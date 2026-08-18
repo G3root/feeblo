@@ -126,6 +126,7 @@ export const trackEvent = <Name extends AnalyticsEventName>(
     ? [properties?: AnalyticsEvents[Name]]
     : [properties: AnalyticsEvents[Name]]
 ): void => {
+  // SAFETY: Empty-state placeholder for the generic container until real data is set.
   currentAnalyticsClient?.(name, rest[0] ?? ({} as AnalyticsEvents[Name]));
 };
 

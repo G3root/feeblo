@@ -27,7 +27,7 @@ export const { getClientHintCheckScript, getHints } = hintUtils;
 //TODO use a cookie parser
 export const getClientTimeZone = (): string | undefined => {
   if (
-    typeof document === "undefined" ||
+    !("document" in globalThis) ||
     !document.cookie
       .split(";")
       .some((cookie) => cookie.trim().startsWith(`${timeZoneHintCookieName}=`))

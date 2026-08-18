@@ -16,9 +16,11 @@ export type ReactionEmoji = ReactionEmojiName;
 export type ReactionEmojiValue =
   (typeof REACTION_EMOJI_BY_NAME)[ReactionEmojiName];
 
-export const REACTION_EMOJIS = Object.keys(
-  REACTION_EMOJI_BY_NAME
-) as readonly ReactionEmoji[];
+export const REACTION_EMOJIS = (
+  /* SAFETY: Object.keys of the constant map yields exactly the emoji-name
+     literals the schema reuses. */
+  Object.keys(REACTION_EMOJI_BY_NAME) as readonly ReactionEmoji[]
+);
 
 export function getReactionEmoji(emoji: ReactionEmoji): ReactionEmojiValue {
   return REACTION_EMOJI_BY_NAME[emoji];

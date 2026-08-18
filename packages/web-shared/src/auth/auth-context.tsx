@@ -1,3 +1,4 @@
+import { hasWindow } from "@feeblo/utils/runtime-kind";
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import type { AuthClientSession } from "@feeblo/auth/client";
 import * as Option from "effect/Option";
@@ -125,7 +126,7 @@ export function AuthProvider({
     [initialHint]
   );
 
-  if (typeof window === "undefined") {
+  if (!hasWindow()) {
     return (
       <AuthContext.Provider value={serverState}>
         {children}

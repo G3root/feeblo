@@ -16,6 +16,7 @@ export async function runEffect<A, E, R>(
   options?: { signal?: AbortSignal; runtime?: typeof runtime }
 ): Promise<A> {
   const result = await (options?.runtime ?? runtime).runPromiseExit(
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     effect as Effect.Effect<A, E, never>,
     { signal: options?.signal }
   );

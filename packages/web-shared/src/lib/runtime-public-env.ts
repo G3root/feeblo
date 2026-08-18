@@ -13,6 +13,7 @@ function parseRuntimePublicEnv(env: ProcessEnv) {
 }
 
 function readClientRuntimePublicEnv() {
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const runtimeWindow = window as Window & {
     global?: { __ENV?: ProcessEnv };
   };

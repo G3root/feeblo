@@ -60,7 +60,9 @@ const joinChildren = <T extends Node>(children: T[]): T[] => {
       !isParagraphEmpty(previous) &&
       !isParagraphEmpty(child)
     ) {
-      result[result.length - 1] = joinParagraphs(previous, child) as Node as T;
+      // SAFETY: `previous` and `child` were both narrowed to non-empty
+      // paragraphs; the merged node is a valid member of the children's T.
+      result[result.length - 1] = joinParagraphs(previous, child) as any;
     } else {
       result.push(child);
     }

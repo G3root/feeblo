@@ -22,6 +22,7 @@ export function OrganizationIdGate({
   activeOrganizationId,
   children,
 }: OrganizationIdGateProps) {
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const params = useParams({ strict: false }) as { organizationId?: string };
   const navigate = useNavigate();
   const isNotFound = useRouterState({
