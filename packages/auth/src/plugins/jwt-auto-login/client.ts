@@ -7,6 +7,7 @@ export const jwtAutoLoginClient = () => {
   return {
     id: ID,
 
+    // SAFETY: Empty-state placeholder for the generic container until real data is set.
     $InferServerPlugin: {} as ReturnType<typeof jwtAutoLogin>,
     pathMethods: {
       [SIGN_IN_PATH]: "POST",

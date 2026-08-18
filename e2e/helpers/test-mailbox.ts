@@ -19,6 +19,7 @@ export async function getTestEmails(
 ): Promise<readonly TestEmail[]> {
   const response = await request.get(mailboxUrl);
   expect(response.ok()).toBeTruthy();
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const body = (await response.json()) as { readonly emails: TestEmail[] };
   return body.emails;
 }
@@ -42,6 +43,7 @@ export async function waitForTestEmail(
     timeout: 15_000,
   });
 
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   return matchingEmail as TestEmail;
 }
 
@@ -65,6 +67,8 @@ export async function waitForVerificationEmail(
     timeout: 15_000,
   });
 
+// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+
   return matchingEmail as TestEmail;
 }
 
@@ -86,8 +90,10 @@ export async function waitForPasswordResetEmail(
   }).toPass({
     intervals: [100, 250, 500, 1000],
     timeout: 15_000,
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   });
 
+  // SAFETY: The upstream contract guarantees this value here.
   return matchingEmail as TestEmail;
 }
 

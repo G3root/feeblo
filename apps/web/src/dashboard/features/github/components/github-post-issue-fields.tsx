@@ -22,6 +22,7 @@ type GitHubRepositoryFieldProps = {
 
 export const GitHubConnectionField = withForm({
   ...githubPostIssueFormOpts,
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   props: { connections: [] } as GitHubConnectionFieldProps,
   render: ({ form, connections }) => (
     <form.AppField
@@ -71,6 +72,7 @@ export const GitHubConnectionField = withForm({
 
 export const GitHubRepositoryField = withForm({
   ...githubPostIssueFormOpts,
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   props: {
     disabled: false,
     repositories: [],

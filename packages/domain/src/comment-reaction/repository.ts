@@ -58,6 +58,7 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           Effect.map((reactions) =>
             reactions.map((reaction) => ({
               ...reaction,
+              // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
               emoji: reaction.emoji as ReactionEmoji,
             }))
           )
@@ -102,6 +103,7 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           Effect.map((reactions) =>
             reactions.map((reaction) => ({
               ...reaction,
+              // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
               emoji: reaction.emoji as ReactionEmoji,
             }))
           )

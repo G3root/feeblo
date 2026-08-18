@@ -99,6 +99,7 @@ function DiscordSettingsContent({
   } = useAsyncList<DiscordConnection>(connectionsResult);
   const statusResult = useAtomValue(discordStatusAtom);
   const discordConfigured = AsyncResult.match(statusResult, {
+    // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
     onInitial: () => null as boolean | null,
     onFailure: () => false,
     onSuccess: ({ value }) => value,

@@ -75,6 +75,7 @@ export const deliveryHistoryRefreshAtom = Atom.family(
 export const deliveriesAtom = Atom.family((args: DeliveryHistoryArgs) =>
   Atom.pull((get) => {
     get(deliveryHistoryRefreshAtom(args));
+    // SAFETY: Absent-value placeholder: undefined is valid until the async source resolves.
     return Stream.paginate(undefined as string | undefined, (cursor) =>
       Effect.tryPromise(() =>
         loadDeliveries(args.organizationId, args.connectionId, cursor)

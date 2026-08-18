@@ -20,5 +20,6 @@ export async function setPlan(
 
   expect(response.ok()).toBeTruthy();
 
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   return (await response.json()) as { plan: "starter" | "professional" };
 }

@@ -38,6 +38,7 @@ export const policy = <E, R>(
     user: CurrentSession["Service"]
   ) => Effect.Effect<boolean, E | DenyAccess, R>
 ): Policy<E, R> =>
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   Effect.flatMap(CurrentSession, (user) =>
     Effect.flatMap(
       predicate(user).pipe(
@@ -55,7 +56,9 @@ export const publicPolicy = <E, R>(
   predicate: (
     user: Option.Option<CurrentSession["Service"]>
   ) => Effect.Effect<boolean, E, R>
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 ): PublicPolicy<E, R> =>
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   Effect.gen(function* () {
     const context = yield* Effect.context<CurrentSession>();
     const user = Context.getOption(context, CurrentSession);

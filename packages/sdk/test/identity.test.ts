@@ -17,6 +17,7 @@ describe("normalizeUserIdentity", () => {
       normalizeUserIdentity({ id: "" });
     } catch (err) {
       expect(err).toBeInstanceOf(EmbedError);
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       expect((err as EmbedError).code).toBe("INVALID_IDENTITY");
     }
   });
@@ -52,6 +53,7 @@ describe("normalizeUserIdentity", () => {
     const result = normalizeUserIdentity({
       id: "user_1",
       companies: [
+        // SAFETY: Test fixture seam: `any` deliberately bridges the fixture to the API at the test boundary.
         {
           id: "comp_1",
           name: "Acme Inc",

@@ -20,6 +20,7 @@ export function SettingsLayout({ children }: { children: React.ReactNode }) {
       <SidebarProvider
         className="h-dvh overflow-hidden"
         style={
+          // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
           {
             "--sidebar-width": "calc(var(--spacing) * 64)",
             "--header-height": "calc(var(--spacing) * 12)",

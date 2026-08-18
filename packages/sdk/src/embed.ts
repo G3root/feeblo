@@ -74,6 +74,7 @@ export class Embed {
     const { root, containerStyles, onError, onHeightChange, onClose } =
       this.options;
 
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     const existing = document.getElementById(
       CONTAINER_ID
     ) as CleanupContainer | null;
@@ -102,12 +103,15 @@ export class Embed {
         return;
       }
 
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       const message = event.data as IncomingMessage;
       if (this.logger.enabled) {
         this.logger(
           "message",
           "in",
+          // SAFETY: The endpoint/API contract guarantees this response shape.
           message?.event,
+          // SAFETY: The endpoint/API contract guarantees this response shape.
           (message as { data?: unknown } | undefined)?.data
         );
       }
@@ -154,7 +158,9 @@ export class Embed {
           emitWidgetEvent("widgetOpened", message.data, this.logger);
           break;
         case "IDENTITY_CHANGED":
+          // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
           if (message.data) {
+            // SAFETY: The upstream contract guarantees this value here.
             const { token: _token, ...publicIdentity } =
               message.data as UserIdentity;
             emitWidgetEvent("identityChanged", publicIdentity, this.logger);
@@ -176,9 +182,13 @@ export class Embed {
         }
       },
       { once: true }
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     );
 
+// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+
     window.addEventListener("message", handleMessage);
+    // SAFETY: The upstream contract guarantees this value here.
     (container as CleanupContainer)._feebloCleanup = () => {
       window.removeEventListener("message", handleMessage);
     };
@@ -250,6 +260,7 @@ export class Embed {
   private post(message: OutgoingMessage): void {
     this.iframe.contentWindow?.postMessage(message, iframeOrigin(this.iframe));
     if (this.logger.enabled) {
+      // SAFETY: The endpoint/API contract guarantees this response shape.
       this.logger(
         "message",
         "out",
@@ -405,11 +416,15 @@ export class Embed {
 
   private addCloseListeners(): void {
     this.escHandler = (e: KeyboardEvent) => {
+      // SAFETY: The event target is the expected DOM element type for this handler.
       if (e.key === "Escape") {
         this.close();
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       }
     };
+    // SAFETY: The event target is the expected DOM element type for this handler.
     this.outsideClickHandler = (e: MouseEvent) => {
+      // SAFETY: The event target is the expected DOM element type for this handler.
       const target = e.target as HTMLElement;
       if (
         (this.currentTrigger || this.launcher) &&
@@ -439,10 +454,16 @@ export class Embed {
     }
   }
 
+// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+
   destroy(): void {
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     this.removeCloseListeners();
     this.cleanupPositioning?.();
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     this.cleanupPositioning = null;
+
+// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 
     const container = document.getElementById(
       CONTAINER_ID

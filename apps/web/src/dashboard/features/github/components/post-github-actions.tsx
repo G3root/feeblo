@@ -77,6 +77,7 @@ function GitHubPostResourceActionsContent({
   const refreshPostExternalResources = usePostExternalResourceRefresh();
   const connectionsResult = useAtomValue(gitHubConnectionsAtom(organizationId));
   const hasActiveConnection = AsyncResult.match(connectionsResult, {
+    // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
     onInitial: () => null as boolean | null,
     onFailure: ({ previousSuccess }) =>
       Option.match(previousSuccess, {
@@ -145,6 +146,7 @@ function GitHubPostIssueDialog({
 }) {
   const connectionsResult = useAtomValue(gitHubConnectionsAtom(organizationId));
   const connections = AsyncResult.match(connectionsResult, {
+    // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
     onInitial: () => null as readonly GitHubConnection[] | null,
     onFailure: ({ previousSuccess }) =>
       Option.getOrNull(previousSuccess)?.value ?? [],
@@ -260,11 +262,13 @@ function GitHubPostIssueForm({
     gitHubRepositoriesAtom({ organizationId, connectionId })
   );
   const repositories = AsyncResult.match(repositoriesResult, {
+    // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
     onInitial: () => ({
       list: [] as readonly GitHubRepository[],
       isLoading: true,
     }),
     onFailure: ({ previousSuccess }) =>
+      // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       Option.match(previousSuccess, {
         onNone: () => ({
           list: [] as readonly GitHubRepository[],

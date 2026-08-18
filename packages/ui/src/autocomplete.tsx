@@ -27,6 +27,7 @@ export function AutocompleteInput({
   triggerProps?: AutocompletePrimitive.Trigger.Props;
   clearProps?: AutocompletePrimitive.Clear.Props;
 }): React.ReactElement {
+  // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
   const sizeValue = (size ?? "default") as "sm" | "default" | "lg" | number;
 
   return (

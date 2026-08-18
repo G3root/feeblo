@@ -52,6 +52,7 @@ describe("renderChannelUpdateMessageBlocks", () => {
       ...message,
       title: "x".repeat(200),
     });
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     const header = blocks[0] as { text: { text: string } };
     expect(header.text.text.length).toBeLessThanOrEqual(150);
     expect(header.text.text.endsWith("…")).toBe(true);

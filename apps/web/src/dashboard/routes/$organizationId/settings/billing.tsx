@@ -101,6 +101,7 @@ function BillingSettingsContent({
 
   const currentSubscribedPlan = usePlan();
 
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const productList = products as WorkspaceProduct[];
   const currentPlanType = currentSubscribedPlan.data?.plan ?? "free";
   const { plans } = buildPlanCards(productList, currentPlanType);

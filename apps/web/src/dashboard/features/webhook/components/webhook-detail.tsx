@@ -520,9 +520,11 @@ function DeliveryHistoryTable({
   // whatever pages have streamed in so far, keeping the previous rows visible
   // while the next page (or a refresh) is in flight.
   const deliveries = AsyncResult.match(historyResult, {
+    // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
     onInitial: () => [] as readonly Delivery[],
     onFailure: ({ previousSuccess }) =>
       Option.match(previousSuccess, {
+        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
         onNone: () => [] as readonly Delivery[],
         onSome: ({ value }) => value.items,
       }),

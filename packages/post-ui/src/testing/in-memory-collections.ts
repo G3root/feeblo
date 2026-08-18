@@ -51,6 +51,7 @@ export function createMockCollection<T extends object>({
       }
       handle();
     },
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     write: ((value) => {
       const handle = write;
       if (!handle) {

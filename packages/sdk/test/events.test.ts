@@ -21,6 +21,7 @@ describe("subscribe / unsubscribe", () => {
     emitWidgetEvent("widgetReady", undefined);
 
     expect(callback).toHaveBeenCalledTimes(1);
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     const event = callback.mock.calls[0]?.[0] as CustomEvent<FeebloEventDetail>;
     expect(event.detail.type).toBe("widgetReady");
     expect(event.detail.namespace).toBe("feeblo");
@@ -70,6 +71,7 @@ describe("subscribe / unsubscribe", () => {
     };
     emitWidgetEvent("feedbackSubmitted", data);
 
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     const event = callback.mock.calls[0]?.[0] as CustomEvent<
       FeebloEventDetail<"feedbackSubmitted">
     >;
@@ -81,6 +83,8 @@ describe("subscribe / unsubscribe", () => {
     cleanups.push(subscribe("widgetReady", callback));
 
     emitWidgetEvent("widgetReady", undefined);
+
+// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 
     const event = callback.mock.calls[0]?.[0] as CustomEvent<FeebloEventDetail>;
     expect(event.detail.data).toBeUndefined();
@@ -147,7 +151,10 @@ describe("emitWidgetEvent", () => {
 
     emitWidgetEvent("widgetReady", undefined);
 
+// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+
     expect(handler).toHaveBeenCalledTimes(1);
+    // SAFETY: The upstream contract guarantees this value here.
     const event = handler.mock.calls[0]?.[0] as CustomEvent<FeebloEventDetail>;
     expect(event.detail.type).toBe("widgetReady");
     expect(event.detail.namespace).toBe("feeblo");

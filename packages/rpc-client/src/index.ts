@@ -11,6 +11,7 @@ import * as RpcSerialization from "effect/unstable/rpc/RpcSerialization";
 /** Fetch client that sends cookies (needed for BetterAuth session) */
 export const FetchWithCredentials = FetchHttpClient.layer.pipe(
   Layer.provide(
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     Layer.succeed(FetchHttpClient.RequestInit, {
       credentials: "include",
     } as RequestInit)

@@ -27,6 +27,7 @@ export const RoadmapVisibilityField = withForm({
 
             <Select
               onValueChange={(value) =>
+                // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
                 field.handleChange(value as "public" | "private")
               }
               value={field.state.value}

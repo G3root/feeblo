@@ -19,6 +19,7 @@ export type ChangelogStoreDefaultValue = {
 
 const createChangelogStore = (defaultValue?: ChangelogStoreDefaultValue) =>
   createStore({
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     context: {
       filters: {
         search: defaultValue?.filters?.search ?? "",

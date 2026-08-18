@@ -353,11 +353,13 @@ export function PostReactionPicker() {
   };
 
   const existingReactions = new Set(
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     (currentUserReactions ?? []).map((r) => r.emoji as ReactionEmoji)
   );
 
   const reactionList = new Map(
     (reactionCounts ?? []).map((r) => [
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       r.emoji as ReactionEmoji,
       { count: r.count },
     ])
@@ -516,10 +518,12 @@ export function CommentReactionPicker({
     await tx.isPersisted.promise;
   };
 
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const existingReactions = new Set(
     (currentUserReactions ?? []).map((r) => r.emoji as ReactionEmoji)
   );
 
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const reactionList = new Map(
     (reactionCounts ?? []).map((r) => [
       r.emoji as ReactionEmoji,

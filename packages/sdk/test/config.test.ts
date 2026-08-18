@@ -39,12 +39,14 @@ describe("normalizeWidgetConfig", () => {
 
   it("rejects an unrecognized mode", () => {
     expect(() =>
+      // SAFETY: Test fixture: `never` marks an intentionally unsupported input to assert rejection.
       normalizeWidgetConfig({ mode: "unsupported" as never })
     ).toThrow(EmbedError);
   });
 
   it("rejects an unrecognized placement", () => {
     expect(() =>
+      // SAFETY: Test fixture: `never` marks an intentionally unsupported input to assert rejection.
       normalizeWidgetConfig({ placement: "unsupported" as never })
     ).toThrow(EmbedError);
   });

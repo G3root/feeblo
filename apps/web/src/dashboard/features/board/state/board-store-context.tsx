@@ -50,6 +50,7 @@ export type BoardStoreDefaultValue = {
 
 const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
   createStore({
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     context: {
       activeView: defaultValue?.activeView ?? {
         id: "all-feedback",

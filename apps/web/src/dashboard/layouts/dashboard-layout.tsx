@@ -112,6 +112,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                             <SidebarProvider
                               className="h-dvh overflow-hidden"
                               style={
+                                // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
                                 {
                                   "--sidebar-width":
                                     "calc(var(--spacing) * 72)",

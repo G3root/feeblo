@@ -121,6 +121,7 @@ function GitHubSettingsContent({
     gitHubConnectionsAtom(organizationId)
   );
   const configured = AsyncResult.match(statusResult, {
+    // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
     onInitial: () => null as boolean | null,
     onFailure: () => false,
     onSuccess: ({ value }) => value,

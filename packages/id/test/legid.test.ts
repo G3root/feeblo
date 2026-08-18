@@ -110,6 +110,7 @@ describe("makeId", () => {
           );
 
         expect(result).toBeInstanceOf(LegidError);
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
         expect((result as LegidError).message).toBe(
           "ID must contain a prefix separator '_'"
         );
@@ -125,6 +126,7 @@ describe("makeId", () => {
           );
 
         expect(result).toBeInstanceOf(LegidError);
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
         expect((result as LegidError).message).toBe('ID prefix must be "pst"');
       })
     );

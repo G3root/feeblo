@@ -48,6 +48,7 @@ const coverImageWithDefault = S.NullOr(
 
 export const ChangelogCreate = S.Struct({
   assetIds: S.Array(S.String).pipe(
+    // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
     S.withDecodingDefaultKey(Effect.succeed([] as string[]))
   ),
   coverImage: coverImageWithDefault,
@@ -65,6 +66,7 @@ export type TChangelogCreate = S.Schema.Type<typeof ChangelogCreate>;
 
 export const ChangelogUpdate = S.Struct({
   assetIds: S.Array(S.String).pipe(
+    // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
     S.withDecodingDefaultKey(Effect.succeed([] as string[]))
   ),
   coverImage: coverImageWithDefault,

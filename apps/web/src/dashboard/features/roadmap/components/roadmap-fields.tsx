@@ -202,6 +202,7 @@ function RoadmapColumnItem({
                         <FieldLabel>Status</FieldLabel>
                         <Select
                           onValueChange={(value) =>
+                            // SAFETY: The upstream contract guarantees a string here.
                             subField.handleChange(value as string)
                           }
                           value={subField.state.value}

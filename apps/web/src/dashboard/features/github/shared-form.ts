@@ -43,6 +43,7 @@ export type GitHubPostIssueFormValues = z.infer<
 
 export const githubPostIssueFormOpts = formOptions({
   defaultValues: {
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     action: "create" as GitHubPostIssueAction,
     connectionId: "",
     repositoryFullName: "",

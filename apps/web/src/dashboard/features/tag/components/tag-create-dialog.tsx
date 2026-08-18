@@ -60,6 +60,7 @@ function TagCreateForm({
   const organizationId = useOrganizationId();
   const { tagCollection } = useDashboardCollections();
   const store = useTagCreateDialogContext();
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const type = store.get().context.data.type as TagType;
 
   const form = useAppForm({

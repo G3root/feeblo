@@ -62,6 +62,7 @@ export function IntegrationCard<C extends IntegrationConnection>({
   const statusResult = useAtomValue(config.statusAtom);
 
   const configured = AsyncResult.match(statusResult, {
+    // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
     onInitial: () => null as boolean | null,
     onFailure: () => false,
     onSuccess: ({ value }) => value,
@@ -71,12 +72,14 @@ export function IntegrationCard<C extends IntegrationConnection>({
     connectionsResult,
     {
       onInitial: () => ({
+        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
         connections: [] as readonly C[],
         isLoading: true,
         loadFailed: false,
       }),
       onFailure: ({ previousSuccess }) =>
         Option.match(previousSuccess, {
+          // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
           onNone: () => ({
             connections: [] as readonly C[],
             isLoading: false,
