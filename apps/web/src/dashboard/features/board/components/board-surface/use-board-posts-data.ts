@@ -21,7 +21,7 @@ import type { BoardPostRow } from "./types";
 const STATUSES_BY_PRESET = {
   active: ["PLANNED", "IN_PROGRESS"],
   backlog: ["PENDING", "REVIEW"],
-} satisfies ecord<Exclude<BoardPostStatusFilter, "all">, BoardPostStatus[]>;
+} satisfies Record<Exclude<BoardPostStatusFilter, "all">, BoardPostStatus[]>;
 
 function filterPostStatusesByPreset(
   statuses: ReadonlyArray<{ id: string; type: BoardPostStatus }>,

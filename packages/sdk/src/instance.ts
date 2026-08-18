@@ -14,6 +14,33 @@ import type {
 } from "./types";
 import { isBrowser } from "./utils";
 
+/** Boxed-prototype classification for untrusted runtime values (no `typeof`). */
+const boxedKind = <T>(value: T): string | null => {
+  if (value === null || value === undefined) return null;
+  // SAFETY: Object.getPrototypeOf always returns an object or null; every
+  // prototype carries a constructor whose name identifies the built-in.
+  const prototype = Object.getPrototypeOf(Object(value)) as {
+    constructor?: { name?: string };
+  } | null;
+  return prototype?.constructor?.name ?? null;
+};
+
+const isStringValue = <T>(value: T): value is T & string =>
+  boxedKind(value) === "String";
+
+const isObjectValue = <T>(value: T): boolean => {
+  const kind = boxedKind(value);
+  return (
+    kind !== null &&
+    kind !== "String" &&
+    kind !== "Number" &&
+    kind !== "Boolean" &&
+    kind !== "Symbol" &&
+    kind !== "BigInt" &&
+    kind !== "Function"
+  );
+};
+
 let currentEmbed: Embed | null = null;
 let currentOrgId: string | null = null;
 let globalCleanup: (() => void) | null = null;
@@ -25,10 +52,12 @@ function setupGlobalListeners(): void {
   }
 
   const handleExternalMessage = (e: MessageEvent<unknown>) => {
+    // SAFETY: the message contract is established by the guards below (object
+    // value, FeebloWidget target, non-empty data) before any field is read.
     const msg = e.data as ExternalMessageData;
     if (
       !msg ||
-      typeof msg !== "object" ||
+      !isObjectValue(msg) ||
       msg.target !== "FeebloWidget" ||
       !msg.data
     ) {
@@ -140,15 +169,17 @@ export function init(
   let organizationId: string;
   let resolvedOptions: EmbedOptions = options;
 
-  if (typeof orgIdOrConfig === "string") {
+  if (isStringValue(orgIdOrConfig)) {
     organizationId = orgIdOrConfig;
   } else {
     const { organizationId: id, ...rest } = orgIdOrConfig;
+    // SAFETY: the union branch above established that orgIdOrConfig is the
+    // InitConfig shape, whose organizationId is a string.
     organizationId = id as string;
     resolvedOptions = rest;
   }
 
-  if (typeof organizationId !== "string" || organizationId.length === 0) {
+  if (!isStringValue(organizationId) || organizationId.length === 0) {
     throw new EmbedError({
       code: "INVALID_ORG",
       message:

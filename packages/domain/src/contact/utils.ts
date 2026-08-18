@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
+import type { JWTPayload } from "jose";
 
 import type {
   TCompanyAttributeDefinition,
@@ -15,6 +16,22 @@ import { CommonContactFields } from "./schema";
 
 export type AttributeValue = string | number | boolean | Date | null;
 
+/** Untrusted identity-token payload: arbitrary claims plus the standard fields. */
+export interface AttributeSource {
+  readonly [key: string]: AttributeSourceValue;
+}
+
+/** Value space of untrusted identity-token payloads (JSON-ish, no class instances). */
+export type AttributeSourceValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | JWTPayload
+  | AttributeSource
+  | readonly AttributeSource[];
+
 export const AttributeValueColumns = S.Struct({
   valueText: S.NullOr(S.String),
   valueInteger: S.NullOr(S.Number),
@@ -25,6 +42,13 @@ export const AttributeValueColumns = S.Struct({
 
 export type AttributeValueColumns = S.Schema.Type<typeof AttributeValueColumns>;
 
+const isStringValue = (value: AttributeSourceValue): value is string =>
+  Object(value) instanceof String;
+const isBooleanValue = (value: AttributeSourceValue): value is boolean =>
+  Object(value) instanceof Boolean;
+
+// SAFETY: the prototype of a boxed primitive exactly mirrors its type, so
+// the narrowed view below is sound for every AttributeSourceValue.
 export function buildAttributeValueColumns(
   value: AttributeValue | undefined
 ): AttributeValueColumns {
@@ -38,7 +62,17 @@ export function buildAttributeValueColumns(
     };
   }
 
-  if (typeof value === "string") {
+  if (value instanceof Date) {
+    return {
+      valueText: null,
+      valueInteger: null,
+      valueDecimal: null,
+      valueBoolean: null,
+      valueDate: value,
+    };
+  }
+
+  if (isStringValue(value)) {
     return {
       valueText: value,
       valueInteger: null,
@@ -48,7 +82,7 @@ export function buildAttributeValueColumns(
     };
   }
 
-  if (typeof value === "boolean") {
+  if (isBooleanValue(value)) {
     return {
       valueText: null,
       valueInteger: null,
@@ -58,43 +92,38 @@ export function buildAttributeValueColumns(
     };
   }
 
-  if (typeof value === "number") {
-    if (Number.isInteger(value)) {
-      return {
-        valueText: null,
-        valueInteger: value,
-        valueDecimal: null,
-        valueBoolean: null,
-        valueDate: null,
-      };
-    }
+  if (Number.isInteger(value)) {
     return {
       valueText: null,
-      valueInteger: null,
-      valueDecimal: value,
+      valueInteger: value,
+      valueDecimal: null,
       valueBoolean: null,
       valueDate: null,
     };
   }
-
   return {
     valueText: null,
     valueInteger: null,
-    valueDecimal: null,
+    valueDecimal: value,
     valueBoolean: null,
-    valueDate: value,
+    valueDate: null,
   };
 }
 
+/** Source object accepted by `toMutableConfig` before schema validation. */
+export type AttributeConfigSource = Readonly<
+  Record<string, string | number | boolean | null | undefined>
+>;
+
 export function toMutableConfig(
-  config: Record<string, unknown> | undefined | null
-): { min?: number; max?: number; pattern?: string } | null {
+  config: AttributeConfigSource | undefined | null
+): S.Schema.Type<typeof AttributeConfig> | null {
   if (config === null || config === undefined) {
     return null;
   }
   return S.decodeUnknownSync(AttributeConfig)(config, {
     onExcessProperty: "ignore",
-  }) as { min?: number; max?: number; pattern?: string };
+  });
 }
 
 export type ParsedAttribute = {
@@ -165,7 +194,9 @@ const valueSchemaForDefinition = (
                 message: `configured validation pattern "${pattern}" is invalid`,
               })
             );
-            return schema as unknown as S.Codec<AttributeValue>;
+            // SAFETY: the checked schema still decodes to `string`, which is a
+            // member of AttributeValue, so the widening is lossless.
+            return schema as S.Codec<AttributeValue>;
           }
           schema = schema.check(
             S.isPattern(expression, {
@@ -174,7 +205,9 @@ const valueSchemaForDefinition = (
           );
         }
       }
-      return schema as unknown as S.Codec<AttributeValue>;
+      // SAFETY: the checked schema still decodes to `string`, which is a
+      // member of AttributeValue, so the widening is lossless.
+      return schema as S.Codec<AttributeValue>;
     }
     case "INTEGER": {
       let schema: S.Codec<number> = S.Number.check(
@@ -196,7 +229,8 @@ const valueSchemaForDefinition = (
           })
         );
       }
-      return schema as unknown as S.Codec<AttributeValue>;
+      // SAFETY: the result decodes to `number`, a member of AttributeValue.
+      return schema as S.Codec<AttributeValue>;
     }
     case "DECIMAL": {
       let schema: S.Codec<number> = S.Number.check(
@@ -218,29 +252,30 @@ const valueSchemaForDefinition = (
           })
         );
       }
-      return schema as unknown as S.Codec<AttributeValue>;
+      // SAFETY: the result decodes to `number`, a member of AttributeValue.
+      return schema as S.Codec<AttributeValue>;
     }
     case "BOOLEAN": {
-      return S.Boolean as unknown as S.Codec<AttributeValue>;
+      // SAFETY: the result decodes to `boolean`, a member of AttributeValue.
+      return S.Boolean as S.Codec<AttributeValue>;
     }
     case "DATE": {
       // S.Date already rejects NaN/invalid Date instances, and S.DateFromString
       // fails to decode garbage strings into a valid date, so no extra
       // validity filter is needed.
-      return S.Union([
-        S.Date,
-        S.DateFromString,
-      ]) as unknown as S.Codec<AttributeValue>;
+      // SAFETY: both members decode to `Date`, a member of AttributeValue.
+      return S.Union([S.Date, S.DateFromString]) as S.Codec<AttributeValue>;
     }
     default: {
-      return S.Never as unknown as S.Codec<AttributeValue>;
+      // SAFETY: Never rejects every value, so any target type is sound.
+      return S.Never as S.Codec<AttributeValue>;
     }
   }
 };
 
 const validateSingleAttribute = (
   definition: AttributeDefinition,
-  raw: unknown
+  raw: AttributeSourceValue
 ): Effect.Effect<AttributeValue, DataValidationError> =>
   Effect.gen(function* () {
     if (raw === null || raw === undefined) {
@@ -265,7 +300,7 @@ const validateSingleAttribute = (
 
 const validateRequiredAttributes = (
   definitions: readonly AttributeDefinition[],
-  data: Record<string, unknown>
+  data: AttributeSource
 ): Effect.Effect<void, DataValidationError> => {
   const missing = definitions
     .filter((d) => d.isRequired && !(d.key in data))
@@ -276,7 +311,7 @@ const validateRequiredAttributes = (
 };
 
 const parseCustomAttributes = (
-  customFields: Record<string, unknown>,
+  customFields: AttributeSource,
   definitions: readonly AttributeDefinition[],
   knownFields: ReadonlySet<string>
 ): Effect.Effect<ParsedAttribute[], DataValidationError> =>
@@ -311,21 +346,25 @@ const parseCustomAttributes = (
   });
 
 export const parseContactCustomAttributes = (
-  data: Record<string, unknown>,
+  data: JWTPayload,
   definitions: readonly TContactAttributeDefinition[]
 ): Effect.Effect<ParsedAttribute[], DataValidationError> =>
   parseCustomAttributes(
-    asRecord(data.customFields),
+    // SAFETY: token claims are untrusted; asRecord validates the shape and
+    // falls back to `{}` for anything that is not a plain object.
+    asRecord(data.customFields as AttributeSourceValue),
     definitions,
     KNOWN_CONTACT_FIELDS
   );
 
 export const parseCompanyCustomAttributes = (
-  data: Record<string, unknown>,
+  data: JWTPayload,
   definitions: readonly TCompanyAttributeDefinition[]
 ): Effect.Effect<ParsedAttribute[], DataValidationError> =>
   parseCustomAttributes(
-    asRecord(data.customFields),
+    // SAFETY: token claims are untrusted; asRecord validates the shape and
+    // falls back to `{}` for anything that is not a plain object.
+    asRecord(data.customFields as AttributeSourceValue),
     definitions,
     KNOWN_COMPANY_FIELDS
   );
@@ -333,7 +372,7 @@ export const parseCompanyCustomAttributes = (
 const decodeCommonFields = <A>(
   schema: S.Codec<A, any, never, never>,
   kind: string,
-  fields: Record<string, unknown>
+  fields: AttributeSource
 ): Effect.Effect<A, DataValidationError> =>
   S.decodeUnknownEffect(schema)(fields, { onExcessProperty: "ignore" }).pipe(
     Effect.mapError(
@@ -344,13 +383,24 @@ const decodeCommonFields = <A>(
     )
   );
 
-const asRecord = (raw: unknown): Record<string, unknown> =>
-  typeof raw === "object" && raw !== null && !Array.isArray(raw)
-    ? (raw as Record<string, unknown>)
-    : {};
+const asRecord = (
+  raw: AttributeSourceValue | null | undefined
+): AttributeSource => {
+  if (
+    raw !== null &&
+    raw !== undefined &&
+    !Array.isArray(raw) &&
+    Object.getPrototypeOf(Object(raw)) === Object.prototype
+  ) {
+    // SAFETY: the checks above establish that `raw` is a non-array plain
+    // object, which is exactly the AttributeSource contract its callers read.
+    return raw as AttributeSource;
+  }
+  return {};
+};
 
 const parseSingleCompany = (
-  raw: unknown,
+  raw: AttributeSourceValue,
   definitions: readonly TCompanyAttributeDefinition[]
 ): Effect.Effect<ParsedCompanyAttributes, DataValidationError> =>
   Effect.gen(function* () {
@@ -376,7 +426,7 @@ const parseSingleCompany = (
   });
 
 const parseCompanies = (
-  companies: unknown,
+  companies: AttributeSourceValue,
   definitions: readonly TCompanyAttributeDefinition[]
 ): Effect.Effect<ParsedCompanyAttributes[], DataValidationError> =>
   Array.isArray(companies) && companies.length > 0
@@ -387,7 +437,7 @@ const parseCompanies = (
     : Effect.succeed([]);
 
 export function parsePersonAttributes(
-  data: unknown,
+  data: JWTPayload | null,
   contactAttributeDefinitions: readonly TContactAttributeDefinition[],
   companyAttributeDefinitions: readonly TCompanyAttributeDefinition[]
 ): Effect.Effect<ParsedPersonAttributes, DataValidationError> {
