@@ -14,7 +14,7 @@ import { roadmapFormOpts } from "../shared-form";
 
 export const RoadmapVisibilityField = withForm({
   ...roadmapFormOpts,
-  render: ({ form }) => {
+  render: function RoadmapVisibilityFieldRender({ form }) {
     const { entitlements, isLoading } = useEntitlements();
     const canUsePrivateRoadmaps =
       isLoading || entitlements.capabilities.privateRoadmaps;

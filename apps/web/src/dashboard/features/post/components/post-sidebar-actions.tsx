@@ -25,7 +25,7 @@ import { createOptimisticAction } from "@tanstack/react-db";
 import { memo, useState } from "react";
 
 import { usePostDeleteDialogContext } from "~/features/post/dialog-stores";
-import { getPublicSiteUrl } from "~/hooks/use-site";
+import { usePublicSiteUrl } from "~/hooks/use-site";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -230,7 +230,7 @@ function ConfirmActionDialog({
 
 function RedirectToPostUrlButton() {
   const { post } = usePostCollectionData();
-  const publicSiteUrl = getPublicSiteUrl();
+  const publicSiteUrl = usePublicSiteUrl();
 
   if (!publicSiteUrl) {
     return null;
@@ -265,7 +265,7 @@ function RedirectToPostUrlButton() {
 
 function CopyPostButton() {
   const { post } = usePostCollectionData();
-  const publicSiteUrl = getPublicSiteUrl();
+  const publicSiteUrl = usePublicSiteUrl();
 
   if (!publicSiteUrl) {
     return null;

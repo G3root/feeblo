@@ -81,7 +81,7 @@ function renderSlugFooter(
 
 export const RegisterWorkspaceStep = withForm({
   ...registerFormOpts,
-  render: ({ form }) => {
+  render: function RegisterWorkspaceStepRender({ form }) {
     const workspaceName = useStore(
       form.store,
       // SAFETY: The upstream contract guarantees a string here.

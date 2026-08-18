@@ -52,7 +52,7 @@ import {
 } from "react";
 import { z } from "zod";
 
-import { getPublicSiteUrl } from "~/hooks/use-site";
+import { usePublicSiteUrl } from "~/hooks/use-site";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -835,7 +835,7 @@ export function ChangelogEditorCategoryField() {
 export function ChangelogEditorSidebarActions() {
   const { changelog, isOwner } = useChangelogEditor();
   const deleteDialogStore = useChangelogDeleteDialogContext();
-  const publicSiteUrl = getPublicSiteUrl();
+  const publicSiteUrl = usePublicSiteUrl();
 
   return (
     <div className="flex items-center justify-end gap-2">

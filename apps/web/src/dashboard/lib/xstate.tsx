@@ -1,5 +1,9 @@
 import { createStore } from "@xstate/store";
-import { createContext, useContext as useReactContext, useRef } from "react";
+import {
+  createContext,
+  useContext as useReactContext,
+  useState,
+} from "react";
 
 type AnyRecord = object;
 
@@ -48,14 +52,12 @@ export function createStoreContext<TStore, TDefaultValue = undefined>(
 
   const Provider: React.FC<ProviderProps> = (props) => {
     const { children, defaultValue: providerDefaultValue } = props;
-    const store = useRef<TStore | null>(null);
-
-    if (!store.current) {
-      store.current = createStoreForContext(providerDefaultValue);
-    }
+    const [store] = useState(() =>
+      createStoreForContext(providerDefaultValue)
+    );
 
     return (
-      <Context.Provider value={store.current}>{children}</Context.Provider>
+      <Context.Provider value={store}>{children}</Context.Provider>
     );
   };
 

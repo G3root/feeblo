@@ -62,7 +62,7 @@ import {
   useRenameBoardDialogContext,
 } from "~/features/board/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { getPublicSiteUrl } from "~/hooks/use-site";
+import { usePublicSiteUrl } from "~/hooks/use-site";
 import { roadmapCollection } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -479,7 +479,7 @@ function RoadmapNav({ pathname }: { pathname: string }) {
 }
 
 function MyBoardLink() {
-  const publicSiteUrl = getPublicSiteUrl();
+  const publicSiteUrl = usePublicSiteUrl();
 
   if (!publicSiteUrl) {
     return null;

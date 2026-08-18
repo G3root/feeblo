@@ -55,7 +55,7 @@ export const RoadmapFields = withForm({
 
 const RoadmapColumnsSection = withForm({
   ...roadmapFormOpts,
-  render: ({ form }) => {
+  render: function RoadmapColumnsSectionRender({ form }) {
     const organizationId = useOrganizationId();
     const [openItems, setOpenItems] = useState<string[]>([]);
 

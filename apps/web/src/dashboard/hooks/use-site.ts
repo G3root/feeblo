@@ -29,7 +29,7 @@ const getSiteUrl = (subdomain: string) => {
     : undefined;
 };
 
-export const getPublicSiteUrl = () => {
+export const usePublicSiteUrl = () => {
   const site = useSite();
   if (!site?.subdomain) {
     return undefined;

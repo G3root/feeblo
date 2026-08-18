@@ -14,7 +14,7 @@ import { boardFormOpts } from "../shared-form";
 
 export const BoardVisibilityField = withForm({
   ...boardFormOpts,
-  render: ({ form }) => {
+  render: function BoardVisibilityFieldRender({ form }) {
     const { entitlements } = useEntitlements();
     const canUsePrivateBoards = entitlements.capabilities.privateBoards;
 

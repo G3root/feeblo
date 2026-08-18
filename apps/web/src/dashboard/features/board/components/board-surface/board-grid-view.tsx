@@ -19,6 +19,40 @@ const sensors = [
   KeyboardSensor,
 ];
 
+function movePostToColumn(
+  lanes: BoardPostLane[],
+  sourceId: string,
+  targetStatusId: string
+) {
+  const nextItems = structuredClone(lanes);
+  const fromLane = nextItems.find((lane) =>
+    lane.posts.some((post) => post.id === sourceId)
+  );
+  const toLane = nextItems.find((lane) => lane.statusId === targetStatusId);
+
+  if (!(fromLane && toLane) || fromLane.statusId === toLane.statusId) {
+    return lanes;
+  }
+
+  const itemIndex = fromLane.posts.findIndex((post) => post.id === sourceId);
+
+  if (itemIndex === -1) {
+    return lanes;
+  }
+
+  const [movedPost] = fromLane.posts.splice(itemIndex, 1);
+
+  if (!movedPost) {
+    return lanes;
+  }
+
+  movedPost.status = toLane.status;
+  movedPost.statusId = toLane.statusId;
+  toLane.posts.push(movedPost);
+
+  return nextItems;
+}
+
 export function BoardGridView({
   organizationId,
   boardId,
@@ -66,40 +100,6 @@ export function BoardGridView({
     [items]
   );
 
-  const movePostToColumn = (
-    lanes: BoardPostLane[],
-    sourceId: string,
-    targetStatusId: string
-  ) => {
-    const nextItems = structuredClone(lanes);
-    const fromLane = nextItems.find((lane) =>
-      lane.posts.some((post) => post.id === sourceId)
-    );
-    const toLane = nextItems.find((lane) => lane.statusId === targetStatusId);
-
-    if (!(fromLane && toLane) || fromLane.statusId === toLane.statusId) {
-      return lanes;
-    }
-
-    const itemIndex = fromLane.posts.findIndex((post) => post.id === sourceId);
-
-    if (itemIndex === -1) {
-      return lanes;
-    }
-
-    const [movedPost] = fromLane.posts.splice(itemIndex, 1);
-
-    if (!movedPost) {
-      return lanes;
-    }
-
-    movedPost.status = toLane.status;
-    movedPost.statusId = toLane.statusId;
-    toLane.posts.push(movedPost);
-
-    return nextItems;
-  };
-
   const handleDragOver = useCallback<DragDropEventHandlers["onDragOver"]>(
     (event) => {
       const { source, target } = event.operation;
@@ -124,7 +124,7 @@ export function BoardGridView({
         movePostToColumn(currentItems, source.id as string, targetStatusId)
       );
     },
-    [movePostToColumn]
+    []
   );
 
   const handleDragEnd = useCallback<DragDropEventHandlers["onDragEnd"]>(
