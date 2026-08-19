@@ -13,6 +13,10 @@ import { useCommentComposer } from "./context";
 export function VisibilityToggle() {
   const { actions, meta, state } = useCommentComposer();
 
+  if (!state.showVisibilityToggle) {
+    return null;
+  }
+
   const visibilityLabel = state.isPrivate
     ? meta.privateLabel
     : meta.publicLabel;

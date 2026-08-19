@@ -21,7 +21,7 @@ export function PostCommentComposer({
   showVisibilityPicker = false,
 }: PostCommentComposerProps) {
   const { data: session } = useAuthState();
-  const { isLocked } = usePostCollectionData();
+  const { isLocked, isMember } = usePostCollectionData();
   const disabled = isLocked || !session;
   const [editorKey, setEditorKey] = useState(0);
 
@@ -48,6 +48,7 @@ export function PostCommentComposer({
         disabled={disabled}
         form={form}
         resetKey={editorKey}
+        showVisibilityToggle={isMember}
       />
       {isLocked && (
         <Alert variant="info">

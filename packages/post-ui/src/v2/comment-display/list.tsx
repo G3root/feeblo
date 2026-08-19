@@ -7,7 +7,7 @@ import { CommentDisplayItem } from "./list-item";
 
 export function CommentsList() {
   const { data: session } = useAuthState();
-  const { organizationId, post } = usePostCollectionData();
+  const { organizationId, post, isMember } = usePostCollectionData();
   const {
     collections: { commentCollection },
   } = usePostCollections();
@@ -20,11 +20,12 @@ export function CommentsList() {
         .where(({ comment }) =>
           and(
             eq(comment.organizationId, organizationId),
-            eq(comment.postSlug, postSlug)
+            eq(comment.postSlug, postSlug),
+            ...(isMember ? [] : [eq(comment.visibility, "PUBLIC")])
           )
         )
         .orderBy((comment) => comment.comment.createdAt, "desc"),
-    [organizationId, postSlug]
+    [organizationId, postSlug, isMember]
   );
 
   if (isCommentsLoading) {

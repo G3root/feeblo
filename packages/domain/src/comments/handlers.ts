@@ -179,6 +179,10 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     CommentListPublic: (args: TCommentList) =>
       Effect.gen(function* () {
         const sessionOption = yield* OptionalCurrentSession;
+        const isMember = Option.match(sessionOption, {
+          onNone: () => false,
+          onSome: (session) => Policy.isMember(session, args.organizationId),
+        });
         const sessionUserId =
           sessionOption._tag === "Some"
             ? sessionOption.value.session.userId
@@ -187,6 +191,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
         const comments = yield* repository.findManyPublic({
           organizationId: args.organizationId,
           slug: args.slug,
+          includeInternal: isMember,
         });
 
         // Never leak internal commenter identifiers to public callers.

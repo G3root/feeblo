@@ -38,6 +38,7 @@ interface FindManyComments {
 interface FindManyPublicComments {
   organizationId: string;
   slug: string;
+  includeInternal?: boolean;
 }
 const makeCommentRepository = Effect.gen(function* () {
   const db = yield* currentDb;
@@ -81,7 +82,11 @@ const makeCommentRepository = Effect.gen(function* () {
           )
           .where(and(...where));
       }),
-    findManyPublic: ({ organizationId, slug }: FindManyPublicComments) =>
+    findManyPublic: ({
+      organizationId,
+      slug,
+      includeInternal = false,
+    }: FindManyPublicComments) =>
       db
         .select({
           id: schema.commentTable.id,
@@ -116,7 +121,9 @@ const makeCommentRepository = Effect.gen(function* () {
           and(
             eq(schema.commentTable.organizationId, organizationId),
             eq(schema.postTable.slug, slug),
-            eq(schema.commentTable.visibility, "PUBLIC"),
+            ...(includeInternal
+              ? []
+              : [eq(schema.commentTable.visibility, "PUBLIC")]),
             eq(schema.boardTable.visibility, "PUBLIC")
           )
         ),
