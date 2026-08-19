@@ -1,6 +1,5 @@
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogPopup,
   AlertDialogDescription,
@@ -8,6 +7,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
+import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { useSelector } from "@xstate/store-react";
 
@@ -43,11 +43,10 @@ export function CommentVisibilityDialog() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          <Button
             onClick={async () => {
               try {
                 const { commentId, isInternal } = store.get().context.data;
-                store.send({ type: "toggle" });
                 const tx = commentCollection.update(commentId, (draft) => {
                   draft.visibility = isInternal ? "PUBLIC" : "INTERNAL";
                 });
@@ -58,6 +57,7 @@ export function CommentVisibilityDialog() {
                     : "Comment is now internal",
                   type: "success",
                 });
+                store.send({ type: "toggle" });
               } catch {
                 toastManager.add({
                   title: "Failed to update comment visibility",
@@ -65,9 +65,10 @@ export function CommentVisibilityDialog() {
                 });
               }
             }}
+            variant="destructive"
           >
             Continue
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>

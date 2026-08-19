@@ -1,6 +1,5 @@
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogPopup,
   AlertDialogDescription,
@@ -8,6 +7,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
+import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { useSelector } from "@xstate/store-react";
 
@@ -35,17 +35,17 @@ export function CommentDeleteDialog() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          <Button
             onClick={async () => {
               try {
                 const id = store.get().context.data.commentId;
-                store.send({ type: "toggle" });
                 const tx = commentCollection.delete(id);
                 await tx.isPersisted.promise;
                 toastManager.add({
                   title: "Comment deleted successfully",
                   type: "success",
                 });
+                store.send({ type: "toggle" });
               } catch {
                 toastManager.add({
                   title: "Failed to delete comment",
@@ -53,9 +53,10 @@ export function CommentDeleteDialog() {
                 });
               }
             }}
+            variant="destructive"
           >
             Continue
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>
