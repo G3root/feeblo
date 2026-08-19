@@ -139,7 +139,7 @@ describe("PostSubscriptionRpcHandlers", () => {
               handlers
                 .PostSubscriptionList({
                   organizationId: f.organizationId,
-                  postId: f.postId,
+                  slug: f.postId,
                 })
                 .pipe(Effect.provideService(CurrentSession, session(f, false)))
             );
@@ -150,27 +150,34 @@ describe("PostSubscriptionRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* PostSubscriptionRpcHandlersEffect;
           const f = yield* fixture();
-          const input = { organizationId: f.organizationId, postId: f.postId };
+          const listInput = {
+            organizationId: f.organizationId,
+            slug: f.postId,
+          };
+          const mutationInput = {
+            organizationId: f.organizationId,
+            postId: f.postId,
+          };
           expect(
             yield* handlers
-              .PostSubscriptionCreate(input)
+              .PostSubscriptionCreate(mutationInput)
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toEqual({ subscribed: true });
           expect(
             yield* handlers
-              .PostSubscriptionList(input)
+              .PostSubscriptionList(listInput)
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toMatchObject([
             { postId: f.postId, userId: f.userId, memberId: f.membershipId },
           ]);
           expect(
             yield* handlers
-              .PostSubscriptionDelete(input)
+              .PostSubscriptionDelete(mutationInput)
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toEqual({ subscribed: false });
           expect(
             yield* handlers
-              .PostSubscriptionList(input)
+              .PostSubscriptionList(listInput)
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toHaveLength(0);
           const emailSubscription =
@@ -190,7 +197,11 @@ describe("PostSubscriptionRpcHandlers", () => {
           Effect.gen(function* () {
             const handlers = yield* PostSubscriptionRpcHandlersEffect;
             const f = yield* fixture();
-            const input = {
+            const listInput = {
+              organizationId: f.organizationId,
+              slug: f.postId,
+            };
+            const mutationInput = {
               organizationId: f.organizationId,
               postId: f.postId,
             };
@@ -202,7 +213,7 @@ describe("PostSubscriptionRpcHandlers", () => {
 
             const error = yield* Effect.flip(
               handlers
-                .PostSubscriptionCreate(input)
+                .PostSubscriptionCreate(mutationInput)
                 .pipe(
                   Effect.provideService(CurrentSession, invalidEmailSession)
                 )
@@ -211,7 +222,7 @@ describe("PostSubscriptionRpcHandlers", () => {
             expect(error._tag).toBe("InternalServerError");
             expect(
               yield* handlers
-                .PostSubscriptionList(input)
+                .PostSubscriptionList(listInput)
                 .pipe(Effect.provideService(CurrentSession, validSession))
             ).toHaveLength(0);
           })
@@ -221,7 +232,14 @@ describe("PostSubscriptionRpcHandlers", () => {
           const handlers = yield* PostSubscriptionRpcHandlersEffect;
           const f = yield* fixture("PUBLIC");
           const db = yield* currentDb;
-          const input = { organizationId: f.organizationId, postId: f.postId };
+          const listInput = {
+            organizationId: f.organizationId,
+            slug: f.postId,
+          };
+          const mutationInput = {
+            organizationId: f.organizationId,
+            postId: f.postId,
+          };
           const otherUserId = `other_${f.organizationId}`;
           const otherSession: Session = {
             ...session(f, false),
@@ -240,20 +258,20 @@ describe("PostSubscriptionRpcHandlers", () => {
           });
           expect(
             yield* handlers
-              .PostSubscriptionCreatePublic(input)
+              .PostSubscriptionCreatePublic(mutationInput)
               .pipe(Effect.provideService(CurrentSession, session(f, false)))
           ).toEqual({ subscribed: true });
           yield* handlers
-            .PostSubscriptionCreatePublic(input)
+            .PostSubscriptionCreatePublic(mutationInput)
             .pipe(Effect.provideService(CurrentSession, otherSession));
           expect(
             yield* handlers
-              .PostSubscriptionListPublic(input)
+              .PostSubscriptionListPublic(listInput)
               .pipe(Effect.provideService(CurrentSession, session(f, false)))
           ).toMatchObject([{ userId: f.userId, memberId: null }]);
           expect(
             yield* handlers
-              .PostSubscriptionListPublic(input)
+              .PostSubscriptionListPublic(listInput)
               .pipe(Effect.provideService(CurrentSession, session(f, false)))
           ).toHaveLength(1);
         })
@@ -264,16 +282,20 @@ describe("PostSubscriptionRpcHandlers", () => {
           Effect.gen(function* () {
             const handlers = yield* PostSubscriptionRpcHandlersEffect;
             const f = yield* fixture("PRIVATE");
-            const input = {
+            const listInput = {
+              organizationId: f.organizationId,
+              slug: f.postId,
+            };
+            const mutationInput = {
               organizationId: f.organizationId,
               postId: f.postId,
             };
             yield* handlers
-              .PostSubscriptionCreate(input)
+              .PostSubscriptionCreate(mutationInput)
               .pipe(Effect.provideService(CurrentSession, session(f)));
             expect(
               yield* handlers
-                .PostSubscriptionListPublic(input)
+                .PostSubscriptionListPublic(listInput)
                 .pipe(Effect.provideService(CurrentSession, session(f)))
             ).toHaveLength(0);
           })

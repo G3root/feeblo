@@ -657,7 +657,6 @@ export const publicUpvoteCollection = createCollection(
           postId: newUpvote.postId,
         })
       );
-      await publicPostCollection.utils.refetch();
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -669,7 +668,6 @@ export const publicUpvoteCollection = createCollection(
           postId: deletedUpvote.postId,
         })
       );
-      await publicPostCollection.utils.refetch();
     },
   })
 );
@@ -747,13 +745,14 @@ export const publicPostSubscriptionCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const slug =
+        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
 
-      return postId
+      return slug
         ? getOrganizationScopedQueryKey(
             "public-post-subscription",
-            "postId",
-            postId
+            "postSlug",
+            slug
           )
         : getOrganizationScopedQueryKey("public-post-subscription");
     },
@@ -761,14 +760,15 @@ export const publicPostSubscriptionCollection = createCollection(
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const slug =
+        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
 
-      if (!(postId && organizationId)) {
+      if (!(slug && organizationId)) {
         return [];
       }
 
       const data = await fetchRpc(
-        (rpc) => rpc.PostSubscriptionListPublic({ organizationId, postId }),
+        (rpc) => rpc.PostSubscriptionListPublic({ organizationId, slug }),
         {
           signal: ctx.signal,
         }
