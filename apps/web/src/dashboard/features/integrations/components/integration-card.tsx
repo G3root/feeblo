@@ -5,13 +5,13 @@ import { toastManager } from "@feeblo/ui/toast";
 import { LockedIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type HugeiconsIconProps } from "@hugeicons/react";
 import { useRouter } from "@tanstack/react-router";
-import * as Option from "effect/Option";
 import * as Result from "effect/unstable/reactivity/AsyncResult";
 import type * as Atom from "effect/unstable/reactivity/Atom";
 import { useState } from "react";
 
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import { useEntitlements } from "~/hooks/use-entitlements";
+import { useAsyncList } from "~/lib/use-async-list";
 
 /** Minimal shape every provider connection exposes to the card. */
 export type IntegrationConnection = {
@@ -49,6 +49,9 @@ export type IntegrationCardConfig<C extends IntegrationConnection> = {
     organizationId: string
   ) => Atom.Atom<Result.AsyncResult<readonly C[], unknown>>;
   readonly startConnectAtom: StartConnectAtom;
+  readonly startConnectReactivityKeys: (
+    organizationId: string
+  ) => Readonly<Record<string, ReadonlyArray<unknown>>>;
   readonly connectErrorMessage: string;
   readonly connectLabel: (connecting: boolean) => string;
   readonly configureTo: IntegrationConfigureRoute;
@@ -82,36 +85,11 @@ export function IntegrationCard<C extends IntegrationConnection>({
     .onSuccess((value) => value)
     .exhaustive();
 
-  const { connections, isLoading, loadFailed } = Result.builder(
-    connectionsResult
-  )
-    .onInitial(() => ({
-      // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-      connections: [] as readonly C[],
-      isLoading: true,
-      loadFailed: false,
-    }))
-    .onFailure((_, { previousSuccess }) =>
-      Option.match(previousSuccess, {
-        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-        onNone: () => ({
-          connections: [] as readonly C[],
-          isLoading: false,
-          loadFailed: true,
-        }),
-        onSome: ({ value }) => ({
-          connections: value,
-          isLoading: false,
-          loadFailed: false,
-        }),
-      })
-    )
-    .onSuccess((value) => ({
-      connections: value,
-      isLoading: false,
-      loadFailed: false,
-    }))
-    .exhaustive();
+  const {
+    list: connections,
+    isLoading,
+    loadFailed,
+  } = useAsyncList(connectionsResult);
 
   const activeConnections = connections.filter(
     (connection) =>
@@ -124,7 +102,7 @@ export function IntegrationCard<C extends IntegrationConnection>({
     try {
       const { authorizeUrl } = await startConnect({
         payload: { organizationId },
-        reactivityKeys: { integrations: [organizationId] },
+        reactivityKeys: config.startConnectReactivityKeys(organizationId),
       });
       window.location.assign(authorizeUrl.toString());
     } catch {

@@ -42,6 +42,8 @@ import {
   useState,
 } from "react";
 
+import { useAsyncList } from "~/lib/use-async-list";
+
 import {
   type GitHubConnection,
   type GitHubPostStatus,
@@ -61,35 +63,6 @@ import {
   updateGitHubPublishSettingsAtom,
   updateGitHubSyncRuleAtom,
 } from "../atoms";
-
-type AsyncListState<T> = {
-  readonly list: readonly T[];
-  readonly isLoading: boolean;
-  readonly loadFailed: boolean;
-};
-
-function useAsyncList<T>(
-  result: Result.AsyncResult<readonly T[], unknown>
-): AsyncListState<T> {
-  return Result.builder(result)
-    .onInitial(() => ({ list: [], isLoading: true, loadFailed: false }))
-    .onFailure((_, { previousSuccess }) =>
-      Option.match(previousSuccess, {
-        onNone: () => ({ list: [], isLoading: false, loadFailed: true }),
-        onSome: ({ value }) => ({
-          list: value,
-          isLoading: false,
-          loadFailed: false,
-        }),
-      })
-    )
-    .onSuccess((value) => ({
-      list: value,
-      isLoading: false,
-      loadFailed: false,
-    }))
-    .exhaustive();
-}
 
 /** GitHub connection, automatic publishing, and issue-state rule settings. */
 export function GitHubSettings({
@@ -259,6 +232,7 @@ function GitHubConnectionFrame({
         payload: args,
         reactivityKeys: gitHubReactivityKeys(organizationId),
       });
+      setDisconnecting(false);
       setDialogOpen(false);
       onDisconnected();
     } catch {

@@ -1,6 +1,7 @@
 import { RegistryContext, useAtomSet, useAtomValue } from "@effect/atom-react";
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
+import { toastManager } from "@feeblo/ui/toast";
 import { BellDotIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useNavigate } from "@tanstack/react-router";
@@ -78,6 +79,11 @@ function NotificationsList({
                   notificationId: notification.id,
                 },
                 reactivityKeys: notificationReactivityKeys(organizationId),
+              }).catch(() => {
+                toastManager.add({
+                  title: "Could not update notification",
+                  type: "error",
+                });
               });
             }
           }}
@@ -141,10 +147,18 @@ export function NotificationsMenu() {
             {unreadCount > 0 && (
               <Button
                 onClick={async () => {
-                  await markAllRead({
-                    payload: { organizationId },
-                    reactivityKeys: notificationReactivityKeys(organizationId),
-                  });
+                  try {
+                    await markAllRead({
+                      payload: { organizationId },
+                      reactivityKeys:
+                        notificationReactivityKeys(organizationId),
+                    });
+                  } catch {
+                    toastManager.add({
+                      title: "Could not update notifications",
+                      type: "error",
+                    });
+                  }
                 }}
                 size="xs"
                 variant="ghost"

@@ -1,4 +1,4 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { Link03Icon, LinkSquare02Icon } from "@hugeicons/core-free-icons";
@@ -26,12 +26,36 @@ export function PostExternalResources({
   const resourcesResult = useAtomValue(
     postExternalResourceLinksAtom({ organizationId, postId })
   );
-  const resources = Result.builder(resourcesResult)
-    .onInitial(() => null)
-    .onFailure(
-      (_, { previousSuccess }) => Option.getOrNull(previousSuccess)?.value ?? []
+  const refreshResources = useAtomRefresh(
+    postExternalResourceLinksAtom({ organizationId, postId })
+  );
+  const { resources, isLoading, loadFailed } = Result.builder(resourcesResult)
+    .onInitial(() => ({
+      // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+      resources: [] as readonly PostExternalResourceLink[],
+      isLoading: true,
+      loadFailed: false,
+    }))
+    .onFailure((_, { previousSuccess }) =>
+      Option.match(previousSuccess, {
+        onNone: () => ({
+          // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+          resources: [] as readonly PostExternalResourceLink[],
+          isLoading: false,
+          loadFailed: true,
+        }),
+        onSome: ({ value }) => ({
+          resources: value,
+          isLoading: false,
+          loadFailed: false,
+        }),
+      })
     )
-    .onSuccess((value) => value)
+    .onSuccess((value) => ({
+      resources: value,
+      isLoading: false,
+      loadFailed: false,
+    }))
     .exhaustive();
   return (
     <section aria-labelledby="post-external-resources-heading">
@@ -61,7 +85,12 @@ export function PostExternalResources({
         )}
       </div>
       <div className="mt-2">
-        <PostExternalResourceList resources={resources} />
+        <PostExternalResourceList
+          isLoading={isLoading}
+          loadFailed={loadFailed}
+          onRetry={refreshResources}
+          resources={resources}
+        />
       </div>
     </section>
   );
@@ -69,12 +98,30 @@ export function PostExternalResources({
 
 function PostExternalResourceList({
   resources,
+  isLoading,
+  loadFailed,
+  onRetry,
 }: {
-  readonly resources: readonly PostExternalResourceLink[] | null;
+  readonly resources: readonly PostExternalResourceLink[];
+  readonly isLoading: boolean;
+  readonly loadFailed: boolean;
+  readonly onRetry: () => void;
 }) {
-  if (resources === null) {
+  if (isLoading) {
     return (
       <p className="text-muted-foreground text-sm">Loading linked resources…</p>
+    );
+  }
+  if (loadFailed) {
+    return (
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-destructive">
+          Could not load linked resources.
+        </span>
+        <Button onClick={onRetry} size="sm" variant="outline">
+          Try again
+        </Button>
+      </div>
     );
   }
   if (resources.length === 0) {

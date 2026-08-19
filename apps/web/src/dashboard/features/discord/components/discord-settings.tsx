@@ -21,9 +21,10 @@ import {
 } from "@feeblo/ui/frame";
 import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
-import * as Option from "effect/Option";
 import * as Result from "effect/unstable/reactivity/AsyncResult";
 import { useState } from "react";
+
+import { useAsyncList } from "~/lib/use-async-list";
 
 import {
   channelsAtom,
@@ -36,36 +37,6 @@ import {
   startDiscordConnectAtom,
   updateDiscordChannelNotificationsAtom,
 } from "../atoms";
-
-type AsyncListState<T> = {
-  readonly list: readonly T[];
-  readonly isLoading: boolean;
-  readonly loadFailed: boolean;
-};
-
-/** Collapses an atom AsyncResult into the loading/loaded/error trio the settings frames render. */
-function useAsyncList<T>(
-  result: Result.AsyncResult<readonly T[], unknown>
-): AsyncListState<T> {
-  return Result.builder(result)
-    .onInitial(() => ({ list: [], isLoading: true, loadFailed: false }))
-    .onFailure((_, { previousSuccess }) =>
-      Option.match(previousSuccess, {
-        onNone: () => ({ list: [], isLoading: false, loadFailed: true }),
-        onSome: ({ value }) => ({
-          list: value,
-          isLoading: false,
-          loadFailed: false,
-        }),
-      })
-    )
-    .onSuccess((value) => ({
-      list: value,
-      isLoading: false,
-      loadFailed: false,
-    }))
-    .exhaustive();
-}
 
 export function DiscordSettings({
   organizationId,

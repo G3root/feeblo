@@ -8,6 +8,7 @@ import { z } from "zod";
 import {
   type DiscordConnection,
   connectionsAtom as discordConnectionsAtom,
+  discordReactivityKeys,
   discordStatusAtom,
   startDiscordConnectAtom,
 } from "~/features/discord/atoms";
@@ -15,6 +16,7 @@ import {
   type GitHubConnection,
   gitHubConnectionsAtom,
   gitHubIntegrationStatusAtom,
+  gitHubReactivityKeys,
   startGitHubConnectAtom,
 } from "~/features/github/atoms";
 import {
@@ -26,6 +28,7 @@ import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import {
   connectionsAtom,
   type SlackConnection,
+  slackReactivityKeys,
   slackStatusAtom,
   startSlackConnectAtom,
 } from "~/features/slack/atoms";
@@ -39,6 +42,7 @@ const slackConfig: IntegrationCardConfig<SlackConnection> = {
   statusAtom: slackStatusAtom,
   connectionsAtom,
   startConnectAtom: startSlackConnectAtom,
+  startConnectReactivityKeys: slackReactivityKeys,
   connectErrorMessage: "Could not start Slack connection",
   connectLabel: (connecting) => (connecting ? "Redirecting…" : "Connect"),
   configureTo: "/$organizationId/settings/integrations/slack",
@@ -54,6 +58,7 @@ const discordConfig: IntegrationCardConfig<DiscordConnection> = {
   statusAtom: discordStatusAtom,
   connectionsAtom: discordConnectionsAtom,
   startConnectAtom: startDiscordConnectAtom,
+  startConnectReactivityKeys: discordReactivityKeys,
   connectErrorMessage: "Could not start Discord connection",
   connectLabel: (connecting) => (connecting ? "Redirecting…" : "Connect"),
   configureTo: "/$organizationId/settings/integrations/discord",
@@ -69,6 +74,7 @@ const gitHubConfig: IntegrationCardConfig<GitHubConnection> = {
   statusAtom: gitHubIntegrationStatusAtom,
   connectionsAtom: gitHubConnectionsAtom,
   startConnectAtom: startGitHubConnectAtom,
+  startConnectReactivityKeys: gitHubReactivityKeys,
   connectErrorMessage: "Could not start GitHub App installation",
   connectLabel: (connecting) =>
     connecting ? "Opening GitHub…" : "Install GitHub App",

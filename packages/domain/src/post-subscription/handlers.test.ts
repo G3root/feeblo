@@ -24,6 +24,7 @@ describe("PostSubscriptionRpcHandlers", () => {
     membershipId: string;
     organizationId: LegidOf<"WorkspaceId">;
     postId: LegidOf<"PostId">;
+    postSlug: string;
     statusId: LegidOf<"PostStatusId">;
     userId: string;
   };
@@ -52,6 +53,9 @@ describe("PostSubscriptionRpcHandlers", () => {
       const organizationId = yield* WorkspaceId.generate;
       const boardId = yield* BoardId.generate;
       const postId = yield* PostId.generate;
+      // A slug distinct from the post id, so slug-based list lookups cannot
+      // accidentally pass through the id column.
+      const postSlug = `post-${postId}`;
       const statusId = yield* PostStatusId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `member_${organizationId}`;
@@ -95,7 +99,7 @@ describe("PostSubscriptionRpcHandlers", () => {
         id: postId,
         title: "Post",
         content: "Content",
-        slug: postId,
+        slug: postSlug,
         excerpt: "Content",
         boardId,
         organizationId,
@@ -109,6 +113,7 @@ describe("PostSubscriptionRpcHandlers", () => {
         membershipId,
         organizationId,
         postId,
+        postSlug,
         statusId,
         userId,
       } satisfies Fixture;
@@ -139,7 +144,7 @@ describe("PostSubscriptionRpcHandlers", () => {
               handlers
                 .PostSubscriptionList({
                   organizationId: f.organizationId,
-                  slug: f.postId,
+                  slug: f.postSlug,
                 })
                 .pipe(Effect.provideService(CurrentSession, session(f, false)))
             );
@@ -152,7 +157,7 @@ describe("PostSubscriptionRpcHandlers", () => {
           const f = yield* fixture();
           const listInput = {
             organizationId: f.organizationId,
-            slug: f.postId,
+            slug: f.postSlug,
           };
           const mutationInput = {
             organizationId: f.organizationId,
@@ -199,7 +204,7 @@ describe("PostSubscriptionRpcHandlers", () => {
             const f = yield* fixture();
             const listInput = {
               organizationId: f.organizationId,
-              slug: f.postId,
+              slug: f.postSlug,
             };
             const mutationInput = {
               organizationId: f.organizationId,
@@ -234,7 +239,7 @@ describe("PostSubscriptionRpcHandlers", () => {
           const db = yield* currentDb;
           const listInput = {
             organizationId: f.organizationId,
-            slug: f.postId,
+            slug: f.postSlug,
           };
           const mutationInput = {
             organizationId: f.organizationId,
@@ -284,7 +289,7 @@ describe("PostSubscriptionRpcHandlers", () => {
             const f = yield* fixture("PRIVATE");
             const listInput = {
               organizationId: f.organizationId,
-              slug: f.postId,
+              slug: f.postSlug,
             };
             const mutationInput = {
               organizationId: f.organizationId,
