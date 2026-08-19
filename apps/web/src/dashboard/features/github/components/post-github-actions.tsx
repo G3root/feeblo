@@ -1,4 +1,4 @@
-import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
@@ -21,18 +21,22 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useSelector } from "@tanstack/react-store";
 import * as Option from "effect/Option";
-import * as Result from "effect/unstable/reactivity/AsyncResult";
+import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { useState } from "react";
+
+import { usePostExternalResourceRefresh } from "~/features/integrations/components/post-external-resources";
 
 import {
   type GitHubConnection,
   type GitHubRepository,
-  createGitHubPostIssueAtom,
+  gitHubAtomRegistry,
   gitHubConnectionsAtom,
-  gitHubReactivityKeys,
   gitHubRepositoriesAtom,
-  linkGitHubPostIssueAtom,
 } from "../atoms";
+import {
+  createGitHubPostIssue,
+  linkGitHubPostIssue,
+} from "../lib/github-connections";
 import {
   type GitHubPostIssueAction,
   githubPostIssueFormOpts,
@@ -53,10 +57,12 @@ export function GitHubPostResourceActions({
   readonly postId: string;
 }) {
   return (
-    <GitHubPostResourceActionsContent
-      organizationId={organizationId}
-      postId={postId}
-    />
+    <RegistryContext.Provider value={gitHubAtomRegistry}>
+      <GitHubPostResourceActionsContent
+        organizationId={organizationId}
+        postId={postId}
+      />
+    </RegistryContext.Provider>
   );
 }
 
@@ -68,23 +74,20 @@ function GitHubPostResourceActionsContent({
   readonly postId: string;
 }) {
   const [action, setAction] = useState<GitHubPostAction>(null);
+  const refreshPostExternalResources = usePostExternalResourceRefresh();
   const connectionsResult = useAtomValue(gitHubConnectionsAtom(organizationId));
-  const hasActiveConnection = Result.builder(connectionsResult)
-    .onInitial(
-      // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
-      () => null as boolean | null
-    )
-    .onFailure((_, { previousSuccess }) =>
+  const hasActiveConnection = AsyncResult.match(connectionsResult, {
+    // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
+    onInitial: () => null as boolean | null,
+    onFailure: ({ previousSuccess }) =>
       Option.match(previousSuccess, {
         onNone: () => false,
         onSome: ({ value }) =>
           value.some((connection) => connection.lifecycle === "active"),
-      })
-    )
-    .onSuccess((value) =>
-      value.some((connection) => connection.lifecycle === "active")
-    )
-    .exhaustive();
+      }),
+    onSuccess: ({ value }) =>
+      value.some((connection) => connection.lifecycle === "active"),
+  });
 
   // While the installations are still loading, render nothing so the menu
   // never flashes a stale or "not connected" state.
@@ -114,6 +117,7 @@ function GitHubPostResourceActionsContent({
       {action ? (
         <GitHubPostIssueDialog
           action={action}
+          onChanged={refreshPostExternalResources}
           onOpenChange={(open) => {
             if (!open) {
               setAction(null);
@@ -131,24 +135,23 @@ function GitHubPostIssueDialog({
   action,
   organizationId,
   postId,
+  onChanged,
   onOpenChange,
 }: {
   readonly action: GitHubPostIssueAction;
   readonly organizationId: string;
   readonly postId: string;
+  readonly onChanged: () => void;
   readonly onOpenChange: (open: boolean) => void;
 }) {
   const connectionsResult = useAtomValue(gitHubConnectionsAtom(organizationId));
-  const connections = Result.builder(connectionsResult)
-    .onInitial(
-      // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
-      () => null as readonly GitHubConnection[] | null
-    )
-    .onFailure(
-      (_, { previousSuccess }) => Option.getOrNull(previousSuccess)?.value ?? []
-    )
-    .onSuccess((value) => value)
-    .exhaustive();
+  const connections = AsyncResult.match(connectionsResult, {
+    // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
+    onInitial: () => null as readonly GitHubConnection[] | null,
+    onFailure: ({ previousSuccess }) =>
+      Option.getOrNull(previousSuccess)?.value ?? [],
+    onSuccess: ({ value }) => value,
+  });
 
   return (
     <Dialog onOpenChange={onOpenChange} open>
@@ -175,6 +178,7 @@ function GitHubPostIssueDialog({
           <GitHubPostIssueForm
             action={action}
             connections={connections}
+            onChanged={onChanged}
             onOpenChange={onOpenChange}
             organizationId={organizationId}
             postId={postId}
@@ -190,21 +194,17 @@ function GitHubPostIssueForm({
   connections,
   organizationId,
   postId,
+  onChanged,
   onOpenChange,
 }: {
   readonly action: GitHubPostIssueAction;
   readonly connections: readonly GitHubConnection[];
   readonly organizationId: string;
   readonly postId: string;
+  readonly onChanged: () => void;
   readonly onOpenChange: (open: boolean) => void;
 }) {
   const [idempotencyKey] = useState(() => crypto.randomUUID());
-  const createIssue = useAtomSet(createGitHubPostIssueAtom, {
-    mode: "promise",
-  });
-  const linkIssue = useAtomSet(linkGitHubPostIssueAtom, {
-    mode: "promise",
-  });
   const form = useAppForm({
     ...githubPostIssueFormOpts,
     defaultValues: {
@@ -226,25 +226,14 @@ function GitHubPostIssueForm({
       };
       try {
         if (value.action === "create") {
-          await createIssue({
-            payload: input,
-            reactivityKeys: {
-              ...gitHubReactivityKeys(organizationId),
-              postExternalResources: [postId],
-            },
-          });
+          await createGitHubPostIssue(input);
         } else {
-          await linkIssue({
-            payload: {
-              ...input,
-              issueNumber: Number(value.issueNumber),
-            },
-            reactivityKeys: {
-              ...gitHubReactivityKeys(organizationId),
-              postExternalResources: [postId],
-            },
+          await linkGitHubPostIssue({
+            ...input,
+            issueNumber: Number(value.issueNumber),
           });
         }
+        onChanged();
         onOpenChange(false);
         toastManager.add({
           title:
@@ -272,13 +261,13 @@ function GitHubPostIssueForm({
   const repositoriesResult = useAtomValue(
     gitHubRepositoriesAtom({ organizationId, connectionId })
   );
-  const repositories = Result.builder(repositoriesResult)
-    .onInitial(() => ({
-      // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+  const repositories = AsyncResult.match(repositoriesResult, {
+    // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+    onInitial: () => ({
       list: [] as readonly GitHubRepository[],
       isLoading: true,
-    }))
-    .onFailure((_, { previousSuccess }) =>
+    }),
+    onFailure: ({ previousSuccess }) =>
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       Option.match(previousSuccess, {
         onNone: () => ({
@@ -286,10 +275,9 @@ function GitHubPostIssueForm({
           isLoading: false,
         }),
         onSome: ({ value }) => ({ list: value, isLoading: false }),
-      })
-    )
-    .onSuccess((value) => ({ list: value, isLoading: false }))
-    .exhaustive();
+      }),
+    onSuccess: ({ value }) => ({ list: value, isLoading: false }),
+  });
 
   const submitLabel = action === "create" ? "Create issue" : "Link issue";
 

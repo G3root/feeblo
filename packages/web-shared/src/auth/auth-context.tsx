@@ -2,7 +2,7 @@ import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import type { AuthClientSession } from "@feeblo/auth/client";
 import { hasWindow } from "@feeblo/utils/runtime-kind";
 import * as Option from "effect/Option";
-import * as Result from "effect/unstable/reactivity/AsyncResult";
+import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import type React from "react";
 import { createContext, useContext, useMemo } from "react";
 
@@ -49,25 +49,26 @@ export const useAuth = () => useContext(AuthContext);
  * (analytics identify, redirects, …) subscribe to this hook directly instead
  * of receiving data back through a parent callback in an effect.
  */
-const resolveAuthState = (
-  session: Result.AsyncResult<AuthClientSession | null, unknown>
-): AuthState =>
-  Result.builder(session)
-    .onInitial((): AuthState => ({ status: "loading" }))
-    // A failed revalidation is not evidence that the user signed out. Keep the
-    // last authoritative result when available; otherwise remain in the
-    // reconciliation state so an initial server hint can continue to paint.
-    .onFailure((_, { previousSuccess }): AuthState =>
-      Option.match(previousSuccess, {
-        onNone: (): AuthState => ({ status: "loading" }),
-        onSome: ({ value }) => confirmedState(value),
-      })
-    )
-    .onSuccess((value) => confirmedState(value))
-    .exhaustive();
+export const useResolvedAuth = (): AuthState => {
+  const session = useAtomValue(meAtom);
 
-export const useResolvedAuth = (): AuthState =>
-  useAtomValue(meAtom, resolveAuthState);
+  return useMemo<AuthState>(
+    () =>
+      AsyncResult.match(session, {
+        onInitial: () => ({ status: "loading" }),
+        // A failed revalidation is not evidence that the user signed out. Keep
+        // the last authoritative result when available; otherwise remain in the
+        // reconciliation state so an initial server hint can continue to paint.
+        onFailure: ({ previousSuccess }) =>
+          Option.match(previousSuccess, {
+            onNone: () => ({ status: "loading" }),
+            onSome: ({ value }) => confirmedState(value),
+          }),
+        onSuccess: ({ value }) => confirmedState(value),
+      }),
+    [session]
+  );
+};
 
 const hintState = (hint: AuthHint | null): AuthState | null =>
   hint === null

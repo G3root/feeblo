@@ -1,16 +1,34 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { Link03Icon, LinkSquare02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import * as Option from "effect/Option";
-import * as Result from "effect/unstable/reactivity/AsyncResult";
-import type { ReactNode } from "react";
+import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
+import { createContext, type ReactNode, useContext, useMemo } from "react";
 
 import {
   type PostExternalResourceLink,
   postExternalResourceLinksAtom,
 } from "../atoms";
+
+type PostExternalResourceActionsContextValue = {
+  readonly refreshPostExternalResources: () => void;
+};
+
+const PostExternalResourceActionsContext =
+  createContext<PostExternalResourceActionsContextValue | null>(null);
+
+/** Refreshes the provider-neutral external resource list after a provider mutation. */
+export function usePostExternalResourceRefresh() {
+  const context = useContext(PostExternalResourceActionsContext);
+  if (context === null) {
+    throw new Error(
+      "Post external resource refresh must be used within PostExternalResources."
+    );
+  }
+  return context.refreshPostExternalResources;
+}
 
 /** Displays every safe external resource linked to a post and hosts optional provider actions. */
 export function PostExternalResources({
@@ -26,44 +44,53 @@ export function PostExternalResources({
   const resourcesResult = useAtomValue(
     postExternalResourceLinksAtom({ organizationId, postId })
   );
-  const resources = Result.builder(resourcesResult)
-    .onInitial(() => null)
-    .onFailure(
-      (_, { previousSuccess }) => Option.getOrNull(previousSuccess)?.value ?? []
-    )
-    .onSuccess((value) => value)
-    .exhaustive();
+  const refreshPostExternalResources = useAtomRefresh(
+    postExternalResourceLinksAtom({ organizationId, postId })
+  );
+  const resources = AsyncResult.match(resourcesResult, {
+    onInitial: () => null,
+    onFailure: ({ previousSuccess }) =>
+      Option.getOrNull(previousSuccess)?.value ?? [],
+    onSuccess: ({ value }) => value,
+  });
+  const contextValue = useMemo(
+    () => ({ refreshPostExternalResources }),
+    [refreshPostExternalResources]
+  );
+
   return (
-    <section aria-labelledby="post-external-resources-heading">
-      <div className="flex items-center justify-between gap-2">
-        <h2
-          className="text-sm font-medium"
-          id="post-external-resources-heading"
-        >
-          Linked resources
-        </h2>
-        {actions === undefined ? null : (
-          <Menu>
-            <MenuTrigger
-              render={
-                <Button
-                  aria-label="Linked resource actions"
-                  className="rounded-full"
-                  size="icon-xs"
-                  variant="outline"
-                />
-              }
-            >
-              <HugeiconsIcon icon={Link03Icon} />
-            </MenuTrigger>
-            <MenuPopup align="end">{actions}</MenuPopup>
-          </Menu>
-        )}
-      </div>
-      <div className="mt-2">
-        <PostExternalResourceList resources={resources} />
-      </div>
-    </section>
+    <PostExternalResourceActionsContext.Provider value={contextValue}>
+      <section aria-labelledby="post-external-resources-heading">
+        <div className="flex items-center justify-between gap-2">
+          <h2
+            className="text-sm font-medium"
+            id="post-external-resources-heading"
+          >
+            Linked resources
+          </h2>
+          {actions === undefined ? null : (
+            <Menu>
+              <MenuTrigger
+                render={
+                  <Button
+                    aria-label="Linked resource actions"
+                    className="rounded-full"
+                    size="icon-xs"
+                    variant="outline"
+                  />
+                }
+              >
+                <HugeiconsIcon icon={Link03Icon} />
+              </MenuTrigger>
+              <MenuPopup align="end">{actions}</MenuPopup>
+            </Menu>
+          )}
+        </div>
+        <div className="mt-2">
+          <PostExternalResourceList resources={resources} />
+        </div>
+      </section>
+    </PostExternalResourceActionsContext.Provider>
   );
 }
 

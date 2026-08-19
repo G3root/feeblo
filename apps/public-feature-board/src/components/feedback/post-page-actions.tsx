@@ -1,5 +1,6 @@
 import { usePostDeleteDialogContext } from "@feeblo/post-ui/dialog-stores";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
+import { SubscribeButton } from "@feeblo/post-ui/subscribe-toggle";
 import { Button, buttonVariants } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { cn } from "@feeblo/ui/utils";
@@ -33,6 +34,8 @@ export function PostPageActions() {
       </Link>
 
       <div className="ml-auto flex items-center gap-2">
+        <SubscribeButton />
+
         <Menu>
           <MenuTrigger
             render={(props) => (

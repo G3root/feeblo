@@ -1,4 +1,3 @@
-import { RegistryProvider } from "@effect/atom-react";
 import { AnalyticsProvider } from "@feeblo/web-shared/analytics-provider";
 import { AuthProvider } from "@feeblo/web-shared/auth-context";
 import type { AuthHint } from "@feeblo/web-shared/auth-hint";
@@ -22,9 +21,7 @@ export const Dashboard = ({
     <PostHogProvider>
       <AuthProvider initialHint={initialHint}>
         <PostHogIdentify />
-        <RegistryProvider>
-          <RouterProvider router={router} />
-        </RegistryProvider>
+        <RouterProvider router={router} />
       </AuthProvider>
     </PostHogProvider>
   </AnalyticsProvider>

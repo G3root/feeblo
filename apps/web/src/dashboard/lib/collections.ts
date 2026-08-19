@@ -823,6 +823,7 @@ export const postActivityCollection = createCollection(
         : getOrganizationScopedQueryKey("post-activity");
     },
     syncMode: "on-demand",
+    refetchInterval: Duration.toMillis(Duration.seconds(30)),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
@@ -1116,26 +1117,24 @@ export const postSubscriptionCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
+      const postId = getEqFilterValue(parsed.filters, "postId");
 
-      return slug
-        ? getOrganizationScopedQueryKey("post-subscription", "postSlug", slug)
+      return postId
+        ? getOrganizationScopedQueryKey("post-subscription", "postId", postId)
         : getOrganizationScopedQueryKey("post-subscription");
     },
     syncMode: "on-demand",
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
+      const postId = getEqFilterValue(parsed.filters, "postId");
 
-      if (!(organizationId && slug)) {
+      if (!(organizationId && postId)) {
         return [];
       }
 
       const data = await fetchRpc(
-        (rpc) => rpc.PostSubscriptionList({ organizationId, slug }),
+        (rpc) => rpc.PostSubscriptionList({ organizationId, postId }),
         {
           signal: ctx.signal,
         }
