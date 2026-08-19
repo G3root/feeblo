@@ -2,7 +2,7 @@ import { defineBasicExtension } from "prosekit/basic";
 import { union } from "prosekit/core";
 import {
   defineCodeBlock,
-  defineCodeBlockShiki,
+  defineCodeBlockHighlight,
 } from "prosekit/extensions/code-block";
 import { defineHorizontalRule } from "prosekit/extensions/horizontal-rule";
 import { defineImageUploadHandler } from "prosekit/extensions/image";
@@ -10,6 +10,7 @@ import { defineMention } from "prosekit/extensions/mention";
 import { definePlaceholder } from "prosekit/extensions/placeholder";
 import { defineReadonly } from "prosekit/extensions/readonly";
 
+import { createRangiParser } from "./highlight/rangi.js";
 import { defineCodeBlockView } from "./ui/code-block-view/index.js";
 import { defineImageView } from "./ui/image-view/index.js";
 import { createEditorUploader } from "./uploader";
@@ -36,7 +37,7 @@ export function defineExtension({
     //   renderMathInline: renderKaTeXMathInline,
     // }),
     defineCodeBlock(),
-    defineCodeBlockShiki(),
+    defineCodeBlockHighlight({ parser: createRangiParser() }),
     defineHorizontalRule(),
     defineCodeBlockView(),
     defineImageView(),

@@ -36,6 +36,7 @@
     "prosekit": "^0.21.4",
     "react": "catalog:",
     "react-day-picker": "^10.0.1",
+    "rangi": "catalog:",
     "react-dom": "catalog:",
     "tailwind-merge": "catalog:",
     "zod": "catalog:"

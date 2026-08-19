@@ -1,4 +1,3 @@
-import "@feeblo/web-shared/typeset.css";
 import { markdownToHtml } from "@feeblo/utils/markdown";
 import { type ComponentProps, useMemo } from "react";
 

@@ -52,6 +52,7 @@ catalog:
   postgres: ^3.4.7
   react: ^19.2.8
   react-dom: ^19.2.8
+  rangi: ^2.2.0
   rolldown: v1.0.0-rc.16
   shadcn: ^3.8.5
   solid-js: ^1.9.14

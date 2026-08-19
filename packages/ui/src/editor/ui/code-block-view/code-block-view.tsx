@@ -2,10 +2,11 @@
 import {
   type CodeBlockAttrs,
   isCodeBlockPreviewHiddenDecoration,
-  shikiBundledLanguagesInfo,
 } from "prosekit/extensions/code-block";
 import type { ReactNodeViewProps } from "prosekit/react";
 import { useRef } from "react";
+
+import { codeBlockLanguages } from "../../highlight/languages.js";
 
 export default function CodeBlockView(props: ReactNodeViewProps) {
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
@@ -69,9 +70,9 @@ export default function CodeBlockView(props: ReactNodeViewProps) {
           value={language}
         >
           <option value="">Plain Text</option>
-          {shikiBundledLanguagesInfo.map((info) => (
-            <option key={info.id} value={info.id}>
-              {info.name}
+          {codeBlockLanguages.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
             </option>
           ))}
         </select>
