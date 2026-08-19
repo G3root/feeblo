@@ -11,11 +11,6 @@ import { useRef } from "react";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
-interface SubscribeButtonProps {
-  fullWidth?: boolean;
-  variant?: "default" | "icon";
-}
-
 const ANCHORED_SUBSCRIBE_TOAST_ID = "post-subscribe";
 
 /**
@@ -29,7 +24,7 @@ const ANCHORED_SUBSCRIBE_TOAST_ID = "post-subscribe";
  * local collection immediately flips the button state, while the collection's
  * `onInsert`/`onDelete` handlers persist the change to the backend.
  */
-export function SubscribeButton({ variant = "default" }: SubscribeButtonProps) {
+export function SubscribeButton() {
   const { isLocked, organizationId, post } = usePostCollectionData();
   const { data: session } = useAuthState();
   const {
@@ -146,27 +141,6 @@ export function SubscribeButton({ variant = "default" }: SubscribeButtonProps) {
 
   const label = isSubscribed ? "Unsubscribe" : "Subscribe";
 
-  if (variant === "icon") {
-    return (
-      <Button
-        aria-label={label}
-        aria-pressed={isSubscribed}
-        className="rounded-full"
-        disabled={disabled}
-        onClick={onToggle}
-        ref={buttonRef}
-        size="icon-sm"
-        type="button"
-        variant={isSubscribed ? "default" : "outline"}
-      >
-        <HugeiconsIcon
-          icon={isSubscribed ? BellOffIcon : BellIcon}
-          strokeWidth={2}
-        />
-      </Button>
-    );
-  }
-
   return (
     <Button
       aria-label={label}
@@ -184,5 +158,20 @@ export function SubscribeButton({ variant = "default" }: SubscribeButtonProps) {
       />
       {label}
     </Button>
+  );
+}
+
+export function SubscribeCard() {
+  return (
+    <>
+      <div className="flex flex-col gap-1.5">
+        <h2 className="text-sm font-semibold">Subscribe to post</h2>
+        <p className="text-muted-foreground text-xs text-pretty">
+          Subscribe to receive future updates on the post by email
+        </p>
+      </div>
+
+      <SubscribeButton />
+    </>
   );
 }

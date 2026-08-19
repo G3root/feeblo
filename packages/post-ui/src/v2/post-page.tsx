@@ -16,7 +16,7 @@ import {
 } from "./post-page-context";
 import { PostTitleUpdateInput } from "./post-title-input";
 import { PostReactionPicker } from "./reaction-picker";
-import { SubscribeButton } from "./subscribe-toggle";
+import { SubscribeCard } from "./subscribe-toggle";
 import { UpvoteButton } from "./upvote-toggle";
 
 // Post content is rendered as sanitized Markdown in display mode and as the
@@ -145,7 +145,7 @@ export const PostPage = {
   PublicCommentComposer,
   Reactions,
   Root,
-  Subscribe: SubscribeButton,
+  Subscribe: SubscribeCard,
   Title,
   Unlocked,
   Vote,
