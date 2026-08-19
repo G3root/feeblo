@@ -1,6 +1,7 @@
 import { authClient } from "@feeblo/web-shared/auth-client";
 import {
   getAuthSession,
+  getCachedAuthSession,
   refreshAuthSession,
 } from "@feeblo/web-shared/auth-session";
 import { and, createLiveQueryCollection, eq } from "@tanstack/react-db";
@@ -210,6 +211,7 @@ const postRoute = createRoute({
   beforeLoad: async ({ params }) => {
     const { slug } = params;
     const subsetQueries = createPublicPostSubsetQueries(slug);
+    const session = getCachedAuthSession();
 
     await Promise.all([
       publicBoardCollection.preload(),
@@ -221,7 +223,11 @@ const postRoute = createRoute({
       subsetQueries.comments.preload(),
       subsetQueries.commentReactions.preload(),
       subsetQueries.postReactions.preload(),
-      subsetQueries.postSubscription.preload(),
+      // Subscription is per-user private state. Skip the RPC for anonymous
+      // visitors to avoid `RpcError: RPC request failed` /
+      // `[QueryCollection] Error observing query public-post-subscription`—
+      // the collection's queryFn also guards with getCachedAuthSession + try/catch.
+      ...(session ? [subsetQueries.postSubscription.preload()] : []),
     ]);
 
     return null;
