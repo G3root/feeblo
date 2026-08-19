@@ -26,8 +26,8 @@ export const gitHubIntegrationStatusAtom = DashboardClient.query(
   "GitHubIntegrationStatus",
   void 0
 ).pipe(
-  Atom.map((result) => Result.map(result, (value) => value.configured)),
   dashboardSWR("30 seconds"),
+  Atom.map((result) => Result.map(result, (value) => value.configured)),
   Atom.setIdleTTL("5 minutes")
 );
 
@@ -74,7 +74,12 @@ export const gitHubBoardsAtom = Atom.family((organizationId: string) =>
   DashboardClient.query(
     "BoardList",
     { organizationId },
-    { reactivityKeys: gitHubReactivityKeys(organizationId) }
+    {
+      reactivityKeys: {
+        ...gitHubReactivityKeys(organizationId),
+        boards: [organizationId],
+      },
+    }
   ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
 
@@ -87,7 +92,12 @@ export const gitHubPostStatusesAtom = Atom.family((organizationId: string) =>
   DashboardClient.query(
     "PostStatusList",
     { organizationId },
-    { reactivityKeys: gitHubReactivityKeys(organizationId) }
+    {
+      reactivityKeys: {
+        ...gitHubReactivityKeys(organizationId),
+        postStatuses: [organizationId],
+      },
+    }
   ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
 

@@ -534,7 +534,8 @@ function DeliveryHistoryTable({
 
   // Accumulated rows. The pull atom owns pagination, so the visible list is
   // whatever pages have streamed in so far, keeping the previous rows visible
-  // while the next page (or a refresh) is in flight.
+  // while the next page (or a refresh) is in flight. Pages are kept as stream
+  // values so an explicit empty page is still a successful result.
   const deliveries = Result.builder(historyResult)
     .onInitial(
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
@@ -544,19 +545,18 @@ function DeliveryHistoryTable({
       Option.match(previousSuccess, {
         // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
         onNone: () => [] as readonly Delivery[],
-        onSome: ({ value }) => value.items,
+        onSome: ({ value }) => value.items.flatMap((page) => page.items),
       })
     )
-    .onSuccess((value) => value.items)
+    .onSuccess((value) => value.items.flatMap((page) => page.items))
     .exhaustive();
 
-  // An empty history surfaces as `NoSuchElementError` (the paging stream ends
-  // without emitting a chunk), so it renders as the empty state; every other
-  // failure renders inline below.
+  // Empty history is represented by a successful page with no items. Every
+  // actual stream failure, including NoSuchElementError, is a load error.
   const hasLoadError = Result.builder(historyResult)
     .onInitial(() => false)
     .onSuccess(() => false)
-    .onError((error) => error._tag !== "NoSuchElementError")
+    .onError(() => true)
     .onDefect(() => true)
     .onInterrupt(() => true)
     .exhaustive();

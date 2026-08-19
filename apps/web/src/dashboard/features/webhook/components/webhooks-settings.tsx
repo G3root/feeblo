@@ -21,9 +21,9 @@ import { toastManager } from "@feeblo/ui/toast";
 import { Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
-import * as Option from "effect/Option";
-import * as Result from "effect/unstable/reactivity/AsyncResult";
 import { useContext, useState } from "react";
+
+import { useAsyncList } from "~/hooks/use-async-list";
 
 import {
   type Endpoint,
@@ -58,32 +58,11 @@ function WebhooksSettingsContent({
   const endpointsResult = useAtomValue(endpointsAtom(organizationId));
   const refreshEndpoints = useAtomRefresh(endpointsAtom(organizationId));
 
-  const { endpoints, isLoading, loadFailed } = Result.builder(endpointsResult)
-    .onInitial(() => ({
-      endpoints: [],
-      isLoading: true,
-      loadFailed: false,
-    }))
-    .onFailure((_, { previousSuccess }) =>
-      Option.match(previousSuccess, {
-        onNone: () => ({
-          endpoints: [],
-          isLoading: false,
-          loadFailed: true,
-        }),
-        onSome: ({ value }) => ({
-          endpoints: value,
-          isLoading: false,
-          loadFailed: false,
-        }),
-      })
-    )
-    .onSuccess((value) => ({
-      endpoints: value,
-      isLoading: false,
-      loadFailed: false,
-    }))
-    .exhaustive();
+  const {
+    list: endpoints,
+    isLoading,
+    loadFailed,
+  } = useAsyncList(endpointsResult);
 
   const handleCreated = (endpoint: CreatedWebhookEndpoint) => {
     setOneTimeSecret({

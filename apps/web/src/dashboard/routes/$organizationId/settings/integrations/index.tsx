@@ -36,6 +36,7 @@ const slackConfig: IntegrationCardConfig<SlackConnection> = {
   icon: SlackIcon,
   description:
     "Let your team send feedback with /feeblo, forward messages with “Send to Feeblo”, and get new requests posted to your channels.",
+  reactivityKey: "slack",
   statusAtom: slackStatusAtom,
   connectionsAtom,
   startConnectAtom: startSlackConnectAtom,
@@ -51,6 +52,7 @@ const discordConfig: IntegrationCardConfig<DiscordConnection> = {
   icon: DiscordIcon,
   description:
     "Let your team send feedback with /feeblo, forward messages with “Send to Feeblo”, and get new requests posted to your channels.",
+  reactivityKey: "discord",
   statusAtom: discordStatusAtom,
   connectionsAtom: discordConnectionsAtom,
   startConnectAtom: startDiscordConnectAtom,
@@ -66,6 +68,7 @@ const gitHubConfig: IntegrationCardConfig<GitHubConnection> = {
   icon: GithubIcon,
   description:
     "Choose repositories for the Feeblo bot to publish feedback as GitHub issues and comments.",
+  reactivityKey: "github",
   statusAtom: gitHubIntegrationStatusAtom,
   connectionsAtom: gitHubConnectionsAtom,
   startConnectAtom: startGitHubConnectAtom,

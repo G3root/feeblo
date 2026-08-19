@@ -1,4 +1,4 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { Link03Icon, LinkSquare02Icon } from "@hugeicons/core-free-icons";
@@ -23,15 +23,21 @@ export function PostExternalResources({
   readonly organizationId: string;
   readonly postId: string;
 }) {
-  const resourcesResult = useAtomValue(
-    postExternalResourceLinksAtom({ organizationId, postId })
-  );
-  const resources = Result.builder(resourcesResult)
-    .onInitial(() => null)
-    .onFailure(
-      (_, { previousSuccess }) => Option.getOrNull(previousSuccess)?.value ?? []
+  const resourcesAtom = postExternalResourceLinksAtom({
+    organizationId,
+    postId,
+  });
+  const resourcesResult = useAtomValue(resourcesAtom);
+  const refreshResources = useAtomRefresh(resourcesAtom);
+  const { resources, loadFailed } = Result.builder(resourcesResult)
+    .onInitial(() => ({ resources: null, loadFailed: false }))
+    .onFailure((_, { previousSuccess }) =>
+      Option.match(previousSuccess, {
+        onNone: () => ({ resources: null, loadFailed: true }),
+        onSome: ({ value }) => ({ resources: value, loadFailed: false }),
+      })
     )
-    .onSuccess((value) => value)
+    .onSuccess((value) => ({ resources: value, loadFailed: false }))
     .exhaustive();
   return (
     <section aria-labelledby="post-external-resources-heading">
@@ -61,17 +67,37 @@ export function PostExternalResources({
         )}
       </div>
       <div className="mt-2">
-        <PostExternalResourceList resources={resources} />
+        <PostExternalResourceList
+          loadFailed={loadFailed}
+          onRetry={refreshResources}
+          resources={resources}
+        />
       </div>
     </section>
   );
 }
 
 function PostExternalResourceList({
+  loadFailed,
+  onRetry,
   resources,
 }: {
+  readonly loadFailed: boolean;
+  readonly onRetry: () => void;
   readonly resources: readonly PostExternalResourceLink[] | null;
 }) {
+  if (loadFailed) {
+    return (
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-destructive">
+          Linked resources could not be loaded.
+        </span>
+        <Button onClick={onRetry} size="sm" variant="outline">
+          Retry
+        </Button>
+      </div>
+    );
+  }
   if (resources === null) {
     return (
       <p className="text-muted-foreground text-sm">Loading linked resources…</p>

@@ -44,6 +44,7 @@ export type IntegrationCardConfig<C extends IntegrationConnection> = {
   readonly name: string;
   readonly icon: HugeiconsIconProps["icon"];
   readonly description: string;
+  readonly reactivityKey: string;
   readonly statusAtom: Atom.Atom<Result.AsyncResult<boolean, unknown>>;
   readonly connectionsAtom: (
     organizationId: string
@@ -124,7 +125,7 @@ export function IntegrationCard<C extends IntegrationConnection>({
     try {
       const { authorizeUrl } = await startConnect({
         payload: { organizationId },
-        reactivityKeys: { integrations: [organizationId] },
+        reactivityKeys: { [config.reactivityKey]: [organizationId] },
       });
       window.location.assign(authorizeUrl.toString());
     } catch {

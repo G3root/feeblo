@@ -21,9 +21,10 @@ import {
 } from "@feeblo/ui/frame";
 import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
-import * as Option from "effect/Option";
 import * as Result from "effect/unstable/reactivity/AsyncResult";
 import { useState } from "react";
+
+import { useAsyncList } from "~/hooks/use-async-list";
 
 import {
   channelsAtom,
@@ -36,36 +37,6 @@ import {
   startDiscordConnectAtom,
   updateDiscordChannelNotificationsAtom,
 } from "../atoms";
-
-type AsyncListState<T> = {
-  readonly list: readonly T[];
-  readonly isLoading: boolean;
-  readonly loadFailed: boolean;
-};
-
-/** Collapses an atom AsyncResult into the loading/loaded/error trio the settings frames render. */
-function useAsyncList<T>(
-  result: Result.AsyncResult<readonly T[], unknown>
-): AsyncListState<T> {
-  return Result.builder(result)
-    .onInitial(() => ({ list: [], isLoading: true, loadFailed: false }))
-    .onFailure((_, { previousSuccess }) =>
-      Option.match(previousSuccess, {
-        onNone: () => ({ list: [], isLoading: false, loadFailed: true }),
-        onSome: ({ value }) => ({
-          list: value,
-          isLoading: false,
-          loadFailed: false,
-        }),
-      })
-    )
-    .onSuccess((value) => ({
-      list: value,
-      isLoading: false,
-      loadFailed: false,
-    }))
-    .exhaustive();
-}
 
 export function DiscordSettings({
   organizationId,
@@ -90,12 +61,13 @@ function DiscordSettingsContent({
     loadFailed,
   } = useAsyncList<DiscordConnection>(connectionsResult);
   const statusResult = useAtomValue(discordStatusAtom);
+  const refreshStatus = useAtomRefresh(discordStatusAtom);
   const discordConfigured = Result.builder(statusResult)
     .onInitial(
       // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
       () => null as boolean | null
     )
-    .onFailure(() => false)
+    .onFailure(() => "error" as const)
     .onSuccess((value) => value)
     .exhaustive();
 
@@ -128,6 +100,20 @@ function DiscordSettingsContent({
       <Card>
         <CardPanel>
           <p className="text-muted-foreground text-sm">Loading Discord…</p>
+        </CardPanel>
+      </Card>
+    );
+  }
+  if (discordConfigured === "error") {
+    return (
+      <Card>
+        <CardPanel>
+          <div className="text-sm">
+            Discord configuration could not be loaded.{" "}
+            <Button onClick={refreshStatus} size="sm" variant="outline">
+              Try again
+            </Button>
+          </div>
         </CardPanel>
       </Card>
     );

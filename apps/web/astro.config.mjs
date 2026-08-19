@@ -191,15 +191,14 @@ export default defineConfig({
                   if (name === "history") {
                     return "tanstack-react-router-vendor";
                   }
-                  // react-pacer, pacer and devtools-event-client all depend on
-                  // react-store (already grouped into the router chunk); keep them
-                  // together rather than as ~4kB standalone chunks.
+                  // Keep the Pacer packages together in their own vendor chunk
+                  // instead of coupling them to the router vendor.
                   if (
                     name === "react-pacer" ||
                     name === "pacer" ||
                     name === "devtools-event-client"
                   ) {
-                    return "tanstack-react-router-vendor";
+                    return "pacer-vendor";
                   }
                   return `tanstack-${name}-vendor`;
                 }

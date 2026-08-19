@@ -196,7 +196,6 @@ function RouteComponent() {
                 <PostPage.Comments />
               </TabsPanel>
               <TabsPanel className="pt-4" value="activity">
-                {/* //TODO refetch on mount */}
                 <PostActivityList
                   activityQuery={activityQuery}
                   organizationId={organizationId}

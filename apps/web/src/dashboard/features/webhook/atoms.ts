@@ -62,13 +62,12 @@ export const deliveriesAtom = Atom.family((args: DeliveryHistoryArgs) =>
           organizationId: args.organizationId,
         }).pipe(
           Effect.map(
-            (page) =>
-              [page.items, Option.fromNullishOr(page.nextCursor)] as const
+            (page) => [[page], Option.fromNullishOr(page.nextCursor)] as const
           )
         )
       );
     })
-    .pipe(Atom.keepAlive)
+    .pipe(Atom.setIdleTTL("5 minutes"))
 );
 
 export const deliveriesLoadingAtom = Atom.family((args: DeliveryHistoryArgs) =>

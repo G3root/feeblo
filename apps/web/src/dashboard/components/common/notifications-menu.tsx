@@ -1,6 +1,7 @@
 import { RegistryContext, useAtomSet, useAtomValue } from "@effect/atom-react";
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
+import { toastManager } from "@feeblo/ui/toast";
 import { BellDotIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useNavigate } from "@tanstack/react-router";
@@ -12,6 +13,14 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 import { DashboardClient, dashboardSWR } from "~/lib/atom-rpc";
 
 const refreshMs = 30_000;
+const idleTTL = "5 minutes";
+
+const showNotificationReadError = () => {
+  toastManager.add({
+    title: "Could not mark notifications as read",
+    type: "error",
+  });
+};
 
 const notificationReactivityKeys = (organizationId: string) => ({
   notifications: [organizationId],
@@ -25,7 +34,7 @@ const notificationListAtom = Atom.family((organizationId: string) =>
       reactivityKeys: notificationReactivityKeys(organizationId),
       timeToLive: refreshMs,
     }
-  ).pipe(dashboardSWR(refreshMs), Atom.setIdleTTL(refreshMs))
+  ).pipe(dashboardSWR(refreshMs), Atom.setIdleTTL(idleTTL))
 );
 
 const notificationUnreadAtom = Atom.family((organizationId: string) =>
@@ -34,8 +43,9 @@ const notificationUnreadAtom = Atom.family((organizationId: string) =>
     { organizationId },
     {
       reactivityKeys: notificationReactivityKeys(organizationId),
+      timeToLive: refreshMs,
     }
-  ).pipe(dashboardSWR(refreshMs), Atom.setIdleTTL(refreshMs))
+  ).pipe(dashboardSWR(refreshMs), Atom.setIdleTTL(idleTTL))
 );
 
 const preloadNotificationsAtom = Atom.fnSync((organizationId: string, get) => {
@@ -78,7 +88,7 @@ function NotificationsList({
                   notificationId: notification.id,
                 },
                 reactivityKeys: notificationReactivityKeys(organizationId),
-              });
+              }).catch(showNotificationReadError);
             }
           }}
         >
@@ -141,10 +151,15 @@ export function NotificationsMenu() {
             {unreadCount > 0 && (
               <Button
                 onClick={async () => {
-                  await markAllRead({
-                    payload: { organizationId },
-                    reactivityKeys: notificationReactivityKeys(organizationId),
-                  });
+                  try {
+                    await markAllRead({
+                      payload: { organizationId },
+                      reactivityKeys:
+                        notificationReactivityKeys(organizationId),
+                    });
+                  } catch {
+                    showNotificationReadError();
+                  }
                 }}
                 size="xs"
                 variant="ghost"
