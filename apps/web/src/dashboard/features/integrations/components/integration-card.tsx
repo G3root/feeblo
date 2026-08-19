@@ -1,4 +1,4 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { Button } from "@feeblo/ui/button";
 import { Card, CardPanel } from "@feeblo/ui/card";
 import { toastManager } from "@feeblo/ui/toast";
@@ -6,7 +6,7 @@ import { LockedIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type HugeiconsIconProps } from "@hugeicons/react";
 import { useRouter } from "@tanstack/react-router";
 import * as Option from "effect/Option";
-import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
+import * as Result from "effect/unstable/reactivity/AsyncResult";
 import type * as Atom from "effect/unstable/reactivity/Atom";
 import { useState } from "react";
 
@@ -29,17 +29,26 @@ export type IntegrationConfigureRoute =
  * provider as a module-level constant so the card itself stays generic and
  * every provider shares the same connection, connect flow, and layout logic.
  */
+type StartConnectAtom = Atom.AtomResultFn<
+  {
+    readonly payload: { readonly organizationId: string };
+    readonly reactivityKeys?:
+      | ReadonlyArray<unknown>
+      | Readonly<Record<string, ReadonlyArray<unknown>>>;
+  },
+  { readonly authorizeUrl: URL },
+  unknown
+>;
+
 export type IntegrationCardConfig<C extends IntegrationConnection> = {
   readonly name: string;
   readonly icon: HugeiconsIconProps["icon"];
   readonly description: string;
-  readonly statusAtom: Atom.Atom<AsyncResult.AsyncResult<boolean, unknown>>;
+  readonly statusAtom: Atom.Atom<Result.AsyncResult<boolean, unknown>>;
   readonly connectionsAtom: (
     organizationId: string
-  ) => Atom.Atom<AsyncResult.AsyncResult<readonly C[], unknown>>;
-  readonly startConnect: (
-    organizationId: string
-  ) => Promise<{ readonly authorizeUrl: URL }>;
+  ) => Atom.Atom<Result.AsyncResult<readonly C[], unknown>>;
+  readonly startConnectAtom: StartConnectAtom;
   readonly connectErrorMessage: string;
   readonly connectLabel: (connecting: boolean) => string;
   readonly configureTo: IntegrationConfigureRoute;
@@ -56,48 +65,53 @@ export function IntegrationCard<C extends IntegrationConnection>({
   const router = useRouter();
   const { entitlements, isLoading: isEntitlementsLoading } = useEntitlements();
   const [connecting, setConnecting] = useState(false);
+  const startConnect = useAtomSet(config.startConnectAtom, {
+    mode: "promise",
+  });
   const connectionsResult = useAtomValue(
     config.connectionsAtom(organizationId)
   );
   const statusResult = useAtomValue(config.statusAtom);
 
-  const configured = AsyncResult.match(statusResult, {
-    // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
-    onInitial: () => null as boolean | null,
-    onFailure: () => false,
-    onSuccess: ({ value }) => value,
-  });
+  const configured = Result.builder(statusResult)
+    .onInitial(
+      // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
+      () => null as boolean | null
+    )
+    .onFailure(() => false)
+    .onSuccess((value) => value)
+    .exhaustive();
 
-  const { connections, isLoading, loadFailed } = AsyncResult.match(
-    connectionsResult,
-    {
-      onInitial: () => ({
+  const { connections, isLoading, loadFailed } = Result.builder(
+    connectionsResult
+  )
+    .onInitial(() => ({
+      // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+      connections: [] as readonly C[],
+      isLoading: true,
+      loadFailed: false,
+    }))
+    .onFailure((_, { previousSuccess }) =>
+      Option.match(previousSuccess, {
         // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-        connections: [] as readonly C[],
-        isLoading: true,
-        loadFailed: false,
-      }),
-      onFailure: ({ previousSuccess }) =>
-        Option.match(previousSuccess, {
-          // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-          onNone: () => ({
-            connections: [] as readonly C[],
-            isLoading: false,
-            loadFailed: true,
-          }),
-          onSome: ({ value }) => ({
-            connections: value,
-            isLoading: false,
-            loadFailed: false,
-          }),
+        onNone: () => ({
+          connections: [] as readonly C[],
+          isLoading: false,
+          loadFailed: true,
         }),
-      onSuccess: ({ value }) => ({
-        connections: value,
-        isLoading: false,
-        loadFailed: false,
-      }),
-    }
-  );
+        onSome: ({ value }) => ({
+          connections: value,
+          isLoading: false,
+          loadFailed: false,
+        }),
+      })
+    )
+    .onSuccess((value) => ({
+      connections: value,
+      isLoading: false,
+      loadFailed: false,
+    }))
+    .exhaustive();
 
   const activeConnections = connections.filter(
     (connection) =>
@@ -108,7 +122,10 @@ export function IntegrationCard<C extends IntegrationConnection>({
   const handleConnect = async () => {
     setConnecting(true);
     try {
-      const { authorizeUrl } = await config.startConnect(organizationId);
+      const { authorizeUrl } = await startConnect({
+        payload: { organizationId },
+        reactivityKeys: { integrations: [organizationId] },
+      });
       window.location.assign(authorizeUrl.toString());
     } catch {
       setConnecting(false);

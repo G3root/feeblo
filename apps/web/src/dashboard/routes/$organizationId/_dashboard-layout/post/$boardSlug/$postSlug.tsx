@@ -14,11 +14,15 @@ import { Activity01Icon, Comment01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo } from "react";
 
 import { GitHubPostResourceActions } from "~/features/github/components/post-github-actions";
 import { PostExternalResources } from "~/features/integrations/components/post-external-resources";
 import { PostStatusSelect } from "~/features/post-status/components/post-status-select";
-import { PostActivityList } from "~/features/post/components/post-activity-list";
+import {
+  createPostActivityQuery,
+  PostActivityList,
+} from "~/features/post/components/post-activity-list";
 import { PostBoardField } from "~/features/post/components/post-board-field";
 import { PostEtaField } from "~/features/post/components/post-eta-field";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
@@ -30,6 +34,7 @@ import {
   postCollection,
   postReactionCollection,
   postStatusCollection,
+  postSubscriptionCollection,
   postTagCollection,
   tagCollection,
   upvoteCollection,
@@ -57,6 +62,7 @@ export const Route = createFileRoute(
       commentCollection.preload(),
       commentReactionCollection.preload(),
       postReactionCollection.preload(),
+      postSubscriptionCollection.preload(),
     ]);
   },
 });
@@ -91,6 +97,18 @@ function RouteComponent() {
 
   const board = postRow?.board;
   const post = postRow?.post;
+  const activityQuery = useMemo(
+    () =>
+      createPostActivityQuery({
+        organizationId,
+        postId: post?.id ?? "",
+      }),
+    [organizationId, post?.id]
+  );
+
+  const preloadActivity = () => {
+    activityQuery.preload();
+  };
 
   // The post query is derived from the preloaded collections, but it still
   // passes through a brief `loading` phase on mount and post navigation.
@@ -164,7 +182,11 @@ function RouteComponent() {
                   <HugeiconsIcon icon={Comment01Icon} />
                   Comments
                 </TabsTab>
-                <TabsTab value="activity">
+                <TabsTab
+                  onMouseEnter={preloadActivity}
+                  onFocus={preloadActivity}
+                  value="activity"
+                >
                   <HugeiconsIcon icon={Activity01Icon} />
                   Activity
                 </TabsTab>
@@ -174,9 +196,10 @@ function RouteComponent() {
                 <PostPage.Comments />
               </TabsPanel>
               <TabsPanel className="pt-4" value="activity">
+                {/* //TODO refetch on mount */}
                 <PostActivityList
+                  activityQuery={activityQuery}
                   organizationId={organizationId}
-                  postId={post.id}
                 />
               </TabsPanel>
             </Tabs>
@@ -236,14 +259,7 @@ function RouteComponent() {
               <Separator />
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <h2 className="text-sm font-semibold">Subscribe to post</h2>
-              <p className="text-muted-foreground text-xs text-pretty">
-                Subscribe to receive future updates on the post by email
-              </p>
-            </div>
-
-            <PostPage.Subscribe variant="default" />
+            <PostPage.Subscribe />
           </div>
         </aside>
       </div>

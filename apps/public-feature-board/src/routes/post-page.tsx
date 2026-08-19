@@ -2,6 +2,7 @@ import { AuthDialog } from "@feeblo/post-ui/auth-dialog";
 import { PostCommentGuestPrompt } from "@feeblo/post-ui/post-comment-composer";
 import { PostPage as ComposedPostPage } from "@feeblo/post-ui/post-page";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
+import { SubscribeCard } from "@feeblo/post-ui/subscribe-toggle";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -220,6 +221,7 @@ export function PostPage() {
             <PostMetaSidebar.Author />
             <PostMetaSidebar.PublishedOn />
             {/* <PostMetaSidebar.Share /> */}
+            <SubscribeCard />
           </PostMetaSidebar.Root>
         </div>
       </RootLayout>

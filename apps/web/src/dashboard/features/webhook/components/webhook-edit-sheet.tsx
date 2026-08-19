@@ -1,4 +1,4 @@
-import { useAtomRefresh } from "@effect/atom-react";
+import { useAtomSet } from "@effect/atom-react";
 import { Button } from "@feeblo/ui/button";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
@@ -16,9 +16,8 @@ import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { fetchRpc } from "~/lib/runtime";
 
-import { endpointsAtom } from "../atoms";
+import { updateWebhookEndpointAtom, webhookReactivityKeys } from "../atoms";
 import { useWebhookEditSheetContext } from "../dialog-stores";
 import { webhookFormOpts, webhookFormSchema } from "../shared-form";
 import { WebhookEventSelectionField } from "./webhook-events-selection";
@@ -54,7 +53,9 @@ function WebhookEditForm() {
   const organizationId = useOrganizationId();
   const store = useWebhookEditSheetContext();
   const endpoint = useSelector(store, (state) => state.context.data.endpoint);
-  const refreshEndpoints = useAtomRefresh(endpointsAtom(organizationId));
+  const updateEndpoint = useAtomSet(updateWebhookEndpointAtom, {
+    mode: "promise",
+  });
 
   const form = useAppForm({
     ...webhookFormOpts,
@@ -72,8 +73,8 @@ function WebhookEditForm() {
     },
     onSubmit: async ({ value }) => {
       try {
-        await fetchRpc((rpc) =>
-          rpc.WebhookEndpointUpdate({
+        await updateEndpoint({
+          payload: {
             connectionId: endpoint.id,
             ...(value.endpointUrl.trim() === ""
               ? undefined
@@ -81,10 +82,10 @@ function WebhookEditForm() {
             eventTypes: [...value.eventTypes],
             name: value.name.trim(),
             organizationId,
-          })
-        );
+          },
+          reactivityKeys: webhookReactivityKeys(organizationId),
+        });
         form.reset();
-        refreshEndpoints();
         store.send({ type: "toggle" });
         toastManager.add({
           title: "Webhook endpoint updated",
