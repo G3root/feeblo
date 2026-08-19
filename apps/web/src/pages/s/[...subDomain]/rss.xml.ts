@@ -3,8 +3,6 @@ import type { TChangelog } from "@feeblo/domain/changelog/schema";
 import { markdownToHtml } from "@feeblo/utils/markdown";
 import type { APIRoute } from "astro";
 
-import { fetchRpcServer } from "~/lib/runtime-server";
-
 export const prerender = false;
 
 const escapeXml = (value: string): string =>
@@ -53,6 +51,9 @@ export const GET: APIRoute = async ({ locals, url }) => {
   let changelogs: readonly TChangelog[];
 
   try {
+    // Lazy-load the Effect RPC runtime so it stays out of the worker's
+    // startup module graph; it is only needed for this feed's data fetch.
+    const { fetchRpcServer } = await import("~/lib/runtime-server");
     changelogs = await fetchRpcServer((rpc) =>
       rpc.ChangelogListPublic({ organizationId: site.organizationId })
     );

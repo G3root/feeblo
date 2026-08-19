@@ -21,15 +21,14 @@ import { toastManager } from "@feeblo/ui/toast";
 import { Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
-import * as Option from "effect/Option";
-import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { useContext, useMemo, useState } from "react";
+import { useContext, useState } from "react";
+
+import { useAsyncList } from "~/hooks/use-async-list";
 
 import {
   type Endpoint,
   endpointsAtom,
   preloadDeliveryHistoryAtom,
-  webhookAtomRegistry,
 } from "../atoms";
 import { useWebhookCreateDialogContext } from "../dialog-stores";
 import {
@@ -42,11 +41,7 @@ export function WebhooksSettings({
 }: {
   organizationId: string;
 }) {
-  return (
-    <RegistryContext.Provider value={webhookAtomRegistry}>
-      <WebhooksSettingsContent organizationId={organizationId} />
-    </RegistryContext.Provider>
-  );
+  return <WebhooksSettingsContent organizationId={organizationId} />;
 }
 
 function WebhooksSettingsContent({
@@ -63,42 +58,17 @@ function WebhooksSettingsContent({
   const endpointsResult = useAtomValue(endpointsAtom(organizationId));
   const refreshEndpoints = useAtomRefresh(endpointsAtom(organizationId));
 
-  const { endpoints, isLoading, loadFailed } = useMemo(
-    () =>
-      AsyncResult.match(endpointsResult, {
-        onInitial: () => ({
-          endpoints: [],
-          isLoading: true,
-          loadFailed: false,
-        }),
-        onFailure: ({ previousSuccess }) =>
-          Option.match(previousSuccess, {
-            onNone: () => ({
-              endpoints: [],
-              isLoading: false,
-              loadFailed: true,
-            }),
-            onSome: ({ value }) => ({
-              endpoints: value,
-              isLoading: false,
-              loadFailed: false,
-            }),
-          }),
-        onSuccess: ({ value }) => ({
-          endpoints: value,
-          isLoading: false,
-          loadFailed: false,
-        }),
-      }),
-    [endpointsResult]
-  );
+  const {
+    list: endpoints,
+    isLoading,
+    loadFailed,
+  } = useAsyncList(endpointsResult);
 
   const handleCreated = (endpoint: CreatedWebhookEndpoint) => {
     setOneTimeSecret({
       endpointName: endpoint.endpointName,
       value: endpoint.signingSecret,
     });
-    refreshEndpoints();
     toastManager.add({ title: "Webhook endpoint created", type: "success" });
   };
 

@@ -1,60 +1,33 @@
 import type { GitHubSyncRule as GitHubSyncRuleSchema } from "@feeblo/domain/integration/github/schema";
-import * as Effect from "effect/Effect";
+import * as Result from "effect/unstable/reactivity/AsyncResult";
 import * as Atom from "effect/unstable/reactivity/Atom";
-import * as AtomRegistry from "effect/unstable/reactivity/AtomRegistry";
 
-import {
-  loadGitHubBoards,
-  loadGitHubConnections,
-  loadGitHubIntegrationStatus,
-  loadGitHubPostStatuses,
-  loadGitHubPublishSettings,
-  loadGitHubRepositories,
-  loadGitHubSyncRules,
-} from "./lib/github-connections";
+import { DashboardClient, dashboardSWR } from "~/lib/atom-rpc";
 
-export type GitHubConnection = Awaited<
-  ReturnType<typeof loadGitHubConnections>
->[number];
-export type GitHubRepository = Awaited<
-  ReturnType<typeof loadGitHubRepositories>
->[number];
-export type GitHubPublishSettings = Awaited<
-  ReturnType<typeof loadGitHubPublishSettings>
->;
-/** GitHub state synchronization rule derived from the shared Effect Schema. */
-export type GitHubSyncRule = GitHubSyncRuleSchema;
-export type GitHubBoard = Awaited<ReturnType<typeof loadGitHubBoards>>[number];
-export type GitHubPostStatus = Awaited<
-  ReturnType<typeof loadGitHubPostStatuses>
->[number];
-
-/** Isolated Effect atom registry for GitHub integration screens. */
-export const gitHubAtomRegistry = AtomRegistry.make();
+export const gitHubReactivityKeys = (organizationId: string) => ({
+  github: [organizationId],
+});
 
 /** GitHub App installations cached per organization. */
 export const gitHubConnectionsAtom = Atom.family((organizationId: string) =>
-  Atom.make(
-    Effect.tryPromise(() => loadGitHubConnections(organizationId))
-  ).pipe(
-    Atom.swr({
-      staleTime: "30 seconds",
-      revalidateOnFocus: "always",
-      focusSignal: Atom.windowFocusSignal,
-    }),
-    Atom.setIdleTTL("5 minutes")
-  )
+  DashboardClient.query(
+    "GitHubConnectionList",
+    { organizationId },
+    { reactivityKeys: gitHubReactivityKeys(organizationId) }
+  ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
 
-/** GitHub setup availability for this deployment. */
-export const gitHubIntegrationStatusAtom = Atom.make(
-  Effect.tryPromise(() => loadGitHubIntegrationStatus())
+export type GitHubConnection = Atom.Success<
+  ReturnType<typeof gitHubConnectionsAtom>
+>[number];
+
+/** Whether the GitHub App is configured for this deployment. */
+export const gitHubIntegrationStatusAtom = DashboardClient.query(
+  "GitHubIntegrationStatus",
+  void 0
 ).pipe(
-  Atom.swr({
-    staleTime: "30 seconds",
-    revalidateOnFocus: "always",
-    focusSignal: Atom.windowFocusSignal,
-  }),
+  dashboardSWR("30 seconds"),
+  Atom.map((result) => Result.map(result, (value) => value.configured)),
   Atom.setIdleTTL("5 minutes")
 );
 
@@ -66,63 +39,89 @@ export type GitHubConnectionArgs = {
 /** Repositories available to one GitHub connection. */
 export const gitHubRepositoriesAtom = Atom.family(
   (args: GitHubConnectionArgs) =>
-    Atom.make(Effect.tryPromise(() => loadGitHubRepositories(args))).pipe(
-      Atom.swr({
-        staleTime: "30 seconds",
-        revalidateOnFocus: "always",
-        focusSignal: Atom.windowFocusSignal,
-      }),
-      Atom.setIdleTTL("5 minutes")
-    )
+    DashboardClient.query("GitHubRepositoryList", args, {
+      reactivityKeys: gitHubReactivityKeys(args.organizationId),
+    }).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
+
+export type GitHubRepository = Atom.Success<
+  ReturnType<typeof gitHubRepositoriesAtom>
+>[number];
 
 /** Automatic publishing settings for one GitHub connection. */
 export const gitHubPublishSettingsAtom = Atom.family(
   (args: GitHubConnectionArgs) =>
-    Atom.make(Effect.tryPromise(() => loadGitHubPublishSettings(args))).pipe(
-      Atom.swr({
-        staleTime: "30 seconds",
-        revalidateOnFocus: "always",
-        focusSignal: Atom.windowFocusSignal,
-      }),
-      Atom.setIdleTTL("5 minutes")
-    )
+    DashboardClient.query("GitHubSettingsGet", args, {
+      reactivityKeys: gitHubReactivityKeys(args.organizationId),
+    }).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
+
+export type GitHubPublishSettings = Atom.Success<
+  ReturnType<typeof gitHubPublishSettingsAtom>
+>;
 
 /** State synchronization rules for one GitHub connection. */
 export const gitHubSyncRulesAtom = Atom.family((args: GitHubConnectionArgs) =>
-  Atom.make(Effect.tryPromise(() => loadGitHubSyncRules(args))).pipe(
-    Atom.swr({
-      staleTime: "30 seconds",
-      revalidateOnFocus: "always",
-      focusSignal: Atom.windowFocusSignal,
-    }),
-    Atom.setIdleTTL("5 minutes")
-  )
+  DashboardClient.query("GitHubRuleList", args, {
+    reactivityKeys: gitHubReactivityKeys(args.organizationId),
+  }).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
 
-/** Boards available for scoping automatic GitHub issue publishing. */
+export type GitHubSyncRule = GitHubSyncRuleSchema;
+
+/** Boards available for scoping automatic publishing. */
 export const gitHubBoardsAtom = Atom.family((organizationId: string) =>
-  Atom.make(Effect.tryPromise(() => loadGitHubBoards(organizationId))).pipe(
-    Atom.swr({
-      staleTime: "30 seconds",
-      revalidateOnFocus: "always",
-      focusSignal: Atom.windowFocusSignal,
-    }),
-    Atom.setIdleTTL("5 minutes")
-  )
+  DashboardClient.query(
+    "BoardList",
+    { organizationId },
+    {
+      reactivityKeys: {
+        ...gitHubReactivityKeys(organizationId),
+        boards: [organizationId],
+      },
+    }
+  ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
+
+export type GitHubBoard = Atom.Success<
+  ReturnType<typeof gitHubBoardsAtom>
+>[number];
 
 /** Feeblo statuses available as synchronization-rule targets. */
 export const gitHubPostStatusesAtom = Atom.family((organizationId: string) =>
-  Atom.make(
-    Effect.tryPromise(() => loadGitHubPostStatuses(organizationId))
-  ).pipe(
-    Atom.swr({
-      staleTime: "30 seconds",
-      revalidateOnFocus: "always",
-      focusSignal: Atom.windowFocusSignal,
-    }),
-    Atom.setIdleTTL("5 minutes")
-  )
+  DashboardClient.query(
+    "PostStatusList",
+    { organizationId },
+    {
+      reactivityKeys: {
+        ...gitHubReactivityKeys(organizationId),
+        postStatuses: [organizationId],
+      },
+    }
+  ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
+);
+
+export type GitHubPostStatus = Atom.Success<
+  ReturnType<typeof gitHubPostStatusesAtom>
+>[number];
+
+export const startGitHubConnectAtom =
+  DashboardClient.mutation("GitHubConnectStart");
+export const disconnectGitHubConnectionAtom = DashboardClient.mutation(
+  "GitHubConnectionDisconnect"
+);
+export const updateGitHubPublishSettingsAtom = DashboardClient.mutation(
+  "GitHubSettingsUpdate"
+);
+export const createGitHubSyncRuleAtom =
+  DashboardClient.mutation("GitHubRuleCreate");
+export const updateGitHubSyncRuleAtom =
+  DashboardClient.mutation("GitHubRuleUpdate");
+export const deleteGitHubSyncRuleAtom =
+  DashboardClient.mutation("GitHubRuleDelete");
+export const createGitHubPostIssueAtom = DashboardClient.mutation(
+  "GitHubPostIssueCreate"
+);
+export const linkGitHubPostIssueAtom = DashboardClient.mutation(
+  "GitHubPostIssueLink"
 );

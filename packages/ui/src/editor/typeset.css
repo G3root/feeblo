@@ -1,10 +1,10 @@
 /*
- * Use the read-only renderer's typography as the editor's source of truth.
- * The rules below only adapt ProseKit-specific DOM that has no equivalent in
- * the semantic HTML targeted by the shared stylesheet.
+ * ProseKit-specific overrides built on top of the shared typeset stylesheet
+ * (`@feeblo/web-shared/typeset.css`). The shared stylesheet is included once
+ * by each host's global CSS (web `global.css`), not re-imported here, so it is
+ * not inlined twice: once by the host stylesheet and again by the editor's
+ * route chunk.
  */
-@import "@feeblo/web-shared/typeset.css";
-
 /* Keep this compatibility layer unlayered. ProseKit's structural CSS is also
    unlayered, so putting these overrides in `components` would make them lose
    in the cascade regardless of selector specificity. */
