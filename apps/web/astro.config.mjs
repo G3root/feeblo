@@ -177,6 +177,30 @@ export default defineConfig({
                   if (name === "form-core") {
                     return "tanstack-react-form-vendor";
                   }
+                  // Thin re-export / leaf wrappers: co-locate each with the chunk it
+                  // actually shares code with, so tree-shaking doesn't leave
+                  // near-empty chunks and extra requests on the dashboard.
+                  // (All of these are dashboard-only, so pulling them into shared
+                  // dashboard chunks adds no cross-route overhead.)
+                  if (name === "react-query") {
+                    return "tanstack-query-core-vendor";
+                  }
+                  if (name === "react-db") {
+                    return "tanstack-db-vendor";
+                  }
+                  if (name === "history") {
+                    return "tanstack-react-router-vendor";
+                  }
+                  // react-pacer, pacer and devtools-event-client all depend on
+                  // react-store (already grouped into the router chunk); keep them
+                  // together rather than as ~4kB standalone chunks.
+                  if (
+                    name === "react-pacer" ||
+                    name === "pacer" ||
+                    name === "devtools-event-client"
+                  ) {
+                    return "tanstack-react-router-vendor";
+                  }
                   return `tanstack-${name}-vendor`;
                 }
               }
