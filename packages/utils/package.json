@@ -23,6 +23,7 @@
   "dependencies": {
     "@better-auth/utils": "catalog:",
     "@noble/ciphers": "^2.0.1",
+    "@noble/hashes": "^2.0.1",
     "dayjs": "^1.11.21",
     "dompurify": "^3.2.6",
     "effect": "catalog:",

@@ -30,10 +30,8 @@ export const getSessionCookieNameForUrl = (
  * backwards-compat with call sites that have not yet migrated to DI.
  */
 export const getSessionCookieName = (): string => {
-  const apiUrl =
-    typeof process !== "undefined" ? process.env.API_URL : undefined;
-  const nodeEnv =
-    typeof process !== "undefined" ? process.env.NODE_ENV : undefined;
+  const apiUrl = process.env.API_URL;
+  const nodeEnv = process.env.NODE_ENV;
   if (apiUrl !== undefined) {
     return getSessionCookieNameForUrl(apiUrl);
   }

@@ -108,7 +108,8 @@ export const makePublicRpcRateLimiter = ({
           Effect.tap(() =>
             Effect.logWarning(
               "Public RPC rate-limit used shared unavailable bucket — check ClientIp proxy trust / remoteAddress"
-            ).pipe(Effect.annotateLogs({ rpc: name })))
+            ).pipe(Effect.annotateLogs({ rpc: name }))
+          )
         )
       : consumeEffect;
   },
