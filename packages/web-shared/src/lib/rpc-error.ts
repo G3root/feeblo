@@ -1,4 +1,5 @@
 import * as Cause from "effect/Cause";
+import * as Option from "effect/Option";
 
 export type ParsedRpcError =
   | {
@@ -44,72 +45,32 @@ function extractUserMessage(failure: unknown): string | undefined {
   return undefined;
 }
 
-function findMessageInCause(
-  value: unknown,
-  seen = new WeakSet<object>()
-): string | undefined {
-  if (!value || typeof value !== "object") {
-    return undefined;
-  }
-  const obj = value as object;
-  if (seen.has(obj)) {
-    return undefined;
-  }
-  seen.add(obj);
-  const record = value as Record<string, unknown>;
-  const direct = extractUserMessage(record);
-  if (direct) {
-    return direct;
-  }
-  // Common Cause nesting keys
-  const keys = [
-    "error",
-    "failure",
-    "cause",
-    "defect",
-    "reason",
-    "left",
-    "right",
-    "head",
-    "tail",
-    "value",
-    "_cause",
-    "failures",
-    "reasons",
-    "defects",
-  ];
-  for (const key of keys) {
-    const child = record[key];
-    if (child && typeof child === "object") {
-      if (Array.isArray(child)) {
-        for (const item of child) {
-          const found = findMessageInCause(item, seen);
-          if (found) {
-            return found;
-          }
-        }
-      } else {
-        const found = findMessageInCause(child, seen);
-        if (found) {
-          return found;
-        }
-      }
+function getCauseMessage(cause: Cause.Cause<unknown>): string | undefined {
+  // Effect's canonical API: extract the first typed failure, if any.
+  // For RpcError the cause is a Cause<E> where E is a tagged domain error
+  // like PolicyDeniedError ({ _tag: "PolicyDenied", reason: string }).
+  const failureOption = Cause.findErrorOption(cause);
+  if (Option.isSome(failureOption)) {
+    const msg = extractUserMessage(failureOption.value);
+    if (msg) {
+      return msg;
     }
   }
-  // Fallback: scan all object values (covers unknown Cause shapes)
-  for (const v of Object.values(record)) {
-    if (v && typeof v === "object") {
-      const found = findMessageInCause(v as object, seen);
-      if (found) {
-        return found;
+  // Fallback for causes that wrap the error differently (e.g. nested
+  // Fail reasons or parallel causes): scan the Cause's reasons.
+  // `cause.reasons` is available on the Cause value when it exists.
+  const maybeReasons = (cause as unknown as { reasons?: ReadonlyArray<unknown> }).reasons;
+  if (Array.isArray(maybeReasons)) {
+    for (const reason of maybeReasons) {
+      // Fail reason shape: { _tag: "Fail", error: E }
+      const error = (reason as { error?: unknown }).error ?? reason;
+      const msg = extractUserMessage(error);
+      if (msg) {
+        return msg;
       }
     }
   }
   return undefined;
-}
-
-function getCauseMessage(cause: Cause.Cause<unknown>): string | undefined {
-  return findMessageInCause(cause as unknown);
 }
 
 /**
