@@ -248,6 +248,11 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
       }
       signingCertCache.delete(certUrl);
 
+      // SNS SigningCertURL must be fetched without following redirects —
+      // a whitelist-bypass via 302 to an attacker host would leak the fetch
+      // to an untrusted endpoint. The server composition root should
+      // configure HttpClient with `followRedirects: false`; we defensively
+      // reject any 3xx even if the client does follow.
       const response = yield* HttpClient.execute(
         HttpClientRequest.get(certUrl)
       ).pipe(
@@ -270,6 +275,13 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
           )
         )
       );
+      if (response.status >= 300 && response.status < 400) {
+        return yield* new SesWebhookEnvelopeError({
+          httpStatus: response.status,
+          message: `SNS signing certificate redirected (HTTP ${response.status}) — redirects are not allowed`,
+          operation: "SesEmailFeedbackWebhook.fetchSnsSigningCert",
+        });
+      }
       if (response.status < 200 || response.status >= 300) {
         return yield* new SesWebhookEnvelopeError({
           httpStatus: response.status,
@@ -321,6 +333,8 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
           operation: "SesEmailFeedbackWebhook.confirmSubscription",
         });
       }
+      // Subscription confirmation must also not follow redirects — an
+      // attacker-controlled SubscribeURL would otherwise be fetched.
       const response = yield* HttpClient.execute(
         HttpClientRequest.get(subscribeUrl)
       ).pipe(
@@ -344,6 +358,13 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
         )
       );
 
+      if (response.status >= 300 && response.status < 400) {
+        return yield* new SesWebhookConfirmationError({
+          httpStatus: response.status,
+          message: `SNS subscription confirmation redirected (HTTP ${response.status}) — redirects are not allowed`,
+          operation: "SesEmailFeedbackWebhook.confirmSubscription",
+        });
+      }
       if (response.status < 200 || response.status >= 300) {
         return yield* new SesWebhookConfirmationError({
           httpStatus: response.status,

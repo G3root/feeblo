@@ -12,7 +12,8 @@ const makeContactPolicy = Effect.gen(function* () {
   const belongsToOrganization = (args: TContactDelete) =>
     Policy.policy(() => repository.exists(args));
 
-  //TODO REVISIT LATER
+  // Linked user must already be a member of the organization; null (no
+  // linked user) is allowed for external contacts created before SSO.
   const userIsOrgMember = (args: {
     organizationId: string;
     userId: string | null | undefined;

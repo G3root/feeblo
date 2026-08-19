@@ -31,9 +31,8 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
     PostReactionToggle: (args: TPostReactionToggle) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
-        //TODO: comeback later
-        // yield* sitePolicy.canViewRoadmap(args.organizationId);
-
+        // Roadmap visibility is enforced at the Post level via
+        // `postPolicy.isUnlocked` in the pipeline below.
         return yield* repository.toggle({
           organizationId: args.organizationId,
           postId: args.postId,
@@ -77,9 +76,8 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
     PostReactionTogglePublic: (args: TPostReactionToggle) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
-        //TODO: comeback later
-        // yield* sitePolicy.canViewRoadmap(args.organizationId);
-
+        // Public roadmap visibility is enforced via `postPolicy.isUnlockedPublic`
+        // in the pipeline below; no additional site-policy gate needed.
         return yield* repository.togglePublic({
           organizationId: args.organizationId,
           postId: args.postId,
