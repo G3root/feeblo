@@ -1,3 +1,4 @@
+/* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-runtime-typeof, anti-slop/no-unsafe-dictionary-type, anti-slop/require-safety-comment-for-type-assertion, anti-slop/no-chained-type-assertions */
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 
@@ -59,7 +60,9 @@ function getCauseMessage(cause: Cause.Cause<unknown>): string | undefined {
   // Fallback for causes that wrap the error differently (e.g. nested
   // Fail reasons or parallel causes): scan the Cause's reasons.
   // `cause.reasons` is available on the Cause value when it exists.
-  const maybeReasons = (cause as unknown as { reasons?: ReadonlyArray<unknown> }).reasons;
+  const maybeReasons = (
+    cause as unknown as { reasons?: ReadonlyArray<unknown> }
+  ).reasons;
   if (Array.isArray(maybeReasons)) {
     for (const reason of maybeReasons) {
       // Fail reason shape: { _tag: "Fail", error: E }

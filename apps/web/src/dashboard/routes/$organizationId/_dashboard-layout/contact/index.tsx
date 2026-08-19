@@ -1,4 +1,3 @@
-import { PLAN_ENTITLEMENTS } from "@feeblo/domain/plan-entitlements";
 import { Button } from "@feeblo/ui/button";
 import {
   Empty,
@@ -118,7 +117,7 @@ function ContactPage() {
   );
   const companiesById = new Map(companies.map((c) => [c.id, c]));
 
-  const { entitlements, plan } = useEntitlements();
+  const { entitlements } = useEntitlements();
   const crmLimit = entitlements.limits.crmEntries;
   const totalCrmEntries = contacts.length + companies.length;
   const hasReachedCrmLimit = crmLimit !== null && totalCrmEntries >= crmLimit;
