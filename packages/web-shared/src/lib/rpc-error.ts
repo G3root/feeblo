@@ -1,6 +1,6 @@
-/* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-runtime-typeof, anti-slop/no-unsafe-dictionary-type, anti-slop/require-safety-comment-for-type-assertion, anti-slop/no-chained-type-assertions */
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
 export type ParsedRpcError =
   | {
@@ -23,25 +23,35 @@ export class RpcError extends Error {
   }
 }
 
-function extractUserMessage(failure: unknown): string | undefined {
-  if (!failure || typeof failure !== "object") {
+const UserFacingErrorSchema = Schema.Struct({
+  _tag: Schema.String,
+  reason: Schema.optional(Schema.String),
+  message: Schema.optional(Schema.String),
+});
+
+const decodeUserFacingError = Schema.decodeUnknownOption(UserFacingErrorSchema);
+
+function extractUserMessage(cause: unknown): string | undefined {
+  const decoded = decodeUserFacingError(cause);
+  if (Option.isNone(decoded)) {
     return undefined;
   }
-  const record = failure as Record<string, unknown>;
-  // Never expose internal server / DB errors directly
+  const error = decoded.value;
   if (
-    record["_tag"] === "InternalServerError" ||
-    record["_tag"] === "SqlError" ||
-    record["_tag"] === "SchemaError" ||
-    record["_tag"] === "LegidError"
+    error._tag === "InternalServerError" ||
+    error._tag === "SqlError" ||
+    error._tag === "SchemaError" ||
+    error._tag === "LegidError"
   ) {
     return undefined;
   }
-  if (typeof record["reason"] === "string" && record["reason"].trim()) {
-    return record["reason"] as string;
+  const reason = error.reason?.trim();
+  if (reason) {
+    return reason;
   }
-  if (typeof record["message"] === "string" && record["message"].trim()) {
-    return record["message"] as string;
+  const message = error.message?.trim();
+  if (message) {
+    return message;
   }
   return undefined;
 }
@@ -52,25 +62,9 @@ function getCauseMessage(cause: Cause.Cause<unknown>): string | undefined {
   // like PolicyDeniedError ({ _tag: "PolicyDenied", reason: string }).
   const failureOption = Cause.findErrorOption(cause);
   if (Option.isSome(failureOption)) {
-    const msg = extractUserMessage(failureOption.value);
-    if (msg) {
-      return msg;
-    }
-  }
-  // Fallback for causes that wrap the error differently (e.g. nested
-  // Fail reasons or parallel causes): scan the Cause's reasons.
-  // `cause.reasons` is available on the Cause value when it exists.
-  const maybeReasons = (
-    cause as unknown as { reasons?: ReadonlyArray<unknown> }
-  ).reasons;
-  if (Array.isArray(maybeReasons)) {
-    for (const reason of maybeReasons) {
-      // Fail reason shape: { _tag: "Fail", error: E }
-      const error = (reason as { error?: unknown }).error ?? reason;
-      const msg = extractUserMessage(error);
-      if (msg) {
-        return msg;
-      }
+    const message = extractUserMessage(failureOption.value);
+    if (message) {
+      return message;
     }
   }
   return undefined;
