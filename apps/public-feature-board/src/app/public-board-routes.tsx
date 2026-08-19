@@ -207,7 +207,7 @@ const roadmapSlugRoute = createRoute({
 const postRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/p/$slug",
-  beforeLoad: async (params) => {
+  beforeLoad: async ({ params }) => {
     const { slug } = params;
     const subsetQueries = createPublicPostSubsetQueries(slug);
 
