@@ -106,6 +106,10 @@ function RouteComponent() {
     [organizationId, post?.id]
   );
 
+  const preloadActivity = () => {
+    activityQuery.preload();
+  };
+
   // The post query is derived from the preloaded collections, but it still
   // passes through a brief `loading` phase on mount and post navigation.
   // Rendering the "Post not found" empty state then would flash the wrong
@@ -179,7 +183,8 @@ function RouteComponent() {
                   Comments
                 </TabsTab>
                 <TabsTab
-                  onMouseEnter={() => void activityQuery.preload()}
+                  onMouseEnter={preloadActivity}
+                  onFocus={preloadActivity}
                   value="activity"
                 >
                   <HugeiconsIcon icon={Activity01Icon} />
