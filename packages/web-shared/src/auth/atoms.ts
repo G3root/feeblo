@@ -61,7 +61,6 @@ export const meAtom = Atom.make(
     return result.data;
   })
 ).pipe(
-  Atom.withRefresh("5 minutes"),
   Atom.swr({
     staleTime: "5 minutes",
     revalidateOnFocus: "always",

@@ -1,4 +1,8 @@
-import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
+import {
+  RegistryContext,
+  useAtomRefresh,
+  useAtomValue,
+} from "@effect/atom-react";
 import { BoardId, PostStatusId } from "@feeblo/id";
 import {
   AlertDialog,
@@ -33,7 +37,7 @@ import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import * as Result from "effect/unstable/reactivity/AsyncResult";
+import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import {
   startTransition,
   useMemo,
@@ -46,21 +50,23 @@ import {
   type GitHubConnection,
   type GitHubPostStatus,
   type GitHubSyncRule,
+  gitHubAtomRegistry,
   gitHubBoardsAtom,
-  gitHubReactivityKeys,
   gitHubConnectionsAtom,
   gitHubIntegrationStatusAtom,
   gitHubPostStatusesAtom,
   gitHubPublishSettingsAtom,
   gitHubRepositoriesAtom,
   gitHubSyncRulesAtom,
-  createGitHubSyncRuleAtom,
-  deleteGitHubSyncRuleAtom,
-  disconnectGitHubConnectionAtom,
-  startGitHubConnectAtom,
-  updateGitHubPublishSettingsAtom,
-  updateGitHubSyncRuleAtom,
 } from "../atoms";
+import {
+  createGitHubSyncRule,
+  deleteGitHubSyncRule,
+  disconnectGitHubConnection,
+  startGitHubConnect,
+  updateGitHubPublishSettings,
+  updateGitHubSyncRule,
+} from "../lib/github-connections";
 
 type AsyncListState<T> = {
   readonly list: readonly T[];
@@ -69,11 +75,11 @@ type AsyncListState<T> = {
 };
 
 function useAsyncList<T>(
-  result: Result.AsyncResult<readonly T[], unknown>
+  result: AsyncResult.AsyncResult<readonly T[], unknown>
 ): AsyncListState<T> {
-  return Result.builder(result)
-    .onInitial(() => ({ list: [], isLoading: true, loadFailed: false }))
-    .onFailure((_, { previousSuccess }) =>
+  return AsyncResult.match(result, {
+    onInitial: () => ({ list: [], isLoading: true, loadFailed: false }),
+    onFailure: ({ previousSuccess }) =>
       Option.match(previousSuccess, {
         onNone: () => ({ list: [], isLoading: false, loadFailed: true }),
         onSome: ({ value }) => ({
@@ -81,14 +87,13 @@ function useAsyncList<T>(
           isLoading: false,
           loadFailed: false,
         }),
-      })
-    )
-    .onSuccess((value) => ({
+      }),
+    onSuccess: ({ value }) => ({
       list: value,
       isLoading: false,
       loadFailed: false,
-    }))
-    .exhaustive();
+    }),
+  });
 }
 
 /** GitHub connection, automatic publishing, and issue-state rule settings. */
@@ -97,7 +102,11 @@ export function GitHubSettings({
 }: {
   readonly organizationId: string;
 }) {
-  return <GitHubSettingsContent organizationId={organizationId} />;
+  return (
+    <RegistryContext.Provider value={gitHubAtomRegistry}>
+      <GitHubSettingsContent organizationId={organizationId} />
+    </RegistryContext.Provider>
+  );
 }
 
 function GitHubSettingsContent({
@@ -106,31 +115,23 @@ function GitHubSettingsContent({
   readonly organizationId: string;
 }) {
   const [connecting, setConnecting] = useState(false);
-  const startConnect = useAtomSet(startGitHubConnectAtom, {
-    mode: "promise",
-  });
   const statusResult = useAtomValue(gitHubIntegrationStatusAtom);
   const connectionsResult = useAtomValue(gitHubConnectionsAtom(organizationId));
   const refreshConnections = useAtomRefresh(
     gitHubConnectionsAtom(organizationId)
   );
-  const configured = Result.builder(statusResult)
-    .onInitial(
-      // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
-      () => null as boolean | null
-    )
-    .onFailure(() => false)
-    .onSuccess((value) => value)
-    .exhaustive();
+  const configured = AsyncResult.match(statusResult, {
+    // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
+    onInitial: () => null as boolean | null,
+    onFailure: () => false,
+    onSuccess: ({ value }) => value,
+  });
   const connections = useAsyncList<GitHubConnection>(connectionsResult);
 
   const installGitHubApp = async () => {
     setConnecting(true);
     try {
-      const { authorizeUrl } = await startConnect({
-        payload: { organizationId },
-        reactivityKeys: gitHubReactivityKeys(organizationId),
-      });
+      const { authorizeUrl } = await startGitHubConnect(organizationId);
       window.location.assign(authorizeUrl.toString());
     } catch {
       setConnecting(false);
@@ -193,6 +194,7 @@ function GitHubSettingsContent({
           connection={connection}
           key={connection.id}
           onDisconnected={() => {
+            refreshConnections();
             toastManager.add({
               title: "GitHub integration removed",
               type: "success",
@@ -248,17 +250,11 @@ function GitHubConnectionFrame({
   const args = { organizationId, connectionId: connection.id };
   const [dialogOpen, setDialogOpen] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
-  const disconnect = useAtomSet(disconnectGitHubConnectionAtom, {
-    mode: "promise",
-  });
 
   const handleDisconnect = async () => {
     setDisconnecting(true);
     try {
-      await disconnect({
-        payload: args,
-        reactivityKeys: gitHubReactivityKeys(organizationId),
-      });
+      await disconnectGitHubConnection(args);
       setDialogOpen(false);
       onDisconnected();
     } catch {
@@ -350,20 +346,16 @@ function GitHubPublishingSettings({
     readonly connectionId: string;
   };
 }) {
-  const updateSettings = useAtomSet(updateGitHubPublishSettingsAtom, {
-    mode: "promise",
-  });
   const settingsResult = useAtomValue(gitHubPublishSettingsAtom(args));
   const repositoriesResult = useAtomValue(gitHubRepositoriesAtom(args));
   const boardsResult = useAtomValue(gitHubBoardsAtom(args.organizationId));
-  const settings = Result.builder(settingsResult)
-    .onInitial(() => null)
-    .onFailure(
-      (_, { previousSuccess }) =>
-        Option.getOrNull(previousSuccess)?.value ?? null
-    )
-    .onSuccess((value) => value)
-    .exhaustive();
+  const refreshSettings = useAtomRefresh(gitHubPublishSettingsAtom(args));
+  const settings = AsyncResult.match(settingsResult, {
+    onInitial: () => null,
+    onFailure: ({ previousSuccess }) =>
+      Option.getOrNull(previousSuccess)?.value ?? null,
+    onSuccess: ({ value }) => value,
+  });
   const repositories = useAsyncList(repositoriesResult);
   const boards = useAsyncList(boardsResult);
   const [optimisticSettings, setOptimisticSettings] = useOptimistic(
@@ -375,11 +367,10 @@ function GitHubPublishingSettings({
     startTransition(async () => {
       setOptimisticSettings(next);
       try {
-        await updateSettings({
-          payload: { ...args, ...next },
-          reactivityKeys: gitHubReactivityKeys(args.organizationId),
-        });
+        await updateGitHubPublishSettings({ ...args, ...next });
+        refreshSettings();
       } catch {
+        refreshSettings();
         toastManager.add({
           title: "Could not save GitHub publishing settings",
           type: "error",
@@ -563,6 +554,7 @@ function GitHubSyncRules({
   const statusesResult = useAtomValue(
     gitHubPostStatusesAtom(args.organizationId)
   );
+  const refreshRules = useAtomRefresh(gitHubSyncRulesAtom(args));
   const rules = useAsyncList<GitHubSyncRule>(rulesResult);
   const statuses = useAsyncList<GitHubPostStatus>(statusesResult);
   const openRule = rules.list.find(
@@ -599,6 +591,7 @@ function GitHubSyncRules({
           description="When any linked issue is open"
           issueMatchMode="any"
           issueState="open"
+          onChanged={refreshRules}
           rule={openRule}
           statuses={statuses.list}
           statusesLoading={statuses.isLoading}
@@ -608,6 +601,7 @@ function GitHubSyncRules({
           description="When every linked issue is closed"
           issueMatchMode="all"
           issueState="closed"
+          onChanged={refreshRules}
           rule={closedRule}
           statuses={statuses.list}
           statusesLoading={statuses.isLoading}
@@ -622,6 +616,7 @@ function GitHubSyncRuleSlot({
   description,
   issueMatchMode,
   issueState,
+  onChanged,
   rule,
   statuses,
   statusesLoading,
@@ -633,6 +628,7 @@ function GitHubSyncRuleSlot({
   readonly description: string;
   readonly issueMatchMode: GitHubSyncRule["issueMatchMode"];
   readonly issueState: GitHubSyncRule["issueState"];
+  readonly onChanged: () => void;
   readonly rule: GitHubSyncRule | undefined;
   readonly statuses: readonly GitHubPostStatus[];
   readonly statusesLoading: boolean;
@@ -644,15 +640,6 @@ function GitHubSyncRuleSlot({
   // saves cannot issue duplicate createGitHubSyncRule calls.
   const createInFlightRef = useRef<Promise<GitHubSyncRule> | null>(null);
   const [saving, setSaving] = useState(false);
-  const createRule = useAtomSet(createGitHubSyncRuleAtom, {
-    mode: "promise",
-  });
-  const updateRule = useAtomSet(updateGitHubSyncRuleAtom, {
-    mode: "promise",
-  });
-  const deleteRule = useAtomSet(deleteGitHubSyncRuleAtom, {
-    mode: "promise",
-  });
   // Optimistic draft derived from the server rule. Field changes render
   // immediately and reset to the server value once the refresh lands (or a
   // failed save reverts the rule).
@@ -685,17 +672,14 @@ function GitHubSyncRuleSlot({
           const reused = createInFlightRef.current !== null;
           const createPromise =
             createInFlightRef.current ??
-            createRule({
-              payload: {
-                organizationId: args.organizationId,
-                connectionId: args.connectionId,
-                issueMatchMode,
-                issueState,
-                postStatusId: next.postStatusId,
-                upvoterNotificationPolicy: next.upvoterNotificationPolicy,
-                enabled: next.enabled,
-              },
-              reactivityKeys: gitHubReactivityKeys(args.organizationId),
+            createGitHubSyncRule({
+              organizationId: args.organizationId,
+              connectionId: args.connectionId,
+              issueMatchMode,
+              issueState,
+              postStatusId: next.postStatusId,
+              upvoterNotificationPolicy: next.upvoterNotificationPolicy,
+              enabled: next.enabled,
             });
           createInFlightRef.current = createPromise;
           let created: GitHubSyncRule;
@@ -709,32 +693,28 @@ function GitHubSyncRuleSlot({
           }
           setCreatedRuleId(created.id);
           if (reused) {
-            await updateRule({
-              payload: {
-                organizationId: args.organizationId,
-                connectionId: args.connectionId,
-                id: created.id,
-                postStatusId: next.postStatusId,
-                upvoterNotificationPolicy: next.upvoterNotificationPolicy,
-                enabled: next.enabled,
-              },
-              reactivityKeys: gitHubReactivityKeys(args.organizationId),
-            });
-          }
-        } else {
-          await updateRule({
-            payload: {
+            await updateGitHubSyncRule({
               organizationId: args.organizationId,
               connectionId: args.connectionId,
-              id: ruleId,
+              id: created.id,
               postStatusId: next.postStatusId,
               upvoterNotificationPolicy: next.upvoterNotificationPolicy,
               enabled: next.enabled,
-            },
-            reactivityKeys: gitHubReactivityKeys(args.organizationId),
+            });
+          }
+        } else {
+          await updateGitHubSyncRule({
+            organizationId: args.organizationId,
+            connectionId: args.connectionId,
+            id: ruleId,
+            postStatusId: next.postStatusId,
+            upvoterNotificationPolicy: next.upvoterNotificationPolicy,
+            enabled: next.enabled,
           });
         }
+        onChanged();
       } catch {
+        onChanged();
         toastManager.add({
           title:
             ruleId === null
@@ -754,21 +734,20 @@ function GitHubSyncRuleSlot({
     }
     setSaving(true);
     try {
-      await deleteRule({
-        payload: {
-          organizationId: args.organizationId,
-          connectionId: args.connectionId,
-          id: ruleId,
-        },
-        reactivityKeys: gitHubReactivityKeys(args.organizationId),
+      await deleteGitHubSyncRule({
+        organizationId: args.organizationId,
+        connectionId: args.connectionId,
+        id: ruleId,
       });
       setCreatedRuleId(null);
       createInFlightRef.current = null;
+      onChanged();
       toastManager.add({
         title: "GitHub synchronization rule removed",
         type: "success",
       });
     } catch {
+      onChanged();
       toastManager.add({
         title: "Could not remove GitHub synchronization rule",
         type: "error",

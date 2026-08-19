@@ -1,4 +1,9 @@
-import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
+import {
+  RegistryContext,
+  useAtomRefresh,
+  useAtomSet,
+  useAtomValue,
+} from "@effect/atom-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,11 +41,12 @@ import {
 } from "@tanstack/react-router";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import * as Option from "effect/Option";
-import * as Result from "effect/unstable/reactivity/AsyncResult";
+import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useScrollBottom } from "~/hooks/use-scroll-bottom";
+import { fetchRpc } from "~/lib/runtime";
 
 import {
   type Delivery,
@@ -49,14 +55,7 @@ import {
   deliveryHistoryRefreshAtom,
   type Endpoint,
   endpointsAtom,
-  pauseWebhookEndpointAtom,
-  removeWebhookEndpointAtom,
-  resumeWebhookEndpointAtom,
-  retryWebhookDeliveryAtom,
-  rotateWebhookSecretAtom,
-  testWebhookDeliveryAtom,
-  updateWebhookEndpointAtom,
-  webhookReactivityKeys,
+  webhookAtomRegistry,
 } from "../atoms";
 import {
   useWebhookEditSheetContext,
@@ -75,10 +74,12 @@ export function WebhookDetail({
 }) {
   return (
     <WebhookEditSheetProvider>
-      <WebhookDetailContent
-        connectionId={connectionId}
-        organizationId={organizationId}
-      />
+      <RegistryContext.Provider value={webhookAtomRegistry}>
+        <WebhookDetailContent
+          connectionId={connectionId}
+          organizationId={organizationId}
+        />
+      </RegistryContext.Provider>
     </WebhookEditSheetProvider>
   );
 }
@@ -100,24 +101,6 @@ function WebhookDetailContent({
   const [testResult, setTestResult] = useState<string | null>(null);
 
   const endpointsResult = useAtomValue(endpointsAtom(organizationId));
-  const testDelivery = useAtomSet(testWebhookDeliveryAtom, {
-    mode: "promise",
-  });
-  const rotateSecret = useAtomSet(rotateWebhookSecretAtom, {
-    mode: "promise",
-  });
-  const pauseEndpoint = useAtomSet(pauseWebhookEndpointAtom, {
-    mode: "promise",
-  });
-  const resumeEndpoint = useAtomSet(resumeWebhookEndpointAtom, {
-    mode: "promise",
-  });
-  const updateEndpoint = useAtomSet(updateWebhookEndpointAtom, {
-    mode: "promise",
-  });
-  const removeEndpoint = useAtomSet(removeWebhookEndpointAtom, {
-    mode: "promise",
-  });
   const refreshEndpoints = useAtomRefresh(endpointsAtom(organizationId));
   // Mutations that create or change deliveries (test, retry) bump this to
   // restart the history stream so new rows appear without a manual refresh.
@@ -125,43 +108,43 @@ function WebhookDetailContent({
     deliveryHistoryRefreshAtom({ connectionId, organizationId })
   );
 
-  const findEndpoint = (value: readonly Endpoint[]) =>
-    value.find((candidate) => candidate.id === connectionId) ?? null;
-  const { endpoint, isLoading, loadFailed } = Result.builder(endpointsResult)
-    .onInitial(() => ({ endpoint: null, isLoading: true, loadFailed: false }))
-    .onFailure((_, { previousSuccess }) =>
-      Option.match(previousSuccess, {
-        onNone: () => ({
-          endpoint: null,
-          isLoading: false,
-          loadFailed: true,
+  const { endpoint, isLoading, loadFailed } = useMemo(() => {
+    const findEndpoint = (value: readonly Endpoint[]) =>
+      value.find((candidate) => candidate.id === connectionId) ?? null;
+    return AsyncResult.match(endpointsResult, {
+      onInitial: () => ({ endpoint: null, isLoading: true, loadFailed: false }),
+      onFailure: ({ previousSuccess }) =>
+        Option.match(previousSuccess, {
+          onNone: () => ({
+            endpoint: null,
+            isLoading: false,
+            loadFailed: true,
+          }),
+          onSome: ({ value }) => ({
+            endpoint: findEndpoint(value),
+            isLoading: false,
+            loadFailed: false,
+          }),
         }),
-        onSome: ({ value }) => ({
-          endpoint: findEndpoint(value),
-          isLoading: false,
-          loadFailed: false,
-        }),
-      })
-    )
-    .onSuccess((value) => ({
-      endpoint: findEndpoint(value),
-      isLoading: false,
-      loadFailed: false,
-    }))
-    .exhaustive();
+      onSuccess: ({ value }) => ({
+        endpoint: findEndpoint(value),
+        isLoading: false,
+        loadFailed: false,
+      }),
+    });
+  }, [connectionId, endpointsResult]);
 
   const handleTest = async (endpoint: Endpoint) => {
     // Clear any previous result up front, so an in-flight or failed test never
     // shows stale delivery information.
     setTestResult(null);
     try {
-      const result = await testDelivery({
-        payload: {
+      const result = await fetchRpc((rpc) =>
+        rpc.WebhookTestDelivery({
           connectionId: endpoint.id,
           organizationId,
-        },
-        reactivityKeys: webhookReactivityKeys(organizationId),
-      });
+        })
+      );
       setTestResult(`${result.result}: ${result.deliveryId}`);
       toastManager.add({ title: "Test delivery queued", type: "success" });
       refreshDeliveryHistory();
@@ -175,13 +158,12 @@ function WebhookDetailContent({
 
   const handleRotateSecret = async (endpoint: Endpoint) => {
     try {
-      const result = await rotateSecret({
-        payload: {
+      const result = await fetchRpc((rpc) =>
+        rpc.WebhookSecretRotate({
           connectionId: endpoint.id,
           organizationId,
-        },
-        reactivityKeys: webhookReactivityKeys(organizationId),
-      });
+        })
+      );
       setOneTimeSecret({
         endpointName: endpoint.name,
         value: result.signingSecret,
@@ -196,13 +178,18 @@ function WebhookDetailContent({
 
   const handleToggleLifecycle = async (endpoint: Endpoint) => {
     try {
-      await (endpoint.lifecycle === "paused" ? resumeEndpoint : pauseEndpoint)({
-        payload: {
-          connectionId: endpoint.id,
-          organizationId,
-        },
-        reactivityKeys: webhookReactivityKeys(organizationId),
-      });
+      await fetchRpc((rpc) =>
+        endpoint.lifecycle === "paused"
+          ? rpc.WebhookEndpointResume({
+              connectionId: endpoint.id,
+              organizationId,
+            })
+          : rpc.WebhookEndpointPause({
+              connectionId: endpoint.id,
+              organizationId,
+            })
+      );
+      refreshEndpoints();
     } catch {
       toastManager.add({
         title: "Could not change endpoint lifecycle",
@@ -216,14 +203,14 @@ function WebhookDetailContent({
     nextEventTypes: readonly WebhookEventType[]
   ) => {
     try {
-      await updateEndpoint({
-        payload: {
+      await fetchRpc((rpc) =>
+        rpc.WebhookEndpointUpdate({
           connectionId: endpoint.id,
           eventTypes: [...nextEventTypes],
           organizationId,
-        },
-        reactivityKeys: webhookReactivityKeys(organizationId),
-      });
+        })
+      );
+      refreshEndpoints();
     } catch {
       toastManager.add({
         title: "Could not update event selection",
@@ -237,10 +224,10 @@ function WebhookDetailContent({
       return;
     }
     try {
-      await removeEndpoint({
-        payload: { connectionId, organizationId },
-        reactivityKeys: webhookReactivityKeys(organizationId),
-      });
+      await fetchRpc((rpc) =>
+        rpc.WebhookEndpointRemove({ connectionId, organizationId })
+      );
+      refreshEndpoints();
       toastManager.add({ title: "Webhook endpoint removed", type: "success" });
       await navigate({
         params: { organizationId },
@@ -525,9 +512,6 @@ function DeliveryHistoryTable({
   // the component no longer tracks cursors or accumulates pages itself.
   const pull = useAtomSet(deliveriesAtom(historyArgs));
   const refreshHistory = useAtomSet(deliveryHistoryRefreshAtom(historyArgs));
-  const retryDelivery = useAtomSet(retryWebhookDeliveryAtom, {
-    mode: "promise",
-  });
   useScrollBottom(() => {
     pull();
   });
@@ -535,31 +519,27 @@ function DeliveryHistoryTable({
   // Accumulated rows. The pull atom owns pagination, so the visible list is
   // whatever pages have streamed in so far, keeping the previous rows visible
   // while the next page (or a refresh) is in flight.
-  const deliveries = Result.builder(historyResult)
-    .onInitial(
-      // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-      () => [] as readonly Delivery[]
-    )
-    .onFailure((_, { previousSuccess }) =>
+  const deliveries = AsyncResult.match(historyResult, {
+    // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+    onInitial: () => [] as readonly Delivery[],
+    onFailure: ({ previousSuccess }) =>
       Option.match(previousSuccess, {
         // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
         onNone: () => [] as readonly Delivery[],
         onSome: ({ value }) => value.items,
-      })
-    )
-    .onSuccess((value) => value.items)
-    .exhaustive();
+      }),
+    onSuccess: ({ value }) => value.items,
+  });
 
   // An empty history surfaces as `NoSuchElementError` (the paging stream ends
   // without emitting a chunk), so it renders as the empty state; every other
   // failure renders inline below.
-  const hasLoadError = Result.builder(historyResult)
-    .onInitial(() => false)
-    .onSuccess(() => false)
-    .onError((error) => error._tag !== "NoSuchElementError")
-    .onDefect(() => true)
-    .onInterrupt(() => true)
-    .exhaustive();
+  const hasLoadError = AsyncResult.matchWithError(historyResult, {
+    onInitial: () => false,
+    onSuccess: () => false,
+    onError: (error) => error._tag !== "NoSuchElementError",
+    onDefect: () => true,
+  });
 
   const loadFailed = hasLoadError && deliveries.length === 0;
 
@@ -572,10 +552,9 @@ function DeliveryHistoryTable({
 
   const handleRetry = async (deliveryId: Delivery["id"]) => {
     try {
-      await retryDelivery({
-        payload: { deliveryId, organizationId },
-        reactivityKeys: webhookReactivityKeys(organizationId),
-      });
+      await fetchRpc((rpc) =>
+        rpc.WebhookDeliveryRetry({ deliveryId, organizationId })
+      );
       toastManager.add({ title: "Delivery retry queued", type: "success" });
       refreshHistory();
     } catch {

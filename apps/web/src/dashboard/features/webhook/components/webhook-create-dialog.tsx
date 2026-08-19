@@ -1,4 +1,3 @@
-import { useAtomSet } from "@effect/atom-react";
 import { Button } from "@feeblo/ui/button";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
@@ -15,8 +14,8 @@ import { toastManager } from "@feeblo/ui/toast";
 import { useSelector } from "@xstate/store-react";
 
 import { useOrganizationId } from "~/hooks/use-organization-id";
+import { fetchRpc } from "~/lib/runtime";
 
-import { createWebhookEndpointAtom, webhookReactivityKeys } from "../atoms";
 import { useWebhookCreateDialogContext } from "../dialog-stores";
 import { webhookFormOpts } from "../shared-form";
 import { WebhookEventSelectionField } from "./webhook-events-selection";
@@ -65,23 +64,19 @@ function WebhookCreateForm({
 }) {
   const organizationId = useOrganizationId();
   const store = useWebhookCreateDialogContext();
-  const createEndpoint = useAtomSet(createWebhookEndpointAtom, {
-    mode: "promise",
-  });
 
   const form = useAppForm({
     ...webhookFormOpts,
     onSubmit: async ({ value }) => {
       try {
-        const result = await createEndpoint({
-          payload: {
+        const result = await fetchRpc((rpc) =>
+          rpc.WebhookEndpointCreate({
             endpointUrl: value.endpointUrl,
             eventTypes: [...value.eventTypes],
             name: value.name,
             organizationId,
-          },
-          reactivityKeys: webhookReactivityKeys(organizationId),
-        });
+          })
+        );
         form.reset();
         store.send({ type: "toggle" });
         await onCreated?.({

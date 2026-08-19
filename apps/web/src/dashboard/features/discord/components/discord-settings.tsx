@@ -1,4 +1,8 @@
-import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
+import {
+  RegistryContext,
+  useAtomRefresh,
+  useAtomValue,
+} from "@effect/atom-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,20 +26,22 @@ import {
 import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
 import * as Option from "effect/Option";
-import * as Result from "effect/unstable/reactivity/AsyncResult";
+import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { useState } from "react";
 
 import {
   channelsAtom,
   connectionsAtom,
-  discordReactivityKeys,
-  disconnectDiscordConnectionAtom,
   type DiscordChannel,
   type DiscordConnection,
+  discordAtomRegistry,
   discordStatusAtom,
-  startDiscordConnectAtom,
-  updateDiscordChannelNotificationsAtom,
 } from "../atoms";
+import {
+  disconnectDiscordConnection,
+  startDiscordConnect,
+  updateChannelNotifications,
+} from "../lib/connections";
 
 type AsyncListState<T> = {
   readonly list: readonly T[];
@@ -45,11 +51,11 @@ type AsyncListState<T> = {
 
 /** Collapses an atom AsyncResult into the loading/loaded/error trio the settings frames render. */
 function useAsyncList<T>(
-  result: Result.AsyncResult<readonly T[], unknown>
+  result: AsyncResult.AsyncResult<readonly T[], unknown>
 ): AsyncListState<T> {
-  return Result.builder(result)
-    .onInitial(() => ({ list: [], isLoading: true, loadFailed: false }))
-    .onFailure((_, { previousSuccess }) =>
+  return AsyncResult.match(result, {
+    onInitial: () => ({ list: [], isLoading: true, loadFailed: false }),
+    onFailure: ({ previousSuccess }) =>
       Option.match(previousSuccess, {
         onNone: () => ({ list: [], isLoading: false, loadFailed: true }),
         onSome: ({ value }) => ({
@@ -57,14 +63,13 @@ function useAsyncList<T>(
           isLoading: false,
           loadFailed: false,
         }),
-      })
-    )
-    .onSuccess((value) => ({
+      }),
+    onSuccess: ({ value }) => ({
       list: value,
       isLoading: false,
       loadFailed: false,
-    }))
-    .exhaustive();
+    }),
+  });
 }
 
 export function DiscordSettings({
@@ -72,7 +77,11 @@ export function DiscordSettings({
 }: {
   readonly organizationId: string;
 }) {
-  return <DiscordSettingsContent organizationId={organizationId} />;
+  return (
+    <RegistryContext.Provider value={discordAtomRegistry}>
+      <DiscordSettingsContent organizationId={organizationId} />
+    </RegistryContext.Provider>
+  );
 }
 
 function DiscordSettingsContent({
@@ -81,7 +90,6 @@ function DiscordSettingsContent({
   readonly organizationId: string;
 }) {
   const [connecting, setConnecting] = useState(false);
-  const startConnect = useAtomSet(startDiscordConnectAtom, { mode: "promise" });
   const connectionsResult = useAtomValue(connectionsAtom(organizationId));
   const refreshConnections = useAtomRefresh(connectionsAtom(organizationId));
   const {
@@ -90,22 +98,17 @@ function DiscordSettingsContent({
     loadFailed,
   } = useAsyncList<DiscordConnection>(connectionsResult);
   const statusResult = useAtomValue(discordStatusAtom);
-  const discordConfigured = Result.builder(statusResult)
-    .onInitial(
-      // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
-      () => null as boolean | null
-    )
-    .onFailure(() => false)
-    .onSuccess((value) => value)
-    .exhaustive();
+  const discordConfigured = AsyncResult.match(statusResult, {
+    // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
+    onInitial: () => null as boolean | null,
+    onFailure: () => false,
+    onSuccess: ({ value }) => value,
+  });
 
   const handleConnect = async () => {
     setConnecting(true);
     try {
-      const { authorizeUrl } = await startConnect({
-        payload: { organizationId },
-        reactivityKeys: discordReactivityKeys(organizationId),
-      });
+      const { authorizeUrl } = await startDiscordConnect(organizationId);
       window.location.assign(authorizeUrl.toString());
     } catch {
       setConnecting(false);
@@ -117,6 +120,7 @@ function DiscordSettingsContent({
   };
 
   const handleDisconnected = () => {
+    refreshConnections();
     toastManager.add({
       title: "Discord server disconnected",
       type: "success",
@@ -222,19 +226,13 @@ function DiscordConnectionFrame({
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
-  const disconnect = useAtomSet(disconnectDiscordConnectionAtom, {
-    mode: "promise",
-  });
 
   const handleDisconnect = async () => {
     setDisconnecting(true);
     try {
-      await disconnect({
-        payload: {
-          connectionId: connection.id,
-          organizationId,
-        },
-        reactivityKeys: discordReactivityKeys(organizationId),
+      await disconnectDiscordConnection({
+        connectionId: connection.id,
+        organizationId,
       });
       setDisconnecting(false);
       setDialogOpen(false);
@@ -355,10 +353,6 @@ function FeedbackChannelSelect({
   readonly organizationId: string;
 }) {
   const args = { connectionId, organizationId };
-  const updateNotifications = useAtomSet(
-    updateDiscordChannelNotificationsAtom,
-    { mode: "promise" }
-  );
   const channelsResult = useAtomValue(channelsAtom(args));
   const refreshChannels = useAtomRefresh(channelsAtom(args));
   const {
@@ -371,15 +365,13 @@ function FeedbackChannelSelect({
   const handleToggle = async (channel: DiscordChannel, enabled: boolean) => {
     setPendingChannelId(channel.id);
     try {
-      await updateNotifications({
-        payload: {
-          channelId: channel.id,
-          connectionId,
-          enabled,
-          organizationId,
-        },
-        reactivityKeys: discordReactivityKeys(organizationId),
+      await updateChannelNotifications({
+        channelId: channel.id,
+        connectionId,
+        enabled,
+        organizationId,
       });
+      refreshChannels();
       toastManager.add({
         title: enabled
           ? "New post notifications enabled"
@@ -387,6 +379,7 @@ function FeedbackChannelSelect({
         type: "success",
       });
     } catch {
+      refreshChannels();
       toastManager.add({
         title: "Could not update new post notifications",
         type: "error",

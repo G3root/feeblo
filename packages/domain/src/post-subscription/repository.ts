@@ -27,7 +27,7 @@ interface TIsSubscribed {
 
 interface TFindSubscribers {
   organizationId: string;
-  slug: string;
+  postId: string;
   /** Restricts the list to subscriptions on public boards (used by public endpoints). */
   publicOnly?: boolean;
   userId?: string;
@@ -90,7 +90,7 @@ const makePostSubscriptionRepository = Effect.gen(function* () {
 
     findSubscribers: ({
       organizationId,
-      slug,
+      postId,
       publicOnly = false,
       userId,
     }: TFindSubscribers) =>
@@ -116,7 +116,7 @@ const makePostSubscriptionRepository = Effect.gen(function* () {
         .where(
           and(
             eq(schema.postSubscriptionTable.organizationId, organizationId),
-            eq(schema.postTable.slug, slug),
+            eq(schema.postSubscriptionTable.postId, postId),
             ...(userId
               ? [eq(schema.postSubscriptionTable.userId, userId)]
               : []),

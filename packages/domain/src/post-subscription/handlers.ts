@@ -31,7 +31,7 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   ) =>
     repository.findSubscribers({
       organizationId: args.organizationId,
-      slug: args.slug,
+      postId: args.postId,
       ...(options?.publicOnly !== undefined && {
         publicOnly: options.publicOnly,
       }),

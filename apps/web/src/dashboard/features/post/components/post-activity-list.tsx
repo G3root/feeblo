@@ -29,12 +29,7 @@ import {
   Tag02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  and,
-  createLiveQueryCollection,
-  eq,
-  useLiveQuery,
-} from "@tanstack/react-db";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useMemo } from "react";
 
 import {
@@ -136,34 +131,26 @@ function getActivityIcon(
   };
 }
 
-export function createPostActivityQuery({
+export function PostActivityList({
   organizationId,
   postId,
 }: {
   organizationId: string;
   postId: string;
 }) {
-  return createLiveQueryCollection((query) =>
-    query
-      .from({ activity: postActivityCollection })
-      .where(({ activity }) =>
-        and(
-          eq(activity.organizationId, organizationId),
-          eq(activity.postId, postId)
+  const { data: activities, isLoading } = useLiveQuery(
+    (query) =>
+      query
+        .from({ activity: postActivityCollection })
+        .where(({ activity }) =>
+          and(
+            eq(activity.organizationId, organizationId),
+            eq(activity.postId, postId)
+          )
         )
-      )
-      .orderBy(({ activity }) => activity.createdAt, "desc")
+        .orderBy(({ activity }) => activity.createdAt, "desc"),
+    [organizationId, postId]
   );
-}
-
-export function PostActivityList({
-  activityQuery,
-  organizationId,
-}: {
-  activityQuery: ReturnType<typeof createPostActivityQuery>;
-  organizationId: string;
-}) {
-  const { data: activities, isLoading } = useLiveQuery(activityQuery);
   const { data: statuses } = useLiveQuery(
     (query) =>
       query

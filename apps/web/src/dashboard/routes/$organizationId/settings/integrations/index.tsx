@@ -1,3 +1,4 @@
+import { RegistryContext } from "@effect/atom-react";
 import { toastManager } from "@feeblo/ui/toast";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { DiscordIcon, GithubIcon, SlackIcon } from "@hugeicons/core-free-icons";
@@ -7,16 +8,18 @@ import { z } from "zod";
 
 import {
   type DiscordConnection,
+  discordAtomRegistry,
   connectionsAtom as discordConnectionsAtom,
   discordStatusAtom,
-  startDiscordConnectAtom,
 } from "~/features/discord/atoms";
+import { startDiscordConnect } from "~/features/discord/lib/connections";
 import {
   type GitHubConnection,
+  gitHubAtomRegistry,
   gitHubConnectionsAtom,
   gitHubIntegrationStatusAtom,
-  startGitHubConnectAtom,
 } from "~/features/github/atoms";
+import { startGitHubConnect } from "~/features/github/lib/github-connections";
 import {
   IntegrationCard,
   type IntegrationCardConfig,
@@ -26,9 +29,10 @@ import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import {
   connectionsAtom,
   type SlackConnection,
+  slackAtomRegistry,
   slackStatusAtom,
-  startSlackConnectAtom,
 } from "~/features/slack/atoms";
+import { startSlackConnect } from "~/features/slack/lib/connections";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 
 const slackConfig: IntegrationCardConfig<SlackConnection> = {
@@ -38,7 +42,7 @@ const slackConfig: IntegrationCardConfig<SlackConnection> = {
     "Let your team send feedback with /feeblo, forward messages with “Send to Feeblo”, and get new requests posted to your channels.",
   statusAtom: slackStatusAtom,
   connectionsAtom,
-  startConnectAtom: startSlackConnectAtom,
+  startConnect: startSlackConnect,
   connectErrorMessage: "Could not start Slack connection",
   connectLabel: (connecting) => (connecting ? "Redirecting…" : "Connect"),
   configureTo: "/$organizationId/settings/integrations/slack",
@@ -53,7 +57,7 @@ const discordConfig: IntegrationCardConfig<DiscordConnection> = {
     "Let your team send feedback with /feeblo, forward messages with “Send to Feeblo”, and get new requests posted to your channels.",
   statusAtom: discordStatusAtom,
   connectionsAtom: discordConnectionsAtom,
-  startConnectAtom: startDiscordConnectAtom,
+  startConnect: startDiscordConnect,
   connectErrorMessage: "Could not start Discord connection",
   connectLabel: (connecting) => (connecting ? "Redirecting…" : "Connect"),
   configureTo: "/$organizationId/settings/integrations/discord",
@@ -68,7 +72,7 @@ const gitHubConfig: IntegrationCardConfig<GitHubConnection> = {
     "Choose repositories for the Feeblo bot to publish feedback as GitHub issues and comments.",
   statusAtom: gitHubIntegrationStatusAtom,
   connectionsAtom: gitHubConnectionsAtom,
-  startConnectAtom: startGitHubConnectAtom,
+  startConnect: startGitHubConnect,
   connectErrorMessage: "Could not start GitHub App installation",
   connectLabel: (connecting) =>
     connecting ? "Opening GitHub…" : "Install GitHub App",
@@ -167,18 +171,24 @@ function IntegrationsSettingsRoute() {
       </SettingsLayout.Header>
       <SettingsLayout.Content>
         <div className="grid gap-4">
-          <IntegrationCard
-            config={slackConfig}
-            organizationId={organizationId}
-          />
-          <IntegrationCard
-            config={discordConfig}
-            organizationId={organizationId}
-          />
-          <IntegrationCard
-            config={gitHubConfig}
-            organizationId={organizationId}
-          />
+          <RegistryContext.Provider value={slackAtomRegistry}>
+            <IntegrationCard
+              config={slackConfig}
+              organizationId={organizationId}
+            />
+          </RegistryContext.Provider>
+          <RegistryContext.Provider value={discordAtomRegistry}>
+            <IntegrationCard
+              config={discordConfig}
+              organizationId={organizationId}
+            />
+          </RegistryContext.Provider>
+          <RegistryContext.Provider value={gitHubAtomRegistry}>
+            <IntegrationCard
+              config={gitHubConfig}
+              organizationId={organizationId}
+            />
+          </RegistryContext.Provider>
         </div>
       </SettingsLayout.Content>
     </SettingsLayout.Root>
