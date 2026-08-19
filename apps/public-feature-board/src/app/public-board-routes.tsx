@@ -23,6 +23,7 @@ import {
   publicRoadmapColumnCollection,
   publicTagCollection,
   publicUpvoteCollection,
+  publicPostSubscriptionCollection,
 } from "../lib/collections";
 import { NotFoundPage } from "../routes/not-found-page";
 import { getSsoTokenFromHash, removeSsoTokenFromHash } from "./sso-token";
@@ -161,6 +162,7 @@ const postRoute = createRoute({
       publicCommentCollection.preload(),
       publicCommentReactionCollection.preload(),
       publicPostReactionCollection.preload(),
+      publicPostSubscriptionCollection.preload(),
     ]);
 
     return null;

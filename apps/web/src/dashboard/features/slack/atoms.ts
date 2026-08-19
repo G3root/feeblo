@@ -1,37 +1,26 @@
-import * as Effect from "effect/Effect";
+import * as Result from "effect/unstable/reactivity/AsyncResult";
 import * as Atom from "effect/unstable/reactivity/Atom";
-import * as AtomRegistry from "effect/unstable/reactivity/AtomRegistry";
 
-import {
-  loadChannels,
-  loadConnections,
-  loadSlackStatus,
-} from "./lib/connections";
+import { DashboardClient, dashboardSWR } from "~/lib/atom-rpc";
 
-export type SlackConnection = Awaited<
-  ReturnType<typeof loadConnections>
+export type SlackConnection = Atom.Success<
+  ReturnType<typeof connectionsAtom>
 >[number];
-export type SlackChannel = Awaited<ReturnType<typeof loadChannels>>[number];
+export type SlackChannel = Atom.Success<
+  ReturnType<typeof channelsAtom>
+>[number];
 
-/**
- * Client-side source of truth for the Slack settings page.
- *
- * Connection and channel lists are Effect atoms whose results stream into
- * React through `useAtomValue` from `@effect/atom-react`. Mutations refresh
- * the matching atom after they succeed so the visible state stays in sync.
- */
-export const slackAtomRegistry = AtomRegistry.make();
+export const slackReactivityKeys = (organizationId: string) => ({
+  slack: [organizationId],
+});
 
-/** Slack connections of one organization, one cached atom per organization id. */
+/** Slack connections of one organization, cached per organization id. */
 export const connectionsAtom = Atom.family((organizationId: string) =>
-  Atom.make(Effect.tryPromise(() => loadConnections(organizationId))).pipe(
-    Atom.swr({
-      staleTime: "30 seconds",
-      revalidateOnFocus: "always",
-      focusSignal: Atom.windowFocusSignal,
-    }),
-    Atom.setIdleTTL("5 minutes")
-  )
+  DashboardClient.query(
+    "SlackConnectionList",
+    { organizationId },
+    { reactivityKeys: slackReactivityKeys(organizationId) }
+  ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
 
 export type ChannelListArgs = {
@@ -39,30 +28,30 @@ export type ChannelListArgs = {
   readonly connectionId: string;
 };
 
-/** Channels of one connection, one cached atom per connection id. */
+/** Channels of one connection, cached per organization and connection id. */
 export const channelsAtom = Atom.family((args: ChannelListArgs) =>
-  Atom.make(
-    Effect.tryPromise(() =>
-      loadChannels(args.organizationId, args.connectionId)
-    )
-  ).pipe(
-    Atom.swr({
-      staleTime: "30 seconds",
-      revalidateOnFocus: "always",
-      focusSignal: Atom.windowFocusSignal,
-    }),
-    Atom.setIdleTTL("5 minutes")
-  )
+  DashboardClient.query(
+    "SlackChannelList",
+    { connectionId: args.connectionId, organizationId: args.organizationId },
+    { reactivityKeys: slackReactivityKeys(args.organizationId) }
+  ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
 
-/** Whether the Slack integration is configured for this deployment (global, not per-org). */
-export const slackStatusAtom = Atom.make(
-  Effect.tryPromise(() => loadSlackStatus())
+/** Whether Slack is configured for this deployment. */
+export const slackStatusAtom = DashboardClient.query(
+  "SlackIntegrationStatus",
+  void 0
 ).pipe(
-  Atom.swr({
-    staleTime: "30 seconds",
-    revalidateOnFocus: "always",
-    focusSignal: Atom.windowFocusSignal,
-  }),
+  Atom.map((result) => Result.map(result, (value) => value.configured)),
+  dashboardSWR("30 seconds"),
   Atom.setIdleTTL("5 minutes")
+);
+
+export const startSlackConnectAtom =
+  DashboardClient.mutation("SlackConnectStart");
+export const updateSlackChannelNotificationsAtom = DashboardClient.mutation(
+  "SlackChannelNotificationsUpdate"
+);
+export const disconnectSlackConnectionAtom = DashboardClient.mutation(
+  "SlackConnectionDisconnect"
 );

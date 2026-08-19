@@ -22,14 +22,13 @@ import { Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import * as Option from "effect/Option";
-import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { useContext, useMemo, useState } from "react";
+import * as Result from "effect/unstable/reactivity/AsyncResult";
+import { useContext, useState } from "react";
 
 import {
   type Endpoint,
   endpointsAtom,
   preloadDeliveryHistoryAtom,
-  webhookAtomRegistry,
 } from "../atoms";
 import { useWebhookCreateDialogContext } from "../dialog-stores";
 import {
@@ -42,11 +41,7 @@ export function WebhooksSettings({
 }: {
   organizationId: string;
 }) {
-  return (
-    <RegistryContext.Provider value={webhookAtomRegistry}>
-      <WebhooksSettingsContent organizationId={organizationId} />
-    </RegistryContext.Provider>
-  );
+  return <WebhooksSettingsContent organizationId={organizationId} />;
 }
 
 function WebhooksSettingsContent({
@@ -63,42 +58,38 @@ function WebhooksSettingsContent({
   const endpointsResult = useAtomValue(endpointsAtom(organizationId));
   const refreshEndpoints = useAtomRefresh(endpointsAtom(organizationId));
 
-  const { endpoints, isLoading, loadFailed } = useMemo(
-    () =>
-      AsyncResult.match(endpointsResult, {
-        onInitial: () => ({
+  const { endpoints, isLoading, loadFailed } = Result.builder(endpointsResult)
+    .onInitial(() => ({
+      endpoints: [],
+      isLoading: true,
+      loadFailed: false,
+    }))
+    .onFailure((_, { previousSuccess }) =>
+      Option.match(previousSuccess, {
+        onNone: () => ({
           endpoints: [],
-          isLoading: true,
-          loadFailed: false,
+          isLoading: false,
+          loadFailed: true,
         }),
-        onFailure: ({ previousSuccess }) =>
-          Option.match(previousSuccess, {
-            onNone: () => ({
-              endpoints: [],
-              isLoading: false,
-              loadFailed: true,
-            }),
-            onSome: ({ value }) => ({
-              endpoints: value,
-              isLoading: false,
-              loadFailed: false,
-            }),
-          }),
-        onSuccess: ({ value }) => ({
+        onSome: ({ value }) => ({
           endpoints: value,
           isLoading: false,
           loadFailed: false,
         }),
-      }),
-    [endpointsResult]
-  );
+      })
+    )
+    .onSuccess((value) => ({
+      endpoints: value,
+      isLoading: false,
+      loadFailed: false,
+    }))
+    .exhaustive();
 
   const handleCreated = (endpoint: CreatedWebhookEndpoint) => {
     setOneTimeSecret({
       endpointName: endpoint.endpointName,
       value: endpoint.signingSecret,
     });
-    refreshEndpoints();
     toastManager.add({ title: "Webhook endpoint created", type: "success" });
   };
 

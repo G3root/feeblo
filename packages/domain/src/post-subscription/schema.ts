@@ -15,7 +15,7 @@ export type TPostSubscription = S.Schema.Type<typeof PostSubscription>;
 
 export const PostSubscriptionList = S.Struct({
   organizationId: WorkspaceId.schema,
-  postId: PostId.schema,
+  slug: S.String,
 });
 
 export type TPostSubscriptionList = S.Schema.Type<typeof PostSubscriptionList>;
