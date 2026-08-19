@@ -823,7 +823,6 @@ export const postActivityCollection = createCollection(
         : getOrganizationScopedQueryKey("post-activity");
     },
     syncMode: "on-demand",
-    refetchInterval: Duration.toMillis(Duration.seconds(30)),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
