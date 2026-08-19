@@ -1,3 +1,4 @@
+import { PLAN_ENTITLEMENTS } from "@feeblo/domain/plan-entitlements";
 import { Button } from "@feeblo/ui/button";
 import {
   Empty,
@@ -14,7 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from "@feeblo/ui/table";
-import { PLAN_ENTITLEMENTS } from "@feeblo/domain/plan-entitlements";
 import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import { UserAdd01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -22,8 +22,6 @@ import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
-import { useEntitlements } from "~/hooks/use-entitlements";
-
 import { CompanyEditDialog } from "~/features/contact/components/company-edit-dialog";
 import { ContactCreateDialog } from "~/features/contact/components/contact-create-dialog";
 import { ContactDeleteDialog } from "~/features/contact/components/contact-delete-dialog";
@@ -39,6 +37,7 @@ import {
   useContactDeleteDialogContext,
   useContactEditDialogContext,
 } from "~/features/contact/dialog-stores";
+import { useEntitlements } from "~/hooks/use-entitlements";
 import {
   companyCollection,
   contactAttributeDefinitionCollection,
@@ -122,8 +121,7 @@ function ContactPage() {
   const { entitlements, plan } = useEntitlements();
   const crmLimit = entitlements.limits.crmEntries;
   const totalCrmEntries = contacts.length + companies.length;
-  const hasReachedCrmLimit =
-    crmLimit !== null && totalCrmEntries >= crmLimit;
+  const hasReachedCrmLimit = crmLimit !== null && totalCrmEntries >= crmLimit;
   const upgradePlanStore = useUpgradePlanDialogContext();
 
   const openCreateDialog = () => {

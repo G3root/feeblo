@@ -23,8 +23,6 @@ import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
-import { useEntitlements } from "~/hooks/use-entitlements";
-
 import { CompanyCreateDialog } from "~/features/contact/components/company-create-dialog";
 import { CompanyDeleteDialog } from "~/features/contact/components/company-delete-dialog";
 import { CompanyEditDialog } from "~/features/contact/components/company-edit-dialog";
@@ -41,6 +39,7 @@ import {
   type CustomAttributeValue,
   formatCustomAttributeValue,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
+import { useEntitlements } from "~/hooks/use-entitlements";
 import {
   companyAttributeDefinitionCollection,
   companyAttributeValueCollection,
@@ -118,8 +117,7 @@ function CompanyPage() {
   const { entitlements } = useEntitlements();
   const crmLimit = entitlements.limits.crmEntries;
   const totalCrmEntries = companies.length + contacts.length;
-  const hasReachedCrmLimit =
-    crmLimit !== null && totalCrmEntries >= crmLimit;
+  const hasReachedCrmLimit = crmLimit !== null && totalCrmEntries >= crmLimit;
   const upgradePlanStore = useUpgradePlanDialogContext();
   const openCreateDialog = () => {
     if (hasReachedCrmLimit) {

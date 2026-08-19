@@ -9,8 +9,6 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { useAppForm } from "@feeblo/ui/hooks/form";
-import { SparklesIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Select,
   SelectItem,
@@ -30,16 +28,18 @@ import {
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
+import { SparklesIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 
+import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import {
   CustomAttributeFields,
   createContactAction,
   getContactCustomAttributeValueChanges,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
-import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import { useEntitlements } from "~/hooks/use-entitlements";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -65,8 +65,11 @@ export function ContactCreateDialog() {
 
 function ContactCreateForm() {
   const organizationId = useOrganizationId();
-  const { companyCollection, contactAttributeDefinitionCollection, contactCollection } =
-    useDashboardCollections();
+  const {
+    companyCollection,
+    contactAttributeDefinitionCollection,
+    contactCollection,
+  } = useDashboardCollections();
   const store = useContactCreateDialogContext();
   const upgradePlanStore = useUpgradePlanDialogContext();
   const { entitlements } = useEntitlements();
@@ -109,7 +112,8 @@ function ContactCreateForm() {
             <EmptyTitle>CRM limit reached</EmptyTitle>
             <EmptyDescription>
               The {crmLimit} CRM entry limit for your plan has been reached (
-              {totalCrmEntries} of {crmLimit} used). Upgrade to create more contacts and companies.
+              {totalCrmEntries} of {crmLimit} used). Upgrade to create more
+              contacts and companies.
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>

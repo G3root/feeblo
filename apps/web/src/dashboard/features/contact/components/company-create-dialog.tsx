@@ -9,8 +9,6 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { useAppForm } from "@feeblo/ui/hooks/form";
-import { SparklesIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Sheet,
   SheetDescription,
@@ -23,17 +21,19 @@ import {
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
+import { SparklesIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 
+import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import {
   CustomAttributeFields,
   createCompanyAction,
   getCompanyCustomAttributeValueChanges,
   hasMissingRequiredCustomAttributeValues,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
-import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import { useEntitlements } from "~/hooks/use-entitlements";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -59,18 +59,26 @@ export function CompanyCreateDialog() {
 
 function CompanyCreateForm() {
   const organizationId = useOrganizationId();
-  const { companyAttributeDefinitionCollection, companyCollection, contactCollection } = useDashboardCollections();
+  const {
+    companyAttributeDefinitionCollection,
+    companyCollection,
+    contactCollection,
+  } = useDashboardCollections();
   const store = useCompanyCreateDialogContext();
   const upgradePlanStore = useUpgradePlanDialogContext();
   const { entitlements } = useEntitlements();
   const { data: companies = [] } = useLiveQuery(
     (q) =>
-      q.from({ company: companyCollection }).where(({ company }) => eq(company.organizationId, organizationId)),
+      q
+        .from({ company: companyCollection })
+        .where(({ company }) => eq(company.organizationId, organizationId)),
     [organizationId]
   );
   const { data: contacts = [] } = useLiveQuery(
     (q) =>
-      q.from({ contact: contactCollection }).where(({ contact }) => eq(contact.organizationId, organizationId)),
+      q
+        .from({ contact: contactCollection })
+        .where(({ contact }) => eq(contact.organizationId, organizationId)),
     [organizationId]
   );
   const crmLimit = entitlements.limits.crmEntries;
@@ -86,7 +94,9 @@ function CompanyCreateForm() {
             </EmptyMedia>
             <EmptyTitle>CRM limit reached</EmptyTitle>
             <EmptyDescription>
-              The {crmLimit} CRM entry limit for your plan has been reached ({totalCrmEntries} of {crmLimit} used). Upgrade to create more companies and contacts.
+              The {crmLimit} CRM entry limit for your plan has been reached (
+              {totalCrmEntries} of {crmLimit} used). Upgrade to create more
+              companies and contacts.
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
