@@ -22,8 +22,10 @@ const makeCompanyPolicy = Effect.gen(function* () {
       entitlementPolicy.canCreateCrmEntry({
         organizationId,
         crmEntryCount: Effect.gen(function* () {
-          const companyCount = yield* repository.countByOrganizationId(organizationId);
-          const contactCount = yield* contactRepository.countByOrganizationId(organizationId);
+          const companyCount =
+            yield* repository.countByOrganizationId(organizationId);
+          const contactCount =
+            yield* contactRepository.countByOrganizationId(organizationId);
           return companyCount + contactCount;
         }),
       })
