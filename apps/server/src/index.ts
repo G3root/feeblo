@@ -90,6 +90,7 @@ import { e2eSetPlanRouter } from "./e2e-set-plan";
 import { makeGitHubRouters } from "./github";
 import { GitHubProviderLive } from "./github-provider";
 import { makeIntegrationLayers } from "./integrations";
+import { serverTimingMiddleware } from "./server-timing";
 import { makeSesEmailFeedbackRouter } from "./ses-email-feedback";
 import { makeSlackRouters } from "./slack";
 
@@ -476,12 +477,17 @@ const program = Effect.gen(function* () {
           allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
           credentials: true,
           maxAge: 86_400,
+          // Lets browser clients read the Server-Timing header on responses.
+          exposedHeaders: ["Server-Timing"],
         }),
         { global: true }
       )
     ),
     Layer.provide(
       HttpRouter.middleware(bodySizeLimitMiddleware, { global: true })
+    ),
+    Layer.provide(
+      HttpRouter.middleware(serverTimingMiddleware, { global: true })
     ),
     // Provides the peer-anchored client IP (socket remoteAddress) to every
     // route, including RPC middleware, so public rate limits are keyed on an
