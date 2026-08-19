@@ -30,6 +30,7 @@ import {
   postCollection,
   postReactionCollection,
   postStatusCollection,
+  postSubscriptionCollection,
   postTagCollection,
   tagCollection,
   upvoteCollection,
@@ -57,6 +58,7 @@ export const Route = createFileRoute(
       commentCollection.preload(),
       commentReactionCollection.preload(),
       postReactionCollection.preload(),
+      postSubscriptionCollection.preload(),
     ]);
   },
 });
@@ -236,14 +238,7 @@ function RouteComponent() {
               <Separator />
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <h2 className="text-sm font-semibold">Subscribe to post</h2>
-              <p className="text-muted-foreground text-xs text-pretty">
-                Subscribe to receive future updates on the post by email
-              </p>
-            </div>
-
-            <PostPage.Subscribe variant="default" />
+            <PostPage.Subscribe />
           </div>
         </aside>
       </div>
