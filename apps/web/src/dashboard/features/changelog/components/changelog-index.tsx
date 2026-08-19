@@ -120,7 +120,7 @@ function ChangelogIndexContent({ organizationId }: { organizationId: string }) {
           </EmptyHeader>
           {canCreate && !hasSearchFilter ? (
             <EmptyContent>
-              <Button onClick={createChangeLog} type="button">
+              <Button variant="brand" onClick={createChangeLog} type="button">
                 Create your first entry
               </Button>
             </EmptyContent>

@@ -177,7 +177,12 @@ function TagTableActions({
       <SkeletonWrapper>
         <PolicyGuard policy={hasPermission(organizationId, "tags.create")}>
           {({ allowed }) => (
-            <Button disabled={!allowed} onClick={onCreate} type="button">
+            <Button
+              variant="brand"
+              disabled={!allowed}
+              onClick={onCreate}
+              type="button"
+            >
               <HugeiconsIcon icon={Plus} />
               <span>New tag</span>
             </Button>
