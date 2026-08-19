@@ -312,40 +312,40 @@
 }
 
 /*
- * Rangi code-block token colors (shj-<type> classes emitted by the editor's
- * rangi highlighter). Co-located with the theme so the CSS ships with the app's
- * global stylesheet; tokens are scoped to the ProseMirror editor because the
- * read-only markdown renderer does not highlight.
+ * Rangi code-block token colors (shj-<type> classes). Applied globally so they
+ * cover both the ProseMirror editor's inline decorations and the read-only
+ * Markdown renderer (`.typeset` blocks). Co-located with the theme so the CSS
+ * ships with the app's global stylesheet.
  */
-.ProseMirror .shj-kwd,
-.ProseMirror .shj-oper {
+.shj-kwd,
+.shj-oper {
   color: var(--code-token-keyword);
 }
-.ProseMirror .shj-class {
+.shj-class {
   color: var(--code-token-class);
 }
-.ProseMirror .shj-func,
-.ProseMirror .shj-fun {
+.shj-func,
+.shj-fun {
   color: var(--code-token-func);
 }
-.ProseMirror .shj-cmnt,
-.ProseMirror .shj-bracket,
-.ProseMirror .shj-section,
-.ProseMirror .shj-var {
+.shj-cmnt,
+.shj-bracket,
+.shj-section,
+.shj-var {
   color: var(--code-token-muted);
 }
-.ProseMirror .shj-num,
-.ProseMirror .shj-bool,
-.ProseMirror .shj-type,
-.ProseMirror .shj-attr,
-.ProseMirror .shj-prop {
+.shj-num,
+.shj-bool,
+.shj-type,
+.shj-attr,
+.shj-prop {
   color: var(--code-token-value);
 }
-.ProseMirror .shj-str {
+.shj-str {
   color: var(--code-token-string);
 }
-.ProseMirror .shj-err,
-.ProseMirror .shj-deleted,
-.ProseMirror .shj-insert {
+.shj-err,
+.shj-deleted,
+.shj-insert {
   font-weight: 600;
 }
