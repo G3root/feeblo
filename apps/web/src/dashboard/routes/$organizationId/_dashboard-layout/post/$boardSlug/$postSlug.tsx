@@ -210,22 +210,24 @@ function RouteComponent() {
           <div className="space-y-4 lg:sticky lg:top-0">
             <PostSidebarActions />
 
-            <div>
-              <Separator />
-            </div>
-
             {githubResourcesPolicy.isPending ||
             !githubResourcesPolicy.allowed ? null : (
-              <PostExternalResources
-                actions={
-                  <GitHubPostResourceActions
-                    organizationId={organizationId}
-                    postId={post.id}
-                  />
-                }
-                organizationId={organizationId}
-                postId={post.id}
-              />
+              <>
+                <div>
+                  <Separator />
+                </div>
+
+                <PostExternalResources
+                  actions={
+                    <GitHubPostResourceActions
+                      organizationId={organizationId}
+                      postId={post.id}
+                    />
+                  }
+                  organizationId={organizationId}
+                  postId={post.id}
+                />
+              </>
             )}
 
             <div>

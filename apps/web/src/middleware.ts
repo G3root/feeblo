@@ -5,7 +5,6 @@ import type { APIContext, MiddlewareNext } from "astro";
 import { defineMiddleware, sequence } from "astro:middleware";
 
 import { fetchRpcServer } from "~/lib/runtime-server";
-import { authClient } from "~/lib/server-auth-client";
 import { getServerRuntimePublicEnv } from "~/lib/server-runtime-public-env";
 
 import { paraglideMiddleware } from "./paraglide/server";
@@ -179,6 +178,13 @@ async function authMiddleware(context: APIContext, next: MiddlewareNext) {
     context.locals.authHint = null;
     return next();
   }
+
+  // Lazy-load the Better Auth client (organization, 2FA, admin, email OTP
+  // plugins — ~50 kB of vendor code) so it stays out of the worker's startup
+  // module graph. It is only needed to resolve the session for document
+  // requests; requests that never reach this point (feedback widget, feeds,
+  // assets) skip evaluating it entirely on a cold isolate.
+  const { authClient } = await import("~/lib/server-auth-client");
 
   const { data } = await authClient.getSession({
     fetchOptions: { headers: context.request.headers },
