@@ -270,7 +270,7 @@ test(
       ).toBeDisabled();
       await expect(
         visitorPage.getByRole("button", { name: "Switch to internal" })
-      ).toBeDisabled();
+      ).toHaveCount(0);
 
       await visitorPage
         .getByRole("button", { name: "Sign in", exact: true })
