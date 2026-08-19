@@ -1,5 +1,16 @@
 import { ContactId } from "@feeblo/id";
+import { Button } from "@feeblo/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@feeblo/ui/empty";
 import { useAppForm } from "@feeblo/ui/hooks/form";
+import { SparklesIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Select,
   SelectItem,
@@ -28,6 +39,8 @@ import {
   createContactAction,
   getContactCustomAttributeValueChanges,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
+import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
+import { useEntitlements } from "~/hooks/use-entitlements";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -52,9 +65,11 @@ export function ContactCreateDialog() {
 
 function ContactCreateForm() {
   const organizationId = useOrganizationId();
-  const { companyCollection, contactAttributeDefinitionCollection } =
+  const { companyCollection, contactAttributeDefinitionCollection, contactCollection } =
     useDashboardCollections();
   const store = useContactCreateDialogContext();
+  const upgradePlanStore = useUpgradePlanDialogContext();
+  const { entitlements } = useEntitlements();
   const { data: definitions = [] } = useLiveQuery(
     (q) =>
       q
@@ -73,6 +88,47 @@ function ContactCreateForm() {
         .orderBy(({ company }) => company.name, "asc"),
     [organizationId]
   );
+  const { data: contacts = [] } = useLiveQuery(
+    (q) =>
+      q
+        .from({ contact: contactCollection })
+        .where(({ contact }) => eq(contact.organizationId, organizationId)),
+    [organizationId]
+  );
+  const crmLimit = entitlements.limits.crmEntries;
+  const totalCrmEntries = contacts.length + companies.length;
+  const atLimit = crmLimit !== null && totalCrmEntries >= crmLimit;
+  if (atLimit) {
+    return (
+      <div className="p-6">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={SparklesIcon} />
+            </EmptyMedia>
+            <EmptyTitle>CRM limit reached</EmptyTitle>
+            <EmptyDescription>
+              The {crmLimit} CRM entry limit for your plan has been reached (
+              {totalCrmEntries} of {crmLimit} used). Upgrade to create more contacts and companies.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button
+              onClick={() => {
+                store.send({ type: "toggle" });
+                upgradePlanStore.send({ type: "toggle" });
+              }}
+              size="sm"
+              type="button"
+            >
+              <HugeiconsIcon icon={SparklesIcon} />
+              Upgrade plan
+            </Button>
+          </EmptyContent>
+        </Empty>
+      </div>
+    );
+  }
   const form = useAppForm({
     defaultValues: {
       attributes: {},

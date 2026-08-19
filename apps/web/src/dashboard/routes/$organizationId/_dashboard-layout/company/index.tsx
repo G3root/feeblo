@@ -22,6 +22,9 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 
+import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
+import { useEntitlements } from "~/hooks/use-entitlements";
+
 import { CompanyCreateDialog } from "~/features/contact/components/company-create-dialog";
 import { CompanyDeleteDialog } from "~/features/contact/components/company-delete-dialog";
 import { CompanyEditDialog } from "~/features/contact/components/company-edit-dialog";
@@ -76,8 +79,11 @@ function RouteComponent() {
 
 function CompanyPage() {
   const { organizationId } = Route.useParams();
-  const { companyAttributeDefinitionCollection, companyCollection } =
-    useDashboardCollections();
+  const {
+    companyAttributeDefinitionCollection,
+    companyCollection,
+    contactCollection,
+  } = useDashboardCollections();
   const createDialogStore = useCompanyCreateDialogContext();
   const editDialogStore = useCompanyEditDialogContext();
   const deleteDialogStore = useCompanyDeleteDialogContext();
@@ -90,6 +96,13 @@ function CompanyPage() {
     [organizationId]
   );
   const companies = companiesQuery.data ?? [];
+  const { data: contacts = [] } = useLiveQuery(
+    (q) =>
+      q
+        .from({ contact: contactCollection })
+        .where(({ contact }) => eq(contact.organizationId, organizationId)),
+    [organizationId]
+  );
   const definitionsQuery = useLiveQuery(
     (q) =>
       q
@@ -102,11 +115,31 @@ function CompanyPage() {
   );
   const definitions = definitionsQuery.data ?? [];
 
-  const openCreateDialog = () => createDialogStore.send({ type: "toggle" });
+  const { entitlements } = useEntitlements();
+  const crmLimit = entitlements.limits.crmEntries;
+  const totalCrmEntries = companies.length + contacts.length;
+  const hasReachedCrmLimit =
+    crmLimit !== null && totalCrmEntries >= crmLimit;
+  const upgradePlanStore = useUpgradePlanDialogContext();
+  const openCreateDialog = () => {
+    if (hasReachedCrmLimit) {
+      upgradePlanStore.send({ type: "toggle" });
+      return;
+    }
+    createDialogStore.send({ type: "toggle" });
+  };
 
   if (!companiesQuery.isLoading && companies.length === 0) {
     return (
       <div className="p-3">
+        {crmLimit !== null ? (
+          <div className="mb-3 flex justify-end">
+            <p className="text-muted-foreground text-sm">
+              {totalCrmEntries} of {crmLimit} CRM entries used
+              {hasReachedCrmLimit ? " — upgrade for unlimited" : ""}
+            </p>
+          </div>
+        ) : null}
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -123,7 +156,7 @@ function CompanyPage() {
             >
               {({ allowed }) => (
                 <Button
-                  disabled={!allowed}
+                  disabled={!allowed || hasReachedCrmLimit}
                   onClick={openCreateDialog}
                   type="button"
                   variant="brand"
@@ -141,11 +174,19 @@ function CompanyPage() {
 
   return (
     <div className="p-3">
-      <div className="mb-3 flex justify-end">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          {crmLimit !== null ? (
+            <p className="text-muted-foreground text-sm">
+              {totalCrmEntries} of {crmLimit} CRM entries used
+              {hasReachedCrmLimit ? " — upgrade for unlimited" : ""}
+            </p>
+          ) : null}
+        </div>
         <PolicyGuard policy={hasPermission(organizationId, "companies.create")}>
           {({ allowed }) => (
             <Button
-              disabled={!allowed}
+              disabled={!allowed || hasReachedCrmLimit}
               onClick={openCreateDialog}
               type="button"
               variant="brand"
