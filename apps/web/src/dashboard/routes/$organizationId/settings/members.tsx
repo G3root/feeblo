@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import {
+  InvitationsSection,
+  MembersSection,
+} from "~/features/settings/components/member-sections";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { invitationsCollection, membersCollection } from "~/lib/collections";
-
-import { InvitationsSection, MembersSection } from "./members-parts";
 
 export const Route = createFileRoute("/$organizationId/settings/members")({
   component: MembersSettingsPage,

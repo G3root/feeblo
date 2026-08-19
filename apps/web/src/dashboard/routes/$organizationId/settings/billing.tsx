@@ -19,6 +19,10 @@ import { z } from "zod";
 
 import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
 import {
+  CurrentPlanStat,
+  PlanGridSkeleton,
+} from "~/features/billing/components/billing-plan-summary";
+import {
   startBillingCheckout,
   startBillingPortal,
 } from "~/features/billing/lib/checkout";
@@ -39,8 +43,6 @@ import {
   workspacePlanCollection,
   workspaceProductCollection,
 } from "~/lib/collections";
-
-import { CurrentPlanStat, PlanGridSkeleton } from "./billing-parts";
 
 export const Route = createFileRoute("/$organizationId/settings/billing")({
   validateSearch: (search) =>

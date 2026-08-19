@@ -21,6 +21,11 @@ import { PostStatusSelect } from "~/features/post-status/components/post-status-
 import { PostActivityList } from "~/features/post/components/post-activity-list";
 import { PostBoardField } from "~/features/post/components/post-board-field";
 import { PostEtaField } from "~/features/post/components/post-eta-field";
+import {
+  PostPageSkeleton,
+  PostDetails,
+  PostStatusAlerts,
+} from "~/features/post/components/post-page-sections";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { PostTagField } from "~/features/post/components/post-tag-field";
 import {
@@ -35,12 +40,6 @@ import {
   upvoteCollection,
 } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
-
-import {
-  PostPageSkeleton,
-  PostDetails,
-  PostStatusAlerts,
-} from "./post-page-parts";
 
 export const Route = createFileRoute(
   "/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"

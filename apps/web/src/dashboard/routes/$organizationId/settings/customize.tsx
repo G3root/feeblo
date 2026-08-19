@@ -2,17 +2,16 @@ import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { isPaidPlan } from "~/features/billing/lib/plans";
+import {
+  SearchEngineIndexing,
+  PublicPublicSiteNameField,
+  HidePoweredByBranding,
+} from "~/features/settings/components/customize-sections";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePlan } from "~/hooks/use-plan";
 import { siteCollection, workspacePlanCollection } from "~/lib/collections";
-
-import {
-  SearchEngineIndexing,
-  PublicPublicSiteNameField,
-  HidePoweredByBranding,
-} from "./customize-parts";
 
 export const Route = createFileRoute("/$organizationId/settings/customize")({
   component: RouteComponent,

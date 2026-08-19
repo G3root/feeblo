@@ -24,6 +24,7 @@ import { CompanyEditDialog } from "~/features/contact/components/company-edit-di
 import { ContactCreateDialog } from "~/features/contact/components/contact-create-dialog";
 import { ContactDeleteDialog } from "~/features/contact/components/contact-delete-dialog";
 import { ContactEditDialog } from "~/features/contact/components/contact-edit-dialog";
+import { ContactTableRow } from "~/features/contact/components/contact-table-row";
 import {
   CompanyEditDialogProvider,
   ContactCreateDialogProvider,
@@ -41,8 +42,6 @@ import {
   contactCollection,
 } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
-
-import { ContactTableRow } from "./contact-table-row";
 
 export const Route = createFileRoute(
   "/$organizationId/_dashboard-layout/contact/"

@@ -1,9 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import {
+  FullNameField,
+  DangerZone,
+  ProfileButton,
+} from "~/features/settings/components/profile-sections";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
-
-import { FullNameField, DangerZone, ProfileButton } from "./profile-parts";
 
 export const Route = createFileRoute("/$organizationId/settings/profile")({
   component: ProfileSettingsPage,

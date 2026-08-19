@@ -1,12 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
+import { WorkspaceDetailsSection } from "~/features/settings/components/workspace-details-section";
 import {
   membershipCollection,
   organizationCollection,
 } from "~/lib/collections";
-
-import { WorkspaceDetailsSection } from "./workspace-parts";
 
 export const Route = createFileRoute("/$organizationId/settings/workspace")({
   component: WorkspaceSettingsPage,

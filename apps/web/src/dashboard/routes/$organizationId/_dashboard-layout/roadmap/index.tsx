@@ -3,19 +3,18 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { RoadmapBoard } from "~/features/roadmap/components/roadmap-board";
 import {
+  RoadmapListHeader,
+  RoadmapLoadingState,
+  RoadmapEmptyState,
+  RoadmapEmptyMessage,
+} from "~/features/roadmap/components/roadmap-list-states";
+import {
   boardCollection,
   postCollection,
   postStatusCollection,
   roadmapCollection,
   roadmapColumnCollection,
 } from "~/lib/collections";
-
-import {
-  RoadmapListHeader,
-  RoadmapLoadingState,
-  RoadmapEmptyState,
-  RoadmapEmptyMessage,
-} from "./roadmap-list-parts";
 
 export const Route = createFileRoute(
   "/$organizationId/_dashboard-layout/roadmap/"
