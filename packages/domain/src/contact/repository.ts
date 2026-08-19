@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { ContactId } from "@feeblo/id";
-import { and, eq, sql } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -248,6 +248,13 @@ const makeContactRepository = Effect.gen(function* () {
         .select()
         .from(schema.contactTable)
         .where(eq(schema.contactTable.organizationId, organizationId)),
+
+    countByOrganizationId: (organizationId: string) =>
+      db
+        .select({ count: count() })
+        .from(schema.contactTable)
+        .where(eq(schema.contactTable.organizationId, organizationId))
+        .pipe(Effect.map((rows) => Number(rows[0]?.count ?? 0))),
   };
 });
 
