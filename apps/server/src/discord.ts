@@ -7,12 +7,11 @@ import {
 } from "@feeblo/domain/integration/discord";
 import type { IntegrationProviderRegistry } from "@feeblo/integration-core";
 import { DiscordOAuthState } from "@feeblo/integration-discord";
-import type { ParsedDiscordInboundRequest } from "@feeblo/integration-discord/inbound-schema";
+import { ParsedDiscordInboundRequest } from "@feeblo/integration-discord/inbound-schema";
 import {
   discordInteractionsCapabilityKey,
   discordProviderKey,
 } from "@feeblo/integration-discord/manifest";
-import { isObject } from "@feeblo/utils/runtime-kind";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -36,22 +35,6 @@ const headerValue = (
   name: string
 ): string | undefined =>
   Option.getOrUndefined(HttpHeaders.get(request.headers, name));
-
-/**
- * Cheap narrow back to the provider's parsed payload. The inbound handler has
- * already signature-verified and fully decoded the body, so this guard only
- * discriminates on the `kind` tag instead of re-running the full schema.
- */
-const isParsedDiscordInboundRequest = <T>(
-  value: T
-): value is Extract<T, ParsedDiscordInboundRequest> =>
-  isObject(value) &&
-  value !== null &&
-  "kind" in value &&
-  (value.kind === "ping" ||
-    value.kind === "application_command" ||
-    value.kind === "modal_submit" ||
-    value.kind === "unknown");
 
 const handleInteraction = (
   request: HttpServerRequest.HttpServerRequest,
@@ -78,17 +61,21 @@ const handleInteraction = (
         status: response.status,
       });
     }
-    // The inbound handler already signature-verified and decoded the payload;
-    // its 200 body is always a `ParsedDiscordInboundRequest` produced by this
-    // package. A tag-only guard restores the erased type without a second
-    // full decode; a malformed body is still a client error, not a crash.
-    if (!isParsedDiscordInboundRequest(response.body)) {
+    // The inbound handler already signature-verified the payload; decode the
+    // body at the boundary so the domain service receives a typed request. A
+    // malformed body is still a client error, not a crash.
+    const parsed = yield* Effect.exit(
+      Schema.decodeUnknownEffect(Schema.toType(ParsedDiscordInboundRequest))(
+        response.body
+      )
+    );
+    if (Exit.isFailure(parsed)) {
       return HttpServerResponse.text("invalid inbound payload", {
         status: 400,
       });
     }
     const inbound = yield* DiscordInboundService;
-    const result = yield* inbound.handleInteraction(response.body.payload);
+    const result = yield* inbound.handleInteraction(parsed.value.payload);
     return result.body === undefined
       ? HttpServerResponse.empty({ status: result.status })
       : HttpServerResponse.jsonUnsafe(result.body, { status: result.status });

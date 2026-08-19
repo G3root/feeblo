@@ -127,3 +127,5 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
+
+export type ServerConfigValue = Effect.Success<typeof ServerConfig.make>;
