@@ -1,6 +1,5 @@
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -8,6 +7,7 @@ import {
   AlertDialogPopup,
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
+import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useSelector } from "@xstate/store-react";
@@ -52,7 +52,7 @@ export function CustomAttributeDeleteDialog() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          <Button
             onClick={async () => {
               try {
                 const { attributeId } = store.get().context.data;
@@ -63,6 +63,7 @@ export function CustomAttributeDeleteDialog() {
                   entity_type: entityType,
                   success: true,
                 });
+                store.send({ type: "toggle" });
                 toastManager.add({
                   title: "Attribute deleted successfully",
                   type: "success",
@@ -78,9 +79,10 @@ export function CustomAttributeDeleteDialog() {
                 });
               }
             }}
+            variant="destructive"
           >
             Continue
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>

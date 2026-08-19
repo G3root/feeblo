@@ -1,6 +1,5 @@
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -8,6 +7,7 @@ import {
   AlertDialogPopup,
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
+import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useSelector } from "@xstate/store-react";
@@ -50,9 +50,9 @@ export function ContactDeleteDialog() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={deleteContact}>
+          <Button onClick={deleteContact} variant="destructive">
             Delete contact
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>

@@ -1,7 +1,6 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -242,6 +241,7 @@ function WebhookDetailContent({
         reactivityKeys: webhookReactivityKeys(organizationId),
       });
       toastManager.add({ title: "Webhook endpoint removed", type: "success" });
+      setConfirmRemove(false);
       await navigate({
         params: { organizationId },
         to: "/$organizationId/settings/webhooks",
@@ -473,9 +473,9 @@ function WebhookDetailContent({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRemove}>
+            <Button onClick={handleRemove} variant="destructive">
               Remove endpoint
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>
       </AlertDialog>

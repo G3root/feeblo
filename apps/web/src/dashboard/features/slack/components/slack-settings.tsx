@@ -1,7 +1,6 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -264,12 +263,9 @@ function SlackConnectionFrame({
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  className="text-destructive"
-                  onClick={handleDisconnect}
-                >
+                <Button onClick={handleDisconnect} variant="destructive">
                   {disconnecting ? "Disconnecting…" : "Disconnect"}
-                </AlertDialogAction>
+                </Button>
               </AlertDialogFooter>
             </AlertDialogPopup>
           </AlertDialog>

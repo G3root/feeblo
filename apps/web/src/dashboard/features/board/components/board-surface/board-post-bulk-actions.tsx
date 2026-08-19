@@ -1,6 +1,5 @@
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -88,7 +87,7 @@ function BulkDeleteAlert() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          <Button
             onClick={async () => {
               if (selectedPostIds.length === 0) {
                 store.send({ type: "setBulkDeleteOpen", open: false });
@@ -137,9 +136,10 @@ function BulkDeleteAlert() {
                 });
               }
             }}
+            variant="destructive"
           >
             Delete
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>

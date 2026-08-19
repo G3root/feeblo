@@ -2,7 +2,6 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
 import { BoardId, PostStatusId } from "@feeblo/id";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -327,12 +326,9 @@ function GitHubConnectionFrame({
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  className="text-destructive"
-                  onClick={handleDisconnect}
-                >
+                <Button onClick={handleDisconnect} variant="destructive">
                   {disconnecting ? "Removing…" : "Remove integration"}
-                </AlertDialogAction>
+                </Button>
               </AlertDialogFooter>
             </AlertDialogPopup>
           </AlertDialog>

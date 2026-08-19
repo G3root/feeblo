@@ -1,7 +1,6 @@
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -219,9 +218,9 @@ function ConfirmActionDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
-          <AlertDialogAction disabled={isPending} onClick={onConfirm}>
+          <Button disabled={isPending} onClick={onConfirm}>
             {isPending ? "Updating..." : "Continue"}
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>

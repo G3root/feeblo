@@ -1,6 +1,5 @@
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -107,9 +106,9 @@ export function ToggleRoadmapVisibilityDialog() {
               Upgrade plan
             </Button>
           ) : (
-            <AlertDialogAction disabled={isPending} onClick={handleConfirm}>
+            <Button disabled={isPending} onClick={handleConfirm}>
               {actionLabel}
-            </AlertDialogAction>
+            </Button>
           )}
         </AlertDialogFooter>
       </AlertDialogPopup>
