@@ -265,7 +265,7 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
 
             const sessionCookie = parseSetCookieHeader(setCookie || "")
               .get(sessionTokenName)
-              ?.value.split(".")[0]!;
+              ?.value?.split(".")?.[0];
 
             if (!sessionCookie) {
               return;
