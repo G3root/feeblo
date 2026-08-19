@@ -12,7 +12,12 @@ import { Tabs, TabsList, TabsPanel, TabsTab } from "@feeblo/ui/tabs";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { Activity01Icon, Comment01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import {
+  and,
+  createLiveQueryCollection,
+  eq,
+  useLiveQuery,
+} from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 
@@ -46,11 +51,71 @@ import {
 } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
+/**
+ * These collections are configured with `syncMode: "on-demand"`, so calling
+ * `collection.preload()` on them is a no-op — their slug-scoped subset is only
+ * fetched when a live query actually subscribes. That query normally lives in
+ * the route component, which only mounts *after* `defaultPendingComponent` is
+ * replaced, which is why reactions/comments/subscriptions historically loaded
+ * late. Building the slug-scoped live queries here (matching the filters the
+ * components use) and preloading them in `beforeLoad` pulls those subsets in
+ * alongside the eager collections, before the pending shell clears.
+ */
+function createPostSubsetQueries(organizationId: string, postSlug: string) {
+  return {
+    commentReactions: createLiveQueryCollection((query) =>
+      query
+        .from({ commentReaction: commentReactionCollection })
+        .where(({ commentReaction }) =>
+          and(
+            eq(commentReaction.organizationId, organizationId),
+            eq(commentReaction.postSlug, postSlug)
+          )
+        )
+    ),
+    comments: createLiveQueryCollection((query) =>
+      query
+        .from({ comment: commentCollection })
+        .where(({ comment }) =>
+          and(
+            eq(comment.organizationId, organizationId),
+            eq(comment.postSlug, postSlug)
+          )
+        )
+    ),
+    postReactions: createLiveQueryCollection((query) =>
+      query
+        .from({ postReaction: postReactionCollection })
+        .where(({ postReaction }) =>
+          and(
+            eq(postReaction.organizationId, organizationId),
+            eq(postReaction.postSlug, postSlug)
+          )
+        )
+    ),
+    // PostSubscription has no `postSlug` column; its query key falls back to
+    // the current URL slug, which is what the SubscribeToggle component relies
+    // on too. An org-scoped load is enough to resolve that same slug key.
+    postSubscription: createLiveQueryCollection((query) =>
+      query
+        .from({ subscription: postSubscriptionCollection })
+        .where(({ subscription }) =>
+          eq(subscription.organizationId, organizationId)
+        )
+    ),
+  };
+}
+
 export const Route = createFileRoute(
   "/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
 )({
   component: RouteComponent,
-  beforeLoad: async () => {
+  beforeLoad: async ({ params }) => {
+    const subsetQueries = createPostSubsetQueries(
+      params.organizationId,
+      params.postSlug
+    );
+
     await Promise.all([
       boardCollection.preload(),
       postCollection.preload(),
@@ -58,10 +123,10 @@ export const Route = createFileRoute(
       postTagCollection.preload(),
       tagCollection.preload(),
       upvoteCollection.preload(),
-      commentCollection.preload(),
-      commentReactionCollection.preload(),
-      postReactionCollection.preload(),
-      postSubscriptionCollection.preload(),
+      subsetQueries.comments.preload(),
+      subsetQueries.commentReactions.preload(),
+      subsetQueries.postReactions.preload(),
+      subsetQueries.postSubscription.preload(),
     ]);
   },
 });
