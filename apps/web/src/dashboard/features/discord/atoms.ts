@@ -1,37 +1,26 @@
-import * as Effect from "effect/Effect";
+import * as Result from "effect/unstable/reactivity/AsyncResult";
 import * as Atom from "effect/unstable/reactivity/Atom";
-import * as AtomRegistry from "effect/unstable/reactivity/AtomRegistry";
 
-import {
-  loadChannels,
-  loadConnections,
-  loadDiscordStatus,
-} from "./lib/connections";
+import { DashboardClient, dashboardSWR } from "~/lib/atom-rpc";
 
-export type DiscordConnection = Awaited<
-  ReturnType<typeof loadConnections>
+export type DiscordConnection = Atom.Success<
+  ReturnType<typeof connectionsAtom>
 >[number];
-export type DiscordChannel = Awaited<ReturnType<typeof loadChannels>>[number];
+export type DiscordChannel = Atom.Success<
+  ReturnType<typeof channelsAtom>
+>[number];
 
-/**
- * Client-side source of truth for the Discord settings page.
- *
- * Connection and channel lists are Effect atoms whose results stream into
- * React through `useAtomValue` from `@effect/atom-react`. Mutations refresh
- * the matching atom after they succeed so the visible state stays in sync.
- */
-export const discordAtomRegistry = AtomRegistry.make();
+export const discordReactivityKeys = (organizationId: string) => ({
+  discord: [organizationId],
+});
 
-/** Discord connections of one organization, one cached atom per organization id. */
+/** Discord connections of one organization, cached per organization id. */
 export const connectionsAtom = Atom.family((organizationId: string) =>
-  Atom.make(Effect.tryPromise(() => loadConnections(organizationId))).pipe(
-    Atom.swr({
-      staleTime: "30 seconds",
-      revalidateOnFocus: "always",
-      focusSignal: Atom.windowFocusSignal,
-    }),
-    Atom.setIdleTTL("5 minutes")
-  )
+  DashboardClient.query(
+    "DiscordConnectionList",
+    { organizationId },
+    { reactivityKeys: discordReactivityKeys(organizationId) }
+  ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
 
 export type ChannelListArgs = {
@@ -39,30 +28,31 @@ export type ChannelListArgs = {
   readonly connectionId: string;
 };
 
-/** Channels of one connection, one cached atom per connection id. */
+/** Channels of one connection, cached per organization and connection id. */
 export const channelsAtom = Atom.family((args: ChannelListArgs) =>
-  Atom.make(
-    Effect.tryPromise(() =>
-      loadChannels(args.organizationId, args.connectionId)
-    )
-  ).pipe(
-    Atom.swr({
-      staleTime: "30 seconds",
-      revalidateOnFocus: "always",
-      focusSignal: Atom.windowFocusSignal,
-    }),
-    Atom.setIdleTTL("5 minutes")
-  )
+  DashboardClient.query(
+    "DiscordChannelList",
+    { connectionId: args.connectionId, organizationId: args.organizationId },
+    { reactivityKeys: discordReactivityKeys(args.organizationId) }
+  ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
 
-/** Whether the Discord integration is configured for this deployment (global, not per-org). */
-export const discordStatusAtom = Atom.make(
-  Effect.tryPromise(() => loadDiscordStatus())
+/** Whether Discord is configured for this deployment. */
+export const discordStatusAtom = DashboardClient.query(
+  "DiscordIntegrationStatus",
+  void 0
 ).pipe(
-  Atom.swr({
-    staleTime: "30 seconds",
-    revalidateOnFocus: "always",
-    focusSignal: Atom.windowFocusSignal,
-  }),
+  Atom.map((result) => Result.map(result, (value) => value.configured)),
+  dashboardSWR("30 seconds"),
   Atom.setIdleTTL("5 minutes")
+);
+
+export const startDiscordConnectAtom = DashboardClient.mutation(
+  "DiscordConnectStart"
+);
+export const updateDiscordChannelNotificationsAtom = DashboardClient.mutation(
+  "DiscordChannelNotificationsUpdate"
+);
+export const disconnectDiscordConnectionAtom = DashboardClient.mutation(
+  "DiscordConnectionDisconnect"
 );

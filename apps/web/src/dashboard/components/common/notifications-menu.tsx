@@ -1,18 +1,15 @@
 import { RegistryContext, useAtomSet, useAtomValue } from "@effect/atom-react";
-import { AllRpcs } from "@feeblo/domain/rpc-group";
-import { createRpcProtocolLive } from "@feeblo/rpc-client";
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
-import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 import { BellDotIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useNavigate } from "@tanstack/react-router";
 import * as Result from "effect/unstable/reactivity/AsyncResult";
 import * as Atom from "effect/unstable/reactivity/Atom";
-import * as AtomRpc from "effect/unstable/reactivity/AtomRpc";
 import { useContext, useState } from "react";
 
 import { useOrganizationId } from "~/hooks/use-organization-id";
+import { DashboardClient, dashboardSWR } from "~/lib/atom-rpc";
 
 const refreshMs = 30_000;
 
@@ -20,47 +17,25 @@ const notificationReactivityKeys = (organizationId: string) => ({
   notifications: [organizationId],
 });
 
-class NotificationsClient extends AtomRpc.Service<NotificationsClient>()(
-  "NotificationsClient",
-  {
-    group: AllRpcs,
-    // The existing RPC route is HTTP-based. Keeping the protocol here gives
-    // the atom client the same credentials and serialization as fetchRpc.
-    protocol: () => createRpcProtocolLive(getRuntimePublicEnv().apiUrl),
-  }
-) {}
-
 const notificationListAtom = Atom.family((organizationId: string) =>
-  Atom.swr(
-    Atom.withRefresh(
-      NotificationsClient.query(
-        "NotificationList",
-        { organizationId, limit: 20 },
-        {
-          reactivityKeys: notificationReactivityKeys(organizationId),
-          timeToLive: refreshMs,
-        }
-      ),
-      refreshMs
-    ),
-    { staleTime: refreshMs }
-  )
+  DashboardClient.query(
+    "NotificationList",
+    { organizationId, limit: 20 },
+    {
+      reactivityKeys: notificationReactivityKeys(organizationId),
+      timeToLive: refreshMs,
+    }
+  ).pipe(dashboardSWR(refreshMs), Atom.setIdleTTL(refreshMs))
 );
 
 const notificationUnreadAtom = Atom.family((organizationId: string) =>
-  Atom.swr(
-    Atom.withRefresh(
-      NotificationsClient.query(
-        "NotificationUnreadCount",
-        { organizationId },
-        {
-          reactivityKeys: notificationReactivityKeys(organizationId),
-        }
-      ),
-      refreshMs
-    ),
-    { staleTime: refreshMs }
-  )
+  DashboardClient.query(
+    "NotificationUnreadCount",
+    { organizationId },
+    {
+      reactivityKeys: notificationReactivityKeys(organizationId),
+    }
+  ).pipe(dashboardSWR(refreshMs), Atom.setIdleTTL(refreshMs))
 );
 
 const preloadNotificationsAtom = Atom.fnSync((organizationId: string, get) => {
@@ -76,7 +51,7 @@ function NotificationsList({
 }) {
   const list = useAtomValue(notificationListAtom(organizationId));
   const markRead = useAtomSet(
-    NotificationsClient.mutation("NotificationMarkRead"),
+    DashboardClient.mutation("NotificationMarkRead"),
     { mode: "promise" }
   );
 
@@ -128,7 +103,7 @@ export function NotificationsMenu() {
   const [open, setOpen] = useState(false);
   const unread = useAtomValue(notificationUnreadAtom(organizationId));
   const markAllRead = useAtomSet(
-    NotificationsClient.mutation("NotificationMarkAllRead"),
+    DashboardClient.mutation("NotificationMarkAllRead"),
     { mode: "promise" }
   );
 

@@ -1,8 +1,4 @@
-import {
-  RegistryContext,
-  useAtomRefresh,
-  useAtomValue,
-} from "@effect/atom-react";
+import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,22 +22,20 @@ import {
 import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
 import * as Option from "effect/Option";
-import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
+import * as Result from "effect/unstable/reactivity/AsyncResult";
 import { useState } from "react";
 
 import {
   channelsAtom,
   connectionsAtom,
+  disconnectSlackConnectionAtom,
+  slackReactivityKeys,
   type SlackChannel,
   type SlackConnection,
-  slackAtomRegistry,
   slackStatusAtom,
+  startSlackConnectAtom,
+  updateSlackChannelNotificationsAtom,
 } from "../atoms";
-import {
-  disconnectSlackConnection,
-  startSlackConnect,
-  updateChannelNotifications,
-} from "../lib/connections";
 
 type AsyncListState<T> = {
   readonly list: readonly T[];
@@ -51,11 +45,11 @@ type AsyncListState<T> = {
 
 /** Collapses an atom AsyncResult into the loading/loaded/error trio the settings frames render. */
 function useAsyncList<T>(
-  result: AsyncResult.AsyncResult<readonly T[], unknown>
+  result: Result.AsyncResult<readonly T[], unknown>
 ): AsyncListState<T> {
-  return AsyncResult.match(result, {
-    onInitial: () => ({ list: [], isLoading: true, loadFailed: false }),
-    onFailure: ({ previousSuccess }) =>
+  return Result.builder(result)
+    .onInitial(() => ({ list: [], isLoading: true, loadFailed: false }))
+    .onFailure((_, { previousSuccess }) =>
       Option.match(previousSuccess, {
         onNone: () => ({ list: [], isLoading: false, loadFailed: true }),
         onSome: ({ value }) => ({
@@ -63,13 +57,14 @@ function useAsyncList<T>(
           isLoading: false,
           loadFailed: false,
         }),
-      }),
-    onSuccess: ({ value }) => ({
+      })
+    )
+    .onSuccess((value) => ({
       list: value,
       isLoading: false,
       loadFailed: false,
-    }),
-  });
+    }))
+    .exhaustive();
 }
 
 export function SlackSettings({
@@ -77,11 +72,7 @@ export function SlackSettings({
 }: {
   readonly organizationId: string;
 }) {
-  return (
-    <RegistryContext.Provider value={slackAtomRegistry}>
-      <SlackSettingsContent organizationId={organizationId} />
-    </RegistryContext.Provider>
-  );
+  return <SlackSettingsContent organizationId={organizationId} />;
 }
 
 function SlackSettingsContent({
@@ -90,6 +81,7 @@ function SlackSettingsContent({
   readonly organizationId: string;
 }) {
   const [connecting, setConnecting] = useState(false);
+  const startConnect = useAtomSet(startSlackConnectAtom, { mode: "promise" });
   const connectionsResult = useAtomValue(connectionsAtom(organizationId));
   const refreshConnections = useAtomRefresh(connectionsAtom(organizationId));
   const {
@@ -98,17 +90,22 @@ function SlackSettingsContent({
     loadFailed,
   } = useAsyncList<SlackConnection>(connectionsResult);
   const statusResult = useAtomValue(slackStatusAtom);
-  const slackConfigured = AsyncResult.match(statusResult, {
-    // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
-    onInitial: () => null as boolean | null,
-    onFailure: () => false,
-    onSuccess: ({ value }) => value,
-  });
+  const slackConfigured = Result.builder(statusResult)
+    .onInitial(
+      // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
+      () => null as boolean | null
+    )
+    .onFailure(() => false)
+    .onSuccess((value) => value)
+    .exhaustive();
 
   const handleConnect = async () => {
     setConnecting(true);
     try {
-      const { authorizeUrl } = await startSlackConnect(organizationId);
+      const { authorizeUrl } = await startConnect({
+        payload: { organizationId },
+        reactivityKeys: slackReactivityKeys(organizationId),
+      });
       window.location.assign(authorizeUrl.toString());
     } catch {
       setConnecting(false);
@@ -120,7 +117,6 @@ function SlackSettingsContent({
   };
 
   const handleDisconnected = () => {
-    refreshConnections();
     toastManager.add({
       title: "Slack workspace disconnected",
       type: "success",
@@ -225,13 +221,19 @@ function SlackConnectionFrame({
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const disconnect = useAtomSet(disconnectSlackConnectionAtom, {
+    mode: "promise",
+  });
 
   const handleDisconnect = async () => {
     setDisconnecting(true);
     try {
-      await disconnectSlackConnection({
-        connectionId: connection.id,
-        organizationId,
+      await disconnect({
+        payload: {
+          connectionId: connection.id,
+          organizationId,
+        },
+        reactivityKeys: slackReactivityKeys(organizationId),
       });
       setDialogOpen(false);
       onDisconnected();
@@ -354,6 +356,9 @@ function FeedbackChannelSelect({
   readonly organizationId: string;
 }) {
   const args = { connectionId, organizationId };
+  const updateNotifications = useAtomSet(updateSlackChannelNotificationsAtom, {
+    mode: "promise",
+  });
   const channelsResult = useAtomValue(channelsAtom(args));
   const refreshChannels = useAtomRefresh(channelsAtom(args));
   const {
@@ -366,14 +371,16 @@ function FeedbackChannelSelect({
   const handleToggle = async (channel: SlackChannel, enabled: boolean) => {
     setPendingChannelId(channel.id);
     try {
-      await updateChannelNotifications({
-        channelId: channel.id,
-        channelName: channel.name,
-        connectionId,
-        enabled,
-        organizationId,
+      await updateNotifications({
+        payload: {
+          channelId: channel.id,
+          channelName: channel.name,
+          connectionId,
+          enabled,
+          organizationId,
+        },
+        reactivityKeys: slackReactivityKeys(organizationId),
       });
-      refreshChannels();
       toastManager.add({
         title: enabled
           ? "New post notifications enabled"
@@ -381,7 +388,6 @@ function FeedbackChannelSelect({
         type: "success",
       });
     } catch {
-      refreshChannels();
       toastManager.add({
         title: "Could not update new post notifications",
         type: "error",
