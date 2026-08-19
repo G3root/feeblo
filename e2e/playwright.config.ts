@@ -58,7 +58,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  ...(process.env.CI && { workers: 2 }),
+  // The e2e server uses one shared file-backed PGlite instance. Letting
+  // Playwright use all host CPUs creates enough concurrent writes to cause
+  // dropped connections during auth setup, especially on developer laptops.
+  workers: process.env.CI ? 2 : 4,
   reporter: process.env.CI
     ? [["line"], ["github"], ["html", { open: "never" }]]
     : [["list"], ["html", { open: "never" }]],

@@ -24,6 +24,9 @@ export async function signUpProgrammatically(page: Page, user: TestUser) {
         email: user.email,
         password: user.password,
       },
+      // The e2e server is shared by workers. Retry a dropped connection rather
+      // than failing authentication on a transient ECONNRESET.
+      maxRetries: 2,
     });
 
   expect(response.ok()).toBeTruthy();
@@ -36,6 +39,7 @@ export async function signUpProgrammatically(page: Page, user: TestUser) {
         email: user.email,
         otp: verificationCodeFromEmail(email),
       },
+      maxRetries: 2,
     });
   expect(verificationResponse.ok()).toBeTruthy();
 }
