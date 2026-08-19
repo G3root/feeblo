@@ -4,7 +4,6 @@ import type { AuthHint } from "@feeblo/web-shared/auth-hint";
 import type { APIContext, MiddlewareNext } from "astro";
 import { defineMiddleware, sequence } from "astro:middleware";
 
-import { fetchRpcServer } from "~/lib/runtime-server";
 import { getServerRuntimePublicEnv } from "~/lib/server-runtime-public-env";
 
 import { paraglideMiddleware } from "./paraglide/server";
@@ -158,6 +157,10 @@ async function siteMiddleware(context: APIContext, next: MiddlewareNext) {
   const { subdomain } = context.locals;
   if (isPublicBoardSubdomain(subdomain)) {
     try {
+      // The Effect RPC runtime (~150 kB) is only needed to resolve the site
+      // for public board subdomains. Load it lazily so dashboard/app requests
+      // never evaluate it, keeping it out of the worker's startup module graph.
+      const { fetchRpcServer } = await import("~/lib/runtime-server");
       const sites = await fetchRpcServer((rpc) =>
         rpc.SiteListBySubdomain({ subdomain })
       );
