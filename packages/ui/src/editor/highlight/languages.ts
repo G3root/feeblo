@@ -7,7 +7,10 @@
  * `typescript`, ...) itself, and `plain` maps to the existing "Plain Text"
  * option (an empty language string) so it is excluded here.
  */
-export const codeBlockLanguages: ReadonlyArray<{ value: string; label: string }> = [
+export const codeBlockLanguages: ReadonlyArray<{
+  value: string;
+  label: string;
+}> = [
   { value: "ts", label: "TypeScript" },
   { value: "tsx", label: "TSX" },
   { value: "js", label: "JavaScript" },

@@ -19,7 +19,8 @@ import { normalizeCodeBlockLanguage } from "./languages.js";
  * mode working through the app's existing theme variables instead of inlining
  * colors.
  */
-export const createRangiParser = (): Parser =>
+export const createRangiParser =
+  (): Parser =>
   ({ content, pos, language }) => {
     // Plain-text code blocks get no highlighting.
     if (!language) {

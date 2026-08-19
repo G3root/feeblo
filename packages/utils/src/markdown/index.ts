@@ -10,11 +10,11 @@
 
 import rehypeParse from "rehype-parse";
 import rehypeRemark from "rehype-remark";
+import rehypeStringify from "rehype-stringify";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import remarkStringify from "remark-stringify";
-import rehypeStringify from "rehype-stringify";
 import { unified } from "unified";
 
 import { rehypeCodeHighlight } from "./rehype-code-highlight";
