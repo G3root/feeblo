@@ -178,9 +178,9 @@ export class HtmlSanitizer {
       //   node.setAttribute("src", sanitizedUrl);
       // }
 
-      const sanitizeAttributeValue = (_: string) => {
+      const sanitizeAttributeValue = (_value: string) => {
         // Title and alt parsing is too ambiguous. We need to fully remove it
-
+        void _value;
         return "";
       };
 
