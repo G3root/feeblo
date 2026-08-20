@@ -97,13 +97,11 @@ function RouteComponent() {
           {recentPosts.map((post) => {
             const board = boardMap.get(post.boardId);
             const status = statuses.find((s) => s.id === post.statusId);
-            const user = (post as unknown as { user?: { image?: string | null; name?: string | null } }).user;
-            const excerpt = (post as unknown as { excerpt?: string }).excerpt;
             const description =
-              (excerpt && excerpt.trim().length > 0
-                ? excerpt.length > 100
-                  ? `${excerpt.slice(0, 99).trimEnd()}...`
-                  : excerpt
+              (post.excerpt && post.excerpt.trim().length > 0
+                ? post.excerpt.length > 100
+                  ? `${post.excerpt.slice(0, 99).trimEnd()}...`
+                  : post.excerpt
                 : "No details yet.") ||
               `${board?.name ?? ""}${board?.name ? " · " : ""}${formatPostDate(post.createdAt)}`;
             return (
@@ -125,14 +123,14 @@ function RouteComponent() {
                   <PostCard.Description>{description}</PostCard.Description>
                   <PostCard.MobileMeta
                     boardName={board?.name ?? ""}
-                    image={user?.image}
-                    name={user?.name}
+                    image={post.user?.image}
+                    name={post.user?.name}
                   />
                 </PostCard.Body>
                 <PostCard.DesktopMeta>
                   {status && <PostCard.Status status={status.type} />}
                   {board?.name && <PostCard.BoardBadge>{board.name}</PostCard.BoardBadge>}
-                  <PostCard.Author image={user?.image} name={user?.name} />
+                  <PostCard.Author image={post.user?.image} name={post.user?.name} />
                 </PostCard.DesktopMeta>
               </PostCard.Root>
             );
@@ -311,7 +309,8 @@ function RecentPostUpvote({
 
   return (
     <button
-      aria-label="Upvote"
+      aria-label={isUpvoted ? "Remove upvote" : "Upvote"}
+      aria-pressed={isUpvoted}
       className={cn(
         "flex h-9 w-10 shrink-0 flex-col items-center justify-center rounded-md text-xs transition-colors",
         isUpvoted ? "bg-primary/10 text-primary" : "bg-muted/70 text-muted-foreground hover:bg-muted"

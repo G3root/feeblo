@@ -3,7 +3,6 @@ import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { cn } from "@feeblo/ui/utils";
 import { getBoardStatusIndicatorColor } from "@feeblo/web-shared/board/constants";
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
 
 // ---------------------------------------------------------------------------
 // Shared composable PostCard — coss-style primitives (no useRender, no mergeProps)
