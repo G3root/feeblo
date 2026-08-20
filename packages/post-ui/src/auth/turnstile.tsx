@@ -15,6 +15,7 @@ export function useTurnstile() {
 
   const handleError = useCallback(() => {
     setToken(null);
+    ref.current?.reset();
   }, []);
 
   const handleExpire = useCallback(() => {

@@ -118,7 +118,7 @@ export function useSignUpEmail({
         }
 
         const verificationEmail = response.data?.user?.email ?? email;
-        if (!response.data?.user.emailVerified) {
+        if (!response.data?.user?.emailVerified) {
           const ready = await initializeEmailVerification(verificationEmail);
           if (ready) {
             await onVerifyEmail?.(verificationEmail);
@@ -159,7 +159,7 @@ export function useVerifyEmailOtp({
             title:
               response.error.code === "INVALID_OTP"
                 ? "Invalid verification code"
-                : response.error.message,
+                : (response.error.message ?? "Something went wrong"),
             type: "error",
           });
           return false;
@@ -233,7 +233,7 @@ export function useCheckResetPasswordOtp({
               return false;
             default:
               toastManager.add({
-                title: response.error.message,
+                title: response.error.message ?? "Something went wrong",
                 type: "error",
               });
               return false;

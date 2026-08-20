@@ -9,7 +9,12 @@ import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 export type SocialProvider = "github" | "google";
 
 export const getSafeCallbackURL = (redirectTo?: string) => {
-  const safePath = redirectTo?.startsWith("/") ? redirectTo : "/";
+  const safePath =
+    redirectTo?.startsWith("/") &&
+    redirectTo[1] !== "/" &&
+    redirectTo[1] !== "\\"
+      ? redirectTo
+      : "/";
   const currentOrigin = hasWindow() ? window.location.origin : undefined;
   const appUrl = getRuntimePublicEnv().appUrl;
   const callbackBase = currentOrigin ?? appUrl;

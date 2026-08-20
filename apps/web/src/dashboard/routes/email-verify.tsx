@@ -4,7 +4,7 @@ import {
   OtpResend,
   otpFormOpts,
 } from "@feeblo/post-ui/auth-forms";
-import { RateLimitErrorSchema } from "@feeblo/post-ui/otp-resend";
+import { toResendResult } from "@feeblo/post-ui/otp-resend";
 import { useVerifyEmailOtp } from "@feeblo/post-ui/use-auth-submission";
 import { Field, FieldDescription, FieldGroup } from "@feeblo/ui/field";
 import { useAppForm } from "@feeblo/ui/hooks/form";
@@ -58,9 +58,12 @@ function RouteComponent() {
   const verifyOtp = useVerifyEmailOtp({
     email: verificationState.email,
     onSuccess: () => {
-      const redirectTo = search.redirectTo?.startsWith("/")
-        ? search.redirectTo
-        : "/";
+      const redirectTo =
+        search.redirectTo?.startsWith("/") &&
+        search.redirectTo[1] !== "/" &&
+        search.redirectTo[1] !== "\\"
+          ? search.redirectTo
+          : "/";
 
       window.location.href = redirectTo;
     },
@@ -73,14 +76,7 @@ function RouteComponent() {
     });
 
     if (response.error) {
-      const rateLimitError = RateLimitErrorSchema.safeParse(response.error);
-      return {
-        success: false as const,
-        retryAfterSeconds: rateLimitError.success
-          ? rateLimitError.data.retryAfterSeconds
-          : undefined,
-        message: response.error.message,
-      };
+      return toResendResult(response.error);
     }
 
     return { success: true as const };

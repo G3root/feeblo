@@ -29,7 +29,7 @@ import {
   SignUpFields,
   signUpFormOpts,
 } from "../../auth/auth-forms";
-import { RateLimitErrorSchema } from "../../auth/otp-resend";
+import { toResendResult } from "../../auth/otp-resend";
 import { SocialAuthButtons } from "../../auth/social-auth-buttons";
 import { TurnstileField, useTurnstile } from "../../auth/turnstile";
 import {
@@ -325,14 +325,7 @@ function OtpVerificationForm({
     });
 
     if (response.error) {
-      const rateLimitError = RateLimitErrorSchema.safeParse(response.error);
-      return {
-        success: false as const,
-        retryAfterSeconds: rateLimitError.success
-          ? rateLimitError.data.retryAfterSeconds
-          : undefined,
-        message: response.error.message,
-      };
+      return toResendResult(response.error);
     }
 
     return { success: true as const };

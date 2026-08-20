@@ -1,10 +1,5 @@
 import { Button } from "@feeblo/ui/button";
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
-} from "@feeblo/ui/field";
+import { Field, FieldDescription, FieldError } from "@feeblo/ui/field";
 import { withForm } from "@feeblo/ui/hooks/form";
 import {
   OTPField,
@@ -183,11 +178,7 @@ export const OtpFormFields = withForm({
             field.state.meta.isTouched && !field.state.meta.isValid;
           return (
             <Field data-invalid={isInvalid}>
-              <FieldLabel className="sr-only" htmlFor={field.name}>
-                Verification code
-              </FieldLabel>
               <OTPField
-                aria-label="Verification code"
                 className="justify-center gap-4"
                 id={field.name}
                 length={6}
@@ -197,7 +188,7 @@ export const OtpFormFields = withForm({
                 size="lg"
                 value={field.state.value}
               >
-                <OTPFieldInput />
+                <OTPFieldInput aria-label="Character 1 of 6" />
                 <OTPFieldInput aria-label="Character 2 of 6" />
                 <OTPFieldInput aria-label="Character 3 of 6" />
                 <OTPFieldSeparator />

@@ -36,10 +36,7 @@ function RouteComponent() {
     getCaptchaToken: () => turnstile.token,
     onSuccess: () =>
       navigate({
-        to: "/$organizationId/feedback",
-        params: {
-          organizationId: "",
-        },
+        to: "/register",
       }),
     onVerifyEmail: () =>
       navigate({

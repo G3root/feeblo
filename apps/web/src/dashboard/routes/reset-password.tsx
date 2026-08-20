@@ -6,7 +6,7 @@ import {
 } from "@feeblo/post-ui/auth-forms";
 import {
   clearVerificationOtp,
-  RateLimitErrorSchema,
+  toResendResult,
 } from "@feeblo/post-ui/otp-resend";
 import { useCheckResetPasswordOtp } from "@feeblo/post-ui/use-auth-submission";
 import { useAppForm } from "@feeblo/ui/hooks/form";
@@ -80,14 +80,7 @@ function RouteComponent() {
     });
 
     if (response.error) {
-      const rateLimitError = RateLimitErrorSchema.safeParse(response.error);
-      return {
-        success: false as const,
-        retryAfterSeconds: rateLimitError.success
-          ? rateLimitError.data.retryAfterSeconds
-          : undefined,
-        message: response.error.message,
-      };
+      return toResendResult(response.error);
     }
 
     return { success: true as const };

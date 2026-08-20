@@ -60,6 +60,20 @@ export type ResendResult =
       readonly message?: string;
     };
 
+export function toResendResult(error: {
+  message?: string | null;
+  code?: string;
+}): ResendResult {
+  const rateLimitError = RateLimitErrorSchema.safeParse(error);
+  return {
+    success: false as const,
+    retryAfterSeconds: rateLimitError.success
+      ? rateLimitError.data.retryAfterSeconds
+      : undefined,
+    message: error.message ?? undefined,
+  };
+}
+
 /**
  * Encapsulates the shared OTP resend UX: a countdown cooldown, an in-flight
  * flag, rate-limit-aware error handling, and success/error toasts. The caller
