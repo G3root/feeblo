@@ -11,11 +11,13 @@ type BoardRowLike = {
 type PostRowLike = {
   boardId: string;
   createdAt: Date | string;
+  excerpt?: string;
   id: string;
   organizationId: string;
   slug: string;
   statusId: string;
   title: string;
+  user?: { image?: string | null; name?: string | null };
 };
 
 type PostStatusRowLike = {
