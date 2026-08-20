@@ -17,7 +17,7 @@ export const makeSentryLayer = (
           tracesSampleRate: config.sentryTracesSampleRate,
         }),
         Layer.succeed(Tracer.Tracer, Sentry.SentryEffectTracer),
-        Logger.layer([Sentry.SentryEffectLogger]),
+        Logger.layer([Sentry.SentryEffectLogger], { mergeWithExisting: true }),
         Sentry.SentryEffectMetricsLayer
       )
     : Layer.empty;

@@ -30,10 +30,13 @@ import type { IntegrationRuntime } from "../integrations";
 import { makeSlackRouters } from "../slack";
 
 export const makePublicRouters = (
-  mailbox: Ref.Ref<TestMailerState> | undefined
+  mailbox: Ref.Ref<TestMailerState> | undefined,
+  nodeEnv: string
 ) => {
+  // E2E routers must never mount in production, even if E2E_TEST_MAILER
+  // provides a mailbox.
   const RootRouterLive =
-    mailbox === undefined
+    mailbox === undefined || nodeEnv === "production"
       ? RootRouter
       : Layer.mergeAll(
           RootRouter,

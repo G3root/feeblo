@@ -5,9 +5,16 @@ import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
 import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
-/** Human-readable request label used to identify each timing entry. */
-const requestLabel = (request: HttpServerRequest.HttpServerRequest): string =>
-  `${request.method} ${request.url.split("?")[0]}`;
+/**
+ * Human-readable request label used to identify each timing entry. The SES
+ * feedback webhook embeds its signing token in the URL path, so that segment
+ * is redacted to the route pattern before the label is emitted.
+ */
+const requestLabel = (request: HttpServerRequest.HttpServerRequest): string => {
+  const path = request.url.split("?")[0] ?? "";
+  const redacted = path.replace(/^(\/email-provider\/ses\/).+$/, "$1:token");
+  return `${request.method} ${redacted}`;
+};
 
 /**
  * Adds timing headers to every response:

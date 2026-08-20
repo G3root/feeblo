@@ -39,6 +39,7 @@ import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
 import type { Mailer } from "@feeblo/transactional/mailer";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
+import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import type * as Ref from "effect/Ref";
@@ -71,12 +72,26 @@ export const makeRateLimitLayer = (
   config: ServerConfigValue,
   useTestMailer: boolean
 ): Layer.Layer<RateLimitService> => {
+  const memoryStore = RateLimiter.layerStoreMemory;
+
   const RateLimitStoreLayer: Layer.Layer<RateLimiter.RateLimiterStore> =
-    config.nodeEnv === "test" || useTestMailer || !config.redisUrl
-      ? RateLimiter.layerStoreMemory
-      : RateLimiter.layerStoreRedis({ prefix: "feeblo:rate-limit" }).pipe(
-          Layer.provide(NodeRedis.layer(redisOptions(config.redisUrl)))
-        );
+    useTestMailer || config.nodeEnv === "test"
+      ? memoryStore
+      : config.redisUrl !== undefined
+        ? RateLimiter.layerStoreRedis({ prefix: "feeblo:rate-limit" }).pipe(
+            Layer.provide(NodeRedis.layer(redisOptions(config.redisUrl)))
+          )
+        : config.nodeEnv === "development"
+          ? memoryStore
+          : memoryStore.pipe(
+              Layer.tap(() =>
+                Effect.logWarning(
+                  "REDIS_URL is not set: falling back to in-memory rate limiting, " +
+                    "which is not shared across server instances. Configure " +
+                    "REDIS_URL for production deployments."
+                )
+              )
+            );
 
   return RateLimitService.layer.pipe(
     Layer.provide(RateLimiter.layer),

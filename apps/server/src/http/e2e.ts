@@ -1,4 +1,4 @@
-import { Database, schema } from "@feeblo/db";
+import { Database, schema, transaction } from "@feeblo/db";
 import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
 import { RoadmapColumnRepository } from "@feeblo/domain/roadmap-column/repository";
 import { RoadmapRepository } from "@feeblo/domain/roadmap/repository";
@@ -145,47 +145,59 @@ export const e2eSetPlanRouter = HttpRouter.use((router) =>
         const body = yield* request.json;
         const payload = yield* Schema.decodeUnknownEffect(SetPlanPayload)(body);
         const now = new Date();
-
-        // Converge on the requested plan: drop any existing subscription so
-        // re-runs never stack multiple active rows for the same workspace.
-        // The product row goes with it (subscription.productId cascades).
-        yield* db
-          .delete(schema.subscriptionTable)
-          .where(
-            eq(schema.subscriptionTable.organizationId, payload.organizationId)
-          );
-
         const productId = `prod_e2e_${payload.organizationId}`;
-        yield* db.insert(schema.productTable).values({
-          id: productId,
-          name:
-            payload.plan === "starter"
-              ? "Starter monthly"
-              : "Professional monthly",
-          isRecurring: true,
-          isArchived: false,
-          externalOrganizationId: "polar_org",
-          visibility: "PUBLIC",
-          recurringInterval: "month",
-          recurringIntervalCount: 1,
-          metadata: { plan: payload.plan, variant: "monthly" },
-        });
 
-        yield* db.insert(schema.subscriptionTable).values({
-          id: `sub_e2e_${payload.organizationId}`,
-          externalId: `sub_e2e_ext_${payload.organizationId}`,
-          organizationId: payload.organizationId,
-          amount: payload.plan === "starter" ? 4900 : 9900,
-          cancelAtPeriodEnd: false,
-          currency: "usd",
-          recurringInterval: "month",
-          recurringIntervalCount: 1,
-          status: "trialing",
-          currentPeriodStart: now,
-          currentPeriodEnd: new Date(now.getTime() + 86_400_000),
-          customerId: `cus_e2e_${payload.organizationId}`,
-          productId,
-        });
+        // Converge on the requested plan atomically so re-runs are idempotent:
+        // drop any existing subscription, replace the E2E product row, then
+        // re-insert both. Deleting the product also cascades to any
+        // subscription that still references it.
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* db
+              .delete(schema.subscriptionTable)
+              .where(
+                eq(
+                  schema.subscriptionTable.organizationId,
+                  payload.organizationId
+                )
+              );
+
+            yield* db
+              .delete(schema.productTable)
+              .where(eq(schema.productTable.id, productId));
+
+            yield* db.insert(schema.productTable).values({
+              id: productId,
+              name:
+                payload.plan === "starter"
+                  ? "Starter monthly"
+                  : "Professional monthly",
+              isRecurring: true,
+              isArchived: false,
+              externalOrganizationId: "polar_org",
+              visibility: "PUBLIC",
+              recurringInterval: "month",
+              recurringIntervalCount: 1,
+              metadata: { plan: payload.plan, variant: "monthly" },
+            });
+
+            yield* db.insert(schema.subscriptionTable).values({
+              id: `sub_e2e_${payload.organizationId}`,
+              externalId: `sub_e2e_ext_${payload.organizationId}`,
+              organizationId: payload.organizationId,
+              amount: payload.plan === "starter" ? 4900 : 9900,
+              cancelAtPeriodEnd: false,
+              currency: "usd",
+              recurringInterval: "month",
+              recurringIntervalCount: 1,
+              status: "trialing",
+              currentPeriodStart: now,
+              currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+              customerId: `cus_e2e_${payload.organizationId}`,
+              productId,
+            });
+          })
+        );
 
         return HttpServerResponse.jsonUnsafe({ plan: payload.plan });
       }).pipe(Effect.orDie)

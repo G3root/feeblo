@@ -40,6 +40,7 @@ const handleInbound = (
   capabilityKey:
     | typeof slackCommandsCapabilityKey
     | typeof slackMessageActionCapabilityKey,
+  expectedKind: "slash_command" | "interactive",
   registry: IntegrationProviderRegistry
 ) =>
   Effect.gen(function* () {
@@ -75,6 +76,12 @@ const handleInbound = (
       )
     );
     if (Exit.isFailure(parsed)) {
+      yield* Effect.logError(parsed.cause);
+      return HttpServerResponse.text("invalid inbound payload", {
+        status: 400,
+      });
+    }
+    if (parsed.value.kind !== expectedKind) {
       return HttpServerResponse.text("invalid inbound payload", {
         status: 400,
       });
@@ -169,9 +176,12 @@ const makeSlackCommandRouter = (registry: IntegrationProviderRegistry) =>
       "POST",
       "/slack/commands/feeblo",
       (request: HttpServerRequest.HttpServerRequest) =>
-        handleInbound(request, slackCommandsCapabilityKey, registry).pipe(
-          Effect.orDie
-        )
+        handleInbound(
+          request,
+          slackCommandsCapabilityKey,
+          "slash_command",
+          registry
+        ).pipe(Effect.orDie)
     )
   );
 
@@ -182,9 +192,12 @@ const makeSlackInteractiveRouter = (registry: IntegrationProviderRegistry) =>
       "POST",
       "/slack/interactive",
       (request: HttpServerRequest.HttpServerRequest) =>
-        handleInbound(request, slackMessageActionCapabilityKey, registry).pipe(
-          Effect.orDie
-        )
+        handleInbound(
+          request,
+          slackMessageActionCapabilityKey,
+          "interactive",
+          registry
+        ).pipe(Effect.orDie)
     )
   );
 

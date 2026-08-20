@@ -70,6 +70,7 @@ const handleInteraction = (
       )
     );
     if (Exit.isFailure(parsed)) {
+      yield* Effect.logError(parsed.cause);
       return HttpServerResponse.text("invalid inbound payload", {
         status: 400,
       });

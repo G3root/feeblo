@@ -58,7 +58,10 @@ export const makeSesEmailFeedbackRouter = () =>
               result: outcome.result._tag,
             });
           default:
-            return outcome satisfies never;
+            outcome satisfies never;
+            return HttpServerResponse.text("unexpected SES webhook outcome", {
+              status: 500,
+            });
         }
       }).pipe(
         Effect.catchTags({

@@ -17,6 +17,9 @@ export const handleBetterAuthRequest = async ({
   readonly headers: Headers;
   readonly request: Request;
 }): Promise<Response> => {
+  // Missing or non-numeric Content-Length values parse to NaN and fall
+  // through to the streaming body-size guard below; only finite lengths above
+  // the cap are rejected up front.
   const declaredLength = Number(headers.get("content-length"));
   if (
     Number.isFinite(declaredLength) &&
@@ -36,6 +39,7 @@ export const handleBetterAuthRequest = async ({
         bytesRead += chunk.byteLength;
         if (bytesRead > MAX_REQUEST_BODY_BYTES) {
           bodyLimitExceeded = true;
+          controller.error(new Error("Request body too large"));
           return;
         }
         controller.enqueue(chunk);

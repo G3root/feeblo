@@ -41,7 +41,6 @@ import {
 
 export const program = Effect.gen(function* () {
   const config = yield* ServerConfig;
-  const SentryLive = makeSentryLayer(config);
 
   const useTestMailer = yield* Config.boolean("E2E_TEST_MAILER").pipe(
     Config.withDefault(false)
@@ -70,7 +69,7 @@ export const program = Effect.gen(function* () {
     workflowLayer: WorkFlowLayer,
   });
 
-  const PublicRouters = makePublicRouters(mailbox);
+  const PublicRouters = makePublicRouters(mailbox, config.nodeEnv);
   const MergedRoutes = makeMergedRoutes({
     integrationRuntime,
     publicRouters: PublicRouters,
@@ -87,7 +86,6 @@ export const program = Effect.gen(function* () {
     Layer.provide(ServiceLayers),
     Layer.provide(NodeFileSystem.layer),
     Layer.provide(NodePath.layer),
-    Layer.provide(SentryLive),
     Layer.provide(
       NodeHttpServer.layerConfig(
         createServer,
@@ -104,17 +102,27 @@ export const program = Effect.gen(function* () {
   return yield* Layer.launch(server);
 });
 
-export const runProgram = program.pipe(
+// Sentry must wrap the entire program (layer construction, forked workers,
+// and server execution), not just the HTTP server layer.
+const SentryLiveLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const config = yield* ServerConfig;
+    return makeSentryLayer(config);
+  })
+).pipe(Layer.provideMerge(ServerConfig.layer));
+
+export const main = program.pipe(
   Effect.scoped,
   Effect.provide(
     Layer.mergeAll(
-      ServerConfig.layer,
+      SentryLiveLayer,
       Database.DatabaseContextLive,
       WebhookIntegrationConfig.layer,
       NodeCrypto.layer,
       SlackIntegrationConfig.layer,
       DiscordIntegrationConfig.layer
     )
-  ),
-  NodeRuntime.runMain
+  )
 );
+
+export const runProgram = () => NodeRuntime.runMain(main);

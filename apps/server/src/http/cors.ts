@@ -12,6 +12,10 @@ const parseUrl = (value: string): URL | null =>
 export const makeIsAllowedOrigin =
   (config: ServerConfigValue) =>
   (origin: string | undefined): boolean => {
+    // Missing Origin headers come from non-browser clients and same-origin
+    // navigations. CORS cannot gate them, so credentials-enabled,
+    // state-changing routes must not rely on CORS alone for cross-site
+    // protection.
     if (!origin) {
       return true;
     }
@@ -45,7 +49,10 @@ export const makeIsAllowedOrigin =
       return true;
     }
 
-    if (originHost.endsWith(`.${appRootDomainHost}`)) {
+    if (
+      appRootDomainHost !== "" &&
+      originHost.endsWith(`.${appRootDomainHost}`)
+    ) {
       return true;
     }
 

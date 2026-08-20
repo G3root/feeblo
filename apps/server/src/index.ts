@@ -23,4 +23,4 @@
  */
 import { runProgram } from "./app/program";
 
-void runProgram;
+runProgram();
