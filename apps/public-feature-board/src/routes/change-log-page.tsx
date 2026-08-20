@@ -12,6 +12,7 @@ import {
   InputGroupText,
 } from "@feeblo/ui/input-group";
 import { MarkdownContent } from "@feeblo/ui/markdown-content";
+import { ScrollArea } from "@feeblo/ui/scroll-area";
 import { Separator } from "@feeblo/ui/separator";
 import {
   Cancel01Icon,
@@ -189,46 +190,48 @@ export function ChangelogPage() {
             <Separator />
           </div>
 
-          <ChangelogTimeline>
-            {changelogs.map((item) => (
-              <ChangelogTimelineItem className="pb-14 md:pb-16" key={item.id}>
-                <ChangelogTimelineDate>
-                  <time className="text-muted-foreground text-sm font-medium tracking-tight">
-                    {formatChangelogDate(item.publishedAt ?? item.createdAt)}
-                  </time>
-                </ChangelogTimelineDate>
+          <ScrollArea className="h-[calc(100vh-12rem)]">
+            <ChangelogTimeline>
+              {changelogs.map((item) => (
+                <ChangelogTimelineItem className="pb-14 md:pb-16" key={item.id}>
+                  <ChangelogTimelineDate>
+                    <time className="text-muted-foreground text-sm font-medium tracking-tight">
+                      {formatChangelogDate(item.publishedAt ?? item.createdAt)}
+                    </time>
+                  </ChangelogTimelineDate>
 
-                <ChangelogTimelineBody className="space-y-6 p-0 sm:p-0">
-                  {item.coverImage ? (
-                    <img
-                      alt=""
-                      className="aspect-[16/7] w-full rounded-xl border object-cover"
-                      height={525}
-                      loading="lazy"
-                      src={item.coverImage}
-                      width={1200}
-                    />
-                  ) : null}
-                  <header className="space-y-3">
-                    <ChangelogCategoryBadges
-                      categoryIds={categoryIdsByChangelog.get(item.id) ?? []}
-                    />
-                    <Link
-                      className="block w-fit transition-opacity hover:opacity-80"
-                      params={{ changelogSlug: item.slug }}
-                      to="/changelog/$changelogSlug"
-                    >
-                      <h3 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                        {item.title}
-                      </h3>
-                    </Link>
-                  </header>
+                  <ChangelogTimelineBody className="space-y-6 p-0 sm:p-0">
+                    {item.coverImage ? (
+                      <img
+                        alt=""
+                        className="aspect-[16/7] w-full rounded-xl border object-cover"
+                        height={525}
+                        loading="lazy"
+                        src={item.coverImage}
+                        width={1200}
+                      />
+                    ) : null}
+                    <header className="space-y-3">
+                      <ChangelogCategoryBadges
+                        categoryIds={categoryIdsByChangelog.get(item.id) ?? []}
+                      />
+                      <Link
+                        className="block w-fit transition-opacity hover:opacity-80"
+                        params={{ changelogSlug: item.slug }}
+                        to="/changelog/$changelogSlug"
+                      >
+                        <h3 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                          {item.title}
+                        </h3>
+                      </Link>
+                    </header>
 
-                  <MarkdownContent content={item.content} />
-                </ChangelogTimelineBody>
-              </ChangelogTimelineItem>
-            ))}
-          </ChangelogTimeline>
+                    <MarkdownContent content={item.content} />
+                  </ChangelogTimelineBody>
+                </ChangelogTimelineItem>
+              ))}
+            </ChangelogTimeline>
+          </ScrollArea>
         </>
       )}
     </ChangelogPageLayout>
