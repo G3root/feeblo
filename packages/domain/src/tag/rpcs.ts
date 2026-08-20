@@ -67,6 +67,5 @@ export class TagRpcs extends RpcGroup.make(
     payload: PostTagSet,
     success: Schema.Void,
     error: TagServiceErrors,
-  }).middleware(AuthMiddleware),
-
+  }).middleware(AuthMiddleware)
 ) {}

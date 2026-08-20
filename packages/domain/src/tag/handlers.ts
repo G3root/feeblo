@@ -86,12 +86,12 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
           includeFeedback: true,
         })
         .pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "TagListPublic",
-          level: "read",
-        }),
-        withRemapDbErrors("Tag", "select")
-      ),
+          RateLimit.withPublicRpcRateLimit({
+            name: "TagListPublic",
+            level: "read",
+          }),
+          withRemapDbErrors("Tag", "select")
+        ),
 
     PostTagList: (args: TPostTagList) =>
       repository

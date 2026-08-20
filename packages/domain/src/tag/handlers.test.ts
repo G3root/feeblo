@@ -210,9 +210,7 @@ describe("TagRpcHandlers", () => {
             const publicTags = yield* handlers.TagListPublic({
               organizationId: f.organizationId,
             });
-            expect(publicTags).toMatchObject([
-              { id: tagId, name: "Feature" },
-            ]);
+            expect(publicTags).toMatchObject([{ id: tagId, name: "Feature" }]);
             expect(publicTags[0]).not.toHaveProperty("creatorId");
           })
       );
@@ -459,7 +457,6 @@ describe("TagRpcHandlers", () => {
         })
       );
 
-
       it.effect(
         "hides post tags on private boards from the public endpoint",
         () =>
@@ -526,7 +523,6 @@ describe("TagRpcHandlers", () => {
             ).toHaveLength(1);
           })
       );
-
     }
   );
 });

@@ -104,8 +104,7 @@ export function TagSelect({
         <Button
           aria-label="Create tag"
           disabled={disabled || !canCreate}
-          onClick={() => createDialogStore.send({ type: "toggle", data: {} })
-          }
+          onClick={() => createDialogStore.send({ type: "toggle", data: {} })}
           size="icon-sm"
           title={
             canCreate ? undefined : "You don't have permission to create tags"

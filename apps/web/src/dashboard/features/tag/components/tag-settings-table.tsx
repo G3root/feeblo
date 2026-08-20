@@ -62,7 +62,8 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
   );
 
   const tags = tagsQuery?.data;
-  const handleCreate = () => createDialogStore.send({ type: "toggle", data: {} });
+  const handleCreate = () =>
+    createDialogStore.send({ type: "toggle", data: {} });
 
   if (tagsQuery.isLoading) {
     return (

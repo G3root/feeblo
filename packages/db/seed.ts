@@ -357,7 +357,8 @@ Planned roles
   title: string;
   status: "draft" | "scheduled" | "published";
   publishedDaysAgo: number | null;
-  scheduledDaysAhead: number | null;  categories: readonly string[];
+  scheduledDaysAhead: number | null;
+  categories: readonly string[];
   linkPostCount: number;
   content: string;
 }>;
