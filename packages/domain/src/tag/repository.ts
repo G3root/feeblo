@@ -128,7 +128,6 @@ const makeTagRepository = Effect.gen(function* () {
             id,
             name,
             slug: slugify(name),
-            type: "FEEDBACK",
             organizationId,
             creatorId,
             ...(creatorMemberId && { creatorMemberId }),
