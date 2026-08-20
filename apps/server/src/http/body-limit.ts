@@ -39,7 +39,11 @@ export const handleBetterAuthRequest = async ({
         bytesRead += chunk.byteLength;
         if (bytesRead > MAX_REQUEST_BODY_BYTES) {
           bodyLimitExceeded = true;
-          controller.error(new Error("Request body too large"));
+          // Don't call controller.error() — that surfaces as an unhandled
+          // stream error inside Better Auth and gets logged as
+          // `ERROR [Better Auth]: Request body too large`. Dropping this
+          // and subsequent chunks gives the handler a truncated body;
+          // we override its response with 413 below.
           return;
         }
         controller.enqueue(chunk);
