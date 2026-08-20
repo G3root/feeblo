@@ -83,13 +83,13 @@ function PublicRoadmapProvider({
   const displayedRoadmap = roadmaps[0] ?? null;
   const lanes = useMemo(
     () => (displayedRoadmap ? lanesFor(displayedRoadmap.id) : []),
-    [displayedRoadmap, lanesFor],
+    [displayedRoadmap, lanesFor]
   );
   const primarySlug = allRoadmaps[0]?.slug;
 
   const openPost = useCallback(
     (postSlug: string) => navigate({ to: `/p/${postSlug}` }),
-    [navigate],
+    [navigate]
   );
 
   const switchRoadmap = useCallback(
@@ -104,7 +104,7 @@ function PublicRoadmapProvider({
         });
       }
     },
-    [primarySlug, navigate],
+    [primarySlug, navigate]
   );
 
   const value = useMemo(
@@ -122,7 +122,7 @@ function PublicRoadmapProvider({
       isError,
       isLoading,
       lanes,
-    ],
+    ]
   );
 
   return (

@@ -91,7 +91,7 @@ function DashboardRoadmapIndexProvider({
   const displayedRoadmap = roadmaps[0] ?? null;
   const lanes = useMemo(
     () => (displayedRoadmap ? lanesFor(displayedRoadmap.id) : []),
-    [displayedRoadmap, lanesFor],
+    [displayedRoadmap, lanesFor]
   );
 
   const switchRoadmap = useCallback(
@@ -109,7 +109,7 @@ function DashboardRoadmapIndexProvider({
         });
       }
     },
-    [allRoadmaps, navigate, organizationId],
+    [allRoadmaps, navigate, organizationId]
   );
 
   const value = useMemo<RoadmapDashboardContextValue>(
@@ -134,7 +134,7 @@ function DashboardRoadmapIndexProvider({
       isError,
       isLoading,
       lanes,
-    ],
+    ]
   );
 
   return (
@@ -168,7 +168,7 @@ function DashboardRoadmapDetailProvider({
   const displayedRoadmap = roadmaps[0] ?? null;
   const lanes = useMemo(
     () => (displayedRoadmap ? lanesFor(displayedRoadmap.id) : []),
-    [displayedRoadmap, lanesFor],
+    [displayedRoadmap, lanesFor]
   );
 
   const switchRoadmap = useCallback(
@@ -186,7 +186,7 @@ function DashboardRoadmapDetailProvider({
         });
       }
     },
-    [allRoadmaps, navigate, organizationId],
+    [allRoadmaps, navigate, organizationId]
   );
 
   const value = useMemo<RoadmapDashboardContextValue>(
@@ -211,7 +211,7 @@ function DashboardRoadmapDetailProvider({
       isError,
       isLoading,
       lanes,
-    ],
+    ]
   );
 
   return (

@@ -78,7 +78,7 @@ function RoadmapProvider({
       meta: {},
       state: { description, options, title, value },
     }),
-    [onValueChange, description, options, title, value],
+    [onValueChange, description, options, title, value]
   );
 
   return (
