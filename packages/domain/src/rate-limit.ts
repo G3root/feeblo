@@ -80,8 +80,9 @@ export const makePublicRpcRateLimiter = ({
 }): PublicRpcRateLimiterService => ({
   consume: ({ name, level, limit, window }) => {
     const defaults = publicRpcLimits[level];
+    const isUnavailable = clientIp._tag !== "ClientIpAddress";
 
-    return rateLimitService
+    const consumeEffect = rateLimitService
       .consume({
         key: `public-rpc:${name}:${
           clientIp._tag === "ClientIpAddress" ? clientIp.address : "unavailable"
@@ -98,6 +99,19 @@ export const makePublicRpcRateLimiter = ({
           )
         )
       );
+
+    // Shared "unavailable" bucket is a DoS vector when remoteAddress is
+    // missing or proxy trust is misconfigured. Emit a warning so operators
+    // can detect a spike and fix proxy config; do not block the request.
+    return isUnavailable
+      ? consumeEffect.pipe(
+          Effect.tap(() =>
+            Effect.logWarning(
+              "Public RPC rate-limit used shared unavailable bucket — check ClientIp proxy trust / remoteAddress"
+            ).pipe(Effect.annotateLogs({ rpc: name }))
+          )
+        )
+      : consumeEffect;
   },
 });
 

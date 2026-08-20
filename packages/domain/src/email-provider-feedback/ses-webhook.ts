@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 
@@ -248,10 +249,17 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
       }
       signingCertCache.delete(certUrl);
 
+      // SNS SigningCertURL must be fetched without following redirects —
+      // a whitelist-bypass via 302 to an attacker host would leak the fetch
+      // to an untrusted endpoint. We explicitly set redirect to manual so
+      // fetch does not follow before the 3xx validation below.
       const response = yield* HttpClient.execute(
         HttpClientRequest.get(certUrl)
       ).pipe(
         Effect.provideService(HttpClient.HttpClient, httpClient),
+        Effect.provideService(FetchHttpClient.RequestInit, {
+          redirect: "manual",
+        }),
         Effect.mapError(
           (cause) =>
             new SesWebhookEnvelopeError({
@@ -270,6 +278,13 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
           )
         )
       );
+      if (response.status >= 300 && response.status < 400) {
+        return yield* new SesWebhookEnvelopeError({
+          httpStatus: response.status,
+          message: `SNS signing certificate redirected (HTTP ${response.status}) — redirects are not allowed`,
+          operation: "SesEmailFeedbackWebhook.fetchSnsSigningCert",
+        });
+      }
       if (response.status < 200 || response.status >= 300) {
         return yield* new SesWebhookEnvelopeError({
           httpStatus: response.status,
@@ -321,10 +336,15 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
           operation: "SesEmailFeedbackWebhook.confirmSubscription",
         });
       }
+      // Subscription confirmation must also not follow redirects — an
+      // attacker-controlled SubscribeURL would otherwise be fetched.
       const response = yield* HttpClient.execute(
         HttpClientRequest.get(subscribeUrl)
       ).pipe(
         Effect.provideService(HttpClient.HttpClient, httpClient),
+        Effect.provideService(FetchHttpClient.RequestInit, {
+          redirect: "manual",
+        }),
         Effect.mapError(
           (cause) =>
             new SesWebhookConfirmationError({
@@ -344,6 +364,13 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
         )
       );
 
+      if (response.status >= 300 && response.status < 400) {
+        return yield* new SesWebhookConfirmationError({
+          httpStatus: response.status,
+          message: `SNS subscription confirmation redirected (HTTP ${response.status}) — redirects are not allowed`,
+          operation: "SesEmailFeedbackWebhook.confirmSubscription",
+        });
+      }
       if (response.status < 200 || response.status >= 300) {
         return yield* new SesWebhookConfirmationError({
           httpStatus: response.status,

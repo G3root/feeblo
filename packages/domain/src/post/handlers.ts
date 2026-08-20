@@ -760,8 +760,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           sessionOption._tag === "Some"
             ? sessionOption.value.session.userId
             : undefined;
-        //TODO: comeback later
-        // yield* sitePolicy.canViewRoadmap(args.organizationId);
+        // Public post listing is intentionally unauthenticated; board
+        // visibility is enforced inside `findManyPublic` (unlocked boards
+        // only). No site-policy gate needed here.
         return yield* repository.findManyPublic({
           organizationId: args.organizationId,
           boardId: args.boardId,
