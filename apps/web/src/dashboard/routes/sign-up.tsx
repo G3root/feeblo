@@ -1,19 +1,17 @@
+import { getSafeCallbackURL } from "@feeblo/post-ui/auth-flows";
 import {
-  getSafeCallbackURL,
-  initializeEmailVerification,
-} from "@feeblo/post-ui/auth-flows";
+  AuthForm,
+  SignUpFields,
+  signUpFormOpts,
+} from "@feeblo/post-ui/auth-forms";
 import { SocialAuthButtons } from "@feeblo/post-ui/social-auth-buttons";
-import { useAppForm } from "@feeblo/ui/hooks/form";
-import { authClient } from "@feeblo/web-shared/auth-client";
-import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
+import { TurnstileField, useTurnstile } from "@feeblo/post-ui/turnstile";
 import {
-  EmailSchema,
-  NameSchema,
-  PasswordAndConfirmPasswordSchema,
-} from "@feeblo/web-shared/user-validation";
-import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
+  getSignUpErrorField,
+  useSignUpEmail,
+} from "@feeblo/post-ui/use-auth-submission";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
 import { z } from "zod";
 
 import { AuthShell } from "~/features/auth/components/auth-shell";
@@ -28,38 +26,38 @@ export const Route = createFileRoute("/sign-up")({
   component: RouteComponent,
 });
 
-const turnstileSiteKey = getRuntimePublicEnv().turnstileSiteKey;
-const isTurnstileEnabled = !!turnstileSiteKey;
-
-const FormSchema = z
-  .object({
-    name: NameSchema,
-    email: EmailSchema,
-  })
-  .and(PasswordAndConfirmPasswordSchema);
-
 function RouteComponent() {
   const navigate = useNavigate({ from: "/sign-up" });
   const search = Route.useSearch();
-  const turnstileRef = useRef<TurnstileInstance>(null);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstile = useTurnstile();
+
+  const signUp = useSignUpEmail({
+    getCallbackURL: () => getSafeCallbackURL(search.redirectTo),
+    getCaptchaToken: () => turnstile.token,
+    onSuccess: () =>
+      navigate({
+        to: "/$organizationId/feedback",
+        params: {
+          organizationId: "",
+        },
+      }),
+    onVerifyEmail: () =>
+      navigate({
+        to: "/email-verify",
+        search: {
+          redirectTo: search.redirectTo,
+        },
+      }),
+  });
 
   const form = useAppForm({
-    defaultValues: {
-      name: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-    },
-    validators: {
-      onSubmit: FormSchema,
-    },
+    ...signUpFormOpts,
     onSubmit: async ({ value }) => {
       form.setErrorMap({
         onSubmit: undefined,
       });
 
-      if (isTurnstileEnabled && !turnstileToken) {
+      if (turnstile.isEnabled && !turnstile.token) {
         form.setErrorMap({
           onSubmit: {
             fields: {
@@ -72,129 +70,25 @@ function RouteComponent() {
         return;
       }
 
-      try {
-        const response = await authClient.signUp.email({
-          email: value.email,
-          name: value.name,
-          password: value.password,
-          callbackURL: getSafeCallbackURL(search.redirectTo),
-          fetchOptions: turnstileToken
-            ? {
-                headers: {
-                  "x-captcha-response": turnstileToken,
-                },
-              }
-            : undefined,
-        });
+      const result = await signUp({
+        email: value.email,
+        name: value.name,
+        password: value.password,
+      });
 
-        const email = response.data?.user?.email ?? value.email;
+      turnstile.reset();
 
-        if (response.error) {
-          switch (response.error.code) {
-            case "EMAIL_NOT_VERIFIED": {
-              const isVerificationReady =
-                await initializeEmailVerification(email);
-              if (!isVerificationReady) {
-                return;
-              }
-
-              await navigate({
-                to: "/email-verify",
-                search: {
-                  redirectTo: search.redirectTo,
-                },
-              });
-              return;
-            }
-            case "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL": {
-              form.setErrorMap({
-                onSubmit: {
-                  fields: {
-                    email: {
-                      message: "A user with that email already exists",
-                    },
-                  },
-                },
-              });
-              return;
-            }
-            case "EMAIL_BLOCKED": {
-              form.setErrorMap({
-                onSubmit: {
-                  fields: {
-                    email: {
-                      message: "Email is blocked.",
-                    },
-                  },
-                },
-              });
-              return;
-            }
-            case "TEMPORARY_EMAIL_NOT_ALLOWED": {
-              form.setErrorMap({
-                onSubmit: {
-                  fields: {
-                    email: {
-                      message: "Temporary email addresses are not allowed.",
-                    },
-                  },
-                },
-              });
-              return;
-            }
-            default:
-              form.setErrorMap({
-                onSubmit: {
-                  fields: {
-                    email: {
-                      message: response.error.message,
-                    },
-                  },
-                },
-              });
-              return;
-          }
-        }
-
-        if (!response.data?.user.emailVerified) {
-          const isVerificationReady = await initializeEmailVerification(email);
-          if (!isVerificationReady) {
-            return;
-          }
-
-          await navigate({
-            to: "/email-verify",
-            search: {
-              redirectTo: search.redirectTo,
-            },
-          });
-          return;
-        }
-
-        navigate({
-          to: "/$organizationId/feedback",
-          params: {
-            organizationId: "",
-          },
-        });
-      } catch (error) {
+      if (result.type === "error") {
+        const { message } = getSignUpErrorField(result.error);
         form.setErrorMap({
           onSubmit: {
             fields: {
               email: {
-                message:
-                  error instanceof Error
-                    ? error.message
-                    : "Something went wrong",
+                message,
               },
             },
           },
         });
-      } finally {
-        if (isTurnstileEnabled) {
-          setTurnstileToken(null);
-          turnstileRef.current?.reset();
-        }
       }
     },
   });
@@ -211,58 +105,21 @@ function RouteComponent() {
       }
       title="Create account"
     >
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          form.handleSubmit();
-        }}
-      >
-        <form.AppField name="name">
-          {(field) => <field.TextField label="Full Name" />}
-        </form.AppField>
-
-        <form.AppField name="email">
-          {(field) => <field.TextField label="Email" type="email" />}
-        </form.AppField>
-
-        <form.AppField name="password">
-          {(field) => <field.PasswordField label="Password" />}
-        </form.AppField>
-
-        <form.AppField name="confirmPassword">
-          {(field) => <field.PasswordField label="Confirm Password" />}
-        </form.AppField>
-
-        {turnstileSiteKey ? (
-          <Turnstile
-            onError={() => {
-              setTurnstileToken(null);
-            }}
-            onExpire={() => {
-              setTurnstileToken(null);
-              turnstileRef.current?.reset();
-            }}
-            onSuccess={(token) => {
-              setTurnstileToken(token);
-            }}
-            options={{
-              size: "flexible",
-            }}
-            ref={turnstileRef}
-            siteKey={turnstileSiteKey}
+      <AuthForm form={form}>
+        <SignUpFields
+          disabled={turnstile.isEnabled && !turnstile.token}
+          form={form}
+          submitLabel="Sign up"
+        >
+          <TurnstileField
+            onError={turnstile.handleError}
+            onExpire={turnstile.handleExpire}
+            onSuccess={turnstile.handleSuccess}
+            ref={turnstile.ref}
+            siteKey={turnstile.siteKey}
           />
-        ) : null}
-
-        <form.AppForm>
-          <form.SubscribeButton
-            className="w-full"
-            disabled={isTurnstileEnabled && !turnstileToken}
-            label="Sign up"
-          />
-        </form.AppForm>
-      </form>
+        </SignUpFields>
+      </AuthForm>
 
       <SocialAuthButtons redirectTo={search.redirectTo} />
     </AuthShell>

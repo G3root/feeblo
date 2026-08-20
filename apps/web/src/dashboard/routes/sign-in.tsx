@@ -1,14 +1,15 @@
+import { getSafeCallbackURL } from "@feeblo/post-ui/auth-flows";
 import {
-  getSafeCallbackURL,
-  initializeEmailVerification,
-} from "@feeblo/post-ui/auth-flows";
+  AuthForm,
+  SignInFields,
+  signInFormOpts,
+} from "@feeblo/post-ui/auth-forms";
 import { SocialAuthButtons } from "@feeblo/post-ui/social-auth-buttons";
-import { useAppForm } from "@feeblo/ui/hooks/form";
-import { authClient } from "@feeblo/web-shared/auth-client";
 import {
-  EmailSchema,
-  PasswordSchema,
-} from "@feeblo/web-shared/user-validation";
+  getSignInErrorField,
+  useSignInEmail,
+} from "@feeblo/post-ui/use-auth-submission";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 
@@ -24,101 +25,41 @@ export const Route = createFileRoute("/sign-in")({
   component: RouteComponent,
 });
 
-const FormSchema = z.object({
-  email: EmailSchema,
-  password: PasswordSchema,
-});
-
 function RouteComponent() {
   const navigate = useNavigate({ from: "/sign-in" });
   const search = Route.useSearch();
 
+  const signIn = useSignInEmail({
+    getCallbackURL: () => getSafeCallbackURL(search.redirectTo),
+    onEmailNotVerified: () =>
+      navigate({
+        to: "/email-verify",
+        search: {
+          redirectTo: search.redirectTo,
+        },
+      }),
+  });
+
   const form = useAppForm({
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-    validators: {
-      onSubmit: FormSchema,
-    },
+    ...signInFormOpts,
     onSubmit: async ({ value }) => {
       form.setErrorMap({
         onSubmit: undefined,
       });
 
-      try {
-        const response = await authClient.signIn.email({
-          email: value.email,
-          password: value.password,
-          callbackURL: getSafeCallbackURL(search.redirectTo),
-        });
+      const result = await signIn({
+        email: value.email,
+        password: value.password,
+      });
 
-        if (response.error) {
-          switch (response.error.code) {
-            case "EMAIL_NOT_VERIFIED": {
-              const isVerificationReady = await initializeEmailVerification(
-                value.email
-              );
-              if (!isVerificationReady) {
-                return;
-              }
-              navigate({
-                to: "/email-verify",
-                search: {
-                  redirectTo: search.redirectTo,
-                },
-              });
-              break;
-            }
-            case "INVALID_EMAIL_OR_PASSWORD": {
-              form.setErrorMap({
-                onSubmit: {
-                  fields: {
-                    password: {
-                      message: "Invalid email or password",
-                    },
-                  },
-                },
-              });
-              return;
-            }
-            case "EMAIL_BLOCKED": {
-              form.setErrorMap({
-                onSubmit: {
-                  fields: {
-                    email: {
-                      message: "Email is blocked.",
-                    },
-                  },
-                },
-              });
-              return;
-            }
-
-            default:
-              form.setErrorMap({
-                onSubmit: {
-                  fields: {
-                    email: {
-                      message: response.error.message,
-                    },
-                  },
-                },
-              });
-              return;
-          }
-        }
-      } catch (error) {
+      if (result.type === "error") {
+        const { field, message } = getSignInErrorField(result.error);
         form.setErrorMap({
           onSubmit: {
-            fields: {
-              email: {
-                message:
-                  error instanceof Error
-                    ? error.message
-                    : "Something went wrong",
-              },
-            },
+            fields:
+              field === "password"
+                ? { password: { message } }
+                : { email: { message } },
           },
         });
       }
@@ -138,41 +79,17 @@ function RouteComponent() {
       }
       title="Sign in"
     >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          form.handleSubmit();
-        }}
-      >
-        <div className="flex flex-col gap-4">
-          <form.AppField name="email">
-            {(field) => <field.TextField label="Email" type="email" />}
-          </form.AppField>
-
-          <form.AppField name="password">
-            {(field) => <field.PasswordField label="Password" />}
-          </form.AppField>
-
-          <div className="flex justify-end">
-            <Link
-              className="text-muted-foreground text-sm underline underline-offset-4"
-              search={{ redirectTo: search.redirectTo }}
-              to="/forgot-password"
-            >
-              Forgot password?
-            </Link>
-          </div>
-
-          <form.AppForm>
-            <form.SubscribeButton
-              className="w-full"
-              label="Login"
-              type="submit"
-            />
-          </form.AppForm>
-        </div>
-      </form>
+      <AuthForm form={form}>
+        <SignInFields form={form} submitLabel="Login">
+          <Link
+            className="text-muted-foreground text-sm underline underline-offset-4"
+            search={{ redirectTo: search.redirectTo }}
+            to="/forgot-password"
+          >
+            Forgot password?
+          </Link>
+        </SignInFields>
+      </AuthForm>
 
       <SocialAuthButtons redirectTo={search.redirectTo} />
     </AuthShell>
