@@ -74,8 +74,13 @@ function useInitOptions(
     theme,
   } = props;
 
-  // Keep the memo in sync with the actual prop it returns.
-  const memoizedModules = React.useMemo(() => modules, [modules]);
+  // Serialize modules to a primitive key so inline array literals on the
+  // consumer side cannot churn the init-options memo (and tear down the
+  // iframe) on unrelated re-renders.
+  const modulesKey = React.useMemo(() => modules?.join(",") ?? "", [modules]);
+  // Keyed off the primitive while still returning the exact prop value, so
+  // the undefined vs [] empty-value behavior is preserved.
+  const memoizedModules = React.useMemo(() => modules, [modulesKey]);
 
   // Memoise containerStyles to avoid passing a new object to the embed.
   const memoizedContainerStyles = React.useMemo(
@@ -119,7 +124,11 @@ function useInitOptions(
   );
 }
 
-let activeProviderCount = 0;
+// Live registry of mounted providers. Each mount registers a unique token so
+// the multi-provider condition and the final-cleanup decision derive from
+// actual membership rather than a mutable counter that can drift when the
+// singleton is replaced concurrently.
+const activeProviders = new Set<object>();
 
 // ---------------------------------------------------------------------------
 // Provider
@@ -161,14 +170,13 @@ function FeebloProviderContent(props: FeebloProviderProps): React.ReactElement {
     }
 
     let cancelled = false;
-    if (!getCurrentEmbed()) {
-      activeProviderCount = 0;
-    }
-    activeProviderCount += 1;
+    const providerToken = {};
+    activeProviders.add(providerToken);
+    const isMultiProvider = activeProviders.size > 1;
 
     let w: FeebloWidget;
     const existingEmbed = getCurrentEmbed();
-    if (activeProviderCount > 1 && existingEmbed) {
+    if (isMultiProvider && existingEmbed) {
       let canReuse = false;
       try {
         const normalized = normalizeWidgetConfig(initOptions);
@@ -215,9 +223,8 @@ function FeebloProviderContent(props: FeebloProviderProps): React.ReactElement {
       offReady();
       offOpened();
       offClosed();
-      activeProviderCount = Math.max(0, activeProviderCount - 1);
-      const isLastProvider = activeProviderCount === 0;
-      if (isLastProvider) {
+      activeProviders.delete(providerToken);
+      if (activeProviders.size === 0) {
         // P1: final cleanup must destroy the *current* singleton, not the
         // stale local `w`. When a later provider replaced the singleton
         // (different org/config), the earlier provider's `w` is a proxy to a

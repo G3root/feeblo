@@ -309,13 +309,15 @@ function App() {
 
 ```tsx
 <FeebloTrigger asChild>
-  <a href="#">Feedback</a>
+  <button type="button">Feedback</button>
 </FeebloTrigger>
 ```
 
 ### Identifying users
 
-Pass `user` to the provider — changes are propagated via `identify` without re-creating the widget (stringified key, separate effect):
+Pass `user` to the provider — non-empty user changes call `identify` without
+re-creating the widget, while a user becoming absent after auto-login
+reinitializes an anonymous widget to clear the retained token:
 
 ```tsx
 <FeebloProvider
@@ -379,7 +381,6 @@ function Analytics() {
   // Convenience alias:
   useOnFeedbackSubmitted((e) => toast.success(`Submitted: ${e.detail.data?.title}`));
   return null;
-}
 }
 ```
 

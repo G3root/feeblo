@@ -1,29 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
-import {
-  fakePostMessage,
-  installTestEmbedDependencies,
-} from "../../test/react-browser-helpers";
+import { installTestEmbedDependencies } from "../../test/react-browser-helpers";
 import type { FeebloEventListener, FeebloEventName } from "../types";
 
-let restoreEmbedDependencies: (() => void) | undefined;
-
 beforeEach(() => {
-  restoreEmbedDependencies = installTestEmbedDependencies();
+  installTestEmbedDependencies();
 });
 
-import { Feeblo } from "../index";
 import { useFeebloEvent, useOnFeedbackSubmitted } from "./hooks";
 import { FeebloProvider } from "./provider";
-
-afterEach(() => {
-  restoreEmbedDependencies?.();
-  fakePostMessage.mockClear();
-  Feeblo.destroy();
-  document.getElementById("feeblo-embed-container")?.remove();
-  document.getElementById("feeblo-widget-launcher")?.remove();
-});
 
 function fireFeedback(title: string) {
   window.dispatchEvent(

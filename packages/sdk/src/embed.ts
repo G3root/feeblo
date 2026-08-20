@@ -56,6 +56,7 @@ export class Embed {
   private readonly config: NormalizedWidgetConfig;
   readonly logger: Logger;
   private identity: NormalizedUserIdentity | null;
+  private pendingClear = false;
   private isLoaded = false;
   private isOpen = false;
   private openAcknowledged = false;
@@ -282,6 +283,19 @@ export class Embed {
     this.sendContext();
     this.sendLocale();
     this.syncNavigation();
+    this.flushPendingClear();
+  }
+
+  /**
+   * Deliver a clear requested before the widget reported READY so it is not
+   * lost to the load race (the clear is the final identity assertion).
+   */
+  private flushPendingClear(): void {
+    if (!this.pendingClear) {
+      return;
+    }
+    this.pendingClear = false;
+    this.post({ event: "IDENTIFY", data: { id: "" } });
   }
 
   private post(message: OutgoingMessage): void {
@@ -418,6 +432,7 @@ export class Embed {
 
   identify(user: UserIdentity): void {
     this.identity = normalizeUserIdentity(user);
+    this.pendingClear = false;
     if (this.logger.enabled) {
       this.logger("identity", this.identity.id);
     }
@@ -432,9 +447,13 @@ export class Embed {
       this.logger("identity", "clear");
     }
     if (this.isLoaded) {
-      // Send an explicit clear to the iframe so the previous token
-      // is not retained for subsequent feedback submissions.
-      this.post({ event: "IDENTIFY", data: {} });
+      // Send the explicit clear payload (`id: ""`) so the widget drops any
+      // retained token before the next anonymous submission.
+      this.post({ event: "IDENTIFY", data: { id: "" } });
+    } else {
+      // Not loaded yet: remember the clear so it is delivered on READY
+      // instead of being lost to the load race.
+      this.pendingClear = true;
     }
   }
 

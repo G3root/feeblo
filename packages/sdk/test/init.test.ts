@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { Embed } from "../src/embed";
+import { normalizeWidgetConfig } from "../src/config";
 import { EmbedError } from "../src/errors";
 import { Feeblo } from "../src/index";
 import { getCurrentEmbed, init } from "../src/instance";
@@ -128,6 +130,53 @@ describe("init", () => {
       ([msg]: [any]) => msg?.event === "IDENTIFY"
     );
     expect(identifyCall).toBeDefined();
+  });
+
+  it("clears the retained token before recreating anonymously on logout", () => {
+    init("org_logout", { user: { id: "u_1", token: "secret" } });
+    postWidgetMessage({ event: "READY" });
+    fakePostMessage.mockClear();
+
+    // Re-init without a user: the previously identified embed must receive an
+    // explicit clear (IDENTIFY id:"") before being torn down and replaced.
+    init("org_logout");
+
+    const clearMsg = fakePostMessage.mock.calls.find(
+      ([msg]: [any]) => msg?.event === "IDENTIFY"
+    );
+    expect(clearMsg?.[0]).toEqual({ event: "IDENTIFY", data: { id: "" } });
+
+    const embed = getCurrentEmbed();
+    expect(embed).not.toBeNull();
+    expect(embed?.getAutoLoginToken()).toBeUndefined();
+    const containers = document.querySelectorAll("#feeblo-embed-container");
+    expect(containers.length).toBe(1);
+  });
+
+  it("reuses the anonymous embed without a clear when no token was retained", () => {
+    init("org_anon_reuse");
+    const embedBefore = getCurrentEmbed();
+
+    init("org_anon_reuse");
+
+    expect(getCurrentEmbed()).toBe(embedBefore);
+    const identifyCalls = fakePostMessage.mock.calls.filter(
+      ([msg]: [any]) => msg?.event === "IDENTIFY"
+    );
+    expect(identifyCalls).toHaveLength(0);
+  });
+
+  it("re-identifies the existing embed when re-initialized with a different user", () => {
+    init("org_reid", { user: { id: "u_1", name: "Ada" } });
+    postWidgetMessage({ event: "READY" });
+    fakePostMessage.mockClear();
+
+    init("org_reid", { user: { id: "u_2", name: "Grace" } });
+
+    expect(fakePostMessage).toHaveBeenCalledWith(
+      { event: "IDENTIFY", data: { id: "u_2", name: "Grace" } },
+      MOCK_ORIGIN
+    );
   });
 });
 
@@ -885,5 +934,73 @@ describe("Feeblo namespace", () => {
 
     const result = Feeblo.open().close().open();
     expect(result).toBe(Feeblo);
+  });
+});
+
+describe("embed identity clear (pending until READY)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fakePostMessage.mockClear();
+    document.getElementById("feeblo-embed-container")?.remove();
+  });
+
+  /** Embed constructed with the same mocked iframe deps used by init(). */
+  function createDirectEmbed(): Embed {
+    return new Embed("org_direct", {}, normalizeWidgetConfig({}), {
+      createFloatingInstance: () => () => {},
+      createIframe: () => createMockIframe(),
+      iframeOrigin: () => MOCK_ORIGIN,
+    });
+  }
+
+  it("delivers a clear requested before READY once the widget is ready", () => {
+    const embed = createDirectEmbed();
+    embed.clearIdentity();
+    fakePostMessage.mockClear();
+
+    postWidgetMessage({ event: "READY" });
+
+    expect(fakePostMessage).toHaveBeenCalledWith(
+      { event: "IDENTIFY", data: { id: "" } },
+      MOCK_ORIGIN
+    );
+    embed.destroy();
+  });
+
+  it("a later identify supersedes a pending clear", () => {
+    const embed = createDirectEmbed();
+    embed.clearIdentity();
+    embed.identify({ id: "u_9", name: "Ada" });
+    fakePostMessage.mockClear();
+
+    postWidgetMessage({ event: "READY" });
+
+    expect(fakePostMessage).toHaveBeenCalledWith(
+      { event: "IDENTIFY", data: { id: "u_9", name: "Ada" } },
+      MOCK_ORIGIN
+    );
+    const clears = fakePostMessage.mock.calls.filter(
+      ([message]: [any]) =>
+        message?.event === "IDENTIFY" && message?.data?.id === ""
+    );
+    expect(clears).toHaveLength(0);
+    embed.destroy();
+  });
+
+  it("does not resend a pending clear after it has been flushed", () => {
+    const embed = createDirectEmbed();
+    embed.clearIdentity();
+    postWidgetMessage({ event: "READY" });
+    fakePostMessage.mockClear();
+
+    // A second READY (iframe reload) must not re-emit the already-flushed clear.
+    postWidgetMessage({ event: "READY" });
+
+    const clears = fakePostMessage.mock.calls.filter(
+      ([message]: [any]) =>
+        message?.event === "IDENTIFY" && message?.data?.id === ""
+    );
+    expect(clears).toHaveLength(0);
+    embed.destroy();
   });
 });

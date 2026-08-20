@@ -230,9 +230,10 @@ export function init(
       return createWidgetProxy(currentEmbed);
     }
     if (currentEmbed.getAutoLoginToken()) {
-      // P1 security: clearing must not rely on empty IDENTIFY alone (validator
-      // previously discarded it). Destroy and recreate anonymously to guarantee
-      // the iframe does not retain the logged-out token.
+      // Logout without a replacement user: reliably clear the widget's
+      // retained token (IDENTIFY id:"") before tearing the singleton down,
+      // then recreate anonymously so the next session starts fresh.
+      currentEmbed.clearIdentity();
       destroyInstance(currentEmbed);
     } else {
       return createWidgetProxy(currentEmbed);

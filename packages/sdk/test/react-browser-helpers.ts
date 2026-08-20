@@ -1,6 +1,7 @@
-import { vi } from "vitest";
+import { afterEach, vi } from "vitest";
 
 import type { Logger } from "../src/debug";
+import { Feeblo } from "../src/index";
 import { setEmbedDependencies } from "../src/instance";
 import type { EmbedOptions, OutgoingMessage } from "../src/types";
 
@@ -8,8 +9,10 @@ export const MOCK_ORIGIN = "http://localhost:3001";
 export const fakePostMessage =
   vi.fn<(message: OutgoingMessage, targetOrigin: string) => void>();
 
+let restoreEmbedDependencies: (() => void) | undefined;
+
 export function installTestEmbedDependencies(): () => void {
-  return setEmbedDependencies({
+  restoreEmbedDependencies = setEmbedDependencies({
     createIframe: (
       _organizationId: string,
       _options: EmbedOptions,
@@ -30,8 +33,20 @@ export function installTestEmbedDependencies(): () => void {
       () =>
         undefined,
   });
+  return restoreEmbedDependencies;
 }
 
 export function triggerIframeLoad(): void {
   document.querySelector("iframe")?.dispatchEvent(new Event("load"));
 }
+
+// Shared teardown for every test that installs the embed dependencies:
+// reset the singleton and remove leftover DOM so tests never leak widgets
+// into each other.
+afterEach(() => {
+  restoreEmbedDependencies?.();
+  fakePostMessage.mockClear();
+  Feeblo.destroy();
+  document.getElementById("feeblo-embed-container")?.remove();
+  document.getElementById("feeblo-widget-launcher")?.remove();
+});

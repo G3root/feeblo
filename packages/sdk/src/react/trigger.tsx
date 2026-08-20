@@ -104,12 +104,8 @@ export const FeebloTrigger = React.forwardRef<HTMLElement, FeebloTriggerProps>(
 
         if (module) {
           openModule(module);
-          // openModule already calls open() internally when needed, but when we
-          // have an anchor we want the anchored variant. Re-open with anchor.
-          open(triggerEl, mergedMeta);
-        } else {
-          open(triggerEl, mergedMeta);
         }
+        open(triggerEl, mergedMeta);
       },
       [onClick, board, metadata, module, open, openModule]
     );
@@ -126,7 +122,11 @@ export const FeebloTrigger = React.forwardRef<HTMLElement, FeebloTriggerProps>(
       // Preserve child's onClick via composition
       const childOnClick = child.props.onClick;
 
+      // Forward the trigger's button props (className, style, aria-*, data-*)
+      // onto the child, with the child's own props winning on conflicts.
       return React.cloneElement(child, {
+        ...buttonProps,
+        ...child.props,
         ref: setRef,
         onClick: (e: React.MouseEvent<HTMLElement>) => {
           childOnClick?.(e);
@@ -180,10 +180,8 @@ export function useFeebloTrigger(
       const mergedMeta = mergeTriggerMetadata(board, metadata);
       if (module) {
         openModule(module);
-        open(el, mergedMeta);
-      } else {
-        open(el, mergedMeta);
       }
+      open(el, mergedMeta);
     },
     [board, metadata, module, open, openModule]
   );

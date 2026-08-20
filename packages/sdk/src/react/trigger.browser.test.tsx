@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
 import {
@@ -8,23 +8,12 @@ import {
 } from "../../test/react-browser-helpers";
 import type { OutgoingMessage } from "../types";
 
-let restoreEmbedDependencies: (() => void) | undefined;
-
 beforeEach(() => {
-  restoreEmbedDependencies = installTestEmbedDependencies();
+  installTestEmbedDependencies();
 });
 
-import { Feeblo } from "../index";
 import { FeebloProvider } from "./provider";
 import { FeebloTrigger, useFeebloTrigger } from "./trigger";
-
-afterEach(() => {
-  restoreEmbedDependencies?.();
-  fakePostMessage.mockClear();
-  Feeblo.destroy();
-  document.getElementById("feeblo-embed-container")?.remove();
-  document.getElementById("feeblo-widget-launcher")?.remove();
-});
 
 describe("FeebloTrigger", () => {
   it("renders a button with default text and opens widget on click", async () => {

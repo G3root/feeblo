@@ -8,8 +8,7 @@
     "sourceMap": false,
     "rootDir": "./src",
     "outDir": "dist",
-    "incremental": false,
-    "tsBuildInfoFile": "./.tsbuildinfo.build"
+    "incremental": false
   },
   "include": ["src/index.ts", "src/react/index.ts"],
   "exclude": ["src/preview.ts"]
