@@ -43,6 +43,13 @@ function publicBoardUrl(workspaceName: string) {
   return `${baseURL.protocol}//${subdomain}.${baseURL.hostname}${baseURL.port ? `:${baseURL.port}` : ""}`;
 }
 
+async function openPostFromDashboard(page: Page, title: string) {
+  // Dashboard recent posts use composable PostCard with an absolute overlay link.
+  // Clicking the text (h3 inside pointer-events-none container) is intercepted
+  // by the overlay, so click the link directly.
+  await page.getByRole("link", { name: `View ${title}` }).click();
+}
+
 test.describe("roadmap", () => {
   test(
     "posts move through dashboard roadmap lanes as their status changes",
@@ -78,7 +85,7 @@ test.describe("roadmap", () => {
 
       // Move the post to Planned so it lands in the matching lane.
       await page.goto(workspace.organizationUrl);
-      await page.getByText(title).click();
+      await openPostFromDashboard(page, title);
       await expect(page.getByLabel("Post Title")).toHaveValue(title);
       await page.getByRole("combobox").first().click();
       await page.getByRole("option", { name: "Planned", exact: true }).click();
@@ -102,7 +109,7 @@ test.describe("roadmap", () => {
       await createPost(page, title, "Visitors can follow this on the roadmap.");
 
       // Move the post to Planned so it shows up in a configured lane.
-      await page.getByText(title).click();
+      await openPostFromDashboard(page, title);
       await expect(page.getByLabel("Post Title")).toHaveValue(title);
       await page.getByRole("combobox").first().click();
       await page.getByRole("option", { name: "Planned", exact: true }).click();
@@ -134,7 +141,7 @@ test.describe("roadmap", () => {
           )
         ).toBeVisible();
 
-        await plannedLane.getByText(title).click();
+        await plannedLane.getByRole("button", { name: title }).click();
         await expect(visitorPage).toHaveURL(publicPostUrlPattern);
         await expect(visitorPage.getByText(title)).toBeVisible();
       } finally {
@@ -156,7 +163,7 @@ test.describe("roadmap", () => {
 
       // Move the post to Planned so it lands in a lane that exists on both
       // roadmaps (the seeded one's "Backlog" lane points at Planned too).
-      await page.getByText(title).click();
+      await openPostFromDashboard(page, title);
       await expect(page.getByLabel("Post Title")).toHaveValue(title);
       await page.getByRole("combobox").first().click();
       await page.getByRole("option", { name: "Planned", exact: true }).click();

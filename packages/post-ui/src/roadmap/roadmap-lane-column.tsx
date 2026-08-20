@@ -13,6 +13,7 @@ interface RoadmapLaneColumnProps {
   isHighlighted?: boolean;
   name?: string;
   status: RoadmapStatus;
+  totalPosts?: number;
 }
 
 export function RoadmapLaneColumn({
@@ -22,8 +23,16 @@ export function RoadmapLaneColumn({
   isHighlighted = false,
   name,
   status,
+  totalPosts,
 }: RoadmapLaneColumnProps) {
   const readableStatus = getBoardStatusLabel(status);
+  const resolvedAction =
+    action ??
+    (totalPosts !== undefined ? (
+      <span className="text-muted-foreground text-xs tabular-nums">
+        {totalPosts}
+      </span>
+    ) : undefined);
 
   return (
     <div className="bg-muted/30 flex h-full min-h-0 w-80 flex-col overflow-hidden rounded-lg">
@@ -33,7 +42,7 @@ export function RoadmapLaneColumn({
             <RoadmapStatusIcon status={status} />
             <h3 className="text-sm font-medium">{name ?? readableStatus}</h3>
           </div>
-          {action}
+          {resolvedAction}
         </div>
       </div>
 

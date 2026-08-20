@@ -10,8 +10,8 @@ import { cn } from "@feeblo/ui/utils";
 import type { ReactNode } from "react";
 
 import {
-  FeedbackCard,
   FeedbackCardSkeleton,
+  PostCard,
 } from "../../components/feedback/feedback-card";
 import {
   FeedbackBrowseLayout,
@@ -121,7 +121,21 @@ function HomeList() {
                 pageType="PublicPage"
                 post={post}
               >
-                <FeedbackCard status={status.type} />
+                {/* Reuses feedback-page PostCard composably — checkbox omitted via composition, no boolean prop */}
+                <PostCard.Root>
+                  <PostCard.Link />
+                  <PostCard.Upvote />
+                  <PostCard.Body>
+                    <PostCard.Title />
+                    <PostCard.Description />
+                    <PostCard.MobileMeta />
+                  </PostCard.Body>
+                  <PostCard.DesktopMeta>
+                    <PostCard.Status status={status.type} />
+                    <PostCard.BoardBadge />
+                    <PostCard.Author />
+                  </PostCard.DesktopMeta>
+                </PostCard.Root>
               </PostCollectionDataProvider>
             ))}
           </div>

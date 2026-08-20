@@ -12,6 +12,7 @@ import {
   FieldDescription,
   FieldError,
   FieldGroup,
+  FieldSeparator,
 } from "@feeblo/ui/field";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
@@ -40,14 +41,7 @@ import { z } from "zod";
 
 import { getSafeCallbackURL } from "../../auth/auth-flows";
 import { SocialAuthButtons } from "../../auth/social-auth-buttons";
-import {
-  type AuthDialogVariant,
-  useAuthDialogContext,
-} from "../dialog-stores/auth";
-
-interface AuthDialogProps {
-  variant: AuthDialogVariant;
-}
+import { useAuthDialogContext } from "../dialog-stores/auth";
 
 type EmailStep = "email-sign-in" | "email-sign-up";
 
@@ -74,19 +68,16 @@ const OtpSchema = z.object({
 
 const CHOOSER_STEP: DialogStep = { kind: "chooser" };
 
-export function AuthDialog({ variant }: AuthDialogProps) {
+export function AuthButton() {
   const store = useAuthDialogContext();
-  const triggerLabel = variant === "sign-in" ? "Sign in" : "Sign up";
 
   return (
     <Button
-      onClick={() =>
-        store.send({ type: "setOpen", open: true, data: { variant } })
-      }
+      onClick={() => store.send({ type: "setOpen", open: true })}
       type="button"
       variant="secondary"
     >
-      {triggerLabel}
+      Sign in / Sign up
     </Button>
   );
 }
@@ -94,14 +85,8 @@ export function AuthDialog({ variant }: AuthDialogProps) {
 export function AuthDialogRoot() {
   const store = useAuthDialogContext();
   const isOpen = useSelector(store, (state) => state.context.open);
-  const variant = useSelector(
-    store,
-    (state) => state.context.data.variant ?? "sign-in"
-  );
-  const [step, setStep] = useState<DialogStep>(CHOOSER_STEP);
 
-  const preferredEmailStep: EmailStep =
-    variant === "sign-in" ? "email-sign-in" : "email-sign-up";
+  const [step, setStep] = useState<DialogStep>(CHOOSER_STEP);
 
   const { title, description } = getStepCopy(step);
 
@@ -142,10 +127,6 @@ export function AuthDialogRoot() {
     setStep(CHOOSER_STEP);
   }, [step]);
 
-  useEffect(() => {
-    setStep(CHOOSER_STEP);
-  }, [variant, isOpen]);
-
   return (
     <Dialog onOpenChange={handleOpenChange} open={isOpen}>
       <DialogPopup>
@@ -167,11 +148,7 @@ export function AuthDialogRoot() {
         </DialogHeader>
         <DialogPanel className="flex flex-col gap-5">
           {step.kind === "chooser" ? (
-            <AuthMethodChooser
-              onSelectEmailStep={handleSelectEmailStep}
-              preferredEmailStep={preferredEmailStep}
-              socialMode={variant}
-            />
+            <AuthMethodChooser onSelectEmailStep={handleSelectEmailStep} />
           ) : null}
           {step.kind === "email-sign-in" ? (
             <SignInForm
@@ -197,9 +174,7 @@ function getStepCopy(step: DialogStep) {
   switch (step.kind) {
     case "chooser":
       return {
-        title: "Continue to Feeblo",
-        description:
-          "Choose how you want to get into your account or create a new one.",
+        title: "Sign in / Sign up",
       };
     case "email-sign-in":
       return {
@@ -222,66 +197,23 @@ function getStepCopy(step: DialogStep) {
 
 function AuthMethodChooser({
   onSelectEmailStep,
-  preferredEmailStep,
-  socialMode,
 }: {
   onSelectEmailStep: (step: EmailStep) => void;
-  preferredEmailStep: EmailStep;
-  socialMode: "sign-in" | "sign-up";
 }) {
-  const actions = getEmailChooserActions(preferredEmailStep);
-
   return (
     <div className="flex flex-col gap-3">
-      {actions.map((action) => (
-        <Button
-          autoFocus={action.step === preferredEmailStep}
-          className="!h-auto w-full flex-col items-start gap-1.5 rounded-2xl px-4 py-3 text-left whitespace-normal"
-          key={action.label}
-          onClick={() => onSelectEmailStep(action.step)}
-          type="button"
-          variant={action.variant}
-        >
-          <span>{action.label}</span>
-          <span className="text-sm font-normal text-current/70">
-            {action.description}
-          </span>
-        </Button>
-      ))}
-      <SocialAuthButtons mode={socialMode} />
+      <SocialAuthButtons />
+      <FieldSeparator>Or continue with email</FieldSeparator>
+
+      <Button onClick={() => onSelectEmailStep("email-sign-in")}>
+        Sign in with email
+      </Button>
+
+      <Button onClick={() => onSelectEmailStep("email-sign-up")}>
+        Sign up with email
+      </Button>
     </div>
   );
-}
-
-function getEmailChooserActions(preferredEmailStep: EmailStep) {
-  const baseActions: Array<{
-    description: string;
-    label: string;
-    step: EmailStep;
-  }> = [
-    {
-      description: "Use your email address and password.",
-      label: "Sign in with email",
-      step: "email-sign-in",
-    },
-    {
-      description: "Create a new account with your email.",
-      label: "Sign up with email",
-      step: "email-sign-up",
-    },
-  ];
-
-  return baseActions
-    .toSorted((a, b) =>
-      a.step === preferredEmailStep ? -1 : b.step === preferredEmailStep ? 1 : 0
-    )
-    .map((action) => ({
-      ...action,
-      variant:
-        action.step === preferredEmailStep
-          ? ("default" as const)
-          : ("outline" as const),
-    }));
 }
 
 async function initializeVerification(email: string) {

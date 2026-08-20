@@ -35,7 +35,8 @@ function signWidgetToken(
     })
   ).toString("base64url");
   const unsignedToken = `${header}.${payload}`;
-  const signature = createHmac("sha256", secret)
+  const key = Buffer.from(secret, "hex");
+  const signature = createHmac("sha256", key)
     .update(unsignedToken)
     .digest("base64url");
 
@@ -281,11 +282,11 @@ test(
         ).toBeTruthy();
 
         await expect(
-          visitorPage.getByRole("button", { name: "Sign out" })
-        ).toBeVisible();
-        await expect(
-          visitorPage.getByRole("button", { name: "Sign in" })
+          visitorPage.getByRole("button", { name: "Sign in / Sign up" })
         ).toHaveCount(0);
+        await expect(
+          visitorPage.getByRole("button", { name: "User menu" })
+        ).toBeVisible();
 
         await visitorPage
           .getByRole("link", { name: new RegExp(feedbackTitle) })

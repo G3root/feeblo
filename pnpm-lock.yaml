@@ -1328,6 +1328,9 @@ importers:
       '@noble/ciphers':
         specifier: ^2.0.1
         version: 2.3.0
+      '@noble/hashes':
+        specifier: ^2.0.1
+        version: 2.3.0
       dayjs:
         specifier: ^1.11.21
         version: 1.11.21
