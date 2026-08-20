@@ -1,5 +1,5 @@
-import { StandaloneUpvoteButton } from "@feeblo/post-ui/upvote-toggle";
 import { PostCard } from "@feeblo/post-ui/post/post-card";
+import { StandaloneUpvoteButton } from "@feeblo/post-ui/upvote-toggle";
 import { Button } from "@feeblo/ui/button";
 import {
   Empty,
@@ -9,10 +9,9 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import * as dayjs from "@feeblo/utils/dayjs";
 import { MessageMultiple01Icon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-
-import * as dayjs from "@feeblo/utils/dayjs";
 
 import { useCreateBoardDialogContext } from "~/features/board/dialog-stores";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";

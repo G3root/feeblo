@@ -1,15 +1,15 @@
 import { useDashboardHomeStats } from "@feeblo/post-ui/dashboard/use-dashboard-home-stats";
 import { Button } from "@feeblo/ui/button";
 import { Separator } from "@feeblo/ui/separator";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute } from "@tanstack/react-router";
 
-import { RecentPostsSection } from "~/features/dashboard-home/components/recent-posts-section";
 import { useCreateBoardDialogContext } from "~/features/board/dialog-stores";
+import { RecentPostsSection } from "~/features/dashboard-home/components/recent-posts-section";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   boardCollection,
   postCollection,
