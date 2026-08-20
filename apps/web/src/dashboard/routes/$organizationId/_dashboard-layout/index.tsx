@@ -1,5 +1,5 @@
-import { useDashboardHomeStats } from "@feeblo/post-ui/dashboard/use-dashboard-home-stats";
 import { UpvoteId } from "@feeblo/id";
+import { useDashboardHomeStats } from "@feeblo/post-ui/dashboard/use-dashboard-home-stats";
 import { PostCard } from "@feeblo/post-ui/post/post-card";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -21,10 +21,10 @@ import {
   Plus,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import NumberFlow from "@number-flow/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import NumberFlow from "@number-flow/react";
 
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import { useCreateBoardDialogContext } from "~/features/board/dialog-stores";
@@ -116,7 +116,10 @@ function RouteComponent() {
                   to="/$organizationId/post/$boardSlug/$postSlug"
                 />
                 <PostCard.Media>
-                  <RecentPostUpvote organizationId={organizationId} postId={post.id} />
+                  <RecentPostUpvote
+                    organizationId={organizationId}
+                    postId={post.id}
+                  />
                 </PostCard.Media>
                 <PostCard.Body>
                   <PostCard.Title>{post.title}</PostCard.Title>
@@ -129,8 +132,13 @@ function RouteComponent() {
                 </PostCard.Body>
                 <PostCard.DesktopMeta>
                   {status && <PostCard.Status status={status.type} />}
-                  {board?.name && <PostCard.BoardBadge>{board.name}</PostCard.BoardBadge>}
-                  <PostCard.Author image={post.user?.image} name={post.user?.name} />
+                  {board?.name && (
+                    <PostCard.BoardBadge>{board.name}</PostCard.BoardBadge>
+                  )}
+                  <PostCard.Author
+                    image={post.user?.image}
+                    name={post.user?.name}
+                  />
                 </PostCard.DesktopMeta>
               </PostCard.Root>
             );
@@ -250,26 +258,30 @@ function RecentPostUpvote({
       q
         .from({ upvote: upvoteCollection })
         .where(({ upvote }) =>
-          and(eq(upvote.organizationId, organizationId), eq(upvote.postId, postId))
+          and(
+            eq(upvote.organizationId, organizationId),
+            eq(upvote.postId, postId)
+          )
         ),
     [organizationId, postId]
   );
-  const { data: hasUserUpvoted, isLoading: isUserUpvotedLoading } = useLiveQuery(
-    (q) => {
-      if (!session) return undefined;
-      return q
-        .from({ upvote: upvoteCollection })
-        .where(({ upvote }) =>
-          and(
-            eq(upvote.organizationId, organizationId),
-            eq(upvote.postId, postId),
-            eq(upvote.userId, session.user.id)
+  const { data: hasUserUpvoted, isLoading: isUserUpvotedLoading } =
+    useLiveQuery(
+      (q) => {
+        if (!session) return undefined;
+        return q
+          .from({ upvote: upvoteCollection })
+          .where(({ upvote }) =>
+            and(
+              eq(upvote.organizationId, organizationId),
+              eq(upvote.postId, postId),
+              eq(upvote.userId, session.user.id)
+            )
           )
-        )
-        .findOne();
-    },
-    [organizationId, postId, session?.user.id]
-  );
+          .findOne();
+      },
+      [organizationId, postId, session?.user.id]
+    );
 
   if (isUpvotesLoading || isUserUpvotedLoading) {
     return <Skeleton className="h-9 w-10 rounded-md" />;
@@ -291,7 +303,9 @@ function RecentPostUpvote({
     } else {
       const upvoteId = await UpvoteId.unsafeGenerate();
       const membership = session.memberships.find(
-        (value) => value.organizationId === organizationId && value.userId === session.user.id
+        (value) =>
+          value.organizationId === organizationId &&
+          value.userId === session.user.id
       );
       const tx = upvoteCollection.insert({
         id: upvoteId,
@@ -301,7 +315,10 @@ function RecentPostUpvote({
         postId,
         userId,
         memberId: membership?.membershipId ?? null,
-        user: { name: session.user.name ?? null, image: session.user.image ?? null },
+        user: {
+          name: session.user.name ?? null,
+          image: session.user.image ?? null,
+        },
       });
       await tx.isPersisted.promise;
     }
@@ -313,7 +330,9 @@ function RecentPostUpvote({
       aria-pressed={isUpvoted}
       className={cn(
         "flex h-9 w-10 shrink-0 flex-col items-center justify-center rounded-md text-xs transition-colors",
-        isUpvoted ? "bg-primary/10 text-primary" : "bg-muted/70 text-muted-foreground hover:bg-muted"
+        isUpvoted
+          ? "bg-primary/10 text-primary"
+          : "bg-muted/70 text-muted-foreground hover:bg-muted"
       )}
       data-slot="post-card-upvote"
       onClick={handleToggle}
@@ -321,7 +340,11 @@ function RecentPostUpvote({
     >
       <span className="flex items-center gap-1.5">
         <HugeiconsIcon className="size-3" icon={ArrowUp01Icon} />
-        <NumberFlow className="text-xs leading-none font-medium tabular-nums" value={upvoteCount} willChange />
+        <NumberFlow
+          className="text-xs leading-none font-medium tabular-nums"
+          value={upvoteCount}
+          willChange
+        />
       </span>
     </button>
   );

@@ -1,7 +1,5 @@
-import {
-  PostCard as SharedPostCard,
-} from "@feeblo/post-ui/post/post-card";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
+import { PostCard as SharedPostCard } from "@feeblo/post-ui/post/post-card";
 import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
 import type { ReactNode } from "react";
 
@@ -43,17 +41,27 @@ function FeedbackPostCardTitle({ children }: { children?: ReactNode }) {
 function FeedbackPostCardDescription({ children }: { children?: ReactNode }) {
   const { post } = usePostCollectionData();
   const description = truncate(post.excerpt, 100) || "No details yet.";
-  return <SharedPostCard.Description>{children ?? description}</SharedPostCard.Description>;
+  return (
+    <SharedPostCard.Description>
+      {children ?? description}
+    </SharedPostCard.Description>
+  );
 }
 
 function FeedbackPostCardBoardBadge({ children }: { children?: ReactNode }) {
   const { board } = usePostCollectionData();
-  return <SharedPostCard.BoardBadge>{children ?? board.name}</SharedPostCard.BoardBadge>;
+  return (
+    <SharedPostCard.BoardBadge>
+      {children ?? board.name}
+    </SharedPostCard.BoardBadge>
+  );
 }
 
 function FeedbackPostCardAuthor() {
   const { post } = usePostCollectionData();
-  return <SharedPostCard.Author image={post.user.image} name={post.user.name} />;
+  return (
+    <SharedPostCard.Author image={post.user.image} name={post.user.name} />
+  );
 }
 
 function FeedbackPostCardMobileMeta({
