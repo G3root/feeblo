@@ -280,6 +280,146 @@ Or via a global config placed before the script:
 
 SDK errors are thrown or reported as `EmbedError`, which carries a stable `code` (e.g. `INVALID_ORG`, `INVALID_IDENTITY`) alongside `message`.
 
+## React integration — `@feeblo/sdk/react`
+
+A React-friendly layer over the vanilla SDK. It follows Vercel React best practices (stable callbacks, primitive effect deps, `useRef` for transient widget handles, `useMemo` for context) and is fully tested with Vitest Browser Mode + Playwright.
+
+```bash
+pnpm add @feeblo/sdk react react-dom
+```
+
+### Basic usage
+
+```tsx
+import { FeebloProvider, FeebloTrigger } from "@feeblo/sdk/react";
+
+function App() {
+  return (
+    <FeebloProvider organizationId="org_123" mode="feedback">
+      <header>
+        <h1>My App</h1>
+        <FeebloTrigger>Give feedback</FeebloTrigger>
+      </header>
+    </FeebloProvider>
+  );
+}
+```
+
+`FeebloTrigger` renders an accessible `<button>` that opens the widget anchored to itself via Floating UI. Use `asChild` to attach the behaviour to any element:
+
+```tsx
+<FeebloTrigger asChild>
+  <a href="#">Feedback</a>
+</FeebloTrigger>
+```
+
+### Identifying users
+
+Pass `user` to the provider — changes are propagated via `identify` without re-creating the widget (stringified key, separate effect):
+
+```tsx
+<FeebloProvider organizationId="org_123" user={{ id: "u_1", email: "ada@example.com", name: "Ada" }}>
+  <App />
+</FeebloProvider>
+```
+
+Or imperatively via the hook:
+
+```tsx
+import { useFeeblo } from "@feeblo/sdk/react";
+
+function SignInButton() {
+  const { identify } = useFeeblo();
+  return (
+    <button onClick={() => identify({ id: "u_2", email: "grace@example.com", name: "Grace" })}>
+      Sign in
+    </button>
+  );
+}
+```
+
+### Controlled open / close
+
+```tsx
+import { useFeeblo } from "@feeblo/sdk/react";
+
+function Controls() {
+  const { isOpen, isReady, open, close, setBoard, openModule } = useFeeblo();
+  return (
+    <>
+      <span>{isReady ? "ready" : "loading"} · {isOpen ? "open" : "closed"}</span>
+      <button onClick={() => open()}>Open</button>
+      <button onClick={() => close()}>Close</button>
+      <button onClick={() => openModule("updates")}>What&apos;s new</button>
+      <button onClick={() => setBoard("roadmap")}>Roadmap board</button>
+    </>
+  );
+}
+```
+
+### Events — `useFeebloEvent`
+
+Stay subscribed with a stable ref (handler identity never forces resubscribe):
+
+```tsx
+import { useFeebloEvent, useOnFeedbackSubmitted } from "@feeblo/sdk/react";
+
+function Analytics() {
+  useFeebloEvent("widgetOpened", (e) => console.log("opened", e.detail.data));
+  useFeebloEvent("feedbackSubmitted", (e) => console.log("feedback", e.detail.data));
+  // Convenience alias:
+  useOnFeedbackSubmitted((e) => toast.success(`Submitted: ${e.detail.data?.title}`));
+  return null;
+}
+}
+```
+
+Wildcard subscription (`"*"`) is also supported.
+
+### Hub / placement / boards
+
+```tsx
+// Hub with launcher in bottom-right
+<FeebloProvider organizationId="org_123" mode="hub" modules={["feedback", "updates"]} placement="bottom-right">
+  <FeebloTrigger module="updates">What&apos;s new</FeebloTrigger>
+  <FeebloTrigger module="feedback">Feedback</FeebloTrigger>
+</FeebloProvider>
+
+// Board-scoped trigger
+<FeebloTrigger board="bugs" metadata={{ source: "pricing-page" }}>Report a bug</FeebloTrigger>
+```
+
+All `EmbedOptions` (`baseUrl`, `theme`, `locale`, `containerStyles`, `onError`, etc.) are accepted as provider props and memoised on primitive keys so the widget is not torn down unless a structural option actually changes.
+
+### Hook API
+
+| Hook | Description |
+| --- | --- |
+| `useFeeblo()` | Full context: `widget`, `isReady`, `isOpen`, `open`, `close`, `identify`, `setBoard`, `metadata`, `openModule` |
+| `useFeebloEvent(event, handler)` | Subscribe to `widgetReady`, `widgetOpened`, `widgetClosed`, `feedbackSubmitted`, … |
+| `useOnFeedbackSubmitted(handler)` | Alias for `useFeebloEvent("feedbackSubmitted", …)` |
+| `useFeebloIsReady()` / `useFeebloIsOpen()` | Derived boolean selectors |
+| `useFeebloWidget()` | Nullable `FeebloWidget` handle |
+| `useFeebloTrigger(options)` | Headless `ref` + `onClick` for custom elements |
+
+### Examples
+
+See `src/react/examples/`:
+
+- `basic.example.tsx` — minimal + controlled + events
+- `with-identify.example.tsx` — provider `user`, hook `identify`, anonymous → identified
+- `hub.example.tsx` — hub modules, board scoping, launcher-only
+
+### Testing
+
+React integration tests run in Vitest Browser Mode (Chromium + Playwright) and are colocated with the source:
+
+```bash
+pnpm -F @feeblo/sdk test        # unit (happy-dom) + browser (chromium)
+```
+
+Browser specs: `src/react/*.browser.test.tsx` — cover provider lifecycle, `useFeebloEvent` ref stability & cleanup, `FeebloTrigger` (`asChild`, `board`/`metadata` forwarding, `defaultPrevented` guard) and `useFeebloTrigger`.
+
 ## Local development
 
 ```bash
