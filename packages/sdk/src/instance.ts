@@ -85,13 +85,17 @@ function setupGlobalListeners(): void {
 /**
  * Tear down an embed and, when it is the active singleton, release the shared
  * trigger scanner and global message listener.
+ *
+ * Guards against destroying a stale embed that has already been replaced by
+ * a newer singleton with the same container ID — calling destroy on a
+ * non-current embed would remove the current singleton's DOM.
  */
 export function destroyInstance(embed: Embed | null): void {
   if (!embed) {
     return;
   }
-  embed.destroy();
   if (currentEmbed === embed) {
+    embed.destroy();
     stopTriggerScanning();
     linkCleanup?.();
     linkCleanup = null;
@@ -99,6 +103,11 @@ export function destroyInstance(embed: Embed | null): void {
     currentEmbed = null;
     currentOrgId = null;
   }
+}
+
+export function getCurrentWidget(): FeebloWidget | null {
+  if (!currentEmbed) return null;
+  return createWidgetProxy(currentEmbed);
 }
 
 function createWidgetProxy(embed: Embed): FeebloWidget {
@@ -200,6 +209,8 @@ export function init(
   ) {
     if (resolvedOptions.user) {
       currentEmbed.identify(resolvedOptions.user);
+    } else if (currentEmbed.getAutoLoginToken()) {
+      currentEmbed.clearIdentity();
     }
     return createWidgetProxy(currentEmbed);
   }

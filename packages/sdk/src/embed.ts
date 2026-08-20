@@ -396,6 +396,18 @@ export class Embed {
     }
   }
 
+  clearIdentity(): void {
+    this.identity = null;
+    if (this.logger.enabled) {
+      this.logger("identity", "clear");
+    }
+    if (this.isLoaded) {
+      // Send an explicit clear to the iframe so the previous token
+      // is not retained for subsequent feedback submissions.
+      this.post({ event: "IDENTIFY", data: {} });
+    }
+  }
+
   isOpenState(): boolean {
     return this.isOpen;
   }

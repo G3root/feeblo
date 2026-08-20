@@ -1,7 +1,7 @@
 import * as React from "react";
 
 import { subscribe } from "../events";
-import { init } from "../instance";
+import { getCurrentEmbed, getCurrentWidget, init } from "../instance";
 import type {
   EmbedOptions,
   FeebloWidget,
@@ -61,6 +61,7 @@ function useInitOptions(props: Omit<FeebloProviderProps, "organizationId" | "use
 
   // Serialize modules to a primitive for stable deps (js-set-map-lookups)
   const modulesKey = React.useMemo(() => modules?.join(",") ?? "", [modules]);
+  const memoizedModules = React.useMemo(() => modules, [modulesKey]);
 
   // Memoise containerStyles by JSON — avoids object identity churn
   const containerStylesKey = React.useMemo(
@@ -80,7 +81,7 @@ function useInitOptions(props: Omit<FeebloProviderProps, "organizationId" | "use
       ...(defaultBoard !== undefined && { defaultBoard }),
       ...(locale !== undefined && { locale }),
       ...(mode !== undefined && { mode }),
-      ...(modules !== undefined && { modules }),
+      ...(memoizedModules !== undefined && { modules: memoizedModules }),
       ...(onClose !== undefined && { onClose }),
       ...(onError !== undefined && { onError }),
       ...(onHeightChange !== undefined && { onHeightChange }),
@@ -95,8 +96,7 @@ function useInitOptions(props: Omit<FeebloProviderProps, "organizationId" | "use
       defaultBoard,
       locale,
       mode,
-      modulesKey,
-      modules,
+      memoizedModules,
       onClose,
       onError,
       onHeightChange,
@@ -121,6 +121,8 @@ function useUserKey(user: UserIdentity | null | undefined): string {
     }
   }, [user]);
 }
+
+let activeProviderCount = 0;
 
 // ---------------------------------------------------------------------------
 // Provider
@@ -152,11 +154,25 @@ export function FeebloProvider(props: FeebloProviderProps): React.ReactElement {
     }
 
     let cancelled = false;
+    if (!getCurrentEmbed()) {
+      activeProviderCount = 0;
+    }
+    activeProviderCount += 1;
 
-    const w = init(organizationId, {
-      ...initOptions,
-      ...(user ? { user } : {}),
-    });
+    let w: FeebloWidget;
+    const existingEmbed = getCurrentEmbed();
+    if (activeProviderCount > 1 && existingEmbed) {
+      const shared = getCurrentWidget();
+      w = shared ?? init(organizationId, {
+        ...initOptions,
+        ...(user ? { user } : {}),
+      });
+    } else {
+      w = init(organizationId, {
+        ...initOptions,
+        ...(user ? { user } : {}),
+      });
+    }
 
     widgetRef.current = w;
     if (!cancelled) {
@@ -182,15 +198,21 @@ export function FeebloProvider(props: FeebloProviderProps): React.ReactElement {
       offReady();
       offOpened();
       offClosed();
-      // Only destroy if this widget is still the current singleton.
-      // This avoids destroying a newer widget that another Provider created.
-      if (widgetRef.current === w) {
+      activeProviderCount = Math.max(0, activeProviderCount - 1);
+      const isLastProvider = activeProviderCount === 0;
+      // Only the last mounted provider owns the singleton's lifecycle.
+      // This prevents a provider sharing an embed from destroying it for
+      // the other, and avoids a stale destroy() removing a newer
+      // singleton's container (same ID) via destroyInstance.
+      if (isLastProvider && widgetRef.current === w) {
         w.destroy();
         widgetRef.current = null;
       }
-      setWidget((prev) => (prev === w ? null : prev));
-      setIsReady(false);
-      setIsOpen(false);
+      setWidget((prev) => (prev === w && isLastProvider ? null : prev));
+      if (isLastProvider) {
+        setIsReady(false);
+        setIsOpen(false);
+      }
     };
     // initOptions is memoised; organizationId is primitive; user intentionally
     // excluded — identity sync is handled separately to avoid re-creating the
@@ -201,8 +223,14 @@ export function FeebloProvider(props: FeebloProviderProps): React.ReactElement {
   // --- Identity sync — separate effect with independent deps ----------------
   // (rerender-split-combined-hooks)
   React.useEffect(() => {
-    if (!userKey) return;
     if (!widgetRef.current) return;
+    if (!userKey) {
+      const current = getCurrentEmbed();
+      if (current?.getAutoLoginToken()) {
+        current.clearIdentity();
+      }
+      return;
+    }
     try {
       const parsed = JSON.parse(userKey) as UserIdentity;
       widgetRef.current.identify(parsed);
