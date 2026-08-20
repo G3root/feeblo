@@ -40,6 +40,7 @@ describe("plan feature catalog", () => {
         privilegedMembers: 5,
         changelogCategories: null,
         submissionNotificationRecipients: null,
+        crmEntries: null,
       },
       capabilities: {
         changelog: true,
@@ -63,6 +64,7 @@ describe("plan feature catalog", () => {
         key: "submissionNotificationRecipients",
         label: "Unlimited Submission Notification Recipients",
       },
+      { key: "crmEntries", label: "Unlimited CRM Entries" },
       { key: "roadmap", label: "Roadmap" },
       { key: "changelog", label: "Changelog" },
       { key: "integrations", label: "Integrations" },

@@ -38,6 +38,10 @@ type TCanUpdateRoadmapVisibility = {
   organizationId: string;
 };
 
+type TCanCreateCrmEntry = {
+  organizationId: string;
+};
+
 const makeEntitlementPolicy = Effect.gen(function* () {
   const workspaceRepository = yield* WorkspaceRepository;
 
@@ -193,6 +197,27 @@ const makeEntitlementPolicy = Effect.gen(function* () {
       }
     });
 
+  const canCreateCrmEntry = <E, R>(
+    args: TCanCreateCrmEntry & {
+      crmEntryCount: Effect.Effect<number, E, R>;
+    }
+  ) =>
+    Effect.gen(function* () {
+      const { entitlements, plan } = yield* findEntitlements(
+        args.organizationId
+      );
+
+      if (entitlements.limits.crmEntries === null) {
+        return;
+      }
+
+      if ((yield* args.crmEntryCount) >= entitlements.limits.crmEntries) {
+        return yield* new Policy.PolicyDeniedError({
+          reason: `The ${plan} plan allows up to ${entitlements.limits.crmEntries} CRM entries.`,
+        });
+      }
+    });
+
   /** Whether a workspace may create public changelog or post email subscriptions. */
   const mayCreatePublicEmailSubscriptions = Effect.fn(
     "EntitlementPolicy.mayCreatePublicEmailSubscriptions"
@@ -236,6 +261,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     canCreateRoadmap,
     canUpdateRoadmapVisibility,
     canCreateChangelogCategory,
+    canCreateCrmEntry,
     mayCreatePublicEmailSubscriptions,
     mayMaterializeEmailIntent,
     submissionNotificationRecipientLimit,

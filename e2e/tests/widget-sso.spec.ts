@@ -281,11 +281,11 @@ test(
         ).toBeTruthy();
 
         await expect(
-          visitorPage.getByRole("button", { name: "Sign out" })
-        ).toBeVisible();
-        await expect(
-          visitorPage.getByRole("button", { name: "Sign in" })
+          visitorPage.getByRole("button", { name: "Sign in / Sign up" })
         ).toHaveCount(0);
+        await expect(
+          visitorPage.getByRole("button", { name: "User menu" })
+        ).toBeVisible();
 
         await visitorPage
           .getByRole("link", { name: new RegExp(feedbackTitle) })
