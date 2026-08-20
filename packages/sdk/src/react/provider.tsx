@@ -1,5 +1,6 @@
 import * as React from "react";
 
+import { normalizeWidgetConfig, widgetConfigKey } from "../config";
 import { subscribe } from "../events";
 import { getCurrentEmbed, getCurrentWidget, init } from "../instance";
 import type {
@@ -162,11 +163,30 @@ export function FeebloProvider(props: FeebloProviderProps): React.ReactElement {
     let w: FeebloWidget;
     const existingEmbed = getCurrentEmbed();
     if (activeProviderCount > 1 && existingEmbed) {
-      const shared = getCurrentWidget();
-      w = shared ?? init(organizationId, {
-        ...initOptions,
-        ...(user ? { user } : {}),
-      });
+      let canReuse = false;
+      try {
+        const normalized = normalizeWidgetConfig(initOptions);
+        const nextKey = widgetConfigKey(normalized);
+        canReuse =
+          existingEmbed.organizationId === organizationId &&
+          existingEmbed.getConfigKey() === nextKey;
+      } catch {
+        canReuse = false;
+      }
+      if (canReuse) {
+        const shared = getCurrentWidget();
+        w = shared ?? init(organizationId, {
+          ...initOptions,
+          ...(user ? { user } : {}),
+        });
+      } else {
+        // Different org or structural config: must go through init validation
+        // so the requested organization/configuration is not silently ignored.
+        w = init(organizationId, {
+          ...initOptions,
+          ...(user ? { user } : {}),
+        });
+      }
     } else {
       w = init(organizationId, {
         ...initOptions,
@@ -227,55 +247,65 @@ export function FeebloProvider(props: FeebloProviderProps): React.ReactElement {
     if (!userKey) {
       const current = getCurrentEmbed();
       if (current?.getAutoLoginToken()) {
-        current.clearIdentity();
+        // P1 security: do not rely on empty IDENTIFY alone (previously
+        // rejected by widget validator). Destroy and recreate anonymously to
+        // guarantee the iframe token is not retained for later feedback.
+        const nextWidget = init(organizationId, initOptions);
+        widgetRef.current = nextWidget;
+        setWidget(nextWidget);
+        setIsReady(false);
+        setIsOpen(false);
       }
       return;
     }
     try {
       const parsed = JSON.parse(userKey) as UserIdentity;
-      widgetRef.current.identify(parsed);
+      (getCurrentWidget() ?? widgetRef.current).identify(parsed);
     } catch {
       // Fallback: userKey was user.id
-      if (user) widgetRef.current.identify(user);
+      if (user) (getCurrentWidget() ?? widgetRef.current).identify(user);
     }
-  }, [userKey, user]);
+  }, [userKey, user, organizationId, initOptions]);
 
   // --- Stable callbacks (rerender-functional-setstate / advanced-event-handler-refs) ---
+  // Always target the current singleton so a provider whose local w became
+  // stale after a concurrent provider replaced the singleton still acts on
+  // the live iframe.
   const open = React.useCallback<FeebloContextValue["open"]>(
     (trigger, metadata) => {
-      widgetRef.current?.open(trigger, metadata);
+      (getCurrentWidget() ?? widgetRef.current)?.open(trigger, metadata);
     },
     [],
   );
 
   const close = React.useCallback(() => {
-    widgetRef.current?.close();
+    (getCurrentWidget() ?? widgetRef.current)?.close();
   }, []);
 
   const identify = React.useCallback<FeebloContextValue["identify"]>(
     (nextUser) => {
-      widgetRef.current?.identify(nextUser);
+      (getCurrentWidget() ?? widgetRef.current)?.identify(nextUser);
     },
     [],
   );
 
   const setBoard = React.useCallback<FeebloContextValue["setBoard"]>(
     (board) => {
-      widgetRef.current?.setBoard(board);
+      (getCurrentWidget() ?? widgetRef.current)?.setBoard(board);
     },
     [],
   );
 
   const metadata = React.useCallback<FeebloContextValue["metadata"]>(
     (patch) => {
-      widgetRef.current?.metadata(patch);
+      (getCurrentWidget() ?? widgetRef.current)?.metadata(patch);
     },
     [],
   );
 
   const openModule = React.useCallback<FeebloContextValue["openModule"]>(
     (module) => {
-      widgetRef.current?.openModule(module);
+      (getCurrentWidget() ?? widgetRef.current)?.openModule(module);
     },
     [],
   );

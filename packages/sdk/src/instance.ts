@@ -209,10 +209,16 @@ export function init(
   ) {
     if (resolvedOptions.user) {
       currentEmbed.identify(resolvedOptions.user);
-    } else if (currentEmbed.getAutoLoginToken()) {
-      currentEmbed.clearIdentity();
+      return createWidgetProxy(currentEmbed);
     }
-    return createWidgetProxy(currentEmbed);
+    if (currentEmbed.getAutoLoginToken()) {
+      // P1 security: clearing must not rely on empty IDENTIFY alone (validator
+      // previously discarded it). Destroy and recreate anonymously to guarantee
+      // the iframe does not retain the logged-out token.
+      destroyInstance(currentEmbed);
+    } else {
+      return createWidgetProxy(currentEmbed);
+    }
   }
 
   if (currentEmbed) {

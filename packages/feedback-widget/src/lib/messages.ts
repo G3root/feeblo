@@ -97,6 +97,11 @@ export function isParentMessage<T>(
         isSupportedLocale(dataRecord.locale)
       );
     case "IDENTIFY":
+      // Allow clear: empty id is a valid clear signal from host logout.
+      // isParentMessage must accept it so the widget can clear retained token.
+      if (!("id" in dataRecord) || !isString(dataRecord.id) || dataRecord.id.length === 0) {
+        return true;
+      }
       return (
         "id" in dataRecord &&
         isString(dataRecord.id) &&

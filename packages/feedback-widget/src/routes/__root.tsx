@@ -14,7 +14,7 @@ import { ErrorFallback } from "../components/ui/error-fallback";
 import { Icon } from "../components/ui/icon";
 import { getWidgetConfig, moduleForPath } from "../lib/config";
 import { setWidgetContext } from "../lib/context";
-import { setWidgetIdentity } from "../lib/identity";
+import { clearWidgetIdentity, setWidgetIdentity } from "../lib/identity";
 import {
   type ParentMessage,
   sendToParent,
@@ -56,6 +56,10 @@ export function RootComponent(props: RouteSectionProps) {
         document.documentElement.lang = message.data.locale;
         break;
       case "IDENTIFY":
+        if (!message.data.id) {
+          clearWidgetIdentity();
+          break;
+        }
         setWidgetIdentity(message.data);
         {
           const { token: _token, ...publicIdentity } = message.data;
