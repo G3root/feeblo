@@ -20,6 +20,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 
+import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import { CompanyEditDialog } from "~/features/contact/components/company-edit-dialog";
 import { ContactCreateDialog } from "~/features/contact/components/contact-create-dialog";
 import { ContactDeleteDialog } from "~/features/contact/components/contact-delete-dialog";
@@ -35,6 +36,7 @@ import {
   useContactDeleteDialogContext,
   useContactEditDialogContext,
 } from "~/features/contact/dialog-stores";
+import { useEntitlements } from "~/hooks/use-entitlements";
 import {
   companyCollection,
   contactAttributeDefinitionCollection,
@@ -115,11 +117,31 @@ function ContactPage() {
   );
   const companiesById = new Map(companies.map((c) => [c.id, c]));
 
-  const openCreateDialog = () => createDialogStore.send({ type: "toggle" });
+  const { entitlements } = useEntitlements();
+  const crmLimit = entitlements.limits.crmEntries;
+  const totalCrmEntries = contacts.length + companies.length;
+  const hasReachedCrmLimit = crmLimit !== null && totalCrmEntries >= crmLimit;
+  const upgradePlanStore = useUpgradePlanDialogContext();
+
+  const openCreateDialog = () => {
+    if (hasReachedCrmLimit) {
+      upgradePlanStore.send({ type: "toggle" });
+      return;
+    }
+    createDialogStore.send({ type: "toggle" });
+  };
 
   if (!contactsQuery.isLoading && contacts.length === 0) {
     return (
       <div className="p-3">
+        {crmLimit !== null ? (
+          <div className="mb-3 flex justify-end">
+            <p className="text-muted-foreground text-sm">
+              {totalCrmEntries} of {crmLimit} CRM entries used
+              {hasReachedCrmLimit ? " — upgrade for unlimited" : ""}
+            </p>
+          </div>
+        ) : null}
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -154,7 +176,15 @@ function ContactPage() {
 
   return (
     <div className="p-3">
-      <div className="mb-3 flex justify-end">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          {crmLimit !== null ? (
+            <p className="text-muted-foreground text-sm">
+              {totalCrmEntries} of {crmLimit} CRM entries used
+              {hasReachedCrmLimit ? " — upgrade for unlimited" : ""}
+            </p>
+          ) : null}
+        </div>
         <PolicyGuard policy={hasPermission(organizationId, "contacts.create")}>
           {({ allowed }) => (
             <Button

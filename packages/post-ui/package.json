@@ -124,9 +124,17 @@
       "types": "./src/roadmap/use-roadmap-data.ts",
       "default": "./src/roadmap/use-roadmap-data.ts"
     },
+    "./roadmap/roadmap-page-layout": {
+      "types": "./src/roadmap/roadmap-page-layout.tsx",
+      "default": "./src/roadmap/roadmap-page-layout.tsx"
+    },
     "./dashboard/use-dashboard-home-stats": {
       "types": "./src/dashboard/use-dashboard-home-stats.ts",
       "default": "./src/dashboard/use-dashboard-home-stats.ts"
+    },
+    "./post/post-card": {
+      "types": "./src/post/post-card.tsx",
+      "default": "./src/post/post-card.tsx"
     }
   },
   "scripts": {

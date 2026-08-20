@@ -264,7 +264,7 @@ function RouteComponent() {
         </form.AppForm>
       </form>
 
-      <SocialAuthButtons mode="sign-up" redirectTo={search.redirectTo} />
+      <SocialAuthButtons redirectTo={search.redirectTo} />
     </AuthShell>
   );
 }

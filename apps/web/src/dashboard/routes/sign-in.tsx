@@ -174,7 +174,7 @@ function RouteComponent() {
         </div>
       </form>
 
-      <SocialAuthButtons mode="sign-in" redirectTo={search.redirectTo} />
+      <SocialAuthButtons redirectTo={search.redirectTo} />
     </AuthShell>
   );
 }

@@ -5,8 +5,11 @@ import * as Option from "effect/Option";
 
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import { validateAttributeValueEffect } from "../attribute-definition/validation";
+import { ContactRepository } from "../contact/repository";
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
+import { WorkspaceRepository } from "../workspace/repository";
 import { CompanyNotFoundError, FailedToCreateCompanyError } from "./errors";
 import { CompanyPolicy } from "./policies";
 import { CompanyRepository } from "./repository";
@@ -127,6 +130,9 @@ export const CompanyRpcHandlers = CompanyRpcs.toLayer(
   CompanyRpcHandlersEffect
 ).pipe(
   Layer.provide(CompanyPolicy.layer),
+  Layer.provide(EntitlementPolicy.layer),
+  Layer.provide(WorkspaceRepository.layer),
+  Layer.provide(ContactRepository.layer),
   Layer.provide(CompanyRepository.layer),
   Layer.provide(AttributeDefinitionRepository.layer)
 );

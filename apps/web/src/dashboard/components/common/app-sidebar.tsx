@@ -1,9 +1,4 @@
 import {
-  Collapsible,
-  CollapsiblePanel,
-  CollapsibleTrigger,
-} from "@feeblo/ui/collapsible";
-import {
   Menu,
   MenuItem,
   MenuPopup,
@@ -22,9 +17,6 @@ import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   useSidebar,
 } from "@feeblo/ui/sidebar";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
@@ -35,7 +27,6 @@ import {
   usePolicy,
 } from "@feeblo/web-shared/use-policy";
 import {
-  ArrowRight01Icon,
   Building06Icon,
   Delete02Icon,
   Edit,
@@ -63,7 +54,6 @@ import {
 } from "~/features/board/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePublicSiteUrl } from "~/hooks/use-site";
-import { roadmapCollection } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { NavUser } from "./nav-user";
@@ -413,68 +403,24 @@ const RenameBoardButton = ({
 
 function RoadmapNav({ pathname }: { pathname: string }) {
   const organizationId = useOrganizationId();
-
-  const roadmapsQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ roadmap: roadmapCollection })
-        .where(({ roadmap }) => eq(roadmap.organizationId, organizationId))
-        .select(({ roadmap }) => ({
-          id: roadmap.id,
-          name: roadmap.name,
-          slug: roadmap.slug,
-        }))
-        .orderBy(({ roadmap }) => roadmap.createdAt, "asc"),
-    [organizationId]
-  );
-
   const isActive = pathname.startsWith(`/${organizationId}/roadmap`);
-  const roadmaps = roadmapsQuery.data ?? [];
 
   return (
-    <Collapsible className="group/collapsible" defaultOpen={isActive}>
-      <SidebarMenuItem>
-        <CollapsibleTrigger
-          render={(props) => (
-            <SidebarMenuButton
-              isActive={isActive}
-              render={(buttonProps) => (
-                <button {...buttonProps} {...props}>
-                  <HugeiconsIcon icon={LayoutThreeColumnIcon} />
-                  <span>Roadmap</span>
-                  <HugeiconsIcon
-                    className="ml-auto size-4 transition-transform duration-200 group-data-[open]/collapsible:rotate-90"
-                    icon={ArrowRight01Icon}
-                  />
-                </button>
-              )}
-            />
-          )}
-        />
-        <CollapsiblePanel>
-          <SidebarMenuSub>
-            {roadmaps.map((roadmap) => (
-              <SidebarMenuSubItem key={roadmap.id}>
-                <SidebarMenuSubButton
-                  isActive={
-                    pathname === `/${organizationId}/roadmap/${roadmap.slug}`
-                  }
-                  render={(props) => (
-                    <Link
-                      {...props}
-                      params={{ organizationId, slug: roadmap.slug }}
-                      to="/$organizationId/roadmap/$slug"
-                    >
-                      <span>{roadmap.name}</span>
-                    </Link>
-                  )}
-                />
-              </SidebarMenuSubItem>
-            ))}
-          </SidebarMenuSub>
-        </CollapsiblePanel>
-      </SidebarMenuItem>
-    </Collapsible>
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        isActive={isActive}
+        render={(props) => (
+          <Link
+            {...props}
+            params={{ organizationId }}
+            to="/$organizationId/roadmap"
+          >
+            <HugeiconsIcon icon={LayoutThreeColumnIcon} />
+            <span>Roadmap</span>
+          </Link>
+        )}
+      />
+    </SidebarMenuItem>
   );
 }
 

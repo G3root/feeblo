@@ -1,5 +1,6 @@
 import { RoadmapGrid } from "@feeblo/post-ui/roadmap/roadmap-grid";
 import { PublicRoadmapIssueCard } from "@feeblo/post-ui/roadmap/roadmap-issue-card";
+import { Roadmap } from "@feeblo/post-ui/roadmap/roadmap-page-layout";
 import type {
   RoadmapBoardPost,
   RoadmapLane,
@@ -14,24 +15,50 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
-import {
-  Select,
-  SelectItem,
-  SelectPopup,
-  SelectTrigger,
-  SelectValue,
-} from "@feeblo/ui/select";
 import { useNavigate } from "@tanstack/react-router";
+import { createContext, use } from "react";
 
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
 
-/**
- * Public roadmap page shared by `/roadmap` (primary roadmap) and
- * `/roadmap/$slug` (any roadmap). Owns the roadmap data query and the
- * loading / error / empty states so routes stay thin.
- */
-export function PublicRoadmapPage({ slug }: { slug?: string }) {
+// --- Generic context (state / actions / meta) — provider decouples implementation ---
+
+interface PublicRoadmapState {
+  allRoadmaps: RoadmapSummary[];
+  displayedRoadmap: RoadmapSummary | null;
+  lanes: RoadmapLane<RoadmapBoardPost>[];
+  isError: boolean;
+  isLoading: boolean;
+}
+
+interface PublicRoadmapActions {
+  openPost: (slug: string) => void;
+  switchRoadmap: (slug: string) => void;
+}
+
+interface PublicRoadmapMeta {
+  organizationId: string;
+}
+
+const PublicRoadmapContext = createContext<{
+  actions: PublicRoadmapActions;
+  meta: PublicRoadmapMeta;
+  state: PublicRoadmapState;
+} | null>(null);
+
+function usePublicRoadmap() {
+  const ctx = use(PublicRoadmapContext);
+  if (!ctx) throw new Error("Must be used within PublicRoadmapProvider");
+  return ctx;
+}
+
+function PublicRoadmapProvider({
+  children,
+  slug,
+}: {
+  children: React.ReactNode;
+  slug?: string;
+}) {
   const site = useSite();
   const navigate = useNavigate();
   const {
@@ -53,136 +80,39 @@ export function PublicRoadmapPage({ slug }: { slug?: string }) {
       slug,
     });
 
-  if (isError) {
-    return (
-      <PublicRoadmapMessage
-        description="There was a problem loading the roadmap."
-        title="Roadmap unavailable"
-      />
-    );
-  }
-
-  if (isLoading) {
-    return <PublicRoadmapSkeleton />;
-  }
-
-  const displayedRoadmap = roadmaps[0];
-
-  if (!displayedRoadmap) {
-    return (
-      <PublicRoadmapMessage
-        description={
-          slug
-            ? "This roadmap does not exist or has been removed."
-            : "This workspace does not have a public roadmap yet."
-        }
-        title={slug ? "Roadmap not found" : "No roadmap yet"}
-      />
-    );
-  }
-
+  const displayedRoadmap = roadmaps[0] ?? null;
+  const lanes = displayedRoadmap ? lanesFor(displayedRoadmap.id) : [];
   const primarySlug = allRoadmaps[0]?.slug;
 
   return (
-    <PublicRoadmapBoard
-      description={displayedRoadmap.description}
-      lanes={lanesFor(displayedRoadmap.id)}
-      onOpenPost={(postSlug) => navigate({ to: `/p/${postSlug}` })}
-      onSelectRoadmap={(nextSlug) => {
-        if (nextSlug === primarySlug) {
-          navigate({ to: "/roadmap", replace: true });
-        } else {
-          navigate({
-            to: "/roadmap/$slug",
-            params: { slug: nextSlug },
-            replace: true,
-          });
-        }
+    <PublicRoadmapContext.Provider
+      value={{
+        actions: {
+          openPost: (postSlug) => navigate({ to: `/p/${postSlug}` }),
+          switchRoadmap: (nextSlug) => {
+            if (nextSlug === primarySlug) {
+              navigate({ to: "/roadmap", replace: true });
+            } else {
+              navigate({
+                params: { slug: nextSlug },
+                replace: true,
+                to: "/roadmap/$slug",
+              });
+            }
+          },
+        },
+        meta: { organizationId: site.organizationId },
+        state: { allRoadmaps, displayedRoadmap, isError, isLoading, lanes },
       }}
-      roadmapOptions={allRoadmaps}
-      title={displayedRoadmap.name}
-      value={displayedRoadmap.slug}
-    />
+    >
+      {children}
+    </PublicRoadmapContext.Provider>
   );
 }
 
-function PublicRoadmapBoard({
-  description,
-  emptyLaneMessage = "No updates in this stage.",
-  lanes,
-  onOpenPost,
-  onSelectRoadmap,
-  roadmapOptions,
-  title,
-  value,
-}: {
-  description: string | null | undefined;
-  emptyLaneMessage?: string;
-  lanes: RoadmapLane<RoadmapBoardPost>[];
-  onOpenPost: (postSlug: string) => void;
-  onSelectRoadmap: (slug: string) => void;
-  roadmapOptions: RoadmapSummary[];
-  title: string;
-  value: string;
-}) {
-  return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 overflow-y-auto p-4 md:p-6">
-      <section className="flex h-full min-h-0 shrink-0 flex-col gap-4">
-        <header className="flex items-start justify-between gap-2 px-3">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold">{title}</h1>
-            {description ? (
-              <p className="text-muted-foreground mt-1 text-sm">
-                {description}
-              </p>
-            ) : null}
-          </div>
-          <Select
-            onValueChange={(nextSlug) => {
-              if (nextSlug !== null && nextSlug !== value) {
-                onSelectRoadmap(nextSlug);
-              }
-            }}
-            value={value}
-          >
-            <SelectTrigger className="w-44 shrink-0">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectPopup>
-              {roadmapOptions.map((roadmap) => (
-                <SelectItem key={roadmap.id} value={roadmap.slug}>
-                  {roadmap.name}
-                </SelectItem>
-              ))}
-            </SelectPopup>
-          </Select>
-        </header>
-        {lanes.length > 0 ? (
-          <RoadmapGrid
-            emptyLaneMessage={emptyLaneMessage}
-            lanes={lanes}
-            renderCard={({ post }) => (
-              <PublicRoadmapIssueCard
-                boardName={post.boardName}
-                key={post.id}
-                onClick={() => onOpenPost(post.slug)}
-                status={post.status}
-                title={post.title}
-                updatedAt={post.updatedAt}
-              />
-            )}
-          />
-        ) : (
-          <div className="border-border/70 bg-muted/20 text-muted-foreground flex min-h-64 flex-1 items-center justify-center rounded-lg border border-dashed p-6 text-center text-sm">
-            This roadmap has no columns configured.
-          </div>
-        )}
-      </section>
-    </div>
-  );
-}
+// --- Explicit variants — no boolean prop proliferation ---
 
-function PublicRoadmapMessage({
+function PublicRoadmapError({
   description,
   title,
 }: {
@@ -190,25 +120,139 @@ function PublicRoadmapMessage({
   title: string;
 }) {
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 overflow-y-auto p-4 md:p-6">
+    <Roadmap.Container>
       <Empty className="border">
         <EmptyHeader>
           <EmptyTitle>{title}</EmptyTitle>
           <EmptyDescription>{description}</EmptyDescription>
         </EmptyHeader>
       </Empty>
-    </div>
+    </Roadmap.Container>
   );
 }
 
-function PublicRoadmapSkeleton() {
+function PublicRoadmapBoardContent() {
+  const {
+    actions: { openPost, switchRoadmap },
+    state: { allRoadmaps, displayedRoadmap, lanes },
+  } = usePublicRoadmap();
+
+  if (!displayedRoadmap) return null;
+
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col overflow-hidden p-4 md:p-6">
-      <div className="grid min-w-max auto-cols-max grid-flow-col gap-4 overflow-x-auto p-3">
-        {["planned", "in-progress", "completed"].map((key) => (
-          <div className="bg-muted/30 h-96 w-80 rounded-lg" key={key} />
-        ))}
-      </div>
-    </div>
+    <Roadmap.Provider
+      description={displayedRoadmap.description}
+      onValueChange={switchRoadmap}
+      options={allRoadmaps}
+      title={displayedRoadmap.name}
+      value={displayedRoadmap.slug}
+    >
+      <Roadmap.Container>
+        <Roadmap.Section>
+          <Roadmap.Header>
+            <Roadmap.HeaderMain>
+              <Roadmap.Title />
+              <Roadmap.Description />
+            </Roadmap.HeaderMain>
+            <Roadmap.HeaderActions>
+              <Roadmap.Switcher />
+            </Roadmap.HeaderActions>
+          </Roadmap.Header>
+
+          {lanes.length > 0 ? (
+            <RoadmapGrid
+              emptyLaneMessage="No updates in this stage."
+              lanes={lanes}
+              renderCard={({ post }) => (
+                <PublicRoadmapIssueCard
+                  boardName={post.boardName}
+                  key={post.id}
+                  onClick={() => openPost(post.slug)}
+                  status={post.status}
+                  title={post.title}
+                  updatedAt={post.updatedAt}
+                />
+              )}
+            />
+          ) : (
+            <Roadmap.NoColumnsEmpty />
+          )}
+        </Roadmap.Section>
+      </Roadmap.Container>
+    </Roadmap.Provider>
   );
+}
+
+// --- Public API — explicit page variants instead of optional slug boolean ---
+
+export function PublicRoadmapPage({ slug }: { slug?: string }) {
+  // Back-compat: delegates to explicit variants
+  if (slug === undefined) return <PublicRoadmapIndexPage />;
+  return <PublicRoadmapDetailPage slug={slug} />;
+}
+
+export function PublicRoadmapIndexPage() {
+  return (
+    <PublicRoadmapProvider>
+      <PublicRoadmapIndexView />
+    </PublicRoadmapProvider>
+  );
+}
+
+function PublicRoadmapIndexView() {
+  const {
+    state: { displayedRoadmap, isError, isLoading },
+  } = usePublicRoadmap();
+
+  if (isError) {
+    return (
+      <PublicRoadmapError
+        description="There was a problem loading the roadmap."
+        title="Roadmap unavailable"
+      />
+    );
+  }
+  if (isLoading) return <Roadmap.Skeleton />;
+  if (!displayedRoadmap) {
+    return (
+      <PublicRoadmapError
+        description="This workspace does not have a public roadmap yet."
+        title="No roadmap yet"
+      />
+    );
+  }
+  return <PublicRoadmapBoardContent />;
+}
+
+export function PublicRoadmapDetailPage({ slug }: { slug: string }) {
+  return (
+    <PublicRoadmapProvider slug={slug}>
+      <PublicRoadmapDetailView />
+    </PublicRoadmapProvider>
+  );
+}
+
+function PublicRoadmapDetailView() {
+  const {
+    state: { displayedRoadmap, isError, isLoading },
+  } = usePublicRoadmap();
+
+  if (isError) {
+    return (
+      <PublicRoadmapError
+        description="There was a problem loading the roadmap."
+        title="Roadmap unavailable"
+      />
+    );
+  }
+  if (isLoading) return <Roadmap.Skeleton />;
+  if (!displayedRoadmap) {
+    return (
+      <PublicRoadmapError
+        description="This roadmap does not exist or has been removed."
+        title="Roadmap not found"
+      />
+    );
+  }
+  return <PublicRoadmapBoardContent />;
 }
