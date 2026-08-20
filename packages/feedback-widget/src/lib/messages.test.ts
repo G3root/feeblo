@@ -100,9 +100,7 @@ describe("isParentMessage", () => {
         accepts({ event: "SET_CONTEXT", data: { page: "/pricing" } })
       ).toBe(true);
       expect(accepts({ event: "SET_CONTEXT", data: {} })).toBe(true);
-      expect(
-        accepts({ event: "SET_CONTEXT", data: { page: 42 } })
-      ).toBe(false);
+      expect(accepts({ event: "SET_CONTEXT", data: { page: 42 } })).toBe(false);
     });
 
     it("accepts SET_MODULE only for enabled modules", () => {
@@ -118,19 +116,19 @@ describe("isParentMessage", () => {
     });
 
     it("accepts SET_BOARD only with a non-empty board id", () => {
-      expect(
-        accepts({ event: "SET_BOARD", data: { board: "bugs" } })
-      ).toBe(true);
+      expect(accepts({ event: "SET_BOARD", data: { board: "bugs" } })).toBe(
+        true
+      );
       expect(accepts({ event: "SET_BOARD", data: { board: "" } })).toBe(false);
     });
 
     it("accepts SET_LOCALE only for supported locales", () => {
-      expect(
-        accepts({ event: "SET_LOCALE", data: { locale: "en" } })
-      ).toBe(true);
-      expect(
-        accepts({ event: "SET_LOCALE", data: { locale: "fr" } })
-      ).toBe(false);
+      expect(accepts({ event: "SET_LOCALE", data: { locale: "en" } })).toBe(
+        true
+      );
+      expect(accepts({ event: "SET_LOCALE", data: { locale: "fr" } })).toBe(
+        false
+      );
     });
   });
 });

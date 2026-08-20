@@ -315,9 +315,7 @@ function App() {
 
 ### Identifying users
 
-Pass `user` to the provider — non-empty user changes call `identify` without
-re-creating the widget, while a user becoming absent after auto-login
-reinitializes an anonymous widget to clear the retained token:
+Pass `user` to the provider — non-empty user changes call `identify` without re-creating the widget, while a user becoming absent after auto-login reinitializes an anonymous widget to clear the retained token:
 
 ```tsx
 <FeebloProvider
@@ -377,9 +375,13 @@ import { useFeebloEvent, useOnFeedbackSubmitted } from "@feeblo/sdk/react";
 
 function Analytics() {
   useFeebloEvent("widgetOpened", (e) => console.log("opened", e.detail.data));
-  useFeebloEvent("feedbackSubmitted", (e) => console.log("feedback", e.detail.data));
+  useFeebloEvent("feedbackSubmitted", (e) =>
+    console.log("feedback", e.detail.data)
+  );
   // Convenience alias:
-  useOnFeedbackSubmitted((e) => toast.success(`Submitted: ${e.detail.data?.title}`));
+  useOnFeedbackSubmitted((e) =>
+    toast.success(`Submitted: ${e.detail.data?.title}`)
+  );
   return null;
 }
 ```
