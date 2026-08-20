@@ -211,6 +211,7 @@ describe("TagRpcHandlers", () => {
               organizationId: f.organizationId,
             });
             expect(publicTags).toMatchObject([{ id: tagId, name: "Feature" }]);
+            expect(publicTags[0]).not.toHaveProperty("type");
             expect(publicTags[0]).not.toHaveProperty("creatorId");
           })
       );
