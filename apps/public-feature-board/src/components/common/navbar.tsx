@@ -1,4 +1,4 @@
-import { AuthDialog } from "@feeblo/post-ui/auth-dialog";
+import { AuthButton } from "@feeblo/post-ui/auth-dialog";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { cn } from "@feeblo/ui/utils";
 import { useAuth } from "@feeblo/web-shared/auth-context";
@@ -79,14 +79,7 @@ function UserActions() {
 
   return (
     <div className="flex items-center gap-2">
-      {isAuthenticated ? (
-        <UserMenu />
-      ) : (
-        <>
-          <AuthDialog variant="sign-in" />
-          <AuthDialog variant="sign-up" />
-        </>
-      )}
+      {isAuthenticated ? <UserMenu /> : <AuthButton />}
     </div>
   );
 }

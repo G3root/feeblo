@@ -5,7 +5,6 @@ import { type ReactNode, useState } from "react";
 import { type SocialProvider, signInWithSocialProvider } from "./auth-flows";
 
 type SocialAuthButtonsProps = {
-  mode: "sign-in" | "sign-up";
   redirectTo?: string;
 };
 
@@ -40,17 +39,13 @@ const providers: Array<{
   },
 ];
 
-export function SocialAuthButtons({
-  mode,
-  redirectTo,
-}: SocialAuthButtonsProps) {
+export function SocialAuthButtons({ redirectTo }: SocialAuthButtonsProps) {
   const [pendingProvider, setPendingProvider] = useState<SocialProvider | null>(
     null
   );
 
   return (
     <>
-      <FieldSeparator>Or continue with</FieldSeparator>
       {providers.map((provider) => (
         <Field key={provider.id}>
           <Button
@@ -61,7 +56,6 @@ export function SocialAuthButtons({
               await signInWithSocialProvider({
                 provider: provider.id,
                 redirectTo,
-                requestSignUp: mode === "sign-up",
               });
               setPendingProvider(null);
             }}
@@ -69,7 +63,7 @@ export function SocialAuthButtons({
             variant="outline"
           >
             {provider.icon}
-            {mode === "sign-in" ? "Login" : "Continue"} with {provider.label}
+            Continue with {provider.label}
           </Button>
         </Field>
       ))}
