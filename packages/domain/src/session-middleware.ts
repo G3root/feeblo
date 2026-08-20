@@ -11,9 +11,17 @@ import * as HttpApiSecurity from "effect/unstable/httpapi/HttpApiSecurity";
 import * as RpcMiddleware from "effect/unstable/rpc/RpcMiddleware";
 
 import { UnauthorizedError } from "./rpc-errors";
-import { getSessionCookieName } from "./session-cookie";
+import {
+  getSessionCookieName,
+  getSessionCookieNameForUrl,
+} from "./session-cookie";
 
-const sessionCookie = getSessionCookieName();
+// Lazily resolved per-call so tests can stub `process.env` and server
+// composition can inject API_URL via `getSessionCookieNameForUrl`.
+const getSessionCookie = (): string => getSessionCookieName();
+
+/** Pure helper for server composition that injects the API URL via Config. */
+export const getSessionCookieForApiUrl = getSessionCookieNameForUrl;
 
 //TODO: infer session later
 export type Session = {
@@ -88,6 +96,7 @@ function getValidatedSessionFromToken(
     if (!token) {
       return yield* new UnauthorizedError({ message: "Not authenticated" });
     }
+    const sessionCookie = getSessionCookie();
     const session = yield* Effect.tryPromise({
       try: () =>
         auth.api.getSession({
@@ -113,7 +122,7 @@ function getSessionTokenFromCookieHeader(
 
   const parsedCookie = parseCookie(cookieHeader);
 
-  const value = parsedCookie?.[sessionCookie];
+  const value = parsedCookie?.[getSessionCookie()];
 
   return value;
 }
@@ -179,7 +188,7 @@ export class HttpApiAuthMiddleware extends HttpApiMiddleware.Service<
   security: {
     cookie: HttpApiSecurity.apiKey({
       in: "cookie",
-      key: sessionCookie,
+      key: getSessionCookieName(),
     }),
   },
 }) {}

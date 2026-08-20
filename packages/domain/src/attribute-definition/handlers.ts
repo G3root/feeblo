@@ -22,7 +22,6 @@ import type {
 } from "./schema";
 import { validateAttributeValueEffect } from "./validation";
 
-//TODO FIX later
 export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* AttributeDefinitionRepository;
   const attributeDefinitionPolicy = yield* AttributeDefinitionPolicy;
