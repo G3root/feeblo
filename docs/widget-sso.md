@@ -45,7 +45,7 @@ Secrets are **never auto-created** — merely probing an org id cannot materiali
 import { SignJWT } from "jose";
 
 const workspaceId = process.env.FEEBLO_WORKSPACE_ID; // from the widget config
-const secret = process.env.FEEBLO_SSO_SECRET; // from Settings → Security
+const secret = process.env.FEEBLO_SSO_SECRET; // from Settings → Security (64-char hex)
 
 const token = await new SignJWT({
   userId: user.id,
@@ -56,7 +56,7 @@ const token = await new SignJWT({
   .setProtectedHeader({ alg: "HS256" })
   .setAudience(workspaceId) // REQUIRED — binds to the workspace
   .setExpirationTime("5m") // strongly recommended, optional
-  .sign(new TextEncoder().encode(secret));
+  .sign(new Uint8Array(Buffer.from(secret, "hex")));
 ```
 
 ## Rotation & revocation

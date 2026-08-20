@@ -5,14 +5,14 @@ import * as jose from "jose";
 import { UnauthorizedError } from "../rpc-errors";
 import { verifyJwt } from "./verification";
 
-const SECRET = "test-secret";
-const OTHER_SECRET = "other-secret";
+const SECRET = "a".repeat(64);
+const OTHER_SECRET = "b".repeat(64);
 const ORGANIZATION_ID = "org_test";
 
 async function signToken(payload: jose.JWTPayload, secret: string) {
   return await new jose.SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
-    .sign(new TextEncoder().encode(secret));
+    .sign(new Uint8Array(Buffer.from(secret, "hex")));
 }
 
 const futureExp = Math.floor(Date.now() / 1000) + 3600;
@@ -126,7 +126,7 @@ describe("verifyJwt", () => {
   it("fails when no secret matches", async () => {
     const token = await signToken(
       { userId: "u_1", aud: ORGANIZATION_ID, exp: futureExp },
-      "unknown-secret"
+      "c".repeat(64)
     );
 
     await expect(
