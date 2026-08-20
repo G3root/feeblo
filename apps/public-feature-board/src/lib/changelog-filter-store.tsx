@@ -62,13 +62,3 @@ export const [ChangelogFilterProvider, useChangelogFilterStore] =
     name: "ChangelogFilterStoreContext",
     providerName: "ChangelogFilterProvider",
   });
-
-export function useChangelogSearch() {
-  const store = useChangelogFilterStore();
-  return useSelector(store, (state) => state.context.search);
-}
-
-export function useChangelogSelectedCategoryIds() {
-  const store = useChangelogFilterStore();
-  return useSelector(store, (state) => state.context.selectedCategoryIds);
-}
