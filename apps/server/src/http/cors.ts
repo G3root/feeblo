@@ -28,16 +28,14 @@ export const makeIsAllowedOrigin =
     }
 
     const originHost = originUrl.hostname;
-    const appHost = appUrl.hostname;
-    const apiHost = apiUrl.hostname;
     const appRootDomainHost = config.appRootDomain.includes(":")
       ? config.appRootDomain.split(":")[0]
       : config.appRootDomain;
 
-    if (originHost === apiHost) {
+    if (originUrl.origin === apiUrl.origin) {
       return true;
     }
-    if (originHost === appHost) {
+    if (originUrl.origin === appUrl.origin) {
       return true;
     }
 
@@ -51,7 +49,9 @@ export const makeIsAllowedOrigin =
 
     if (
       appRootDomainHost !== "" &&
-      originHost.endsWith(`.${appRootDomainHost}`)
+      originHost.endsWith(`.${appRootDomainHost}`) &&
+      originUrl.protocol === appUrl.protocol &&
+      originUrl.port === appUrl.port
     ) {
       return true;
     }
