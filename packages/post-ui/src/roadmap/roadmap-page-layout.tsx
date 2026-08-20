@@ -1,3 +1,11 @@
+import { Button } from "@feeblo/ui/button";
+import {
+  Menu,
+  MenuPopup,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuTrigger,
+} from "@feeblo/ui/menu";
 import {
   Select,
   SelectItem,
@@ -5,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
+import { FilterIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, use, useMemo } from "react";
 
 // ---------------------------------------------------------------------------
@@ -116,7 +126,7 @@ export function RoadmapPageSection({
 
 function RoadmapHeader({ children }: { children: React.ReactNode }) {
   return (
-    <header className="flex items-start justify-between gap-2 px-3">
+    <header className="flex flex-row items-start justify-between gap-2 px-3 sm:gap-4">
       {children}
     </header>
   );
@@ -143,7 +153,11 @@ function RoadmapDescription({ children }: { children?: React.ReactNode }) {
 }
 
 function RoadmapHeaderActions({ children }: { children: React.ReactNode }) {
-  return <div className="flex shrink-0 items-center gap-2">{children}</div>;
+  return (
+    <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+      {children}
+    </div>
+  );
 }
 
 function RoadmapSwitcher() {
@@ -155,25 +169,61 @@ function RoadmapSwitcher() {
   if (options.length === 0) return null;
 
   return (
-    <Select
-      onValueChange={(nextSlug) => {
-        if (nextSlug !== null && nextSlug !== value) {
-          onValueChange(nextSlug);
-        }
-      }}
-      value={value}
-    >
-      <SelectTrigger className="w-44 shrink-0">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectPopup>
-        {options.map((roadmap) => (
-          <SelectItem key={roadmap.id} value={roadmap.slug}>
-            {roadmap.name}
-          </SelectItem>
-        ))}
-      </SelectPopup>
-    </Select>
+    <>
+      {/* Desktop: Select */}
+      <div className="hidden sm:block">
+        <Select
+          onValueChange={(nextSlug) => {
+            if (nextSlug !== null && nextSlug !== value) {
+              onValueChange(nextSlug);
+            }
+          }}
+          value={value}
+        >
+          <SelectTrigger className="w-44 shrink-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectPopup>
+            {options.map((roadmap) => (
+              <SelectItem key={roadmap.id} value={roadmap.slug}>
+                {roadmap.name}
+              </SelectItem>
+            ))}
+          </SelectPopup>
+        </Select>
+      </div>
+
+      {/* Mobile: Menu like changelog filter */}
+      <div className="sm:hidden">
+        <Menu>
+          <MenuTrigger
+            render={
+              <Button
+                aria-label={`Switch roadmap, current ${options.find((o) => o.slug === value)?.name ?? value}`}
+                size="icon-sm"
+                variant="outline"
+              >
+                <HugeiconsIcon icon={FilterIcon} />
+              </Button>
+            }
+          />
+          <MenuPopup align="end" className="w-56">
+            <MenuRadioGroup
+              value={value}
+              onValueChange={(next) => {
+                if (next && next !== value) onValueChange(next);
+              }}
+            >
+              {options.map((roadmap) => (
+                <MenuRadioItem key={roadmap.id} value={roadmap.slug}>
+                  {roadmap.name}
+                </MenuRadioItem>
+              ))}
+            </MenuRadioGroup>
+          </MenuPopup>
+        </Menu>
+      </div>
+    </>
   );
 }
 
@@ -273,25 +323,58 @@ export function LegacyRoadmapSwitcher({
   value: string;
 }) {
   return (
-    <Select
-      onValueChange={(nextSlug) => {
-        if (nextSlug !== null && nextSlug !== value) {
-          onValueChange(nextSlug);
-        }
-      }}
-      value={value}
-    >
-      <SelectTrigger className="w-44 shrink-0">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectPopup>
-        {options.map((roadmap) => (
-          <SelectItem key={roadmap.id} value={roadmap.slug}>
-            {roadmap.name}
-          </SelectItem>
-        ))}
-      </SelectPopup>
-    </Select>
+    <>
+      <div className="hidden sm:block">
+        <Select
+          onValueChange={(nextSlug) => {
+            if (nextSlug !== null && nextSlug !== value) {
+              onValueChange(nextSlug);
+            }
+          }}
+          value={value}
+        >
+          <SelectTrigger className="w-44 shrink-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectPopup>
+            {options.map((roadmap) => (
+              <SelectItem key={roadmap.id} value={roadmap.slug}>
+                {roadmap.name}
+              </SelectItem>
+            ))}
+          </SelectPopup>
+        </Select>
+      </div>
+      <div className="sm:hidden">
+        <Menu>
+          <MenuTrigger
+            render={
+              <Button
+                aria-label={`Switch roadmap, current ${options.find((o) => o.slug === value)?.name ?? value}`}
+                size="icon-sm"
+                variant="outline"
+              >
+                <HugeiconsIcon icon={FilterIcon} />
+              </Button>
+            }
+          />
+          <MenuPopup align="end" className="w-56">
+            <MenuRadioGroup
+              value={value}
+              onValueChange={(next) => {
+                if (next && next !== value) onValueChange(next);
+              }}
+            >
+              {options.map((roadmap) => (
+                <MenuRadioItem key={roadmap.id} value={roadmap.slug}>
+                  {roadmap.name}
+                </MenuRadioItem>
+              ))}
+            </MenuRadioGroup>
+          </MenuPopup>
+        </Menu>
+      </div>
+    </>
   );
 }
 

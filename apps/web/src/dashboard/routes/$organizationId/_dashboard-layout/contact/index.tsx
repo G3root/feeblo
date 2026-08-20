@@ -26,6 +26,7 @@ import { ContactCreateDialog } from "~/features/contact/components/contact-creat
 import { ContactDeleteDialog } from "~/features/contact/components/contact-delete-dialog";
 import { ContactEditDialog } from "~/features/contact/components/contact-edit-dialog";
 import { ContactTableRow } from "~/features/contact/components/contact-table-row";
+import { CrmEntriesUsage } from "~/features/contact/components/crm-entries-usage";
 import {
   CompanyEditDialogProvider,
   ContactCreateDialogProvider,
@@ -136,10 +137,10 @@ function ContactPage() {
       <div className="p-3">
         {crmLimit !== null ? (
           <div className="mb-3 flex justify-end">
-            <p className="text-muted-foreground text-sm">
-              {totalCrmEntries} of {crmLimit} CRM entries used
-              {hasReachedCrmLimit ? " — upgrade for unlimited" : ""}
-            </p>
+            <CrmEntriesUsage
+              crmLimit={crmLimit}
+              totalCrmEntries={totalCrmEntries}
+            />
           </div>
         ) : null}
         <Empty>
@@ -178,12 +179,10 @@ function ContactPage() {
     <div className="p-3">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          {crmLimit !== null ? (
-            <p className="text-muted-foreground text-sm">
-              {totalCrmEntries} of {crmLimit} CRM entries used
-              {hasReachedCrmLimit ? " — upgrade for unlimited" : ""}
-            </p>
-          ) : null}
+          <CrmEntriesUsage
+            crmLimit={crmLimit}
+            totalCrmEntries={totalCrmEntries}
+          />
         </div>
         <PolicyGuard policy={hasPermission(organizationId, "contacts.create")}>
           {({ allowed }) => (
