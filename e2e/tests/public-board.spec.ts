@@ -67,9 +67,9 @@ async function signInThroughPublicBoard(
   expect((await signInResponse).ok()).toBeTruthy();
 
   await expect(signInDialog).toBeHidden();
-  await expect(
-    page.getByRole("button", { name: authButtonName })
-  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: authButtonName })).toHaveCount(
+    0
+  );
   // Authenticated: user menu should be visible
   await expect(page.getByRole("button", { name: "User menu" })).toBeVisible();
 }
@@ -184,9 +184,7 @@ test(
     try {
       const boardUrl = publicBoardUrl(owner.workspaceName);
       await visitorPage.goto(boardUrl);
-      await visitorPage
-        .getByRole("button", { name: authButtonName })
-        .click();
+      await visitorPage.getByRole("button", { name: authButtonName }).click();
 
       const chooserDialog = visitorPage.getByRole("dialog", {
         name: authDialogName,
