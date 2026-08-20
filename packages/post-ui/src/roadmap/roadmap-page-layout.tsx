@@ -5,7 +5,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
-import { createContext, use } from "react";
+import { createContext, use, useMemo } from "react";
 
 // ---------------------------------------------------------------------------
 // Shareable roadmap layout primitives — compound components with lifted state
@@ -72,14 +72,17 @@ function RoadmapProvider({
   title,
   value,
 }: RoadmapProviderProps) {
+  const contextValue = useMemo<RoadmapContextValue>(
+    () => ({
+      actions: { onValueChange },
+      meta: {},
+      state: { description, options, title, value },
+    }),
+    [onValueChange, description, options, title, value]
+  );
+
   return (
-    <RoadmapContext.Provider
-      value={{
-        actions: { onValueChange },
-        meta: {},
-        state: { description, options, title, value },
-      }}
-    >
+    <RoadmapContext.Provider value={contextValue}>
       {children}
     </RoadmapContext.Provider>
   );

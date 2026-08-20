@@ -16,7 +16,7 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { useNavigate } from "@tanstack/react-router";
-import { createContext, use } from "react";
+import { createContext, use, useCallback, useMemo } from "react";
 
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
@@ -81,30 +81,52 @@ function PublicRoadmapProvider({
     });
 
   const displayedRoadmap = roadmaps[0] ?? null;
-  const lanes = displayedRoadmap ? lanesFor(displayedRoadmap.id) : [];
+  const lanes = useMemo(
+    () => (displayedRoadmap ? lanesFor(displayedRoadmap.id) : []),
+    [displayedRoadmap, lanesFor]
+  );
   const primarySlug = allRoadmaps[0]?.slug;
 
+  const openPost = useCallback(
+    (postSlug: string) => navigate({ to: `/p/${postSlug}` }),
+    [navigate]
+  );
+
+  const switchRoadmap = useCallback(
+    (nextSlug: string) => {
+      if (nextSlug === primarySlug) {
+        navigate({ to: "/roadmap", replace: true });
+      } else {
+        navigate({
+          params: { slug: nextSlug },
+          replace: true,
+          to: "/roadmap/$slug",
+        });
+      }
+    },
+    [primarySlug, navigate]
+  );
+
+  const value = useMemo(
+    () => ({
+      actions: { openPost, switchRoadmap },
+      meta: { organizationId: site.organizationId },
+      state: { allRoadmaps, displayedRoadmap, isError, isLoading, lanes },
+    }),
+    [
+      openPost,
+      switchRoadmap,
+      site.organizationId,
+      allRoadmaps,
+      displayedRoadmap,
+      isError,
+      isLoading,
+      lanes,
+    ]
+  );
+
   return (
-    <PublicRoadmapContext.Provider
-      value={{
-        actions: {
-          openPost: (postSlug) => navigate({ to: `/p/${postSlug}` }),
-          switchRoadmap: (nextSlug) => {
-            if (nextSlug === primarySlug) {
-              navigate({ to: "/roadmap", replace: true });
-            } else {
-              navigate({
-                params: { slug: nextSlug },
-                replace: true,
-                to: "/roadmap/$slug",
-              });
-            }
-          },
-        },
-        meta: { organizationId: site.organizationId },
-        state: { allRoadmaps, displayedRoadmap, isError, isLoading, lanes },
-      }}
-    >
+    <PublicRoadmapContext.Provider value={value}>
       {children}
     </PublicRoadmapContext.Provider>
   );
@@ -191,7 +213,7 @@ export function PublicRoadmapPage({ slug }: { slug?: string }) {
   return <PublicRoadmapDetailPage slug={slug} />;
 }
 
-export function PublicRoadmapIndexPage() {
+function PublicRoadmapIndexPage() {
   return (
     <PublicRoadmapProvider>
       <PublicRoadmapIndexView />
@@ -224,7 +246,7 @@ function PublicRoadmapIndexView() {
   return <PublicRoadmapBoardContent />;
 }
 
-export function PublicRoadmapDetailPage({ slug }: { slug: string }) {
+function PublicRoadmapDetailPage({ slug }: { slug: string }) {
   return (
     <PublicRoadmapProvider slug={slug}>
       <PublicRoadmapDetailView />
