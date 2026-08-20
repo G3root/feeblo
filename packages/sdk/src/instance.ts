@@ -1,6 +1,10 @@
 import { normalizeWidgetConfig, widgetConfigKey } from "./config";
 import { banner } from "./debug";
-import { Embed } from "./embed";
+import {
+  getDefaultEmbedDependencies,
+  Embed,
+  type EmbedDependencies,
+} from "./embed";
 import { EmbedError } from "./errors";
 import { resolveBaseUrl } from "./iframe";
 import { startLinkAuthentication } from "./links";
@@ -43,6 +47,20 @@ const isObjectValue = <T>(value: T): boolean => {
 
 let currentEmbed: Embed | null = null;
 let currentOrgId: string | null = null;
+let embedDependencies: EmbedDependencies | undefined;
+
+export function setEmbedDependencies(
+  overrides: Partial<EmbedDependencies>
+): () => void {
+  const previous = embedDependencies;
+  embedDependencies = {
+    ...(embedDependencies ?? getDefaultEmbedDependencies()),
+    ...overrides,
+  };
+  return () => {
+    embedDependencies = previous;
+  };
+}
 let globalCleanup: (() => void) | null = null;
 let linkCleanup: (() => void) | null = null;
 
@@ -225,7 +243,12 @@ export function init(
     destroyInstance(currentEmbed);
   }
 
-  const embed = new Embed(organizationId, resolvedOptions, normalizedConfig);
+  const embed = new Embed(
+    organizationId,
+    resolvedOptions,
+    normalizedConfig,
+    embedDependencies ?? getDefaultEmbedDependencies()
+  );
   currentEmbed = embed;
   currentOrgId = organizationId;
 

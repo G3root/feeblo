@@ -1,65 +1,17 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
-import * as React from "react";
 
-const { fakePostMessage, MOCK_ORIGIN } = vi.hoisted(() => {
-  return {
-    fakePostMessage: vi.fn(),
-    MOCK_ORIGIN: "http://localhost:3001",
-  };
-});
+import {
+  fakePostMessage,
+  installTestEmbedDependencies,
+  triggerIframeLoad,
+} from "../../test/react-browser-helpers";
+import type { OutgoingMessage } from "../types";
 
-vi.mock("../iframe", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../iframe")>();
-  return {
-    ...actual,
-    createIframe: () => {
-      const iframe = document.createElement("iframe");
-      iframe.src = "about:blank";
-      Object.defineProperty(iframe, "contentWindow", {
-        value: { postMessage: fakePostMessage },
-        writable: true,
-        configurable: true,
-      });
-      const originalAddEventListener = iframe.addEventListener.bind(iframe);
-      let loadCb: EventListener | null = null;
-      (iframe as unknown as { _feebloTriggerLoad?: () => void })._feebloTriggerLoad =
-        () => {
-          if (loadCb) loadCb(new Event("load") as unknown as Event);
-        };
-      iframe.addEventListener = ((
-        type: string,
-        listener: EventListenerOrEventListenerObject,
-        options?: unknown,
-      ) => {
-        if (type === "load") {
-          loadCb =
-            typeof listener === "function"
-              ? (listener as EventListener)
-              : (listener.handleEvent.bind(listener) as EventListener);
-          return;
-        }
-        return (
-          originalAddEventListener as unknown as (
-            a: string,
-            b: EventListenerOrEventListenerObject,
-            c?: unknown,
-          ) => void
-        )(type, listener, options);
-      }) as typeof iframe.addEventListener;
-      return iframe;
-    },
-    iframeOrigin: () => MOCK_ORIGIN,
-    resolveBaseUrl: () => MOCK_ORIGIN,
-  };
-});
+let restoreEmbedDependencies: (() => void) | undefined;
 
-vi.mock("../positioning", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../positioning")>();
-  return {
-    ...actual,
-    createFloatingInstance: () => () => {},
-  };
+beforeEach(() => {
+  restoreEmbedDependencies = installTestEmbedDependencies();
 });
 
 import { Feeblo } from "../index";
@@ -67,25 +19,19 @@ import { FeebloProvider } from "./provider";
 import { FeebloTrigger, useFeebloTrigger } from "./trigger";
 
 afterEach(() => {
+  restoreEmbedDependencies?.();
   fakePostMessage.mockClear();
   Feeblo.destroy();
   document.getElementById("feeblo-embed-container")?.remove();
   document.getElementById("feeblo-widget-launcher")?.remove();
 });
 
-function triggerIframeLoad() {
-  const iframe = document.querySelector("iframe") as unknown as {
-    _feebloTriggerLoad?: () => void;
-  } | null;
-  iframe?._feebloTriggerLoad?.();
-}
-
 describe("FeebloTrigger", () => {
   it("renders a button with default text and opens widget on click", async () => {
     const screen = await render(
       <FeebloProvider organizationId="org_trigger">
         <FeebloTrigger />
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     const btn = screen.getByRole("button", { name: "Give feedback" });
@@ -97,7 +43,7 @@ describe("FeebloTrigger", () => {
     window.dispatchEvent(
       new CustomEvent("widgetReady", {
         detail: { data: undefined, type: "widgetReady", namespace: "feeblo" },
-      }),
+      })
     );
 
     await btn.click();
@@ -105,7 +51,7 @@ describe("FeebloTrigger", () => {
     await vi.waitFor(() => {
       expect(fakePostMessage).toHaveBeenCalledWith(
         expect.objectContaining({ event: "SHOW" }),
-        expect.any(String),
+        expect.any(String)
       );
     });
   });
@@ -116,14 +62,14 @@ describe("FeebloTrigger", () => {
         <FeebloTrigger board="bugs" metadata={{ source: "test" }}>
           Report a bug
         </FeebloTrigger>
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     triggerIframeLoad();
     window.dispatchEvent(
       new CustomEvent("widgetReady", {
         detail: { data: undefined, type: "widgetReady", namespace: "feeblo" },
-      }),
+      })
     );
 
     const btn = screen.getByRole("button", { name: "Report a bug" });
@@ -137,27 +83,36 @@ describe("FeebloTrigger", () => {
         expect.arrayContaining([
           expect.objectContaining({ event: "SHOW" }),
           expect.objectContaining({ event: "SET_CONTEXT" }),
-        ]),
+        ])
       );
-      const ctxCall = calls.find((c) => (c as { event: string }).event === "SET_CONTEXT") as
-        | { data: Record<string, string> }
-        | undefined;
-      expect(ctxCall?.data).toEqual(expect.objectContaining({ board: "bugs", source: "test" }));
+      const ctxCall = calls.find(
+        (
+          message
+        ): message is Extract<OutgoingMessage, { event: "SET_CONTEXT" }> =>
+          message.event === "SET_CONTEXT"
+      );
+      expect(ctxCall?.data).toEqual(
+        expect.objectContaining({ board: "bugs", source: "test" })
+      );
     });
   });
 
   it("opens the correct module when module prop is set", async () => {
     const screen = await render(
-      <FeebloProvider organizationId="org_mod" mode="hub" modules={["feedback", "updates"]}>
+      <FeebloProvider
+        organizationId="org_mod"
+        mode="hub"
+        modules={["feedback", "updates"]}
+      >
         <FeebloTrigger module="updates">What&apos;s new</FeebloTrigger>
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     triggerIframeLoad();
     window.dispatchEvent(
       new CustomEvent("widgetReady", {
         detail: { data: undefined, type: "widgetReady", namespace: "feeblo" },
-      }),
+      })
     );
     fakePostMessage.mockClear();
 
@@ -167,8 +122,11 @@ describe("FeebloTrigger", () => {
       const calls = fakePostMessage.mock.calls.map((c) => c[0]);
       expect(calls).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ event: "SET_MODULE", data: { module: "updates" } }),
-        ]),
+          expect.objectContaining({
+            event: "SET_MODULE",
+            data: { module: "updates" },
+          }),
+        ])
       );
     });
   });
@@ -183,14 +141,14 @@ describe("FeebloTrigger", () => {
             Feedback link
           </a>
         </FeebloTrigger>
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     triggerIframeLoad();
     window.dispatchEvent(
       new CustomEvent("widgetReady", {
         detail: { data: undefined, type: "widgetReady", namespace: "feeblo" },
-      }),
+      })
     );
     fakePostMessage.mockClear();
 
@@ -202,8 +160,8 @@ describe("FeebloTrigger", () => {
     await vi.waitFor(() =>
       expect(fakePostMessage).toHaveBeenCalledWith(
         expect.objectContaining({ event: "SHOW" }),
-        expect.any(String),
-      ),
+        expect.any(String)
+      )
     );
   });
 
@@ -215,7 +173,7 @@ describe("FeebloTrigger", () => {
             Blocked
           </a>
         </FeebloTrigger>
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     triggerIframeLoad();
@@ -224,7 +182,7 @@ describe("FeebloTrigger", () => {
 
     await new Promise((r) => setTimeout(r, 50));
     const showCalls = fakePostMessage.mock.calls.filter(
-      ([msg]) => (msg as { event: string }).event === "SHOW",
+      ([message]) => message.event === "SHOW"
     );
     expect(showCalls.length).toBe(0);
   });
@@ -235,7 +193,7 @@ describe("useFeebloTrigger", () => {
     function CustomButton() {
       const { ref, onClick } = useFeebloTrigger({ board: "roadmap" });
       return (
-        <button type="button" ref={ref as React.Ref<HTMLButtonElement>} onClick={onClick}>
+        <button type="button" ref={ref} onClick={onClick}>
           Custom trigger
         </button>
       );
@@ -244,14 +202,14 @@ describe("useFeebloTrigger", () => {
     const screen = await render(
       <FeebloProvider organizationId="org_hook_trigger">
         <CustomButton />
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     triggerIframeLoad();
     window.dispatchEvent(
       new CustomEvent("widgetReady", {
         detail: { data: undefined, type: "widgetReady", namespace: "feeblo" },
-      }),
+      })
     );
     fakePostMessage.mockClear();
 
@@ -260,8 +218,8 @@ describe("useFeebloTrigger", () => {
     await vi.waitFor(() =>
       expect(fakePostMessage).toHaveBeenCalledWith(
         expect.objectContaining({ event: "SHOW" }),
-        expect.any(String),
-      ),
+        expect.any(String)
+      )
     );
   });
 });

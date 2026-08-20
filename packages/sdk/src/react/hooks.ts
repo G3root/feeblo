@@ -19,42 +19,40 @@ export function useFeeblo() {
 
 export function useFeebloEvent<K extends FeebloEventName>(
   event: K,
-  handler: FeebloEventListener<K>,
+  handler: FeebloEventListener<K>
 ): void;
 
 export function useFeebloEvent(
   event: "*",
-  handler: FeebloEventListener<FeebloEventName>,
+  handler: FeebloEventListener<FeebloEventName>
 ): void;
 
 export function useFeebloEvent<K extends FeebloEventName | "*">(
   event: K,
   handler: K extends "*"
     ? FeebloEventListener<FeebloEventName>
-    : FeebloEventListener<Extract<FeebloEventName, K>>,
+    : FeebloEventListener<Extract<FeebloEventName, K>>
 ): void {
   const handlerRef = React.useRef(handler);
-  // Keep ref in sync without triggering resubscribe
-  handlerRef.current = handler as unknown as typeof handlerRef.current;
+  React.useLayoutEffect(() => {
+    handlerRef.current = handler;
+  }, [handler]);
 
   React.useEffect(() => {
     // Wrap so the current ref is always invoked — stable subscription
-    const wrapped = ((e: CustomEvent<unknown>) => {
-      // SAFETY: the event system guarantees the detail shape
-      (handlerRef.current as (e: CustomEvent<unknown>) => void)(e);
+    // SAFETY: EventTarget accepts this listener shape for the custom event wrapper.
+    const wrapped = ((event: CustomEvent<unknown>) => {
+      const invoke =
+        // SAFETY: subscribe only invokes this listener with the matching custom event.
+        handlerRef.current as (event: CustomEvent<unknown>) => void;
+      invoke(event);
     }) as EventListener;
 
+    // SAFETY: K is constrained to the event names accepted by subscribe.
     const target = event as FeebloEventName | "*";
-    // subscribe returns an unsubscribe function; use that for cleanup
-    const off = subscribe(
-      target as FeebloEventName,
-      wrapped as unknown as FeebloEventListener<FeebloEventName>,
-    );
-
-    // The subscribe overload for "*" expects the same handler shape; the cast
-    // above covers both branches. subscribe handles "*" internally by
-    // iterating EVENT_NAMES.
-    return off;
+    // SAFETY: this listener handles every event detail represented by the wildcard overload.
+    const callback = wrapped as FeebloEventListener<FeebloEventName>;
+    return subscribe(target, callback);
   }, [event]);
 }
 
@@ -84,7 +82,7 @@ export function useFeebloWidget() {
 // ---------------------------------------------------------------------------
 
 export function useOnFeedbackSubmitted(
-  handler: FeebloEventListener<"feedbackSubmitted">,
+  handler: FeebloEventListener<"feedbackSubmitted">
 ): void {
   useFeebloEvent("feedbackSubmitted", handler);
 }

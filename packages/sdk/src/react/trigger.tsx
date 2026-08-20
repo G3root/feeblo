@@ -24,6 +24,29 @@ export interface FeebloTriggerProps extends React.ButtonHTMLAttributes<HTMLButto
   readonly asChild?: boolean | undefined;
 }
 
+type TriggerChildProps = {
+  readonly onClick?: React.MouseEventHandler<HTMLElement> | undefined;
+  readonly ref?: React.Ref<HTMLElement> | undefined;
+};
+
+export interface UseFeebloTriggerResult {
+  readonly onClick: React.MouseEventHandler<HTMLElement>;
+  readonly ref: React.RefCallback<HTMLElement>;
+}
+
+function mergeTriggerMetadata(
+  board: string | undefined,
+  metadata: Record<string, string> | undefined
+): Record<string, string> | undefined {
+  if (!board && !metadata) return undefined;
+
+  const mergedMetadata = { ...metadata };
+  if (board) {
+    mergedMetadata.board = board;
+  }
+  return mergedMetadata;
+}
+
 // ---------------------------------------------------------------------------
 // Component — no inline component definitions (rerender-no-inline-components)
 // ---------------------------------------------------------------------------
@@ -39,95 +62,92 @@ export interface FeebloTriggerProps extends React.ButtonHTMLAttributes<HTMLButto
  * @example
  * <FeebloTrigger asChild><a href="#">Feedback</a></FeebloTrigger>
  */
-export const FeebloTrigger = React.forwardRef<
-  HTMLButtonElement,
-  FeebloTriggerProps
->(function FeebloTrigger(props, forwardedRef) {
-  const {
-    board,
-    metadata,
-    module,
-    asChild = false,
-    children,
-    onClick,
-    ...buttonProps
-  } = props;
+export const FeebloTrigger = React.forwardRef<HTMLElement, FeebloTriggerProps>(
+  function FeebloTrigger(props, forwardedRef) {
+    const {
+      board,
+      metadata,
+      module,
+      asChild = false,
+      children,
+      onClick,
+      ...buttonProps
+    } = props;
 
-  const { open, openModule } = useFeebloContext();
-  const innerRef = React.useRef<HTMLButtonElement>(null);
+    const { open, openModule } = useFeebloContext();
+    const innerRef = React.useRef<HTMLElement | null>(null);
 
-  // Merge forwarded + inner ref (js-cache-property-access / rerender-lazy-state-init not needed)
-  const setRef = React.useCallback(
-    (node: HTMLButtonElement | null) => {
-      (innerRef as React.MutableRefObject<HTMLButtonElement | null>).current = node;
-      if (typeof forwardedRef === "function") {
-        forwardedRef(node);
-      } else if (forwardedRef && typeof forwardedRef === "object") {
-        (forwardedRef as React.MutableRefObject<HTMLButtonElement | null>).current = node;
-      }
-    },
-    [forwardedRef],
-  );
-
-  const handleClick = React.useCallback(
-    (e: React.MouseEvent<HTMLButtonElement>) => {
-      onClick?.(e);
-      if (e.defaultPrevented) return;
-
-      const triggerEl = innerRef.current;
-      if (!triggerEl) return;
-
-      // Merge board into metadata so both reach the SDK's open() path
-      const mergedMeta: Record<string, string> | undefined =
-        board || metadata
-          ? { ...(metadata ?? {}), ...(board ? { board } : {}) }
-          : undefined;
-
-      if (module) {
-        openModule(module);
-        // openModule already calls open() internally when needed, but when we
-        // have an anchor we want the anchored variant. Re-open with anchor.
-        open(triggerEl, mergedMeta);
-      } else {
-        open(triggerEl, mergedMeta);
-      }
-    },
-    [onClick, board, metadata, module, open, openModule],
-  );
-
-  if (asChild) {
-    // Clone the single child and attach trigger behaviour.
-    // This matches the `asChild` pattern familiar from shadcn / Radix without
-    // pulling in @radix-ui/react-slot — keeps bundle lean (bundle-barrel-imports).
-    const child = React.Children.only(children) as React.ReactElement<{
-      onClick?: React.MouseEventHandler<unknown>;
-      ref?: React.Ref<HTMLElement>;
-    }>;
-
-    // Preserve child's onClick via composition
-    const childOnClick = (child.props as { onClick?: React.MouseEventHandler<unknown> }).onClick;
-
-    return React.cloneElement(child, {
-      ref: setRef,
-      onClick: (e: unknown) => {
-        (childOnClick as unknown as (e: unknown) => void)?.(e);
-        handleClick(e as React.MouseEvent<HTMLButtonElement>);
+    // Merge forwarded + inner ref (js-cache-property-access / rerender-lazy-state-init not needed)
+    const setRef = React.useCallback(
+      (node: HTMLElement | null) => {
+        innerRef.current = node;
+        if (forwardedRef && "current" in forwardedRef) {
+          forwardedRef.current = node;
+        } else if (forwardedRef) {
+          forwardedRef(node);
+        }
       },
-    } as unknown as React.Attributes & Record<string, unknown>);
-  }
+      [forwardedRef]
+    );
 
-  return (
-    <button
-      ref={setRef}
-      type="button"
-      data-feeblo-trigger="react"
-      onClick={handleClick}
-      {...buttonProps}
-    >
-      {children ?? "Give feedback"}
-    </button>
-  );
-});
+    const handleClick = React.useCallback(
+      (e: React.MouseEvent<HTMLElement>) => {
+        // SAFETY: the public onClick prop is only invoked by the button variant.
+        onClick?.(e as React.MouseEvent<HTMLButtonElement>);
+        if (e.defaultPrevented) return;
+
+        const triggerEl = innerRef.current;
+        if (!triggerEl) return;
+
+        // Merge board into metadata so both reach the SDK's open() path
+        const mergedMeta = mergeTriggerMetadata(board, metadata);
+
+        if (module) {
+          openModule(module);
+          // openModule already calls open() internally when needed, but when we
+          // have an anchor we want the anchored variant. Re-open with anchor.
+          open(triggerEl, mergedMeta);
+        } else {
+          open(triggerEl, mergedMeta);
+        }
+      },
+      [onClick, board, metadata, module, open, openModule]
+    );
+
+    if (asChild) {
+      // Clone the single child and attach trigger behaviour.
+      // This matches the `asChild` pattern familiar from shadcn / Radix without
+      // pulling in @radix-ui/react-slot — keeps bundle lean (bundle-barrel-imports).
+      const child = React.Children.only(children);
+      if (!React.isValidElement<TriggerChildProps>(child)) {
+        throw new Error("FeebloTrigger asChild requires a React element");
+      }
+
+      // Preserve child's onClick via composition
+      const childOnClick = child.props.onClick;
+
+      return React.cloneElement(child, {
+        ref: setRef,
+        onClick: (e: React.MouseEvent<HTMLElement>) => {
+          childOnClick?.(e);
+          handleClick(e);
+        },
+      });
+    }
+
+    return (
+      <button
+        ref={setRef}
+        type="button"
+        data-feeblo-trigger="react"
+        onClick={handleClick}
+        {...buttonProps}
+      >
+        {children ?? "Give feedback"}
+      </button>
+    );
+  }
+);
 
 FeebloTrigger.displayName = "FeebloTrigger";
 
@@ -142,11 +162,8 @@ export interface UseFeebloTriggerOptions {
 }
 
 export function useFeebloTrigger(
-  options: UseFeebloTriggerOptions = {},
-): {
-  readonly onClick: React.MouseEventHandler<HTMLElement>;
-  readonly ref: React.RefCallback<HTMLElement>;
-} {
+  options: UseFeebloTriggerOptions = {}
+): UseFeebloTriggerResult {
   const { board, metadata, module } = options;
   const { open, openModule } = useFeebloContext();
   const triggerRef = React.useRef<HTMLElement | null>(null);
@@ -160,18 +177,15 @@ export function useFeebloTrigger(
       if (e.defaultPrevented) return;
       const el = triggerRef.current;
       if (!el) return;
-      const mergedMeta =
-        board || metadata
-          ? { ...(metadata ?? {}), ...(board ? { board } : {}) }
-          : undefined;
+      const mergedMeta = mergeTriggerMetadata(board, metadata);
       if (module) {
         openModule(module);
-        open(el as HTMLElement, mergedMeta);
+        open(el, mergedMeta);
       } else {
-        open(el as HTMLElement, mergedMeta);
+        open(el, mergedMeta);
       }
     },
-    [board, metadata, module, open, openModule],
+    [board, metadata, module, open, openModule]
   );
 
   return { ref, onClick };

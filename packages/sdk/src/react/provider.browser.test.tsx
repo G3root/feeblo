@@ -1,71 +1,23 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
-const { fakePostMessage, MOCK_ORIGIN } = vi.hoisted(() => {
-  return {
-    fakePostMessage: vi.fn(),
-    MOCK_ORIGIN: "http://localhost:3001",
-  };
-});
+import {
+  fakePostMessage,
+  installTestEmbedDependencies,
+} from "../../test/react-browser-helpers";
 
-vi.mock("../iframe", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../iframe")>();
-  return {
-    ...actual,
-    createIframe: () => {
-      const iframe = document.createElement("iframe");
-      iframe.src = "about:blank";
-      Object.defineProperty(iframe, "contentWindow", {
-        value: { postMessage: fakePostMessage },
-        writable: true,
-        configurable: true,
-      });
-      const originalAddEventListener = iframe.addEventListener.bind(iframe);
-      let loadCb: EventListener | null = null;
-      (iframe as unknown as { _feebloTriggerLoad?: () => void })._feebloTriggerLoad =
-        () => {
-          if (loadCb) loadCb(new Event("load") as unknown as Event);
-        };
-      iframe.addEventListener = ((
-        type: string,
-        listener: EventListenerOrEventListenerObject,
-        options?: unknown,
-      ) => {
-        if (type === "load") {
-          loadCb =
-            typeof listener === "function"
-              ? (listener as EventListener)
-              : (listener.handleEvent.bind(listener) as EventListener);
-          return;
-        }
-        return (
-          originalAddEventListener as unknown as (
-            a: string,
-            b: EventListenerOrEventListenerObject,
-            c?: unknown,
-          ) => void
-        )(type, listener, options);
-      }) as typeof iframe.addEventListener;
-      return iframe;
-    },
-    iframeOrigin: () => MOCK_ORIGIN,
-    resolveBaseUrl: () => MOCK_ORIGIN,
-  };
-});
+let restoreEmbedDependencies: (() => void) | undefined;
 
-vi.mock("../positioning", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../positioning")>();
-  return {
-    ...actual,
-    createFloatingInstance: () => () => {},
-  };
+beforeEach(() => {
+  restoreEmbedDependencies = installTestEmbedDependencies();
 });
 
 import { Feeblo } from "../index";
-import { FeebloProvider } from "./provider";
 import { useFeeblo, useFeebloIsOpen, useFeebloIsReady } from "./hooks";
+import { FeebloProvider } from "./provider";
 
 afterEach(() => {
+  restoreEmbedDependencies?.();
   fakePostMessage.mockClear();
   Feeblo.destroy();
   document.getElementById("feeblo-embed-container")?.remove();
@@ -93,10 +45,12 @@ describe("FeebloProvider", () => {
       <FeebloProvider organizationId="org_test">
         <Probe />
         <span>hello</span>
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
-    await expect.element(screen.getByTestId("org")).toHaveTextContent("org_test");
+    await expect
+      .element(screen.getByTestId("org"))
+      .toHaveTextContent("org_test");
     await expect.element(screen.getByText("hello")).toBeVisible();
   });
 
@@ -104,26 +58,30 @@ describe("FeebloProvider", () => {
     const screen = await render(
       <FeebloProvider organizationId="org_ready">
         <Probe />
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
-    await expect.element(screen.getByTestId("ready")).toHaveTextContent("false");
+    await expect
+      .element(screen.getByTestId("ready"))
+      .toHaveTextContent("false");
 
     window.dispatchEvent(
       new CustomEvent("widgetReady", {
         detail: { data: undefined, type: "widgetReady", namespace: "feeblo" },
-      }),
+      })
     );
 
     await expect.element(screen.getByTestId("ready")).toHaveTextContent("true");
-    await expect.element(screen.getByTestId("ready2")).toHaveTextContent("true");
+    await expect
+      .element(screen.getByTestId("ready2"))
+      .toHaveTextContent("true");
   });
 
   it("tracks isOpen via widgetOpened / widgetClosed", async () => {
     const screen = await render(
       <FeebloProvider organizationId="org_open">
         <Probe />
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     await expect.element(screen.getByTestId("open")).toHaveTextContent("false");
@@ -131,14 +89,14 @@ describe("FeebloProvider", () => {
     window.dispatchEvent(
       new CustomEvent("widgetOpened", {
         detail: { data: undefined, type: "widgetOpened", namespace: "feeblo" },
-      }),
+      })
     );
     await expect.element(screen.getByTestId("open")).toHaveTextContent("true");
 
     window.dispatchEvent(
       new CustomEvent("widgetClosed", {
         detail: { data: undefined, type: "widgetClosed", namespace: "feeblo" },
-      }),
+      })
     );
     await expect.element(screen.getByTestId("open")).toHaveTextContent("false");
   });
@@ -156,10 +114,14 @@ describe("FeebloProvider", () => {
     }
 
     const screen = await render(<Wrapper user={firstUser} />);
-    await expect.element(screen.getByTestId("org")).toHaveTextContent("org_user");
+    await expect
+      .element(screen.getByTestId("org"))
+      .toHaveTextContent("org_user");
 
     await screen.rerender(<Wrapper user={secondUser} />);
-    await expect.element(screen.getByTestId("org")).toHaveTextContent("org_user");
+    await expect
+      .element(screen.getByTestId("org"))
+      .toHaveTextContent("org_user");
 
     const containers = document.querySelectorAll("#feeblo-embed-container");
     expect(containers.length).toBe(1);
@@ -169,7 +131,7 @@ describe("FeebloProvider", () => {
     const screen = await render(
       <FeebloProvider organizationId="org_destroy">
         <Probe />
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     expect(document.getElementById("feeblo-embed-container")).not.toBeNull();
@@ -202,7 +164,7 @@ describe("FeebloProvider", () => {
     await render(
       <FeebloProvider organizationId="org_onready" onReady={onReady}>
         <Probe />
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     expect(onReady).not.toHaveBeenCalled();
@@ -210,7 +172,7 @@ describe("FeebloProvider", () => {
     window.dispatchEvent(
       new CustomEvent("widgetReady", {
         detail: { data: undefined, type: "widgetReady", namespace: "feeblo" },
-      }),
+      })
     );
 
     await vi.waitFor(() => expect(onReady).toHaveBeenCalledOnce());

@@ -1,71 +1,24 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
-const { fakePostMessage, MOCK_ORIGIN } = vi.hoisted(() => {
-  return {
-    fakePostMessage: vi.fn(),
-    MOCK_ORIGIN: "http://localhost:3001",
-  };
-});
+import {
+  fakePostMessage,
+  installTestEmbedDependencies,
+} from "../../test/react-browser-helpers";
+import type { FeebloEventListener, FeebloEventName } from "../types";
 
-vi.mock("../iframe", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../iframe")>();
-  return {
-    ...actual,
-    createIframe: () => {
-      const iframe = document.createElement("iframe");
-      iframe.src = "about:blank";
-      Object.defineProperty(iframe, "contentWindow", {
-        value: { postMessage: fakePostMessage },
-        writable: true,
-        configurable: true,
-      });
-      const originalAddEventListener = iframe.addEventListener.bind(iframe);
-      let loadCb: EventListener | null = null;
-      (iframe as unknown as { _feebloTriggerLoad?: () => void })._feebloTriggerLoad =
-        () => {
-          if (loadCb) loadCb(new Event("load") as unknown as Event);
-        };
-      iframe.addEventListener = ((
-        type: string,
-        listener: EventListenerOrEventListenerObject,
-        options?: unknown,
-      ) => {
-        if (type === "load") {
-          loadCb =
-            typeof listener === "function"
-              ? (listener as EventListener)
-              : (listener.handleEvent.bind(listener) as EventListener);
-          return;
-        }
-        return (
-          originalAddEventListener as unknown as (
-            a: string,
-            b: EventListenerOrEventListenerObject,
-            c?: unknown,
-          ) => void
-        )(type, listener, options);
-      }) as typeof iframe.addEventListener;
-      return iframe;
-    },
-    iframeOrigin: () => MOCK_ORIGIN,
-    resolveBaseUrl: () => MOCK_ORIGIN,
-  };
-});
+let restoreEmbedDependencies: (() => void) | undefined;
 
-vi.mock("../positioning", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../positioning")>();
-  return {
-    ...actual,
-    createFloatingInstance: () => () => {},
-  };
+beforeEach(() => {
+  restoreEmbedDependencies = installTestEmbedDependencies();
 });
 
 import { Feeblo } from "../index";
-import { FeebloProvider } from "./provider";
 import { useFeebloEvent, useOnFeedbackSubmitted } from "./hooks";
+import { FeebloProvider } from "./provider";
 
 afterEach(() => {
+  restoreEmbedDependencies?.();
   fakePostMessage.mockClear();
   Feeblo.destroy();
   document.getElementById("feeblo-embed-container")?.remove();
@@ -80,7 +33,7 @@ function fireFeedback(title: string) {
         type: "feedbackSubmitted",
         namespace: "feeblo",
       },
-    }),
+    })
   );
 }
 
@@ -96,7 +49,7 @@ describe("useFeebloEvent", () => {
     await render(
       <FeebloProvider organizationId="org_hooks">
         <Listener />
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     fireFeedback("hello world");
@@ -106,25 +59,29 @@ describe("useFeebloEvent", () => {
   });
 
   it("keeps stable subscription when handler identity changes (ref pattern)", async () => {
-    const first = vi.fn();
-    const second = vi.fn();
+    const first = vi.fn<FeebloEventListener<"widgetOpened">>();
+    const second = vi.fn<FeebloEventListener<"widgetOpened">>();
 
     function Switchable({ useSecond }: { useSecond: boolean }) {
       const handler = useSecond ? second : first;
-      useFeebloEvent("widgetOpened", handler as unknown as typeof first);
+      useFeebloEvent("widgetOpened", handler);
       return <div>switchable</div>;
     }
 
     const screen = await render(
       <FeebloProvider organizationId="org_switch">
         <Switchable useSecond={false} />
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     window.dispatchEvent(
       new CustomEvent("widgetOpened", {
-        detail: { data: { module: "feedback" }, type: "widgetOpened", namespace: "feeblo" },
-      }),
+        detail: {
+          data: { module: "feedback" },
+          type: "widgetOpened",
+          namespace: "feeblo",
+        },
+      })
     );
     await vi.waitFor(() => expect(first).toHaveBeenCalledOnce());
     expect(second).not.toHaveBeenCalled();
@@ -134,13 +91,17 @@ describe("useFeebloEvent", () => {
     await screen.rerender(
       <FeebloProvider organizationId="org_switch">
         <Switchable useSecond={true} />
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     window.dispatchEvent(
       new CustomEvent("widgetOpened", {
-        detail: { data: { module: "feedback" }, type: "widgetOpened", namespace: "feeblo" },
-      }),
+        detail: {
+          data: { module: "feedback" },
+          type: "widgetOpened",
+          namespace: "feeblo",
+        },
+      })
     );
     await vi.waitFor(() => expect(second).toHaveBeenCalledOnce());
     expect(first).not.toHaveBeenCalled();
@@ -157,19 +118,19 @@ describe("useFeebloEvent", () => {
     const screen = await render(
       <FeebloProvider organizationId="org_cleanup">
         <Listener />
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     await screen.rerender(
       <FeebloProvider organizationId="org_cleanup">
         <div>empty</div>
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     window.dispatchEvent(
       new CustomEvent("widgetClosed", {
         detail: { data: undefined, type: "widgetClosed", namespace: "feeblo" },
-      }),
+      })
     );
 
     await new Promise((r) => setTimeout(r, 50));
@@ -177,17 +138,17 @@ describe("useFeebloEvent", () => {
   });
 
   it("supports wildcard '*' subscription", async () => {
-    const handler = vi.fn();
+    const handler = vi.fn<FeebloEventListener<FeebloEventName>>();
 
     function Wild() {
-      useFeebloEvent("*" as const, handler as unknown as Parameters<typeof useFeebloEvent>[1]);
+      useFeebloEvent("*", handler);
       return <div>wild</div>;
     }
 
     await render(
       <FeebloProvider organizationId="org_wild">
         <Wild />
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     // Clear any automatic calls (none with our mock, but be safe)
@@ -196,12 +157,12 @@ describe("useFeebloEvent", () => {
     window.dispatchEvent(
       new CustomEvent("widgetReady", {
         detail: { data: undefined, type: "widgetReady", namespace: "feeblo" },
-      }),
+      })
     );
     window.dispatchEvent(
       new CustomEvent("widgetClosed", {
         detail: { data: undefined, type: "widgetClosed", namespace: "feeblo" },
-      }),
+      })
     );
 
     await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(2));
@@ -220,7 +181,7 @@ describe("useOnFeedbackSubmitted", () => {
     await render(
       <FeebloProvider organizationId="org_conv">
         <Listener />
-      </FeebloProvider>,
+      </FeebloProvider>
     );
 
     fireFeedback("convenience");

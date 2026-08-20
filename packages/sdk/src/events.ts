@@ -26,11 +26,19 @@ export function emitWidgetEvent<K extends FeebloEventName>(
   );
 }
 
+export function subscribe(
+  event: FeebloEventName | "*",
+  callback: FeebloEventListener<FeebloEventName>
+): () => void;
 export function subscribe<E extends FeebloEventName | "*">(
   event: E,
   callback: E extends "*"
     ? FeebloEventListener<FeebloEventName>
     : FeebloEventListener<Extract<FeebloEventName, E>>
+): () => void;
+export function subscribe(
+  event: FeebloEventName | "*",
+  callback: FeebloEventListener<FeebloEventName>
 ): () => void {
   if (!isBrowser()) {
     return () => undefined;

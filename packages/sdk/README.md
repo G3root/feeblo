@@ -318,7 +318,10 @@ function App() {
 Pass `user` to the provider — changes are propagated via `identify` without re-creating the widget (stringified key, separate effect):
 
 ```tsx
-<FeebloProvider organizationId="org_123" user={{ id: "u_1", email: "ada@example.com", name: "Ada" }}>
+<FeebloProvider
+  organizationId="org_123"
+  user={{ id: "u_1", email: "ada@example.com", name: "Ada" }}
+>
   <App />
 </FeebloProvider>
 ```
@@ -331,7 +334,11 @@ import { useFeeblo } from "@feeblo/sdk/react";
 function SignInButton() {
   const { identify } = useFeeblo();
   return (
-    <button onClick={() => identify({ id: "u_2", email: "grace@example.com", name: "Grace" })}>
+    <button
+      onClick={() =>
+        identify({ id: "u_2", email: "grace@example.com", name: "Grace" })
+      }
+    >
       Sign in
     </button>
   );
@@ -347,7 +354,9 @@ function Controls() {
   const { isOpen, isReady, open, close, setBoard, openModule } = useFeeblo();
   return (
     <>
-      <span>{isReady ? "ready" : "loading"} · {isOpen ? "open" : "closed"}</span>
+      <span>
+        {isReady ? "ready" : "loading"} · {isOpen ? "open" : "closed"}
+      </span>
       <button onClick={() => open()}>Open</button>
       <button onClick={() => close()}>Close</button>
       <button onClick={() => openModule("updates")}>What&apos;s new</button>

@@ -25,6 +25,26 @@ import type {
 } from "./types";
 import { compact } from "./utils";
 
+export interface EmbedDependencies {
+  readonly createFloatingInstance: typeof createFloatingInstance;
+  readonly createIframe: typeof createIframe;
+  readonly iframeOrigin: typeof iframeOrigin;
+}
+
+export const defaultEmbedDependencies = {
+  createFloatingInstance,
+  createIframe,
+  iframeOrigin,
+} satisfies EmbedDependencies;
+
+export function getDefaultEmbedDependencies(): EmbedDependencies {
+  return {
+    createFloatingInstance,
+    createIframe,
+    iframeOrigin,
+  };
+}
+
 type CleanupContainer = HTMLDivElement & { _feebloCleanup?: () => void };
 
 export class Embed {
@@ -46,22 +66,29 @@ export class Embed {
   private currentTrigger: HTMLElement | null = null;
   private escHandler: ((e: KeyboardEvent) => void) | null = null;
   private outsideClickHandler: ((e: MouseEvent) => void) | null = null;
+  private readonly dependencies: EmbedDependencies;
 
   constructor(
     organizationId: string,
     options: EmbedOptions,
-    config: NormalizedWidgetConfig
+    config: NormalizedWidgetConfig,
+    dependencies: EmbedDependencies = defaultEmbedDependencies
   ) {
     this.organizationId = organizationId;
     this.options = options;
     this.config = config;
+    this.dependencies = dependencies;
     this.logger = createLogger(options.debug === true);
     this.identity = options.user ? normalizeUserIdentity(options.user) : null;
     this.module = config.modules[0] ?? "feedback";
     this.board = supportsBoardSelection(config)
       ? (options.defaultBoard ?? null)
       : null;
-    this.iframe = createIframe(organizationId, options, this.logger);
+    this.iframe = this.dependencies.createIframe(
+      organizationId,
+      options,
+      this.logger
+    );
     this.container = this.createContainer();
     this.launcher = this.createLauncher();
 
@@ -99,7 +126,7 @@ export class Embed {
     container.appendChild(this.iframe);
 
     const handleMessage = (event: MessageEvent<unknown>) => {
-      if (event.origin !== iframeOrigin(this.iframe)) {
+      if (event.origin !== this.dependencies.iframeOrigin(this.iframe)) {
         return;
       }
 
@@ -258,7 +285,10 @@ export class Embed {
   }
 
   private post(message: OutgoingMessage): void {
-    this.iframe.contentWindow?.postMessage(message, iframeOrigin(this.iframe));
+    this.iframe.contentWindow?.postMessage(
+      message,
+      this.dependencies.iframeOrigin(this.iframe)
+    );
     if (this.logger.enabled) {
       // SAFETY: The endpoint/API contract guarantees this response shape.
       this.logger(
@@ -293,7 +323,7 @@ export class Embed {
     this.container.style.display = "";
 
     if (trigger) {
-      this.cleanupPositioning = createFloatingInstance(
+      this.cleanupPositioning = this.dependencies.createFloatingInstance(
         trigger,
         this.container,
         this.logger

@@ -10,7 +10,7 @@ export interface FeebloContextValue {
   readonly metadata: (patch: Record<string, string | null>) => void;
   readonly open: (
     trigger?: HTMLElement,
-    metadata?: Record<string, string>,
+    metadata?: Record<string, string>
   ) => void;
   readonly openModule: (module: WidgetModule) => void;
   readonly organizationId: string;
@@ -19,14 +19,14 @@ export interface FeebloContextValue {
 }
 
 export const FeebloContext = React.createContext<FeebloContextValue | null>(
-  null,
+  null
 );
 
 export function useFeebloContext(): FeebloContextValue {
   const ctx = React.useContext(FeebloContext);
   if (!ctx) {
     throw new Error(
-      "[feeblo-sdk/react] useFeeblo must be used within <FeebloProvider>",
+      "[feeblo-sdk/react] useFeeblo must be used within <FeebloProvider>"
     );
   }
   return ctx;

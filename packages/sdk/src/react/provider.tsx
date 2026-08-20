@@ -11,6 +11,7 @@ import type {
   WidgetModule,
   WidgetPlacement,
 } from "../types";
+import { isBrowser } from "../utils";
 import { FeebloContext, type FeebloContextValue } from "./context";
 
 // ---------------------------------------------------------------------------
@@ -43,7 +44,20 @@ export interface FeebloProviderProps {
 
 type InitOptions = Omit<EmbedOptions, "user">;
 
-function useInitOptions(props: Omit<FeebloProviderProps, "organizationId" | "user" | "children" | "onReady">): InitOptions {
+function withUser(
+  initOptions: InitOptions,
+  user: UserIdentity | null | undefined
+): EmbedOptions {
+  if (!user) return initOptions;
+  return { ...initOptions, user };
+}
+
+function useInitOptions(
+  props: Omit<
+    FeebloProviderProps,
+    "organizationId" | "user" | "children" | "onReady"
+  >
+): InitOptions {
   const {
     baseUrl,
     containerStyles,
@@ -60,24 +74,21 @@ function useInitOptions(props: Omit<FeebloProviderProps, "organizationId" | "use
     theme,
   } = props;
 
-  // Serialize modules to a primitive for stable deps (js-set-map-lookups)
-  const modulesKey = React.useMemo(() => modules?.join(",") ?? "", [modules]);
-  const memoizedModules = React.useMemo(() => modules, [modulesKey]);
+  // Keep the memo in sync with the actual prop it returns.
+  const memoizedModules = React.useMemo(() => modules, [modules]);
 
-  // Memoise containerStyles by JSON — avoids object identity churn
-  const containerStylesKey = React.useMemo(
-    () => (containerStyles ? JSON.stringify(containerStyles) : ""),
-    [containerStyles],
-  );
+  // Memoise containerStyles to avoid passing a new object to the embed.
   const memoizedContainerStyles = React.useMemo(
-    () => (containerStylesKey ? (JSON.parse(containerStylesKey) as Partial<CSSStyleDeclaration>) : undefined),
-    [containerStylesKey],
+    () => (containerStyles ? { ...containerStyles } : undefined),
+    [containerStyles]
   );
 
   return React.useMemo<InitOptions>(
     () => ({
       ...(baseUrl !== undefined && { baseUrl }),
-      ...(memoizedContainerStyles !== undefined && { containerStyles: memoizedContainerStyles }),
+      ...(memoizedContainerStyles !== undefined && {
+        containerStyles: memoizedContainerStyles,
+      }),
       ...(debug !== undefined && { debug }),
       ...(defaultBoard !== undefined && { defaultBoard }),
       ...(locale !== undefined && { locale }),
@@ -104,23 +115,8 @@ function useInitOptions(props: Omit<FeebloProviderProps, "organizationId" | "use
       placement,
       root,
       theme,
-    ],
+    ]
   );
-}
-
-// Serialize user to a primitive key to avoid effect churn on object identity.
-// Uses JSON.stringify — cheap vs. deep-equal and preserves placement of null.
-function useUserKey(user: UserIdentity | null | undefined): string {
-  return React.useMemo(() => {
-    if (!user) return "";
-    // Exclude token from key if you want to avoid re-identifying on token refresh?
-    // Keep full identity for correctness — token changes must propagate.
-    try {
-      return JSON.stringify(user);
-    } catch {
-      return user.id;
-    }
-  }, [user]);
 }
 
 let activeProviderCount = 0;
@@ -130,9 +126,17 @@ let activeProviderCount = 0;
 // ---------------------------------------------------------------------------
 
 export function FeebloProvider(props: FeebloProviderProps): React.ReactElement {
+  // A token change crosses an authentication boundary. Reset this provider's
+  // state only when token presence changes; ordinary identity changes still
+  // use identify() without recreating the iframe.
+  const authenticationKey = props.user?.token ? "authenticated" : "anonymous";
+
+  return <FeebloProviderContent key={authenticationKey} {...props} />;
+}
+
+function FeebloProviderContent(props: FeebloProviderProps): React.ReactElement {
   const { organizationId, user, children, onReady } = props;
   const initOptions = useInitOptions(props);
-  const userKey = useUserKey(user);
 
   const [widget, setWidget] = React.useState<FeebloWidget | null>(null);
   const [isReady, setIsReady] = React.useState(false);
@@ -141,7 +145,9 @@ export function FeebloProvider(props: FeebloProviderProps): React.ReactElement {
   // Transient refs — avoids subscribing to state only used in callbacks (rerender-defer-reads)
   const widgetRef = React.useRef<FeebloWidget | null>(null);
   const onReadyRef = React.useRef(onReady);
-  onReadyRef.current = onReady;
+  React.useLayoutEffect(() => {
+    onReadyRef.current = onReady;
+  }, [onReady]);
 
   // --- Lifecycle: init / destroy ------------------------------------------
   // Cheap sync condition before awaiting / doing work (async-cheap-condition-before-await)
@@ -150,7 +156,7 @@ export function FeebloProvider(props: FeebloProviderProps): React.ReactElement {
     if (!organizationId) {
       return;
     }
-    if (typeof window === "undefined" || typeof document === "undefined") {
+    if (!isBrowser()) {
       return;
     }
 
@@ -175,23 +181,14 @@ export function FeebloProvider(props: FeebloProviderProps): React.ReactElement {
       }
       if (canReuse) {
         const shared = getCurrentWidget();
-        w = shared ?? init(organizationId, {
-          ...initOptions,
-          ...(user ? { user } : {}),
-        });
+        w = shared ?? init(organizationId, withUser(initOptions, user));
       } else {
         // Different org or structural config: must go through init validation
         // so the requested organization/configuration is not silently ignored.
-        w = init(organizationId, {
-          ...initOptions,
-          ...(user ? { user } : {}),
-        });
+        w = init(organizationId, withUser(initOptions, user));
       }
     } else {
-      w = init(organizationId, {
-        ...initOptions,
-        ...(user ? { user } : {}),
-      });
+      w = init(organizationId, withUser(initOptions, user));
     }
 
     widgetRef.current = w;
@@ -254,29 +251,9 @@ export function FeebloProvider(props: FeebloProviderProps): React.ReactElement {
   // --- Identity sync — separate effect with independent deps ----------------
   // (rerender-split-combined-hooks)
   React.useEffect(() => {
-    if (!widgetRef.current) return;
-    if (!userKey) {
-      const current = getCurrentEmbed();
-      if (current?.getAutoLoginToken()) {
-        // P1 security: do not rely on empty IDENTIFY alone (previously
-        // rejected by widget validator). Destroy and recreate anonymously to
-        // guarantee the iframe token is not retained for later feedback.
-        const nextWidget = init(organizationId, initOptions);
-        widgetRef.current = nextWidget;
-        setWidget(nextWidget);
-        setIsReady(false);
-        setIsOpen(false);
-      }
-      return;
-    }
-    try {
-      const parsed = JSON.parse(userKey) as UserIdentity;
-      (getCurrentWidget() ?? widgetRef.current).identify(parsed);
-    } catch {
-      // Fallback: userKey was user.id
-      if (user) (getCurrentWidget() ?? widgetRef.current).identify(user);
-    }
-  }, [userKey, user, organizationId, initOptions]);
+    if (!widgetRef.current || !user) return;
+    (getCurrentWidget() ?? widgetRef.current).identify(user);
+  }, [user, organizationId, initOptions]);
 
   // --- Stable callbacks (rerender-functional-setstate / advanced-event-handler-refs) ---
   // Always target the current singleton so a provider whose local w became
@@ -286,7 +263,7 @@ export function FeebloProvider(props: FeebloProviderProps): React.ReactElement {
     (trigger, metadata) => {
       (getCurrentWidget() ?? widgetRef.current)?.open(trigger, metadata);
     },
-    [],
+    []
   );
 
   const close = React.useCallback(() => {
@@ -297,28 +274,28 @@ export function FeebloProvider(props: FeebloProviderProps): React.ReactElement {
     (nextUser) => {
       (getCurrentWidget() ?? widgetRef.current)?.identify(nextUser);
     },
-    [],
+    []
   );
 
   const setBoard = React.useCallback<FeebloContextValue["setBoard"]>(
     (board) => {
       (getCurrentWidget() ?? widgetRef.current)?.setBoard(board);
     },
-    [],
+    []
   );
 
   const metadata = React.useCallback<FeebloContextValue["metadata"]>(
     (patch) => {
       (getCurrentWidget() ?? widgetRef.current)?.metadata(patch);
     },
-    [],
+    []
   );
 
   const openModule = React.useCallback<FeebloContextValue["openModule"]>(
     (module) => {
       (getCurrentWidget() ?? widgetRef.current)?.openModule(module);
     },
-    [],
+    []
   );
 
   const contextValue = React.useMemo<FeebloContextValue>(
@@ -334,7 +311,18 @@ export function FeebloProvider(props: FeebloProviderProps): React.ReactElement {
       metadata,
       openModule,
     }),
-    [widget, isReady, isOpen, organizationId, open, close, identify, setBoard, metadata, openModule],
+    [
+      widget,
+      isReady,
+      isOpen,
+      organizationId,
+      open,
+      close,
+      identify,
+      setBoard,
+      metadata,
+      openModule,
+    ]
   );
 
   return (
