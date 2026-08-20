@@ -35,6 +35,7 @@ import {
   hasOwnerOrAdminRole,
   hasPermission,
   PolicyGuard,
+  usePolicy,
 } from "@feeblo/web-shared/use-policy";
 import { Delete02Icon, Plus, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -75,16 +76,20 @@ interface OrganizationInvitationRow {
 
 export function MembersSection() {
   const organizationId = useOrganizationId();
+  const { allowed: canListInvitations, isPending: isPolicyPending } = usePolicy(
+    hasPermission(organizationId, "members.invite")
+  );
   const { data: session } = useAuthState();
   const { atLimit: atPrivilegedLimit } = usePrivilegedMemberLimit();
   const [search, setSearch] = React.useState("");
 
   const membersQuery = useLiveQuery(
-    (q) =>
-      q
+    (q) => {
+      return q
         .from({ member: membersCollection })
-        .where(({ member }) => eq(member.organizationId, organizationId)),
-    [organizationId]
+        .where(({ member }) => eq(member.organizationId, organizationId));
+    },
+    [organizationId, canListInvitations, isPolicyPending]
   );
   const membersData = membersQuery.data;
   const members = React.useMemo(() => {
@@ -230,10 +235,16 @@ export function MembersSection() {
 
 export function InvitationsSection() {
   const organizationId = useOrganizationId();
+  const { allowed: canListInvitations, isPending: isPolicyPending } = usePolicy(
+    hasPermission(organizationId, "members.invite")
+  );
   const [search, setSearch] = React.useState("");
 
   const invitationsQuery = useLiveQuery(
     (q) => {
+      if (isPolicyPending || !canListInvitations) {
+        return undefined;
+      }
       return q
         .from({ invitation: invitationsCollection })
         .where(({ invitation }) =>
@@ -243,7 +254,7 @@ export function InvitationsSection() {
           )
         );
     },
-    [organizationId]
+    [organizationId, canListInvitations, isPolicyPending]
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   );
   const invitationsData = invitationsQuery.data;
@@ -263,6 +274,10 @@ export function InvitationsSection() {
 
   const noFilter = invitations.length === 0 && search.trim() !== "";
   const isEmpty = (invitationsData?.length ?? 0) === 0;
+
+  if (isPolicyPending || !canListInvitations) {
+    return null;
+  }
 
   if (invitationsQuery.isLoading) {
     return (
