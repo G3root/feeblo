@@ -1,5 +1,5 @@
 import { Button } from "@feeblo/ui/button";
-import { Field, FieldSeparator } from "@feeblo/ui/field";
+import { Field } from "@feeblo/ui/field";
 import { type ReactNode, useState } from "react";
 
 import { type SocialProvider, signInWithSocialProvider } from "./auth-flows";
