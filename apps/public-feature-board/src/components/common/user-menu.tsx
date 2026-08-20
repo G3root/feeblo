@@ -22,7 +22,10 @@ export function UserMenu() {
 
   return (
     <Menu>
-      <MenuTrigger className="bg-background hover:bg-accent hover:text-accent-foreground flex items-center gap-2 rounded-full py-1 pr-2 pl-1 transition-colors">
+      <MenuTrigger
+        aria-label="User menu"
+        className="bg-background hover:bg-accent hover:text-accent-foreground flex items-center gap-2 rounded-full py-1 pr-2 pl-1 transition-colors"
+      >
         <UserAvatar image={user.image} name={user.name ?? "CN"} />
       </MenuTrigger>
       <MenuPopup align="end" className="min-w-56 rounded-lg" sideOffset={4}>
