@@ -127,6 +127,10 @@
     "./dashboard/use-dashboard-home-stats": {
       "types": "./src/dashboard/use-dashboard-home-stats.ts",
       "default": "./src/dashboard/use-dashboard-home-stats.ts"
+    },
+    "./post/post-card": {
+      "types": "./src/post/post-card.tsx",
+      "default": "./src/post/post-card.tsx"
     }
   },
   "scripts": {

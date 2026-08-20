@@ -1,93 +1,121 @@
+import {
+  PostCard as SharedPostCard,
+} from "@feeblo/post-ui/post/post-card";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
-import { Skeleton } from "@feeblo/ui/skeleton";
-import { UserAvatar } from "@feeblo/ui/user-avatar";
-import { cn } from "@feeblo/ui/utils";
-import { getBoardStatusIndicatorColor } from "@feeblo/web-shared/board/constants";
-import { Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 
-import { formatPostStatus, truncate } from "../../lib/utils";
+import { truncate } from "../../lib/utils";
 
-function StatusIndicator({ status }: { status: string }) {
+// ---------------------------------------------------------------------------
+// Feedback-specific augmentations — context-aware wrappers around shared primitives.
+// Shared PostCard is props-driven (no context) so dashboard can use it directly.
+// Public feedback/home pass data via PostCollectionDataProvider; these wrappers
+// read from context when no explicit children/props are given, preserving the
+// original <PostCard.Title /> / <PostCard.Link /> ergonomic while staying composable.
+// No boolean props: checkbox is added by composition, homepage omits it.
+// ---------------------------------------------------------------------------
+
+function FeedbackPostCardLink({
+  label,
+  params,
+  to,
+}: {
+  label?: string;
+  params?: Record<string, string>;
+  to?: string;
+}) {
+  const { post } = usePostCollectionData();
   return (
-    <div className="flex items-center gap-1.5" title={formatPostStatus(status)}>
-      <span
-        className={cn(
-          "size-2 shrink-0 rounded-full",
-          getBoardStatusIndicatorColor(status)
-        )}
-      />
-      <span className="text-muted-foreground text-xs whitespace-nowrap">
-        {formatPostStatus(status)}
-      </span>
-    </div>
+    <SharedPostCard.Link
+      label={label ?? `View ${post.title}`}
+      params={params ?? { slug: post.slug }}
+      to={to ?? "/p/$slug"}
+    />
   );
 }
 
-export function FeedbackCard({ status }: { status: string }) {
-  const { board, post } = usePostCollectionData();
+function FeedbackPostCardTitle({ children }: { children?: ReactNode }) {
+  const { post } = usePostCollectionData();
+  return <SharedPostCard.Title>{children ?? post.title}</SharedPostCard.Title>;
+}
 
+function FeedbackPostCardDescription({ children }: { children?: ReactNode }) {
+  const { post } = usePostCollectionData();
   const description = truncate(post.excerpt, 100) || "No details yet.";
+  return <SharedPostCard.Description>{children ?? description}</SharedPostCard.Description>;
+}
 
+function FeedbackPostCardBoardBadge({ children }: { children?: ReactNode }) {
+  const { board } = usePostCollectionData();
+  return <SharedPostCard.BoardBadge>{children ?? board.name}</SharedPostCard.BoardBadge>;
+}
+
+function FeedbackPostCardAuthor() {
+  const { post } = usePostCollectionData();
+  return <SharedPostCard.Author image={post.user.image} name={post.user.name} />;
+}
+
+function FeedbackPostCardMobileMeta({
+  boardName,
+  image,
+  name,
+}: {
+  boardName?: string;
+  image?: string | null;
+  name?: string | null;
+}) {
+  const { board, post } = usePostCollectionData();
   return (
-    <div className="group hover:bg-muted/40 relative flex items-center gap-3 px-4 py-3 transition-colors">
-      <Link
-        aria-label={`View ${post.title}`}
-        className="focus-visible:outline-primary absolute inset-0 z-0 focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
-        params={{
-          slug: post.slug,
-        }}
-        to="/p/$slug"
-      />
+    <SharedPostCard.MobileMeta
+      boardName={boardName ?? board.name}
+      image={image ?? post.user.image}
+      name={name ?? post.user.name}
+    />
+  );
+}
 
-      <div className="relative z-10">
-        <UpvoteButton variant="compact" />
-      </div>
+function FeedbackPostCardUpvote() {
+  return (
+    <SharedPostCard.Media>
+      <UpvoteButton variant="compact" />
+    </SharedPostCard.Media>
+  );
+}
 
-      <div className="pointer-events-none relative z-10 min-w-0 flex-1">
-        <h3 className="truncate text-sm leading-snug font-medium">
-          {post.title}
-        </h3>
-        <p className="text-muted-foreground mt-0.5 truncate text-xs">
-          {description}
-        </p>
-        <div className="text-muted-foreground mt-2 flex items-center gap-2 text-xs sm:hidden">
-          <UserAvatar image={post.user.image} name={post.user.name} />
-          <span className="truncate">{post.user.name ?? "Anonymous"}</span>
-          <span className="text-border">·</span>
-          <span className="truncate">{board.name}</span>
-        </div>
-      </div>
+// Re-export shared composable primitives augmented for public context.
+// Dashboard imports directly from @feeblo/post-ui/post/post-card and is composable without checkbox.
+export const PostCard = {
+  ...SharedPostCard,
+  Author: FeedbackPostCardAuthor,
+  BoardBadge: FeedbackPostCardBoardBadge,
+  Description: FeedbackPostCardDescription,
+  Link: FeedbackPostCardLink,
+  MobileMeta: FeedbackPostCardMobileMeta,
+  Title: FeedbackPostCardTitle,
+  Upvote: FeedbackPostCardUpvote,
+};
 
-      <div className="pointer-events-none relative z-10 hidden shrink-0 items-center gap-3 sm:flex">
-        <StatusIndicator status={status} />
-        <span className="bg-muted/70 text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
-          {board.name}
-        </span>
-        <div className="flex items-center gap-2">
-          <UserAvatar image={post.user.image} name={post.user.name} />
-          <span className="text-muted-foreground truncate text-right text-xs">
-            {post.user.name ?? "Anonymous"}
-          </span>
-        </div>
-      </div>
-    </div>
+// Convenience wrapper for feedback-page / board-page reuse
+export function FeedbackCard({ status }: { status: string }) {
+  return (
+    <PostCard.Root>
+      <PostCard.Link />
+      <PostCard.Upvote />
+      <PostCard.Body>
+        <PostCard.Title />
+        <PostCard.Description />
+        <PostCard.MobileMeta />
+      </PostCard.Body>
+      <PostCard.DesktopMeta>
+        <PostCard.Status status={status} />
+        <PostCard.BoardBadge />
+        <PostCard.Author />
+      </PostCard.DesktopMeta>
+    </PostCard.Root>
   );
 }
 
 export function FeedbackCardSkeleton() {
-  return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <Skeleton className="h-9 w-10 rounded-md" />
-      <div className="min-w-0 flex-1 space-y-1.5">
-        <Skeleton className="h-3.5 w-3/5" />
-        <Skeleton className="h-3 w-2/5" />
-      </div>
-      <div className="hidden items-center gap-3 sm:flex">
-        <Skeleton className="h-3 w-16" />
-        <Skeleton className="h-5 w-14 rounded-full" />
-        <Skeleton className="h-3 w-16" />
-      </div>
-    </div>
-  );
+  return <SharedPostCard.Skeleton />;
 }

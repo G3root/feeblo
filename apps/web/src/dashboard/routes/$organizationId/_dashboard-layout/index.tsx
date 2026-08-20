@@ -1,5 +1,6 @@
 import { useDashboardHomeStats } from "@feeblo/post-ui/dashboard/use-dashboard-home-stats";
-import { Badge } from "@feeblo/ui/badge";
+import { UpvoteId } from "@feeblo/id";
+import { PostCard } from "@feeblo/post-ui/post/post-card";
 import { Button } from "@feeblo/ui/button";
 import {
   Empty,
@@ -9,23 +10,21 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemMedia,
-  ItemTitle,
-} from "@feeblo/ui/item";
 import { Separator } from "@feeblo/ui/separator";
 import { Skeleton } from "@feeblo/ui/skeleton";
-import { UserAvatar } from "@feeblo/ui/user-avatar";
+import { cn } from "@feeblo/ui/utils";
+import { getUpvoteCollectionKey } from "@feeblo/web-shared/reaction-keys";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
-import { MessageMultiple01Icon, Plus } from "@hugeicons/core-free-icons";
+import {
+  ArrowUp01Icon,
+  MessageMultiple01Icon,
+  Plus,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { createFileRoute } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import NumberFlow from "@number-flow/react";
 
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import { useCreateBoardDialogContext } from "~/features/board/dialog-stores";
@@ -68,9 +67,6 @@ function RouteComponent() {
     });
 
   const boardMap = new Map(boards.map((b) => [b.id, b]));
-  const upvoteCountByPostId = new Map(
-    upvoteCounts.map((entry) => [entry.postId, entry.count])
-  );
 
   const userName =
     sessionData?.user?.name ?? sessionData?.user?.email ?? "there";
@@ -96,55 +92,52 @@ function RouteComponent() {
         <h2 className="text-muted-foreground mb-3 text-sm font-medium">
           Recent posts
         </h2>
-        <ItemGroup>
+        {/* Reuses feedback-page PostCard composably — no checkbox, layout mirrors public board with upvote */}
+        <div className="divide-border/40 border-border/60 overflow-hidden rounded-xl border">
           {recentPosts.map((post) => {
             const board = boardMap.get(post.boardId);
             const status = statuses.find((s) => s.id === post.statusId);
+            const user = (post as unknown as { user?: { image?: string | null; name?: string | null } }).user;
+            const excerpt = (post as unknown as { excerpt?: string }).excerpt;
+            const description =
+              (excerpt && excerpt.trim().length > 0
+                ? excerpt.length > 100
+                  ? `${excerpt.slice(0, 99).trimEnd()}...`
+                  : excerpt
+                : "No details yet.") ||
+              `${board?.name ?? ""}${board?.name ? " · " : ""}${formatPostDate(post.createdAt)}`;
             return (
-              <Link
-                className="block transition-transform duration-100 active:scale-[0.99]"
-                key={post.id}
-                params={{
-                  organizationId,
-                  boardSlug: board?.slug ?? "",
-                  postSlug: post.slug,
-                }}
-                to="/$organizationId/post/$boardSlug/$postSlug"
-              >
-                <Item size="sm" variant="outline">
-                  <ItemMedia>
-                    <UserAvatar
-                      image={post.user?.image}
-                      name={post.user?.name}
-                      size="sm"
-                    />
-                  </ItemMedia>
-                  <ItemContent>
-                    <ItemTitle>{post.title}</ItemTitle>
-                    <ItemDescription>
-                      {board?.name}
-                      {board?.name && " · "}
-                      {formatPostDate(post.createdAt)}
-                    </ItemDescription>
-                  </ItemContent>
-                  <ItemActions>
-                    {status && (
-                      <Badge className="text-xs" variant="secondary">
-                        {status.type
-                          .toLowerCase()
-                          .replace(/_/g, " ")
-                          .replace(/\b\w/g, (c) => c.toUpperCase())}
-                      </Badge>
-                    )}
-                    <span className="text-muted-foreground text-sm tabular-nums">
-                      {upvoteCountByPostId.get(post.id) ?? 0}
-                    </span>
-                  </ItemActions>
-                </Item>
-              </Link>
+              <PostCard.Root key={post.id}>
+                <PostCard.Link
+                  label={`View ${post.title}`}
+                  params={{
+                    organizationId,
+                    boardSlug: board?.slug ?? "",
+                    postSlug: post.slug,
+                  }}
+                  to="/$organizationId/post/$boardSlug/$postSlug"
+                />
+                <PostCard.Media>
+                  <RecentPostUpvote organizationId={organizationId} postId={post.id} />
+                </PostCard.Media>
+                <PostCard.Body>
+                  <PostCard.Title>{post.title}</PostCard.Title>
+                  <PostCard.Description>{description}</PostCard.Description>
+                  <PostCard.MobileMeta
+                    boardName={board?.name ?? ""}
+                    image={user?.image}
+                    name={user?.name}
+                  />
+                </PostCard.Body>
+                <PostCard.DesktopMeta>
+                  {status && <PostCard.Status status={status.type} />}
+                  {board?.name && <PostCard.BoardBadge>{board.name}</PostCard.BoardBadge>}
+                  <PostCard.Author image={user?.image} name={user?.name} />
+                </PostCard.DesktopMeta>
+              </PostCard.Root>
             );
           })}
-        </ItemGroup>
+        </div>
       </section>
     );
   } else {
@@ -246,33 +239,106 @@ function RouteComponent() {
   );
 }
 
+function RecentPostUpvote({
+  organizationId,
+  postId,
+}: {
+  organizationId: string;
+  postId: string;
+}) {
+  const { data: session } = useAuthState();
+  const { data: upvotes, isLoading: isUpvotesLoading } = useLiveQuery(
+    (q) =>
+      q
+        .from({ upvote: upvoteCollection })
+        .where(({ upvote }) =>
+          and(eq(upvote.organizationId, organizationId), eq(upvote.postId, postId))
+        ),
+    [organizationId, postId]
+  );
+  const { data: hasUserUpvoted, isLoading: isUserUpvotedLoading } = useLiveQuery(
+    (q) => {
+      if (!session) return undefined;
+      return q
+        .from({ upvote: upvoteCollection })
+        .where(({ upvote }) =>
+          and(
+            eq(upvote.organizationId, organizationId),
+            eq(upvote.postId, postId),
+            eq(upvote.userId, session.user.id)
+          )
+        )
+        .findOne();
+    },
+    [organizationId, postId, session?.user.id]
+  );
+
+  if (isUpvotesLoading || isUserUpvotedLoading) {
+    return <Skeleton className="h-9 w-10 rounded-md" />;
+  }
+
+  const upvoteCount = upvotes?.length ?? 0;
+  const isUpvoted = !!hasUserUpvoted;
+
+  const handleToggle = async (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!session) return;
+    const userId = session.user.id;
+    const key = getUpvoteCollectionKey({ userId, postId });
+    const hasUpvoted = upvoteCollection.has(key);
+    if (hasUpvoted) {
+      const tx = upvoteCollection.delete(key);
+      await tx.isPersisted.promise;
+    } else {
+      const upvoteId = await UpvoteId.unsafeGenerate();
+      const membership = session.memberships.find(
+        (value) => value.organizationId === organizationId && value.userId === session.user.id
+      );
+      const tx = upvoteCollection.insert({
+        id: upvoteId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        organizationId,
+        postId,
+        userId,
+        memberId: membership?.membershipId ?? null,
+        user: { name: session.user.name ?? null, image: session.user.image ?? null },
+      });
+      await tx.isPersisted.promise;
+    }
+  };
+
+  return (
+    <button
+      aria-label="Upvote"
+      className={cn(
+        "flex h-9 w-10 shrink-0 flex-col items-center justify-center rounded-md text-xs transition-colors",
+        isUpvoted ? "bg-primary/10 text-primary" : "bg-muted/70 text-muted-foreground hover:bg-muted"
+      )}
+      data-slot="post-card-upvote"
+      onClick={handleToggle}
+      type="button"
+    >
+      <span className="flex items-center gap-1.5">
+        <HugeiconsIcon className="size-3" icon={ArrowUp01Icon} />
+        <NumberFlow className="text-xs leading-none font-medium tabular-nums" value={upvoteCount} willChange />
+      </span>
+    </button>
+  );
+}
+
 function RecentPostsSkeleton() {
   return (
     <section>
       <h2 className="text-muted-foreground mb-3 text-sm font-medium">
         Recent posts
       </h2>
-      <ItemGroup>
+      <div className="divide-border/40 border-border/60 overflow-hidden rounded-xl border">
         {RECENT_POST_SKELETON_KEYS.map((key) => (
-          <Item key={key} size="sm" variant="outline">
-            <ItemMedia>
-              <Skeleton className="size-6 rounded-full" />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>
-                <Skeleton className="h-4 w-2/5" />
-              </ItemTitle>
-              <ItemDescription>
-                <Skeleton className="h-3 w-1/3" />
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Skeleton className="h-5 w-16 rounded-full" />
-              <Skeleton className="h-4 w-6" />
-            </ItemActions>
-          </Item>
+          <PostCard.Skeleton key={key} />
         ))}
-      </ItemGroup>
+      </div>
     </section>
   );
 }
