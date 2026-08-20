@@ -220,18 +220,29 @@ export function FeebloProvider(props: FeebloProviderProps): React.ReactElement {
       offClosed();
       activeProviderCount = Math.max(0, activeProviderCount - 1);
       const isLastProvider = activeProviderCount === 0;
-      // Only the last mounted provider owns the singleton's lifecycle.
-      // This prevents a provider sharing an embed from destroying it for
-      // the other, and avoids a stale destroy() removing a newer
-      // singleton's container (same ID) via destroyInstance.
-      if (isLastProvider && widgetRef.current === w) {
-        w.destroy();
-        widgetRef.current = null;
-      }
-      setWidget((prev) => (prev === w && isLastProvider ? null : prev));
       if (isLastProvider) {
+        // P1: final cleanup must destroy the *current* singleton, not the
+        // stale local `w`. When a later provider replaced the singleton
+        // (different org/config), the earlier provider's `w` is a proxy to a
+        // destroyed embed - destroying it is a no-op due to destroyInstance's
+        // currentEmbed guard, leaving the replacement iframe leaked.
+        const current = getCurrentWidget();
+        if (current) {
+          current.destroy();
+        } else if (widgetRef.current === w) {
+          w.destroy();
+        }
+        widgetRef.current = null;
+        setWidget(null);
         setIsReady(false);
         setIsOpen(false);
+      } else {
+        // Not last - just detach this provider's local state; do not destroy
+        // the shared singleton still needed by remaining providers.
+        if (widgetRef.current === w) {
+          widgetRef.current = null;
+        }
+        setWidget((prev) => (prev === w ? null : prev));
       }
     };
     // initOptions is memoised; organizationId is primitive; user intentionally
