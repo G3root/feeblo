@@ -7,6 +7,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
 import { EmailProviderFeedbackConfig } from "./config";
 import {
@@ -250,13 +251,15 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
 
       // SNS SigningCertURL must be fetched without following redirects —
       // a whitelist-bypass via 302 to an attacker host would leak the fetch
-      // to an untrusted endpoint. The server composition root should
-      // configure HttpClient with `followRedirects: false`; we defensively
-      // reject any 3xx even if the client does follow.
+      // to an untrusted endpoint. We explicitly set redirect to manual so
+      // fetch does not follow before the 3xx validation below.
       const response = yield* HttpClient.execute(
         HttpClientRequest.get(certUrl)
       ).pipe(
         Effect.provideService(HttpClient.HttpClient, httpClient),
+        Effect.provideService(FetchHttpClient.RequestInit, {
+          redirect: "manual",
+        }),
         Effect.mapError(
           (cause) =>
             new SesWebhookEnvelopeError({
@@ -339,6 +342,9 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
         HttpClientRequest.get(subscribeUrl)
       ).pipe(
         Effect.provideService(HttpClient.HttpClient, httpClient),
+        Effect.provideService(FetchHttpClient.RequestInit, {
+          redirect: "manual",
+        }),
         Effect.mapError(
           (cause) =>
             new SesWebhookConfirmationError({

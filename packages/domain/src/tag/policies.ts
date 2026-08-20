@@ -27,10 +27,11 @@ type TCanSetChangelogTags = {
 const makeTagPolicy = Effect.gen(function* () {
   const repository = yield* TagRepository;
 
-  // Org ownership is enforced via `tags.create` permission check (same gate
-  // used for all tag mutations). Membership is asserted by callers via
-  // `canSetPostTags`/`canSetChangelogTags`; standalone create/delete/update
-  // require `tags.*` which implies privileged membership.
+  // `tags.create` is used only by `canCreate`; `canDelete` and `canUpdate`
+  // require `tags.*`. Tag assignment via `canSetPostTags` may use `posts.*`,
+  // `tags.*`, or the post-creator path, and via `canSetChangelogTags` may use
+  // `changelog.*` or `tags.*`; both `canSet*` methods enforce membership
+  // directly.
   const canCreate = (organizationId: string) =>
     Policy.canPermission(organizationId, "tags.create");
 
