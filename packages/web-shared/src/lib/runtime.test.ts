@@ -60,4 +60,26 @@ describe("parseRpcError", () => {
       message: "Something went wrong. Please try again.",
     });
   });
+
+  it("hides sensitive details from unlisted tags", () => {
+    const cause = Cause.fail({
+      _tag: "SecretInternalError",
+      reason: "database credentials leak: postgres://secret",
+      message: "sensitive internal stack trace",
+    });
+    expect(parseRpcError(cause)).toEqual({
+      cause,
+      kind: "rpc",
+      message: "Something went wrong. Please try again.",
+    });
+    const sqlCause = Cause.fail({
+      _tag: "SqlError",
+      reason: "SQLSTATE 42P01: relation secret_table",
+    });
+    expect(parseRpcError(sqlCause, "Fallback message")).toEqual({
+      cause: sqlCause,
+      kind: "rpc",
+      message: "Fallback message",
+    });
+  });
 });

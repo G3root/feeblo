@@ -31,18 +31,36 @@ const UserFacingErrorSchema = Schema.Struct({
 
 const decodeUserFacingError = Schema.decodeUnknownOption(UserFacingErrorSchema);
 
+const ALLOWED_USER_FACING_TAGS = new Set<string>([
+  "PolicyDenied",
+  "BadRequestError",
+  "NotFoundError",
+  "UnauthorizedError",
+  "BoardNotFoundError",
+  "CompanyNotFoundError",
+  "CompanyAlreadyExistsError",
+  "ContactNotFoundError",
+  "ContactAlreadyExistsError",
+  "DataValidationError",
+  "PostAlreadyExistsError",
+  "AttributeDefinitionNotFoundError",
+  "OgImageRequestValidationError",
+  "OgImageSiteNotFoundError",
+  "OgImagePostNotFoundError",
+  "ProfanityError",
+  "ReservedSubdomainError",
+  "UploadLimitError",
+  "FailedToCreateCheckoutError",
+  "FailedToCreatePortalError",
+]);
+
 function extractUserMessage(cause: unknown): string | undefined {
   const decoded = decodeUserFacingError(cause);
   if (Option.isNone(decoded)) {
     return undefined;
   }
   const error = decoded.value;
-  if (
-    error._tag === "InternalServerError" ||
-    error._tag === "SqlError" ||
-    error._tag === "SchemaError" ||
-    error._tag === "LegidError"
-  ) {
+  if (!ALLOWED_USER_FACING_TAGS.has(error._tag)) {
     return undefined;
   }
   const reason = error.reason?.trim();

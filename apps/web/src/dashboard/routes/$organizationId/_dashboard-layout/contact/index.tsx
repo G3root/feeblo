@@ -158,7 +158,7 @@ function ContactPage() {
             >
               {({ allowed }) => (
                 <Button
-                  disabled={!allowed || hasReachedCrmLimit}
+                  disabled={!allowed}
                   onClick={openCreateDialog}
                   type="button"
                   variant="brand"
@@ -188,7 +188,7 @@ function ContactPage() {
         <PolicyGuard policy={hasPermission(organizationId, "contacts.create")}>
           {({ allowed }) => (
             <Button
-              disabled={!allowed || hasReachedCrmLimit}
+              disabled={!allowed}
               onClick={openCreateDialog}
               type="button"
               variant="brand"

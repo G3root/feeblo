@@ -154,7 +154,7 @@ function CompanyPage() {
             >
               {({ allowed }) => (
                 <Button
-                  disabled={!allowed || hasReachedCrmLimit}
+                  disabled={!allowed}
                   onClick={openCreateDialog}
                   type="button"
                   variant="brand"
@@ -184,7 +184,7 @@ function CompanyPage() {
         <PolicyGuard policy={hasPermission(organizationId, "companies.create")}>
           {({ allowed }) => (
             <Button
-              disabled={!allowed || hasReachedCrmLimit}
+              disabled={!allowed}
               onClick={openCreateDialog}
               type="button"
               variant="brand"

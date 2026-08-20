@@ -84,38 +84,6 @@ function CompanyCreateForm() {
   const crmLimit = entitlements.limits.crmEntries;
   const totalCrmEntries = companies.length + contacts.length;
   const atLimit = crmLimit !== null && totalCrmEntries >= crmLimit;
-  if (atLimit) {
-    return (
-      <div className="p-6">
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <HugeiconsIcon icon={SparklesIcon} />
-            </EmptyMedia>
-            <EmptyTitle>CRM limit reached</EmptyTitle>
-            <EmptyDescription>
-              The {crmLimit} CRM entry limit for your plan has been reached (
-              {totalCrmEntries} of {crmLimit} used). Upgrade to create more
-              companies and contacts.
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <Button
-              onClick={() => {
-                store.send({ type: "toggle" });
-                upgradePlanStore.send({ type: "toggle" });
-              }}
-              size="sm"
-              type="button"
-            >
-              <HugeiconsIcon icon={SparklesIcon} />
-              Upgrade plan
-            </Button>
-          </EmptyContent>
-        </Empty>
-      </div>
-    );
-  }
   const definitionsQuery = useLiveQuery(
     (q) =>
       q
@@ -192,6 +160,38 @@ function CompanyCreateForm() {
       }
     },
   });
+  if (atLimit) {
+    return (
+      <div className="p-6">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={SparklesIcon} />
+            </EmptyMedia>
+            <EmptyTitle>CRM limit reached</EmptyTitle>
+            <EmptyDescription>
+              The {crmLimit} CRM entry limit for your plan has been reached (
+              {totalCrmEntries} of {crmLimit} used). Upgrade to create more
+              companies and contacts.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button
+              onClick={() => {
+                store.send({ type: "toggle" });
+                upgradePlanStore.send({ type: "toggle" });
+              }}
+              size="sm"
+              type="button"
+            >
+              <HugeiconsIcon icon={SparklesIcon} />
+              Upgrade plan
+            </Button>
+          </EmptyContent>
+        </Empty>
+      </div>
+    );
+  }
 
   return (
     <form
