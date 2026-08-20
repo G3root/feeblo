@@ -521,7 +521,6 @@ export const tagCollection = createCollection(
         rpc.TagCreate({
           id: newTag.id,
           name: newTag.name,
-          type: newTag.type,
           organizationId: newTag.organizationId,
         })
       );
@@ -534,7 +533,6 @@ export const tagCollection = createCollection(
         rpc.TagUpdate({
           id: updatedTag.id,
           name: updatedTag.name,
-          type: updatedTag.type,
           organizationId: updatedTag.organizationId,
         })
       );
@@ -566,30 +564,6 @@ export const postTagCollection = createCollection(
 
       const data = await fetchRpc(
         (rpc) => rpc.PostTagList({ organizationId }),
-        {
-          signal: ctx.signal,
-        }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const changelogTagCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("changelog-tag"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.ChangelogTagList({ organizationId }),
         {
           signal: ctx.signal,
         }
@@ -1656,7 +1630,6 @@ export const dashboardCollections = {
   changelogCategoryLinkCollection,
   changelogCollection,
   changelogPostCollection,
-  changelogTagCollection,
   commentCollection,
   commentReactionCollection,
   companyCollection,

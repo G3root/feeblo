@@ -6,9 +6,6 @@ import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { AuthMiddleware, OptionalAuthMiddleware } from "../session-middleware";
 import { TagServiceErrors } from "./errors";
 import {
-  ChangelogTagAssignment,
-  ChangelogTagList,
-  ChangelogTagSet,
   PostTagAssignment,
   PostTagList,
   PostTagSet,
@@ -66,29 +63,10 @@ export class TagRpcs extends RpcGroup.make(
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
 
-  Rpc.make("ChangelogTagList", {
-    payload: ChangelogTagList,
-    success: Schema.Array(ChangelogTagAssignment),
-    error: TagServiceErrors,
-  }).middleware(AuthMiddleware),
-
-  Rpc.make("ChangelogTagListPublic", {
-    payload: ChangelogTagList,
-    success: Schema.Array(ChangelogTagAssignment),
-    error: Schema.Union([TagServiceErrors, RateLimitErrors]),
-  })
-    .middleware(OptionalAuthMiddleware)
-    .middleware(PublicRpcRateLimitMiddleware),
-
   Rpc.make("PostTagSet", {
     payload: PostTagSet,
     success: Schema.Void,
     error: TagServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("ChangelogTagSet", {
-    payload: ChangelogTagSet,
-    success: Schema.Void,
-    error: TagServiceErrors,
-  }).middleware(AuthMiddleware)
 ) {}

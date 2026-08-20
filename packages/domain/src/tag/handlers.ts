@@ -8,19 +8,14 @@ import { PostActivityRepository } from "../post-activity/repository";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
-import { SitePolicy } from "../site/policies";
-import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { TagPolicy } from "./policies";
 import { postTagChangeActivities } from "./post-tag-activities";
 import { TagRepository } from "./repository";
 import { TagRpcs } from "./rpcs";
 import type {
-  TChangelogTagList,
-  TChangelogTagSet,
   TPostTagList,
   TPostTagSet,
-  TTag,
   TTagCreate,
   TTagDelete,
   TTagList,
@@ -34,23 +29,20 @@ const normalizeTagIds = <T extends string>(tagIds: readonly T[]): T[] => [
 const validateTagIds = ({
   organizationId,
   tagIds,
-  type,
 }: {
   organizationId: string;
   tagIds: readonly string[];
-  type?: TTag["type"];
 }) =>
   Effect.gen(function* () {
     const repository = yield* TagRepository;
     const count = yield* repository.countExistingTags({
       organizationId,
       tagIds,
-      ...(type && { type }),
     });
 
     if (count !== tagIds.length) {
       return yield* new Policy.PolicyDeniedError({
-        reason: "One or more tags do not belong to this organization or type",
+        reason: "One or more tags do not belong to this organization",
       });
     }
   });
@@ -73,32 +65,9 @@ const validatePost = ({
     }
   });
 
-const validateChangelog = ({
-  changelogId,
-  organizationId,
-}: {
-  changelogId: string;
-  organizationId: string;
-}) =>
-  Effect.gen(function* () {
-    const repository = yield* TagRepository;
-    const exists = yield* repository.hasChangelog({
-      changelogId,
-      organizationId,
-    });
-
-    if (!exists) {
-      return yield* new Policy.PolicyDeniedError({
-        reason: "Changelog does not belong to this organization",
-      });
-    }
-  });
-
 export const TagRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* TagRepository;
   const tagPolicy = yield* TagPolicy;
-  const sitePolicy = yield* SitePolicy;
-  const siteRepository = yield* SiteRepository;
   const postActivityRepository = yield* PostActivityRepository;
 
   return {
@@ -111,19 +80,12 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     TagListPublic: (args: TTagList) =>
-      Effect.gen(function* () {
-        const site = yield* siteRepository.findByOrganizationId(args);
-        if (site._tag === "None") {
-          return [];
-        }
-        return yield* repository.findManyPublic({
+      repository
+        .findManyPublic({
           organizationId: args.organizationId,
-          // Feedback tags are rendered alongside public-board posts and are
-          // independent from the roadmap's visibility setting.
           includeFeedback: true,
-          includeChangelog: site.value.changelogVisibility === "PUBLIC",
-        });
-      }).pipe(
+        })
+        .pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "TagListPublic",
           level: "read",
@@ -148,26 +110,6 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Tag", "select")
       ),
 
-    ChangelogTagList: (args: TChangelogTagList) =>
-      repository
-        .findChangelogTags(args)
-        .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("Tag", "select")
-        ),
-
-    ChangelogTagListPublic: (args: TChangelogTagList) =>
-      repository.findChangelogTags(args, { publishedOnly: true }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "ChangelogTagListPublic",
-          level: "read",
-        }),
-        Policy.withPublicPolicy(
-          sitePolicy.canViewChangelog(args.organizationId)
-        ),
-        withRemapDbErrors("Tag", "select")
-      ),
-
     TagCreate: (args: TTagCreate) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
@@ -186,7 +128,9 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     TagUpdate: (args: TTagUpdate) =>
-      repository.update(args).pipe(
+      Effect.gen(function* () {
+        yield* repository.update(args);
+      }).pipe(
         Policy.withPolicy(
           tagPolicy.canUpdate({
             organizationId: args.organizationId,
@@ -219,7 +163,6 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         yield* validateTagIds({
           organizationId: args.organizationId,
           tagIds,
-          type: "FEEDBACK",
         });
 
         const actor = {
@@ -247,34 +190,13 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         Policy.withPolicy(tagPolicy.canSetPostTags(args)),
         withRemapDbErrors("Tag", "update")
       ),
-
-    ChangelogTagSet: (args: TChangelogTagSet) =>
-      Effect.gen(function* () {
-        const tagIds = normalizeTagIds(args.tagIds);
-        yield* validateChangelog({
-          changelogId: args.changelogId,
-          organizationId: args.organizationId,
-        });
-        yield* validateTagIds({
-          organizationId: args.organizationId,
-          tagIds,
-          type: "CHANGELOG",
-        });
-
-        yield* repository.setChangelogTags({ ...args, tagIds });
-      }).pipe(
-        Policy.withPolicy(tagPolicy.canSetChangelogTags(args)),
-        withRemapDbErrors("Tag", "update")
-      ),
   };
 });
 
 export const TagRpcHandlers = TagRpcs.toLayer(TagRpcHandlersEffect).pipe(
-  Layer.provide(SitePolicy.layer),
   Layer.provide(EntitlementPolicy.layer),
   Layer.provide(TagPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
-  Layer.provide(SiteRepository.layer),
   Layer.provide(PostActivityRepository.layer),
   Layer.provide(TagRepository.layer)
 );

@@ -24,7 +24,7 @@ export const Route = createFileRoute("/$organizationId/settings/feedback-tags")(
 
 function RouteComponent() {
   return (
-    <TagCreateDialogProvider defaultValue={{ data: { type: "FEEDBACK" } }}>
+    <TagCreateDialogProvider defaultValue={{ data: {} }}>
       <TagEditDialogProvider>
         <TagDeleteDialogProvider>
           <SettingsLayout.Root>
@@ -40,7 +40,6 @@ function RouteComponent() {
               <TagSettingsTable
                 emptyDescription="Create your first feedback tag to start sorting requests and reports."
                 emptyTitle="No feedback tags yet"
-                type="FEEDBACK"
               />
             </SettingsLayout.Content>
           </SettingsLayout.Root>

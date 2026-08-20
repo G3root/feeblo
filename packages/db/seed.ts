@@ -5,7 +5,6 @@ import {
   ChangelogCategoryId,
   ChangelogCategoryLinkId,
   ChangelogId,
-  ChangelogTagId,
   CommentId,
   CommentReactionId,
   MemberId,
@@ -16,7 +15,6 @@ import {
   RoadmapId,
   SiteId,
   SubscriptionId,
-  TagId,
   UpvoteId,
   WorkspaceId,
 } from "@feeblo/id";
@@ -36,7 +34,6 @@ import {
   changelogCategoryTable,
   changelogPostTable,
   changelogTable,
-  changelogTagTable,
   commentReactionTable,
   commentTable,
   DEFAULT_CHANGELOG_CATEGORIES,
@@ -208,19 +205,12 @@ const ORGANIZATION_PLANS = {
   },
 } satisfies Record<string, SubscriptionScenario>;
 
-const CHANGELOG_TAG_NAMES = [
-  "New features",
-  "Improvements",
-  "Bug fixes",
-] as const;
-
 const CHANGELOG_SEEDS = [
   {
     title: "Introducing the unified inbox",
     status: "published",
     publishedDaysAgo: 30,
     scheduledDaysAhead: null,
-    tags: ["New features"],
     categories: ["New"],
     linkPostCount: 2,
     content: `We've redesigned how feedback lands in your workspace. Every submission now arrives in a single, triage-ready inbox, so nothing gets lost between boards, sites, and the API.
@@ -237,7 +227,6 @@ This is the first step toward a fully automated intake pipeline, and we'd love t
     status: "published",
     publishedDaysAgo: 12,
     scheduledDaysAhead: null,
-    tags: ["Improvements", "New features"],
     categories: ["Improved", "New"],
     linkPostCount: 2,
     content: `Your daily digest just got smarter. We now summarize overnight feedback with AI, so you wake up to a shortlist of the most impactful requests instead of a wall of notifications.
@@ -254,7 +243,6 @@ Summaries respect your existing statuses and can be turned off per board in sett
     status: "published",
     publishedDaysAgo: 4,
     scheduledDaysAhead: null,
-    tags: ["New features"],
     categories: ["New"],
     linkPostCount: 1,
     content: `Feeblo now pushes updates to Slack and Linear, so your team can act on feedback without leaving the tools they already live in.
@@ -269,7 +257,6 @@ Set up in minutes
     status: "scheduled",
     publishedDaysAgo: null,
     scheduledDaysAhead: 5,
-    tags: ["New features"],
     categories: ["New"],
     linkPostCount: 0,
     content: `Next week we're shipping outbound webhooks. Subscribe to post and comment events, receive them as signed JSON payloads, and build your own automations on top of Feeblo.
@@ -286,7 +273,6 @@ Sign up in the integrations tab to get early access.`,
     status: "draft",
     publishedDaysAgo: null,
     scheduledDaysAhead: null,
-    tags: ["Improvements"],
     categories: ["Improved"],
     linkPostCount: 0,
     content: `Explore a new way to model your pipeline. Custom statuses let you define exactly how feedback moves from submission to shipped, with rules for auto-advancing items and notifying the right people.
@@ -301,7 +287,6 @@ Planned capabilities
     status: "published",
     publishedDaysAgo: 45,
     scheduledDaysAhead: null,
-    tags: ["Improvements"],
     categories: ["Improved"],
     linkPostCount: 2,
     content: `Planning a quarter used to mean copying rows between spreadsheets. The roadmap is now fully interactive: drag posts between columns, reorder them within a status, and watch the timeline update live.
@@ -316,7 +301,6 @@ What changed
     status: "published",
     publishedDaysAgo: 60,
     scheduledDaysAhead: null,
-    tags: ["Improvements"],
     categories: ["Improved"],
     linkPostCount: 1,
     content: `We've been hard at work on performance. Boards with thousands of posts now load in under a second, pagination is smoother, and the search index updates in real time.
@@ -331,7 +315,6 @@ Measured improvements
     status: "published",
     publishedDaysAgo: 2,
     scheduledDaysAhead: null,
-    tags: ["Bug fixes"],
     categories: ["Fixed"],
     linkPostCount: 1,
     content: `A round of fixes focused on reliability and edge cases reported by the community.
@@ -347,7 +330,6 @@ Fixed in this release
     status: "scheduled",
     publishedDaysAgo: null,
     scheduledDaysAhead: 10,
-    tags: ["New features"],
     categories: ["New"],
     linkPostCount: 0,
     content: `Coming soon: export any board, filtered view, or the full workspace to CSV. Perfect for quarterly reviews, importing into your analytics stack, or sharing with stakeholders who live in spreadsheets.
@@ -362,7 +344,6 @@ What you'll be able to do
     status: "draft",
     publishedDaysAgo: null,
     scheduledDaysAhead: null,
-    tags: ["New features", "Improvements"],
     categories: ["New", "Improved"],
     linkPostCount: 0,
     content: `Draft: more granular roles are on the way. Beyond owners and members, we're introducing admins, moderators, and read-only analysts so every workspace can control who can edit, publish, and manage settings.
@@ -376,9 +357,7 @@ Planned roles
   title: string;
   status: "draft" | "scheduled" | "published";
   publishedDaysAgo: number | null;
-  scheduledDaysAhead: number | null;
-  tags: readonly string[];
-  categories: readonly string[];
+  scheduledDaysAhead: number | null;  categories: readonly string[];
   linkPostCount: number;
   content: string;
 }>;
@@ -1176,24 +1155,6 @@ const seedChangelogs = ({
     }
 
     const now = new Date();
-    const tagIdsByName = new Map<string, string>();
-
-    for (const tagName of CHANGELOG_TAG_NAMES) {
-      const tagId = yield* TagId.generate;
-      yield* db.insert(tagTable).values({
-        id: tagId,
-        name: tagName,
-        slug: slugify(tagName),
-        type: "CHANGELOG",
-        organizationId,
-        creatorId,
-        creatorMemberId,
-        createdAt: now,
-        updatedAt: now,
-      });
-      tagIdsByName.set(tagName, tagId);
-    }
-
     const categoryRows = yield* db
       .select({
         id: changelogCategoryTable.id,
@@ -1249,23 +1210,6 @@ const seedChangelogs = ({
         });
       }
 
-      for (const tagName of definition.tags) {
-        const tagId = tagIdsByName.get(tagName);
-        if (!tagId) {
-          continue;
-        }
-
-        const changelogTagId = yield* ChangelogTagId.generate;
-        yield* db.insert(changelogTagTable).values({
-          id: changelogTagId,
-          changelogId,
-          tagId,
-          organizationId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-      }
-
       for (const categoryName of definition.categories) {
         const categoryId = categoryIdsByName.get(categoryName);
         if (!categoryId) {
@@ -1284,9 +1228,7 @@ const seedChangelogs = ({
       }
     }
 
-    console.log(
-      `   Seeded ${CHANGELOG_SEEDS.length} changelogs across ${CHANGELOG_TAG_NAMES.length} tags (published, scheduled, draft)`
-    );
+    console.log(`   Seeded ${CHANGELOG_SEEDS.length} changelogs`);
   });
 
 const seed = Effect.gen(function* () {

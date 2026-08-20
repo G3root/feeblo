@@ -125,8 +125,7 @@ export function PostPage() {
           and(
             eq(postTag.organizationId, site.organizationId),
             eq(postTag.postId, postId),
-            eq(tag.organizationId, site.organizationId),
-            eq(tag.type, "FEEDBACK")
+            eq(tag.organizationId, site.organizationId)
           )
         )
         .select(({ tag }) => ({

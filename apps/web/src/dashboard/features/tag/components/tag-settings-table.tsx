@@ -27,7 +27,7 @@ import {
   Tag01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { eq, useLiveQuery } from "@tanstack/react-db";
 import type { ReactNode } from "react";
 
 import { useOrganizationId } from "~/hooks/use-organization-id";
@@ -39,17 +39,13 @@ import {
   useTagEditDialogContext,
 } from "../dialog-stores";
 
-type TagType = "FEEDBACK" | "CHANGELOG";
-
 type TagSettingsTableProps = {
   emptyDescription: string;
   emptyTitle: string;
-
-  type: TagType;
 };
 
 export function TagSettingsTable(props: TagSettingsTableProps) {
-  const { emptyDescription, emptyTitle, type } = props;
+  const { emptyDescription, emptyTitle } = props;
   const organizationId = useOrganizationId();
   const { tagCollection } = useDashboardCollections();
   const createDialogStore = useTagCreateDialogContext();
@@ -60,16 +56,13 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
     (q) =>
       q
         .from({ tag: tagCollection })
-        .where(({ tag }) =>
-          and(eq(tag.organizationId, organizationId), eq(tag.type, type))
-        )
+        .where(({ tag }) => eq(tag.organizationId, organizationId))
         .orderBy(({ tag }) => tag.updatedAt, "desc"),
-    [organizationId, type]
+    [organizationId]
   );
 
   const tags = tagsQuery?.data;
-  const handleCreate = () =>
-    createDialogStore.send({ type: "toggle", data: { type } });
+  const handleCreate = () => createDialogStore.send({ type: "toggle", data: {} });
 
   if (tagsQuery.isLoading) {
     return (

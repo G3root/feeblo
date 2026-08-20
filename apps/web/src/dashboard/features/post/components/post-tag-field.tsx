@@ -43,16 +43,10 @@ export function PostTagField() {
     (q) => {
       return q
         .from({ tags: tagCollection })
-        .where(({ tags }) =>
-          and(
-            eq(tags.organizationId, organizationId),
-            eq(tags.type, "FEEDBACK")
-          )
-        )
+        .where(({ tags }) => eq(tags.organizationId, organizationId))
         .select(({ tags }) => ({
           id: tags.id,
           name: tags.name,
-          type: tags.type,
         }));
     },
     [organizationId]
@@ -125,14 +119,13 @@ export function PostTagField() {
   };
 
   return (
-    <TagCreateDialogProvider defaultValue={{ data: { type: "FEEDBACK" } }}>
+    <TagCreateDialogProvider defaultValue={{ data: {} }}>
       <TagSelect
         canCreate={canCreateTags}
         disabled={disabled}
         onTagSelect={handleTagSelect}
         selectedTags={postTags ?? []}
         tags={tags}
-        type="FEEDBACK"
       />
       {/* Always mounted like the settings routes; the create button in
           TagSelect is disabled without tags.create, so the dialog can never
