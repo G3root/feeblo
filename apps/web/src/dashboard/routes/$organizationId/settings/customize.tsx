@@ -1,4 +1,4 @@
-import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { isPaidPlan } from "~/features/billing/lib/plans";
@@ -26,10 +26,14 @@ export const Route = createFileRoute("/$organizationId/settings/customize")({
 
 function RouteComponent() {
   const organizationId = useOrganizationId();
-  const { allowed, isPending } = usePolicy(hasOwnerOrAdminRole(organizationId));
+  // Same permission as the sidebar entry and the SiteUpdate mutation
+  // (`site.*`) — keep all three spellings aligned.
+  const { allowed, isPending } = usePolicy(
+    hasPermission(organizationId, "site.update")
+  );
   const plan = usePlan();
 
-  const isAdmin = allowed && !isPending;
+  const canEditSite = allowed && !isPending;
   const isPaidPlan_ = isPaidPlan(plan.data?.plan);
   return (
     <SettingsLayout.Root>
@@ -40,20 +44,20 @@ function RouteComponent() {
         <SettingsItem.Item>
           <SettingsItem.ItemContent>
             <SettingsItem.FieldGroup>
-              <PublicPublicSiteNameField canEdit={isAdmin} />
+              <PublicPublicSiteNameField canEdit={canEditSite} />
             </SettingsItem.FieldGroup>
           </SettingsItem.ItemContent>
           <SettingsItem.Separator />
           <SettingsItem.ItemContent>
             <SettingsItem.FieldGroup>
-              <SearchEngineIndexing canEdit={isAdmin} />
+              <SearchEngineIndexing canEdit={canEditSite} />
             </SettingsItem.FieldGroup>
           </SettingsItem.ItemContent>
           <SettingsItem.Separator />
           <SettingsItem.ItemContent>
             <SettingsItem.FieldGroup>
               <HidePoweredByBranding
-                canEdit={isAdmin && isPaidPlan_}
+                canEdit={canEditSite && isPaidPlan_}
                 hasPaidPlan={isPaidPlan_}
               />
             </SettingsItem.FieldGroup>

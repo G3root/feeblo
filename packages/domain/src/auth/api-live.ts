@@ -5,6 +5,7 @@ import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { Api } from "../http/api";
+import * as RateLimit from "../rate-limit";
 import {
   BadRequestError,
   InternalServerError,
@@ -26,13 +27,31 @@ export const AuthApiLive = HttpApiBuilder.group(
   (handlers) =>
     handlers
       .handle("postVerificationOtp", ({ payload }) =>
-        postVerificationOtp(payload).pipe(withRemapDbErrors("Otp", "create"))
+        postVerificationOtp(payload).pipe(
+          RateLimit.withPublicHttpRateLimit({
+            name: "VerificationOtpPost",
+            level: "read",
+          }),
+          withRemapDbErrors("Otp", "create")
+        )
       )
       .handle("getVerificationOtp", () =>
-        getVerificationOtp().pipe(withRemapDbErrors("Otp", "select"))
+        getVerificationOtp().pipe(
+          RateLimit.withPublicHttpRateLimit({
+            name: "VerificationOtpGet",
+            level: "read",
+          }),
+          withRemapDbErrors("Otp", "select")
+        )
       )
       .handle("deleteVerificationOtp", () =>
-        deleteVerificationOtp().pipe(withRemapDbErrors("Otp", "delete"))
+        deleteVerificationOtp().pipe(
+          RateLimit.withPublicHttpRateLimit({
+            name: "VerificationOtpDelete",
+            level: "read",
+          }),
+          withRemapDbErrors("Otp", "delete")
+        )
       )
 );
 

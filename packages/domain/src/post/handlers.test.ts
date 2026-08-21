@@ -40,6 +40,7 @@ import {
   DEFAULT_POST_EMBEDDING_MODEL,
   PostEmbeddingService,
 } from "./embedding-service";
+import { PostNotFoundError } from "./errors";
 import { PostRpcHandlersEffect } from "./handlers";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
@@ -670,6 +671,32 @@ describe("PostRpcHandlers", () => {
       );
     });
 
+    describe("PostDelete", () => {
+      it.effect(
+        "reports NotFound when a privileged delete matches no post",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const missingPostId = yield* PostId.generate;
+
+            const error = yield* Effect.flip(
+              handlers
+                .PostDelete({
+                  id: missingPostId,
+                  organizationId: fixture.organizationId,
+                  boardId: fixture.boardId,
+                })
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                )
+            );
+
+            expect(error).toBeInstanceOf(PostNotFoundError);
+          })
+      );
+    });
+
     describe("PostListPublic", () => {
       it.effect("does not expose posts from private boards", () =>
         Effect.gen(function* () {
@@ -747,6 +774,53 @@ describe("PostRpcHandlers", () => {
             expect(ownView?.creatorId).toBe(fixture.userId);
             expect(ownView?.creatorMemberId).toBe(fixture.membershipId);
           })
+      );
+
+      it.effect("does not list archived or merged posts", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const activePostId = yield* PostId.generate;
+          const archivedPostId = yield* PostId.generate;
+          const mergedSourcePostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [activePostId, "Active feedback"],
+            [archivedPostId, "Archived feedback"],
+            [mergedSourcePostId, "Merged feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          yield* handlers
+            .PostAdminUpdate({
+              id: archivedPostId,
+              organizationId: fixture.organizationId,
+              archived: true,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId: mergedSourcePostId,
+              targetPostId: activePostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const posts = yield* handlers
+            .PostListPublic({
+              organizationId: fixture.organizationId,
+              boardId: null,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+          expect(posts.map((post) => post.id)).toEqual([activePostId]);
+        })
       );
     });
 
@@ -1897,12 +1971,14 @@ describe("PostRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
+          // Merge bookkeeping is internal state; the membership-gated list
+          // still returns archived/merged rows (the public list filters them).
           const posts = yield* handlers
-            .PostListPublic({
+            .PostList({
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
             })
-            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           const sourcePost = posts.find((post) => post.id === sourcePostId);
 
           expect(sourcePost).toMatchObject({ mergedIntoPostId: targetPostId });

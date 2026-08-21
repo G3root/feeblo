@@ -366,6 +366,10 @@ const makePostRepository = Effect.gen(function* () {
     findManyPublic: ({ boardId, organizationId, userId }: TPostFindMany) => {
       const where: SQL[] = [
         eq(schema.postTable.organizationId, organizationId),
+        // Superseded content stays queryable internally but must not remain
+        // publicly listed (same rule as `findSuggestionCandidates`).
+        sql`${schema.postTable.archivedAt} is null`,
+        sql`${schema.postTable.mergedIntoPostId} is null`,
       ];
       if (boardId) {
         where.push(eq(schema.postTable.boardId, boardId));
@@ -625,6 +629,12 @@ const makePostRepository = Effect.gen(function* () {
           .from(schema.postTable)
           .where(postScope)
           .for("update");
+
+        // Nothing matched (missing id or wrong org/board) — report "not
+        // deleted" instead of vacuously comparing two empty lists.
+        if (posts.length === 0) {
+          return false;
+        }
 
         if (onlyIfNew) {
           const newPosts = yield* db

@@ -45,7 +45,11 @@ import {
   postEmbeddingInput,
   schedulePostEmbeddingBestEffort,
 } from "./embedding-service";
-import { FailedToUpdatePostError, PostAlreadyExistsError } from "./errors";
+import {
+  FailedToUpdatePostError,
+  PostAlreadyExistsError,
+  PostNotFoundError,
+} from "./errors";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
 import { PostRpcs } from "./rpcs";
@@ -245,6 +249,15 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       if (!(deleted || canDeleteEngagedPost)) {
         return yield* new Policy.PolicyDeniedError({
           reason: "Posts with comments or other users' votes cannot be deleted",
+        });
+      }
+
+      // A privileged delete that matched no row means the post does not exist
+      // (or belongs to another org/board) — report that instead of silently
+      // succeeding.
+      if (!deleted) {
+        return yield* new PostNotFoundError({
+          message: "Post not found",
         });
       }
 
