@@ -23,11 +23,17 @@ import { EmailOutboxRepository } from "../email-outbox/repository";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
+import {
+  InvalidSubjectError,
+  SubjectNotFoundError,
+} from "../identity/errors";
+import { isSyntheticEmail, ResolvePrincipalService } from "../identity/service";
 import { recordPostIntegrationEvent as recordPostIntegrationEventShared } from "../integration/post-event-recording";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import {
   type PostActivityInput,
+  type PostActivityMetadata,
   PostActivityRepository,
 } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
@@ -38,6 +44,7 @@ import {
   withRemapDbErrors,
 } from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
+import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import {
   PostEmbeddingService,
@@ -74,6 +81,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   const entitlementPolicy = yield* EntitlementPolicy;
   const activityRepository = yield* PostActivityRepository;
   const postPolicy = yield* PostPolicy;
+  const resolvePrincipal = yield* ResolvePrincipalService;
+  const userRepository = yield* UserRepository;
   const notifications = yield* Effect.serviceOption(NotificationService);
   const embeddingService = yield* Effect.serviceOption(PostEmbeddingService);
   // const sitePolicy = yield* SitePolicy;
@@ -611,15 +620,54 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
       const persisted = yield* transaction(
         Effect.gen(function* () {
+          // On-behalf attribution resolves the customer inside the same
+          // transaction as the mutation (see plan-on-behalf.md). Absent
+          // `author`, everything below behaves exactly as before. Identity
+          // failures surface as themselves; infrastructure failures are
+          // normalized like every other subscription/persistence error here.
+          const subject =
+            args.author === undefined
+              ? undefined
+              : yield* resolvePrincipal
+                  .resolve({
+                    organizationId: args.organizationId,
+                    needsUser: false,
+                    subject: args.author,
+                  })
+                  .pipe(
+                    Effect.mapError(
+                      (
+                        error,
+                      ):
+                        | SubjectNotFoundError
+                        | InvalidSubjectError
+                        | InternalServerError =>
+                        error instanceof SubjectNotFoundError ||
+                        error instanceof InvalidSubjectError
+                          ? error
+                          : new InternalServerError({
+                              message:
+                                "Could not resolve the post author.",
+                            })
+                    )
+                  );
+          const onBehalfMetadata: PostActivityMetadata | undefined =
+            subject && {
+              onBehalfOf: {
+                contactId: subject.contactId,
+                ...(subject.userId !== null && { userId: subject.userId }),
+              },
+            };
           const persistedSlug = yield* repository.create({
             ...args,
             content: prepared.content,
             excerpt: htmlToExcerpt(sanitizedHtml),
-            creatorId: session.session.userId,
+            creatorId: subject ? subject.userId : session.session.userId,
             ...(opts.source && { source: opts.source }),
-            ...(membership && {
-              creatorMemberId: membership.membershipId,
-            }),
+            // On-behalf posts keep staff attribution out of the author fields.
+            ...(membership &&
+              !subject && { creatorMemberId: membership.membershipId }),
+            ...(subject && { contactId: subject.contactId }),
           });
           yield* commitPreparedEditorAssets(prepared.promotions);
           yield* syncPostAssetReferences({
@@ -636,6 +684,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             actorId: session.session.userId,
             actorMemberId: membership?.membershipId ?? null,
             kind: "POST_CREATED",
+            ...(onBehalfMetadata && { metadata: onBehalfMetadata }),
           });
           yield* recordPostIntegrationEvent({
             actorMemberId: membership?.membershipId ?? null,
@@ -651,34 +700,119 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           });
 
           // The creator of a post is automatically subscribed to it.
-          yield* subscriptionRepository.subscribe({
-            organizationId: args.organizationId,
-            postId: args.id,
-            userId: session.session.userId,
-            ...(membership && { memberId: membership.membershipId }),
-          });
+          // On-behalf posts subscribe the resolved customer instead of the
+          // staff actor, following the same notification-eligibility rules:
+          // a verified account is trusted, everyone else is deferred until
+          // identity linking grants them access.
           const subscriptionNow = yield* DateTime.nowAsDate;
-          yield* emailSubscriptions
-            .requestSubscription({
-              alreadyVerifiedUser: { userId: session.session.userId },
-              email: session.user.email,
-              now: subscriptionNow,
+          if (subject === undefined) {
+            yield* subscriptionRepository.subscribe({
               organizationId: args.organizationId,
-              source: "post_creator",
-              topic: { topicId: args.id, topicType: "post" },
-              verificationExpiresAt: new Date(
-                subscriptionNow.getTime() + 86_400_000
-              ),
-            })
-            .pipe(
-              Effect.mapError(
-                () =>
-                  new InternalServerError({
-                    message:
-                      "Could not record the post creator email subscription.",
+              postId: args.id,
+              userId: session.session.userId,
+              ...(membership && { memberId: membership.membershipId }),
+            });
+            yield* emailSubscriptions
+              .requestSubscription({
+                alreadyVerifiedUser: { userId: session.session.userId },
+                email: session.user.email,
+                now: subscriptionNow,
+                organizationId: args.organizationId,
+                source: "post_creator",
+                topic: { topicId: args.id, topicType: "post" },
+                verificationExpiresAt: new Date(
+                  subscriptionNow.getTime() + 86_400_000
+                ),
+              })
+              .pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message:
+                        "Could not record the post creator email subscription.",
+                    })
+                )
+              );
+          } else {
+            const subjectUser =
+              subject.userId === null
+                ? Option.none()
+                : yield* userRepository.getById(subject.userId);
+            const verifiedEmail =
+              Option.isSome(subjectUser) && subjectUser.value.emailVerified
+                ? subjectUser.value.email
+                : undefined;
+
+            // In-app watch-list parity for the attributed author.
+            if (subject.userId !== null) {
+              yield* subscriptionRepository.subscribe({
+                organizationId: args.organizationId,
+                postId: args.id,
+                userId: subject.userId,
+              });
+            }
+
+            if (verifiedEmail !== undefined && subject.userId !== null) {
+              yield* emailSubscriptions
+                .requestSubscription({
+                  alreadyVerifiedUser: { userId: subject.userId },
+                  email: verifiedEmail,
+                  now: subscriptionNow,
+                  organizationId: args.organizationId,
+                  source: "post_creator",
+                  topic: { topicId: args.id, topicType: "post" },
+                  verificationExpiresAt: new Date(
+                    subscriptionNow.getTime() + 86_400_000
+                  ),
+                })
+                .pipe(
+                  Effect.mapError(
+                    () =>
+                      new InternalServerError({
+                        message:
+                          "Could not record the post author email subscription.",
+                      })
+                  )
+                );
+            } else {
+              // Deferred: the subject has no verified account, so nothing is
+              // emailed — not even a verification request — until identity
+              // linking activates the subscription.
+              const [contact] = yield* db
+                .select({ email: schema.contactTable.email })
+                .from(schema.contactTable)
+                .where(eq(schema.contactTable.id, subject.contactId))
+                .limit(1);
+              const contactEmail = contact?.email;
+              if (
+                contactEmail !== null &&
+                contactEmail !== undefined &&
+                !isSyntheticEmail(contactEmail)
+              ) {
+                yield* emailSubscriptions
+                  .requestSubscription({
+                    deferredNoAccess: true,
+                    email: contactEmail,
+                    now: subscriptionNow,
+                    organizationId: args.organizationId,
+                    source: "post_creator",
+                    topic: { topicId: args.id, topicType: "post" },
+                    verificationExpiresAt: new Date(
+                      subscriptionNow.getTime() + 86_400_000
+                    ),
                   })
-              )
-            );
+                  .pipe(
+                    Effect.mapError(
+                      () =>
+                        new InternalServerError({
+                          message:
+                            "Could not record the deferred post author email subscription.",
+                        })
+                    )
+                  );
+              }
+            }
+          }
 
           const intent = yield* emailOutbox
             .recordIntent({
@@ -918,6 +1052,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         Policy.withPolicy(
           postPolicy.canCreate({
             organizationId: args.organizationId,
+            onBehalf: args.author !== undefined,
             source: "dashboard",
           })
         ),
@@ -932,7 +1067,15 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     PostCreatePublic: (args: TPostCreate) =>
-      createPostEffect(args, { source: "PUBLIC_BOARD" }).pipe(
+      Effect.gen(function* () {
+        if (args.author !== undefined) {
+          return yield* new BadRequestError({
+            message:
+              "Posts cannot be created on behalf of another author from public boards",
+          });
+        }
+        return yield* createPostEffect(args, { source: "PUBLIC_BOARD" });
+      }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "PostCreatePublic",
           level: "expensive",
@@ -1135,6 +1278,8 @@ export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   Layer.provide(EmailOutboxRepository.layer),
   Layer.provide(EmailSubscriptionRepository.layer),
   Layer.provide(EmailOutboxConfig.layer),
+  Layer.provide(ResolvePrincipalService.layer),
+  Layer.provide(UserRepository.layer),
   Layer.provide(
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   ),

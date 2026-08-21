@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 
+import { InvalidSubjectError, SubjectNotFoundError } from "../identity/errors";
 import { PolicyDeniedError } from "../policy";
 import {
   BadRequestError,
@@ -47,4 +48,8 @@ export const PostServiceErrors = Schema.Union([
   FailedToDeletePostError,
   FailedToUpdatePostError,
   FailedToMergePostError,
+  // On-behalf creation resolves an author subject and can reject invalid
+  // identifiers with the shared identity failures.
+  SubjectNotFoundError,
+  InvalidSubjectError,
 ]);

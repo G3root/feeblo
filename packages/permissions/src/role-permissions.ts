@@ -19,7 +19,9 @@ export const ROLE_PERMISSIONS = {
   /**
    * Managers (formerly "member") run day-to-day feedback operations:
    * moderation, changelogs, tags, roadmaps, and user cleanup. CRM
-   * creation/update stays manager-scoped.
+   * creation/update stays manager-scoped. `posts.*` includes
+   * `posts.createOnBehalf` (attributing posts to customers); contributor's
+   * scoped grants deliberately do not.
    */
   manager: [
     "members.remove",

@@ -1,5 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { ContactId } from "@feeblo/id";
+import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import { and, eq } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -17,12 +18,12 @@ import { InvalidSubjectError, SubjectNotFoundError } from "./errors";
  * contact (empty name/avatar backfill); they never overwrite it.
  */
 export interface OnBehalfSubject {
-  userId?: string;
-  contactId?: string;
-  externalId?: string;
-  email?: string;
-  name?: string;
-  avatarUrl?: string;
+  userId?: string | undefined;
+  contactId?: string | undefined;
+  externalId?: string | undefined;
+  email?: string | undefined;
+  name?: string | undefined;
+  avatarUrl?: string | undefined;
 }
 
 export interface ResolvePrincipalInput {
@@ -51,7 +52,7 @@ const normalizeEmail = (email: string | undefined): string | undefined => {
 };
 
 /** Synthetic inboxes of SSO portal and shadow users are never real addresses. */
-const isSyntheticEmail = (email: string): boolean =>
+export const isSyntheticEmail = (email: string): boolean =>
   /^behalf-[0-9a-f]+@feeblo\.com$/.test(email) ||
   /^sso-[0-9a-f]+@feeblo\.com$/.test(email);
 
@@ -195,7 +196,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
    */
   function insertContactToleratingRace(
     values: Omit<ContactInsert, "id" | "createdAt" | "updatedAt">,
-    redetect: () => Effect.Effect<Option.Option<Contact>, unknown>
+    redetect: () => Effect.Effect<Option.Option<Contact>, EffectDrizzleQueryError>
   ) {
     return Effect.gen(function* () {
       const id = yield* ContactId.generate;

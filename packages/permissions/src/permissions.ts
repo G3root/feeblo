@@ -28,7 +28,17 @@ const PERMISSION_ACTIONS = {
   billing: ["update"],
   site: ["update"],
   boards: ["create", "update", "delete"],
-  posts: ["update", "delete", "move", "lock", "archive", "status", "merge"],
+  posts: [
+    "update",
+    "delete",
+    "move",
+    "lock",
+    "archive",
+    "status",
+    "merge",
+    // Create a post attributed to a customer (on-behalf), manager and above.
+    "createOnBehalf",
+  ],
   comments: ["delete"],
   changelog: ["create", "update", "publish", "delete"],
   "changelog-categories": ["create", "update", "delete"],

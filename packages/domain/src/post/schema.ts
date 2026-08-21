@@ -164,6 +164,23 @@ export const PostMerge = S.Struct({
 
 export type TPostMerge = S.Schema.Type<typeof PostMerge>;
 
+/**
+ * The customer a dashboard post is attributed to when created on behalf of
+ * them (see plan-on-behalf.md). Identifiers are consulted in strict priority
+ * order by `ResolvePrincipalService`: `userId` > `contactId` > `externalId` >
+ * `email`; `name`/`avatarUrl` only enrich the resolved contact.
+ */
+export const PostCreateAuthor = S.Struct({
+  userId: S.optional(S.String),
+  contactId: S.optional(S.String),
+  externalId: S.optional(S.String),
+  email: S.optional(S.String),
+  name: S.optional(S.String),
+  avatarUrl: S.optional(S.String),
+});
+
+export type TPostCreateAuthor = S.Schema.Type<typeof PostCreateAuthor>;
+
 export const PostCreate = S.Struct({
   assetIds: S.Array(S.String),
   id: PostId.schema,
@@ -178,6 +195,8 @@ export const PostCreate = S.Struct({
   statusId: PostStatusId.schema,
   organizationId: WorkspaceId.schema,
   etaQuarter: S.optional(S.NullOr(EtaQuarter)),
+  /** Present ⇒ the post is created on behalf of the resolved customer. */
+  author: S.optional(PostCreateAuthor),
 });
 
 export type TPostCreate = S.Schema.Type<typeof PostCreate>;

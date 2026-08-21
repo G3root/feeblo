@@ -25,6 +25,7 @@ import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { ResolvePrincipalService } from "../identity/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError } from "../rpc-errors";
@@ -34,6 +35,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import {
   DEFAULT_POST_EMBEDDING_DIMENSIONS,
@@ -219,6 +221,8 @@ describe("PostRpcHandlers", () => {
         )
       )
     ),
+    ResolvePrincipalService.layer,
+    UserRepository.layer,
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 

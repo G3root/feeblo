@@ -6,6 +6,18 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+/**
+ * Structured provenance stored beside an activity. On-behalf actions record
+ * the customer subject distinct from the staff actor, e.g.
+ * `{ onBehalfOf: { contactId, userId? } }`.
+ */
+export interface PostActivityMetadata {
+  readonly onBehalfOf: {
+    readonly contactId: string;
+    readonly userId?: string | undefined;
+  };
+}
+
 /** Actor facts shared by every recorded activity. */
 export interface PostActivityActor {
   readonly actorId: string | null;
@@ -14,6 +26,8 @@ export interface PostActivityActor {
   readonly id?: LegidOf<"PostActivityId">;
   readonly organizationId: string;
   readonly postId: string;
+  /** Optional structured provenance (see `PostActivityMetadata`). */
+  readonly metadata?: PostActivityMetadata;
 }
 
 /**
@@ -178,6 +192,7 @@ const makePostActivityRepository = Effect.gen(function* () {
         postId: input.postId,
         actorId: input.actorId,
         actorMemberId: input.actorMemberId,
+        metadata: input.metadata ?? null,
         ...toRow(input),
       };
     });
