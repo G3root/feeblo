@@ -1,6 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { NotificationId, type LegidOf, WorkspaceId } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -293,4 +294,161 @@ describe("NotificationRpcHandlers", () => {
       );
     }
   );
+
+  describe("NotificationService", () => {
+    const TestLayer = NotificationService.layer.pipe(
+      Layer.provide(Database.PgliteDatabaseLive)
+    );
+
+    /** A changelog subscriber: contact row linked to a user, plus membership. */
+    const insertChangelogSubscriber = (
+      organizationId: string,
+      suffix: string,
+      state: "active" | "paused_by_plan" | "unsubscribed"
+    ) =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const userId = `user_${suffix}`;
+        const memberId = `member_${suffix}`;
+        const now = new Date();
+        yield* db.insert(schema.userTable).values({
+          id: userId,
+          email: `${userId}@example.com`,
+          name: `User ${suffix}`,
+        });
+        yield* db.insert(schema.memberTable).values({
+          id: memberId,
+          organizationId,
+          userId,
+          role: "manager",
+          createdAt: now,
+        });
+        yield* db.insert(schema.emailContactTable).values({
+          id: `contact_${suffix}`,
+          organizationId,
+          userId,
+          email: `${userId}@example.com`,
+          verificationState: "verified",
+          verifiedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        });
+        yield* db.insert(schema.emailSubscriptionTable).values({
+          id: `subscription_${suffix}`,
+          organizationId,
+          contactId: `contact_${suffix}`,
+          topicType: "changelog",
+          topicId: null,
+          source: "explicit",
+          state,
+          createdAt: now,
+          updatedAt: now,
+        });
+        return { memberId, userId };
+      });
+
+    layer(Layer.merge(TestLayer, Database.PgliteDatabaseLive))(
+      "changelog published notifications",
+      (it) => {
+        it.effect("notifies subscribed members and skips the rest", () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const service = yield* NotificationService;
+            const organizationId = yield* WorkspaceId.generate;
+            yield* db.insert(schema.organizationTable).values({
+              id: organizationId,
+              name: "Changelog org",
+              slug: organizationId,
+              createdAt: new Date(),
+            });
+            const subscribed = yield* insertChangelogSubscriber(
+              organizationId,
+              "subscribed",
+              "active"
+            );
+            const paused = yield* insertChangelogSubscriber(
+              organizationId,
+              "paused",
+              "paused_by_plan"
+            );
+            yield* insertChangelogSubscriber(
+              organizationId,
+              "unsubscribed",
+              "unsubscribed"
+            );
+
+            yield* service.notifyChangelogPublished({
+              changelogId: "chg_1",
+              changelogSlug: "release-1",
+              organizationId,
+              title: "Release 1",
+            });
+
+            const rows = yield* db
+              .select()
+              .from(schema.notificationTable)
+              .where(
+                eq(schema.notificationTable.organizationId, organizationId)
+              );
+            expect(rows).toHaveLength(2);
+            expect(rows.map((row) => row.recipientMemberId).sort()).toEqual(
+              [subscribed.memberId, paused.memberId].sort()
+            );
+            expect(
+              rows.find((row) => row.recipientMemberId === subscribed.memberId)
+            ).toMatchObject({
+              kind: "changelog.published",
+              resourceType: "changelog",
+              resourceId: "chg_1",
+              href: `/${organizationId}/changelog/edit/release-1`,
+              deduplicationKey: "changelog.published:chg_1",
+            });
+          })
+        );
+
+        it.effect("excludes the publishing member from recipients", () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const service = yield* NotificationService;
+            const organizationId = yield* WorkspaceId.generate;
+            yield* db.insert(schema.organizationTable).values({
+              id: organizationId,
+              name: "Changelog org two",
+              slug: organizationId,
+              createdAt: new Date(),
+            });
+            const publisher = yield* insertChangelogSubscriber(
+              organizationId,
+              "publisher",
+              "active"
+            );
+            const reader = yield* insertChangelogSubscriber(
+              organizationId,
+              "reader",
+              "active"
+            );
+
+            yield* service.notifyChangelogPublished({
+              actorMemberId: publisher.memberId,
+              changelogId: "chg_2",
+              changelogSlug: "release-2",
+              organizationId,
+              title: "Release 2",
+            });
+
+            const rows = yield* db
+              .select()
+              .from(schema.notificationTable)
+              .where(
+                eq(schema.notificationTable.organizationId, organizationId)
+              );
+            expect(rows).toHaveLength(1);
+            expect(rows[0]).toMatchObject({
+              recipientMemberId: reader.memberId,
+            });
+          })
+        );
+      }
+    );
+  });
 });
