@@ -1,14 +1,14 @@
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import type { AuthClientSession } from "@feeblo/auth/client";
 import { hasWindow } from "@feeblo/utils/runtime-kind";
-import * as AtomRegistry from "effect/unstable/reactivity/AtomRegistry";
 import * as Option from "effect/Option";
 import * as Result from "effect/unstable/reactivity/AsyncResult";
+import * as AtomRegistry from "effect/unstable/reactivity/AtomRegistry";
 import type React from "react";
 import { createContext, useContext, useMemo, useState } from "react";
 
-import { readAuthHintFromCookie } from "./hint-cookie";
 import { authAtomRegistry, meAtom } from "./atoms";
+import { readAuthHintFromCookie } from "./hint-cookie";
 
 // ---------------------------------------------------------------------------
 // Shared auth seam for Feeblo's dashboard and public-board apps.
@@ -84,9 +84,7 @@ const confirmedState = (session: AuthClientSession | null): AuthState =>
   session === null ? { status: "unauthenticated" } : sessionState(session);
 
 const hintState = (hint: AuthUser | null): AuthState | null =>
-  hint === null
-    ? null
-    : { status: "authenticated", data: null, user: hint };
+  hint === null ? null : { status: "authenticated", data: null, user: hint };
 
 function AuthProviderClient({
   children,

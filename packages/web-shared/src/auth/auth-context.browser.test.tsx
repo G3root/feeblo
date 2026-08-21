@@ -13,8 +13,8 @@ vi.hoisted(() => {
   globalWindow.global.__ENV = { API_URL: "http://localhost:3000/api" };
 });
 
-import { render } from "vitest-browser-react";
 import * as AtomRegistry from "effect/unstable/reactivity/AtomRegistry";
+import { render } from "vitest-browser-react";
 
 import {
   overrideSessionGetterForTests,
@@ -133,9 +133,7 @@ describe("AuthProvider session revalidation", () => {
       </AuthProvider>
     );
 
-    await expect
-      .element(screen.getByText("unauthenticated"))
-      .toBeVisible();
+    await expect.element(screen.getByText("unauthenticated")).toBeVisible();
     expect(document.cookie).not.toContain("feeblo_auth_hint");
   });
 });

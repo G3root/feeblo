@@ -1,7 +1,7 @@
 import type { AuthClientSession } from "@feeblo/auth/client";
+import { extractSubdomain } from "@feeblo/utils/url";
 import { getAuthSession } from "@feeblo/web-shared/auth-session";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
-import { extractSubdomain } from "@feeblo/utils/url";
 import { redirect } from "@tanstack/react-router";
 
 // ---------------------------------------------------------------------------
@@ -147,10 +147,7 @@ export async function dashboardAuthBeforeLoad({
     });
   }
 
-  if (
-    !defaultOrganizationId ||
-    DASHBOARD_NON_ORG_PATHS.has(pathname)
-  ) {
+  if (!defaultOrganizationId || DASHBOARD_NON_ORG_PATHS.has(pathname)) {
     return;
   }
 

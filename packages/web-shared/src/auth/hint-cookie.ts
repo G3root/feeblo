@@ -1,5 +1,5 @@
-import { hasWindow } from "@feeblo/utils/runtime-kind";
 import { AUTH_SESSION_DURATION_SECONDS } from "@feeblo/auth/session";
+import { hasWindow } from "@feeblo/utils/runtime-kind";
 import * as Schema from "effect/Schema";
 
 // ---------------------------------------------------------------------------
