@@ -1,38 +1,23 @@
-import { Button } from "@feeblo/ui/button";
 import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@feeblo/ui/field";
+  AuthForm,
+  OtpFormFields,
+  OtpResend,
+  otpFormOpts,
+} from "@feeblo/post-ui/auth-forms";
+import { toResendResult } from "@feeblo/post-ui/otp-resend";
+import { useVerifyEmailOtp } from "@feeblo/post-ui/use-auth-submission";
+import { Field, FieldDescription, FieldGroup } from "@feeblo/ui/field";
 import { useAppForm } from "@feeblo/ui/hooks/form";
-import {
-  OTPField,
-  OTPFieldInput,
-  OTPFieldSeparator,
-} from "@feeblo/ui/otp-field";
-import { toastManager } from "@feeblo/ui/toast";
 import {
   authClient,
   verificationOtpEndpoint,
 } from "@feeblo/web-shared/auth-client";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { useCallback } from "react";
 import { z } from "zod";
-
-import {
-  clearVerificationOtp,
-  getResendLabel,
-  RateLimitErrorSchema,
-  useOtpResend,
-} from "~/features/auth/lib/otp-resend";
 
 const SearchSchema = z.object({
   redirectTo: z.string().optional(),
-});
-
-const FormSchema = z.object({
-  otp: z.string().length(6, { message: "Verification code must be 6 digits" }),
 });
 
 export const Route = createFileRoute("/email-verify")({
@@ -70,69 +55,37 @@ function RouteComponent() {
   const search = Route.useSearch();
   const verificationState = Route.useLoaderData();
 
-  const {
-    cooldown: resendCooldown,
-    isResending,
-    resend,
-  } = useOtpResend({
-    successMessage: "Verification code sent",
-    onResend: async () => {
-      const response = await authClient.emailOtp.sendVerificationOtp({
-        email: verificationState.email,
-        type: "email-verification",
-      });
+  const verifyOtp = useVerifyEmailOtp({
+    email: verificationState.email,
+    onSuccess: () => {
+      const redirectTo =
+        search.redirectTo?.startsWith("/") &&
+        search.redirectTo[1] !== "/" &&
+        search.redirectTo[1] !== "\\"
+          ? search.redirectTo
+          : "/";
 
-      if (response.error) {
-        const rateLimitError = RateLimitErrorSchema.safeParse(response.error);
-        return {
-          success: false as const,
-          retryAfterSeconds: rateLimitError.success
-            ? rateLimitError.data.retryAfterSeconds
-            : undefined,
-          message: response.error.message,
-        };
-      }
-
-      return { success: true as const };
+      window.location.href = redirectTo;
     },
   });
 
+  const resend = useCallback(async () => {
+    const response = await authClient.emailOtp.sendVerificationOtp({
+      email: verificationState.email,
+      type: "email-verification",
+    });
+
+    if (response.error) {
+      return toResendResult(response.error);
+    }
+
+    return { success: true as const };
+  }, [verificationState.email]);
+
   const form = useAppForm({
-    defaultValues: {
-      otp: "",
-    },
-    validators: {
-      onChange: FormSchema,
-    },
+    ...otpFormOpts,
     onSubmit: async ({ value }) => {
-      const response = await authClient.emailOtp.verifyEmail({
-        email: verificationState.email,
-        otp: value.otp,
-      });
-
-      if (response.error) {
-        toastManager.add({
-          title:
-            response.error.code === "INVALID_OTP"
-              ? "Invalid verification code"
-              : response.error.message,
-          type: "error",
-        });
-        return;
-      }
-
-      toastManager.add({
-        title: "Email verified",
-        type: "success",
-      });
-
-      await clearVerificationOtp(verificationState.email, "email-verification");
-
-      const redirectTo = search.redirectTo?.startsWith("/")
-        ? search.redirectTo
-        : "/";
-
-      window.location.href = redirectTo;
+      await verifyOtp(value.otp);
     },
   });
 
@@ -140,13 +93,7 @@ function RouteComponent() {
     <div className="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
       <div className="w-full max-w-sm">
         <div className="flex flex-col gap-6">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              form.handleSubmit();
-            }}
-          >
+          <AuthForm form={form}>
             <FieldGroup>
               <Field className="items-center text-center">
                 <Link
@@ -163,70 +110,14 @@ function RouteComponent() {
                   We sent a 6-digit code to your email address
                 </FieldDescription>
               </Field>
-              <form.Field name="otp">
-                {(field) => {
-                  const isInvalid =
-                    field.state.meta.isTouched && !field.state.meta.isValid;
-                  return (
-                    <Field data-invalid={isInvalid}>
-                      <FieldLabel className="sr-only" htmlFor={field.name}>
-                        Verification code
-                      </FieldLabel>
-                      <OTPField
-                        aria-label="Verification code"
-                        className="justify-center gap-4"
-                        id={field.name}
-                        length={6}
-                        name={field.name}
-                        onBlur={field.handleBlur}
-                        onValueChange={(value) => field.handleChange(value)}
-                        size="lg"
-                        value={field.state.value}
-                      >
-                        <OTPFieldInput />
-                        <OTPFieldInput aria-label="Character 2 of 6" />
-                        <OTPFieldInput aria-label="Character 3 of 6" />
-                        <OTPFieldSeparator />
-                        <OTPFieldInput aria-label="Character 4 of 6" />
-                        <OTPFieldInput aria-label="Character 5 of 6" />
-                        <OTPFieldInput aria-label="Character 6 of 6" />
-                      </OTPField>
-                      {isInvalid && (
-                        <FieldError errors={field.state.meta.errors} />
-                      )}
-                      <FieldDescription className="text-center">
-                        Didn&apos;t receive the code?
-                        <Button
-                          disabled={resendCooldown > 0 || isResending}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            resend();
-                          }}
-                          type="button"
-                          variant="link"
-                        >
-                          {getResendLabel({
-                            cooldown: resendCooldown,
-                            isResending,
-                          })}
-                        </Button>
-                        <span className="sr-only" role="timer">
-                          {resendCooldown > 0
-                            ? `You can request another code in ${resendCooldown} seconds`
-                            : "You can request another verification code now"}
-                        </span>
-                      </FieldDescription>
-                    </Field>
-                  );
-                }}
-              </form.Field>
-
-              <Field>
-                <Button type="submit">Verify</Button>
-              </Field>
+              <OtpFormFields form={form} submitLabel="Verify">
+                <OtpResend
+                  onResend={resend}
+                  successMessage="Verification code sent"
+                />
+              </OtpFormFields>
             </FieldGroup>
-          </form>
+          </AuthForm>
           <Field>
             <FieldDescription className="px-6 text-center">
               By clicking continue, you agree to our{" "}

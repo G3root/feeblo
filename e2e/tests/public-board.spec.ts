@@ -206,7 +206,7 @@ test(
         .getByLabel("Password", { exact: true })
         .fill(visitor.password);
       await signUpDialog
-        .getByLabel("Confirm password", { exact: true })
+        .getByLabel("Confirm Password", { exact: true })
         .fill(visitor.password);
       await signUpDialog
         .getByRole("button", { name: "Sign up", exact: true })

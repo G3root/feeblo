@@ -12,7 +12,7 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { useNavigate } from "@tanstack/react-router";
-import { createContext, use } from "react";
+import { createContext, use, useCallback, useMemo } from "react";
 
 import {
   boardCollection,
@@ -89,36 +89,56 @@ function DashboardRoadmapIndexProvider({
     });
 
   const displayedRoadmap = roadmaps[0] ?? null;
-  const lanes = displayedRoadmap ? lanesFor(displayedRoadmap.id) : [];
+  const lanes = useMemo(
+    () => (displayedRoadmap ? lanesFor(displayedRoadmap.id) : []),
+    [displayedRoadmap, lanesFor]
+  );
 
-  const switchRoadmap = (nextSlug: string) => {
-    const primarySlug = allRoadmaps[0]?.slug;
-    if (nextSlug === primarySlug) {
-      navigate({ to: "/$organizationId/roadmap", params: { organizationId } });
-    } else {
-      navigate({
-        params: { organizationId, slug: nextSlug },
-        to: "/$organizationId/roadmap/$slug",
-      });
-    }
-  };
+  const switchRoadmap = useCallback(
+    (nextSlug: string) => {
+      const primarySlug = allRoadmaps[0]?.slug;
+      if (nextSlug === primarySlug) {
+        navigate({
+          to: "/$organizationId/roadmap",
+          params: { organizationId },
+        });
+      } else {
+        navigate({
+          params: { organizationId, slug: nextSlug },
+          to: "/$organizationId/roadmap/$slug",
+        });
+      }
+    },
+    [allRoadmaps, navigate, organizationId]
+  );
+
+  const value = useMemo<RoadmapDashboardContextValue>(
+    () => ({
+      actions: { switchRoadmap },
+      meta: { organizationId },
+      state: {
+        allRoadmaps,
+        // SAFETY: displayedRoadmap derives from roadmaps[0] via useRoadmapData; its shape matches RoadmapDashboardState['displayedRoadmap'] (id/name/slug/visibility/description).
+        displayedRoadmap:
+          displayedRoadmap as RoadmapDashboardState["displayedRoadmap"],
+        isError,
+        isLoading,
+        lanes,
+      },
+    }),
+    [
+      switchRoadmap,
+      organizationId,
+      allRoadmaps,
+      displayedRoadmap,
+      isError,
+      isLoading,
+      lanes,
+    ]
+  );
 
   return (
-    <RoadmapDashboardContext.Provider
-      value={{
-        actions: { switchRoadmap },
-        meta: { organizationId },
-        state: {
-          allRoadmaps,
-          // SAFETY: displayedRoadmap derives from roadmaps[0] via useRoadmapData; its shape matches RoadmapDashboardState['displayedRoadmap'] (id/name/slug/visibility/description).
-          displayedRoadmap:
-            displayedRoadmap as RoadmapDashboardState["displayedRoadmap"],
-          isError,
-          isLoading,
-          lanes,
-        },
-      }}
-    >
+    <RoadmapDashboardContext.Provider value={value}>
       {children}
     </RoadmapDashboardContext.Provider>
   );
@@ -146,36 +166,56 @@ function DashboardRoadmapDetailProvider({
     });
 
   const displayedRoadmap = roadmaps[0] ?? null;
-  const lanes = displayedRoadmap ? lanesFor(displayedRoadmap.id) : [];
+  const lanes = useMemo(
+    () => (displayedRoadmap ? lanesFor(displayedRoadmap.id) : []),
+    [displayedRoadmap, lanesFor]
+  );
 
-  const switchRoadmap = (nextSlug: string) => {
-    const primarySlug = allRoadmaps[0]?.slug;
-    if (nextSlug === primarySlug) {
-      navigate({ to: "/$organizationId/roadmap", params: { organizationId } });
-    } else {
-      navigate({
-        params: { organizationId, slug: nextSlug },
-        to: "/$organizationId/roadmap/$slug",
-      });
-    }
-  };
+  const switchRoadmap = useCallback(
+    (nextSlug: string) => {
+      const primarySlug = allRoadmaps[0]?.slug;
+      if (nextSlug === primarySlug) {
+        navigate({
+          to: "/$organizationId/roadmap",
+          params: { organizationId },
+        });
+      } else {
+        navigate({
+          params: { organizationId, slug: nextSlug },
+          to: "/$organizationId/roadmap/$slug",
+        });
+      }
+    },
+    [allRoadmaps, navigate, organizationId]
+  );
+
+  const value = useMemo<RoadmapDashboardContextValue>(
+    () => ({
+      actions: { switchRoadmap },
+      meta: { organizationId },
+      state: {
+        allRoadmaps,
+        // SAFETY: displayedRoadmap derives from roadmaps[0] via useRoadmapData; its shape matches RoadmapDashboardState['displayedRoadmap'] (id/name/slug/visibility/description).
+        displayedRoadmap:
+          displayedRoadmap as RoadmapDashboardState["displayedRoadmap"],
+        isError,
+        isLoading,
+        lanes,
+      },
+    }),
+    [
+      switchRoadmap,
+      organizationId,
+      allRoadmaps,
+      displayedRoadmap,
+      isError,
+      isLoading,
+      lanes,
+    ]
+  );
 
   return (
-    <RoadmapDashboardContext.Provider
-      value={{
-        actions: { switchRoadmap },
-        meta: { organizationId },
-        state: {
-          allRoadmaps,
-          // SAFETY: displayedRoadmap derives from roadmaps[0] via useRoadmapData; its shape matches RoadmapDashboardState['displayedRoadmap'] (id/name/slug/visibility/description).
-          displayedRoadmap:
-            displayedRoadmap as RoadmapDashboardState["displayedRoadmap"],
-          isError,
-          isLoading,
-          lanes,
-        },
-      }}
-    >
+    <RoadmapDashboardContext.Provider value={value}>
       {children}
     </RoadmapDashboardContext.Provider>
   );

@@ -35,7 +35,8 @@ function signWidgetToken(
     })
   ).toString("base64url");
   const unsignedToken = `${header}.${payload}`;
-  const signature = createHmac("sha256", secret)
+  const key = Buffer.from(secret, "hex");
+  const signature = createHmac("sha256", key)
     .update(unsignedToken)
     .digest("base64url");
 

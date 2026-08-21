@@ -16,7 +16,6 @@ import type { TUpvoteList, TUpvoteToggle } from "./schema";
 export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* UpvoteRepository;
   const upvotePolicy = yield* UpvotePolicy;
-  // const sitePolicy = yield* SitePolicy;
 
   return {
     UpvoteList: (args: TUpvoteList) =>
@@ -81,9 +80,8 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
     UpvoteTogglePublic: (args: TUpvoteToggle) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
-        //TODO: comeback later
-        // yield* sitePolicy.canViewRoadmap(args.organizationId);
-
+        // Public visibility is enforced via `upvotePolicy.canToggle` with
+        // `source: "public"` (which checks `isUnlockedPublic` internally).
         const result = yield* transaction(
           repository.toggle({
             organizationId: args.organizationId,
