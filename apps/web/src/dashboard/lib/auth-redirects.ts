@@ -154,16 +154,21 @@ export async function dashboardAuthBeforeLoad({
   const [segment] = pathname.slice(1).split("/");
   const pathOrganizationId = segment || null;
   if (
-    !pathOrganizationId ||
+    pathOrganizationId &&
     organizations.some((organization) => organization.id === pathOrganizationId)
   ) {
+    // Already namespaced under a workspace the user belongs to.
     return;
   }
 
+  // Mirror the former middleware: "/" and unrecognized top-level segments
+  // alike canonicalize under the default workspace.
   const suffix =
-    pathname === `/${pathOrganizationId}`
-      ? ""
-      : pathname.slice(pathOrganizationId.length + 1);
+    pathOrganizationId && pathname !== "/"
+      ? pathname === `/${pathOrganizationId}`
+        ? ""
+        : pathname.slice(pathOrganizationId.length + 1)
+      : "";
   throw redirect({
     href: `/${defaultOrganizationId}${suffix}${location.searchStr}`,
   });
