@@ -49,7 +49,8 @@ export interface FeebloProviderProps {
   /** Identify the current user; changes call `identify` on the live widget.
    * Setting `user` back to `undefined` does not sign the widget out — the SDK
    * has no clear-identity API, so the last identified user (and token) stays
-   * active until another `identify` call or a full remount. */
+   * active until another `identify` call. The latest identity survives config
+   * and root recreation; only unmounting the provider discards it. */
   user?: UserIdentity | undefined;
 }
 
@@ -87,6 +88,12 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
   const closeRef = useRef(props.onClose);
   const errorRef = useRef(props.onError);
   const heightRef = useRef(props.onHeightChange);
+
+  // Last known identity, so a widget recreated by a config or root change is
+  // re-identified without waiting for a new `user` prop or imperative call.
+  // The SDK has no clear-identity API, so only the latest non-undefined
+  // identity is meaningful.
+  const identityRef = useRef<UserIdentity | undefined>(undefined);
 
   useEffect(() => {
     closeRef.current = props.onClose;
@@ -127,6 +134,11 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
       theme: props.theme,
     };
     const next = Feeblo.init(props.organizationId, options);
+    // Replay the remembered identity onto the fresh embed; without this an
+    // imperative identify() would be lost across recreation.
+    if (identityRef.current !== undefined) {
+      next.identify(identityRef.current);
+    }
     setWidget(next);
 
     return () => {
@@ -166,6 +178,7 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
     if (widget === null || user === undefined) {
       return;
     }
+    identityRef.current = user;
     widget.identify(user);
   }, [widget, user]);
 
@@ -200,6 +213,7 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
     widgetRef.current?.setBoard(board);
   }, []);
   const identify = useCallback((identity: UserIdentity) => {
+    identityRef.current = identity;
     widgetRef.current?.identify(identity);
   }, []);
   const metadata = useCallback((patch: Record<string, string | null>) => {

@@ -200,6 +200,39 @@ describe("FeebloProvider", () => {
     expect(document.querySelector("iframe")).toBe(firstIframe);
   });
 
+  it("replays an imperative identify onto the embed recreated by a config change", async () => {
+    const screen = await render(
+      <TestProvider organizationId="org_imperative_identity" theme="dark">
+        <StateProbe />
+      </TestProvider>
+    );
+    postFromWidget({ event: "READY" });
+    await expect.element(screen.getByText("ready:yes")).toBeVisible();
+
+    // Identity arrives through the context action, not the `user` prop.
+    await screen.getByRole("button", { name: "identify" }).click();
+    const firstIframe = document.querySelector("iframe");
+
+    await screen.rerender(
+      <TestProvider organizationId="org_imperative_identity" theme="light">
+        <StateProbe />
+      </TestProvider>
+    );
+    const secondIframe = document.querySelector("iframe");
+    expect(secondIframe).not.toBe(firstIframe);
+
+    // The remembered identity must reach the fresh embed's own postMessage
+    // channel; READY (re)flushes the embed's state, covering both an embed
+    // that has not loaded yet and one whose load already raced ahead.
+    const sent = interceptIframePostMessages();
+    postFromWidget({ event: "READY" });
+
+    await vi.waitFor(() => {
+      const identify = sent.find((message) => message.event === "IDENTIFY");
+      expect(identify?.data).toMatchObject({ id: "u_probe" });
+    });
+  });
+
   it("survives StrictMode double-mounting with a single embed", async () => {
     const screen = await render(
       <StrictMode>

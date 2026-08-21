@@ -11,12 +11,12 @@ Releases are triggered by publishing a GitHub Release whose tag name starts with
 
 ## Release runbook
 
-1. **Bump versions.** Update `version` in the `package.json` of every package that changed.
-2. **Sync the dependency pin.** If `@feeblo/sdk` changed, release `@feeblo/sdk-react` in the same pass: its dependency is declared as `workspace:*`, which pnpm publishes as an **exact version pin** (for example `0.0.2`), so a new core version is only installable alongside the bindings after they are republished. Consumers resolve the bindings against this pinned core, which keeps the singleton SDK to a single copy per install.
+1. **Bump versions.** Update `version` in the `package.json` of every package that changed. Any change to `@feeblo/sdk` also requires assigning a new, unused version to `@feeblo/sdk-react` before publishing, even when its own source is unchanged: the bindings must be republished so their pin points at the new core (next step), and npm rejects re-publishing an existing version.
+2. **Sync the dependency pin.** If `@feeblo/sdk` changed, release `@feeblo/sdk-react` in the same pass: its dependency is declared as `workspace:*`, which pnpm publishes as an **exact version pin** (for example `0.0.2`), so a new core version is only installable alongside the bindings after they are republished. Consumers resolve the bindings against this pinned core, which keeps the singleton SDK to a single copy per install as long as consumers use that pinned compatible `@feeblo/sdk` version; requesting a different core version makes the package manager install multiple SDK copies.
 3. **Check CI is green on `main`.** The publish job builds but does not re-run tests; tests gate merges through [`ci.yml`](../.github/workflows/ci.yml).
 4. **Cut GitHub Releases, SDK first when both changed.** Create one release per package with tags `sdk@X.Y.Z` and/or `sdk-react@X.Y.Z`. Order matters: until the new core is on the registry, a freshly published `@feeblo/sdk-react` that depends on it cannot be installed by consumers.
 5. **Watch the workflow run.** Each job fails loudly if the tag does not match the package version, so a mistyped tag never reaches npm.
-6. **Smoke-check the result.** After both jobs finish: `pnpm view @feeblo/sdk version`, `pnpm view @feeblo/sdk-react dependencies` (the dependency must be the exact released core version, like `0.0.2`, never `workspace:*`), and ideally an install from a scratch project.
+6. **Smoke-check the result.** Once the relevant job or jobs finish — each release tag triggers its matching job only, and a paired release runs two publish jobs, so wait for both: `pnpm view @feeblo/sdk version`, `pnpm view @feeblo/sdk-react dependencies` (the dependency must be the exact released core version, like `0.0.2`, never `workspace:*`), and ideally an install from a scratch project.
 
 ## Why the workflow publishes with pnpm
 
@@ -28,7 +28,7 @@ Both jobs request `id-token: write` and set `NPM_CONFIG_PROVENANCE=true`, so npm
 
 ## Versioning policy
 
-Versions are independent per package; there is no lockstep requirement. In practice most releases touch the core SDK alone, and the React bindings follow only when their adapter surface changes — but because the bindings pin the core to an exact version, every `@feeblo/sdk` release should be paired with an `@feeblo/sdk-react` release so consumers can adopt the new core through the bindings. Breaking changes to the widget's public API should ship as a major bump of `@feeblo/sdk` plus a matching release of `@feeblo/sdk-react`.
+Version numbers are independent per package; there is no shared version scheme. But because the bindings pin the core to an exact version, every `@feeblo/sdk` change requires pairing it with an `@feeblo/sdk-react` release: assign the bindings a new, unused version before publishing even when their adapter surface is unchanged, so consumers can adopt the new core through the bindings. Breaking changes to the widget's public API should ship as a major bump of `@feeblo/sdk` plus a matching release of `@feeblo/sdk-react`.
 
 ## Adding another published package
 
