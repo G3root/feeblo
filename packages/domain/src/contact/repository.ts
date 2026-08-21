@@ -21,6 +21,16 @@ import type {
 
 export type Contact = typeof schema.contactTable.$inferSelect;
 
+/** Arguments for the org-scoped people-picker query backing on-behalf flows. */
+export interface ContactSearchArgs {
+  organizationId: string;
+  query: string;
+  /** Enables the alreadyVoted badge and board-aware access computation. */
+  postId?: string;
+  /** Result cap; defaults to 10 and is clamped to 25. */
+  limit?: number;
+}
+
 const makeContactRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
@@ -248,6 +258,132 @@ const makeContactRepository = Effect.gen(function* () {
         .select()
         .from(schema.contactTable)
         .where(eq(schema.contactTable.organizationId, organizationId)),
+
+    /**
+     * Org-scoped people-picker query backing the on-behalf author combobox.
+     *
+     * Matching runs over contact email/name and company name with prefix +
+     * substring ILIKE patterns supported by the pg_trgm GIN indexes
+     * (migration 20260821021207_pretty_morbius). Ranking is computed in SQL so
+     * the whole search is one round trip: exact email hit first, then email
+     * prefix, then name prefix, then any substring match.
+     *
+     * `hasAccess` mirrors the notification eligibility rule in
+     * plan-on-behalf.md: a linked, email-verified account that is either an
+     * org member, SSO-bound to this org, or an unrestricted global user. When
+     * `postId` is supplied, the unrestricted-global branch additionally
+     * requires that post's board to be PUBLIC.
+     */
+    search: (args: ContactSearchArgs) => {
+      const trimmed = args.query.trim();
+      if (trimmed.length < 2) {
+        return Effect.succeed([]);
+      }
+
+      const limit = Math.min(Math.max(args.limit ?? 10, 1), 25);
+      // Escape LIKE metacharacters so user input can't inject wildcards.
+      const escaped = trimmed.replace(/[\\%_]/g, "\\$&");
+      const exactEmail = escaped.toLowerCase();
+      const prefix = `${escaped}%`;
+      const substring = `%${escaped}%`;
+
+      const rankCase = sql`CASE
+        WHEN lower(${schema.contactTable.email}) = ${exactEmail} THEN 0
+        WHEN ${schema.contactTable.email} ILIKE ${prefix} ESCAPE '\\' THEN 1
+        WHEN ${schema.contactTable.name} ILIKE ${prefix} ESCAPE '\\' THEN 2
+        ELSE 3
+      END`;
+
+      // SAFETY: literal table names in the EXISTS probes are the stable
+      // snake_case names of post/board/upvote; ids are bound parameters.
+      const publicBoardProbe = sql`EXISTS (
+        SELECT 1 FROM "post" p
+        JOIN "board" b ON b.id = p.board_id
+        WHERE p.id = ${args.postId}
+          AND p.organization_id = ${args.organizationId}
+          AND b.visibility = 'PUBLIC'
+      )`;
+
+      const unrestrictedGlobal = args.postId !== undefined
+        ? sql`(
+            ${schema.userTable.restrictedToOrganizationId} IS NULL
+            AND ${publicBoardProbe}
+          )`
+        : sql`${schema.userTable.restrictedToOrganizationId} IS NULL`;
+
+      // COALESCE guards against SQL three-valued logic: when every branch of
+      // the inner OR evaluates to NULL (e.g. an unrestricted user compared
+      // against a non-null organization id), the AND chain would otherwise
+      // yield NULL instead of FALSE.
+      const hasAccess = sql<boolean>`COALESCE(
+        (
+          ${schema.userTable.id} IS NOT NULL
+          AND ${schema.userTable.emailVerified} IS TRUE
+          AND (
+            ${schema.memberTable.id} IS NOT NULL
+            OR ${schema.userTable.restrictedToOrganizationId} = ${args.organizationId}
+            OR ${unrestrictedGlobal}
+          )
+        ),
+        FALSE
+      )`;
+
+      const alreadyVoted = args.postId !== undefined
+        ? sql<boolean>`EXISTS (
+            SELECT 1 FROM "upvote" uv
+            WHERE uv.post_id = ${args.postId}
+              AND uv.organization_id = ${args.organizationId}
+              AND uv.user_id = ${schema.contactTable.userId}
+          )`
+        : sql<boolean>`FALSE`;
+
+      return db
+        .select({
+          contactId: schema.contactTable.id,
+          userId: schema.contactTable.userId,
+          name: schema.contactTable.name,
+          email: schema.contactTable.email,
+          avatarUrl: schema.contactTable.avatar,
+          companyName: schema.companyTable.name,
+          isMember: sql<boolean>`${schema.memberTable.id} IS NOT NULL`,
+          hasAccess,
+          alreadyVoted,
+        })
+        .from(schema.contactTable)
+        .leftJoin(
+          schema.companyTable,
+          eq(schema.companyTable.id, schema.contactTable.companyId)
+        )
+        .leftJoin(
+          schema.memberTable,
+          and(
+            eq(
+              schema.memberTable.organizationId,
+              schema.contactTable.organizationId
+            ),
+            eq(schema.memberTable.userId, schema.contactTable.userId)
+          )
+        )
+        .leftJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.contactTable.userId)
+        )
+        .where(
+          and(
+            eq(
+              schema.contactTable.organizationId,
+              args.organizationId
+            ),
+            sql`(
+              ${schema.contactTable.email} ILIKE ${substring} ESCAPE '\\'
+              OR ${schema.contactTable.name} ILIKE ${substring} ESCAPE '\\'
+              OR COALESCE(${schema.companyTable.name}, '') ILIKE ${substring} ESCAPE '\\'
+            )`
+          )
+        )
+        .orderBy(rankCase, schema.contactTable.createdAt)
+        .limit(limit);
+    },
 
     countByOrganizationId: (organizationId: string) =>
       db

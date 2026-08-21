@@ -9,6 +9,8 @@ import {
   ContactCreate,
   ContactDelete,
   ContactList,
+  ContactSearch,
+  ContactSearchResult,
   ContactUpdate,
 } from "./schema";
 
@@ -16,6 +18,12 @@ export class ContactRpcs extends RpcGroup.make(
   Rpc.make("ContactList", {
     success: Schema.Array(Contact),
     payload: ContactList,
+    error: ContactServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("ContactSearch", {
+    success: Schema.Array(ContactSearchResult),
+    payload: ContactSearch,
     error: ContactServiceErrors,
   }).middleware(AuthMiddleware),
 

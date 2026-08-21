@@ -71,9 +71,30 @@ export const ContactDelete = S.Struct({
   organizationId: WorkspaceId.schema,
 });
 
+export const ContactSearch = S.Struct({
+  organizationId: WorkspaceId.schema,
+  query: S.String,
+  postId: S.optional(S.String),
+  limit: S.optional(S.Number),
+});
+
+export const ContactSearchResult = S.Struct({
+  contactId: S.String,
+  userId: S.NullOr(S.String),
+  name: S.NullOr(S.String),
+  email: S.NullOr(S.String),
+  avatarUrl: S.NullOr(S.String),
+  companyName: S.NullOr(S.String),
+  isMember: S.Boolean,
+  hasAccess: S.Boolean,
+  alreadyVoted: S.Boolean,
+});
+
 export type TContactCreate = S.Schema.Type<typeof ContactCreate>;
 export type TContactUpdate = S.Schema.Type<typeof ContactUpdate>;
 export type TContactDelete = S.Schema.Type<typeof ContactDelete>;
+export type TContactSearch = S.Schema.Type<typeof ContactSearch>;
+export type TContactSearchResult = S.Schema.Type<typeof ContactSearchResult>;
 
 export const Contact = S.Struct({
   id: S.String,
