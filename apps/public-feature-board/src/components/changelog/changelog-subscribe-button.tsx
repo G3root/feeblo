@@ -42,7 +42,11 @@ export function ChangelogSubscribeButton() {
   // still persisting. A ref avoids re-rendering the button on every toggle.
   const isPersistingRef = useRef(false);
 
-  const { data: subscription, isLoading: isSubscriptionLoading } = useQuery({
+  const {
+    data: subscription,
+    isLoading: isSubscriptionLoading,
+    isError: isSubscriptionError,
+  } = useQuery({
     enabled: Boolean(session),
     queryFn: () =>
       fetchRpc((rpc) =>
@@ -87,7 +91,11 @@ export function ChangelogSubscribeButton() {
     return null;
   }
 
-  const isSubscribed = Boolean(subscription?.subscribed);
+  const isSubscribed = subscription?.subscribed === true;
+  // A failed status lookup leaves the true state unknown; keep the control
+  // out of service rather than presenting "not subscribed".
+  const isUnavailable =
+    Boolean(session) && (isSubscriptionError || subscription === undefined);
 
   const onToggle = () => {
     if (isPersistingRef.current) {
@@ -117,9 +125,10 @@ export function ChangelogSubscribeButton() {
     <Button
       aria-label={label}
       aria-pressed={isSubscribed}
-      disabled={setSubscribed.isPending}
+      disabled={setSubscribed.isPending || isUnavailable}
       onClick={onToggle}
       size="sm"
+      title={isUnavailable ? "Subscription status unavailable" : undefined}
       type="button"
       variant={isSubscribed ? "default" : "outline"}
     >

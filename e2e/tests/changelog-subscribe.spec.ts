@@ -62,6 +62,20 @@ test.describe("changelog email subscription", () => {
     await expect(
       page.getByRole("button", { name: "Unsubscribe", exact: true })
     ).toBeVisible();
+
+    // Unsubscribe again and confirm the choice survives a reload.
+    const unsubscribeResponse = page.waitForResponse((response) =>
+      response.url().includes("EmailSubscriptionChangelogSubscribeSet")
+    );
+    await page
+      .getByRole("button", { name: "Unsubscribe", exact: true })
+      .click();
+    expect((await unsubscribeResponse).ok()).toBeTruthy();
+
+    await page.reload();
+    await expect(
+      page.getByRole("button", { name: "Subscribe", exact: true })
+    ).toBeVisible();
   });
 
   test("shows the subscribe button on a changelog entry page", async ({

@@ -436,5 +436,47 @@ describe("EmailSubscriptionConsentHandlers", () => {
         expect(statusError._tag).toBe("PolicyDenied");
       })
     );
+
+    it.effect(
+      "confines organization-restricted sessions to their own workspace",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* EmailSubscriptionRpcHandlersEffect;
+          const organizationId = yield* createWorkspace({ paid: true });
+          const user = yield* createUser(organizationId);
+          const restrictedSession: Session = {
+            user: {
+              id: user.userId,
+              email: user.email,
+              name: "Test User",
+              restrictedToOrganizationId: "org_some_other_workspace",
+            },
+            session: { userId: user.userId, token: "test-token" },
+            organizations: [{ id: organizationId }],
+            memberships: [],
+          };
+          const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+            effect.pipe(
+              Effect.provideService(CurrentSession, restrictedSession)
+            );
+
+          const subscribeError = yield* Effect.flip(
+            handlers
+              .EmailSubscriptionChangelogSubscribeSet({
+                organizationId,
+                subscribed: true,
+              })
+              .pipe(scoped)
+          );
+          expect(subscribeError._tag).toBe("PolicyDenied");
+
+          const statusError = yield* Effect.flip(
+            handlers
+              .EmailSubscriptionChangelogStatusGet({ organizationId })
+              .pipe(scoped)
+          );
+          expect(statusError._tag).toBe("PolicyDenied");
+        })
+    );
   });
 });
