@@ -11,7 +11,12 @@ import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
-import { PolicyGuard, hasPermission } from "@feeblo/web-shared/use-policy";
+import {
+  hasMembership,
+  hasPermission,
+  usePolicy,
+} from "@feeblo/web-shared/use-policy";
+import { inArray, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 
 import {
@@ -23,11 +28,54 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
+/**
+ * Mirrors the backend `PostPolicy.canDelete` for the current selection:
+ * `hasMembership AND (posts.* OR every selected post is an untouched post
+ * created by the caller)`. `canDeleteAsCreator` is the server-computed
+ * new-owner flag for the session user (creator + no comments + no other
+ * users' votes), so a contributor may bulk-delete a selection consisting
+ * only of their own untouched posts — exactly what PostDelete authorizes.
+ */
+function useCanBulkDeleteSelectedPosts(): boolean {
+  const organizationId = useOrganizationId();
+  const { postCollection } = useDashboardCollections();
+  const selectedPostIds = useSelectedPostIds();
+  const selectionKey = selectedPostIds.join(",");
+
+  const { allowed: canManageAllPosts } = usePolicy(
+    hasPermission(organizationId, "posts.*")
+  );
+  const { allowed: isMember } = usePolicy(hasMembership(organizationId));
+
+  const { data: selectedRows } = useLiveQuery(
+    (q) =>
+      q
+        .from({ post: postCollection })
+        .where(({ post }) => inArray(post.id, selectedPostIds)),
+    // SAFETY: selectionKey encodes selectedPostIds as the query re-key.
+    [selectionKey]
+  );
+
+  if (canManageAllPosts) {
+    return true;
+  }
+  if (!isMember || selectedPostIds.length === 0) {
+    return false;
+  }
+  // Every selected post must still be present and flagged as deletable by
+  // its creator; a missing row (filtered out, stale selection) disables.
+  return (
+    selectedRows != null &&
+    selectedRows.length === selectedPostIds.length &&
+    selectedRows.every((post) => post.canDeleteAsCreator === true)
+  );
+}
+
 export function BoardPostBulkActions() {
   const selectedPostIds = useSelectedPostIds();
   const store = useBoardStore();
   const selectedCount = selectedPostIds.length;
-  const organizationId = useOrganizationId();
+  const canBulkDelete = useCanBulkDeleteSelectedPosts();
 
   return (
     <div
@@ -48,24 +96,17 @@ export function BoardPostBulkActions() {
         >
           Cancel
         </Button>
-        {/* Bulk delete hits PostDelete, which requires `posts.*` for posts
-            the user didn't create — a selection can span other people's
-            posts, so gate on `posts.*` and disable instead of hiding. */}
-        <PolicyGuard policy={hasPermission(organizationId, "posts.*")}>
-          {({ allowed }) => (
-            <Button
-              disabled={!allowed}
-              onClick={() =>
-                store.send({ type: "setBulkDeleteOpen", open: true })
-              }
-              size="sm"
-              type="button"
-              variant="destructive"
-            >
-              Delete
-            </Button>
-          )}
-        </PolicyGuard>
+        {/* Disabled instead of hidden: contributors keep the affordance and
+            learn it applies only to their own untouched posts. */}
+        <Button
+          disabled={!canBulkDelete}
+          onClick={() => store.send({ type: "setBulkDeleteOpen", open: true })}
+          size="sm"
+          type="button"
+          variant="destructive"
+        >
+          Delete
+        </Button>
       </div>
       <BulkDeleteAlert />
     </div>
@@ -78,6 +119,7 @@ function BulkDeleteAlert() {
   const selectedPostIds = useSelectedPostIds();
   const selectedPosts = useSelectedPosts();
   const open = useSelector(store, (state) => state.context.bulkDeleteOpen);
+  const canBulkDelete = useCanBulkDeleteSelectedPosts();
 
   const organizationId = useOrganizationId();
 
@@ -99,68 +141,63 @@ function BulkDeleteAlert() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <PolicyGuard policy={hasPermission(organizationId, "posts.*")}>
-            {({ allowed }) => (
-              <Button
-                disabled={!allowed}
-                onClick={async () => {
-                  if (selectedPostIds.length === 0) {
-                    store.send({ type: "setBulkDeleteOpen", open: false });
-                    return;
-                  }
+          <Button
+            disabled={!canBulkDelete}
+            onClick={async () => {
+              if (selectedPostIds.length === 0) {
+                store.send({ type: "setBulkDeleteOpen", open: false });
+                return;
+              }
 
-                  try {
-                    const postIdsByBoardId = new Map<string, string[]>();
+              try {
+                const postIdsByBoardId = new Map<string, string[]>();
 
-                    for (const selectedPost of selectedPosts) {
-                      const boardPostIds =
-                        postIdsByBoardId.get(selectedPost.boardId) ?? [];
-                      boardPostIds.push(selectedPost.postId);
-                      postIdsByBoardId.set(selectedPost.boardId, boardPostIds);
-                    }
+                for (const selectedPost of selectedPosts) {
+                  const boardPostIds =
+                    postIdsByBoardId.get(selectedPost.boardId) ?? [];
+                  boardPostIds.push(selectedPost.postId);
+                  postIdsByBoardId.set(selectedPost.boardId, boardPostIds);
+                }
 
-                    await Promise.all(
-                      [...postIdsByBoardId.entries()].map(
-                        ([boardId, postIds]) =>
-                          fetchRpc((rpc) =>
-                            rpc.PostDelete({
-                              id: postIds,
-                              boardId,
-                              organizationId,
-                            })
-                          )
-                      )
-                    );
+                await Promise.all(
+                  [...postIdsByBoardId.entries()].map(([boardId, postIds]) =>
+                    fetchRpc((rpc) =>
+                      rpc.PostDelete({
+                        id: postIds,
+                        boardId,
+                        organizationId,
+                      })
+                    )
+                  )
+                );
 
-                    await postCollection.utils.refetch();
-                    trackEvent("post_deleted", { mode: "bulk", success: true });
+                await postCollection.utils.refetch();
+                trackEvent("post_deleted", { mode: "bulk", success: true });
 
-                    store.send({ type: "clearSelection" });
-                    store.send({ type: "setBulkDeleteOpen", open: false });
-                    toastManager.add({
-                      title: `${selectedPostIds.length} post${
-                        selectedPostIds.length === 1 ? "" : "s"
-                      } deleted successfully`,
-                      type: "success",
-                    });
-                  } catch (error) {
-                    trackEvent("post_deleted", {
-                      mode: "bulk",
-                      success: false,
-                    });
-                    console.error(error);
-                    toastManager.add({
-                      title: "Failed to delete selected posts",
-                      type: "error",
-                    });
-                  }
-                }}
-                variant="destructive"
-              >
-                Delete
-              </Button>
-            )}
-          </PolicyGuard>
+                store.send({ type: "clearSelection" });
+                store.send({ type: "setBulkDeleteOpen", open: false });
+                toastManager.add({
+                  title: `${selectedPostIds.length} post${
+                    selectedPostIds.length === 1 ? "" : "s"
+                  } deleted successfully`,
+                  type: "success",
+                });
+              } catch (error) {
+                trackEvent("post_deleted", {
+                  mode: "bulk",
+                  success: false,
+                });
+                console.error(error);
+                toastManager.add({
+                  title: "Failed to delete selected posts",
+                  type: "error",
+                });
+              }
+            }}
+            variant="destructive"
+          >
+            Delete
+          </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>
