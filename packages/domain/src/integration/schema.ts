@@ -14,6 +14,10 @@ import {
 } from "@feeblo/id";
 import * as Schema from "effect/Schema";
 
+// Re-exported so client packages (e.g. webhook forms) can use the event-type
+// vocabulary without importing `@feeblo/db` directly.
+export { SUBSCRIBABLE_INTEGRATION_EVENT_TYPES } from "@feeblo/db/validation-schema/integration";
+
 const EventSelection = IntegrationRouteEventSelection.check(
   Schema.isMinLength(1),
   Schema.isMaxLength(2)

@@ -161,7 +161,6 @@
     "ladle:build": "ladle build"
   },
   "dependencies": {
-    "@feeblo/db": "workspace:*",
     "@feeblo/domain": "workspace:*",
     "@feeblo/id": "workspace:*",
     "@feeblo/ui": "workspace:*",

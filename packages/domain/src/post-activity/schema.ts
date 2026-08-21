@@ -4,8 +4,13 @@ import * as S from "effect/Schema";
 
 /**
  * `PostActivityKind` comes from `@feeblo/db/validation-schema/activity-kind` — the canonical
- * vocabulary the `post_activity.kind` column type is derived from.
+ * vocabulary the `post_activity.kind` column type is derived from. Re-exported here so
+ * client packages don't import `@feeblo/db` directly.
  */
+export {
+  PostActivityKind,
+  type TPostActivityKind,
+} from "@feeblo/db/validation-schema/activity-kind";
 
 export const PostActivity = S.Struct({
   id: S.String,
