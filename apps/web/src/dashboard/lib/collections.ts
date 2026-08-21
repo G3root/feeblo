@@ -1047,21 +1047,6 @@ export const siteCollection = createCollection(
   })
 );
 
-export const workspaceProductCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: ["workspace-product"],
-    queryFn: async (ctx) => {
-      const data = await fetchRpc((rpc) => rpc.WorkspaceProductList(), {
-        signal: ctx.signal,
-      });
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    staleTime: Number.POSITIVE_INFINITY,
-  })
-);
-
 export const workspacePlanCollection = createCollection(
   queryCollectionOptions({
     queryKey: () => getOrganizationScopedQueryKey("workspace-plan"),
@@ -1655,7 +1640,6 @@ export const dashboardCollections = {
   tagCollection,
   upvoteCollection,
   workspacePlanCollection,
-  workspaceProductCollection,
 };
 
 export type DashboardCollections = typeof dashboardCollections;

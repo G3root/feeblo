@@ -471,12 +471,7 @@ describe("PostRpcHandlers", () => {
             .select({ id: schema.postTable.id })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
-          const legacyQueue = yield* db
-            .select({ postId: schema.submissionNotificationQueueTable.postId })
-            .from(schema.submissionNotificationQueueTable)
-            .where(eq(schema.submissionNotificationQueueTable.postId, postId));
           expect(posts).toEqual([]);
-          expect(legacyQueue).toEqual([]);
         })
       );
 

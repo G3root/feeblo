@@ -3,6 +3,9 @@
   "extends": "@feeblo/config/tsconfig.base.json",
   "include": ["**/*.ts"],
   "compilerOptions": {
+    // Specs evaluate code in the browser context (e.g. HTMLInputElement),
+    // which needs the DOM lib on top of the ESNext default.
+    "lib": ["ESNext", "DOM"],
     "types": ["node"]
   }
 }

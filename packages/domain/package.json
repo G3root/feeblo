@@ -79,6 +79,9 @@
     "./plan-entitlements": {
       "default": "./src/plan-entitlements.ts"
     },
+    "./pricing/schema": {
+      "default": "./src/pricing/schema.ts"
+    },
     "./entitlement/policies": {
       "default": "./src/entitlement/policies.ts"
     },

@@ -801,7 +801,6 @@ export const initAuthHandler = (
         PolarService.layer,
         BillingRepository.layer,
         MembershipRepository.layer,
-        makeMailerLayer(),
         rateLimitLayer,
         WorkspaceRepository.layer
       )

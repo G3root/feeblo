@@ -92,6 +92,22 @@
       "types": "./src/auth/auth-flows.ts",
       "default": "./src/auth/auth-flows.ts"
     },
+    "./auth-forms": {
+      "types": "./src/auth/auth-forms.tsx",
+      "default": "./src/auth/auth-forms.tsx"
+    },
+    "./otp-resend": {
+      "types": "./src/auth/otp-resend.ts",
+      "default": "./src/auth/otp-resend.ts"
+    },
+    "./use-auth-submission": {
+      "types": "./src/auth/use-auth-submission.ts",
+      "default": "./src/auth/use-auth-submission.ts"
+    },
+    "./turnstile": {
+      "types": "./src/auth/turnstile.tsx",
+      "default": "./src/auth/turnstile.tsx"
+    },
     "./auth-dialog": {
       "types": "./src/v2/dialogs/auth-dialog.tsx",
       "default": "./src/v2/dialogs/auth-dialog.tsx"
@@ -131,6 +147,10 @@
     "./dashboard/use-dashboard-home-stats": {
       "types": "./src/dashboard/use-dashboard-home-stats.ts",
       "default": "./src/dashboard/use-dashboard-home-stats.ts"
+    },
+    "./post/post-card": {
+      "types": "./src/post/post-card.tsx",
+      "default": "./src/post/post-card.tsx"
     }
   },
   "scripts": {

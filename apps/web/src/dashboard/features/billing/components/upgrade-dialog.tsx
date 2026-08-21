@@ -1,3 +1,4 @@
+import type { TPlanPricing } from "@feeblo/domain/pricing/schema";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -24,6 +25,7 @@ import {
   ItemTitle,
 } from "@feeblo/ui/item";
 import { Radio, RadioGroup } from "@feeblo/ui/radio-group";
+import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { SparklesIcon, StarIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
@@ -32,27 +34,22 @@ import { useState } from "react";
 
 import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
 import { useOrganizationId } from "~/hooks/use-organization-id";
+import { usePlanCatalog } from "~/hooks/use-plan-catalog";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { useUpgradePlanDialogContext } from "../dialog-stores";
 import { startBillingCheckout, startBillingPortal } from "../lib/checkout";
 import {
   type BillingInterval,
+  type PlanCard,
   buildPlanCards,
   formatPlanPrice,
-  PLAN_FEATURES,
+  PLAN_COPY,
   type PlanType,
   type WorkspacePlan,
-  type WorkspaceProduct,
 } from "../lib/plans";
 
-type PlanView = {
-  planType: PlanType;
-  name: string;
-  description: string;
-
-  month: WorkspaceProduct | undefined;
-  year: WorkspaceProduct | undefined;
+type PlanView = PlanCard & {
   productId: {
     month: string;
     year: string;
@@ -76,35 +73,63 @@ export function UpgradePlanDialog() {
   );
 }
 
-// TODO: add loading states for products and plans
 function UpgradePlanDialogPopup() {
   const organizationId = useOrganizationId();
-  const { workspacePlanCollection, workspaceProductCollection } =
-    useDashboardCollections();
+  const { workspacePlanCollection } = useDashboardCollections();
 
-  const { data: products } = useLiveQuery((q) =>
-    q.from({ product: workspaceProductCollection })
-  );
+  const catalog = usePlanCatalog();
 
-  const { data: workspacePlans } = useLiveQuery((q) =>
+  const { data: workspacePlans, isLoading: plansLoading } = useLiveQuery((q) =>
     q
       .from({ plan: workspacePlanCollection })
       .where(({ plan }) => eq(plan.organizationId, organizationId))
   );
 
-  const currentPlanType =
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    (workspacePlans[0] as WorkspacePlan | undefined)?.plan ?? "free";
-  const { plans: rawPlans } = buildPlanCards(
-    // SAFETY: The upstream contract guarantees this value here.
-    (products as WorkspaceProduct[]) ?? [],
-    currentPlanType
+  if (catalog.isPending || plansLoading) {
+    return <UpgradePlanDialogSkeleton />;
+  }
+
+  if (catalog.isError) {
+    return (
+      <DialogPopup className="max-w-5xl">
+        <DialogPanel scrollFade={false}>
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle>Upgrade Plan</DialogTitle>
+            <DialogDescription className="mt-1">
+              Plans are unavailable right now. Please try again later.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogPanel>
+      </DialogPopup>
+    );
+  }
+
+  return (
+    <UpgradePlanDialogContent
+      organizationId={organizationId}
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      catalog={catalog.data ?? []}
+      workspacePlans={workspacePlans ?? []}
+    />
   );
+}
+
+function UpgradePlanDialogContent({
+  organizationId,
+  catalog,
+  workspacePlans,
+}: {
+  organizationId: string;
+  catalog: readonly TPlanPricing[];
+  workspacePlans: WorkspacePlan[];
+}) {
+  const currentPlanType = workspacePlans[0]?.plan ?? "free";
+  const { plans: rawPlans } = buildPlanCards(catalog, currentPlanType);
   const plans: PlanView[] = rawPlans.map((plan) => ({
     ...plan,
     productId: {
-      month: plan.month?.id ?? "free",
-      year: plan.year?.id ?? "free",
+      month: plan.month?.productId ?? "free",
+      year: plan.year?.productId ?? "free",
     },
   }));
 
@@ -210,8 +235,14 @@ function UpgradePlanDialogPopup() {
               </p>
             </div>
 
-            <ItemGroup className="mt-5 gap-1">
-              {PLAN_FEATURES[selectedPlan.planType].map((feature) => (
+            {selectedPlan.includesLabel ? (
+              <div className="text-muted-foreground mt-5 text-sm font-medium">
+                {selectedPlan.includesLabel}
+              </div>
+            ) : null}
+
+            <ItemGroup className="mt-2 gap-1">
+              {selectedPlan.features.map((feature) => (
                 <Item key={feature.key} size="sm" variant="outline">
                   <ItemMedia>
                     <HugeiconsIcon icon={StarIcon} />
@@ -222,6 +253,71 @@ function UpgradePlanDialogPopup() {
                 </Item>
               ))}
             </ItemGroup>
+          </aside>
+        </div>
+      </DialogPanel>
+    </DialogPopup>
+  );
+}
+
+function UpgradePlanDialogSkeleton() {
+  return (
+    <DialogPopup className="max-w-5xl">
+      <DialogPanel scrollFade={false}>
+        <div className="grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+          <div className="border-border flex flex-col lg:border-r">
+            <DialogHeader className="gap-4 px-6 pt-6 pb-5">
+              <div className="flex items-center gap-3">
+                <div className="bg-primary/15 text-primary flex h-9 w-9 items-center justify-center rounded-xl">
+                  <HugeiconsIcon className="h-4 w-4" icon={SparklesIcon} />
+                </div>
+                <div>
+                  <DialogTitle>Upgrade Plan</DialogTitle>
+                  <DialogDescription className="mt-1">
+                    Select the plan that fits this workspace.
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            <div className="flex flex-1 flex-col px-6 pb-6">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div className="text-sm font-medium">Select plan:</div>
+              </div>
+              <SkeletonLoader isLoading>
+                <SkeletonWrapper>
+                  <RadioGroup className="gap-3" value="free">
+                    {Object.entries(PLAN_COPY).map(([planType, copy]) => (
+                      <Field key={planType} orientation="horizontal">
+                        <FieldLabel
+                          className="flex flex-1 cursor-pointer items-center gap-3"
+                          htmlFor={planType}
+                        >
+                          <Radio id={planType} value={planType} />
+                          <FieldContent>
+                            <FieldTitle>{copy.name}</FieldTitle>
+                            <FieldDescription>
+                              {copy.description}
+                            </FieldDescription>
+                          </FieldContent>
+                        </FieldLabel>
+                      </Field>
+                    ))}
+                  </RadioGroup>
+                </SkeletonWrapper>
+              </SkeletonLoader>
+            </div>
+          </div>
+          <aside className="bg-muted/20 flex flex-col px-6 py-6">
+            <SkeletonLoader isLoading>
+              <SkeletonWrapper>
+                <div className="max-w-sm space-y-5">
+                  <div className="text-2xl font-semibold tracking-tight">
+                    Loading
+                  </div>
+                  <p className="text-muted-foreground text-base">Loading</p>
+                </div>
+              </SkeletonWrapper>
+            </SkeletonLoader>
           </aside>
         </div>
       </DialogPanel>

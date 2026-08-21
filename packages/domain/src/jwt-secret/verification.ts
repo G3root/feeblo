@@ -24,7 +24,12 @@ const MAX_JWT_LENGTH = 16 * 1024;
  * An `exp` claim is optional but, when present, is validated by jose — an
  * expired token is rejected. Minting short-lived tokens is still strongly
  * recommended (see docs/widget-sso.md).
+ *
+ * Secrets are stored as 64-char hex (32 bytes). Decode hex to raw bytes.
  */
+const secretToKey = (secret: string): Uint8Array =>
+  new Uint8Array(Buffer.from(secret, "hex"));
+
 export const verifyJwt = (
   token: string,
   secrets: readonly string[],
@@ -36,7 +41,7 @@ export const verifyJwt = (
     }
 
     for (const secret of secrets) {
-      const key = new TextEncoder().encode(secret);
+      const key = secretToKey(secret);
 
       // jwtVerify rejects expired tokens (when `exp` is present) and tokens
       // with an invalid signature; any failure just moves on to the next

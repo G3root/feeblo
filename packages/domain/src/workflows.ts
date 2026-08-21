@@ -46,14 +46,17 @@ type MakeMailerLayer = () => Layer.Layer<
   Layer.Error<typeof Mailer.layer>
 >;
 
-const makeWorkflowLayers = (makeMailerLayer: MakeMailerLayer) =>
-  Layer.mergeAll(
+const makeWorkflowLayers = (makeMailerLayer: MakeMailerLayer) => {
+  // One mailer layer shared by every workflow so repeated calls cannot build
+  // duplicate transports.
+  const mailerLayer = makeMailerLayer();
+  return Layer.mergeAll(
     WelcomeUserWorkflowLayer.pipe(
-      Layer.provide(makeMailerLayer()),
+      Layer.provide(mailerLayer),
       Layer.provide(MailerConfig.layer)
     ),
     EmailOutboxWorkflowLayer.pipe(
-      Layer.provide(makeMailerLayer()),
+      Layer.provide(mailerLayer),
       Layer.provide(EmailOutboxConfig.layer),
       Layer.provide(EmailOutboxRepository.layer),
       Layer.provide(EmailSubscriptionRepository.layer),
@@ -63,6 +66,7 @@ const makeWorkflowLayers = (makeMailerLayer: MakeMailerLayer) =>
     ),
     EmailOutboxReconciliationLayer
   );
+};
 
 export const makeWorkflowsLive = (
   makeMailerLayer: MakeMailerLayer = () => Mailer.layer

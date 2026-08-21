@@ -21,7 +21,7 @@ const signToken = (payload: jose.JWTPayload, secret: string) =>
   Effect.promise(() =>
     new jose.SignJWT(payload)
       .setProtectedHeader({ alg: "HS256" })
-      .sign(new TextEncoder().encode(secret))
+      .sign(new Uint8Array(Buffer.from(secret, "hex")))
   );
 
 const futureExp = Math.floor(Date.now() / 1000) + 3600;
@@ -58,7 +58,7 @@ describe("createSsoSession", () => {
         yield* db.insert(schema.jwtSecretTable).values({
           id: `jwt_secret_${organizationId}`,
           organizationId,
-          secret: `secret-${organizationId}`,
+          secret: "a".repeat(64),
           createdAt: now,
           revokedAt: null,
         });
@@ -96,7 +96,7 @@ describe("createSsoSession", () => {
       return {
         clientIp: organizationId,
         organizationId,
-        secret: `secret-${organizationId}`,
+        secret: "a".repeat(64),
       } satisfies Fixture;
     });
 
@@ -237,10 +237,7 @@ describe("createSsoSession", () => {
     it.effect("rejects a token signed with another organization's secret", () =>
       Effect.gen(function* () {
         const fixture = yield* makeFixture(true);
-        const token = yield* signToken(
-          validPayload(fixture),
-          "a-different-orgs-secret"
-        );
+        const token = yield* signToken(validPayload(fixture), "b".repeat(64));
 
         const error = yield* Effect.flip(
           createSsoSession({

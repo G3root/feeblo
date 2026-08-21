@@ -141,7 +141,6 @@ function CompanyCreateForm() {
             values: data.value.attributes,
           }
         );
-        //TODO add error validation
         await createCompanyAction({
           company,
           createAttribute,

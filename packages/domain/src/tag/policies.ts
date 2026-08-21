@@ -23,7 +23,11 @@ type TCanSetPostTags = {
 const makeTagPolicy = Effect.gen(function* () {
   const repository = yield* TagRepository;
 
-  // TODO ADD ORG OWNERSHIP CHECK
+  // `tags.create` is used only by `canCreate`; `canDelete` and `canUpdate`
+  // require `tags.*`. Tag assignment via `canSetPostTags` may use `posts.*`,
+  // `tags.*`, or the post-creator path, and via `canSetChangelogTags` may use
+  // `changelog.*` or `tags.*`; both `canSet*` methods enforce membership
+  // directly.
   const canCreate = (organizationId: string) =>
     Policy.canPermission(organizationId, "tags.create");
 

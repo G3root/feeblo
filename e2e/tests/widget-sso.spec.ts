@@ -35,7 +35,8 @@ function signWidgetToken(
     })
   ).toString("base64url");
   const unsignedToken = `${header}.${payload}`;
-  const signature = createHmac("sha256", secret)
+  const key = Buffer.from(secret, "hex");
+  const signature = createHmac("sha256", key)
     .update(unsignedToken)
     .digest("base64url");
 
@@ -165,21 +166,18 @@ test(
                 ) => WidgetHandle;
               };
               e2eWidget?: WidgetHandle;
-              addEventListener: (
-                event: string,
-                listener: (event: {
-                  detail: { data: { title: string } };
-                }) => void,
-                options: { once: boolean }
-              ) => void;
               document: { body: { dataset: Record<string, string> } };
             };
 
             browserGlobal.addEventListener(
               "feedbackSubmitted",
               (event) => {
-                browserGlobal.document.body.dataset.submittedFeedback =
-                  event.detail.data.title;
+                // SAFETY: The SDK dispatches "feedbackSubmitted" as a
+                // CustomEvent whose detail carries the submitted title.
+                const { title } = (
+                  event as CustomEvent<{ data: { title: string } }>
+                ).detail.data;
+                browserGlobal.document.body.dataset.submittedFeedback = title;
               },
               { once: true }
             );
@@ -281,11 +279,11 @@ test(
         ).toBeTruthy();
 
         await expect(
-          visitorPage.getByRole("button", { name: "Sign out" })
-        ).toBeVisible();
-        await expect(
-          visitorPage.getByRole("button", { name: "Sign in" })
+          visitorPage.getByRole("button", { name: "Sign in / Sign up" })
         ).toHaveCount(0);
+        await expect(
+          visitorPage.getByRole("button", { name: "User menu" })
+        ).toBeVisible();
 
         await visitorPage
           .getByRole("link", { name: new RegExp(feedbackTitle) })

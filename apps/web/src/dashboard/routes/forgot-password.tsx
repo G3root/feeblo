@@ -1,4 +1,8 @@
 import { initializePasswordReset } from "@feeblo/post-ui/auth-flows";
+import {
+  clearVerificationOtp,
+  RateLimitErrorSchema,
+} from "@feeblo/post-ui/otp-resend";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import { EmailSchema } from "@feeblo/web-shared/user-validation";
@@ -6,10 +10,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 
 import { AuthShell } from "~/features/auth/components/auth-shell";
-import {
-  clearVerificationOtp,
-  RateLimitErrorSchema,
-} from "~/features/auth/lib/otp-resend";
 
 const SearchSchema = z.object({
   redirectTo: z.string().optional(),

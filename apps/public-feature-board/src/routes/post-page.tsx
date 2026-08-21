@@ -1,4 +1,4 @@
-import { AuthDialog } from "@feeblo/post-ui/auth-dialog";
+import { AuthButton } from "@feeblo/post-ui/auth-dialog";
 import { PostCommentGuestPrompt } from "@feeblo/post-ui/post-comment-composer";
 import { PostPage as ComposedPostPage } from "@feeblo/post-ui/post-page";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
@@ -201,7 +201,7 @@ export function PostPage() {
                   <ComposedPostPage.PublicCommentComposer />
                   <ComposedPostPage.Guest>
                     <PostCommentGuestPrompt
-                      action={<AuthDialog variant="sign-in" />}
+                      action={<AuthButton />}
                       isAuthenticated={false}
                     />
                   </ComposedPostPage.Guest>

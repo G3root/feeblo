@@ -1,3 +1,5 @@
+import { getCachedAuthSession } from "@feeblo/web-shared/auth-session";
+import { hasPermission } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
 
 import {
@@ -9,11 +11,20 @@ import { invitationsCollection, membersCollection } from "~/lib/collections";
 
 export const Route = createFileRoute("/$organizationId/settings/members")({
   component: MembersSettingsPage,
-  beforeLoad: async () => {
-    await Promise.all([
-      membersCollection.preload(),
-      invitationsCollection.preload(),
-    ]);
+  beforeLoad: async ({ params }) => {
+    const session = getCachedAuthSession();
+
+    const promises = [membersCollection.preload()];
+    const canListInvitations =
+      session !== null &&
+      hasPermission(params.organizationId, "members.invite")(session);
+
+    if (canListInvitations) {
+      promises.push(invitationsCollection.preload());
+    }
+
+    await Promise.all(promises);
+
     return null;
   },
 });

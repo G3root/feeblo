@@ -1,13 +1,11 @@
-import { AuthDialog } from "@feeblo/post-ui/auth-dialog";
-import { Button } from "@feeblo/ui/button";
+import { AuthButton } from "@feeblo/post-ui/auth-dialog";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { cn } from "@feeblo/ui/utils";
-import { authClient } from "@feeblo/web-shared/auth-client";
-import { refreshAuthSession } from "@feeblo/web-shared/auth-session";
-import { useAuthState } from "@feeblo/web-shared/use-auth-state";
+import { useAuth } from "@feeblo/web-shared/auth-context";
 import { Link, useLocation } from "@tanstack/react-router";
 
 import { useSite } from "../../providers/site-provider";
+import { UserMenu } from "./user-menu";
 
 export function Navbar() {
   const site = useSite();
@@ -76,26 +74,12 @@ function NavTab({ href, label }: { href: string; label: string }) {
 }
 
 function UserActions() {
-  const { data: session } = useAuthState();
+  const auth = useAuth();
+  const isAuthenticated = auth.status === "authenticated";
+
   return (
     <div className="flex items-center gap-2">
-      {session ? (
-        <Button
-          onClick={async () => {
-            await authClient.signOut();
-            await refreshAuthSession();
-          }}
-          size="sm"
-          variant="outline"
-        >
-          Sign out
-        </Button>
-      ) : (
-        <>
-          <AuthDialog variant="sign-in" />
-          <AuthDialog variant="sign-up" />
-        </>
-      )}
+      {isAuthenticated ? <UserMenu /> : <AuthButton />}
     </div>
   );
 }

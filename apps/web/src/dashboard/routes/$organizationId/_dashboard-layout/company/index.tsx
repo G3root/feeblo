@@ -1,3 +1,4 @@
+import { Button } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import {
   Table,
@@ -26,6 +27,7 @@ import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import { CompanyCreateDialog } from "~/features/contact/components/company-create-dialog";
 import { CompanyDeleteDialog } from "~/features/contact/components/company-delete-dialog";
 import { CompanyEditDialog } from "~/features/contact/components/company-edit-dialog";
+import { CrmEntriesUsage } from "~/features/contact/components/crm-entries-usage";
 import {
   CompanyCreateDialogProvider,
   CompanyDeleteDialogProvider,
@@ -132,10 +134,10 @@ function CompanyPage() {
       <div className="p-3">
         {crmLimit !== null ? (
           <div className="mb-3 flex justify-end">
-            <p className="text-muted-foreground text-sm">
-              {totalCrmEntries} of {crmLimit} CRM entries used
-              {hasReachedCrmLimit ? " — upgrade for unlimited" : ""}
-            </p>
+            <CrmEntriesUsage
+              crmLimit={crmLimit}
+              totalCrmEntries={totalCrmEntries}
+            />
           </div>
         ) : null}
         <Empty>
@@ -174,12 +176,10 @@ function CompanyPage() {
     <div className="p-3">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          {crmLimit !== null ? (
-            <p className="text-muted-foreground text-sm">
-              {totalCrmEntries} of {crmLimit} CRM entries used
-              {hasReachedCrmLimit ? " — upgrade for unlimited" : ""}
-            </p>
-          ) : null}
+          <CrmEntriesUsage
+            crmLimit={crmLimit}
+            totalCrmEntries={totalCrmEntries}
+          />
         </div>
         <PolicyGuard policy={hasPermission(organizationId, "companies.create")}>
           {({ allowed }) => (
@@ -357,7 +357,6 @@ function formatSource(source: "DASHBOARD" | "WIDGET" | "API" | "IMPORT") {
   }[source];
 }
 
-import { Button } from "@feeblo/ui/button";
 import {
   Empty,
   EmptyContent,

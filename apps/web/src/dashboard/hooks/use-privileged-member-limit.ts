@@ -1,4 +1,5 @@
 import { isPrivilegedRole } from "@feeblo/permissions";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 
 import { invitationsCollection, membersCollection } from "~/lib/collections";
@@ -8,6 +9,10 @@ import { useOrganizationId } from "./use-organization-id";
 
 export const usePrivilegedMemberLimit = () => {
   const organizationId = useOrganizationId();
+
+  const { allowed: canListInvitations, isPending: isPolicyPending } = usePolicy(
+    hasPermission(organizationId, "members.invite")
+  );
   const { entitlements } = useEntitlements();
 
   const membersQuery = useLiveQuery(
@@ -19,16 +24,20 @@ export const usePrivilegedMemberLimit = () => {
   );
 
   const invitationsQuery = useLiveQuery(
-    (q) =>
-      q
+    (q) => {
+      if (isPolicyPending || !canListInvitations) {
+        return undefined;
+      }
+      return q
         .from({ invitation: invitationsCollection })
         .where(({ invitation }) =>
           and(
             eq(invitation.organizationId, organizationId),
             eq(invitation.status, "pending")
           )
-        ),
-    [organizationId]
+        );
+    },
+    [organizationId, isPolicyPending, canListInvitations]
   );
 
   const privilegedMemberCount = (membersQuery.data ?? []).filter((member) =>

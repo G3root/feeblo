@@ -11,6 +11,8 @@ import { createTestUser } from "../helpers/test-users";
 
 const signInWithEmailButtonName = /^Sign in with email/;
 const signUpWithEmailButtonName = /^Sign up with email/;
+const authDialogName = "Sign in / Sign up";
+const authButtonName = "Sign in / Sign up";
 
 async function createPost(page: Page, title: string, content: string) {
   await page.getByRole("button", { name: "New post" }).click();
@@ -42,9 +44,9 @@ async function signInThroughPublicBoard(
   email: string,
   password: string
 ) {
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: authButtonName }).click();
 
-  const authDialog = page.getByRole("dialog", { name: "Continue to Feeblo" });
+  const authDialog = page.getByRole("dialog", { name: authDialogName });
   await expect(authDialog).toBeVisible();
   await authDialog
     .getByRole("button", { name: signInWithEmailButtonName })
@@ -65,7 +67,19 @@ async function signInThroughPublicBoard(
   expect((await signInResponse).ok()).toBeTruthy();
 
   await expect(signInDialog).toBeHidden();
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(page.getByRole("button", { name: authButtonName })).toHaveCount(
+    0
+  );
+  // Authenticated: user menu should be visible
+  await expect(page.getByRole("button", { name: "User menu" })).toBeVisible();
+}
+
+async function signOutFromPublicBoard(page: Page) {
+  await page.getByRole("button", { name: "User menu" }).click();
+  await page.getByRole("menuitem", { name: "Log out" }).click();
+  await expect(
+    page.getByRole("button", { name: authButtonName })
+  ).toBeVisible();
 }
 
 test(
@@ -113,10 +127,10 @@ test(
       // root, now authenticated.
       await expect(visitorPage).toHaveURL(`${boardUrl}/`);
       await expect(
-        visitorPage.getByRole("button", { name: "Sign out" })
+        visitorPage.getByRole("button", { name: "User menu" })
       ).toBeVisible();
       await expect(
-        visitorPage.getByRole("button", { name: "Sign in", exact: true })
+        visitorPage.getByRole("button", { name: authButtonName })
       ).toHaveCount(0);
     } finally {
       await visitorContext.close();
@@ -144,14 +158,11 @@ test(
       ).toBeVisible();
       await visitorPage.keyboard.press("Escape");
 
-      await visitorPage.getByRole("button", { name: "Sign out" }).click();
-      await expect(
-        visitorPage.getByRole("button", { name: "Sign in", exact: true })
-      ).toBeVisible();
+      await signOutFromPublicBoard(visitorPage);
 
       await visitorPage.getByRole("button", { name: "Give Feedback" }).click();
       await expect(
-        visitorPage.getByRole("dialog", { name: "Continue to Feeblo" })
+        visitorPage.getByRole("dialog", { name: authDialogName })
       ).toBeVisible();
     } finally {
       await visitorContext.close();
@@ -173,12 +184,10 @@ test(
     try {
       const boardUrl = publicBoardUrl(owner.workspaceName);
       await visitorPage.goto(boardUrl);
-      await visitorPage
-        .getByRole("button", { name: "Sign up", exact: true })
-        .click();
+      await visitorPage.getByRole("button", { name: authButtonName }).click();
 
       const chooserDialog = visitorPage.getByRole("dialog", {
-        name: "Continue to Feeblo",
+        name: authDialogName,
       });
       await chooserDialog
         .getByRole("button", { name: signUpWithEmailButtonName })
@@ -197,7 +206,7 @@ test(
         .getByLabel("Password", { exact: true })
         .fill(visitor.password);
       await signUpDialog
-        .getByLabel("Confirm password", { exact: true })
+        .getByLabel("Confirm Password", { exact: true })
         .fill(visitor.password);
       await signUpDialog
         .getByRole("button", { name: "Sign up", exact: true })
@@ -221,7 +230,7 @@ test(
 
       await expect(visitorPage).toHaveURL(`${boardUrl}/`);
       await expect(
-        visitorPage.getByRole("button", { name: "Sign out" })
+        visitorPage.getByRole("button", { name: "User menu" })
       ).toBeVisible();
       await visitorPage.getByRole("button", { name: "Give Feedback" }).click();
       await expect(
@@ -251,7 +260,7 @@ test(
 
       await visitorPage.getByRole("button", { name: "Give Feedback" }).click();
       const authDialog = visitorPage.getByRole("dialog", {
-        name: "Continue to Feeblo",
+        name: authDialogName,
       });
       await expect(authDialog).toBeVisible();
       await visitorPage.keyboard.press("Escape");
@@ -273,8 +282,8 @@ test(
       ).toHaveCount(0);
 
       await visitorPage
-        .getByRole("button", { name: "Sign in", exact: true })
-        .last()
+        .getByRole("button", { name: authButtonName })
+        .first()
         .click();
       await expect(authDialog).toBeVisible();
     } finally {
@@ -316,7 +325,7 @@ test(
       await upvoteButton.click();
 
       const authDialogHeading = visitorPage.getByRole("heading", {
-        name: "Continue to Feeblo",
+        name: authDialogName,
       });
       await expect(authDialogHeading).toBeVisible();
       await visitorPage.keyboard.press("Escape");

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Effect-TS/language-service/refs/heads/main/schema.json",
+  "extends": "@feeblo/config/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": [],
+    "noEmit": true,
+    "strictNullChecks": true,
+    "paths": {
+      "@feeblo/sdk": ["../sdk/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*"]
+}
