@@ -11,8 +11,8 @@ import {
 import { Database } from "@feeblo/db";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord";
-import { ExternalResourceService } from "@feeblo/domain/integration/external-resource/service";
 import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
+import { ExternalResourceService } from "@feeblo/domain/integration/external-resource/service";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack";
 import { Mailer } from "@feeblo/transactional/mailer";
 import {
@@ -60,7 +60,9 @@ export const program = Effect.gen(function* () {
   // Built once so the integration kernel and the HTTP layer tree share a
   // single instance instead of building sibling copies in separate memo
   // scopes.
-  const externalResourceContext = yield* Layer.build(ExternalResourceServiceLive);
+  const externalResourceContext = yield* Layer.build(
+    ExternalResourceServiceLive
+  );
   const externalResources = Context.get(
     externalResourceContext,
     ExternalResourceService

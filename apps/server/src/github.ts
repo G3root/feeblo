@@ -131,9 +131,12 @@ const makeGitHubAppWebhookRouter = (registry: IntegrationProviderRegistry) =>
             Effect.catch((cause) =>
               Effect.logError(cause).pipe(
                 Effect.as(
-                  HttpServerResponse.text("GitHub App webhook processing failed", {
-                    status: 500,
-                  })
+                  HttpServerResponse.text(
+                    "GitHub App webhook processing failed",
+                    {
+                      status: 500,
+                    }
+                  )
                 )
               )
             )

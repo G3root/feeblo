@@ -67,7 +67,9 @@ export const handleVerifiedInbound = <A, I, E, R>(input: {
   R
 > => {
   if (input.handler === undefined) {
-    return Effect.succeed(HttpServerResponse.text("not found", { status: 404 }));
+    return Effect.succeed(
+      HttpServerResponse.text("not found", { status: 404 })
+    );
   }
   return Effect.flatMap(
     input.handler.handle({ headers: input.headers, rawBody: input.rawBody }),

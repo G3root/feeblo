@@ -167,10 +167,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
                     schema.integrationExternalResourceTable.connectionId,
                     activeConnection.id
                   ),
-                  eq(
-                    schema.postExternalResourceLinkTable.postId,
-                    link.postId
-                  ),
+                  eq(schema.postExternalResourceLinkTable.postId, link.postId),
                   eq(
                     schema.integrationExternalResourceTable.resourceType,
                     gitHubIssueResourceType
@@ -287,9 +284,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
                   deduplicationKey: `github.issue.status:${webhook.deliveryId}:${link.postId}:${match.id}`,
                 })
                 .pipe(
-                  Effect.mapError(
-                    inboundDatabaseError("upvoter notification")
-                  )
+                  Effect.mapError(inboundDatabaseError("upvoter notification"))
                 );
             }
           }
@@ -386,9 +381,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
                 )
               )
               .pipe(
-                Effect.mapError(
-                  inboundDatabaseError("installation suspension")
-                )
+                Effect.mapError(inboundDatabaseError("installation suspension"))
               );
             yield* db
               .update(schema.integrationConnectionTable)
@@ -399,9 +392,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
                   installation.connectionId
                 )
               )
-              .pipe(
-                Effect.mapError(inboundDatabaseError("connection pause"))
-              );
+              .pipe(Effect.mapError(inboundDatabaseError("connection pause")));
             return;
           }
           if (webhook.action !== "unsuspend") {
@@ -417,9 +408,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
               )
             )
             .pipe(
-              Effect.mapError(
-                inboundDatabaseError("installation restoration")
-              )
+              Effect.mapError(inboundDatabaseError("installation restoration"))
             );
           if (
             installation.lifecycle === "paused" &&
@@ -435,9 +424,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
                 )
               )
               .pipe(
-                Effect.mapError(
-                  inboundDatabaseError("connection restoration")
-                )
+                Effect.mapError(inboundDatabaseError("connection restoration"))
               );
           }
         })
