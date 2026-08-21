@@ -59,17 +59,26 @@ export const PLAN_COPY = {
   { name: string; description: string; recommended?: boolean }
 >;
 
+/** Working slots for one paid plan's products, keyed by billing interval. */
+type PlanProducts = {
+  month: WorkspaceProduct | undefined;
+  year: WorkspaceProduct | undefined;
+};
+
 export function buildPlanCards(
   products: WorkspaceProduct[],
   currentPlanType: PlanType
 ) {
-  const productsByPlan = {
-    starter: { month: undefined, year: undefined },
-    professional: { month: undefined, year: undefined },
-  } satisfies Record<
-    Exclude<PlanType, "free">,
-    Record<BillingInterval, WorkspaceProduct | undefined>
-  >;
+  // Annotations (not `satisfies`) so the slots keep the declared
+  // WorkspaceProduct | undefined type instead of the literal's undefined.
+  const starterProducts: PlanProducts = {
+    month: undefined,
+    year: undefined,
+  };
+  const professionalProducts: PlanProducts = {
+    month: undefined,
+    year: undefined,
+  };
 
   for (const product of products) {
     const plan = product.metadata?.plan;
@@ -79,7 +88,11 @@ export function buildPlanCards(
       continue;
     }
 
-    productsByPlan[plan][interval] = product;
+    if (plan === "starter") {
+      starterProducts[interval] = product;
+    } else {
+      professionalProducts[interval] = product;
+    }
   }
 
   const plans: PlanCard[] = [
@@ -92,12 +105,12 @@ export function buildPlanCards(
     {
       planType: "starter",
       ...PLAN_COPY.starter,
-      ...productsByPlan.starter,
+      ...starterProducts,
     },
     {
       planType: "professional",
       ...PLAN_COPY.professional,
-      ...productsByPlan.professional,
+      ...professionalProducts,
     },
   ];
 

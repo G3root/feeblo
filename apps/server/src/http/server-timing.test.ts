@@ -61,3 +61,18 @@ it.live("adds Server-Timing to error responses", () =>
     })
   )
 );
+
+it.live("adds Server-Timing to unmatched routes", () =>
+  withApp(({ handler }) =>
+    Effect.gen(function* () {
+      const response = yield* Effect.promise(() =>
+        handler(new Request("http://localhost/missing"))
+      );
+      expect(response.status).toBe(404);
+      expect(getServerTiming(response)).toMatch(
+        /^total;dur=\d+(\.\d+)?;desc="GET \/missing"$/
+      );
+      expect(getResponseTime(response)).toMatch(/^\d+(\.\d+)?ms$/);
+    })
+  )
+);

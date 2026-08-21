@@ -11,98 +11,90 @@ import {
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
-import * as HttpHeaders from "effect/unstable/http/Headers";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 import { ServerConfig } from "./config";
-
-const headerValue = (
-  request: HttpServerRequest.HttpServerRequest,
-  name: string
-): string | undefined =>
-  Option.getOrUndefined(HttpHeaders.get(request.headers, name));
-
-const settingsRedirect = (
-  appUrl: string,
-  status: "connected" | "error",
-  message: string,
-  organizationId?: string
-): string => {
-  const base =
-    organizationId === undefined
-      ? `${appUrl}/settings/integrations`
-      : `${appUrl}/${organizationId}/settings/integrations`;
-  return `${base}?github=${status}&message=${encodeURIComponent(message)}`;
-};
+import {
+  handleVerifiedInbound,
+  headerValue,
+  settingsRedirect,
+} from "./webhook-inbound";
 
 /** GitHub redirects here after its App installer authorizes Feeblo to verify ownership. */
 export const makeGitHubAppInstallationCallbackRouter = () =>
   HttpRouter.use((router) =>
-    router.add(
-      "GET",
-      "/github/app/installations/callback",
-      (request: HttpServerRequest.HttpServerRequest) =>
-        Effect.gen(function* () {
-          const config = yield* ServerConfig;
-          const parsed = yield* Effect.exit(
-            parseGitHubAppInstallationCallbackUrl(request.url)
-          );
-          if (Exit.isFailure(parsed)) {
-            yield* Effect.logError(parsed.cause);
-            return HttpServerResponse.redirect(
-              settingsRedirect(
-                config.appUrl,
-                "error",
-                "GitHub App installation failed."
-              )
+    Effect.gen(function* () {
+      // Captured once at construction; the config is immutable.
+      const config = yield* ServerConfig;
+      return yield* router.add(
+        "GET",
+        "/github/app/installations/callback",
+        (request: HttpServerRequest.HttpServerRequest) =>
+          Effect.gen(function* () {
+            const parsed = yield* Effect.exit(
+              parseGitHubAppInstallationCallbackUrl(request.url)
             );
-          }
-          const management = yield* GitHubManagementService;
-          const completed = yield* Effect.exit(
-            management.connectComplete(parsed.value)
-          );
-          if (Exit.isFailure(completed)) {
-            yield* Effect.logError(completed.cause);
-            return HttpServerResponse.redirect(
-              settingsRedirect(
-                config.appUrl,
-                "error",
-                "GitHub App installation failed."
-              )
+            if (Exit.isFailure(parsed)) {
+              yield* Effect.logError(parsed.cause);
+              return HttpServerResponse.redirect(
+                settingsRedirect({
+                  appUrl: config.appUrl,
+                  message: "GitHub App installation failed.",
+                  provider: "github",
+                  status: "error",
+                })
+              );
+            }
+            const management = yield* GitHubManagementService;
+            const completed = yield* Effect.exit(
+              management.connectComplete(parsed.value)
             );
-          }
-          return HttpServerResponse.redirect(
-            settingsRedirect(
-              config.appUrl,
-              "connected",
-              "Feeblo is now connected to GitHub.",
-              completed.value.organizationId
-            )
-          );
-        })
-    )
+            if (Exit.isFailure(completed)) {
+              yield* Effect.logError(completed.cause);
+              return HttpServerResponse.redirect(
+                settingsRedirect({
+                  appUrl: config.appUrl,
+                  message: "GitHub App installation failed.",
+                  provider: "github",
+                  status: "error",
+                })
+              );
+            }
+            return HttpServerResponse.redirect(
+              settingsRedirect({
+                appUrl: config.appUrl,
+                message: "Feeblo is now connected to GitHub.",
+                organizationId: completed.value.organizationId,
+                provider: "github",
+                status: "connected",
+              })
+            );
+          })
+      );
+    })
   ).pipe(Layer.provide(Database.DatabaseContextLive), Layer.orDie);
 
-/** One global GitHub App webhook endpoint. Verified payload installation IDs select the owning connection. */
+/**
+ * One global GitHub App webhook endpoint. Verified payload installation IDs
+ * select the owning connection; event routing lives behind
+ * GitHubInboundService so the HTTP layer only verifies, decodes, and acks.
+ */
 const makeGitHubAppWebhookRouter = (registry: IntegrationProviderRegistry) =>
   HttpRouter.use((router) =>
-    router.add(
-      "POST",
-      "/github/app/webhooks",
-      (request: HttpServerRequest.HttpServerRequest) =>
-        Effect.gen(function* () {
-          const inboundHandler = registry.getInboundHandler({
-            capabilityKey: githubIssueWebhookCapabilityKey,
-            provider: githubProviderKey,
-          });
-          if (inboundHandler === undefined) {
-            return HttpServerResponse.text("not found", { status: 404 });
-          }
-          const response = yield* inboundHandler.handle({
+    Effect.gen(function* () {
+      // Resolved once at construction; the registry is startup-validated and
+      // immutable afterwards.
+      const inboundHandler = registry.getInboundHandler({
+        capabilityKey: githubIssueWebhookCapabilityKey,
+        provider: githubProviderKey,
+      });
+      const inbound = yield* GitHubInboundService;
+      return yield* router.add("POST", "/github/app/webhooks", (request) =>
+        Effect.flatMap(request.text, (rawBody) =>
+          handleVerifiedInbound({
+            handler: inboundHandler,
             headers: {
               "x-github-delivery": headerValue(request, "x-github-delivery"),
               "x-github-event": headerValue(request, "x-github-event"),
@@ -111,83 +103,47 @@ const makeGitHubAppWebhookRouter = (registry: IntegrationProviderRegistry) =>
                 "x-hub-signature-256"
               ),
             },
-            rawBody: yield* request.text,
-          });
-          if (response.status !== 200) {
-            return HttpServerResponse.text(String(response.body), {
-              status: response.status,
-            });
-          }
-          const parsed = yield* Effect.exit(
-            Schema.decodeUnknownEffect(
-              Schema.toType(ParsedGitHubInboundRequest)
-            )(response.body)
-          );
-          if (Exit.isFailure(parsed)) {
-            return HttpServerResponse.text("invalid request payload", {
-              status: 400,
-            });
-          }
-          const inbound = yield* GitHubInboundService;
-          switch (parsed.value.kind) {
-            case "issue": {
-              const payload = parsed.value.payload;
-              if (
-                payload.action !== "opened" &&
-                payload.action !== "reopened" &&
-                payload.action !== "closed"
-              ) {
-                break;
-              }
-              yield* inbound.applyIssueWebhook({
-                deliveryId: parsed.value.deliveryId,
-                eventName: "issues",
-                installationId: String(payload.installation.id),
-                issueNumber: payload.issue.number,
-                issueState: payload.issue.state,
-                repositoryName: payload.repository.name,
-                repositoryOwner: payload.repository.owner.login,
-              });
-              break;
-            }
-            case "installation": {
-              const action = parsed.value.payload.action;
-              if (
-                action === "deleted" ||
-                action === "suspend" ||
-                action === "unsuspend"
-              ) {
-                yield* inbound.applyInstallationLifecycleWebhook({
-                  action,
-                  deliveryId: parsed.value.deliveryId,
-                  installationId: String(parsed.value.payload.installation.id),
-                });
-              }
-              break;
-            }
-            case "installation_repositories":
-              // Settings validate repository availability on update; this event is
-              // acknowledged so GitHub does not retry a delivery with no mutation.
-              break;
-            default:
-              return HttpServerResponse.text("unsupported GitHub App webhook", {
-                status: 202,
-              });
-          }
-          return HttpServerResponse.empty({ status: 202 });
-        }).pipe(
-          Effect.catch((cause) =>
-            Effect.logError(cause).pipe(
+            rawBody,
+            schema: ParsedGitHubInboundRequest,
+            respond: (parsed) =>
+              // Every recognized delivery is acknowledged with 202 so GitHub
+              // does not retry a delivery Feeblo has already recorded.
               Effect.as(
-                HttpServerResponse.text(
-                  "GitHub App webhook processing failed",
-                  { status: 500 }
+                inbound.applyWebhook(parsed),
+                HttpServerResponse.empty({ status: 202 })
+              ),
+          }).pipe(
+            Effect.catchTags({
+              IntegrationInboundRejection: (error) =>
+                Effect.logWarning("GitHub inbound request was rejected", {
+                  message: error.message,
+                  provider: error.provider,
+                }).pipe(
+                  Effect.as(
+                    HttpServerResponse.text("invalid request signature", {
+                      status: 401,
+                    })
+                  )
+                ),
+            }),
+            // Processing failures stay 500 so GitHub redelivers; the durable
+            // inbox makes replays idempotent.
+            Effect.catch((cause) =>
+              Effect.logError(cause).pipe(
+                Effect.as(
+                  HttpServerResponse.text(
+                    "GitHub App webhook processing failed",
+                    {
+                      status: 500,
+                    }
+                  )
                 )
               )
             )
           )
         )
-    )
+      );
+    })
   );
 
 /** Server HTTP adapters for GitHub App setup and its global webhook endpoint. */
