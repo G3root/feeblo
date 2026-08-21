@@ -41,7 +41,6 @@ import {
   type TPostStatusType,
 } from "../validation-schema/post-status-type";
 import type { TRoadmapMode } from "../validation-schema/roadmap-mode";
-import type { TTagType } from "../validation-schema/tag-type";
 import { memberTable, organizationTable, userTable } from "./auth";
 
 const VectorValues = Schema.Array(Schema.Number);
@@ -155,7 +154,6 @@ export const tagTable = pgTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
-    type: text("type").$type<TTagType>().notNull(),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
@@ -177,14 +175,12 @@ export const tagTable = pgTable(
       .notNull(),
   },
   (table) => [
-    uniqueIndex("tag_organizationId_type_name_uidx").on(
+    uniqueIndex("tag_organizationId_name_uidx").on(
       table.organizationId,
-      table.type,
       table.name
     ),
-    uniqueIndex("tag_organizationId_type_slug_uidx").on(
+    uniqueIndex("tag_organizationId_slug_uidx").on(
       table.organizationId,
-      table.type,
       table.slug
     ),
   ]
@@ -353,37 +349,6 @@ export const postTagTable = pgTable(
     index("post_tag_postId_idx").on(table.postId),
     index("post_tag_tagId_idx").on(table.tagId),
     uniqueIndex("post_tag_postId_tagId_uidx").on(table.postId, table.tagId),
-  ]
-);
-
-export const changelogTagTable = pgTable(
-  "changelog_tag",
-  {
-    id: text("id").primaryKey(),
-    changelogId: text("changelog_id")
-      .notNull()
-      .references(() => changelogTable.id, { onDelete: "cascade" }),
-    tagId: text("tag_id")
-      .notNull()
-      .references(() => tagTable.id, { onDelete: "cascade" }),
-    organizationId: text("organization_id")
-      .notNull()
-      .references(() => organizationTable.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
-  },
-  (table) => [
-    index("changelog_tag_changelogId_idx").on(table.changelogId),
-    index("changelog_tag_tagId_idx").on(table.tagId),
-    uniqueIndex("changelog_tag_changelogId_tagId_uidx").on(
-      table.changelogId,
-      table.tagId
-    ),
   ]
 );
 

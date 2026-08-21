@@ -21,7 +21,6 @@ import { useTagCreateDialogContext } from "../dialog-stores";
 export interface TagSelectOption {
   id: string;
   name: string;
-  type: "FEEDBACK" | "CHANGELOG";
 }
 
 export interface SelectedTag {
@@ -39,7 +38,6 @@ interface TagSelectProps {
   ) => void | Promise<void>;
   selectedTags: SelectedTag[];
   tags: TagSelectOption[];
-  type: TagSelectOption["type"];
 }
 
 export function TagSelect({
@@ -48,7 +46,6 @@ export function TagSelect({
   onTagSelect,
   selectedTags,
   tags,
-  type,
 }: TagSelectProps) {
   const [open, setOpen] = useState(false);
   const createDialogStore = useTagCreateDialogContext();
@@ -107,9 +104,7 @@ export function TagSelect({
         <Button
           aria-label="Create tag"
           disabled={disabled || !canCreate}
-          onClick={() =>
-            createDialogStore.send({ type: "toggle", data: { type } })
-          }
+          onClick={() => createDialogStore.send({ type: "toggle", data: {} })}
           size="icon-sm"
           title={
             canCreate ? undefined : "You don't have permission to create tags"
