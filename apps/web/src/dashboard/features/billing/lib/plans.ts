@@ -1,29 +1,13 @@
-import {
-  getPlanFeatureRows,
-  type PlanFeatureRow,
-} from "@feeblo/domain/plan-entitlements";
+import type { TPlanPricing } from "@feeblo/domain/pricing/schema";
 
 export type BillingInterval = "month" | "year";
 export type PlanType = "free" | "starter" | "professional";
 
-export type Price = {
-  priceAmount: number;
-  priceCurrency: string;
-};
-
-export type WorkspaceProduct = {
-  id: string;
-  name: string;
-  description: string | null;
-  recurringInterval: BillingInterval | null;
-  trialInterval: string | null;
-  trialIntervalCount: number | null;
-  isRecurring: boolean;
-  prices: Price[];
-  metadata: {
-    plan: Exclude<PlanType, "free">;
-    variant: "monthly" | "yearly";
-  } | null;
+/** A purchasable price for one plan and billing interval, from /api/plans. */
+export type PlanPrice = {
+  productId: string;
+  amount: number;
+  currency: string;
 };
 
 export type WorkspacePlan = {
@@ -36,8 +20,11 @@ export type PlanCard = {
   name: string;
   description: string;
   recommended?: boolean;
-  month: WorkspaceProduct | undefined;
-  year: WorkspaceProduct | undefined;
+  /** "Everything in Free, plus:" for higher plans; null for the first. */
+  includesLabel: string | null;
+  month: PlanPrice | undefined;
+  year: PlanPrice | undefined;
+  features: readonly { key: string; label: string }[];
 };
 
 export const PLAN_COPY = {
@@ -59,73 +46,28 @@ export const PLAN_COPY = {
   { name: string; description: string; recommended?: boolean }
 >;
 
-/** Working slots for one paid plan's products, keyed by billing interval. */
-type PlanProducts = {
-  month: WorkspaceProduct | undefined;
-  year: WorkspaceProduct | undefined;
-};
-
+/**
+ * Merges the public plan catalog with display copy. Catalog order (free →
+ * starter → professional) is preserved; the current plan only tags which card
+ * is active.
+ */
 export function buildPlanCards(
-  products: WorkspaceProduct[],
+  catalog: readonly TPlanPricing[],
   currentPlanType: PlanType
 ) {
-  // Annotations (not `satisfies`) so the slots keep the declared
-  // WorkspaceProduct | undefined type instead of the literal's undefined.
-  const starterProducts: PlanProducts = {
-    month: undefined,
-    year: undefined,
-  };
-  const professionalProducts: PlanProducts = {
-    month: undefined,
-    year: undefined,
-  };
-
-  for (const product of products) {
-    const plan = product.metadata?.plan;
-    const interval = product.recurringInterval;
-
-    if (!(plan && interval)) {
-      continue;
-    }
-
-    if (plan === "starter") {
-      starterProducts[interval] = product;
-    } else {
-      professionalProducts[interval] = product;
-    }
-  }
-
-  const plans: PlanCard[] = [
-    {
-      planType: "free",
-      ...PLAN_COPY.free,
-      month: undefined,
-      year: undefined,
-    },
-    {
-      planType: "starter",
-      ...PLAN_COPY.starter,
-      ...starterProducts,
-    },
-    {
-      planType: "professional",
-      ...PLAN_COPY.professional,
-      ...professionalProducts,
-    },
-  ];
+  const plans: PlanCard[] = catalog.map((plan) => ({
+    planType: plan.key,
+    ...PLAN_COPY[plan.key],
+    includesLabel: plan.includesLabel,
+    month: plan.prices.month ?? undefined,
+    year: plan.prices.year ?? undefined,
+    features: plan.features,
+  }));
 
   return {
     plans,
     currentPlanType,
   };
-}
-
-export function getPrice(product: WorkspaceProduct | undefined) {
-  if (!product) {
-    return null;
-  }
-
-  return product.prices.find((entry) => entry.priceAmount > 0) ?? null;
 }
 
 export function formatMoney(priceAmount: number, currency: string) {
@@ -137,30 +79,18 @@ export function formatMoney(priceAmount: number, currency: string) {
 }
 
 export function formatPlanPrice(
-  product: WorkspaceProduct | undefined,
+  price: PlanPrice | undefined,
   interval: BillingInterval
 ) {
-  if (!product) {
-    return interval === "month" ? "$0 / month" : "$0 / month";
-  }
-
-  const price = getPrice(product);
   if (!price) {
-    return "Custom";
+    return "$0 / month";
   }
 
-  if (interval === "year") {
-    return `${formatMoney(price.priceAmount / 12, price.priceCurrency)} / month`;
-  }
+  const monthlyAmount =
+    interval === "year" ? price.amount / 12 : price.amount;
 
-  return `${formatMoney(price.priceAmount, price.priceCurrency)} / month`;
+  return `${formatMoney(monthlyAmount, price.currency)} / month`;
 }
-
-export const PLAN_FEATURES = {
-  free: getPlanFeatureRows("free"),
-  starter: getPlanFeatureRows("starter"),
-  professional: getPlanFeatureRows("professional"),
-} satisfies Record<PlanType, readonly PlanFeatureRow[]>;
 
 export const isPaidPlan = (plan?: PlanType): boolean => {
   if (!plan || plan === "free") {

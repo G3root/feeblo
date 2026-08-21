@@ -203,6 +203,7 @@ export const makeServiceLayers = ({
       Layer.provide(EmailOutboxConfig.layer),
       Layer.provide(Database.DatabaseContextLive)
     ),
-    EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
+    EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
+    WorkspaceRepository.layer
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
 };

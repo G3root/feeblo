@@ -21,6 +21,7 @@ export const verificationOtpEndpoint = `${baseUrl}api/auth/verification-otp`;
 export const profilePictureUploadEndpoint = `${baseUrl}api/profile/picture`;
 export const organizationLogoUploadEndpoint = `${baseUrl}api/organization/logo`;
 export const editorMediaUploadEndpoint = `${baseUrl}api/media/upload`;
+export const plansEndpoint = `${baseUrl}api/plans`;
 
 export const uploadedEditorMediaSchema = z.object({
   assetId: z.string(),

@@ -79,7 +79,7 @@ export const withGlobalMiddleware = <A, E, R>(
           allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
           credentials: true,
           maxAge: 86_400,
-          exposedHeaders: ["Server-Timing"],
+          exposedHeaders: ["Server-Timing", "Cache-Control"],
         }),
         { global: true }
       )

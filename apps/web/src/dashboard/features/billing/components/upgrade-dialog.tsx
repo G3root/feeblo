@@ -25,6 +25,7 @@ import {
 } from "@feeblo/ui/item";
 import { Radio, RadioGroup } from "@feeblo/ui/radio-group";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
+import type { TPlanPricing } from "@feeblo/domain/pricing/schema";
 import { SparklesIcon, StarIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
@@ -33,28 +34,22 @@ import { useState } from "react";
 
 import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
 import { useOrganizationId } from "~/hooks/use-organization-id";
+import { usePlanCatalog } from "~/hooks/use-plan-catalog";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { useUpgradePlanDialogContext } from "../dialog-stores";
 import { startBillingCheckout, startBillingPortal } from "../lib/checkout";
 import {
   type BillingInterval,
+  type PlanCard,
   buildPlanCards,
   formatPlanPrice,
   PLAN_COPY,
-  PLAN_FEATURES,
   type PlanType,
   type WorkspacePlan,
-  type WorkspaceProduct,
 } from "../lib/plans";
 
-type PlanView = {
-  planType: PlanType;
-  name: string;
-  description: string;
-
-  month: WorkspaceProduct | undefined;
-  year: WorkspaceProduct | undefined;
+type PlanView = PlanCard & {
   productId: {
     month: string;
     year: string;
@@ -80,12 +75,9 @@ export function UpgradePlanDialog() {
 
 function UpgradePlanDialogPopup() {
   const organizationId = useOrganizationId();
-  const { workspacePlanCollection, workspaceProductCollection } =
-    useDashboardCollections();
+  const { workspacePlanCollection } = useDashboardCollections();
 
-  const { data: products, isLoading: productsLoading } = useLiveQuery((q) =>
-    q.from({ product: workspaceProductCollection })
-  );
+  const catalog = usePlanCatalog();
 
   const { data: workspacePlans, isLoading: plansLoading } = useLiveQuery((q) =>
     q
@@ -93,15 +85,30 @@ function UpgradePlanDialogPopup() {
       .where(({ plan }) => eq(plan.organizationId, organizationId))
   );
 
-  if (productsLoading || plansLoading) {
+  if (catalog.isPending || plansLoading) {
     return <UpgradePlanDialogSkeleton />;
+  }
+
+  if (catalog.isError) {
+    return (
+      <DialogPopup className="max-w-5xl">
+        <DialogPanel scrollFade={false}>
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle>Upgrade Plan</DialogTitle>
+            <DialogDescription className="mt-1">
+              Plans are unavailable right now. Please try again later.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogPanel>
+      </DialogPopup>
+    );
   }
 
   return (
     <UpgradePlanDialogContent
       organizationId={organizationId}
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      products={(products as WorkspaceProduct[]) ?? []}
+      catalog={catalog.data ?? []}
       workspacePlans={workspacePlans ?? []}
     />
   );
@@ -109,20 +116,20 @@ function UpgradePlanDialogPopup() {
 
 function UpgradePlanDialogContent({
   organizationId,
-  products,
+  catalog,
   workspacePlans,
 }: {
   organizationId: string;
-  products: WorkspaceProduct[];
+  catalog: readonly TPlanPricing[];
   workspacePlans: WorkspacePlan[];
 }) {
   const currentPlanType = workspacePlans[0]?.plan ?? "free";
-  const { plans: rawPlans } = buildPlanCards(products, currentPlanType);
+  const { plans: rawPlans } = buildPlanCards(catalog, currentPlanType);
   const plans: PlanView[] = rawPlans.map((plan) => ({
     ...plan,
     productId: {
-      month: plan.month?.id ?? "free",
-      year: plan.year?.id ?? "free",
+      month: plan.month?.productId ?? "free",
+      year: plan.year?.productId ?? "free",
     },
   }));
 
@@ -228,8 +235,14 @@ function UpgradePlanDialogContent({
               </p>
             </div>
 
-            <ItemGroup className="mt-5 gap-1">
-              {PLAN_FEATURES[selectedPlan.planType].map((feature) => (
+            {selectedPlan.includesLabel ? (
+              <div className="text-muted-foreground mt-5 text-sm font-medium">
+                {selectedPlan.includesLabel}
+              </div>
+            ) : null}
+
+            <ItemGroup className="mt-2 gap-1">
+              {selectedPlan.features.map((feature) => (
                 <Item key={feature.key} size="sm" variant="outline">
                   <ItemMedia>
                     <HugeiconsIcon icon={StarIcon} />
