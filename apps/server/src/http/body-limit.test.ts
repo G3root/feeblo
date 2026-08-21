@@ -11,10 +11,7 @@ const CHUNK_SIZE = 64 * 1024;
  * its own, so a server that keeps reading after the body limit is hit will
  * pull from it forever.
  */
-const makeUnboundedChunkedBody = (): {
-  readonly stream: ReadableStream<Uint8Array>;
-  readonly state: { bytesPulled: number; cancelled: boolean };
-} => {
+const makeUnboundedChunkedBody = () => {
   const state = { bytesPulled: 0, cancelled: false };
   const chunk = new Uint8Array(CHUNK_SIZE);
   const stream = new ReadableStream<Uint8Array>({
@@ -59,10 +56,10 @@ describe("handleBetterAuthRequest", () => {
         expect(response.status).toBe(413);
         // The handler saw a truncated body instead of a stream error.
         expect(handlerBodyBytes).toBeLessThanOrEqual(MAX_REQUEST_BODY_BYTES);
-        // The upstream was cancelled rather than drained forever. The source
-        // may have buffered one chunk ahead of the consumer when the cancel
-        // landed, so allow that much slack.
-        expect(state.cancelled).toBe(true);
+        // The upstream was left intact (no cancel → no connection reset) but
+        // stopped being pulled: reading halts right after the cap instead of
+        // draining forever.
+        expect(state.cancelled).toBe(false);
         expect(state.bytesPulled).toBeLessThanOrEqual(
           MAX_REQUEST_BODY_BYTES + 2 * CHUNK_SIZE
         );

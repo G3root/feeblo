@@ -42,14 +42,17 @@ export const handleBetterAuthRequest = async ({
           bytesRead += value.byteLength;
           if (bytesRead > MAX_REQUEST_BODY_BYTES) {
             bodyLimitExceeded = true;
-            // Cancel the upstream body so an oversized upload stops being
-            // read instead of streaming into this process indefinitely.
-            // Don't error the downstream stream — that surfaces as an
-            // unhandled stream error inside Better Auth and gets logged as
+            // Stop reading: after the downstream closes, pull is never called
+            // again, so the rest of the upload is never consumed. Deliberately
+            // do NOT cancel the upstream reader — cancelling destroys the
+            // socket while the client is still sending, so it sees a
+            // connection reset instead of the 413. Don't error the downstream
+            // stream either — that surfaces as an unhandled stream error
+            // inside Better Auth and gets logged as
             // `ERROR [Better Auth]: Request body too large`. Closing it with
             // a truncated body lets the handler finish; we override its
-            // response with 413 below.
-            void sourceReader.cancel().catch(() => {});
+            // response with 413 below and Node cleans up the connection when
+            // the response is flushed.
             controller.close();
             return;
           }
