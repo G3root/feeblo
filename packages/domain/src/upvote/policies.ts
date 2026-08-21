@@ -18,6 +18,11 @@ type TCanToggle = {
   source: TSource;
 };
 
+type TCanVoteOnBehalf = {
+  organizationId: string;
+  postId: string;
+};
+
 const makeUpvotePolicy = Effect.gen(function* () {
   const repository = yield* PostRepository;
 
@@ -53,9 +58,28 @@ const makeUpvotePolicy = Effect.gen(function* () {
     );
   };
 
+  /**
+   * Adding or removing a voter on behalf of a customer is the documented
+   * all-role matrix row "Vote for self or on behalf of another user",
+   * expressed as the named permission `votes.onBehalf` (contributor and
+   * above). Locked posts stay closed to new votes, as with self-service.
+   */
+  const canVoteOnBehalf = (args: TCanVoteOnBehalf) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      Policy.canPermission(args.organizationId, "votes.onBehalf"),
+      Policy.policy(() =>
+        repository.isUnlocked({
+          id: args.postId,
+          organizationId: args.organizationId,
+        })
+      )
+    );
+
   return {
     canList,
     canToggle,
+    canVoteOnBehalf,
   };
 });
 

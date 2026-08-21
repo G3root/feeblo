@@ -14,8 +14,10 @@ export const ROLE_PERMISSIONS = {
   /**
    * Contributors are otherwise governed by membership- and ownership-scoped
    * content policies. Moving posts is intentionally available across posts.
+   * Voting on behalf of another user is the documented all-role capability,
+   * so `votes.onBehalf` starts here and every higher role inherits it.
    */
-  contributor: ["posts.move"],
+  contributor: ["posts.move", "votes.onBehalf"],
   /**
    * Managers (formerly "member") run day-to-day feedback operations:
    * moderation, changelogs, tags, roadmaps, and user cleanup. CRM

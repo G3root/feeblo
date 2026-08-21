@@ -22,6 +22,13 @@ interface TUpvoteToggle {
   visibility?: "PUBLIC" | "PRIVATE";
 }
 
+interface TUpvoteAs {
+  organizationId: string;
+  postId: string;
+  /** The resolved subject's user row (a real account or a shadow user). */
+  userId: string;
+}
+
 const makeUpvoteRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
@@ -129,6 +136,76 @@ const makeUpvoteRepository = Effect.gen(function* () {
           .onConflictDoNothing();
 
         return { upvoted: true };
+      }),
+
+    /**
+     * Inserts a vote for the resolved subject. Idempotent: an existing vote
+     * is a success no-op via the `(userId, postId)` unique index.
+     * `memberId` stays null unless the subject is actually an org member.
+     */
+    addAs: ({ organizationId, postId, userId }: TUpvoteAs) =>
+      Effect.gen(function* () {
+        const existingUpvote = yield* db
+          .select({ id: schema.upvoteTable.id })
+          .from(schema.upvoteTable)
+          .where(
+            and(
+              eq(schema.upvoteTable.postId, postId),
+              eq(schema.upvoteTable.userId, userId)
+            )
+          )
+          .limit(1)
+          .pipe(Effect.map(EffectArray.get(0)));
+
+        if (Option.isSome(existingUpvote)) {
+          return { added: false };
+        }
+
+        const member = yield* db
+          .select({ id: schema.memberTable.id })
+          .from(schema.memberTable)
+          .where(
+            and(
+              eq(schema.memberTable.organizationId, organizationId),
+              eq(schema.memberTable.userId, userId)
+            )
+          )
+          .limit(1)
+          .pipe(Effect.map(EffectArray.get(0)));
+
+        const upvoteId = yield* UpvoteId.generate;
+        yield* db
+          .insert(schema.upvoteTable)
+          .values({
+            id: upvoteId,
+            postId,
+            userId,
+            organizationId,
+            memberId: Option.getOrNull(member)?.id ?? null,
+          })
+          .onConflictDoNothing();
+
+        return { added: true };
+      }),
+
+    /**
+     * Deletes exactly the given subject's vote. Removing a non-voter is a
+     * success no-op, not an error.
+     */
+    removeAs: ({ organizationId, postId, userId }: TUpvoteAs) =>
+      Effect.gen(function* () {
+        const deleted = yield* db
+          .delete(schema.upvoteTable)
+          .where(
+            and(
+              eq(schema.upvoteTable.postId, postId),
+              eq(schema.upvoteTable.userId, userId),
+              eq(schema.upvoteTable.organizationId, organizationId)
+            )
+          )
+          .returning({ id: schema.upvoteTable.id });
+
+        return { removed: deleted.length > 0 };
       }),
   };
 });

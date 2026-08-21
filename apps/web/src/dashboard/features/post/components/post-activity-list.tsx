@@ -27,6 +27,8 @@ import {
   StatusIcon,
   Tag01Icon,
   Tag02Icon,
+  ThumbsUpIcon,
+  UserMinus01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -63,6 +65,8 @@ const activityIconMap = {
   COMMENT_CREATED: CommentAdd01Icon,
   COMMENT_UPDATED: MessageEdit01Icon,
   COMMENT_DELETED: CommentRemove01Icon,
+  VOTE_ADDED: ThumbsUpIcon,
+  VOTE_REMOVED: UserMinus01Icon,
 } satisfies Record<TPostActivityKind, typeof FileAddIcon>;
 
 const ETA_PATTERN = /^(\d{4})-Q([1-4])$/;
@@ -109,6 +113,8 @@ function getActivityDescription({
         : "added a comment",
     COMMENT_UPDATED: "updated a comment",
     COMMENT_DELETED: "deleted a comment",
+    VOTE_ADDED: "added a voter",
+    VOTE_REMOVED: "removed a voter",
   } satisfies Record<TPostActivityKind, string>;
 
   return descriptions[activity.kind];

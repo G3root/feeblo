@@ -9,11 +9,13 @@ import * as Layer from "effect/Layer";
 /**
  * Structured provenance stored beside an activity. On-behalf actions record
  * the customer subject distinct from the staff actor, e.g.
- * `{ onBehalfOf: { contactId, userId? } }`.
+ * `{ onBehalfOf: { contactId, userId? } }`. A field is omitted when the
+ * action cannot know it — e.g. removing a voter by userId may have no
+ * contact for them.
  */
 export interface PostActivityMetadata {
   readonly onBehalfOf: {
-    readonly contactId: string;
+    readonly contactId?: string | undefined;
     readonly userId?: string | undefined;
   };
 }
@@ -78,6 +80,8 @@ export type PostActivityInput = PostActivityActor &
         readonly visibility: string | null;
       }
     | { readonly kind: "COMMENT_DELETED"; readonly commentId: string }
+    | { readonly kind: "VOTE_ADDED" }
+    | { readonly kind: "VOTE_REMOVED" }
   );
 
 type PostActivityRow = {
@@ -101,6 +105,8 @@ const toRow = (input: PostActivityInput): PostActivityRow => {
     case "POST_UNLOCKED":
     case "POST_ARCHIVED":
     case "POST_UNARCHIVED":
+    case "VOTE_ADDED":
+    case "VOTE_REMOVED":
       return {
         kind: input.kind,
         previousValue: null,
