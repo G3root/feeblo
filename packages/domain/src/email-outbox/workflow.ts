@@ -9,7 +9,7 @@ import {
 } from "@feeblo/transactional/mailer";
 import { createEmailSubscriptionVerificationEmail } from "@feeblo/transactional/templates/email-subscription-verification";
 import { createNotificationEmail } from "@feeblo/transactional/templates/notification";
-import { and, eq, gte, isNull, sum } from "drizzle-orm";
+import { and, eq, gte, isNull, sql, sum } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -21,6 +21,7 @@ import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { evaluateOrganizationAccess } from "./access";
 import { EmailOutboxConfig } from "./config";
 import {
   emailSubscriptionTopicForIntent,
@@ -33,6 +34,7 @@ import {
   SubscriptionVerificationTemplatePayload,
 } from "./schema";
 import {
+  recordEmailDeliveryAccessSkip,
   recordEmailDeliveryRetry,
   recordEmailDeliveryThrottle,
   recordEmailIntentTransition,
@@ -554,6 +556,127 @@ const sendDeliveryAttempt = (deliveryId: string) =>
         state: "suppressed",
       });
       return { _tag: "terminal" as const };
+    }
+    // Organization-access gate for post-attributed notifications
+    // (plan-on-behalf.md, "Notification eligibility"). Runs after consent so
+    // verified double-opt-in external subscribers (no feeblo account) keep
+    // their consent-based delivery; the gate only restricts recipients whose
+    // account can be resolved. Re-evaluated per attempt, so a recipient who
+    // gains access later receives subsequent deliveries with no backfill.
+    // Changelog topics are public broadcasts and stay out of scope.
+    if (
+      intent.aggregateType === "post" &&
+      intent.kind !== "subscription.verification_requested"
+    ) {
+      // Resolve the recipient's account: through the delivery's contact link
+      // first, then by the recipient email.
+      let account: {
+        id: string;
+        email: string;
+        emailVerified: boolean;
+        restrictedToOrganizationId: string | null;
+      } | null = null;
+      if (delivery.contactId !== null) {
+        const [contactLink] = yield* db
+          .select({ userId: schema.emailContactTable.userId })
+          .from(schema.emailContactTable)
+          .where(
+            and(
+              eq(schema.emailContactTable.id, delivery.contactId),
+              eq(
+                schema.emailContactTable.organizationId,
+                intent.organizationId
+              )
+            )
+          )
+          .limit(1);
+        if (contactLink?.userId != null) {
+          const [linkedAccount] = yield* db
+            .select({
+              id: schema.userTable.id,
+              email: schema.userTable.email,
+              emailVerified: schema.userTable.emailVerified,
+              restrictedToOrganizationId:
+                schema.userTable.restrictedToOrganizationId,
+            })
+            .from(schema.userTable)
+            .where(eq(schema.userTable.id, contactLink.userId))
+            .limit(1);
+          account = linkedAccount ?? null;
+        }
+      }
+      if (account === null) {
+        const [byEmail] = yield* db
+          .select({
+            id: schema.userTable.id,
+            email: schema.userTable.email,
+            emailVerified: schema.userTable.emailVerified,
+            restrictedToOrganizationId:
+              schema.userTable.restrictedToOrganizationId,
+          })
+          .from(schema.userTable)
+          .where(
+            sql`lower(${schema.userTable.email}) = lower(${delivery.recipientEmail})`
+          )
+          .limit(1);
+        account = byEmail ?? null;
+      }
+
+      // No resolvable account means the recipient is a pure external
+      // subscriber; their consent was already proven above.
+      if (account !== null) {
+        const [postBoard] = yield* db
+          .select({ visibility: schema.boardTable.visibility })
+          .from(schema.postTable)
+          .innerJoin(
+            schema.boardTable,
+            eq(schema.boardTable.id, schema.postTable.boardId)
+          )
+          .where(
+            and(
+              eq(schema.postTable.id, intent.aggregateId),
+              eq(schema.postTable.organizationId, intent.organizationId)
+            )
+          )
+          .limit(1);
+
+        const [memberRow] = yield* db
+          .select({ id: schema.memberTable.id })
+          .from(schema.memberTable)
+          .where(
+            and(
+              eq(schema.memberTable.organizationId, intent.organizationId),
+              eq(schema.memberTable.userId, account.id)
+            )
+          )
+          .limit(1);
+
+        const accessVerdict = evaluateOrganizationAccess({
+          account,
+          hasMembership: memberRow !== undefined,
+          // A post or board that no longer resolves fails rule 3 fail-closed
+          // without affecting rules 1–2.
+          boardVisibility: postBoard?.visibility ?? null,
+          organizationId: intent.organizationId,
+        });
+        if (!accessVerdict.eligible) {
+          yield* recordEmailDeliveryAccessSkip(accessVerdict.recipientClass);
+          yield* Effect.logWarning(
+            "Email delivery skipped: recipient lacks organization access"
+          ).pipe(
+            Effect.annotateLogs({
+              deliveryId,
+              organizationId: intent.organizationId,
+              recipientClass: accessVerdict.recipientClass,
+            })
+          );
+          yield* repository.markDeliveryOutcome({
+            id: delivery.id,
+            state: "no_organization_access",
+          });
+          return { _tag: "terminal" as const };
+        }
+      }
     }
     const claimed = yield* repository.claimDeliveryForSending({
       id: delivery.id,

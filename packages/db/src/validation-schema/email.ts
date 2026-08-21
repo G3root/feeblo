@@ -49,6 +49,13 @@ export const EmailDeliveryState = S.Literals([
   "suppressed",
   "paused_by_plan",
   "expired",
+  /**
+   * Terminal skip recorded by the dispatcher's organization-access gate: the
+   * recipient had no verified account with organization access when the
+   * delivery was attempted. Re-evaluated per attempt, so a recipient who
+   * gains access later receives subsequent deliveries without backfill.
+   */
+  "no_organization_access",
 ]);
 
 export type TEmailDeliveryState = S.Schema.Type<typeof EmailDeliveryState>;

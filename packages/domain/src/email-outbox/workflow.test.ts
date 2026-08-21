@@ -75,7 +75,12 @@ const fixture = Effect.gen(function* () {
   const ownerEmail = `owner-${organizationId}@example.test`;
   yield* db
     .insert(schema.userTable)
-    .values({ id: userId, email: ownerEmail, name: "Owner" });
+    .values({
+      id: userId,
+      email: ownerEmail,
+      name: "Owner",
+      emailVerified: true,
+    });
   yield* db.insert(schema.memberTable).values({
     id: ownerId,
     organizationId,
@@ -168,6 +173,8 @@ const addSubscriptionContact = (args: {
   readonly state: "active" | "pending_verification" | "unsubscribed";
   readonly topicId: string | null;
   readonly topicType: "changelog" | "post";
+  /** Links the email contact to a feeblo user (on-behalf attribution). */
+  readonly userId?: string | null;
 }) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
@@ -179,7 +186,7 @@ const addSubscriptionContact = (args: {
       .values({
         id: contactId,
         organizationId: args.organizationId,
-        userId: null,
+        userId: args.userId ?? null,
         email: args.email,
         verificationState:
           args.state === "pending_verification" ? "pending" : "verified",
@@ -193,10 +200,24 @@ const addSubscriptionContact = (args: {
           schema.emailContactTable.email,
         ],
       });
+    // A second subscription for the same address reuses the existing contact
+    // ((organization_id, email) is unique); the ignored insert above leaves
+    // our generated id unused in that case.
+    const [existingContact] = yield* db
+      .select({ id: schema.emailContactTable.id })
+      .from(schema.emailContactTable)
+      .where(
+        and(
+          eq(schema.emailContactTable.organizationId, args.organizationId),
+          eq(schema.emailContactTable.email, args.email)
+        )
+      )
+      .limit(1);
+    const effectiveContactId = existingContact?.id ?? contactId;
     yield* db.insert(schema.emailSubscriptionTable).values({
       id: subscriptionId,
       organizationId: args.organizationId,
-      contactId,
+      contactId: effectiveContactId,
       topicType: args.topicType,
       topicId: args.topicId,
       source: "explicit",
@@ -325,6 +346,7 @@ describe("EmailOutbox workflows", () => {
             id: adminUserId,
             email: adminEmail,
             name: "Opted-in admin",
+            emailVerified: true,
           });
           yield* db.insert(schema.memberTable).values({
             id: adminMemberId,
@@ -1091,6 +1113,283 @@ describe("EmailOutbox workflows", () => {
           const attemptsBeforeReplay = (yield* testMailerState).attempts;
           yield* EmailDeliveryWorkflow.execute({ deliveryId: delivery.id });
           expect((yield* testMailerState).attempts).toBe(attemptsBeforeReplay);
+        })
+    );
+
+    const insertPrivateBoardPost = (organizationId: string) =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const now = new Date();
+        const boardId = `brd_private_${organizationId}`;
+        const statusId = `pst_private_${organizationId}`;
+        const postId = `post_private_${organizationId}`;
+        yield* db.insert(schema.boardTable).values({
+          id: boardId,
+          organizationId,
+          name: "Private feedback",
+          slug: boardId,
+          visibility: "PRIVATE",
+          createdAt: now,
+          updatedAt: now,
+        });
+        yield* db.insert(schema.postStatusTable).values({
+          id: statusId,
+          organizationId,
+          type: "IN_PROGRESS",
+          orderIndex: 9,
+        });
+        yield* db.insert(schema.postTable).values({
+          id: postId,
+          organizationId,
+          boardId,
+          statusId,
+          title: "Private post",
+          slug: boardId,
+          content: "x",
+          excerpt: "x",
+          createdAt: now,
+          updatedAt: now,
+        });
+        return { postId };
+      });
+
+    const recordStatusChangeIntent = (organizationId: string, postId: string) =>
+      Effect.gen(function* () {
+        const intent = yield* (
+          yield* EmailOutboxRepository
+        ).upsertPendingStatusChange({
+          aggregateId: postId,
+          aggregateType: "post",
+          deduplicationKey: `post.status_changed:${organizationId}:${postId}:gate`,
+          expiresAt: null,
+          organizationId,
+          payload: {
+            kind: "post.status_changed",
+            postId,
+            statusId: `pst_${organizationId}`,
+          },
+          scheduledAt: new Date(),
+        });
+        if (intent._tag !== "Written") {
+          return yield* Effect.die("Expected post intent");
+        }
+        return intent.intent.id;
+      });
+
+    it.effect(
+      "skips a shadow-attributed subscriber without organization access",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { organizationId } = yield* fixture;
+          yield* enableSubscriberEmails(organizationId);
+          const db = yield* Database.Database;
+          const postId = `post_${organizationId}`;
+          const shadowUserId = yield* UserId.generate;
+          yield* db.insert(schema.userTable).values({
+            id: shadowUserId,
+            email: `behalf-${organizationId}@feeblo.com`,
+            name: "Shadowed customer",
+            emailVerified: false,
+            restrictedToOrganizationId: organizationId,
+          });
+          yield* addSubscriptionContact({
+            email: `shadowed-${organizationId}@example.test`,
+            organizationId,
+            state: "active",
+            topicId: postId,
+            topicType: "post",
+            userId: shadowUserId,
+          });
+          const intentId = yield* recordStatusChangeIntent(
+            organizationId,
+            postId
+          );
+
+          const deliveryIds = yield* materializeEmailIntent(intentId);
+          expect(deliveryIds).toHaveLength(1);
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            EmailDeliveryWorkflow.execute({ deliveryId })
+          );
+          // Terminal: replaying the workflow must not retry the send.
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            EmailDeliveryWorkflow.execute({ deliveryId })
+          );
+
+          const [delivery] = yield* db
+            .select()
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+          expect(delivery?.state).toBe("no_organization_access");
+          expect((yield* testMailerState).sentMessages).toHaveLength(0);
+        })
+    );
+
+    it.effect(
+      "delivers to a verified global user on a public board but not on a private board",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { organizationId } = yield* fixture;
+          yield* enableSubscriberEmails(organizationId);
+          const db = yield* Database.Database;
+          const globalUserId = yield* UserId.generate;
+          const globalEmail = `global-${organizationId}@example.test`;
+          yield* db.insert(schema.userTable).values({
+            id: globalUserId,
+            email: globalEmail,
+            name: "Global user",
+            emailVerified: true,
+          });
+
+          const publicPostId = `post_${organizationId}`;
+          yield* addSubscriptionContact({
+            email: globalEmail,
+            organizationId,
+            state: "active",
+            topicId: publicPostId,
+            topicType: "post",
+            userId: globalUserId,
+          });
+          const publicIntentId = yield* recordStatusChangeIntent(
+            organizationId,
+            publicPostId
+          );
+          const publicDeliveryIds = yield* materializeEmailIntent(
+            publicIntentId
+          );
+          yield* Effect.forEach(publicDeliveryIds, (deliveryId) =>
+            EmailDeliveryWorkflow.execute({ deliveryId })
+          );
+          const [publicDelivery] = yield* db
+            .select()
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, publicIntentId));
+          expect(publicDelivery?.state).toBe("accepted");
+
+          const { postId: privatePostId } =
+            yield* insertPrivateBoardPost(organizationId);
+          yield* addSubscriptionContact({
+            email: globalEmail,
+            organizationId,
+            state: "active",
+            topicId: privatePostId,
+            topicType: "post",
+            userId: globalUserId,
+          });
+          const privateIntentId = yield* recordStatusChangeIntent(
+            organizationId,
+            privatePostId
+          );
+          const privateDeliveryIds = yield* materializeEmailIntent(
+            privateIntentId
+          );
+          yield* Effect.forEach(privateDeliveryIds, (deliveryId) =>
+            EmailDeliveryWorkflow.execute({ deliveryId })
+          );
+          const [privateDelivery] = yield* db
+            .select()
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, privateIntentId));
+          expect(privateDelivery?.state).toBe("no_organization_access");
+        })
+    );
+
+    it.effect(
+      "keeps members and SSO-bound users eligible even on private boards",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { organizationId } = yield* fixture;
+          yield* enableSubscriberEmails(organizationId);
+          const db = yield* Database.Database;
+          const { postId } = yield* insertPrivateBoardPost(organizationId);
+
+          const memberUserId = yield* UserId.generate;
+          yield* db.insert(schema.userTable).values({
+            id: memberUserId,
+            email: `member-${organizationId}@example.test`,
+            name: "Member user",
+            emailVerified: true,
+          });
+          yield* db.insert(schema.memberTable).values({
+            id: `mem_gate_${organizationId}`,
+            organizationId,
+            userId: memberUserId,
+            role: "manager",
+            createdAt: new Date(),
+          });
+          yield* addSubscriptionContact({
+            email: `member-${organizationId}@example.test`,
+            organizationId,
+            state: "active",
+            topicId: postId,
+            topicType: "post",
+            userId: memberUserId,
+          });
+
+          const ssoUserId = yield* UserId.generate;
+          yield* db.insert(schema.userTable).values({
+            id: ssoUserId,
+            email: `sso-${organizationId}@example.test`,
+            name: "SSO user",
+            emailVerified: true,
+            restrictedToOrganizationId: organizationId,
+          });
+          yield* addSubscriptionContact({
+            email: `sso-${organizationId}@example.test`,
+            organizationId,
+            state: "active",
+            topicId: postId,
+            topicType: "post",
+            userId: ssoUserId,
+          });
+
+          const intentId = yield* recordStatusChangeIntent(
+            organizationId,
+            postId
+          );
+          const deliveryIds = yield* materializeEmailIntent(intentId);
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            EmailDeliveryWorkflow.execute({ deliveryId })
+          );
+          const mailbox = yield* testMailerState;
+          expect(mailbox.sentMessages.map((message) => message.to).sort()).toEqual(
+            [
+              `member-${organizationId}@example.test`.toLowerCase(),
+              `sso-${organizationId}@example.test`.toLowerCase(),
+            ]
+          );
+        })
+    );
+
+    it.effect(
+      "still delivers to verified external subscribers without any account",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { organizationId } = yield* fixture;
+          yield* enableSubscriberEmails(organizationId);
+          const postId = `post_${organizationId}`;
+          yield* addSubscriptionContact({
+            email: `external-${organizationId}@example.test`,
+            organizationId,
+            state: "active",
+            topicId: postId,
+            topicType: "post",
+          });
+          const intentId = yield* recordStatusChangeIntent(
+            organizationId,
+            postId
+          );
+          const deliveryIds = yield* materializeEmailIntent(intentId);
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            EmailDeliveryWorkflow.execute({ deliveryId })
+          );
+          const mailbox = yield* testMailerState;
+          expect(mailbox.sentMessages.map((message) => message.to)).toEqual([
+            `external-${organizationId}@example.test`.toLowerCase(),
+          ]);
         })
     );
   });
