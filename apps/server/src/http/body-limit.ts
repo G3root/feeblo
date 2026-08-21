@@ -30,26 +30,36 @@ export const handleBetterAuthRequest = async ({
 
   let bodyLimitExceeded = false;
   let bytesRead = 0;
-  const body = request.body?.pipeThrough(
-    new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        if (bodyLimitExceeded) {
-          return;
-        }
-        bytesRead += chunk.byteLength;
-        if (bytesRead > MAX_REQUEST_BODY_BYTES) {
-          bodyLimitExceeded = true;
-          // Don't call controller.error() — that surfaces as an unhandled
-          // stream error inside Better Auth and gets logged as
-          // `ERROR [Better Auth]: Request body too large`. Dropping this
-          // and subsequent chunks gives the handler a truncated body;
-          // we override its response with 413 below.
-          return;
-        }
-        controller.enqueue(chunk);
-      },
-    })
-  );
+  const sourceReader = request.body?.getReader();
+  const body = sourceReader
+    ? new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          const { done, value } = await sourceReader.read();
+          if (done) {
+            controller.close();
+            return;
+          }
+          bytesRead += value.byteLength;
+          if (bytesRead > MAX_REQUEST_BODY_BYTES) {
+            bodyLimitExceeded = true;
+            // Cancel the upstream body so an oversized upload stops being
+            // read instead of streaming into this process indefinitely.
+            // Don't error the downstream stream — that surfaces as an
+            // unhandled stream error inside Better Auth and gets logged as
+            // `ERROR [Better Auth]: Request body too large`. Closing it with
+            // a truncated body lets the handler finish; we override its
+            // response with 413 below.
+            void sourceReader.cancel().catch(() => {});
+            controller.close();
+            return;
+          }
+          controller.enqueue(value);
+        },
+        cancel(reason) {
+          return sourceReader.cancel(reason).catch(() => {});
+        },
+      })
+    : undefined;
   let limitedRequest: Request;
   if (body) {
     const requestInit = { body, duplex: "half" as const, headers };
