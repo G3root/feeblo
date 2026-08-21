@@ -60,7 +60,7 @@ describe("AuthProvider session revalidation", () => {
     overrideSessionGetterForTests(getSession);
 
     const screen = await render(
-      <AuthProvider initialHint={null}>
+      <AuthProvider>
         <AuthProbe />
       </AuthProvider>
     );

@@ -1,5 +1,7 @@
 import { createRootRoute, Outlet } from "@tanstack/react-router";
 
+import { dashboardAuthBeforeLoad } from "~/lib/auth-redirects";
+
 const RootLayout = () => (
   <>
     <Outlet />
@@ -20,4 +22,7 @@ const RootLayout = () => (
   </>
 );
 
-export const Route = createRootRoute({ component: RootLayout });
+export const Route = createRootRoute({
+  component: RootLayout,
+  beforeLoad: dashboardAuthBeforeLoad,
+});
