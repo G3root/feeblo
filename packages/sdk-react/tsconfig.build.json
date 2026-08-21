@@ -1,0 +1,19 @@
+{
+  "extends": "@feeblo/config/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM"],
+    "types": [],
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "declarationMap": false,
+    "sourceMap": false,
+    "rootDir": "./src",
+    "outDir": "dist",
+    // Vite empties dist/ after any previous build; without this, tsc's
+    // incremental state claims the removed declarations are up-to-date.
+    "incremental": false,
+    "strictNullChecks": true
+  },
+  "include": ["src/index.ts"]
+}
