@@ -50,8 +50,6 @@ import {
   roadmapTable,
   sessionTable,
   siteTable,
-  submissionNotificationBatchTable,
-  submissionNotificationQueueTable,
   subscriptionTable,
   tagTable,
   twoFactorTable,
@@ -110,8 +108,6 @@ export const relations = defineRelations(
     companyAttributeValueTable,
     contactAttributeDefinitionTable,
     contactAttributeValueTable,
-    submissionNotificationBatchTable,
-    submissionNotificationQueueTable,
     emailOutboxTable,
     emailDeliveryTable,
     emailProviderEventTable,
@@ -336,14 +332,6 @@ export const relations = defineRelations(
         from: r.organizationTable.id,
         to: r.subscriptionTable.organizationId,
       }),
-      submissionNotificationBatch: r.one.submissionNotificationBatchTable({
-        from: r.organizationTable.id,
-        to: r.submissionNotificationBatchTable.organizationId,
-      }),
-      submissionNotificationQueue: r.many.submissionNotificationQueueTable({
-        from: r.organizationTable.id,
-        to: r.submissionNotificationQueueTable.organizationId,
-      }),
       assets: r.many.assetTable({
         from: r.organizationTable.id,
         to: r.assetTable.organizationId,
@@ -477,10 +465,6 @@ export const relations = defineRelations(
       subscriptions: r.many.postSubscriptionTable({
         from: r.postTable.id,
         to: r.postSubscriptionTable.postId,
-      }),
-      submissionNotification: r.one.submissionNotificationQueueTable({
-        from: r.postTable.id,
-        to: r.submissionNotificationQueueTable.postId,
       }),
       assets: r.many.postAssetTable({
         from: r.postTable.id,
@@ -797,22 +781,6 @@ export const relations = defineRelations(
       organization: r.one.organizationTable({
         from: r.changelogPostTable.organizationId,
         to: r.organizationTable.id,
-      }),
-    },
-    submissionNotificationBatchTable: {
-      organization: r.one.organizationTable({
-        from: r.submissionNotificationBatchTable.organizationId,
-        to: r.organizationTable.id,
-      }),
-    },
-    submissionNotificationQueueTable: {
-      organization: r.one.organizationTable({
-        from: r.submissionNotificationQueueTable.organizationId,
-        to: r.organizationTable.id,
-      }),
-      post: r.one.postTable({
-        from: r.submissionNotificationQueueTable.postId,
-        to: r.postTable.id,
       }),
     },
     changelogTagTable: {

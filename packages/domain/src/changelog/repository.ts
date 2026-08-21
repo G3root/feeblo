@@ -40,7 +40,11 @@ const PUBLIC_CHANGELOG_LIMIT = 100;
 const makeChangelogRepository = Effect.gen(function* () {
   const db = yield* currentDb;
   const effectivePublishedAt = sql<Date>`COALESCE(${schema.changelogTable.publishedAt}, ${schema.changelogTable.createdAt})`;
-  // TODO handle pagination
+  // Listings are intentionally bounded instead of paginated: findManyPublished
+  // returns the newest PUBLIC_CHANGELOG_LIMIT published entries, and clients
+  // (dashboard and public-board collections, RSS, widget) render from the full
+  // list they receive. Server-side pagination would require an RPC contract
+  // change plus collection and UI support.
   return {
     /**
      * Locks the changelog row for a serialized status transition. Callers

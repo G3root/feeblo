@@ -24,6 +24,7 @@ import {
   ItemTitle,
 } from "@feeblo/ui/item";
 import { Radio, RadioGroup } from "@feeblo/ui/radio-group";
+import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { SparklesIcon, StarIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
@@ -40,6 +41,7 @@ import {
   type BillingInterval,
   buildPlanCards,
   formatPlanPrice,
+  PLAN_COPY,
   PLAN_FEATURES,
   type PlanType,
   type WorkspacePlan,
@@ -76,30 +78,46 @@ export function UpgradePlanDialog() {
   );
 }
 
-// TODO: add loading states for products and plans
 function UpgradePlanDialogPopup() {
   const organizationId = useOrganizationId();
   const { workspacePlanCollection, workspaceProductCollection } =
     useDashboardCollections();
 
-  const { data: products } = useLiveQuery((q) =>
+  const { data: products, isLoading: productsLoading } = useLiveQuery((q) =>
     q.from({ product: workspaceProductCollection })
   );
 
-  const { data: workspacePlans } = useLiveQuery((q) =>
+  const { data: workspacePlans, isLoading: plansLoading } = useLiveQuery((q) =>
     q
       .from({ plan: workspacePlanCollection })
       .where(({ plan }) => eq(plan.organizationId, organizationId))
   );
 
-  const currentPlanType =
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    (workspacePlans[0] as WorkspacePlan | undefined)?.plan ?? "free";
-  const { plans: rawPlans } = buildPlanCards(
-    // SAFETY: The upstream contract guarantees this value here.
-    (products as WorkspaceProduct[]) ?? [],
-    currentPlanType
+  if (productsLoading || plansLoading) {
+    return <UpgradePlanDialogSkeleton />;
+  }
+
+  return (
+    <UpgradePlanDialogContent
+      organizationId={organizationId}
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      products={(products as WorkspaceProduct[]) ?? []}
+      workspacePlans={workspacePlans ?? []}
+    />
   );
+}
+
+function UpgradePlanDialogContent({
+  organizationId,
+  products,
+  workspacePlans,
+}: {
+  organizationId: string;
+  products: WorkspaceProduct[];
+  workspacePlans: WorkspacePlan[];
+}) {
+  const currentPlanType = workspacePlans[0]?.plan ?? "free";
+  const { plans: rawPlans } = buildPlanCards(products, currentPlanType);
   const plans: PlanView[] = rawPlans.map((plan) => ({
     ...plan,
     productId: {
@@ -222,6 +240,71 @@ function UpgradePlanDialogPopup() {
                 </Item>
               ))}
             </ItemGroup>
+          </aside>
+        </div>
+      </DialogPanel>
+    </DialogPopup>
+  );
+}
+
+function UpgradePlanDialogSkeleton() {
+  return (
+    <DialogPopup className="max-w-5xl">
+      <DialogPanel scrollFade={false}>
+        <div className="grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+          <div className="border-border flex flex-col lg:border-r">
+            <DialogHeader className="gap-4 px-6 pt-6 pb-5">
+              <div className="flex items-center gap-3">
+                <div className="bg-primary/15 text-primary flex h-9 w-9 items-center justify-center rounded-xl">
+                  <HugeiconsIcon className="h-4 w-4" icon={SparklesIcon} />
+                </div>
+                <div>
+                  <DialogTitle>Upgrade Plan</DialogTitle>
+                  <DialogDescription className="mt-1">
+                    Select the plan that fits this workspace.
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            <div className="flex flex-1 flex-col px-6 pb-6">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div className="text-sm font-medium">Select plan:</div>
+              </div>
+              <SkeletonLoader isLoading>
+                <SkeletonWrapper>
+                  <RadioGroup className="gap-3" value="free">
+                    {Object.entries(PLAN_COPY).map(([planType, copy]) => (
+                      <Field key={planType} orientation="horizontal">
+                        <FieldLabel
+                          className="flex flex-1 cursor-pointer items-center gap-3"
+                          htmlFor={planType}
+                        >
+                          <Radio id={planType} value={planType} />
+                          <FieldContent>
+                            <FieldTitle>{copy.name}</FieldTitle>
+                            <FieldDescription>
+                              {copy.description}
+                            </FieldDescription>
+                          </FieldContent>
+                        </FieldLabel>
+                      </Field>
+                    ))}
+                  </RadioGroup>
+                </SkeletonWrapper>
+              </SkeletonLoader>
+            </div>
+          </div>
+          <aside className="bg-muted/20 flex flex-col px-6 py-6">
+            <SkeletonLoader isLoading>
+              <SkeletonWrapper>
+                <div className="max-w-sm space-y-5">
+                  <div className="text-2xl font-semibold tracking-tight">
+                    Loading
+                  </div>
+                  <p className="text-muted-foreground text-base">Loading</p>
+                </div>
+              </SkeletonWrapper>
+            </SkeletonLoader>
           </aside>
         </div>
       </DialogPanel>
