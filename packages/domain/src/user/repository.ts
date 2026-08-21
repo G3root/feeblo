@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { currentDb, schema } from "@feeblo/db";
 import { UserId } from "@feeblo/id";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -57,6 +57,41 @@ const makeUserRepository = Effect.gen(function* () {
           .select({ id: schema.userTable.id })
           .from(schema.userTable)
           .where(eq(schema.userTable.emailHash, hashEmail(email)))
+          .limit(1);
+        return rows[0] ? Option.some(rows[0]) : Option.none();
+      }),
+
+    getById: (id: string) =>
+      Effect.gen(function* () {
+        const rows = yield* db
+          .select()
+          .from(schema.userTable)
+          .where(eq(schema.userTable.id, id))
+          .limit(1);
+        return rows[0] ? Option.some(rows[0]) : Option.none();
+      }),
+
+    /**
+     * Finds a user by verified identity hash that a workspace may attribute
+     * content to: globally-registered accounts, or accounts restricted to
+     * exactly this organization. Users restricted to other organizations are
+     * deliberately invisible so one workspace cannot adopt another
+     * workspace's portal identities.
+     */
+    findAdoptableByIdentityHash: (args: {
+      email: string;
+      organizationId: string;
+    }) =>
+      Effect.gen(function* () {
+        const rows = yield* db
+          .select()
+          .from(schema.userTable)
+          .where(
+            and(
+              eq(schema.userTable.emailHash, hashEmail(args.email)),
+              sql`(${schema.userTable.restrictedToOrganizationId} IS NULL OR ${schema.userTable.restrictedToOrganizationId} = ${args.organizationId})`
+            )
+          )
           .limit(1);
         return rows[0] ? Option.some(rows[0]) : Option.none();
       }),
