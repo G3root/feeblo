@@ -10,6 +10,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { isShadowUserEmail } from "../identity/emails";
+
 import { UserPersistenceError } from "./errors";
 
 function hashEmail(email: string): string {
@@ -113,7 +115,7 @@ const makeUserRepository = Effect.gen(function* () {
 
         // Match an existing SSO-only user by its email hash and organization.
         const existingByHash = yield* db
-          .select({ id: schema.userTable.id })
+          .select()
           .from(schema.userTable)
           .where(
             and(
@@ -129,10 +131,21 @@ const makeUserRepository = Effect.gen(function* () {
 
         if (existingByHash) {
           const updatedAt = yield* DateTime.nowAsDate;
+          // A `behalf-*` match means an on-behalf shadow user was provisioned
+          // for this human before they ever used the widget portal. The SSO
+          // sign-in heals the identity in place: the row keeps every attributed
+          // contact/post/vote/comment/subscription (nothing to reassign — it
+          // already is the session identity) but is promoted to a clean,
+          // verified portal account with a fresh synthetic `sso-` inbox.
+          const promotedFromShadow = isShadowUserEmail(existingByHash.email);
           const [updated = null] = yield* db
             .update(schema.userTable)
             .set({
               name: args.name,
+              ...(promotedFromShadow && {
+                email: yield* generateRandomEmail("sso"),
+                emailVerified: true,
+              }),
               restrictedToOrganizationId,
               jwtAutoLoginAt: updatedAt,
               updatedAt,

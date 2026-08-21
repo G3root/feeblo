@@ -9,7 +9,12 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { UserRepository } from "../user/repository";
+import { isSyntheticEmail } from "./emails";
 import { InvalidSubjectError, SubjectNotFoundError } from "./errors";
+
+// Re-exported so existing importers keep a single identity entrypoint; the
+// predicates live in a dependency-free leaf module to avoid import cycles.
+export { isSyntheticEmail };
 
 /**
  * The customer an on-behalf action is attributed to. Identifiers are
@@ -50,11 +55,6 @@ const normalizeEmail = (email: string | undefined): string | undefined => {
   const trimmed = email?.toLowerCase().trim();
   return trimmed ? trimmed : undefined;
 };
-
-/** Synthetic inboxes of SSO portal and shadow users are never real addresses. */
-export const isSyntheticEmail = (email: string): boolean =>
-  /^behalf-[0-9a-f]+@feeblo\.com$/.test(email) ||
-  /^sso-[0-9a-f]+@feeblo\.com$/.test(email);
 
 const makeResolvePrincipalService = Effect.gen(function* () {
   const db = yield* currentDb;

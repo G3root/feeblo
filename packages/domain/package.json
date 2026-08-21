@@ -49,6 +49,9 @@
     "./widget/sso": {
       "default": "./src/widget/sso.ts"
     },
+    "./identity/linking": {
+      "default": "./src/identity/linking.ts"
+    },
     "./billing/service": {
       "default": "./src/billing/service.ts"
     },

@@ -1,11 +1,9 @@
-import { currentDb, schema, transaction } from "@feeblo/db";
+import { transaction } from "@feeblo/db";
 import {
   CompanyAttributeDefinitionId,
   ContactAttributeDefinitionId,
   WorkspaceId,
 } from "@feeblo/id";
-import { eq } from "drizzle-orm";
-import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -22,6 +20,7 @@ import { ContactRepository } from "../contact/repository";
 import type { ParsedPersonAttributes } from "../contact/utils";
 import { parsePersonAttributes } from "../contact/utils";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { linkShadowUser } from "../identity/linking";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
 import { PolicyDeniedError } from "../policy";
@@ -307,10 +306,11 @@ export const createSsoSession = ({
   );
 
 /**
- * Re-assigns widget portal data (contacts and authored posts) from the
- * restricted SSO user to the real user created during a global sign-in. Runs
- * before the restricted user is deleted so contact ownership survives the
- * cascade (`contact.userId` is `ON DELETE SET NULL`).
+ * Re-assigns widget portal data from the restricted SSO user to the real user
+ * created during a global sign-in. Delegates to the shared identity-linking
+ * program (see {@link linkShadowUser}); the caller deletes the restricted
+ * user afterwards so contact ownership survives the cascade
+ * (`contact.userId` is `ON DELETE SET NULL`).
  */
 export const linkAnonymousAccount = ({
   anonymousUserId,
@@ -319,27 +319,10 @@ export const linkAnonymousAccount = ({
   anonymousUserId: string;
   newUserId: string;
 }) =>
-  Effect.gen(function* () {
-    if (anonymousUserId === newUserId) {
-      return;
-    }
-
-    yield* transaction(
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        const now = yield* DateTime.nowAsDate;
-
-        yield* db
-          .update(schema.contactTable)
-          .set({ userId: newUserId, updatedAt: now })
-          .where(eq(schema.contactTable.userId, anonymousUserId));
-
-        yield* db
-          .update(schema.postTable)
-          .set({ creatorId: newUserId, updatedAt: now })
-          .where(eq(schema.postTable.creatorId, anonymousUserId));
-      })
-    );
+  linkShadowUser({
+    shadowUserId: anonymousUserId,
+    realUserId: newUserId,
+    deleteShadowUser: false,
   });
 
 /**

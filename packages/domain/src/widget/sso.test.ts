@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
@@ -23,6 +25,9 @@ const signToken = (payload: jose.JWTPayload, secret: string) =>
       .setProtectedHeader({ alg: "HS256" })
       .sign(new Uint8Array(Buffer.from(secret, "hex")))
   );
+
+const hashEmail = (email: string): string =>
+  createHash("sha256").update(email.toLowerCase().trim()).digest("hex");
 
 const futureExp = Math.floor(Date.now() / 1000) + 3600;
 const pastExp = Math.floor(Date.now() / 1000) - 3600;
@@ -327,6 +332,124 @@ describe("createSsoSession", () => {
         );
         expect(error.code).toBe("ORGANIZATION_HAS_NO_JWT_SECRET");
       })
+    );
+  });
+
+  layer(TestLayer)("shadow adoption", (it) => {
+    it.effect(
+      "promotes a matched behalf-* shadow into a clean verified SSO identity",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture(true);
+          const now = new Date();
+
+          // An admin recorded this customer on behalf before they ever used
+          // the widget portal: contact + shadow user already exist.
+          yield* db.insert(schema.userTable).values({
+            id: "user_shadow",
+            name: "Ada Lovelace",
+            email: "behalf-0a1b2c3d4e5f6a7b@feeblo.com",
+            emailHash: hashEmail("ada@example.com"),
+            emailVerified: false,
+            restrictedToOrganizationId: fixture.organizationId,
+          });
+          const boardId = `board_${fixture.organizationId}`;
+          const statusId = `status_${fixture.organizationId}`;
+          yield* db.insert(schema.boardTable).values({
+            id: boardId,
+            name: "Board",
+            slug: boardId,
+            visibility: "PUBLIC",
+            organizationId: fixture.organizationId,
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* db.insert(schema.postStatusTable).values({
+            id: statusId,
+            type: "PENDING",
+            orderIndex: 0,
+            organizationId: fixture.organizationId,
+          });
+          yield* db.insert(schema.postTable).values({
+            id: "post_on_behalf",
+            title: "On-behalf post",
+            slug: "post-on-behalf",
+            content: "Content",
+            boardId,
+            statusId,
+            organizationId: fixture.organizationId,
+            creatorId: "user_shadow",
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* db.insert(schema.contactTable).values({
+            id: "contact_ada",
+            organizationId: fixture.organizationId,
+            email: "ada@example.com",
+            name: "Ada Lovelace",
+            userId: "user_shadow",
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          const token = yield* signToken(validPayload(fixture), fixture.secret);
+          const result = yield* createSsoSession({
+            clientIp: fixture.clientIp,
+            organizationId: fixture.organizationId,
+            token,
+          });
+
+          // The portal session lands on the same (now clean) identity.
+          expect(result.userId).toBe("user_shadow");
+          const [user] = yield* db
+            .select()
+            .from(schema.userTable)
+            .where(eq(schema.userTable.id, result.userId));
+          expect(user?.email).toMatch(/^sso-[0-9a-f]{16}@feeblo\.com$/);
+          expect(user?.emailVerified).toBe(true);
+          expect(user?.restrictedToOrganizationId).toBe(fixture.organizationId);
+
+          // Attributed data stays attached to the healed identity.
+          const [contact] = yield* db
+            .select()
+            .from(schema.contactTable)
+            .where(eq(schema.contactTable.id, "contact_ada"));
+          expect(contact?.userId).toBe("user_shadow");
+          const [post] = yield* db
+            .select()
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, "post_on_behalf"));
+          expect(post?.creatorId).toBe("user_shadow");
+        })
+    );
+
+    it.effect(
+      "leaves native SSO users untouched when they sign in again",
+      () =>
+        Effect.gen(function* () {
+          const fixture = yield* makeFixture(true);
+          const token = yield* signToken(validPayload(fixture), fixture.secret);
+
+          const first = yield* createSsoSession({
+            clientIp: fixture.clientIp,
+            organizationId: fixture.organizationId,
+            token,
+          });
+          const second = yield* createSsoSession({
+            clientIp: `${fixture.clientIp}-2`,
+            organizationId: fixture.organizationId,
+            token,
+          });
+
+          expect(second.userId).toBe(first.userId);
+          const db = yield* currentDb;
+          const [user] = yield* db
+            .select()
+            .from(schema.userTable)
+            .where(eq(schema.userTable.id, second.userId));
+          expect(user?.email).toMatch(/^sso-[0-9a-f]{16}@feeblo\.com$/);
+        })
     );
   });
 });
