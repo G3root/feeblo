@@ -1,4 +1,5 @@
-import { Database } from "@feeblo/db";
+import { Database, schema } from "@feeblo/db";
+import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 
 import type { EmailSubscriptionTopic } from "../email-subscription/schema";
@@ -77,6 +78,19 @@ export const resolveSubscriptionNotificationContent = (
     switch (intent.payload.kind) {
       case "changelog.published":
       case "changelog.update_requested": {
+        // A hidden or missing site closes the public read boundary; delivery
+        // honors the same line so subscribers collected while public stop
+        // receiving entries once the workspace hides its changelog.
+        const [site] = yield* db
+          .select({
+            changelogVisibility: schema.siteTable.changelogVisibility,
+          })
+          .from(schema.siteTable)
+          .where(eq(schema.siteTable.organizationId, intent.organizationId))
+          .limit(1);
+        if (!site || site.changelogVisibility !== "PUBLIC") {
+          return undefined;
+        }
         const changelog = yield* db.query.changelogTable.findFirst({
           where: {
             id: intent.payload.changelogId,
