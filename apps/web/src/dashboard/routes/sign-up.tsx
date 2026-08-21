@@ -11,6 +11,7 @@ import {
   useSignUpEmail,
 } from "@feeblo/post-ui/use-auth-submission";
 import { useAppForm } from "@feeblo/ui/hooks/form";
+import { refreshAuthSession } from "@feeblo/web-shared/auth-session";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 
@@ -34,10 +35,23 @@ function RouteComponent() {
   const signUp = useSignUpEmail({
     getCallbackURL: () => getSafeCallbackURL(search.redirectTo),
     getCaptchaToken: () => turnstile.token,
-    onSuccess: () =>
-      navigate({
+    onSuccess: async () => {
+      // The root auth guard reads the atom's cached session. Without this
+      // refresh it still holds the pre-sign-up null and would bounce the
+      // newly authenticated user back to /sign-in instead of /register.
+      //
+      // Best-effort: a transient refresh failure must not surface the
+      // completed sign-up as an error. The guard re-resolves on navigation
+      // and fails open on its own transport errors.
+      try {
+        await refreshAuthSession();
+      } catch {
+        // Signed-in state lives in the HttpOnly cookie regardless.
+      }
+      await navigate({
         to: "/register",
-      }),
+      });
+    },
     onVerifyEmail: () =>
       navigate({
         to: "/email-verify",

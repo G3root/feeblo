@@ -27,8 +27,8 @@ export type AuthStateResult =
 
 /**
  * Compatibility adapter for existing full-session consumers. New display-only
- * consumers should use `useAuth`; this adapter deliberately withholds an
- * optimistic hint because roles and session metadata must be authoritative.
+ * consumers should use `useAuth`; this adapter deliberately withholds a
+ * display-only hint because roles and session metadata must be authoritative.
  */
 export const useAuthState = (): AuthStateResult => {
   const auth = useAuth();

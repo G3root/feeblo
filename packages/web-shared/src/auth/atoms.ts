@@ -6,6 +6,7 @@ import * as Atom from "effect/unstable/reactivity/Atom";
 import * as AtomRegistry from "effect/unstable/reactivity/AtomRegistry";
 
 import { authClient } from "../lib/auth-client";
+import { clearAuthHintCookie, writeAuthHintToCookie } from "./hint-cookie";
 
 // ---------------------------------------------------------------------------
 // Better Auth session atom.
@@ -18,6 +19,12 @@ import { authClient } from "../lib/auth-client";
 // Better Auth reports a signed-out user as a successful `null` result. Transport
 // and server failures are kept in the Effect error channel so consumers can
 // distinguish them from an authoritative signed-out response.
+//
+// Every successful resolution also syncs the display-only hint cookie (see
+// `hint-cookie.ts`): a confirmed session refreshes it, a confirmed sign-out
+// clears it, and a transport failure leaves it untouched — a failed request is
+// not evidence that the user signed out. Syncing here (rather than in React)
+// keeps router guards and manual refreshes on the same path.
 // ---------------------------------------------------------------------------
 
 export class AuthSessionRequestError extends Schema.TaggedError<AuthSessionRequestError>()(
@@ -57,6 +64,15 @@ export const meAtom = Atom.make(
     const result = yield* Effect.promise(() => currentSessionGetter());
     if (result.error) {
       return yield* new AuthSessionRequestError({ cause: result.error });
+    }
+    if (result.data) {
+      writeAuthHintToCookie({
+        email: result.data.user.email,
+        image: result.data.user.image ?? null,
+        name: result.data.user.name,
+      });
+    } else {
+      clearAuthHintCookie();
     }
     return result.data;
   })

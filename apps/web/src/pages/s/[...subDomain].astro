@@ -4,7 +4,7 @@ import PublicBoardLayout from "../../layouts/PublicBoardLayout.astro";
 
 export const prerender = false;
 
-const { authHint, subdomain, site } = Astro.locals;
+const { subdomain, site } = Astro.locals;
 
 if (!subdomain) {
   throw new Error("Subdomain is required");
@@ -25,6 +25,6 @@ if (!site) {
   title={`${site.name} — Feedback and roadmap`}
 >
   <main>
-    <PublicBoardApp client:only="react" initialHint={authHint} site={site} />
+    <PublicBoardApp client:only="react" site={site} />
   </main>
 </PublicBoardLayout>

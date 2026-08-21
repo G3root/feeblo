@@ -1,6 +1,5 @@
 import { AnalyticsProvider } from "@feeblo/web-shared/analytics-provider";
 import { AuthProvider } from "@feeblo/web-shared/auth-context";
-import type { AuthHint } from "@feeblo/web-shared/auth-hint";
 import { RouterProvider } from "@tanstack/react-router";
 
 import {
@@ -12,14 +11,10 @@ import { createRouter } from "./router";
 
 const router = createRouter();
 
-export const Dashboard = ({
-  initialHint,
-}: {
-  initialHint: AuthHint | null;
-}) => (
+export const Dashboard = () => (
   <AnalyticsProvider client={posthogAnalyticsClient}>
     <PostHogProvider>
-      <AuthProvider initialHint={initialHint}>
+      <AuthProvider>
         <PostHogIdentify />
         <RouterProvider router={router} />
       </AuthProvider>
