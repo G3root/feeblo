@@ -1,0 +1,106 @@
+name: Publish SDKs
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  actions: read
+  # Required for npm provenance (OIDC attestation of the published tarball).
+  id-token: write
+
+jobs:
+  publish-sdk:
+    if: ${{ startsWith(github.event.release.tag_name, 'sdk@') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+          disable-telemetry: true
+          allowed-endpoints: >
+            api.github.com:443 github.com:443 registry.npmjs.org:443 fulcio.sigstore.dev:443 rekor.sigstore.dev:443 tuf-rekor-cdn.sigstore.dev:443
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js, pnpm, and dependencies
+        uses: ./.github/actions/setup-node
+        with:
+          registry-url: https://registry.npmjs.org/
+
+      - name: Verify version matches tag
+        working-directory: packages/sdk
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${RELEASE_TAG#sdk@}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Release tag version $VERSION does not match packages/sdk version $PKG_VERSION"
+            exit 1
+          fi
+
+      - name: Build
+        run: pnpm exec turbo build --filter=@feeblo/sdk
+
+      - name: Publish to npm
+        working-directory: packages/sdk
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"
+        run: pnpm publish --no-git-checks --access public
+
+  publish-sdk-react:
+    if: ${{ startsWith(github.event.release.tag_name, 'sdk-react@') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+          disable-telemetry: true
+          allowed-endpoints: >
+            api.github.com:443 github.com:443 registry.npmjs.org:443 fulcio.sigstore.dev:443 rekor.sigstore.dev:443 tuf-rekor-cdn.sigstore.dev:443
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js, pnpm, and dependencies
+        uses: ./.github/actions/setup-node
+        with:
+          registry-url: https://registry.npmjs.org/
+
+      - name: Verify version matches tag
+        working-directory: packages/sdk-react
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${RELEASE_TAG#sdk-react@}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Release tag version $VERSION does not match packages/sdk-react version $PKG_VERSION"
+            exit 1
+          fi
+
+      # Turbo builds @feeblo/sdk first: the sdk-react declaration build
+      # resolves @feeblo/sdk types from its dist output.
+      - name: Build
+        run: pnpm exec turbo build --filter=@feeblo/sdk-react
+
+      - name: Publish to npm
+        working-directory: packages/sdk-react
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"
+        # pnpm (not npm) is required here: it rewrites the `workspace:*`
+        # dependency on @feeblo/sdk into a real semver range for the registry.
+        run: pnpm publish --no-git-checks --access public

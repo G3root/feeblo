@@ -289,6 +289,10 @@ pnpm -F @feeblo/sdk check-types
 pnpm -F @feeblo/sdk lint
 ```
 
+## Releases
+
+Publishing is tag-triggered; see [`docs/sdk-releases.md`](../../docs/sdk-releases.md) for the runbook.
+
 ## License
 
 AGPL-3.0-only
