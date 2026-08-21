@@ -141,15 +141,14 @@ test.describe("dashboard auth redirects", () => {
     }
   );
 
-  test(
-    "signed-out visitor is redirected from register to sign-in",
-    async ({ page }) => {
-      await page.goto("/register");
+  test("signed-out visitor is redirected from register to sign-in", async ({
+    page,
+  }) => {
+    await page.goto("/register");
 
-      await expect(page).toHaveURL(/\/sign-in/);
-      await expect(page).toHaveURL(/redirectTo=%2Fregister/);
-    }
-  );
+    await expect(page).toHaveURL(/\/sign-in/);
+    await expect(page).toHaveURL(/redirectTo=%2Fregister/);
+  });
 
   test(
     "signed-in user is redirected from sign-in to their workspace",
@@ -167,33 +166,28 @@ test.describe("dashboard auth redirects", () => {
     }
   );
 
-  test(
-    "paths outside a workspace are canonicalized into it",
-    async ({ page }) => {
-      const user = createTestUser();
-      const { organizationUrl } = await createAuthenticatedWorkspace(
-        page,
-        user
-      );
-      expect(organizationUrl).toMatch(/\/org_/);
+  test("paths outside a workspace are canonicalized into it", async ({
+    page,
+  }) => {
+    const user = createTestUser();
+    const { organizationUrl } = await createAuthenticatedWorkspace(page, user);
+    expect(organizationUrl).toMatch(/\/org_/);
 
-      await page.goto("/settings");
+    await page.goto("/settings");
 
-      await expect(page).toHaveURL(/\/org_(?!bogus)[^/]+$/);
-    }
-  );
+    await expect(page).toHaveURL(/\/org_(?!bogus)[^/]+$/);
+  });
 
-  test(
-    "a wrong workspace prefix is canonicalized to the member workspace",
-    async ({ page }) => {
-      const user = createTestUser();
-      await createAuthenticatedWorkspace(page, user);
+  test("a wrong workspace prefix is canonicalized to the member workspace", async ({
+    page,
+  }) => {
+    const user = createTestUser();
+    await createAuthenticatedWorkspace(page, user);
 
-      await page.goto("/org_bogus/settings");
+    await page.goto("/org_bogus/settings");
 
-      await expect(page).toHaveURL(/\/org_(?!bogus)[^/]+\/settings/);
-    }
-  );
+    await expect(page).toHaveURL(/\/org_(?!bogus)[^/]+\/settings/);
+  });
 
   test(
     "freshly authenticated user without a workspace lands on registration",
