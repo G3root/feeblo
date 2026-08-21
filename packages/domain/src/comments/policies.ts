@@ -21,6 +21,8 @@ type TCanCreate = {
   postId: string;
   source: TSource;
   parentCommentId?: string | null;
+  /** True when the payload attributes the comment to a resolved customer. */
+  onBehalf?: boolean;
 };
 
 type TCanDelete = {
@@ -90,6 +92,24 @@ const makeCommentPolicy = Effect.gen(function* () {
           Policy.policy(() => Effect.succeed(args.visibility === "PUBLIC"))
         ),
         canReplyToParent({ ...args, publicOnly: true })
+      );
+    }
+
+    if (args.onBehalf === true) {
+      // Attributing a comment to a customer is a curation capability
+      // reserved for managers and above (`comments.createOnBehalf`).
+      // INTERNAL-visibility comments may also be authored on behalf — same
+      // permission, same resolution.
+      return Policy.all(
+        Policy.hasMembership(args.organizationId),
+        Policy.canPermission(args.organizationId, "comments.createOnBehalf"),
+        Policy.policy(() =>
+          postRepository.isUnlocked({
+            id: args.postId,
+            organizationId: args.organizationId,
+          })
+        ),
+        canReplyToParent({ ...args, publicOnly: false })
       );
     }
 

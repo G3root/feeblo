@@ -39,7 +39,12 @@ const PERMISSION_ACTIONS = {
     // Create a post attributed to a customer (on-behalf), manager and above.
     "createOnBehalf",
   ],
-  comments: ["delete"],
+  comments: [
+    "delete",
+    // Create a comment attributed to a customer (on-behalf), manager and
+    // above.
+    "createOnBehalf",
+  ],
   // Add or remove a voter on behalf of a customer (on-behalf), contributor
   // and above — the documented all-role "vote for self or on behalf of
   // another user" matrix row.

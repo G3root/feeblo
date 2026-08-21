@@ -2,6 +2,7 @@ import { CommentId, PostId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
 import { COMMENT_CONTENT_MAX_LENGTH } from "../content-limits";
+import { PostCreateAuthor } from "../post/schema";
 
 export const Comment = S.Struct({
   id: S.String,
@@ -38,6 +39,8 @@ export const CommentCreate = S.Struct({
   content: S.String.check(S.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)),
   visibility: S.Literals(["PUBLIC", "INTERNAL"]),
   parentCommentId: S.Union([CommentId.schema, S.Null]),
+  /** Present ⇒ the comment is created on behalf of the resolved customer. */
+  author: S.optional(PostCreateAuthor),
 });
 
 export type TCommentCreate = S.Schema.Type<typeof CommentCreate>;

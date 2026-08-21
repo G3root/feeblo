@@ -1,3 +1,4 @@
+import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import {
@@ -13,6 +14,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { BoardRepository } from "../board/repository";
+import { ResolvePrincipalService } from "../identity/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { PostPolicy } from "../post/policies";
@@ -22,6 +24,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { UserRepository } from "../user/repository";
 import { CommentRpcHandlersEffect } from "./handlers";
 import { CommentPolicy } from "./policies";
 import { CommentRepository } from "./repository";
@@ -181,7 +184,9 @@ describe("CommentRpcHandlers", () => {
     CommentRepository.layer,
     PostActivityRepository.layer,
     PostRepository.layer,
-    PostSubscriptionRepository.layer
+    PostSubscriptionRepository.layer,
+    ResolvePrincipalService.layer,
+    UserRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
   const HandlerTest = Layer.mergeAll(
@@ -189,7 +194,11 @@ describe("CommentRpcHandlers", () => {
     PostPolicy.layer
   ).pipe(Layer.provideMerge(RepositoriesTest));
 
-  const TestLayer = Layer.merge(HandlerTest, Database.PgliteDatabaseLive);
+  const TestLayer = Layer.mergeAll(
+    HandlerTest,
+    Database.PgliteDatabaseLive,
+    NodeCrypto.layer
+  );
 
   layer(TestLayer)("handlers", (it) => {
     describe("CommentList", () => {

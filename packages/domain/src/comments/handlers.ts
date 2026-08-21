@@ -4,13 +4,22 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { InvalidSubjectError, SubjectNotFoundError } from "../identity/errors";
+import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
-import { PostActivityRepository } from "../post-activity/repository";
+import {
+  type PostActivityMetadata,
+  PostActivityRepository,
+} from "../post-activity/repository";
 import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
-import { withRemapDbErrors } from "../rpc-errors";
+import {
+  BadRequestError,
+  InternalServerError,
+  withRemapDbErrors,
+} from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import {
   FailedToDeleteCommentError,
@@ -30,6 +39,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CommentRepository;
   const activityRepository = yield* PostActivityRepository;
   const commentPolicy = yield* CommentPolicy;
+  const resolvePrincipal = yield* ResolvePrincipalService;
   // const sitePolicy = yield* SitePolicy;
 
   const notifications = yield* Effect.serviceOption(NotificationService);
@@ -44,12 +54,66 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
 
       yield* transaction(
         Effect.gen(function* () {
+          // On-behalf attribution resolves the customer inside the same
+          // transaction as the mutation (see plan-on-behalf.md). Absent
+          // `author`, everything below behaves exactly as before. Comments
+          // need a user row, so shadow users are provisioned here for
+          // email-only subjects. Identity failures surface as themselves;
+          // infrastructure failures are normalized like every other
+          // persistence error here.
+          const subject =
+            args.author === undefined
+              ? undefined
+              : yield* resolvePrincipal
+                  .resolve({
+                    organizationId: args.organizationId,
+                    needsUser: true,
+                    subject: args.author,
+                  })
+                  .pipe(
+                    Effect.mapError(
+                      (
+                        error
+                      ):
+                        | SubjectNotFoundError
+                        | InvalidSubjectError
+                        | InternalServerError =>
+                        error instanceof SubjectNotFoundError ||
+                        error instanceof InvalidSubjectError
+                          ? error
+                          : new InternalServerError({
+                              message: "Could not resolve the comment author.",
+                            })
+                    )
+                  );
+          // Comments need a user row: resolution with needsUser:true
+          // guarantees one, provisioning a shadow account when necessary.
+          if (subject !== undefined && subject.userId === null) {
+            return yield* new InvalidSubjectError({
+              message: "The resolved customer has no account to comment as",
+            });
+          }
+          const authorUserId =
+            subject === undefined || subject.userId === null
+              ? session.session.userId
+              : subject.userId;
+
           yield* repository.create({
             ...args,
             content: sanitizedMarkdown,
-            userId: session.session.userId,
-            ...(membership && { memberId: membership.membershipId }),
+            userId: authorUserId,
+            // On-behalf comments keep staff attribution out of the author fields.
+            ...(membership &&
+              !subject && { memberId: membership.membershipId }),
           });
+
+          const onBehalfMetadata: PostActivityMetadata | undefined =
+            subject && {
+              onBehalfOf: {
+                contactId: subject.contactId,
+                ...(subject.userId !== null && { userId: subject.userId }),
+              },
+            };
 
           yield* activityRepository.create({
             organizationId: args.organizationId,
@@ -59,8 +123,12 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             kind: "COMMENT_CREATED",
             commentId: args.id,
             visibility: args.visibility,
+            ...(onBehalfMetadata && { metadata: onBehalfMetadata }),
           });
 
+          // Ordinary comments — including on-behalf ones — record no email
+          // intents and subscribe nobody; the in-app notification keeps its
+          // member-only recipients with the staff member as actor.
           yield* Option.match(notifications, {
             onNone: () => Effect.void,
             onSome: (service) =>
@@ -213,13 +281,22 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             postId: args.postId,
             parentCommentId: args.parentCommentId,
             source: "dashboard",
+            onBehalf: args.author !== undefined,
           })
         ),
         withRemapDbErrors("Comment", "create")
       ),
 
     CommentCreatePublic: (args: TCommentCreate) =>
-      createCommentEffect(args).pipe(
+      Effect.gen(function* () {
+        if (args.author !== undefined) {
+          return yield* new BadRequestError({
+            message:
+              "Comments cannot be created on behalf of another author from public boards",
+          });
+        }
+        return yield* createCommentEffect(args);
+      }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "CommentCreatePublic",
           level: "expensive",
@@ -307,5 +384,6 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
   Layer.provide(PostRepository.layer),
   Layer.provide(CommentRepository.layer),
   Layer.provide(PostActivityRepository.layer),
+  Layer.provide(ResolvePrincipalService.layer),
   Layer.provide(NotificationService.layer)
 );
