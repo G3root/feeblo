@@ -737,6 +737,12 @@ export const postActivityTable = pgTable(
     previousValue: text("previous_value"),
     nextValue: text("next_value"),
     commentId: text("comment_id"),
+    /**
+     * Optional structured provenance. Used by on-behalf actions to record the
+     * subject distinct from the actor, e.g.
+     * `{ onBehalfOf: { contactId, userId } }`.
+     */
+    metadata: jsonb("metadata"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

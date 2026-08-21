@@ -1,6 +1,7 @@
 import * as SQLPG from "@effect/sql-pg";
 import { PgliteClient } from "@effect/sql-pglite";
 import { PGlite } from "@electric-sql/pglite";
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { vector } from "@electric-sql/pglite-pgvector";
 import { sql } from "drizzle-orm";
 import * as PgDrizzlePglite from "drizzle-orm/effect-pglite";
@@ -48,7 +49,7 @@ export const PgliteClientLive = PgliteClient.layerFrom(
       Config.string("DATABASE_URL"),
       (url) =>
         new PGlite(pgliteDataDir(url), {
-          extensions: { vector },
+          extensions: { vector, pg_trgm },
         })
     ),
     (pglite) => Effect.promise(() => pglite.close())

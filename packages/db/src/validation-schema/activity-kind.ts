@@ -26,6 +26,10 @@ export const PostActivityKind = S.Literals([
   "COMMENT_CREATED",
   "COMMENT_UPDATED",
   "COMMENT_DELETED",
+  // On-behalf voter management (see plan-on-behalf.md). The actor is the
+  // staff member; the subject is recorded in `post_activity.metadata`.
+  "VOTE_ADDED",
+  "VOTE_REMOVED",
 ]);
 
 export type TPostActivityKind = S.Schema.Type<typeof PostActivityKind>;

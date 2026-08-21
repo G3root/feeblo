@@ -16,11 +16,11 @@ function hashEmail(email: string): string {
   return createHash("sha256").update(email.toLowerCase().trim()).digest("hex");
 }
 
-const generateRandomEmail = () =>
+const generateRandomEmail = (prefix: string) =>
   Effect.gen(function* () {
     const crypto = yield* Crypto.Crypto;
     const suffix = Buffer.from(yield* crypto.randomBytes(8)).toString("hex");
-    return `sso-${suffix}@feeblo.com`;
+    return `${prefix}-${suffix}@feeblo.com`;
   }).pipe(Effect.orDie);
 
 interface UpsertSsoUserInput {
@@ -33,6 +33,17 @@ interface UpsertSsoUserInput {
    * user's session, and an SSO user created for one organization is never
    * re-scoped to another.
    */
+  restrictedToOrganizationId: string;
+}
+
+interface ProvisionShadowUserInput {
+  /**
+   * The subject's real email. It is only hashed for matching; the stored
+   * account email is always synthetic, so a shadow user can never collide
+   * with — or be claimed by — a globally-registered account.
+   */
+  email: string;
+  name: string;
   restrictedToOrganizationId: string;
 }
 
@@ -109,7 +120,7 @@ const makeUserRepository = Effect.gen(function* () {
           .values({
             id,
             name: args.name,
-            email: yield* generateRandomEmail(),
+            email: yield* generateRandomEmail("sso"),
             emailVerified: true,
             emailHash,
             jwtAutoLoginAt: now,
@@ -121,6 +132,83 @@ const makeUserRepository = Effect.gen(function* () {
         if (!created) {
           return yield* new UserPersistenceError({
             message: "SSO user insert did not return a row",
+          });
+        }
+        return created;
+      }),
+
+    /**
+     * Finds or creates the attribution-only user backing an on-behalf
+     * subject (see plan-on-behalf.md). Shadow users carry a synthetic
+     * `behalf-*` email, are never email-verified, and have no credentials,
+     * so they can never authenticate. Matching is scoped to one organization
+     * by (email hash, organization) and may adopt an existing SSO portal
+     * user for the same human — their identity is already proven by the
+     * customer's identity provider, so their verification state is left
+     * untouched.
+     */
+    provisionShadowUser: (args: ProvisionShadowUserInput) =>
+      Effect.gen(function* () {
+        const emailHash = hashEmail(args.email);
+        const restrictedToOrganizationId = args.restrictedToOrganizationId;
+
+        if (restrictedToOrganizationId == null) {
+          return yield* new UserPersistenceError({
+            message: "Shadow user provisioning requires a organization scope",
+          });
+        }
+
+        // Match any org-restricted user for this human in this organization:
+        // a previously provisioned shadow user or an SSO portal user.
+        const existingByHash = yield* db
+          .select({ id: schema.userTable.id })
+          .from(schema.userTable)
+          .where(
+            and(
+              eq(schema.userTable.emailHash, emailHash),
+              eq(
+                schema.userTable.restrictedToOrganizationId,
+                restrictedToOrganizationId
+              )
+            )
+          )
+          .limit(1)
+          .pipe(Effect.map((rows) => rows[0]));
+
+        if (existingByHash) {
+          const updatedAt = yield* DateTime.nowAsDate;
+          const [updated = null] = yield* db
+            .update(schema.userTable)
+            .set({ name: args.name, updatedAt })
+            .where(eq(schema.userTable.id, existingByHash.id))
+            .returning();
+          if (!updated) {
+            return yield* new UserPersistenceError({
+              message: "Shadow user update did not return a row",
+            });
+          }
+          return updated;
+        }
+
+        // Create a new shadow user with a random, never-mailable address.
+        const id = yield* UserId.generate;
+        const now = yield* DateTime.nowAsDate;
+        const [created = null] = yield* db
+          .insert(schema.userTable)
+          .values({
+            id,
+            name: args.name,
+            email: yield* generateRandomEmail("behalf"),
+            emailVerified: false,
+            emailHash,
+            restrictedToOrganizationId,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning();
+        if (!created) {
+          return yield* new UserPersistenceError({
+            message: "Shadow user insert did not return a row",
           });
         }
         return created;
