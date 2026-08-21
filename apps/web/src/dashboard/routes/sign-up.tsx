@@ -39,7 +39,15 @@ function RouteComponent() {
       // The root auth guard reads the atom's cached session. Without this
       // refresh it still holds the pre-sign-up null and would bounce the
       // newly authenticated user back to /sign-in instead of /register.
-      await refreshAuthSession();
+      //
+      // Best-effort: a transient refresh failure must not surface the
+      // completed sign-up as an error. The guard re-resolves on navigation
+      // and fails open on its own transport errors.
+      try {
+        await refreshAuthSession();
+      } catch {
+        // Signed-in state lives in the HttpOnly cookie regardless.
+      }
       await navigate({
         to: "/register",
       });
