@@ -43,6 +43,18 @@ This applies to `NotificationList`, `NotificationUnreadCount`, `NotificationMark
 
 `NotificationsMenu` polls the unread count every 30 seconds and polls the list only while the menu is open. Selecting a notification immediately navigates through TanStack Router, passes an optional URL hash separately for comment deep links, and marks the item read in the background. A mark-read failure never blocks navigation.
 
+## Email updates for on-behalf customers
+
+In-app notifications are member-only by design. Customers attributed through
+on-behalf actions (created posts, added voters) are reached over email
+instead, through the durable outbox — and only when they pass the
+organization-access eligibility rule documented in
+[`docs/on-behalf.md`](./on-behalf.md): a verified account that is a workspace
+member, SSO-bound to the organization, or an unrestricted global user on a
+public board. A bare email typed by an admin grants attribution but never
+notification; its subscription sits at `deferred_no_access` until the subject
+gains real access, at which point subsequent updates flow automatically.
+
 ## Extending the system
 
 Add new event types through `NotificationService` and call them inside the source mutation’s existing database transaction. Add recipient-resolution tests alongside the handler tests. Do not add an external webhook transport for dashboard delivery; if Feeblo later exposes webhooks to customers, introduce a transactional outbox and retrying signed dispatcher as a separate integration boundary.

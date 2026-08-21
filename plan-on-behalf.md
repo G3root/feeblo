@@ -1,5 +1,11 @@
 # On-Behalf Posts, Votes & Comments Plan
 
+> **Status:** Slices 1–8 and 10 are implemented on branch `behalf-user`
+> (commits `78bdc151`…`1cd09bbf`); slice 9 (dashboard UI) is pending. The
+> canonical feature reference is now `docs/on-behalf.md`; this document
+> records the design decisions and, in "As-built deviations" at the bottom,
+> where implementation deliberately diverged.
+
 ## Objective
 
 Let workspace members create posts, add voters, and publish comments that are
@@ -353,6 +359,42 @@ Each slice is test-first and leaves the system deployable.
 - Verification or confirmation emails to inaccessible recipients.
 - Widget or integration-surface on-behalf creation.
 - Full impersonation (acting inside the product *as* the customer's session).
+
+## As-built deviations
+
+Decisions above held; implementation diverged in these places, all recorded
+in code comments and `docs/on-behalf.md`:
+
+1. **Gate ordering and external subscribers.** The eligibility gate runs
+   *after* the consent check, not before it. Verified double-opt-in external
+   subscribers without any account keep their consent-based delivery — the
+   product rule targets on-behalf attribution, not opt-in broadcasts. The
+   gate restricts only recipients whose account resolves; changelog topics
+   are out of scope entirely.
+2. **SSO trigger is an in-place promotion.** When `upsertSsoUser` matches a
+   `behalf-*` shadow by (email hash, organization), the shadow row itself
+   becomes the portal identity (fresh synthetic `sso-*` address,
+   `emailVerified = true`) rather than being moved to a new user and deleted.
+   Identical end state, zero data churn.
+3. **Email subscriptions are email-contact-keyed.** Linking moves the
+   identity reference on the `email_contact` row and activates
+   `deferred_no_access` subscriptions by claiming that contact for the
+   surviving account when eligibility holds.
+4. **Shadow deletion stays with the caller.** The existing plugin deleted
+   restricted users itself after linking (skipping cleanup on failure so data
+   survives for retry); the generalized program therefore takes a
+   `deleteShadowUser` flag instead of always deleting.
+5. **Post subscriptions needed vote-style collision handling too** — they
+   share the `(post_id, user_id)` unique-index shape the ticket flagged only
+   for votes.
+6. **`identity/emails.ts`** holds the synthetic-email predicates as a
+   dependency-free module to avoid a user-repository import cycle.
+7. **Glossary location.** `CONTEXT.md` is scoped to the integration platform
+   domain, so the feature vocabulary (actor/subject, shadow user, deferred
+   subscription) lives in `docs/on-behalf.md` instead.
+8. **Picker `hasAccess` without post context.** With no `postId`, an
+   unrestricted verified global user is reported eligible (board unknown);
+   with `postId`, board visibility participates in the verdict.
 
 ## Completion Criteria
 
