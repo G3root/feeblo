@@ -9,8 +9,10 @@ import { useRef } from "react";
 
 import { useSite } from "../../providers/site-provider";
 
-const changelogSubscriptionQueryKey = (organizationId: string) =>
-  ["changelog-subscription", organizationId] as const;
+const changelogSubscriptionQueryKey = (
+  organizationId: string,
+  userId: string | null
+) => ["changelog-subscription", organizationId, userId] as const;
 
 /**
  * Toggles the visitor's email subscription to the workspace changelog.
@@ -29,7 +31,12 @@ export function ChangelogSubscribeButton() {
   const { data: session, isPending: isAuthPending } = useAuthState();
 
   const organizationId = site.organizationId;
-  const queryKey = changelogSubscriptionQueryKey(organizationId);
+  // Keyed per user so a sign-out/sign-in on the same workspace never reuses
+  // the previous visitor's cached subscription state.
+  const queryKey = changelogSubscriptionQueryKey(
+    organizationId,
+    session?.user.id ?? null
+  );
 
   // Re-entrancy guard: blocks a second toggle while the previous mutation is
   // still persisting. A ref avoids re-rendering the button on every toggle.

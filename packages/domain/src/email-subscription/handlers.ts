@@ -17,6 +17,8 @@ import {
 import { RateLimitService } from "../rate-limit/service";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
+import { SitePolicy } from "../site/policies";
+import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { EmailSubscriptionRepository } from "./repository";
 import { EmailSubscriptionRpcs } from "./rpcs";
@@ -161,6 +163,7 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   const consent = yield* EmailSubscriptionConsentHandlersEffect;
   const entitlementPolicy = yield* EntitlementPolicy;
   const repository = yield* EmailSubscriptionRepository;
+  const sitePolicy = yield* SitePolicy;
 
   const internalConsentFailure = (
     error:
@@ -185,6 +188,9 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       organizationId,
     }: ChangelogSubscriptionRequest) =>
       consent.requestChangelogSubscription({ email, organizationId }).pipe(
+        // Public reads gate on changelog visibility; subscriptions must not
+        // leak hidden entries to outside addresses either.
+        Policy.withPublicPolicy(sitePolicy.canViewChangelog(organizationId)),
         Effect.map(({ verificationRequired }) => ({ verificationRequired })),
         Effect.catchTags({
           EmailOutboxDataError: internalConsentFailure,
@@ -226,7 +232,15 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
           subscribed:
             subscription !== null && subscription.state !== "unsubscribed",
         };
-      }).pipe(withRemapDbErrors("EmailSubscription", "select")),
+      }).pipe(
+        Policy.withPolicy(
+          Policy.all(
+            Policy.hasRestrictedOrganizationScope(organizationId),
+            sitePolicy.canViewChangelog(organizationId)
+          )
+        ),
+        withRemapDbErrors("EmailSubscription", "select")
+      ),
     EmailSubscriptionChangelogSubscribeSet: ({
       organizationId,
       subscribed,
@@ -262,6 +276,12 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
         }
         return { subscribed };
       }).pipe(
+        Policy.withPolicy(
+          Policy.all(
+            Policy.hasRestrictedOrganizationScope(organizationId),
+            sitePolicy.canViewChangelog(organizationId)
+          )
+        ),
         Effect.catchTags({
           EmailSubscriptionDataError: internalConsentFailure,
           EmailSubscriptionInputError: internalConsentFailure,
@@ -330,6 +350,8 @@ export const EmailSubscriptionRpcHandlers = EmailSubscriptionRpcs.toLayer(
 ).pipe(
   Layer.provide(EmailSubscriptionRepository.layer),
   Layer.provide(EmailOutboxRepository.layer),
+  Layer.provide(SitePolicy.layer),
+  Layer.provide(SiteRepository.layer),
   Layer.provide(
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   )
