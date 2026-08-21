@@ -27,14 +27,15 @@ export type AuthStateResult =
 
 /**
  * Compatibility adapter for existing full-session consumers. New display-only
- * consumers should use `useAuth`.
+ * consumers should use `useAuth`; this adapter deliberately withholds a
+ * display-only hint because roles and session metadata must be authoritative.
  */
 export const useAuthState = (): AuthStateResult => {
   const auth = useAuth();
 
   const refetch = useCallback<RefreshAuthSession>(refreshAuthSession, []);
 
-  if (auth.status === "authenticated") {
+  if (auth.status === "authenticated" && auth.data) {
     return {
       status: "authenticated",
       data: auth.data,

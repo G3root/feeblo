@@ -1,11 +1,13 @@
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import type { AuthClientSession } from "@feeblo/auth/client";
 import { hasWindow } from "@feeblo/utils/runtime-kind";
+import * as AtomRegistry from "effect/unstable/reactivity/AtomRegistry";
 import * as Option from "effect/Option";
 import * as Result from "effect/unstable/reactivity/AsyncResult";
 import type React from "react";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 
+import { readAuthHintFromCookie } from "./hint-cookie";
 import { authAtomRegistry, meAtom } from "./atoms";
 
 // ---------------------------------------------------------------------------
@@ -15,6 +17,12 @@ import { authAtomRegistry, meAtom } from "./atoms";
 // custom session endpoint. Auth is resolved entirely on the client: the
 // session starts in a loading state on every full page load and reconciles
 // once the atom's request finishes.
+//
+// While that request is in flight, the display-only hint cookie (written by
+// the atom itself after previous confirmed resolutions) paints the last known
+// identity immediately. Like the atom's response it is never authorization:
+// it contains no session token or membership roles, and the resolved response
+// always replaces it.
 // ---------------------------------------------------------------------------
 
 export type AuthUser = Pick<AuthClientSession["user"], "email" | "name"> & {
@@ -26,7 +34,8 @@ export type AuthState =
   | { status: "unauthenticated" }
   | {
       status: "authenticated";
-      data: AuthClientSession;
+      /** Null only while a display-only hint is awaiting reconciliation. */
+      data: AuthClientSession | null;
       user: AuthUser;
     };
 
@@ -74,20 +83,39 @@ const sessionState = (session: AuthClientSession): AuthState => ({
 const confirmedState = (session: AuthClientSession | null): AuthState =>
   session === null ? { status: "unauthenticated" } : sessionState(session);
 
+const hintState = (hint: AuthUser | null): AuthState | null =>
+  hint === null
+    ? null
+    : { status: "authenticated", data: null, user: hint };
+
 function AuthProviderClient({
   children,
 }: {
   readonly children: React.ReactNode;
 }) {
-  const state = useResolvedAuth();
+  const resolved = useResolvedAuth();
+  // Read once per mount: the cookie only changes through the atom itself, so
+  // a re-render can never observe a fresher hint than the in-flight request.
+  const [initialHint] = useState(() => readAuthHintFromCookie());
+
+  const state = useMemo<AuthState>(
+    () =>
+      resolved.status === "loading"
+        ? (hintState(initialHint) ?? resolved)
+        : resolved,
+    [initialHint, resolved]
+  );
 
   return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>;
 }
 
 export function AuthProvider({
   children,
+  registry = authAtomRegistry,
 }: {
   readonly children: React.ReactNode;
+  /** Test seam: defaults to the shared app-wide registry. */
+  readonly registry?: AtomRegistry.AtomRegistry;
 }) {
   if (!hasWindow()) {
     return (
@@ -98,7 +126,7 @@ export function AuthProvider({
   }
 
   return (
-    <RegistryContext.Provider value={authAtomRegistry}>
+    <RegistryContext.Provider value={registry}>
       <AuthProviderClient>{children}</AuthProviderClient>
     </RegistryContext.Provider>
   );

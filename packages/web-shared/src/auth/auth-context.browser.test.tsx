@@ -14,12 +14,14 @@ vi.hoisted(() => {
 });
 
 import { render } from "vitest-browser-react";
+import * as AtomRegistry from "effect/unstable/reactivity/AtomRegistry";
 
 import {
   overrideSessionGetterForTests,
   resetSessionGetterForTests,
 } from "./atoms";
 import { AuthProvider, useAuth } from "./auth-context";
+import { clearAuthHintCookie, writeAuthHintToCookie } from "./hint-cookie";
 
 function AuthProbe() {
   const auth = useAuth();
@@ -34,6 +36,7 @@ function AuthProbe() {
 describe("AuthProvider session revalidation", () => {
   afterEach(() => {
     resetSessionGetterForTests();
+    clearAuthHintCookie();
   });
 
   it("revalidates on window focus without signing out after a transient failure", async () => {
@@ -60,7 +63,7 @@ describe("AuthProvider session revalidation", () => {
     overrideSessionGetterForTests(getSession);
 
     const screen = await render(
-      <AuthProvider>
+      <AuthProvider registry={AtomRegistry.make()}>
         <AuthProbe />
       </AuthProvider>
     );
@@ -74,5 +77,65 @@ describe("AuthProvider session revalidation", () => {
       expect(getSession).toHaveBeenCalledTimes(2);
     });
     await expect.element(authenticated).toBeVisible();
+  });
+
+  it("paints the cached hint while the session request is in flight", async () => {
+    writeAuthHintToCookie({
+      email: "cached@example.com",
+      image: null,
+      name: "Cached",
+    });
+
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    overrideSessionGetterForTests(() =>
+      gate.then(() => ({
+        data: {
+          user: { email: "fresh@example.com", image: null, name: "Fresh" },
+        },
+        error: null,
+      }))
+    );
+
+    const screen = await render(
+      <AuthProvider registry={AtomRegistry.make()}>
+        <AuthProbe />
+      </AuthProvider>
+    );
+
+    // The cached identity paints synchronously, before the atom resolves.
+    await expect
+      .element(screen.getByText("authenticated:cached@example.com"))
+      .toBeVisible();
+
+    release!();
+    await vi.waitFor(() => {
+      screen.getByText("authenticated:fresh@example.com");
+    });
+    await expect
+      .element(screen.getByText("authenticated:fresh@example.com"))
+      .toBeVisible();
+  });
+
+  it("clears the hint cookie after a confirmed sign-out", async () => {
+    writeAuthHintToCookie({
+      email: "cached@example.com",
+      image: null,
+      name: "Cached",
+    });
+    overrideSessionGetterForTests(async () => ({ data: null, error: null }));
+
+    const screen = await render(
+      <AuthProvider registry={AtomRegistry.make()}>
+        <AuthProbe />
+      </AuthProvider>
+    );
+
+    await expect
+      .element(screen.getByText("unauthenticated"))
+      .toBeVisible();
+    expect(document.cookie).not.toContain("feeblo_auth_hint");
   });
 });

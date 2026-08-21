@@ -34,7 +34,7 @@ function OrganizationLayoutRoute() {
 function PostHogOrganizationGroup() {
   const auth = useAuth();
   const { organizationId } = Route.useParams();
-  const canGroup = auth.status === "authenticated";
+  const canGroup = auth.status === "authenticated" && auth.data !== null;
 
   useEffect(() => {
     if (!canGroup) {
