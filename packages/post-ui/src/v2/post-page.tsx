@@ -18,6 +18,7 @@ import { PostTitleUpdateInput } from "./post-title-input";
 import { PostReactionPicker } from "./reaction-picker";
 import { SubscribeCard } from "./subscribe-toggle";
 import { UpvoteButton } from "./upvote-toggle";
+import { VoterPanel } from "./voter-panel";
 
 // Post content is rendered as sanitized Markdown in display mode and as the
 // rich-text editor in edit mode. Both views are lazy-loaded so the default
@@ -117,6 +118,10 @@ function Vote() {
   return <UpvoteButton />;
 }
 
+function Voters() {
+  return <VoterPanel />;
+}
+
 function CompactVote() {
   return <UpvoteButton variant="compact" />;
 }
@@ -149,4 +154,5 @@ export const PostPage = {
   Title,
   Unlocked,
   Vote,
+  Voters,
 };

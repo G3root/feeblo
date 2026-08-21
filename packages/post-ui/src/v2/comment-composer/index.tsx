@@ -1,5 +1,7 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 
+import { AuthorToggle } from "./author-toggle";
 import { CommentComposerEditor } from "./editor";
 import { CommentComposerProvider } from "./provider";
 import { CommentComposerSubmit } from "./submit";
@@ -7,11 +9,15 @@ import { CommentComposerSubmit } from "./submit";
 export { type CommentComposerProviderProps } from "./provider";
 
 type CommentComposerRootProps = {
+  authorDisplay?: string | null;
+  authorPicker?: ReactNode;
   cancelLabel?: string;
   content?: string;
   disabled?: boolean;
+  isAuthorMode?: boolean;
   isPrivate?: boolean;
   onCancel?: () => void;
+  onAuthorToggle?: (pressed: boolean) => void;
   onContentChange?: (content: string) => void;
   onSubmit?: (value: {
     content: string;
@@ -21,22 +27,28 @@ type CommentComposerRootProps = {
   placeholder?: string;
   privateLabel?: string;
   publicLabel?: string;
+  showAuthorToggle?: boolean;
   showVisibilityToggle?: boolean;
   submitLabel?: string;
 };
 
 function CommentComposerComponent({
+  authorDisplay,
+  authorPicker,
   cancelLabel,
   content: externalContent,
   disabled,
+  isAuthorMode,
   isPrivate: externalIsPrivate,
   onCancel,
+  onAuthorToggle,
   onContentChange: externalOnContentChange,
   onSubmit,
   onVisibilityChange: externalOnVisibilityChange,
   placeholder,
   privateLabel,
   publicLabel,
+  showAuthorToggle,
   showVisibilityToggle,
   submitLabel,
 }: CommentComposerRootProps) {
@@ -85,11 +97,15 @@ function CommentComposerComponent({
 
   return (
     <CommentComposerProvider
+      authorDisplay={authorDisplay}
+      authorPicker={authorPicker}
       cancelLabel={cancelLabel}
       content={content}
       disabled={disabled}
+      isAuthorMode={isAuthorMode}
       isPrivate={isPrivate}
       onCancel={onCancel}
+      onAuthorToggle={onAuthorToggle}
       onContentChange={handleContentChange}
       onSubmit={onSubmit ? handleSubmit : undefined}
       onVisibilityChange={handleVisibilityChange}
@@ -97,6 +113,7 @@ function CommentComposerComponent({
       privateLabel={privateLabel}
       publicLabel={publicLabel}
       resetKey={resetKey}
+      showAuthorToggle={showAuthorToggle}
       showVisibilityToggle={showVisibilityToggle}
       submitLabel={submitLabel}
     >
@@ -109,6 +126,7 @@ function CommentComposerComponent({
 }
 
 export const CommentComposer = Object.assign(CommentComposerComponent, {
+  AuthorToggle,
   Editor: CommentComposerEditor,
   Provider: CommentComposerProvider,
   Submit: CommentComposerSubmit,

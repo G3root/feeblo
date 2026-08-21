@@ -12,33 +12,39 @@ import { formOptions } from "@tanstack/react-form";
 import { z } from "zod";
 
 import { PostEditor } from "../post-editor";
+import {
+  emptyOnBehalfAuthor,
+} from "../contact-combobox/contact-combobox";
 import { PostBoardSelect, StatusField } from "../post-field";
 import { PostTitleInput } from "../post-title-input";
 import { usePostCollections } from "../providers/post-collections-provider";
 
-const Schema = z.object({
-  boardId: z.string().trim().min(1, "Board is required"),
-  content: z
-    .string()
-    .min(1, "Content is required")
-    .max(
-      POST_CONTENT_MAX_LENGTH,
-      `Content must be at most ${POST_CONTENT_MAX_LENGTH} characters`
-    ),
-  createMore: z.boolean(),
-  statusId: z.string().trim().min(1, "Status is required"),
-  title: z
-    .string()
-    .trim()
-    .min(1, "Title is required")
-    .max(
-      POST_TITLE_MAX_LENGTH,
-      `Title must be at most ${POST_TITLE_MAX_LENGTH} characters`
-    ),
-});
+// Per-field schemas: reused by the form's function validator, which checks
+// each field independently (see postCreateFormOpts).
+const BoardIdField = z.string().trim().min(1, "Board is required");
+const ContentField = z
+  .string()
+  .min(1, "Content is required")
+  .max(
+    POST_CONTENT_MAX_LENGTH,
+    `Content must be at most ${POST_CONTENT_MAX_LENGTH} characters`
+  );
+const StatusIdField = z.string().trim().min(1, "Status is required");
+const TitleField = z
+  .string()
+  .trim()
+  .min(1, "Title is required")
+  .max(
+    POST_TITLE_MAX_LENGTH,
+    `Title must be at most ${POST_TITLE_MAX_LENGTH} characters`
+  );
+
+// The composed object schema was dropped: the function validator below checks
+// each field against its own schema, and `author` is server-validated.
 
 export const postCreateFormOpts = formOptions({
   defaultValues: {
+    author: emptyOnBehalfAuthor,
     boardId: "",
     content: "",
     createMore: false,
@@ -46,7 +52,28 @@ export const postCreateFormOpts = formOptions({
     title: "",
   },
   validators: {
-    onChange: Schema,
+    // A function validator (not a zod schema) because TanStack requires the
+    // validator's input AND output types to equal the form values exactly,
+    // which no zod schema can do for an optional-shaped `author` under
+    // exactOptionalPropertyTypes. Each validated field is checked against its
+    // own schema; the author key is server-validated.
+    onChange: ({ value }) => {
+      const fieldErrors: Record<string, string> = {};
+      const fieldChecks = [
+        ["boardId", BoardIdField, value.boardId],
+        ["content", ContentField, value.content],
+        ["statusId", StatusIdField, value.statusId],
+        ["title", TitleField, value.title],
+      ] as const;
+      for (const [key, fieldSchema, fieldValue] of fieldChecks) {
+        const parsed = fieldSchema.safeParse(fieldValue);
+        if (!parsed.success) {
+          fieldErrors[key] =
+            parsed.error.issues[0]?.message ?? "Invalid value";
+        }
+      }
+      return Object.keys(fieldErrors).length > 0 ? fieldErrors : undefined;
+    },
   },
 });
 

@@ -28,6 +28,10 @@
       "types": "./src/v2/comment-display/index.tsx",
       "default": "./src/v2/comment-display/index.tsx"
     },
+    "./contact-combobox": {
+      "types": "./src/v2/contact-combobox/contact-combobox.tsx",
+      "default": "./src/v2/contact-combobox/contact-combobox.tsx"
+    },
     "./dialogs": {
       "types": "./src/v2/dialogs/index.ts",
       "default": "./src/v2/dialogs/index.ts"
@@ -71,6 +75,10 @@
     "./upvote-toggle": {
       "types": "./src/v2/upvote-toggle.tsx",
       "default": "./src/v2/upvote-toggle.tsx"
+    },
+    "./voter-panel": {
+      "types": "./src/v2/voter-panel.tsx",
+      "default": "./src/v2/voter-panel.tsx"
     },
     "./subscribe-toggle": {
       "types": "./src/v2/subscribe-toggle.tsx",

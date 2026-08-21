@@ -10,11 +10,20 @@ import { slugify } from "@feeblo/utils/url";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
+import { UserAdd01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { usePostCreateDialogContext } from "../dialog-stores/post";
+import {
+  ContactCombobox,
+  emptyOnBehalfAuthor,
+  hasOnBehalfAuthorValue,
+  toOnBehalfAuthor,
+} from "../contact-combobox/contact-combobox";
 import {
   PostBoardField,
   PostContentField,
@@ -145,6 +154,13 @@ export function PostCreateForm() {
   } = collections;
   const { data: session } = useAuthState();
 
+  // Mirrors the backend's PostPolicy gate for PostCreate.author; hidden
+  // entirely from roles below manager.
+  const createOnBehalfPolicy = usePolicy(
+    hasPermission(organizationId, "posts.createOnBehalf")
+  );
+  const [isOnBehalfOpen, setIsOnBehalfOpen] = useState(false);
+
   const { data: member } = useLiveQuery(
     (q) => {
       if (!(membersCollection && organizationId && session?.user?.id)) {
@@ -209,6 +225,7 @@ export function PostCreateForm() {
   const form = useAppForm({
     ...postCreateFormOpts,
     defaultValues: {
+      author: emptyOnBehalfAuthor,
       boardId: initialBoardId,
       content: "",
       createMore: false,
@@ -241,6 +258,14 @@ export function PostCreateForm() {
         if (!selectedPostStatus) {
           throw new Error("Post status not found");
         }
+
+        // Attribution only rides along when the section is expanded and a
+        // subject is actually picked; otherwise the session user authors.
+        const authorSelection =
+          createOnBehalfPolicy.allowed && isOnBehalfOpen
+            ? value.author
+            : undefined;
+
         const tx = postCollection.insert({
           id: postId,
           assetIds,
@@ -264,6 +289,9 @@ export function PostCreateForm() {
             name: session?.user?.name ?? null,
             image: session?.user?.image ?? null,
           },
+          ...(hasOnBehalfAuthorValue(authorSelection)
+            ? { author: toOnBehalfAuthor(authorSelection) }
+            : undefined),
         });
 
         await tx.isPersisted.promise;
@@ -278,11 +306,13 @@ export function PostCreateForm() {
         if (value.createMore) {
           form.resetField("title");
           form.resetField("content");
+          form.resetField("author");
           setContentEditorKey((current) => current + 1);
           return;
         }
 
         form.reset();
+        setIsOnBehalfOpen(false);
         setContentEditorKey((current) => current + 1);
         store.send({ type: "toggle" });
       } catch (error) {
@@ -337,6 +367,50 @@ export function PostCreateForm() {
           </form.Subscribe>
         </div>
       </DialogPanel>
+
+      {createOnBehalfPolicy.allowed ? (
+        <div className="border-border border-t px-1 pt-3">
+          <button
+            aria-expanded={isOnBehalfOpen}
+            className="text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-1.5 text-sm transition-colors"
+            onClick={() => {
+              if (isOnBehalfOpen) {
+                form.resetField("author");
+              }
+              setIsOnBehalfOpen((open) => !open);
+            }}
+            type="button"
+          >
+            <HugeiconsIcon className="size-4" icon={UserAdd01Icon} strokeWidth={2} />
+            Post on behalf of a customer
+          </button>
+          {isOnBehalfOpen ? (
+            <form.AppField name="author">
+              {(field) => (
+                <div className="pt-2">
+                  <ContactCombobox
+                    label="Post on behalf of"
+                    onSelect={(next) =>
+                      field.handleChange(next ?? emptyOnBehalfAuthor)
+                    }
+                    organizationId={organizationId}
+                    placeholder="Search customers by name or email..."
+                    value={
+                      hasOnBehalfAuthorValue(field.state.value)
+                        ? field.state.value
+                        : null
+                    }
+                  />
+                  <p className="text-muted-foreground pt-1 text-xs">
+                    The post is attributed to this customer; you stay recorded
+                    as the actor.
+                  </p>
+                </div>
+              )}
+            </form.AppField>
+          ) : null}
+        </div>
+      ) : null}
 
       <DialogFooter className="grid grid-cols-2 items-center">
         <div className="flex justify-start">

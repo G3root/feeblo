@@ -1,16 +1,24 @@
+import type { ReactNode } from "react";
 import { createContext, use } from "react";
 
 export type CommentComposerState = {
+  /** Picked subject display label; null means the session user authors. */
+  authorDisplay: string | null;
+  /** Picker UI rendered while `isAuthorMode` is on (see Provider props). */
+  authorPicker: ReactNode | null;
   content: string;
   disabled: boolean;
+  isAuthorMode: boolean;
   isPrivate: boolean;
   placeholder: string;
   resetKey: number;
+  showAuthorToggle: boolean;
   showVisibilityToggle: boolean;
 };
 
 export type CommentComposerActions = {
   onCancel?: () => void;
+  onAuthorToggle?: (pressed: boolean) => void;
   onContentChange: (content: string) => void;
   onSubmit?: () => void;
   onVisibilityChange: (isPrivate: boolean) => void;

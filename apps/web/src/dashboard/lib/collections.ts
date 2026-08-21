@@ -2,6 +2,7 @@ import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
 import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { PostSubscription } from "@feeblo/domain/post-subscription/schema";
+import type { TPostCreateAuthor } from "@feeblo/domain/post/schema";
 import type { Upvote } from "@feeblo/domain/upvote/schema";
 import { hasWindow } from "@feeblo/utils/runtime-kind";
 import {
@@ -160,6 +161,11 @@ export const postCollection = createCollection(
       const mutation = transaction.mutations[0];
       const { modified: newPost } = mutation;
 
+      // SAFETY: post-ui attaches a transient `author` to the insert payload
+      // so on-behalf attribution rides the same onInsert path; it is not a
+      // persisted column (see docs/on-behalf.md).
+      const author = (newPost as { author?: TPostCreateAuthor }).author;
+
       await fetchRpc((rpc) =>
         rpc.PostCreate({
           id: newPost.id,
@@ -169,6 +175,7 @@ export const postCollection = createCollection(
           content: newPost.content,
           assetIds: newPost.assetIds ?? [],
           statusId: newPost.statusId,
+          ...(author ? { author } : undefined),
         })
       );
     },
@@ -758,6 +765,11 @@ export const commentCollection = createCollection(
       const mutation = transaction.mutations[0];
       const { modified: newComment } = mutation;
 
+      // SAFETY: post-ui attaches a transient `author` to the insert payload
+      // so on-behalf attribution rides the same onInsert path; it is not a
+      // persisted column (see docs/on-behalf.md).
+      const author = (newComment as { author?: TPostCreateAuthor }).author;
+
       await fetchRpc(
         (rpc) =>
           rpc.CommentCreate({
@@ -767,6 +779,7 @@ export const commentCollection = createCollection(
             postId: newComment.postId,
             parentCommentId: newComment.parentCommentId,
             id: newComment.id,
+            ...(author ? { author } : undefined),
           }),
         {}
       );

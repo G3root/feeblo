@@ -16,8 +16,13 @@ import {
 // backend. These are the module boundaries the page reads directly, so
 // interception is the only seam available here.
 // eslint-disable-next-line anti-slop/no-module-mocking
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/use-auth-state", () => ({
   useAuthState: () => ({ data: null }),
+}));
+// eslint-disable-next-line anti-slop/no-module-mocking
+vi.mock("@feeblo/web-shared/runtime", () => ({
+  fetchRpc: () => Promise.resolve([]),
 }));
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/use-policy", () => ({
@@ -59,6 +64,7 @@ vi.mock("./upvote-toggle", () => ({
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("./subscribe-toggle", () => ({
   SubscribeButton: () => <button type="button">subscribe</button>,
+  SubscribeCard: () => <div>subscribe card</div>,
 }));
 
 // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
@@ -235,9 +241,7 @@ describe("PostPage composition", () => {
     await expect
       .element(screen.getByRole("button", { name: "compact vote" }))
       .toBeVisible();
-    await expect
-      .element(screen.getByRole("button", { name: "subscribe" }))
-      .toBeVisible();
+    await expect.element(screen.getByText("subscribe card")).toBeVisible();
     await expect.element(screen.getByText("comment composer")).toBeVisible();
     await expect.element(screen.getByText("comments list")).toBeVisible();
   });

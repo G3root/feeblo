@@ -1,5 +1,6 @@
 import type { TPostActivityKind } from "@feeblo/db/validation-schema/activity-kind";
 import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
+import type { TContact } from "@feeblo/domain/contact/schema";
 import {
   ActivityTimeline,
   ActivityTimelineItem,
@@ -41,12 +42,54 @@ import { useMemo } from "react";
 
 import {
   boardCollection,
+  contactCollection,
   postActivityCollection,
   postStatusCollection,
   tagCollection,
 } from "~/lib/collections";
 
 type NameLookup = ReadonlyMap<string, string>;
+
+/**
+ * Provenance payload recorded by on-behalf actions
+ * (`packages/domain/src/post-activity/repository.ts#PostActivityMetadata`).
+ * `PostActivityList` does not return `metadata` yet, so this stays inert
+ * until the RPC exposes it; the renderer is written against the documented
+ * shape so provenance lights up without further UI changes.
+ */
+type OnBehalfMetadata = {
+  onBehalfOf?:
+    | {
+        contactId?: string | null;
+        userId?: string | null;
+      }
+    | null;
+};
+
+function getOnBehalfMetadata(activity: TPostActivity): OnBehalfMetadata | null {
+  // Metadata is decoded by the PostActivity RPC schema; absent for every
+  // pre-on-behalf activity row.
+  const onBehalfOf = activity.metadata?.onBehalfOf ?? null;
+  if (!onBehalfOf) {
+    return null;
+  }
+  return { onBehalfOf };
+}
+
+/** "{actor} on behalf of {subject}" — subject resolved from contacts. */
+function resolveOnBehalfSubject(
+  metadata: OnBehalfMetadata,
+  contactsById: ReadonlyMap<string, TContact>,
+  contactsByUserId: ReadonlyMap<string, TContact>
+): string {
+  const contactId = metadata.onBehalfOf?.contactId;
+  const userId = metadata.onBehalfOf?.userId;
+  const contact =
+    (contactId ? contactsById.get(contactId) : undefined) ??
+    (userId ? contactsByUserId.get(userId) : undefined);
+
+  return contact?.name ?? contact?.email ?? "a customer";
+}
 
 const activityIconMap = {
   POST_CREATED: FileAddIcon,
@@ -191,6 +234,13 @@ export function PostActivityList({
         .where(({ tag }) => eq(tag.organizationId, organizationId)),
     [organizationId]
   );
+  const { data: contacts } = useLiveQuery(
+    (query) =>
+      query
+        .from({ contact: contactCollection })
+        .where(({ contact }) => eq(contact.organizationId, organizationId)),
+    [organizationId]
+  );
 
   const statusNames = useMemo(
     () =>
@@ -214,6 +264,19 @@ export function PostActivityList({
     () => new Map(tags.map((tag) => [tag.id, tag.name])),
     [tags]
   );
+  const contactsById = useMemo(
+    () => new Map(contacts.map((contact) => [contact.id, contact])),
+    [contacts]
+  );
+  const contactsByUserId = useMemo(() => {
+    const map = new Map<string, TContact>();
+    for (const contact of contacts) {
+      if (contact.userId) {
+        map.set(contact.userId, contact);
+      }
+    }
+    return map;
+  }, [contacts]);
 
   if (isLoading) {
     return null;
@@ -232,6 +295,14 @@ export function PostActivityList({
       {activities.map((activity) => {
         const actorName = activity.actor.name ?? "Someone";
         const { icon, color } = getActivityIcon(activity, statusTypes);
+        const onBehalfMetadata = getOnBehalfMetadata(activity);
+        const onBehalfSubject = onBehalfMetadata
+          ? resolveOnBehalfSubject(
+              onBehalfMetadata,
+              contactsById,
+              contactsByUserId
+            )
+          : null;
         return (
           <ActivityTimelineItem
             icon={
@@ -250,7 +321,13 @@ export function PostActivityList({
               boardNames,
               statusNames,
               tagNames,
-            })}{" "}
+            })}
+            {onBehalfSubject ? (
+              <>
+                {" on behalf of "}
+                <span className="font-medium">{onBehalfSubject}</span>
+              </>
+            ) : null}{" "}
             {dayjs.default(activity.createdAt).fromNow()}
           </ActivityTimelineItem>
         );

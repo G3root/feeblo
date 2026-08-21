@@ -2,6 +2,11 @@ import { isFunction } from "@feeblo/utils/runtime-kind";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
+// eslint-disable-next-line anti-slop/no-module-mocking
+vi.mock("@feeblo/web-shared/runtime", () => ({
+  fetchRpc: () => Promise.resolve([]),
+}));
+
 // The widget form reads these workspace modules directly; the stub provides
 // a faithful in-memory implementation for the upload schema endpoint boundary.
 // eslint-disable-next-line anti-slop/no-module-mocking

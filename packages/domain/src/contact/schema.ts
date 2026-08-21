@@ -105,6 +105,8 @@ export const Contact = S.Struct({
   phone: S.NullOr(S.String),
   avatar: S.NullOr(S.String),
   companyId: S.NullOr(S.String),
+  /** Linked feeblo account, when the customer has (or was provisioned) one. */
+  userId: S.optional(S.NullOr(S.String)),
   source: EntitySource,
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,

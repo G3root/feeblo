@@ -243,6 +243,7 @@ const makePostActivityRepository = Effect.gen(function* () {
           previousValue: schema.postActivityTable.previousValue,
           nextValue: schema.postActivityTable.nextValue,
           commentId: schema.postActivityTable.commentId,
+          metadata: schema.postActivityTable.metadata,
           createdAt: schema.postActivityTable.createdAt,
         })
         .from(schema.postActivityTable)
@@ -263,8 +264,12 @@ const makePostActivityRepository = Effect.gen(function* () {
         )
         .pipe(
           Effect.map((rows) =>
-            rows.map(({ actorName, actorImage, ...activity }) => ({
+            rows.map(({ actorName, actorImage, metadata, ...activity }) => ({
               ...activity,
+              // SAFETY: jsonb contents are written only through
+              // PostActivityMetadata constructors in this repository, so the
+              // runtime shape matches the interface exactly.
+              metadata: (metadata ?? null) as PostActivityMetadata | null,
               actor: {
                 name: actorName,
                 image: actorImage,
