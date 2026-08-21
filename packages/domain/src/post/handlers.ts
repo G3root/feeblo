@@ -843,12 +843,23 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           level: "expensive",
         }),
         Policy.withPolicy(
-          postPolicy.canUpdate({
-            organizationId: args.organizationId,
-            postId: args.id,
-            boardId: args.boardId,
-            source: "public",
-          })
+          Policy.all(
+            postPolicy.canUpdate({
+              organizationId: args.organizationId,
+              postId: args.id,
+              boardId: args.boardId,
+              source: "public",
+            }),
+            // Public updates are rename semantics only: a creator must never
+            // be able to change their post's status or move it across boards
+            // (status changes are reserved for `posts.status` holders).
+            postPolicy.hasUnchangedLocation({
+              organizationId: args.organizationId,
+              postId: args.id,
+              boardId: args.boardId,
+              statusId: args.statusId,
+            })
+          )
         ),
         withRemapDbErrors("Post", "update")
       ),

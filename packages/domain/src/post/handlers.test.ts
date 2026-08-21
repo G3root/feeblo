@@ -171,6 +171,24 @@ describe("PostRpcHandlers", () => {
       return id;
     });
 
+  const addStatus = (
+    fixture: Fixture,
+    type: "PENDING" | "IN_PROGRESS" | "COMPLETED" = "COMPLETED"
+  ) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const id = yield* PostStatusId.generate;
+
+      yield* db.insert(schema.postStatusTable).values({
+        id,
+        type,
+        orderIndex: 1,
+        organizationId: fixture.organizationId,
+      });
+
+      return id;
+    });
+
   const activateStarterPlan = (organizationId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -1187,6 +1205,66 @@ describe("PostRpcHandlers", () => {
             id: postId,
             title: "Original feedback",
           });
+        })
+      );
+
+      it.effect("denies changing the status of their own public post", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, null);
+          const completedStatusId = yield* addStatus(fixture, "COMPLETED");
+
+          yield* handlers
+            .PostCreatePublic(
+              postCreateInput(fixture, postId, "Original feedback")
+            )
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          // A creator must not be able to mark their own post as completed —
+          // status changes are reserved for `posts.status` holders.
+          const error = yield* Effect.flip(
+            handlers
+              .PostUpdatePublic({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                statusId: completedStatusId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("denies moving their own public post to another board", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, null);
+          const otherBoardId = yield* addBoard(fixture, "PUBLIC");
+
+          yield* handlers
+            .PostCreatePublic(
+              postCreateInput(fixture, postId, "Original feedback")
+            )
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostUpdatePublic({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: otherBoardId,
+                statusId: fixture.statusId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
         })
       );
     });

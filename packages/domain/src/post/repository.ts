@@ -200,6 +200,23 @@ const makePostRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows[0]?.statusId)),
 
+    /** Current board/status of a post, used to reject location changes on public paths. */
+    findLocationIds: ({ id, organizationId }: TPostById) =>
+      db
+        .select({
+          boardId: schema.postTable.boardId,
+          statusId: schema.postTable.statusId,
+        })
+        .from(schema.postTable)
+        .where(
+          and(
+            eq(schema.postTable.id, id),
+            eq(schema.postTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0])),
+
     findStatusType: ({
       id,
       organizationId,
