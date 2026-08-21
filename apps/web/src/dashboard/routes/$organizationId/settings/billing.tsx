@@ -35,8 +35,8 @@ import {
 import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { usePlanCatalog } from "~/hooks/use-plan-catalog";
 import { usePlan } from "~/hooks/use-plan";
+import { usePlanCatalog } from "~/hooks/use-plan-catalog";
 import { workspacePlanCollection } from "~/lib/collections";
 
 export const Route = createFileRoute("/$organizationId/settings/billing")({

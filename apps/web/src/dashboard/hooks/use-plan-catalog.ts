@@ -1,4 +1,7 @@
-import { PlansResponse, type TPlanPricing } from "@feeblo/domain/pricing/schema";
+import {
+  PlansResponse,
+  type TPlanPricing,
+} from "@feeblo/domain/pricing/schema";
 import { plansEndpoint } from "@feeblo/web-shared/auth-client";
 import { useQuery } from "@tanstack/react-query";
 import * as Schema from "effect/Schema";

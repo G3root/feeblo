@@ -1,3 +1,4 @@
+import type { TPlanPricing } from "@feeblo/domain/pricing/schema";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -25,7 +26,6 @@ import {
 } from "@feeblo/ui/item";
 import { Radio, RadioGroup } from "@feeblo/ui/radio-group";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
-import type { TPlanPricing } from "@feeblo/domain/pricing/schema";
 import { SparklesIcon, StarIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
