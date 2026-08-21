@@ -11,6 +11,7 @@ import {
 import { Database } from "@feeblo/db";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord";
+import { ExternalResourceService } from "@feeblo/domain/integration/external-resource/service";
 import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack";
 import { Mailer } from "@feeblo/transactional/mailer";
@@ -19,6 +20,7 @@ import {
   TestMailer,
 } from "@feeblo/transactional/mailer/test";
 import * as Config from "effect/Config";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
@@ -55,15 +57,25 @@ export const program = Effect.gen(function* () {
   const RateLimitLayer = makeRateLimitLayer(config, useTestMailer);
   const AuthLayer = makeAuthLayer(makeMailerLayer, RateLimitLayer);
 
+  // Built once so the integration kernel and the HTTP layer tree share a
+  // single instance instead of building sibling copies in separate memo
+  // scopes.
+  const externalResourceContext = yield* Layer.build(ExternalResourceServiceLive);
+  const externalResources = Context.get(
+    externalResourceContext,
+    ExternalResourceService
+  );
+
   const integrationRuntime = yield* makeIntegrationLayers.pipe(
     Effect.provideService(ServerConfig, config),
-    Effect.provide(ExternalResourceServiceLive)
+    Effect.provideService(ExternalResourceService, externalResources)
   );
 
   const GitHubConfigLayer = makeGitHubConfigLayer(config);
 
   const ServiceLayers = makeServiceLayers({
     config,
+    externalResourceService: externalResources,
     gitHubConfigLayer: GitHubConfigLayer,
     integrationRuntime,
     workflowLayer: WorkFlowLayer,

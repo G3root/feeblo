@@ -12,6 +12,17 @@ const parseUrl = (value: string): URL | null =>
 export const makeIsAllowedOrigin =
   (config: ServerConfigValue) =>
   (origin: string | undefined): boolean => {
+    // Constant configuration is parsed once when this predicate is created,
+    // not on every CORS evaluation; only the untrusted Origin header is
+    // parsed per request.
+    const appUrl = parseUrl(config.appUrl);
+    const apiUrl = parseUrl(config.apiUrl);
+    const appRootDomainHost = config.appRootDomain.includes(":")
+      ? (config.appRootDomain.split(":")[0] ?? "")
+      : config.appRootDomain;
+    const allowLocalDevHost =
+      config.nodeEnv === "development" && isLocalDevHost(appRootDomainHost);
+
     // Missing Origin headers come from non-browser clients and same-origin
     // navigations. CORS cannot gate them, so credentials-enabled,
     // state-changing routes must not rely on CORS alone for cross-site
@@ -21,16 +32,11 @@ export const makeIsAllowedOrigin =
     }
 
     const originUrl = parseUrl(origin);
-    const appUrl = parseUrl(config.appUrl);
-    const apiUrl = parseUrl(config.apiUrl);
     if (!(originUrl && appUrl && apiUrl)) {
       return false;
     }
 
     const originHost = originUrl.hostname;
-    const appRootDomainHost = config.appRootDomain.includes(":")
-      ? config.appRootDomain.split(":")[0]
-      : config.appRootDomain;
 
     if (originUrl.origin === apiUrl.origin) {
       return true;
@@ -39,11 +45,7 @@ export const makeIsAllowedOrigin =
       return true;
     }
 
-    if (
-      config.nodeEnv === "development" &&
-      isLocalDevHost(originHost) &&
-      isLocalDevHost(appRootDomainHost ?? "")
-    ) {
+    if (allowLocalDevHost && isLocalDevHost(originHost)) {
       return true;
     }
 

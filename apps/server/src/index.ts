@@ -18,6 +18,7 @@
  *   app/router.ts          → MergedRoutes + global middleware
  *   app/program.ts         → Effect.gen program + NodeRuntime bootstrap
  *   integrations.ts        → provider registry + delivery worker
+ *   webhook-inbound.ts     → shared provider webhook route plumbing
  *   github-provider.ts     → GitHub App provider Live
  *   slack.ts / discord.ts / github.ts → feature routers
  */

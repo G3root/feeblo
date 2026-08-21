@@ -16,7 +16,10 @@ import {
   DiscordManagementServiceLive,
   DiscordUserServiceLive,
 } from "@feeblo/domain/integration/discord";
-import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
+import {
+  ExternalResourceService,
+  type ExternalResourceServiceContract,
+} from "@feeblo/domain/integration/external-resource/service";
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
 import { GitHubInboundServiceLive } from "@feeblo/domain/integration/github/inbound-live";
 import { GitHubManagementServiceLive } from "@feeblo/domain/integration/github/management-live";
@@ -119,16 +122,23 @@ export const makeAuthLayer = (
 
 export const makeServiceLayers = ({
   config,
+  externalResourceService,
   gitHubConfigLayer,
   integrationRuntime,
   workflowLayer,
 }: {
   readonly config: ServerConfigValue;
+  /** Single shared instance built by the composition root. */
+  readonly externalResourceService: ExternalResourceServiceContract;
   readonly gitHubConfigLayer: Layer.Layer<GitHubIntegrationConfig>;
   readonly integrationRuntime: IntegrationRuntime;
   readonly workflowLayer: ReturnType<typeof makeWorkflowLayer>;
-}) =>
-  Layer.mergeAll(
+}) => {
+  const ExternalResources = Layer.succeed(
+    ExternalResourceService,
+    externalResourceService
+  );
+  return Layer.mergeAll(
     workflowLayer,
     SiteRepository.layer,
     EmailOutboxRepository.layer,
@@ -141,7 +151,7 @@ export const makeServiceLayers = ({
     ),
     EmailSubscriptionRepository.layer,
     integrationRuntime.layer,
-    ExternalResourceServiceLive,
+    ExternalResources,
     SlackManagementServiceLive.pipe(
       Layer.provide(SlackIntegrationConfig.layer),
       Layer.provide(Database.DatabaseContextLive)
@@ -174,7 +184,7 @@ export const makeServiceLayers = ({
       Layer.provide(Database.DatabaseContextLive)
     ),
     GitHubManagementServiceLive.pipe(
-      Layer.provide(ExternalResourceServiceLive),
+      Layer.provide(ExternalResources),
       Layer.provide(
         GitHubProviderLive.pipe(
           Layer.provide(gitHubConfigLayer),
@@ -195,3 +205,4 @@ export const makeServiceLayers = ({
     ),
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
+};

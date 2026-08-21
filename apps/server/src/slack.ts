@@ -2,10 +2,15 @@ import { Database } from "@feeblo/db";
 import {
   parseSlackOAuthCallbackUrl,
   SlackInboundService,
+  type SlackInboundServiceContract,
   SlackIntegrationConfig,
   SlackManagementService,
 } from "@feeblo/domain/integration/slack";
-import type { IntegrationProviderRegistry } from "@feeblo/integration-core";
+import {
+  type IntegrationInboundCapabilityHandler,
+  IntegrationInboundRejection,
+  type IntegrationProviderRegistry,
+} from "@feeblo/integration-core";
 import { ParsedSlackInboundRequest } from "@feeblo/integration-slack/inbound-schema";
 import {
   slackCommandsCapabilityKey,
@@ -15,12 +20,16 @@ import {
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
-import * as HttpHeaders from "effect/unstable/http/Headers";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
+
+import {
+  handleVerifiedInbound,
+  headerValue,
+  inboundHttpResponse,
+  settingsRedirect,
+} from "./webhook-inbound";
 
 /**
  * Slack HTTP surface: the OAuth callback, the `/feeblo` slash command, and
@@ -29,30 +38,33 @@ import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
  * work runs; successful inbound responses carry the Slack modal JSON.
  */
 
-const headerValue = (
-  request: HttpServerRequest.HttpServerRequest,
-  name: string
-): string | undefined =>
-  Option.getOrUndefined(HttpHeaders.get(request.headers, name));
+/** Rejects a verified inbound request whose kind does not match this route. */
+const invalidInboundPayload = Effect.succeed(
+  HttpServerResponse.text("invalid inbound payload", { status: 400 })
+);
 
-const handleInbound = (
+/** Maps signature-verification rejections to 401 instead of a crash. */
+const rejectInboundRejection = Effect.catchTags({
+  IntegrationInboundRejection: (error: IntegrationInboundRejection) =>
+    Effect.logWarning("Slack inbound request was rejected", {
+      message: error.message,
+      provider: error.provider,
+    }).pipe(
+      Effect.as(
+        HttpServerResponse.text("invalid request signature", { status: 401 })
+      )
+    ),
+});
+
+const respondToSlackInbound = (
   request: HttpServerRequest.HttpServerRequest,
-  capabilityKey:
-    | typeof slackCommandsCapabilityKey
-    | typeof slackMessageActionCapabilityKey,
-  expectedKind: "slash_command" | "interactive",
-  registry: IntegrationProviderRegistry
+  inboundHandler: IntegrationInboundCapabilityHandler | undefined,
+  inbound: SlackInboundServiceContract,
+  expectedKind: "slash_command" | "interactive"
 ) =>
-  Effect.gen(function* () {
-    const inboundHandler = registry.getInboundHandler({
-      capabilityKey,
-      provider: slackProviderKey,
-    });
-    if (inboundHandler === undefined) {
-      return HttpServerResponse.text("not found", { status: 404 });
-    }
-    const rawBody = yield* request.text;
-    const response = yield* inboundHandler.handle({
+  Effect.flatMap(request.text, (rawBody) =>
+    handleVerifiedInbound({
+      handler: inboundHandler,
       headers: {
         "x-slack-request-timestamp": headerValue(
           request,
@@ -61,145 +73,117 @@ const handleInbound = (
         "x-slack-signature": headerValue(request, "x-slack-signature"),
       },
       rawBody,
-    });
-    if (response.status !== 200) {
-      return HttpServerResponse.text(String(response.body), {
-        status: response.status,
-      });
-    }
-    // The inbound handler already signature-verified the payload; decode the
-    // body at the boundary so the domain service receives a typed request. A
-    // malformed body is still a client error, not a crash.
-    const parsed = yield* Effect.exit(
-      Schema.decodeUnknownEffect(Schema.toType(ParsedSlackInboundRequest))(
-        response.body
-      )
-    );
-    if (Exit.isFailure(parsed)) {
-      yield* Effect.logError(parsed.cause);
-      return HttpServerResponse.text("invalid inbound payload", {
-        status: 400,
-      });
-    }
-    if (parsed.value.kind !== expectedKind) {
-      return HttpServerResponse.text("invalid inbound payload", {
-        status: 400,
-      });
-    }
-    const inbound = yield* SlackInboundService;
-    if (parsed.value.kind === "slash_command") {
-      const result = yield* inbound.handleSlashCommand(parsed.value.payload);
-      return result.body === undefined
-        ? HttpServerResponse.empty({ status: result.status })
-        : HttpServerResponse.jsonUnsafe(result.body, { status: result.status });
-    }
-    const result = yield* inbound.handleInteractive(parsed.value.payload);
-    return result.body === undefined
-      ? HttpServerResponse.empty({ status: result.status })
-      : HttpServerResponse.jsonUnsafe(result.body, { status: result.status });
-  });
-
-const settingsRedirect = (
-  appUrl: string,
-  status: "connected" | "error",
-  message: string,
-  organizationId?: string
-) => {
-  const base =
-    organizationId === undefined
-      ? `${appUrl}/settings/integrations`
-      : `${appUrl}/${organizationId}/settings/integrations`;
-  return `${base}?slack=${status}&message=${encodeURIComponent(message)}`;
-};
-
-/** OAuth callback router; completes the install and redirects to the dashboard settings page. */
-export const makeSlackOAuthCallbackRouter = () =>
-  HttpRouter.use((router) =>
-    router.add(
-      "GET",
-      "/slack/oauth/callback",
-      (request: HttpServerRequest.HttpServerRequest) =>
-        Effect.gen(function* () {
-          const config = yield* SlackIntegrationConfig;
-          // request.url is the relative path (e.g.
-          // /slack/oauth/callback?code=…); parse it without a base URL.
-          const { code, error, state } = parseSlackOAuthCallbackUrl(
-            request.url
-          );
-          if (error !== null) {
-            return HttpServerResponse.redirect(
-              settingsRedirect(
-                config.appUrl,
-                "error",
-                "Slack installation was cancelled or denied."
+      schema: ParsedSlackInboundRequest,
+      respond: (parsed) =>
+        parsed.kind !== expectedKind
+          ? invalidInboundPayload
+          : parsed.kind === "slash_command"
+            ? Effect.map(
+                inbound.handleSlashCommand(parsed.payload),
+                inboundHttpResponse
               )
-            );
-          }
-          if (code === null || state === null) {
-            return HttpServerResponse.redirect(
-              settingsRedirect(
-                config.appUrl,
-                "error",
-                "Slack installation failed."
-              )
-            );
-          }
-          const management = yield* SlackManagementService;
-          const completed = yield* Effect.exit(
-            management.connectComplete({ code, state })
-          );
-          if (Exit.isFailure(completed)) {
-            return HttpServerResponse.redirect(
-              settingsRedirect(
-                config.appUrl,
-                "error",
-                "Slack installation failed."
-              )
-            );
-          }
-          return HttpServerResponse.redirect(
-            settingsRedirect(
-              config.appUrl,
-              "connected",
-              "Feeblo is now connected to Slack.",
-              completed.value.organizationId
-            )
-          );
-        }).pipe(Effect.orDie)
-    )
-  ).pipe(Layer.provide(Database.DatabaseContextLive), Layer.orDie);
+            : Effect.map(
+                inbound.handleInteractive(parsed.payload),
+                inboundHttpResponse
+              ),
+    }).pipe(rejectInboundRejection)
+  );
 
 /** Slash-command router for `/feeblo`. */
 const makeSlackCommandRouter = (registry: IntegrationProviderRegistry) =>
   HttpRouter.use((router) =>
-    router.add(
-      "POST",
-      "/slack/commands/feeblo",
-      (request: HttpServerRequest.HttpServerRequest) =>
-        handleInbound(
-          request,
-          slackCommandsCapabilityKey,
-          "slash_command",
-          registry
-        ).pipe(Effect.orDie)
-    )
+    Effect.gen(function* () {
+      // Resolved once at construction; the registry is startup-validated and
+      // immutable afterwards.
+      const inboundHandler = registry.getInboundHandler({
+        capabilityKey: slackCommandsCapabilityKey,
+        provider: slackProviderKey,
+      });
+      const inbound = yield* SlackInboundService;
+      return yield* router.add("POST", "/slack/commands/feeblo", (request) =>
+        respondToSlackInbound(request, inboundHandler, inbound, "slash_command")
+      );
+    })
   );
 
 /** Interactive payload router (message actions, view submissions, block actions). */
 const makeSlackInteractiveRouter = (registry: IntegrationProviderRegistry) =>
   HttpRouter.use((router) =>
-    router.add(
-      "POST",
-      "/slack/interactive",
-      (request: HttpServerRequest.HttpServerRequest) =>
-        handleInbound(
-          request,
-          slackMessageActionCapabilityKey,
-          "interactive",
-          registry
-        ).pipe(Effect.orDie)
-    )
+    Effect.gen(function* () {
+      const inboundHandler = registry.getInboundHandler({
+        capabilityKey: slackMessageActionCapabilityKey,
+        provider: slackProviderKey,
+      });
+      const inbound = yield* SlackInboundService;
+      return yield* router.add("POST", "/slack/interactive", (request) =>
+        respondToSlackInbound(request, inboundHandler, inbound, "interactive")
+      );
+    })
   );
+
+/** OAuth callback router; completes the install and redirects to the dashboard settings page. */
+export const makeSlackOAuthCallbackRouter = () =>
+  HttpRouter.use((router) =>
+    Effect.gen(function* () {
+      // Captured once at construction; the config is immutable.
+      const config = yield* SlackIntegrationConfig;
+      return yield* router.add(
+        "GET",
+        "/slack/oauth/callback",
+        (request: HttpServerRequest.HttpServerRequest) =>
+          Effect.gen(function* () {
+            // request.url is the relative path (e.g.
+            // /slack/oauth/callback?code=…); parse it without a base URL.
+            const { code, error, state } = parseSlackOAuthCallbackUrl(
+              request.url
+            );
+            if (error !== null) {
+              return HttpServerResponse.redirect(
+                settingsRedirect({
+                  appUrl: config.appUrl,
+                  message: "Slack installation was cancelled or denied.",
+                  provider: "slack",
+                  status: "error",
+                })
+              );
+            }
+            if (code === null || state === null) {
+              return HttpServerResponse.redirect(
+                settingsRedirect({
+                  appUrl: config.appUrl,
+                  message: "Slack installation failed.",
+                  provider: "slack",
+                  status: "error",
+                })
+              );
+            }
+            const management = yield* SlackManagementService;
+            const completed = yield* Effect.exit(
+              management.connectComplete({ code, state })
+            );
+            if (Exit.isFailure(completed)) {
+              return HttpServerResponse.redirect(
+                settingsRedirect({
+                  appUrl: config.appUrl,
+                  message: "Slack installation failed.",
+                  provider: "slack",
+                  status: "error",
+                })
+              );
+            }
+            return HttpServerResponse.redirect(
+              settingsRedirect({
+                appUrl: config.appUrl,
+                message: "Feeblo is now connected to Slack.",
+                organizationId: completed.value.organizationId,
+                provider: "slack",
+                status: "connected",
+              })
+            );
+          })
+      );
+    })
+  ).pipe(Layer.provide(Database.DatabaseContextLive), Layer.orDie);
 
 /**
  * Complete Slack HTTP surface. The routers provide their own service layers
