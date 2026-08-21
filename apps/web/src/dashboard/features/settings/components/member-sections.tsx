@@ -618,7 +618,9 @@ function InvitationListItem({
         </p>
       </div>
 
-      <PolicyGuard policy={hasOwnerOrAdminRole(organizationId)}>
+      {/* Backend requires members.invite (manager+), not workspace.update —
+          anyone who can list invitations can also revoke them. */}
+      <PolicyGuard policy={hasPermission(organizationId, "members.invite")}>
         {({ allowed }) => (
           <Button
             disabled={!allowed}

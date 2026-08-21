@@ -325,7 +325,9 @@ describe("PostRpcHandlers", () => {
             expect(posts[0]).toMatchObject({
               id: postId,
               title: "Public feedback",
-              creatorId: fixture.userId,
+              // Creator identifiers are redacted for anonymous callers
+              // (see `public-actor.ts`); the post itself stays visible.
+              creatorId: null,
               creatorMemberId: null,
             });
             expect(posts[0]?.content).toContain("A public idea");
@@ -698,6 +700,53 @@ describe("PostRpcHandlers", () => {
 
           expect(posts.map((post) => post.id)).toEqual([publicPostId]);
         })
+      );
+
+      it.effect(
+        "redacts creator identifiers except for the session user's own posts",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture("PUBLIC");
+            const postId = yield* PostId.generate;
+            const session = makeSession(fixture);
+
+            yield* handlers
+              .PostCreate(
+                postCreateInput(fixture, postId, "Identifiable feedback")
+              )
+              .pipe(Effect.provideService(CurrentSession, session));
+
+            // Anonymous callers get no creator identifiers.
+            const [anonymousView] = yield* handlers
+              .PostListPublic({
+                organizationId: fixture.organizationId,
+                boardId: null,
+              })
+              .pipe(
+                Effect.provideService(OptionalCurrentSession, Option.none())
+              );
+
+            expect(anonymousView?.creatorId).toBeNull();
+            expect(anonymousView?.creatorMemberId).toBeNull();
+
+            // The creator's own view keeps their identifiers so the client
+            // can compute "did I create this post".
+            const [ownView] = yield* handlers
+              .PostListPublic({
+                organizationId: fixture.organizationId,
+                boardId: null,
+              })
+              .pipe(
+                Effect.provideService(
+                  OptionalCurrentSession,
+                  Option.some(session)
+                )
+              );
+
+            expect(ownView?.creatorId).toBe(fixture.userId);
+            expect(ownView?.creatorMemberId).toBe(fixture.membershipId);
+          })
       );
     });
 

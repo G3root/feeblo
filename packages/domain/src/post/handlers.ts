@@ -31,6 +31,7 @@ import {
   PostActivityRepository,
 } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
+import { redactCreatorIdentity } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import {
   BadRequestError,
@@ -763,11 +764,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         // Public post listing is intentionally unauthenticated; board
         // visibility is enforced inside `findManyPublic` (unlocked boards
         // only). No site-policy gate needed here.
-        return yield* repository.findManyPublic({
+        const posts = yield* repository.findManyPublic({
           organizationId: args.organizationId,
           boardId: args.boardId,
           userId,
         });
+        // Creator identifiers are PII (see `public-actor.ts`): keep them only
+        // on the session user's own rows so "did I create this" still works.
+        return posts.map((post) => redactCreatorIdentity(post, userId));
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "PostListPublic",
@@ -784,10 +788,25 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     PostSuggestionsPublic: (args: TPostSuggestions) =>
-      suggestionsEffect(args, true).pipe(
+      Effect.gen(function* () {
+        const sessionOption = yield* OptionalCurrentSession;
+        const userId =
+          sessionOption._tag === "Some"
+            ? sessionOption.value.session.userId
+            : undefined;
+        const posts = yield* suggestionsEffect(args, true);
+        // Same PII rule as PostListPublic: creator identifiers are only
+        // meaningful for the session user's own rows.
+        return posts.map((post) => redactCreatorIdentity(post, userId));
+      }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "PostSuggestionsPublic",
-          level: "read",
+          // Embedding + vector search per request — priced like the widget
+          // suggest endpoint. The cap is raised above the `expensive`
+          // default because the create dialog fires this per debounced
+          // keystroke while composing a title.
+          level: "expensive",
+          limit: 30,
         }),
         withRemapDbErrors("Post", "select")
       ),
