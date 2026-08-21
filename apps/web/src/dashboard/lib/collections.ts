@@ -10,6 +10,11 @@ import {
   getPostSubscriptionCollectionKey,
   getUpvoteCollectionKey,
 } from "@feeblo/web-shared/reaction-keys";
+import {
+  createRpcCollectionHelpers,
+  eqFilterValue,
+  postSlugFromPath,
+} from "@feeblo/web-shared/collections";
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import {
   BasicIndex,
@@ -53,62 +58,18 @@ function getCurrentPostSlug() {
     return undefined;
   }
 
-  const segments = window.location.pathname
-    .split("/")
-    .filter((segment) => segment.length > 0);
-  const postIndex = segments.indexOf("post");
-
-  if (postIndex === -1 || !segments[postIndex + 2]) {
-    return undefined;
-  }
-
-  try {
-    return decodeURIComponent(segments[postIndex + 2]);
-  } catch {
-    // Malformed percent-encoding (e.g. "%" in a post slug) throws; treat the
-    // slug as missing so callers fall back to an unscoped query instead of
-    // crashing the route loader.
-    return undefined;
-  }
+  return postSlugFromPath(window.location.pathname, "post", 2);
 }
 
-function getOrganizationScopedQueryKey(
-  scope: string,
-  ...parts: ReadonlyArray<string | undefined>
-) {
-  const organizationId = getCurrentOrganizationId();
-  const key = organizationId ? [scope, organizationId] : [scope];
-
-  for (const part of parts) {
-    if (part) {
-      key.push(part);
-    }
-  }
-
-  return key;
-}
-
-function getEqFilterValue(
-  filters: ReadonlyArray<{
-    field: ReadonlyArray<string | number>;
-    operator: string;
-    value?: unknown;
-  }>,
-  fieldName: string
-) {
-  for (const { field, operator, value } of filters) {
-    if (operator === "eq" && field.join(".") === fieldName) {
-      // SAFETY: The upstream contract guarantees a string here.
-      return value as string;
-    }
-  }
-
-  return undefined;
-}
+const { organizationScopedQueryKey, resolvePostSlug, slugScopedQueryKey } =
+  createRpcCollectionHelpers({
+    getOrganizationId: getCurrentOrganizationId,
+    getPostSlug: getCurrentPostSlug,
+  });
 
 export const postCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("post"),
+    queryKey: () => organizationScopedQueryKey("post"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -185,7 +146,7 @@ postCollection.createIndex((row) => row.statusId, {
 
 export const postStatusCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("post-status"),
+    queryKey: () => organizationScopedQueryKey("post-status"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -209,7 +170,7 @@ export const postStatusCollection = createCollection(
 
 export const changelogCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("changelog"),
+    queryKey: () => organizationScopedQueryKey("changelog"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -282,7 +243,7 @@ export const changelogCollection = createCollection(
 
 export const changelogCategoryLinkCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("changelog-category-link"),
+    queryKey: () => organizationScopedQueryKey("changelog-category-link"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -306,7 +267,7 @@ export const changelogCategoryLinkCollection = createCollection(
 
 export const changelogCategoryCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("changelog-category"),
+    queryKey: () => organizationScopedQueryKey("changelog-category"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -391,7 +352,7 @@ export const getChangelogPostKey = ({
 
 export const changelogPostCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("changelog-post"),
+    queryKey: () => organizationScopedQueryKey("changelog-post"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
       if (!organizationId) {
@@ -431,7 +392,7 @@ export const changelogPostCollection = createCollection(
 
 export const boardCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("board"),
+    queryKey: () => organizationScopedQueryKey("board"),
     refetchInterval: Duration.toMillis(Duration.minutes(5)),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
@@ -496,7 +457,7 @@ export const boardCollection = createCollection(
 
 export const tagCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("tag"),
+    queryKey: () => organizationScopedQueryKey("tag"),
 
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
@@ -553,7 +514,7 @@ export const tagCollection = createCollection(
 
 export const postTagCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("post-tag"),
+    queryKey: () => organizationScopedQueryKey("post-tag"),
 
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
@@ -619,7 +580,7 @@ export const organizationCollection = createCollection(
 export const membersCollection = createCollection(
   queryCollectionOptions({
     staleTime: Duration.toMillis(Duration.minutes(20)),
-    queryKey: () => getOrganizationScopedQueryKey("members"),
+    queryKey: () => organizationScopedQueryKey("members"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -663,7 +624,7 @@ export const membersCollection = createCollection(
 
 export const invitationsCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("invitations"),
+    queryKey: () => organizationScopedQueryKey("invitations"),
 
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
@@ -695,22 +656,15 @@ export const invitationsCollection = createCollection(
 
 export const commentCollection = createCollection(
   queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
-
-      return slug
-        ? getOrganizationScopedQueryKey("comment", "postSlug", slug)
-        : getOrganizationScopedQueryKey("comment");
-    },
+    queryKey: (opts) =>
+      slugScopedQueryKey("comment", parseLoadSubsetOptions(opts).filters),
     syncMode: "on-demand",
 
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
+      const slug = resolvePostSlug(
+        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+      );
 
       if (!(organizationId && slug)) {
         return [];
@@ -789,18 +743,22 @@ export const commentCollection = createCollection(
 export const postActivityCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const postId = eqFilterValue(
+        parseLoadSubsetOptions(opts).filters,
+        "postId"
+      );
 
       return postId
-        ? getOrganizationScopedQueryKey("post-activity", "postId", postId)
-        : getOrganizationScopedQueryKey("post-activity");
+        ? organizationScopedQueryKey("post-activity", "postId", postId)
+        : organizationScopedQueryKey("post-activity");
     },
     syncMode: "on-demand",
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const postId = eqFilterValue(
+        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters,
+        "postId"
+      );
 
       if (!(organizationId && postId)) {
         return [];
@@ -839,22 +797,18 @@ export const postActivityCollection = createCollection(
 
 export const commentReactionCollection = createCollection(
   queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
-
-      return slug
-        ? getOrganizationScopedQueryKey("comment-reaction", "postSlug", slug)
-        : getOrganizationScopedQueryKey("comment-reaction");
-    },
+    queryKey: (opts) =>
+      slugScopedQueryKey(
+        "comment-reaction",
+        parseLoadSubsetOptions(opts).filters
+      ),
     syncMode: "on-demand",
 
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
+      const slug = resolvePostSlug(
+        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+      );
 
       if (!(organizationId && slug)) {
         return [];
@@ -904,7 +858,7 @@ export const commentReactionCollection = createCollection(
 
 export const upvoteCollection = createCollection(
   queryCollectionOptions({
-    queryKey: getOrganizationScopedQueryKey("upvote"),
+    queryKey: organizationScopedQueryKey("upvote"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -950,22 +904,18 @@ export const upvoteCollection = createCollection(
 
 export const postReactionCollection = createCollection(
   queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
-
-      return slug
-        ? getOrganizationScopedQueryKey("post-reaction", "postSlug", slug)
-        : getOrganizationScopedQueryKey("post-reaction");
-    },
+    queryKey: (opts) =>
+      slugScopedQueryKey(
+        "post-reaction",
+        parseLoadSubsetOptions(opts).filters
+      ),
     syncMode: "on-demand",
 
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
+      const slug = resolvePostSlug(
+        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+      );
 
       if (!(organizationId && slug)) {
         return [];
@@ -1013,7 +963,7 @@ export const postReactionCollection = createCollection(
 
 export const siteCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("site"),
+    queryKey: () => organizationScopedQueryKey("site"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -1049,7 +999,7 @@ export const siteCollection = createCollection(
 
 export const workspacePlanCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("workspace-plan"),
+    queryKey: () => organizationScopedQueryKey("workspace-plan"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -1073,21 +1023,17 @@ export const workspacePlanCollection = createCollection(
 
 export const postSubscriptionCollection = createCollection(
   queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
-
-      return slug
-        ? getOrganizationScopedQueryKey("post-subscription", "postSlug", slug)
-        : getOrganizationScopedQueryKey("post-subscription");
-    },
+    queryKey: (opts) =>
+      slugScopedQueryKey(
+        "post-subscription",
+        parseLoadSubsetOptions(opts).filters
+      ),
     syncMode: "on-demand",
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
+      const slug = resolvePostSlug(
+        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+      );
 
       if (!(organizationId && slug)) {
         return [];
@@ -1136,7 +1082,7 @@ export const postSubscriptionCollection = createCollection(
 
 export const jwtSecretCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("jwt-secret"),
+    queryKey: () => organizationScopedQueryKey("jwt-secret"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -1157,7 +1103,7 @@ export const jwtSecretCollection = createCollection(
 
 export const contactCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("contact"),
+    queryKey: () => organizationScopedQueryKey("contact"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -1224,7 +1170,7 @@ export const contactCollection = createCollection(
 
 export const companyCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("company"),
+    queryKey: () => organizationScopedQueryKey("company"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -1289,7 +1235,7 @@ export const companyCollection = createCollection(
 export const contactAttributeDefinitionCollection = createCollection(
   queryCollectionOptions({
     queryKey: () =>
-      getOrganizationScopedQueryKey("contact-attribute-definition"),
+      organizationScopedQueryKey("contact-attribute-definition"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -1355,7 +1301,7 @@ export const contactAttributeDefinitionCollection = createCollection(
 export const companyAttributeDefinitionCollection = createCollection(
   queryCollectionOptions({
     queryKey: () =>
-      getOrganizationScopedQueryKey("company-attribute-definition"),
+      organizationScopedQueryKey("company-attribute-definition"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -1419,7 +1365,7 @@ export const companyAttributeDefinitionCollection = createCollection(
 
 export const contactAttributeValueCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("contact-attribute-value"),
+    queryKey: () => organizationScopedQueryKey("contact-attribute-value"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -1441,7 +1387,7 @@ export const contactAttributeValueCollection = createCollection(
 
 export const companyAttributeValueCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("company-attribute-value"),
+    queryKey: () => organizationScopedQueryKey("company-attribute-value"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -1463,7 +1409,7 @@ export const companyAttributeValueCollection = createCollection(
 
 export const roadmapCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("roadmap"),
+    queryKey: () => organizationScopedQueryKey("roadmap"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
       if (!organizationId) {
@@ -1532,7 +1478,7 @@ export const roadmapCollection = createCollection(
 
 export const roadmapColumnCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () => getOrganizationScopedQueryKey("roadmap-column"),
+    queryKey: () => organizationScopedQueryKey("roadmap-column"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 

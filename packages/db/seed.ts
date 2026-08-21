@@ -48,7 +48,6 @@ import {
   roadmapTable,
   siteTable,
   subscriptionTable,
-  tagTable,
   upvoteTable,
   userTable,
 } from "./src/schema";

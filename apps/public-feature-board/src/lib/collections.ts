@@ -11,6 +11,10 @@ import {
   getUpvoteCollectionKey,
 } from "@feeblo/web-shared/reaction-keys";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
+import {
+  createRpcCollectionHelpers,
+  postSlugFromPath,
+} from "@feeblo/web-shared/collections";
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import { createCollection, parseLoadSubsetOptions } from "@tanstack/react-db";
 import * as Duration from "effect/Duration";
@@ -48,23 +52,7 @@ function getCurrentPostSlug() {
     return undefined;
   }
 
-  const segments = window.location.pathname
-    .split("/")
-    .filter((segment) => segment.length > 0);
-  const postIndex = segments.indexOf("p");
-
-  if (postIndex === -1 || !segments[postIndex + 1]) {
-    return undefined;
-  }
-
-  try {
-    return decodeURIComponent(segments[postIndex + 1]);
-  } catch {
-    // Malformed percent-encoding (e.g. "%" in a post slug) throws; treat the
-    // slug as missing so callers fall back to an unscoped query instead of
-    // crashing the route loader.
-    return undefined;
-  }
+  return postSlugFromPath(window.location.pathname, "p", 1);
 }
 
 /**
@@ -92,44 +80,16 @@ function getMutationOrganizationId() {
   return organizationId;
 }
 
-function getOrganizationScopedQueryKey(
-  scope: string,
-  ...parts: ReadonlyArray<string | undefined>
-) {
-  const organizationId = getCurrentOrganizationId();
-  const key = organizationId ? [scope, organizationId] : [scope];
-
-  for (const part of parts) {
-    if (part) {
-      key.push(part);
-    }
-  }
-
-  return key;
-}
-
-function getEqFilterValue(
-  filters: ReadonlyArray<{
-    field: ReadonlyArray<string | number>;
-    operator: string;
-    value?: unknown;
-  }>,
-  fieldName: string
-) {
-  for (const { field, operator, value } of filters) {
-    if (operator === "eq" && field.join(".") === fieldName) {
-      // SAFETY: The upstream contract guarantees a string here.
-      return value as string;
-    }
-  }
-
-  return undefined;
-}
+const { organizationScopedQueryKey, resolvePostSlug, slugScopedQueryKey } =
+  createRpcCollectionHelpers({
+    getOrganizationId: getCurrentOrganizationId,
+    getPostSlug: getCurrentPostSlug,
+  });
 
 export const publicPostCollection = createCollection(
   queryCollectionOptions({
     staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => getOrganizationScopedQueryKey("public-post"),
+    queryKey: () => organizationScopedQueryKey("public-post"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -197,7 +157,7 @@ export const publicPostCollection = createCollection(
 export const publicPostStatusCollection = createCollection(
   queryCollectionOptions({
     staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => getOrganizationScopedQueryKey("public-post-status"),
+    queryKey: () => organizationScopedQueryKey("public-post-status"),
 
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
@@ -221,7 +181,7 @@ export const publicPostStatusCollection = createCollection(
 export const publicRoadmapCollection = createCollection(
   queryCollectionOptions({
     staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => getOrganizationScopedQueryKey("public-roadmap"),
+    queryKey: () => organizationScopedQueryKey("public-roadmap"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -244,7 +204,7 @@ export const publicRoadmapCollection = createCollection(
 export const publicRoadmapColumnCollection = createCollection(
   queryCollectionOptions({
     staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => getOrganizationScopedQueryKey("public-roadmap-column"),
+    queryKey: () => organizationScopedQueryKey("public-roadmap-column"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -267,7 +227,7 @@ export const publicRoadmapColumnCollection = createCollection(
 export const publicChangelogCollection = createCollection(
   queryCollectionOptions({
     staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => getOrganizationScopedQueryKey("public-changelog"),
+    queryKey: () => organizationScopedQueryKey("public-changelog"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -290,7 +250,7 @@ export const publicChangelogCollection = createCollection(
 export const publicChangelogCategoryCollection = createCollection(
   queryCollectionOptions({
     staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => getOrganizationScopedQueryKey("public-changelog-category"),
+    queryKey: () => organizationScopedQueryKey("public-changelog-category"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -314,7 +274,7 @@ export const publicChangelogCategoryLinkCollection = createCollection(
   queryCollectionOptions({
     staleTime: Duration.toMillis(Duration.minutes(5)),
     queryKey: () =>
-      getOrganizationScopedQueryKey("public-changelog-category-link"),
+      organizationScopedQueryKey("public-changelog-category-link"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -345,7 +305,7 @@ export const getPublicChangelogPostKey = ({
 export const publicChangelogPostCollection = createCollection(
   queryCollectionOptions({
     staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => getOrganizationScopedQueryKey("public-changelog-post"),
+    queryKey: () => organizationScopedQueryKey("public-changelog-post"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -368,7 +328,7 @@ export const publicChangelogPostCollection = createCollection(
 export const publicBoardCollection = createCollection(
   queryCollectionOptions({
     staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => getOrganizationScopedQueryKey("public-board"),
+    queryKey: () => organizationScopedQueryKey("public-board"),
 
     refetchInterval: Duration.toMillis(Duration.minutes(5)),
     queryFn: async (ctx) => {
@@ -393,7 +353,7 @@ export const publicBoardCollection = createCollection(
 export const publicTagCollection = createCollection(
   queryCollectionOptions({
     staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => getOrganizationScopedQueryKey("public-tag"),
+    queryKey: () => organizationScopedQueryKey("public-tag"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -418,7 +378,7 @@ export const publicTagCollection = createCollection(
 export const publicPostTagCollection = createCollection(
   queryCollectionOptions({
     staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => getOrganizationScopedQueryKey("public-post-tag"),
+    queryKey: () => organizationScopedQueryKey("public-post-tag"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -442,22 +402,18 @@ export const publicPostTagCollection = createCollection(
 
 export const publicCommentCollection = createCollection(
   queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
-
-      return slug
-        ? getOrganizationScopedQueryKey("public-comment", "postSlug", slug)
-        : getOrganizationScopedQueryKey("public-comment");
-    },
+    queryKey: (opts) =>
+      slugScopedQueryKey(
+        "public-comment",
+        parseLoadSubsetOptions(opts).filters
+      ),
     syncMode: "on-demand",
     staleTime: Duration.toMillis(Duration.minutes(5)),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
+      const slug = resolvePostSlug(
+        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+      );
 
       if (!(slug && organizationId)) {
         return [];
@@ -528,26 +484,18 @@ export const publicCommentCollection = createCollection(
 
 export const publicCommentReactionCollection = createCollection(
   queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
-
-      return slug
-        ? getOrganizationScopedQueryKey(
-            "public-comment-reaction",
-            "postSlug",
-            slug
-          )
-        : getOrganizationScopedQueryKey("public-comment-reaction");
-    },
+    queryKey: (opts) =>
+      slugScopedQueryKey(
+        "public-comment-reaction",
+        parseLoadSubsetOptions(opts).filters
+      ),
     syncMode: "on-demand",
     staleTime: Duration.toMillis(Duration.minutes(5)),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
+      const slug = resolvePostSlug(
+        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+      );
 
       if (!(slug && organizationId)) {
         return [];
@@ -601,7 +549,7 @@ export const publicCommentReactionCollection = createCollection(
 
 export const publicUpvoteCollection = createCollection(
   queryCollectionOptions({
-    queryKey: getOrganizationScopedQueryKey("public-upvote"),
+    queryKey: organizationScopedQueryKey("public-upvote"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -650,26 +598,18 @@ export const publicUpvoteCollection = createCollection(
 
 export const publicPostReactionCollection = createCollection(
   queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
-
-      return slug
-        ? getOrganizationScopedQueryKey(
-            "public-post-reaction",
-            "postSlug",
-            slug
-          )
-        : getOrganizationScopedQueryKey("public-post-reaction");
-    },
+    queryKey: (opts) =>
+      slugScopedQueryKey(
+        "public-post-reaction",
+        parseLoadSubsetOptions(opts).filters
+      ),
     syncMode: "on-demand",
     staleTime: Duration.toMillis(Duration.minutes(5)),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
+      const slug = resolvePostSlug(
+        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+      );
 
       if (!(slug && organizationId)) {
         return [];
@@ -719,25 +659,17 @@ export const publicPostReactionCollection = createCollection(
 
 export const publicPostSubscriptionCollection = createCollection(
   queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
-
-      return slug
-        ? getOrganizationScopedQueryKey(
-            "public-post-subscription",
-            "postSlug",
-            slug
-          )
-        : getOrganizationScopedQueryKey("public-post-subscription");
-    },
+    queryKey: (opts) =>
+      slugScopedQueryKey(
+        "public-post-subscription",
+        parseLoadSubsetOptions(opts).filters
+      ),
     syncMode: "on-demand",
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const slug =
-        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
+      const slug = resolvePostSlug(
+        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+      );
 
       if (!(slug && organizationId)) {
         return [];
