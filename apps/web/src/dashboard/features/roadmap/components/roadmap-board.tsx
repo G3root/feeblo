@@ -9,6 +9,7 @@ import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { getBoardStatusLabel } from "@feeblo/web-shared/board/constants";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useNavigate } from "@tanstack/react-router";
@@ -38,6 +39,12 @@ type RoadmapBoardProps = {
 
 export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
   const { postCollection } = useDashboardCollections();
+  // Dragging an issue between lanes changes its status, which the backend
+  // reserves for `posts.status` holders — disable the interaction entirely
+  // for everyone else instead of letting an optimistic move fail with 403.
+  const { allowed: canChangeStatus } = usePolicy(
+    hasPermission(organizationId, "posts.status")
+  );
   const [dragPreview, setDragPreview] = useState<
     RoadmapLane<RoadmapBoardPost>[] | null
   >(null);
@@ -155,7 +162,7 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
       onDragStart={handleDragStart}
-      sensors={sensors}
+      sensors={canChangeStatus ? sensors : []}
     >
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden p-3 pb-[max(calc(var(--spacing)*3),env(safe-area-inset-bottom))]">
         <div className="grid h-full min-h-0 min-w-max auto-cols-max grid-flow-col gap-4">

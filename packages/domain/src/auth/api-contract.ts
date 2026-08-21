@@ -3,6 +3,7 @@ import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
 import * as OpenApi from "effect/unstable/httpapi/OpenApi";
 
+import { RateLimitErrors } from "../rate-limit";
 import {
   BadRequestError,
   InternalServerError,
@@ -21,7 +22,11 @@ export const AuthApiGroup = HttpApiGroup.make("AuthApiGroup")
   .add(
     HttpApiEndpoint.post("postVerificationOtp", "/auth/verification-otp", {
       payload: VerificationOTPStateSchema,
-      error: Schema.Union([BadRequestError, InternalServerError]),
+      error: Schema.Union([
+        BadRequestError,
+        InternalServerError,
+        RateLimitErrors,
+      ]),
       success: VerificationOTPSuccessSchema,
     })
       .annotate(OpenApi.Title, "Create Verification OTP")
@@ -37,6 +42,7 @@ export const AuthApiGroup = HttpApiGroup.make("AuthApiGroup")
         BadRequestError,
         NotFoundError,
         InternalServerError,
+        RateLimitErrors,
       ]),
       success: VerificationOTPResponseSchema,
     })
@@ -50,7 +56,7 @@ export const AuthApiGroup = HttpApiGroup.make("AuthApiGroup")
   .add(
     HttpApiEndpoint.delete("deleteVerificationOtp", "/auth/verification-otp", {
       payload: VerificationOTPStateSchema,
-      error: InternalServerError,
+      error: Schema.Union([InternalServerError, RateLimitErrors]),
       success: VerificationOTPSuccessSchema,
     })
       .annotate(OpenApi.Title, "Delete Verification OTP")

@@ -39,6 +39,13 @@ type TCanUpdateProperties = TCanUpdate & {
   statusId: string;
 };
 
+type THasUnchangedLocation = {
+  organizationId: string;
+  postId: string;
+  boardId: string;
+  statusId: string;
+};
+
 type TIsUnlocked = {
   organizationId: string;
   postId: string;
@@ -119,6 +126,29 @@ const makePostPolicy = Effect.gen(function* () {
         id: args.postId,
         organizationId: args.organizationId,
       })
+    );
+
+  /**
+   * Requires the submitted board/status to equal the post's current location.
+   * Public-portal updates are rename semantics only: status and board changes
+   * are moderator actions reserved for `posts.status`/`posts.move` holders via
+   * the dashboard RPCs, so the public variant must never relocate a post.
+   */
+  const hasUnchangedLocation = (args: THasUnchangedLocation) =>
+    Policy.policy(() =>
+      repository
+        .findLocationIds({
+          id: args.postId,
+          organizationId: args.organizationId,
+        })
+        .pipe(
+          Effect.map(
+            (location) =>
+              location != null &&
+              location.boardId === args.boardId &&
+              location.statusId === args.statusId
+          )
+        )
     );
 
   const canCreate = (args: TCanCreate) => {
@@ -212,6 +242,7 @@ const makePostPolicy = Effect.gen(function* () {
   return {
     isUnlocked,
     isUnlockedPublic,
+    hasUnchangedLocation,
     canCreate,
     canDelete,
     canUpdate,
