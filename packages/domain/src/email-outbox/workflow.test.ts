@@ -605,6 +605,84 @@ describe("EmailOutbox workflows", () => {
     );
 
     it.effect(
+      "suppresses queued changelog deliveries hidden before the send attempt",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { organizationId } = yield* fixture;
+          const db = yield* Database.Database;
+          yield* enableSubscriberEmails(organizationId);
+          const changelogId = `changelog_${organizationId}`;
+          const subscriptions = yield* EmailSubscriptionRepository;
+          const consentNow = new Date("2026-08-11T00:00:00.000Z");
+          const subscriber = yield* subscriptions.requestSubscription({
+            email: `queued-${organizationId}@example.test`,
+            now: consentNow,
+            organizationId,
+            source: "explicit",
+            topic: { topicId: null, topicType: "changelog" },
+            verificationExpiresAt: new Date(consentNow.getTime() + 86_400_000),
+          });
+          if (Option.isNone(subscriber.verificationToken)) {
+            return yield* Effect.die("Expected a verification token");
+          }
+          yield* subscriptions.verifySubscription({
+            now: consentNow,
+            verificationToken: Redacted.value(
+              subscriber.verificationToken.value
+            ),
+          });
+          yield* db.insert(schema.changelogTable).values({
+            id: changelogId,
+            organizationId,
+            title: "Queued release",
+            slug: "queued-release",
+            content: "Release notes",
+            excerpt: "Release notes",
+            status: "published",
+            publishedAt: new Date(),
+            creatorId: null,
+            creatorMemberId: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+          // Materialize while public: a delivery is queued for the send path.
+          const intent = yield* (yield* EmailOutboxRepository).recordIntent({
+            aggregateId: changelogId,
+            aggregateType: "changelog",
+            deduplicationKey: `changelog.published:${organizationId}:${changelogId}`,
+            expiresAt: null,
+            kind: "changelog.published",
+            organizationId,
+            payload: { kind: "changelog.published", changelogId },
+            scheduledAt: new Date(),
+          });
+          if (intent._tag !== "Inserted") {
+            return yield* Effect.die("Expected changelog intent");
+          }
+          const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
+          const deliveryId = deliveryIds[0];
+          if (deliveryId === undefined) {
+            return yield* Effect.die("Expected a queued delivery");
+          }
+          // The workspace hides its changelog after materialization but
+          // before the queued delivery is sent.
+          yield* db
+            .update(schema.siteTable)
+            .set({ changelogVisibility: "HIDDEN", updatedAt: new Date() })
+            .where(eq(schema.siteTable.organizationId, organizationId));
+          yield* EmailDeliveryWorkflow.execute({ deliveryId });
+          const [delivery] = yield* db
+            .select({ state: schema.emailDeliveryTable.state })
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.id, deliveryId));
+          expect(delivery?.state).toBe("suppressed");
+          const mailer = yield* testMailerState;
+          expect(mailer.sentMessages).toHaveLength(0);
+        })
+    );
+
+    it.effect(
       "delivers a double-opt-in link without persisting its bearer token",
       () =>
         Effect.gen(function* () {

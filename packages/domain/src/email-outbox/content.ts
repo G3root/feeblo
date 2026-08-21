@@ -68,6 +68,20 @@ export const emailSubscriptionTopicForIntent = (
   }
 };
 
+/** Whether the workspace changelog may currently be delivered by email. */
+export const isChangelogPubliclyVisible = (organizationId: string) =>
+  Effect.gen(function* () {
+    const db = yield* Database.Database;
+    const [site] = yield* db
+      .select({
+        changelogVisibility: schema.siteTable.changelogVisibility,
+      })
+      .from(schema.siteTable)
+      .where(eq(schema.siteTable.organizationId, organizationId))
+      .limit(1);
+    return Boolean(site && site.changelogVisibility === "PUBLIC");
+  });
+
 /** Resolves current product data into an immutable subscription-mail snapshot. */
 export const resolveSubscriptionNotificationContent = (
   appUrl: string,
@@ -81,14 +95,7 @@ export const resolveSubscriptionNotificationContent = (
         // A hidden or missing site closes the public read boundary; delivery
         // honors the same line so subscribers collected while public stop
         // receiving entries once the workspace hides its changelog.
-        const [site] = yield* db
-          .select({
-            changelogVisibility: schema.siteTable.changelogVisibility,
-          })
-          .from(schema.siteTable)
-          .where(eq(schema.siteTable.organizationId, intent.organizationId))
-          .limit(1);
-        if (!site || site.changelogVisibility !== "PUBLIC") {
+        if (!(yield* isChangelogPubliclyVisible(intent.organizationId))) {
           return undefined;
         }
         const changelog = yield* db.query.changelogTable.findFirst({

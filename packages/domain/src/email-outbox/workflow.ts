@@ -24,6 +24,7 @@ import { EntitlementPolicy } from "../entitlement/policies";
 import { EmailOutboxConfig } from "./config";
 import {
   emailSubscriptionTopicForIntent,
+  isChangelogPubliclyVisible,
   makeSubmissionNotificationPayload,
   resolveSubscriptionNotificationContent,
 } from "./content";
@@ -495,6 +496,20 @@ const sendDeliveryAttempt = (deliveryId: string) =>
       yield* repository.markDeliveryOutcome({
         id: delivery.id,
         state: "paused_by_plan",
+      });
+      return { _tag: "terminal" as const };
+    }
+    // Queued deliveries may wait out throttles and retries; re-check the
+    // changelog read boundary at send time so content hidden after
+    // materialization is never emailed.
+    if (
+      emailSubscriptionTopicForIntent(intent.payload)?.topicType ===
+        "changelog" &&
+      !(yield* isChangelogPubliclyVisible(intent.organizationId))
+    ) {
+      yield* repository.markDeliveryOutcome({
+        id: delivery.id,
+        state: "suppressed",
       });
       return { _tag: "terminal" as const };
     }
