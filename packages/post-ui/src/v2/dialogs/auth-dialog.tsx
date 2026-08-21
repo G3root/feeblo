@@ -36,7 +36,7 @@ import {
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useSelector } from "@xstate/store-react";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useState } from "react";
 import { z } from "zod";
 
 import { getSafeCallbackURL } from "../../auth/auth-flows";
