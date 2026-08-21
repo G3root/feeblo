@@ -22,7 +22,10 @@ describe("eqFilterValue", () => {
 
   it("joins dotted field paths for comparison", () => {
     expect(
-      eqFilterValue([{ field: ["postId"], operator: "eq", value: "p1" }], "postId")
+      eqFilterValue(
+        [{ field: ["postId"], operator: "eq", value: "p1" }],
+        "postId"
+      )
     ).toBe("p1");
   });
 
@@ -105,7 +108,9 @@ describe("createRpcCollectionHelpers", () => {
 
   it("prefers an explicit postSlug filter over the route slug", () => {
     expect(
-      helpers.resolvePostSlug([{ field: ["postSlug"], operator: "eq", value: "explicit" }])
+      helpers.resolvePostSlug([
+        { field: ["postSlug"], operator: "eq", value: "explicit" },
+      ])
     ).toBe("explicit");
   });
 

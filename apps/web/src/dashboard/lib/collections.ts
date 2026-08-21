@@ -5,16 +5,16 @@ import type { PostSubscription } from "@feeblo/domain/post-subscription/schema";
 import type { Upvote } from "@feeblo/domain/upvote/schema";
 import { hasWindow } from "@feeblo/utils/runtime-kind";
 import {
+  createRpcCollectionHelpers,
+  eqFilterValue,
+  postSlugFromPath,
+} from "@feeblo/web-shared/collections";
+import {
   getCommentReactionCollectionKey,
   getPostReactionCollectionKey,
   getPostSubscriptionCollectionKey,
   getUpvoteCollectionKey,
 } from "@feeblo/web-shared/reaction-keys";
-import {
-  createRpcCollectionHelpers,
-  eqFilterValue,
-  postSlugFromPath,
-} from "@feeblo/web-shared/collections";
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import {
   BasicIndex,
@@ -905,10 +905,7 @@ export const upvoteCollection = createCollection(
 export const postReactionCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) =>
-      slugScopedQueryKey(
-        "post-reaction",
-        parseLoadSubsetOptions(opts).filters
-      ),
+      slugScopedQueryKey("post-reaction", parseLoadSubsetOptions(opts).filters),
     syncMode: "on-demand",
 
     queryFn: async (ctx) => {
@@ -1234,8 +1231,7 @@ export const companyCollection = createCollection(
 //Todo scope
 export const contactAttributeDefinitionCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () =>
-      organizationScopedQueryKey("contact-attribute-definition"),
+    queryKey: () => organizationScopedQueryKey("contact-attribute-definition"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
@@ -1300,8 +1296,7 @@ export const contactAttributeDefinitionCollection = createCollection(
 //Todo scope
 export const companyAttributeDefinitionCollection = createCollection(
   queryCollectionOptions({
-    queryKey: () =>
-      organizationScopedQueryKey("company-attribute-definition"),
+    queryKey: () => organizationScopedQueryKey("company-attribute-definition"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 

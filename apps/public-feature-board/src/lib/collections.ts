@@ -5,16 +5,16 @@ import type { Upvote } from "@feeblo/domain/upvote/schema";
 import { hasWindow } from "@feeblo/utils/runtime-kind";
 import { getCachedAuthSession } from "@feeblo/web-shared/auth-session";
 import {
+  createRpcCollectionHelpers,
+  postSlugFromPath,
+} from "@feeblo/web-shared/collections";
+import {
   getCommentReactionCollectionKey,
   getPostReactionCollectionKey,
   getPostSubscriptionCollectionKey,
   getUpvoteCollectionKey,
 } from "@feeblo/web-shared/reaction-keys";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
-import {
-  createRpcCollectionHelpers,
-  postSlugFromPath,
-} from "@feeblo/web-shared/collections";
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import { createCollection, parseLoadSubsetOptions } from "@tanstack/react-db";
 import * as Duration from "effect/Duration";
