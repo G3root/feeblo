@@ -138,6 +138,38 @@ describe("FeebloProvider", () => {
     await expect.element(screen.getByText("ready:yes")).toBeVisible();
   });
 
+  it("re-initializes onto the new element when the root prop changes", async () => {
+    const firstRoot = document.createElement("div");
+    const secondRoot = document.createElement("div");
+    document.body.append(firstRoot, secondRoot);
+
+    try {
+      const screen = await render(
+        <TestProvider organizationId="org_root" root={firstRoot}>
+          <StateProbe />
+        </TestProvider>
+      );
+      const firstContainer = document.getElementById("feeblo-embed-container");
+      expect(firstContainer?.parentElement).toBe(firstRoot);
+
+      await screen.rerender(
+        <TestProvider organizationId="org_root" root={secondRoot}>
+          <StateProbe />
+        </TestProvider>
+      );
+
+      // A different root element must destroy the old embed and mount a
+      // fresh one inside the new root; DOM elements serialize identically,
+      // so this transition is invisible to the serialized config key.
+      const nextContainer = document.getElementById("feeblo-embed-container");
+      expect(nextContainer).not.toBe(firstContainer);
+      expect(nextContainer?.parentElement).toBe(secondRoot);
+    } finally {
+      firstRoot.remove();
+      secondRoot.remove();
+    }
+  });
+
   it("re-identifies without recreating the embed when user changes", async () => {
     const screen = await render(
       <TestProvider
@@ -149,6 +181,7 @@ describe("FeebloProvider", () => {
     );
     postFromWidget({ event: "READY" });
 
+    const firstIframe = document.querySelector("iframe");
     const sent = interceptIframePostMessages();
     await screen.rerender(
       <TestProvider
@@ -164,7 +197,7 @@ describe("FeebloProvider", () => {
       expect(identify?.data).toMatchObject({ id: "u_2" });
     });
     // The iframe was reused, not recreated.
-    expect(document.querySelector("iframe")).toBeDefined();
+    expect(document.querySelector("iframe")).toBe(firstIframe);
   });
 
   it("survives StrictMode double-mounting with a single embed", async () => {

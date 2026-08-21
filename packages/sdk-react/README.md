@@ -38,7 +38,7 @@ export function App() {
 
 - The widget is initialized when the provider mounts and destroyed when it unmounts (including in StrictMode double-mounts).
 - Changing any config prop (`organizationId`, `theme`, `mode`, `modules`, `placement`, `baseUrl`, `locale`, `defaultBoard`, `debug`, `root`, `containerStyles`) recreates the embed; readiness resets until the new widget reports ready.
-- Changing `user` re-identifies the live widget without recreating it.
+- Changing `user` re-identifies the live widget without recreating it. Setting `user` back to `undefined` does **not** sign the widget out — the underlying SDK has no clear-identity API, so the last identified user (and their token, used for feedback submission and `data-feeblo-link` auto-login) stays active until another `identify` call or a full provider remount.
 - Callback props (`onClose`, `onError`, `onHeightChange`) are read through refs: inline closures never trigger re-initialization, and the widget always invokes the latest one.
 
 The Feeblo SDK exposes a single global widget instance, so mount exactly one provider at the root of your tree — and pick **one** integration mode per page. Combining the provider with the CDN `<script>` auto-init (or any other direct `Feeblo.init` call) creates a second SDK instance: the two fight over the same embed container and split the event stream. Plain HTML triggers (`data-feeblo-feedback`, `data-feeblo-link`) are safe to keep alongside the provider — they bind to whichever instance the provider initialized.

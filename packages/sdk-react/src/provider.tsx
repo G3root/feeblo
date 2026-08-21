@@ -46,14 +46,18 @@ export interface FeebloProviderProps {
   placement?: WidgetPlacement | undefined;
   root?: HTMLElement | undefined;
   theme?: string | undefined;
-  /** Identify the current user; changes call `identify` on the live widget. */
+  /** Identify the current user; changes call `identify` on the live widget.
+   * Setting `user` back to `undefined` does not sign the widget out — the SDK
+   * has no clear-identity API, so the last identified user (and token) stays
+   * active until another `identify` call or a full remount. */
   user?: UserIdentity | undefined;
 }
 
 /**
  * Fields that require tearing down and recreating the underlying embed when
- * they change. Deliberately excludes `user` (handled by `identify`) and the
- * event callbacks (read through refs).
+ * they change. Deliberately excludes `user` (handled by `identify`), the
+ * event callbacks (read through refs), and `root` (compared by reference in
+ * the effect dependencies below — DOM elements do not serialize).
  */
 function configKeyOf(props: FeebloProviderProps): string {
   return JSON.stringify([
@@ -66,7 +70,6 @@ function configKeyOf(props: FeebloProviderProps): string {
     props.mode,
     props.modules,
     props.placement,
-    props.root,
     props.theme,
   ]);
 }
@@ -132,9 +135,11 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
       setIsOpen(false);
       next.destroy();
     };
-    // Re-created only when the serialized config changes; callback identities
-    // are irrelevant because they are consumed through stable ref wrappers.
-  }, [configKey]);
+    // Re-created only when the serialized config or the root element changes;
+    // callback identities are irrelevant because they are consumed through
+    // stable ref wrappers. `root` must be compared by reference: DOM elements
+    // all serialize identically, so it cannot live in the config key.
+  }, [configKey, props.root]);
 
   // Mirror the widget's lifecycle events into reactive state so consumers can
   // render off `isReady`/`isOpen` without subscribing manually.
@@ -172,7 +177,11 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
   }, [widget]);
 
   const open = useCallback(() => {
-    widgetRef.current?.open();
+    const widget = widgetRef.current;
+    if (!widget) {
+      return;
+    }
+    widget.open();
     setIsOpen(true);
   }, []);
   const close = useCallback(() => {
@@ -180,7 +189,11 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
     setIsOpen(false);
   }, []);
   const openModule = useCallback((module: WidgetModule) => {
-    widgetRef.current?.openModule(module);
+    const widget = widgetRef.current;
+    if (!widget) {
+      return;
+    }
+    widget.openModule(module);
     setIsOpen(true);
   }, []);
   const setBoard = useCallback((board: string) => {
