@@ -793,6 +793,9 @@ importers:
       '@electric-sql/pglite-pgvector':
         specifier: ^0.0.5
         version: 0.0.5(@electric-sql/pglite@0.5.4)
+      '@feeblo/domain-contracts':
+        specifier: workspace:*
+        version: link:../domain-contracts
       '@feeblo/permissions':
         specifier: workspace:*
         version: link:../permissions
@@ -888,6 +891,9 @@ importers:
       '@feeblo/db':
         specifier: workspace:*
         version: link:../db
+      '@feeblo/domain-contracts':
+        specifier: workspace:*
+        version: link:../domain-contracts
       '@feeblo/id':
         specifier: workspace:*
         version: link:../id
@@ -961,6 +967,19 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(happy-dom@20.11.2)(msw@2.15.0(@types/node@26.2.0)(typescript@6.0.3))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
+
+  packages/domain-contracts:
+    dependencies:
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.107
+    devDependencies:
+      '@feeblo/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
 
   packages/feedback-widget:
     dependencies:

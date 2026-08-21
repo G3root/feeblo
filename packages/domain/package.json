@@ -435,6 +435,7 @@
     "@effect-aws/s3": "catalog:",
     "@effect/ai-openai": "catalog:",
     "@feeblo/db": "workspace:*",
+    "@feeblo/domain-contracts": "workspace:*",
     "@feeblo/id": "workspace:*",
     "@feeblo/integration-core": "workspace:*",
     "@feeblo/integration-discord": "workspace:*",
