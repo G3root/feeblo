@@ -1,0 +1,19 @@
+{
+  "name": "@feeblo/domain-contracts",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@feeblo/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

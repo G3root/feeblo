@@ -6,7 +6,7 @@ import {
 } from "@feeblo/id";
 import { describe, expect, it } from "vitest";
 
-import { findMatchingGitHubSyncRules } from "./rule-evaluation";
+import { findMatchingGitHubSyncRules } from "./github-rule-evaluation";
 
 const rule = {
   id: asLegid(GitHubSyncRuleId)("gsr_test"),

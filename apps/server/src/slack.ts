@@ -11,6 +11,12 @@ import {
   IntegrationInboundRejection,
   type IntegrationProviderRegistry,
 } from "@feeblo/integration-core";
+import {
+  handleVerifiedInbound,
+  headerValue,
+  inboundHttpResponse,
+  settingsRedirect,
+} from "@feeblo/integration-core/http-inbound";
 import { ParsedSlackInboundRequest } from "@feeblo/integration-slack/inbound-schema";
 import {
   slackCommandsCapabilityKey,
@@ -23,13 +29,6 @@ import * as Layer from "effect/Layer";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
-
-import {
-  handleVerifiedInbound,
-  headerValue,
-  inboundHttpResponse,
-  settingsRedirect,
-} from "./webhook-inbound";
 
 /**
  * Slack HTTP surface: the OAuth callback, the `/feeblo` slash command, and

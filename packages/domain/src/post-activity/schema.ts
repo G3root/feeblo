@@ -1,4 +1,4 @@
-import { PostActivityKind } from "@feeblo/db/validation-schema/activity-kind";
+import { PostActivityKind } from "@feeblo/domain-contracts/activity-kind";
 import { PostId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
@@ -10,7 +10,7 @@ import * as S from "effect/Schema";
 export {
   PostActivityKind,
   type TPostActivityKind,
-} from "@feeblo/db/validation-schema/activity-kind";
+} from "@feeblo/domain-contracts/activity-kind";
 
 export const PostActivity = S.Struct({
   id: S.String,

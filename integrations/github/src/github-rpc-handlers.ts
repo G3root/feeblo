@@ -1,8 +1,7 @@
+import { GitHubManagementService } from "@feeblo/domain/integration/github/management-service";
+import { GitHubManagementRpcs } from "@feeblo/domain/integration/github/rpcs";
+import * as Policy from "@feeblo/domain/policy";
 import * as Effect from "effect/Effect";
-
-import * as Policy from "../../policy";
-import { GitHubManagementService } from "./management-service";
-import { GitHubManagementRpcs } from "./rpcs";
 
 /** RPC handlers authorize GitHub management before delegating provider-specific work to the application service. */
 export const GitHubManagementRpcHandlersEffect = Effect.gen(function* () {

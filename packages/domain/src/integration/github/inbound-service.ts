@@ -1,4 +1,4 @@
-import type { ParsedGitHubInboundRequest } from "@feeblo/integration-github/inbound-schema";
+import type { ParsedGitHubInboundRequest } from "@feeblo/domain-contracts/github-inbound";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 
