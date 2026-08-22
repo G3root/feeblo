@@ -29,7 +29,7 @@ import {
   headerValue,
   inboundHttpResponse,
   settingsRedirect,
-} from "./webhook-inbound";
+} from "@feeblo/integration-core/http-inbound";
 
 /**
  * Slack HTTP surface: the OAuth callback, the `/feeblo` slash command, and

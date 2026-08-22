@@ -49,8 +49,8 @@ import type * as Ref from "effect/Ref";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import * as RateLimiter from "effect/unstable/persistence/RateLimiter";
 
-import { ServerConfig, type ServerConfigValue } from "../config";
-import { GitHubProviderLive } from "../github-provider";
+import type { ServerConfigValue } from "../config";
+import { makeGitHubProviderLive } from "@feeblo/integration-github/github-provider-live";
 import { redisOptions } from "../infra/redis";
 import type { IntegrationRuntime } from "../integrations";
 
@@ -186,9 +186,15 @@ export const makeServiceLayers = ({
     GitHubManagementServiceLive.pipe(
       Layer.provide(ExternalResources),
       Layer.provide(
-        GitHubProviderLive.pipe(
+        makeGitHubProviderLive({
+          githubAppId: config.githubAppId,
+          githubAppSlug: config.githubAppSlug,
+          githubClientId: config.githubClientId,
+          githubClientSecret: config.githubClientSecret,
+          githubPrivateKey: config.githubPrivateKey,
+          githubEncryptionKey: config.githubEncryptionKey,
+        }).pipe(
           Layer.provide(gitHubConfigLayer),
-          Layer.provide(Layer.succeed(ServerConfig, config)),
           Layer.provide(Database.DatabaseContextLive)
         )
       ),

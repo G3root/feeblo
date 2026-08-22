@@ -18,9 +18,9 @@
  *   app/router.ts          → MergedRoutes + global middleware
  *   app/program.ts         → Effect.gen program + NodeRuntime bootstrap
  *   integrations.ts        → provider registry + delivery worker
- *   webhook-inbound.ts     → shared provider webhook route plumbing
- *   github-provider.ts     → GitHub App provider Live
- *   slack.ts / discord.ts / github.ts → feature routers
+ *   slack.ts / discord.ts  → feature routers (shared inbound plumbing and the
+ *                            GitHub adapters live in @feeblo/integration-core
+ *                            and @feeblo/integration-github)
  */
 import { runProgram } from "./app/program";
 

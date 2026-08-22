@@ -18,6 +18,12 @@
     "./github-provider": {
       "default": "./src/github-provider.ts"
     },
+    "./github-provider-live": {
+      "default": "./src/github-provider-live.ts"
+    },
+    "./github-routers": {
+      "default": "./src/github-routers.ts"
+    },
     "./github-rpc-handlers": {
       "default": "./src/github-rpc-handlers.ts"
     },

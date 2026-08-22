@@ -6,7 +6,7 @@ import {
   schema,
 } from "@feeblo/db";
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
-import { GitHubProvider } from "@feeblo/integration-github/github-provider";
+import { GitHubProvider } from "./github-provider";
 import {
   BadRequestError,
   InternalServerError,
@@ -29,23 +29,37 @@ import {
   makeGitHubInstallationTokenResolver,
   renderGitHubIssueBody,
   renderGitHubIssueTitle,
-} from "@feeblo/integration-github";
-import { githubProviderKey } from "@feeblo/integration-github/manifest";
+} from "./index";
+import { githubProviderKey } from "./github-manifest";
 import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
-import { ServerConfig } from "./config";
+
+/**
+ * Live GitHub App adapter input. Mirrors the server-owned configuration the
+ * adapter needs; the composition root reads these from its typed env so this
+ * package never depends on server configuration (see docs/adr/0002).
+ */
+export interface GitHubProviderLiveInput {
+  /** Field names mirror ServerConfig so callers can pass them straight through. */
+  readonly githubAppId: string | undefined;
+  readonly githubAppSlug: string | undefined;
+  readonly githubClientId: string | undefined;
+  readonly githubClientSecret: Redacted.Redacted;
+  readonly githubPrivateKey: Redacted.Redacted;
+  readonly githubEncryptionKey: Redacted.Redacted;
+}
 
 /** Server-owned GitHub App adapter. Durable state is installation identity only; all bearer tokens are ephemeral. */
-export const GitHubProviderLive = Layer.effect(
-  GitHubProvider,
-  Effect.gen(function* () {
-    const db = yield* currentDb;
-    const config = yield* ServerConfig;
-    const domainConfig = yield* GitHubIntegrationConfig;
+export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
+  Layer.effect(
+    GitHubProvider,
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const domainConfig = yield* GitHubIntegrationConfig;
     const api = makeGitHubApiClient();
     const installationTokens = yield* makeGitHubInstallationTokenResolver({
       apiClient: api,

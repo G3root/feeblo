@@ -1,13 +1,13 @@
 import { Database } from "@feeblo/db";
 import { GitHubInboundService } from "@feeblo/domain/integration/github/inbound-service";
 import { GitHubManagementService } from "@feeblo/domain/integration/github/management-service";
-import { parseGitHubAppInstallationCallbackUrl } from "@feeblo/integration-github/github-oauth-callback";
+import { parseGitHubAppInstallationCallbackUrl } from "./github-oauth-callback";
 import type { IntegrationProviderRegistry } from "@feeblo/integration-core";
-import { ParsedGitHubInboundRequest } from "@feeblo/integration-github/inbound-schema";
+import { ParsedGitHubInboundRequest } from "@feeblo/domain-contracts/github-inbound";
 import {
   githubIssueWebhookCapabilityKey,
   githubProviderKey,
-} from "@feeblo/integration-github/manifest";
+} from "./github-manifest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -15,19 +15,16 @@ import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
-import { ServerConfig } from "./config";
 import {
   handleVerifiedInbound,
   headerValue,
   settingsRedirect,
-} from "./webhook-inbound";
+} from "@feeblo/integration-core/http-inbound";
 
 /** GitHub redirects here after its App installer authorizes Feeblo to verify ownership. */
-export const makeGitHubAppInstallationCallbackRouter = () =>
+export const makeGitHubAppInstallationCallbackRouter = (appUrl: string) =>
   HttpRouter.use((router) =>
     Effect.gen(function* () {
-      // Captured once at construction; the config is immutable.
-      const config = yield* ServerConfig;
       return yield* router.add(
         "GET",
         "/github/app/installations/callback",
@@ -40,7 +37,7 @@ export const makeGitHubAppInstallationCallbackRouter = () =>
               yield* Effect.logError(parsed.cause);
               return HttpServerResponse.redirect(
                 settingsRedirect({
-                  appUrl: config.appUrl,
+                  appUrl,
                   message: "GitHub App installation failed.",
                   provider: "github",
                   status: "error",
@@ -55,7 +52,7 @@ export const makeGitHubAppInstallationCallbackRouter = () =>
               yield* Effect.logError(completed.cause);
               return HttpServerResponse.redirect(
                 settingsRedirect({
-                  appUrl: config.appUrl,
+                  appUrl,
                   message: "GitHub App installation failed.",
                   provider: "github",
                   status: "error",
@@ -64,7 +61,7 @@ export const makeGitHubAppInstallationCallbackRouter = () =>
             }
             return HttpServerResponse.redirect(
               settingsRedirect({
-                appUrl: config.appUrl,
+                appUrl,
                 message: "Feeblo is now connected to GitHub.",
                 organizationId: completed.value.organizationId,
                 provider: "github",
@@ -146,9 +143,19 @@ const makeGitHubAppWebhookRouter = (registry: IntegrationProviderRegistry) =>
     })
   );
 
-/** Server HTTP adapters for GitHub App setup and its global webhook endpoint. */
-export const makeGitHubRouters = (registry: IntegrationProviderRegistry) =>
+/**
+ * Server HTTP adapters for GitHub App setup and its global webhook endpoint.
+ * Built by the composition root so the provider package never depends on
+ * server configuration (see docs/adr/0002).
+ */
+export interface GitHubRoutersInput {
+  /** Dashboard base URL used for post-installation redirects. */
+  readonly appUrl: string;
+  readonly registry: IntegrationProviderRegistry;
+}
+
+export const makeGitHubRouters = (input: GitHubRoutersInput) =>
   Layer.mergeAll(
-    makeGitHubAppInstallationCallbackRouter(),
-    makeGitHubAppWebhookRouter(registry)
+    makeGitHubAppInstallationCallbackRouter(input.appUrl),
+    makeGitHubAppWebhookRouter(input.registry)
   ).pipe(Layer.orDie);

@@ -10,7 +10,7 @@ import * as HttpRouter from "effect/unstable/http/HttpRouter";
 
 import type { ServerConfigValue } from "../config";
 import { makeDiscordRouters } from "../discord";
-import { makeGitHubRouters } from "../github";
+import { makeGitHubRouters } from "@feeblo/integration-github/github-routers";
 import { bodySizeLimitMiddleware } from "../http/body-limit";
 import { makeIsAllowedOrigin } from "../http/cors";
 import {
@@ -49,9 +49,12 @@ export const makePublicRouters = (
 };
 
 export const makeMergedRoutes = ({
+  appUrl,
   integrationRuntime,
   publicRouters,
 }: {
+  /** Dashboard base URL handed to provider routers for redirects. */
+  readonly appUrl: string;
   readonly integrationRuntime: IntegrationRuntime;
   readonly publicRouters: ReturnType<typeof makePublicRouters>;
 }) =>
@@ -64,7 +67,7 @@ export const makeMergedRoutes = ({
     DocsRoute,
     makeSlackRouters(integrationRuntime.registry),
     makeDiscordRouters(integrationRuntime.registry),
-    makeGitHubRouters(integrationRuntime.registry),
+    makeGitHubRouters({ appUrl, registry: integrationRuntime.registry }),
     makeSesEmailFeedbackRouter()
   );
 

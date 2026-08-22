@@ -85,6 +85,7 @@ export const program = Effect.gen(function* () {
 
   const PublicRouters = makePublicRouters(mailbox, config.nodeEnv);
   const MergedRoutes = makeMergedRoutes({
+    appUrl: config.appUrl,
     integrationRuntime,
     publicRouters: PublicRouters,
   });

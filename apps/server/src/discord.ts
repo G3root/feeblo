@@ -29,7 +29,7 @@ import {
   headerValue,
   inboundHttpResponse,
   settingsRedirect,
-} from "./webhook-inbound";
+} from "@feeblo/integration-core/http-inbound";
 
 /**
  * Discord HTTP surface: the OAuth callback and the single interactions
