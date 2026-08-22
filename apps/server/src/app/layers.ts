@@ -21,8 +21,6 @@ import {
   type ExternalResourceServiceContract,
 } from "@feeblo/domain/integration/external-resource/service";
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
-import { GitHubInboundServiceLive } from "@feeblo/integration-github/github-inbound-live";
-import { GitHubManagementServiceLive } from "@feeblo/integration-github/github-management-live";
 import {
   SlackFeedbackServiceLive,
   SlackInboundServiceLive,
@@ -40,6 +38,9 @@ import { SiteRepository } from "@feeblo/domain/site/repository";
 import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
 import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
+import { GitHubInboundServiceLive } from "@feeblo/integration-github/github-inbound-live";
+import { GitHubManagementServiceLive } from "@feeblo/integration-github/github-management-live";
+import { makeGitHubProviderLive } from "@feeblo/integration-github/github-provider-live";
 import type { Mailer } from "@feeblo/transactional/mailer";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
 import * as Effect from "effect/Effect";
@@ -50,7 +51,6 @@ import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import * as RateLimiter from "effect/unstable/persistence/RateLimiter";
 
 import type { ServerConfigValue } from "../config";
-import { makeGitHubProviderLive } from "@feeblo/integration-github/github-provider-live";
 import { redisOptions } from "../infra/redis";
 import type { IntegrationRuntime } from "../integrations";
 

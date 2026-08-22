@@ -1,6 +1,15 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { IntegrationProviderKey } from "@feeblo/domain-contracts/integration";
+import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
+import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
+import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
+import { GitHubManagementService } from "@feeblo/domain/integration/github/management-service";
+import type { GitHubResolvedIssue } from "@feeblo/domain/integration/github/schema";
+import {
+  BadRequestError,
+  InternalServerError,
+} from "@feeblo/domain/rpc-errors";
 import {
   BoardId,
   GitHubSyncRuleId,
@@ -15,14 +24,8 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 
-import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
-import { BadRequestError, InternalServerError } from "@feeblo/domain/rpc-errors";
-import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
-import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
-import { GitHubProvider, type GitHubProviderContract } from "./github-provider";
 import { GitHubManagementServiceLive } from "./github-management-live";
-import { GitHubManagementService } from "@feeblo/domain/integration/github/management-service";
-import type { GitHubResolvedIssue } from "@feeblo/domain/integration/github/schema";
+import { GitHubProvider, type GitHubProviderContract } from "./github-provider";
 
 /** Recording fake provider; the test sets `createIssue` behavior per scenario. */
 const makeFakeGitHubProvider = () => {

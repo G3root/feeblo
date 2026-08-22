@@ -8,6 +8,16 @@ import {
   IntegrationExternalResourceType,
   IntegrationProviderKey,
 } from "@feeblo/domain-contracts/integration";
+import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
+import {
+  GitHubInboundService,
+  type GitHubInstallationLifecycleWebhook,
+  type GitHubIssueWebhook,
+} from "@feeblo/domain/integration/github/inbound-service";
+import { recordPostIntegrationEvent } from "@feeblo/domain/integration/post-event-recording";
+import { NotificationService } from "@feeblo/domain/notification/service";
+import { PostRepository } from "@feeblo/domain/post/repository";
+import { InternalServerError, NotFoundError } from "@feeblo/domain/rpc-errors";
 import {
   asLegid,
   BoardId,
@@ -24,16 +34,6 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
-import { NotificationService } from "@feeblo/domain/notification/service";
-import { PostRepository } from "@feeblo/domain/post/repository";
-import { InternalServerError, NotFoundError } from "@feeblo/domain/rpc-errors";
-import { recordPostIntegrationEvent } from "@feeblo/domain/integration/post-event-recording";
-import {
-  GitHubInboundService,
-  type GitHubInstallationLifecycleWebhook,
-  type GitHubIssueWebhook,
-} from "@feeblo/domain/integration/github/inbound-service";
 import { findMatchingGitHubSyncRules } from "./github-rule-evaluation";
 
 const inboundDatabaseError = (operation: string) => () =>

@@ -1,6 +1,26 @@
 import { currentDb, schema } from "@feeblo/db";
 import { isGitHubSyncRuleCombination } from "@feeblo/domain-contracts/github-integration";
 import { IntegrationProviderKey } from "@feeblo/domain-contracts/integration";
+import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
+import type {
+  ExternalResourceRecord,
+  PostExternalResourceLink,
+  RecordedPostExternalResourceLink,
+  RecordPostExternalResourceLink,
+} from "@feeblo/domain/integration/external-resource/schema";
+import { ExternalResourceService } from "@feeblo/domain/integration/external-resource/service";
+import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
+import {
+  GitHubManagementService,
+  type GitHubManagementServiceContract,
+} from "@feeblo/domain/integration/github/management-service";
+import { GitHubIssueCreateRouteConfiguration } from "@feeblo/domain/integration/github/schema";
+import {
+  BadRequestError,
+  InternalServerError,
+  NotFoundError,
+  UnauthorizedError,
+} from "@feeblo/domain/rpc-errors";
 import {
   asLegid,
   GitHubSyncRuleId,
@@ -18,27 +38,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
-import {
-  BadRequestError,
-  InternalServerError,
-  NotFoundError,
-  UnauthorizedError,
-} from "@feeblo/domain/rpc-errors";
-import type {
-  ExternalResourceRecord,
-  PostExternalResourceLink,
-  RecordedPostExternalResourceLink,
-  RecordPostExternalResourceLink,
-} from "@feeblo/domain/integration/external-resource/schema";
-import { ExternalResourceService } from "@feeblo/domain/integration/external-resource/service";
-import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
 import { GitHubProvider } from "./github-provider";
-import {
-  GitHubManagementService,
-  type GitHubManagementServiceContract,
-} from "@feeblo/domain/integration/github/management-service";
-import { GitHubIssueCreateRouteConfiguration } from "@feeblo/domain/integration/github/schema";
 
 const databaseError = (operation: string) => () =>
   new InternalServerError({

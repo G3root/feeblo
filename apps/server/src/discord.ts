@@ -9,6 +9,12 @@ import {
   type IntegrationInboundRejection,
   type IntegrationProviderRegistry,
 } from "@feeblo/integration-core";
+import {
+  handleVerifiedInbound,
+  headerValue,
+  inboundHttpResponse,
+  settingsRedirect,
+} from "@feeblo/integration-core/http-inbound";
 import { DiscordOAuthState } from "@feeblo/integration-discord";
 import { ParsedDiscordInboundRequest } from "@feeblo/integration-discord/inbound-schema";
 import {
@@ -23,13 +29,6 @@ import * as Schema from "effect/Schema";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
-
-import {
-  handleVerifiedInbound,
-  headerValue,
-  inboundHttpResponse,
-  settingsRedirect,
-} from "@feeblo/integration-core/http-inbound";
 
 /**
  * Discord HTTP surface: the OAuth callback and the single interactions

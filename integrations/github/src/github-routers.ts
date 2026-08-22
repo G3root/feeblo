@@ -1,13 +1,13 @@
 import { Database } from "@feeblo/db";
+import { ParsedGitHubInboundRequest } from "@feeblo/domain-contracts/github-inbound";
 import { GitHubInboundService } from "@feeblo/domain/integration/github/inbound-service";
 import { GitHubManagementService } from "@feeblo/domain/integration/github/management-service";
-import { parseGitHubAppInstallationCallbackUrl } from "./github-oauth-callback";
 import type { IntegrationProviderRegistry } from "@feeblo/integration-core";
-import { ParsedGitHubInboundRequest } from "@feeblo/domain-contracts/github-inbound";
 import {
-  githubIssueWebhookCapabilityKey,
-  githubProviderKey,
-} from "./github-manifest";
+  handleVerifiedInbound,
+  headerValue,
+  settingsRedirect,
+} from "@feeblo/integration-core/http-inbound";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -16,10 +16,10 @@ import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest"
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 import {
-  handleVerifiedInbound,
-  headerValue,
-  settingsRedirect,
-} from "@feeblo/integration-core/http-inbound";
+  githubIssueWebhookCapabilityKey,
+  githubProviderKey,
+} from "./github-manifest";
+import { parseGitHubAppInstallationCallbackUrl } from "./github-oauth-callback";
 
 /** GitHub redirects here after its App installer authorizes Feeblo to verify ownership. */
 export const makeGitHubAppInstallationCallbackRouter = (appUrl: string) =>

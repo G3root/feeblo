@@ -1,20 +1,12 @@
 # Integration packages
 
-Provider adapters for external systems (`github`, `slack`, `discord`,
-`webhook`) plus the provider-neutral kernel (`core`). See
-`docs/adr/0001` for the event/delivery architecture and `docs/adr/0002`
-for how these packages relate to `@feeblo/domain`.
+Provider adapters for external systems (`github`, `slack`, `discord`, `webhook`) plus the provider-neutral kernel (`core`). See `docs/adr/0001` for the event/delivery architecture and `docs/adr/0002` for how these packages relate to `@feeblo/domain`.
 
 ## Dependency rules
 
-- Provider packages may depend on: `@feeblo/integration-core`,
-  `@feeblo/domain-contracts`, `@feeblo/domain`, `@feeblo/db`, `@feeblo/id`,
-  `effect`.
-- `@feeblo/domain` must **not** depend on provider packages. RPC definitions
-  (contracts) live in domain; handler layers and HTTP adapters live here and
-  are supplied by the server composition root.
-- Server-only concerns (typed env, middleware) never leak into these packages:
-  adapter factories take plain input objects instead.
+- Provider packages may depend on: `@feeblo/integration-core`, `@feeblo/domain-contracts`, `@feeblo/domain`, `@feeblo/db`, `@feeblo/id`, `effect`.
+- `@feeblo/domain` must **not** depend on provider packages. RPC definitions (contracts) live in domain; handler layers and HTTP adapters live here and are supplied by the server composition root.
+- Server-only concerns (typed env, middleware) never leak into these packages: adapter factories take plain input objects instead.
 
 ## Standard layout
 
@@ -46,11 +38,8 @@ integrations/<provider>/src/
   index.ts                          Public barrel re-export
 ```
 
-Naming: factories are `make<CamelCaseName>`; Live-layer inputs are
-`<Name>Input`; router inputs `<Name>RoutersInput`. Export every public module
-in `package.json` `exports` with a `./<file-without-ext>` subpath.
+Naming: factories are `make<CamelCaseName>`; Live-layer inputs are `<Name>Input`; router inputs `<Name>RoutersInput`. Export every public module in `package.json` `exports` with a `./<file-without-ext>` subpath.
 
 ## Shared HTTP plumbing
 
-Header extraction, settings redirects, and the verified-inbound pipeline live
-once in `integration-core` (`./http-inbound`); provider routers compose them.
+Header extraction, settings redirects, and the verified-inbound pipeline live once in `integration-core` (`./http-inbound`); provider routers compose them.

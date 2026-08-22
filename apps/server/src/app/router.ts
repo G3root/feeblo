@@ -1,6 +1,7 @@
 import { makeClientIpGlobalMiddleware } from "@feeblo/domain/client-ip";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { makeRpcRoute } from "@feeblo/domain/rpc-router";
+import { makeGitHubRouters } from "@feeblo/integration-github/github-routers";
 import { GitHubManagementRpcHandlers } from "@feeblo/integration-github/github-rpc-handlers";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
 import * as Layer from "effect/Layer";
@@ -10,7 +11,6 @@ import * as HttpRouter from "effect/unstable/http/HttpRouter";
 
 import type { ServerConfigValue } from "../config";
 import { makeDiscordRouters } from "../discord";
-import { makeGitHubRouters } from "@feeblo/integration-github/github-routers";
 import { bodySizeLimitMiddleware } from "../http/body-limit";
 import { makeIsAllowedOrigin } from "../http/cors";
 import {

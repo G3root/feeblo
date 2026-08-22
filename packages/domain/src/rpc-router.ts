@@ -68,39 +68,45 @@ export const makeRpcRoute = <RIn, ROut, E>(
     Layer.provide(CoreRpcHandlers),
     Layer.provide(providerHandlers),
     Layer.provide(BillingRpcHandlers),
-  Layer.provide(Layer.mergeAll(BoardRpcHandlers, ChangelogCategoryRpcHandlers)),
-  Layer.provide(Layer.mergeAll(ChangelogRpcHandlers, ChangelogPostRpcHandlers)),
-  Layer.provide(JwtSecretRpcHandlers),
-  Layer.provide(Layer.mergeAll(MembershipRpcHandlers, NotificationRpcHandlers)),
-  Layer.provide(OrganizationRpcHandlers),
-  Layer.provide(CommentReactionRpcHandlers),
-  Layer.provide(CommentRpcHandlers),
-  Layer.provide(
-    Layer.mergeAll(
-      AttributeDefinitionRpcHandlers,
-      CompanyRpcHandlers,
-      ContactRpcHandlers
+    Layer.provide(
+      Layer.mergeAll(BoardRpcHandlers, ChangelogCategoryRpcHandlers)
+    ),
+    Layer.provide(
+      Layer.mergeAll(ChangelogRpcHandlers, ChangelogPostRpcHandlers)
+    ),
+    Layer.provide(JwtSecretRpcHandlers),
+    Layer.provide(
+      Layer.mergeAll(MembershipRpcHandlers, NotificationRpcHandlers)
+    ),
+    Layer.provide(OrganizationRpcHandlers),
+    Layer.provide(CommentReactionRpcHandlers),
+    Layer.provide(CommentRpcHandlers),
+    Layer.provide(
+      Layer.mergeAll(
+        AttributeDefinitionRpcHandlers,
+        CompanyRpcHandlers,
+        ContactRpcHandlers
+      )
+    ),
+    Layer.provide(Layer.merge(SiteRpcHandlers, EmailSubscriptionRpcHandlers)),
+    Layer.provide(Layer.merge(TagRpcHandlers, UpvoteRpcHandlers)),
+    Layer.provide(PostReactionRpcHandlers),
+    Layer.provide(PostStatusRpcHandlers),
+    Layer.provide(
+      Layer.mergeAll(
+        PostSubscriptionRpcHandlers,
+        RoadmapRpcHandlers,
+        RoadmapColumnRpcHandlers
+      )
+    ),
+    Layer.provide(WorkspaceRpcHandlers),
+    Layer.provide(S3UploadServiceLive),
+    Layer.provide(RpcSerialization.layerNdjson),
+    Layer.provide(
+      Layer.mergeAll(
+        AuthMiddlewareLive,
+        OptionalAuthMiddlewareLive,
+        PublicRpcRateLimitMiddlewareLive
+      )
     )
-  ),
-  Layer.provide(Layer.merge(SiteRpcHandlers, EmailSubscriptionRpcHandlers)),
-  Layer.provide(Layer.merge(TagRpcHandlers, UpvoteRpcHandlers)),
-  Layer.provide(PostReactionRpcHandlers),
-  Layer.provide(PostStatusRpcHandlers),
-  Layer.provide(
-    Layer.mergeAll(
-      PostSubscriptionRpcHandlers,
-      RoadmapRpcHandlers,
-      RoadmapColumnRpcHandlers
-    )
-  ),
-  Layer.provide(WorkspaceRpcHandlers),
-  Layer.provide(S3UploadServiceLive),
-  Layer.provide(RpcSerialization.layerNdjson),
-  Layer.provide(
-    Layer.mergeAll(
-      AuthMiddlewareLive,
-      OptionalAuthMiddlewareLive,
-      PublicRpcRateLimitMiddlewareLive
-    )
-  )
-);
+  );
