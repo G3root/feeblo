@@ -718,12 +718,27 @@ importers:
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.0-beta.107(effect@4.0.0-beta.107)(ioredis@5.11.1)
+      '@feeblo/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@feeblo/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@feeblo/domain-contracts':
+        specifier: workspace:*
+        version: link:../../packages/domain-contracts
+      '@feeblo/id':
+        specifier: workspace:*
+        version: link:../../packages/id
       '@feeblo/integration-core':
         specifier: workspace:*
         version: link:../core
       '@feeblo/utils':
         specifier: workspace:*
         version: link:../../packages/utils
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0-beta.107(effect@4.0.0-beta.107))(@effect/sql-pglite@4.0.0-beta.107(effect@4.0.0-beta.107))(@electric-sql/pglite@0.5.4)(@opentelemetry/api@1.9.1)(@types/pg@8.21.0)(effect@4.0.0-beta.107)(pg@8.23.0)(postgres@3.4.9)(zod@4.4.3)
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.107
@@ -737,9 +752,6 @@ importers:
       '@feeblo/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@feeblo/id':
-        specifier: workspace:*
-        version: link:../../packages/id
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.3
@@ -933,9 +945,6 @@ importers:
       '@feeblo/integration-core':
         specifier: workspace:*
         version: link:../../integrations/core
-      '@feeblo/integration-webhook':
-        specifier: workspace:*
-        version: link:../../integrations/webhook
       '@feeblo/permissions':
         specifier: workspace:*
         version: link:../permissions

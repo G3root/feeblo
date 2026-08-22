@@ -10,6 +10,7 @@ import { SesEmailFeedbackWebhook } from "@feeblo/domain/email-provider-feedback/
 import { EmailSubscriptionRepository } from "@feeblo/domain/email-subscription/repository";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
+import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import {
   ExternalResourceService,
   type ExternalResourceServiceContract,
@@ -128,6 +129,30 @@ export const makeDiscordIntegrationConfig = (config: ServerConfigValue) => {
       config.discordOauthRedirectUrl ?? `${apiUrlValue}/discord/oauth/callback`,
     permissions: DISCORD_OAUTH_PERMISSIONS,
     publicKey,
+  });
+};
+
+/** Builds the webhook security configuration values from the server environment. */
+export const makeWebhookIntegrationConfig = (config: ServerConfigValue) => {
+  const environment = (() => {
+    if (config.nodeEnv === "production") {
+      return "production" as const;
+    }
+    if (config.nodeEnv === "test") {
+      return "test" as const;
+    }
+    return "development" as const;
+  })();
+  return WebhookIntegrationConfig.of({
+    encryptionKey: config.integrationEncryptionKey,
+    endpointSecurityPolicy: {
+      // The private-network override is only honored in development; in
+      // every other environment the policy rejects private egress.
+      allowPrivateNetworkInDevelopment:
+        config.nodeEnv === "development" &&
+        config.integrationAllowPrivateNetwork,
+      environment,
+    },
   });
 };
 

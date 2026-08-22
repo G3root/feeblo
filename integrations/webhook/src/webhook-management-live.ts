@@ -15,15 +15,6 @@ import {
   PostId,
   PostStatusId,
 } from "@feeblo/id";
-import {
-  decryptWebhookCredentialMaterial,
-  encryptWebhookCredentialMaterial,
-  generateWebhookSigningSecret,
-  resolveAndParseWebhookEndpoint,
-  rotateWebhookSigningKeyring,
-  webhookEventsPostCapabilityKey,
-  webhookProviderKey,
-} from "@feeblo/integration-webhook";
 import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -33,14 +24,26 @@ import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
 import {
+  decryptWebhookCredentialMaterial,
+  encryptWebhookCredentialMaterial,
+  generateWebhookSigningSecret,
+  resolveAndParseWebhookEndpoint,
+  rotateWebhookSigningKeyring,
+} from "./index";
+import {
+  webhookEventsPostCapabilityKey,
+  webhookProviderKey,
+} from "./webhook-manifest";
+
+import {
   BadRequestError,
   InternalServerError,
   NotFoundError,
-} from "../rpc-errors";
-import { WebhookIntegrationConfig } from "./config";
-import { WebhookManagementErrors } from "./errors";
-import { WebhookDeliveryHistoryPage } from "./schema";
-import { WebhookManagementService } from "./webhook-management-service";
+} from "@feeblo/domain/rpc-errors";
+import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
+import { WebhookManagementErrors } from "@feeblo/domain/integration/errors";
+import { WebhookDeliveryHistoryPage } from "@feeblo/domain/integration/schema";
+import { WebhookManagementService } from "@feeblo/domain/integration/webhook-management-service";
 
 const retentionMs = 30 * 24 * 60 * 60 * 1000;
 const subscribableEventTypes = SUBSCRIBABLE_INTEGRATION_EVENT_TYPES;

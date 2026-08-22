@@ -5,7 +5,12 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./manifest": "./src/webhook-manifest.ts"
+    "./management-live": {
+      "default": "./src/webhook-management-live.ts"
+    },
+    "./manifest": "./src/webhook-manifest.ts",
+    "./rpc-handlers": "./src/webhook-rpc-handlers.ts",
+    "./signature": "./src/webhook-signing.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",
@@ -13,8 +18,13 @@
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
+    "@feeblo/db": "workspace:*",
+    "@feeblo/domain": "workspace:*",
+    "@feeblo/domain-contracts": "workspace:*",
+    "@feeblo/id": "workspace:*",
     "@feeblo/integration-core": "workspace:*",
     "@feeblo/utils": "workspace:*",
+    "drizzle-orm": "catalog:",
     "effect": "catalog:",
     "standardwebhooks": "1.0.0"
   },

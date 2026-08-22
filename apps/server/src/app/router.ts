@@ -7,6 +7,7 @@ import { makeGitHubRouters } from "@feeblo/integration-github/github-routers";
 import { GitHubManagementRpcHandlers } from "@feeblo/integration-github/github-rpc-handlers";
 import { SlackManagementRpcHandlers } from "@feeblo/integration-slack/rpc-handlers";
 import { makeSlackRouters } from "@feeblo/integration-slack/routers";
+import { WebhookManagementRpcHandlers } from "@feeblo/integration-webhook/rpc-handlers";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
 import * as Layer from "effect/Layer";
 import type * as Ref from "effect/Ref";
@@ -66,7 +67,10 @@ export const makeMergedRoutes = ({
     makeRpcRoute(
       Layer.merge(
         GitHubManagementRpcHandlers,
-        Layer.merge(SlackManagementRpcHandlers, DiscordManagementRpcHandlers)
+        Layer.merge(
+          SlackManagementRpcHandlers,
+          Layer.merge(DiscordManagementRpcHandlers, WebhookManagementRpcHandlers)
+        )
       )
     ),
     HttpRoute,

@@ -35,6 +35,7 @@ import {
   makeRateLimitLayer,
   makeServiceLayers,
   makeSlackIntegrationConfig,
+  makeWebhookIntegrationConfig,
   makeWorkflowLayer,
 } from "./layers";
 import {
@@ -79,6 +80,10 @@ export const program = Effect.gen(function* () {
     Effect.provideService(
       DiscordIntegrationConfig,
       makeDiscordIntegrationConfig(config)
+    ),
+    Effect.provideService(
+      WebhookIntegrationConfig,
+      makeWebhookIntegrationConfig(config)
     ),
     Effect.provideService(ExternalResourceService, externalResources)
   );
@@ -152,7 +157,6 @@ export const main = program.pipe(
     Layer.mergeAll(
       SentryLiveLayer,
       Database.DatabaseContextLive,
-      WebhookIntegrationConfig.layer,
       NodeCrypto.layer
     )
   )

@@ -99,8 +99,11 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       const discordOauthRedirectUrl = yield* Config.string(
         "DISCORD_OAUTH_REDIRECT_URL"
       ).pipe(Config.option, Effect.map(Option.getOrUndefined));
-      // Outbound-webhook security configuration (encryption key and egress
-      // policy) is owned by WebhookIntegrationConfig in the domain package.
+      // Outbound-webhook egress policy override: private-network receivers
+      // are honored in development only (see makeWebhookIntegrationConfig).
+      const integrationAllowPrivateNetwork = yield* Config.boolean(
+        "INTEGRATION_ALLOW_PRIVATE_NETWORK"
+      ).pipe(Config.withDefault(false));
       const integrationConnectionConcurrency = yield* Config.schema(
         Schema.Int.check(Schema.isGreaterThan(0)),
         "INTEGRATION_CONNECTION_CONCURRENCY"
@@ -156,6 +159,7 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         githubClientId,
         githubClientSecret,
         integrationEncryptionKey,
+        integrationAllowPrivateNetwork,
         githubPrivateKey,
         githubWebhookSecret,
         integrationConnectionConcurrency,

@@ -1,8 +1,8 @@
 import * as Effect from "effect/Effect";
 
-import * as Policy from "../policy";
-import { WebhookManagementRpcs } from "./rpcs";
-import { WebhookManagementService } from "./webhook-management-service";
+import * as Policy from "@feeblo/domain/policy";
+import { WebhookManagementRpcs } from "@feeblo/domain/integration/rpcs";
+import { WebhookManagementService } from "@feeblo/domain/integration/webhook-management-service";
 
 /** Authenticated RPC handlers which authorize `webhooks.manage` before every service call. */
 export const WebhookManagementRpcHandlersEffect = Effect.gen(function* () {

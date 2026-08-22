@@ -160,3 +160,17 @@ export const StoredIntegrationEventOrigin = S.Struct({
 export type TStoredIntegrationEventOrigin = S.Schema.Type<
   typeof StoredIntegrationEventOrigin
 >;
+
+/** Deployment environments that gate webhook egress policy defaults. */
+export type WebhookEndpointEnvironment = "development" | "production" | "test";
+
+/**
+ * Explicit endpoint security policy for outbound webhooks; private-network
+ * egress is available only to local development receivers. Canonical here so
+ * the webhook management contract can reference it without depending on the
+ * provider package (see docs/adr/0002).
+ */
+export interface WebhookEndpointSecurityPolicy {
+  readonly allowPrivateNetworkInDevelopment: boolean;
+  readonly environment: WebhookEndpointEnvironment;
+}
