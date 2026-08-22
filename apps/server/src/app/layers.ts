@@ -9,13 +9,7 @@ import { EmailProviderFeedbackService } from "@feeblo/domain/email-provider-feed
 import { SesEmailFeedbackWebhook } from "@feeblo/domain/email-provider-feedback/ses-webhook";
 import { EmailSubscriptionRepository } from "@feeblo/domain/email-subscription/repository";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
-import {
-  DiscordFeedbackServiceLive,
-  DiscordInboundServiceLive,
-  DiscordIntegrationConfig,
-  DiscordManagementServiceLive,
-  DiscordUserServiceLive,
-} from "@feeblo/domain/integration/discord";
+import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import {
   ExternalResourceService,
   type ExternalResourceServiceContract,
@@ -23,6 +17,7 @@ import {
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
 import { SlackInboundServiceLive } from "@feeblo/integration-slack/inbound-live";
 import { SlackManagementServiceLive } from "@feeblo/integration-slack/management-live";
+import { DISCORD_OAUTH_PERMISSIONS, DISCORD_OAUTH_SCOPES } from "@feeblo/integration-discord/manifest";
 import { SLACK_OAUTH_SCOPES } from "@feeblo/integration-slack/manifest";
 import { SlackFeedbackServiceLive } from "@feeblo/integration-slack/slack-feedback-service";
 import { SlackUserServiceLive } from "@feeblo/integration-slack/slack-user-service";
@@ -37,6 +32,10 @@ import { SiteRepository } from "@feeblo/domain/site/repository";
 import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
 import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
+import { DiscordFeedbackServiceLive } from "@feeblo/integration-discord/discord-feedback-service";
+import { DiscordUserServiceLive } from "@feeblo/integration-discord/discord-user-service";
+import { DiscordInboundServiceLive } from "@feeblo/integration-discord/inbound-live";
+import { DiscordManagementServiceLive } from "@feeblo/integration-discord/management-live";
 import { GitHubInboundServiceLive } from "@feeblo/integration-github/github-inbound-live";
 import { GitHubManagementServiceLive } from "@feeblo/integration-github/github-management-live";
 import { makeGitHubProviderLive } from "@feeblo/integration-github/github-provider-live";
@@ -102,6 +101,36 @@ export const makeSlackConfigLayer = (
 ): Layer.Layer<SlackIntegrationConfig> =>
   Layer.succeed(SlackIntegrationConfig, makeSlackIntegrationConfig(config));
 
+/** Builds the Discord integration configuration values from the server environment. */
+export const makeDiscordIntegrationConfig = (config: ServerConfigValue) => {
+  const trailingSlashPattern = /\/$/;
+  const apiUrlValue = config.apiUrl.replace(trailingSlashPattern, "");
+  const clientId = config.discordClientId ?? "";
+  const clientSecret = config.discordClientSecret;
+  const botToken = config.discordBotToken;
+  const publicKey = config.discordPublicKey ?? "";
+  return DiscordIntegrationConfig.of({
+    appUrl: config.appUrl.replace(trailingSlashPattern, ""),
+    authorizeScopes: DISCORD_OAUTH_SCOPES,
+    botToken,
+    clientId,
+    clientSecret,
+    // The provider is only exposed when the OAuth client id, client
+    // secret, bot token, and interaction public key are all configured;
+    // otherwise the server runs without the Discord integration.
+    configured:
+      clientId !== "" &&
+      Redacted.value(clientSecret) !== "" &&
+      Redacted.value(botToken) !== "" &&
+      publicKey !== "",
+    encryptionKey: config.integrationEncryptionKey,
+    oauthRedirectUrl:
+      config.discordOauthRedirectUrl ?? `${apiUrlValue}/discord/oauth/callback`,
+    permissions: DISCORD_OAUTH_PERMISSIONS,
+    publicKey,
+  });
+};
+
 export const makeRateLimitLayer = (
   config: ServerConfigValue,
   useTestMailer: boolean
@@ -156,6 +185,7 @@ export const makeServiceLayers = ({
   externalResourceService,
   gitHubConfigLayer,
   integrationRuntime,
+  discordConfigLayer,
   slackConfigLayer,
   workflowLayer,
 }: {
@@ -164,6 +194,7 @@ export const makeServiceLayers = ({
   readonly externalResourceService: ExternalResourceServiceContract;
   readonly gitHubConfigLayer: Layer.Layer<GitHubIntegrationConfig>;
   readonly integrationRuntime: IntegrationRuntime;
+  readonly discordConfigLayer: Layer.Layer<DiscordIntegrationConfig>;
   readonly slackConfigLayer: Layer.Layer<SlackIntegrationConfig>;
   readonly workflowLayer: ReturnType<typeof makeWorkflowLayer>;
 }) => {
@@ -202,7 +233,7 @@ export const makeServiceLayers = ({
       Layer.provide(Database.DatabaseContextLive)
     ),
     DiscordManagementServiceLive.pipe(
-      Layer.provide(DiscordIntegrationConfig.layer),
+      Layer.provide(discordConfigLayer),
       Layer.provide(Database.DatabaseContextLive)
     ),
     DiscordInboundServiceLive.pipe(

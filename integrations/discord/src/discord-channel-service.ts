@@ -15,16 +15,16 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-import { InternalServerError, NotFoundError } from "../../rpc-errors";
-import { DiscordIntegrationConfig } from "./config";
+import { InternalServerError, NotFoundError } from "@feeblo/domain/rpc-errors";
+import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import {
   findDiscordConnection,
   lockDiscordConnection,
   mapDiscordApiError,
   mapManagementError,
 } from "./discord-management-shared";
-import type { DiscordIntegrationError } from "./errors";
-import type * as S from "./schema";
+import type { DiscordIntegrationError } from "@feeblo/domain/integration/discord/errors";
+import type * as S from "@feeblo/domain/integration/discord/schema";
 
 const decodeProviderConfig = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(DiscordChannelNotificationRouteConfiguration)(

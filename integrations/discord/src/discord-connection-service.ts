@@ -29,8 +29,8 @@ import {
   BadRequestError,
   InternalServerError,
   NotFoundError,
-} from "../../rpc-errors";
-import { DiscordIntegrationConfig } from "./config";
+} from "@feeblo/domain/rpc-errors";
+import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import {
   decryptConnectionCredentials,
   findDiscordConnection,
@@ -38,8 +38,8 @@ import {
   mapDiscordApiError,
   mapManagementError,
 } from "./discord-management-shared";
-import type { DiscordIntegrationError } from "./errors";
-import type * as S from "./schema";
+import type { DiscordIntegrationError } from "@feeblo/domain/integration/discord/errors";
+import type * as S from "@feeblo/domain/integration/discord/schema";
 
 const retentionMs = 30 * 24 * 60 * 60 * 1000;
 

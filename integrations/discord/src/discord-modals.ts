@@ -1,9 +1,10 @@
-import type { DiscordEmbed } from "@feeblo/integration-discord/embeds";
+import type { DiscordEmbed } from "./discord-embeds";
 import { truncate } from "@feeblo/utils/text";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-import { DiscordInboundFailure } from "./errors";
+import type { DiscordInteractionCallback } from "./discord-inbound-schema";
+import { DiscordInboundFailure } from "@feeblo/domain/integration/discord/errors";
 
 const TITLE_MAX_LENGTH = 200;
 const DETAILS_MAX_LENGTH = 3000;
@@ -115,28 +116,6 @@ export const readModalValue = (
  * feedback post. The modal's `custom_id` carries the metadata the submit
  * interaction returns.
  */
-/**
- * Discord interaction callback payloads Feeblo emits (types 1, 4, 6, and 9).
- */
-export type DiscordInteractionCallback =
-  | { readonly type: 1 }
-  | {
-      readonly type: 4;
-      readonly data: {
-        readonly flags: 64;
-        readonly content: string;
-        readonly embeds?: readonly DiscordEmbed[];
-      };
-    }
-  | { readonly type: 6 }
-  | {
-      readonly type: 9;
-      readonly data: {
-        readonly custom_id: string;
-        readonly title: string;
-        readonly components: readonly unknown[];
-      };
-    };
 
 export const buildFeedbackModal = ({
   boards,

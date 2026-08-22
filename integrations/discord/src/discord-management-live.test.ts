@@ -6,7 +6,11 @@ import {
   type DiscordChannel,
   DiscordOAuthState,
 } from "@feeblo/integration-discord";
-import { discordProviderKey } from "@feeblo/integration-discord/manifest";
+import {
+  discordProviderKey,
+  DISCORD_OAUTH_PERMISSIONS,
+  DISCORD_OAUTH_SCOPES,
+} from "@feeblo/integration-discord/manifest";
 import { isString } from "@feeblo/utils/runtime-kind";
 import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
@@ -15,9 +19,9 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
-import { DiscordIntegrationConfig } from "./config";
-import { makeDiscordManagementServiceLive } from "./management-live";
-import { DiscordManagementService } from "./management-service";
+import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
+import { makeDiscordManagementServiceLive } from "./discord-management-live";
+import { DiscordManagementService } from "@feeblo/domain/integration/discord/management-service";
 
 const testChannels: readonly DiscordChannel[] = [
   { id: "C1", name: "general", type: 0 },
@@ -97,14 +101,21 @@ const makeFakeDiscordApiClient = (
 };
 
 const testConfig = (configured = true) =>
-  DiscordIntegrationConfig.layerTest({
-    botToken: Redacted.make("discord-bot-token"),
-    clientId: "client-id",
-    clientSecret: Redacted.make("client-secret"),
-    configured,
-    oauthRedirectUrl: "http://localhost:3000/discord/oauth/callback",
-    publicKey: "0".repeat(64),
-  });
+  Layer.succeed(
+    DiscordIntegrationConfig,
+    DiscordIntegrationConfig.of({
+      appUrl: "http://localhost:3001",
+      authorizeScopes: DISCORD_OAUTH_SCOPES,
+      botToken: Redacted.make("discord-bot-token"),
+      clientId: "client-id",
+      clientSecret: Redacted.make("client-secret"),
+      configured,
+      encryptionKey: Redacted.make("0123456789abcdef0123456789abcdef"),
+      oauthRedirectUrl: "http://localhost:3000/discord/oauth/callback",
+      permissions: DISCORD_OAUTH_PERMISSIONS,
+      publicKey: "0".repeat(64),
+    })
+  );
 
 const makeTestLayer = (
   channels?: readonly DiscordChannel[],

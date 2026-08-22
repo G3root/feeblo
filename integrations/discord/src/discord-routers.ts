@@ -1,10 +1,6 @@
 import { Database } from "@feeblo/db";
-import {
-  DiscordInboundService,
-  DiscordIntegrationConfig,
-  DiscordManagementService,
-  parseDiscordOAuthCallbackUrl,
-} from "@feeblo/domain/integration/discord";
+import { DiscordInboundService } from "@feeblo/domain/integration/discord/inbound-service";
+import { DiscordManagementService } from "@feeblo/domain/integration/discord/management-service";
 import {
   type IntegrationInboundRejection,
   type IntegrationProviderRegistry,
@@ -15,12 +11,6 @@ import {
   inboundHttpResponse,
   settingsRedirect,
 } from "@feeblo/integration-core/http-inbound";
-import { DiscordOAuthState } from "@feeblo/integration-discord";
-import { ParsedDiscordInboundRequest } from "@feeblo/integration-discord/inbound-schema";
-import {
-  discordInteractionsCapabilityKey,
-  discordProviderKey,
-} from "@feeblo/integration-discord/manifest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -29,6 +19,13 @@ import * as Schema from "effect/Schema";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
+
+import { ParsedDiscordInboundRequest, DiscordOAuthState } from "./discord-inbound-schema";
+import {
+  discordInteractionsCapabilityKey,
+  discordProviderKey,
+} from "./discord-manifest";
+import { parseDiscordOAuthCallbackUrl } from "./discord-oauth-callback";
 
 /**
  * Discord HTTP surface: the OAuth callback and the single interactions
@@ -99,11 +96,9 @@ const organizationIdFromOAuthState = (state: string | null) =>
       );
 
 /** OAuth callback router; completes the install and redirects to the dashboard settings page. */
-export const makeDiscordOAuthCallbackRouter = () =>
+export const makeDiscordOAuthCallbackRouter = (appUrl: string) =>
   HttpRouter.use((router) =>
     Effect.gen(function* () {
-      // Captured once at construction; the config is immutable.
-      const config = yield* DiscordIntegrationConfig;
       return yield* router.add(
         "GET",
         "/discord/oauth/callback",
@@ -117,7 +112,7 @@ export const makeDiscordOAuthCallbackRouter = () =>
             if (error !== null) {
               return HttpServerResponse.redirect(
                 settingsRedirect({
-                  appUrl: config.appUrl,
+                  appUrl,
                   message: "Discord installation was cancelled or denied.",
                   organizationId: organizationIdFromOAuthState(state),
                   provider: "discord",
@@ -128,7 +123,7 @@ export const makeDiscordOAuthCallbackRouter = () =>
             if (code === null || state === null) {
               return HttpServerResponse.redirect(
                 settingsRedirect({
-                  appUrl: config.appUrl,
+                  appUrl,
                   message: "Discord installation failed.",
                   organizationId: organizationIdFromOAuthState(state),
                   provider: "discord",
@@ -143,7 +138,7 @@ export const makeDiscordOAuthCallbackRouter = () =>
             if (Exit.isFailure(completed)) {
               return HttpServerResponse.redirect(
                 settingsRedirect({
-                  appUrl: config.appUrl,
+                  appUrl,
                   message: "Discord installation failed.",
                   provider: "discord",
                   status: "error",
@@ -152,7 +147,7 @@ export const makeDiscordOAuthCallbackRouter = () =>
             }
             return HttpServerResponse.redirect(
               settingsRedirect({
-                appUrl: config.appUrl,
+                appUrl,
                 message: "Feeblo is now connected to Discord.",
                 organizationId: completed.value.organizationId,
                 provider: "discord",
@@ -165,12 +160,23 @@ export const makeDiscordOAuthCallbackRouter = () =>
   ).pipe(Layer.provide(Database.DatabaseContextLive), Layer.orDie);
 
 /**
- * Complete Discord HTTP surface. The routers provide their own service layers
- * (management, inbound, repositories, database) so the composition root only
- * has to hand over the provider registry.
+ * Server HTTP adapters for the Discord OAuth callback and its interactions
+ * endpoint. Built by the composition root so the provider package never
+ * depends on server configuration (see docs/adr/0002).
  */
-export const makeDiscordRouters = (registry: IntegrationProviderRegistry) =>
+export interface DiscordRoutersInput {
+  /** Dashboard base URL used for post-installation redirects. */
+  readonly appUrl: string;
+  readonly registry: IntegrationProviderRegistry;
+}
+
+/**
+ * Complete Discord HTTP surface. The routers provide their own database
+ * context; management and inbound services are supplied by the composition
+ * root's service layers.
+ */
+export const makeDiscordRouters = (input: DiscordRoutersInput) =>
   Layer.mergeAll(
-    makeDiscordOAuthCallbackRouter(),
-    makeDiscordInteractionsRouter(registry)
+    makeDiscordOAuthCallbackRouter(input.appUrl),
+    makeDiscordInteractionsRouter(input.registry)
   ).pipe(Layer.orDie);

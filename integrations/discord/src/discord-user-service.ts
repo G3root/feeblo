@@ -6,8 +6,8 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { isUniqueViolation } from "../../rpc-errors";
-import { DiscordInboundFailure } from "./errors";
+import { isUniqueViolation } from "@feeblo/domain/rpc-errors";
+import { DiscordInboundFailure } from "@feeblo/domain/integration/discord/errors";
 
 const SYNTHETIC_DISCORD_EMAIL_SUFFIX = "@discord.invalid";
 

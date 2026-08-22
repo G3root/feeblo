@@ -10,7 +10,7 @@ import {
 } from "@effect/platform-node";
 import { Database } from "@feeblo/db";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
-import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord";
+import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
 import { ExternalResourceService } from "@feeblo/domain/integration/external-resource/service";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
@@ -30,6 +30,7 @@ import { makeSentryLayer } from "../infra/sentry";
 import { makeIntegrationLayers } from "../integrations";
 import {
   makeAuthLayer,
+  makeDiscordIntegrationConfig,
   makeGitHubConfigLayer,
   makeRateLimitLayer,
   makeServiceLayers,
@@ -75,6 +76,10 @@ export const program = Effect.gen(function* () {
       SlackIntegrationConfig,
       makeSlackIntegrationConfig(config)
     ),
+    Effect.provideService(
+      DiscordIntegrationConfig,
+      makeDiscordIntegrationConfig(config)
+    ),
     Effect.provideService(ExternalResourceService, externalResources)
   );
 
@@ -83,12 +88,17 @@ export const program = Effect.gen(function* () {
     SlackIntegrationConfig,
     makeSlackIntegrationConfig(config)
   );
+  const DiscordConfigLayer = Layer.succeed(
+    DiscordIntegrationConfig,
+    makeDiscordIntegrationConfig(config)
+  );
 
   const ServiceLayers = makeServiceLayers({
     config,
     externalResourceService: externalResources,
     gitHubConfigLayer: GitHubConfigLayer,
     integrationRuntime,
+    discordConfigLayer: DiscordConfigLayer,
     slackConfigLayer: SlackConfigLayer,
     workflowLayer: WorkFlowLayer,
   });
@@ -143,8 +153,7 @@ export const main = program.pipe(
       SentryLiveLayer,
       Database.DatabaseContextLive,
       WebhookIntegrationConfig.layer,
-      NodeCrypto.layer,
-      DiscordIntegrationConfig.layer
+      NodeCrypto.layer
     )
   )
 );

@@ -13,7 +13,6 @@ import { CommentRpcHandlers } from "./comments/handlers";
 import { CompanyRpcHandlers } from "./company/handlers";
 import { ContactRpcHandlers } from "./contact/handlers";
 import { EmailSubscriptionRpcHandlers } from "./email-subscription/handlers";
-import { DiscordManagementRpcHandlers } from "./integration/discord/handlers";
 import { ExternalResourceRpcHandlers } from "./integration/external-resource/handlers";
 import { WebhookManagementRpcHandlers } from "./integration/handlers";
 import { JwtSecretRpcHandlers } from "./jwt-secret/handlers";
@@ -46,7 +45,6 @@ export const CoreRpcHandlers = Layer.mergeAll(
   PostRpcHandlers,
   PostActivityRpcHandlers,
   WebhookManagementRpcHandlers,
-  DiscordManagementRpcHandlers,
   ExternalResourceRpcHandlers
 );
 

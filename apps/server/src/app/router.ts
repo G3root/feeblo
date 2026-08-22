@@ -1,6 +1,8 @@
 import { makeClientIpGlobalMiddleware } from "@feeblo/domain/client-ip";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { makeRpcRoute } from "@feeblo/domain/rpc-router";
+import { DiscordManagementRpcHandlers } from "@feeblo/integration-discord/rpc-handlers";
+import { makeDiscordRouters } from "@feeblo/integration-discord/routers";
 import { makeGitHubRouters } from "@feeblo/integration-github/github-routers";
 import { GitHubManagementRpcHandlers } from "@feeblo/integration-github/github-rpc-handlers";
 import { SlackManagementRpcHandlers } from "@feeblo/integration-slack/rpc-handlers";
@@ -12,7 +14,6 @@ import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
 
 import type { ServerConfigValue } from "../config";
-import { makeDiscordRouters } from "../discord";
 import { bodySizeLimitMiddleware } from "../http/body-limit";
 import { makeIsAllowedOrigin } from "../http/cors";
 import {
@@ -63,7 +64,10 @@ export const makeMergedRoutes = ({
     publicRouters,
     HealthRouter,
     makeRpcRoute(
-      Layer.merge(GitHubManagementRpcHandlers, SlackManagementRpcHandlers)
+      Layer.merge(
+        GitHubManagementRpcHandlers,
+        Layer.merge(SlackManagementRpcHandlers, DiscordManagementRpcHandlers)
+      )
     ),
     HttpRoute,
     BetterAuthRouterLive,
@@ -72,7 +76,10 @@ export const makeMergedRoutes = ({
       appUrl,
       registry: integrationRuntime.registry,
     }),
-    makeDiscordRouters(integrationRuntime.registry),
+    makeDiscordRouters({
+      appUrl,
+      registry: integrationRuntime.registry,
+    }),
     makeGitHubRouters({ appUrl, registry: integrationRuntime.registry }),
     makeSesEmailFeedbackRouter()
   );

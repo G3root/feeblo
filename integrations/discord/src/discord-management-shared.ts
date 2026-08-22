@@ -8,8 +8,8 @@ import * as Effect from "effect/Effect";
 import type * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
-import { InternalServerError } from "../../rpc-errors";
-import { DiscordIntegrationErrors } from "./errors";
+import { InternalServerError } from "@feeblo/domain/rpc-errors";
+import { DiscordIntegrationErrors } from "@feeblo/domain/integration/discord/errors";
 
 /**
  * Shared helpers for the Discord management services: connection row lookups

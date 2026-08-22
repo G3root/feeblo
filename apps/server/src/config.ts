@@ -76,6 +76,29 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       const slackOauthRedirectUrl = yield* Config.string(
         "SLACK_OAUTH_REDIRECT_URL"
       ).pipe(Config.option, Effect.map(Option.getOrUndefined));
+      // Discord App credentials are optional; the integration only registers
+      // when the client id, client secret, bot token, and public key are set.
+      const discordClientId = yield* Config.string("DISCORD_CLIENT_ID").pipe(
+        Config.option,
+        Effect.map(Option.getOrUndefined)
+      );
+      const discordClientSecret = yield* Config.redacted(
+        "DISCORD_CLIENT_SECRET"
+      ).pipe(
+        Config.option,
+        Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
+      );
+      const discordBotToken = yield* Config.redacted("DISCORD_BOT_TOKEN").pipe(
+        Config.option,
+        Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
+      );
+      const discordPublicKey = yield* Config.string("DISCORD_PUBLIC_KEY").pipe(
+        Config.option,
+        Effect.map(Option.getOrUndefined)
+      );
+      const discordOauthRedirectUrl = yield* Config.string(
+        "DISCORD_OAUTH_REDIRECT_URL"
+      ).pipe(Config.option, Effect.map(Option.getOrUndefined));
       // Outbound-webhook security configuration (encryption key and egress
       // policy) is owned by WebhookIntegrationConfig in the domain package.
       const integrationConnectionConcurrency = yield* Config.schema(
@@ -142,6 +165,11 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         sentryDsn,
         sentryEnvironment,
         sentryTracesSampleRate,
+        discordBotToken,
+        discordClientId,
+        discordClientSecret,
+        discordOauthRedirectUrl,
+        discordPublicKey,
         slackClientId,
         slackClientSecret,
         slackOauthRedirectUrl,

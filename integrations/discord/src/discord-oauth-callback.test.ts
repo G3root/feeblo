@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseDiscordOAuthCallbackUrl } from "./oauth-callback";
+import { parseDiscordOAuthCallbackUrl } from "./discord-oauth-callback";
 
 describe("parseDiscordOAuthCallbackUrl", () => {
   it("parses code and state from the relative callback path", () => {

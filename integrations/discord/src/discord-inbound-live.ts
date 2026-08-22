@@ -15,8 +15,8 @@ import * as EffectArray from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { BoardRepository } from "../../board/repository";
-import { EmailOutboxConfig } from "../../email-outbox/config";
+import { BoardRepository } from "@feeblo/domain/board/repository";
+import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
 import { DiscordFeedbackService } from "./discord-feedback-service";
 import {
   buildDeferredUpdate,
@@ -28,11 +28,11 @@ import {
   readModalValue,
 } from "./discord-modals";
 import { DiscordUserService } from "./discord-user-service";
-import { DiscordInboundFailure } from "./errors";
+import { DiscordInboundFailure } from "@feeblo/domain/integration/discord/errors";
 import {
   type DiscordInboundHttpResponse,
   DiscordInboundService,
-} from "./inbound-service";
+} from "@feeblo/domain/integration/discord/inbound-service";
 
 const TITLE_INPUT_MAX = 200;
 

@@ -14,16 +14,16 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { EmailOutboxConfig } from "../../email-outbox/config";
-import { recordPostIntegrationEvent } from "../../integration/post-event-recording";
-import { PostStatusRepository } from "../../post-status/repository";
-import { PostSubscriptionRepository } from "../../post-subscription/repository";
+import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
+import { recordPostIntegrationEvent } from "@feeblo/domain/integration/post-event-recording";
+import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
+import { PostSubscriptionRepository } from "@feeblo/domain/post-subscription/repository";
 import {
   PostEmbeddingService,
   schedulePostEmbeddingBestEffort,
-} from "../../post/embedding-service";
-import { PostRepository } from "../../post/repository";
-import { DiscordInboundFailure } from "./errors";
+} from "@feeblo/domain/post/embedding-service";
+import { PostRepository } from "@feeblo/domain/post/repository";
+import { DiscordInboundFailure } from "@feeblo/domain/integration/discord/errors";
 
 /** A feedback post created from an inbound Discord submission. */
 export interface DiscordPost {

@@ -6,7 +6,7 @@ import {
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { DiscordIntegrationConfig } from "./config";
+import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import {
   DiscordChannelService,
   makeDiscordChannelServiceLive,
@@ -15,7 +15,7 @@ import {
   DiscordConnectionService,
   makeDiscordConnectionServiceLive,
 } from "./discord-connection-service";
-import { DiscordManagementService } from "./management-service";
+import { DiscordManagementService } from "@feeblo/domain/integration/discord/management-service";
 
 /**
  * Composes the connection lifecycle and channel services behind the single

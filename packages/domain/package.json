@@ -154,17 +154,8 @@
     "./integration/discord/errors": {
       "default": "./src/integration/discord/errors.ts"
     },
-    "./integration/discord/handlers": {
-      "default": "./src/integration/discord/handlers.ts"
-    },
-    "./integration/discord/inbound-live": {
-      "default": "./src/integration/discord/inbound-live.ts"
-    },
     "./integration/discord/inbound-service": {
       "default": "./src/integration/discord/inbound-service.ts"
-    },
-    "./integration/discord/management-live": {
-      "default": "./src/integration/discord/management-live.ts"
     },
     "./integration/discord/management-service": {
       "default": "./src/integration/discord/management-service.ts"
@@ -441,7 +432,6 @@
     "@feeblo/domain-contracts": "workspace:*",
     "@feeblo/id": "workspace:*",
     "@feeblo/integration-core": "workspace:*",
-    "@feeblo/integration-discord": "workspace:*",
     "@feeblo/integration-webhook": "workspace:*",
     "@feeblo/permissions": "workspace:*",
     "@feeblo/transactional": "workspace:*",
