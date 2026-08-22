@@ -16,7 +16,6 @@ import { EmailSubscriptionRpcHandlers } from "./email-subscription/handlers";
 import { DiscordManagementRpcHandlers } from "./integration/discord/handlers";
 import { ExternalResourceRpcHandlers } from "./integration/external-resource/handlers";
 import { WebhookManagementRpcHandlers } from "./integration/handlers";
-import { SlackManagementRpcHandlers } from "./integration/slack/handlers";
 import { JwtSecretRpcHandlers } from "./jwt-secret/handlers";
 import { MembershipRpcHandlers } from "./membership/handlers";
 import { NotificationRpcHandlers } from "./notification/handlers";
@@ -47,7 +46,6 @@ export const CoreRpcHandlers = Layer.mergeAll(
   PostRpcHandlers,
   PostActivityRpcHandlers,
   WebhookManagementRpcHandlers,
-  SlackManagementRpcHandlers,
   DiscordManagementRpcHandlers,
   ExternalResourceRpcHandlers
 );

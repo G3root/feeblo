@@ -31,10 +31,10 @@ import {
   BadRequestError,
   InternalServerError,
   NotFoundError,
-} from "../../rpc-errors";
-import { SlackIntegrationConfig } from "./config";
-import type { SlackIntegrationError } from "./errors";
-import type * as S from "./schema";
+} from "@feeblo/domain/rpc-errors";
+import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
+import type { SlackIntegrationError } from "@feeblo/domain/integration/slack/errors";
+import type * as S from "@feeblo/domain/integration/slack/schema";
 import {
   decryptConnectionCredentials,
   lockSlackConnection,

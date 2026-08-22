@@ -13,7 +13,7 @@ import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord";
 import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
 import { ExternalResourceService } from "@feeblo/domain/integration/external-resource/service";
-import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack";
+import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import { Mailer } from "@feeblo/transactional/mailer";
 import {
   makeMailerTestLayer,
@@ -33,6 +33,7 @@ import {
   makeGitHubConfigLayer,
   makeRateLimitLayer,
   makeServiceLayers,
+  makeSlackIntegrationConfig,
   makeWorkflowLayer,
 } from "./layers";
 import {
@@ -70,16 +71,25 @@ export const program = Effect.gen(function* () {
 
   const integrationRuntime = yield* makeIntegrationLayers.pipe(
     Effect.provideService(ServerConfig, config),
+    Effect.provideService(
+      SlackIntegrationConfig,
+      makeSlackIntegrationConfig(config)
+    ),
     Effect.provideService(ExternalResourceService, externalResources)
   );
 
   const GitHubConfigLayer = makeGitHubConfigLayer(config);
+  const SlackConfigLayer = Layer.succeed(
+    SlackIntegrationConfig,
+    makeSlackIntegrationConfig(config)
+  );
 
   const ServiceLayers = makeServiceLayers({
     config,
     externalResourceService: externalResources,
     gitHubConfigLayer: GitHubConfigLayer,
     integrationRuntime,
+    slackConfigLayer: SlackConfigLayer,
     workflowLayer: WorkFlowLayer,
   });
 
@@ -134,7 +144,6 @@ export const main = program.pipe(
       Database.DatabaseContextLive,
       WebhookIntegrationConfig.layer,
       NodeCrypto.layer,
-      SlackIntegrationConfig.layer,
       DiscordIntegrationConfig.layer
     )
   )

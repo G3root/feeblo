@@ -14,10 +14,10 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-import { InternalServerError, NotFoundError } from "../../rpc-errors";
-import { SlackIntegrationConfig } from "./config";
-import type { SlackIntegrationError } from "./errors";
-import type * as S from "./schema";
+import { InternalServerError, NotFoundError } from "@feeblo/domain/rpc-errors";
+import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
+import type { SlackIntegrationError } from "@feeblo/domain/integration/slack/errors";
+import type * as S from "@feeblo/domain/integration/slack/schema";
 import {
   decryptConnectionCredentials,
   findSlackConnection,

@@ -44,7 +44,7 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         Config.option,
         Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
       );
-      const githubEncryptionKey = yield* Config.redacted(
+      const integrationEncryptionKey = yield* Config.redacted(
         "INTEGRATION_ENCRYPTION_KEY"
       ).pipe(
         Config.option,
@@ -55,6 +55,27 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
           })
         )
       );
+      // Slack App credentials are optional; the integration only registers
+      // when the client id, client secret, and signing secret are all set.
+      const slackClientId = yield* Config.string("SLACK_CLIENT_ID").pipe(
+        Config.option,
+        Effect.map(Option.getOrUndefined)
+      );
+      const slackClientSecret = yield* Config.redacted(
+        "SLACK_CLIENT_SECRET"
+      ).pipe(
+        Config.option,
+        Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
+      );
+      const slackSigningSecret = yield* Config.redacted(
+        "SLACK_SIGNING_SECRET"
+      ).pipe(
+        Config.option,
+        Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
+      );
+      const slackOauthRedirectUrl = yield* Config.string(
+        "SLACK_OAUTH_REDIRECT_URL"
+      ).pipe(Config.option, Effect.map(Option.getOrUndefined));
       // Outbound-webhook security configuration (encryption key and egress
       // policy) is owned by WebhookIntegrationConfig in the domain package.
       const integrationConnectionConcurrency = yield* Config.schema(
@@ -111,7 +132,7 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         githubAppSlug,
         githubClientId,
         githubClientSecret,
-        githubEncryptionKey,
+        integrationEncryptionKey,
         githubPrivateKey,
         githubWebhookSecret,
         integrationConnectionConcurrency,
@@ -121,6 +142,10 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         sentryDsn,
         sentryEnvironment,
         sentryTracesSampleRate,
+        slackClientId,
+        slackClientSecret,
+        slackOauthRedirectUrl,
+        slackSigningSecret,
       } as const;
     }),
   }

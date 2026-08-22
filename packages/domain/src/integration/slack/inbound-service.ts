@@ -1,7 +1,7 @@
 import type {
   SlackInteractivePayload,
   SlackSlashCommandPayload,
-} from "@feeblo/integration-slack/inbound-schema";
+} from "@feeblo/domain-contracts/slack-inbound";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 

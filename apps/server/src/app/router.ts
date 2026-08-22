@@ -3,6 +3,8 @@ import { HttpRoute } from "@feeblo/domain/http/router";
 import { makeRpcRoute } from "@feeblo/domain/rpc-router";
 import { makeGitHubRouters } from "@feeblo/integration-github/github-routers";
 import { GitHubManagementRpcHandlers } from "@feeblo/integration-github/github-rpc-handlers";
+import { SlackManagementRpcHandlers } from "@feeblo/integration-slack/rpc-handlers";
+import { makeSlackRouters } from "@feeblo/integration-slack/routers";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
 import * as Layer from "effect/Layer";
 import type * as Ref from "effect/Ref";
@@ -28,7 +30,6 @@ import {
 import { serverTimingMiddleware } from "../http/server-timing";
 import { makeSesEmailFeedbackRouter } from "../http/ses";
 import type { IntegrationRuntime } from "../integrations";
-import { makeSlackRouters } from "../slack";
 
 export const makePublicRouters = (
   mailbox: Ref.Ref<TestMailerState> | undefined,
@@ -61,11 +62,16 @@ export const makeMergedRoutes = ({
   Layer.mergeAll(
     publicRouters,
     HealthRouter,
-    makeRpcRoute(GitHubManagementRpcHandlers),
+    makeRpcRoute(
+      Layer.merge(GitHubManagementRpcHandlers, SlackManagementRpcHandlers)
+    ),
     HttpRoute,
     BetterAuthRouterLive,
     DocsRoute,
-    makeSlackRouters(integrationRuntime.registry),
+    makeSlackRouters({
+      appUrl,
+      registry: integrationRuntime.registry,
+    }),
     makeDiscordRouters(integrationRuntime.registry),
     makeGitHubRouters({ appUrl, registry: integrationRuntime.registry }),
     makeSesEmailFeedbackRouter()

@@ -21,13 +21,12 @@ import {
   type ExternalResourceServiceContract,
 } from "@feeblo/domain/integration/external-resource/service";
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
-import {
-  SlackFeedbackServiceLive,
-  SlackInboundServiceLive,
-  SlackIntegrationConfig,
-  SlackManagementServiceLive,
-  SlackUserServiceLive,
-} from "@feeblo/domain/integration/slack";
+import { SlackInboundServiceLive } from "@feeblo/integration-slack/inbound-live";
+import { SlackManagementServiceLive } from "@feeblo/integration-slack/management-live";
+import { SLACK_OAUTH_SCOPES } from "@feeblo/integration-slack/manifest";
+import { SlackFeedbackServiceLive } from "@feeblo/integration-slack/slack-feedback-service";
+import { SlackUserServiceLive } from "@feeblo/integration-slack/slack-user-service";
+import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import { NotificationService } from "@feeblo/domain/notification/service";
 import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
 import { PostSubscriptionRepository } from "@feeblo/domain/post-subscription/repository";
@@ -70,6 +69,38 @@ export const makeGitHubConfigLayer = (
         Redacted.value(config.githubWebhookSecret) !== "",
     })
   );
+
+/** Builds the Slack integration configuration values from the server environment. */
+export const makeSlackIntegrationConfig = (config: ServerConfigValue) => {
+  const trailingSlashPattern = /\/$/;
+  const appUrlValue = config.appUrl.replace(trailingSlashPattern, "");
+  const apiUrlValue = config.apiUrl.replace(trailingSlashPattern, "");
+  const clientId = config.slackClientId ?? "";
+  const clientSecret = config.slackClientSecret;
+  const signingSecret = config.slackSigningSecret;
+  return SlackIntegrationConfig.of({
+    appUrl: appUrlValue,
+    authorizeScopes: SLACK_OAUTH_SCOPES,
+    clientId,
+    clientSecret,
+    // The provider is only exposed when its OAuth client id, client
+    // secret, and request signing secret are all configured; otherwise
+    // the server runs without the Slack integration.
+    configured:
+      clientId !== "" &&
+      Redacted.value(clientSecret) !== "" &&
+      Redacted.value(signingSecret) !== "",
+    encryptionKey: config.integrationEncryptionKey,
+    oauthRedirectUrl:
+      config.slackOauthRedirectUrl ?? `${apiUrlValue}/slack/oauth/callback`,
+    signingSecret,
+  });
+};
+
+export const makeSlackConfigLayer = (
+  config: ServerConfigValue
+): Layer.Layer<SlackIntegrationConfig> =>
+  Layer.succeed(SlackIntegrationConfig, makeSlackIntegrationConfig(config));
 
 export const makeRateLimitLayer = (
   config: ServerConfigValue,
@@ -125,6 +156,7 @@ export const makeServiceLayers = ({
   externalResourceService,
   gitHubConfigLayer,
   integrationRuntime,
+  slackConfigLayer,
   workflowLayer,
 }: {
   readonly config: ServerConfigValue;
@@ -132,6 +164,7 @@ export const makeServiceLayers = ({
   readonly externalResourceService: ExternalResourceServiceContract;
   readonly gitHubConfigLayer: Layer.Layer<GitHubIntegrationConfig>;
   readonly integrationRuntime: IntegrationRuntime;
+  readonly slackConfigLayer: Layer.Layer<SlackIntegrationConfig>;
   readonly workflowLayer: ReturnType<typeof makeWorkflowLayer>;
 }) => {
   const ExternalResources = Layer.succeed(
@@ -153,11 +186,11 @@ export const makeServiceLayers = ({
     integrationRuntime.layer,
     ExternalResources,
     SlackManagementServiceLive.pipe(
-      Layer.provide(SlackIntegrationConfig.layer),
+      Layer.provide(slackConfigLayer),
       Layer.provide(Database.DatabaseContextLive)
     ),
     SlackInboundServiceLive.pipe(
-      Layer.provide(SlackIntegrationConfig.layer),
+      Layer.provide(slackConfigLayer),
       Layer.provide(SlackUserServiceLive),
       Layer.provide(SlackFeedbackServiceLive),
       Layer.provide(BoardRepository.layer),
@@ -192,7 +225,7 @@ export const makeServiceLayers = ({
           githubClientId: config.githubClientId,
           githubClientSecret: config.githubClientSecret,
           githubPrivateKey: config.githubPrivateKey,
-          githubEncryptionKey: config.githubEncryptionKey,
+          githubEncryptionKey: config.integrationEncryptionKey,
         }).pipe(
           Layer.provide(gitHubConfigLayer),
           Layer.provide(Database.DatabaseContextLive)

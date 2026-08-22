@@ -19,14 +19,14 @@ import * as Option from "effect/Option";
 import type * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
-import { BoardRepository } from "../../board/repository";
-import { EmailOutboxConfig } from "../../email-outbox/config";
-import { SlackIntegrationConfig } from "./config";
-import { SlackInboundFailure } from "./errors";
+import { BoardRepository } from "@feeblo/domain/board/repository";
+import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
+import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
+import { SlackInboundFailure } from "@feeblo/domain/integration/slack/errors";
 import {
   type SlackInboundHttpResponse,
   SlackInboundService,
-} from "./inbound-service";
+} from "@feeblo/domain/integration/slack/inbound-service";
 import { SlackFeedbackService } from "./slack-feedback-service";
 import {
   buildFeedbackModal,

@@ -7,16 +7,16 @@ import {
   type SlackConversation,
   SlackOAuthState,
 } from "@feeblo/integration-slack";
-import { slackProviderKey } from "@feeblo/integration-slack/manifest";
+import { slackProviderKey, SLACK_OAUTH_SCOPES } from "@feeblo/integration-slack/manifest";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
-import { SlackIntegrationConfig } from "./config";
-import { makeSlackManagementServiceLive } from "./management-live";
-import { SlackManagementService } from "./management-service";
+import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
+import { makeSlackManagementServiceLive } from "./slack-management-live";
+import { SlackManagementService } from "@feeblo/domain/integration/slack/management-service";
 
 /** Fake Slack API client; captures calls and answers with canned data. */
 const makeFakeSlackApiClient = (
@@ -125,13 +125,19 @@ const makeFakeSlackApiClient = (
 };
 
 const testConfig = (configured = true) =>
-  SlackIntegrationConfig.layerTest({
-    clientId: "client-id",
-    clientSecret: Redacted.make("client-secret"),
-    configured,
-    oauthRedirectUrl: "http://localhost:3000/slack/oauth/callback",
-    signingSecret: Redacted.make("signing-secret"),
-  });
+  Layer.succeed(
+    SlackIntegrationConfig,
+    SlackIntegrationConfig.of({
+      appUrl: "http://localhost:3001",
+      authorizeScopes: SLACK_OAUTH_SCOPES,
+      clientId: "client-id",
+      clientSecret: Redacted.make("client-secret"),
+      configured,
+      encryptionKey: Redacted.make("0123456789abcdef0123456789abcdef"),
+      oauthRedirectUrl: "http://localhost:3000/slack/oauth/callback",
+      signingSecret: Redacted.make("signing-secret"),
+    })
+  );
 
 const makeTestLayer = (
   channelPages?: readonly (readonly SlackConversation[])[],

@@ -12,7 +12,7 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import type * as Redacted from "effect/Redacted";
 
-import { SlackInboundFailure } from "./errors";
+import { SlackInboundFailure } from "@feeblo/domain/integration/slack/errors";
 
 const SYNTHETIC_SLACK_EMAIL_SUFFIX = "@slack.invalid";
 

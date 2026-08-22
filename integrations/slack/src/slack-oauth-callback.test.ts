@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseSlackOAuthCallbackUrl } from "./oauth-callback";
+import { parseSlackOAuthCallbackUrl } from "./slack-oauth-callback";
 
 describe("parseSlackOAuthCallbackUrl", () => {
   it("parses code and state from the relative callback path", () => {

@@ -1,11 +1,7 @@
 import { Database } from "@feeblo/db";
-import {
-  parseSlackOAuthCallbackUrl,
-  SlackInboundService,
-  type SlackInboundServiceContract,
-  SlackIntegrationConfig,
-  SlackManagementService,
-} from "@feeblo/domain/integration/slack";
+import { SlackInboundService } from "@feeblo/domain/integration/slack/inbound-service";
+import type { SlackInboundServiceContract } from "@feeblo/domain/integration/slack/inbound-service";
+import { SlackManagementService } from "@feeblo/domain/integration/slack/management-service";
 import {
   type IntegrationInboundCapabilityHandler,
   IntegrationInboundRejection,
@@ -17,18 +13,20 @@ import {
   inboundHttpResponse,
   settingsRedirect,
 } from "@feeblo/integration-core/http-inbound";
-import { ParsedSlackInboundRequest } from "@feeblo/integration-slack/inbound-schema";
-import {
-  slackCommandsCapabilityKey,
-  slackMessageActionCapabilityKey,
-  slackProviderKey,
-} from "@feeblo/integration-slack/manifest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
+
+import { ParsedSlackInboundRequest } from "./slack-inbound-schema";
+import {
+  slackCommandsCapabilityKey,
+  slackMessageActionCapabilityKey,
+  slackProviderKey,
+} from "./slack-manifest";
+import { parseSlackOAuthCallbackUrl } from "./slack-oauth-callback";
 
 /**
  * Slack HTTP surface: the OAuth callback, the `/feeblo` slash command, and
@@ -121,11 +119,9 @@ const makeSlackInteractiveRouter = (registry: IntegrationProviderRegistry) =>
   );
 
 /** OAuth callback router; completes the install and redirects to the dashboard settings page. */
-export const makeSlackOAuthCallbackRouter = () =>
+export const makeSlackOAuthCallbackRouter = (appUrl: string) =>
   HttpRouter.use((router) =>
     Effect.gen(function* () {
-      // Captured once at construction; the config is immutable.
-      const config = yield* SlackIntegrationConfig;
       return yield* router.add(
         "GET",
         "/slack/oauth/callback",
@@ -139,7 +135,7 @@ export const makeSlackOAuthCallbackRouter = () =>
             if (error !== null) {
               return HttpServerResponse.redirect(
                 settingsRedirect({
-                  appUrl: config.appUrl,
+                  appUrl,
                   message: "Slack installation was cancelled or denied.",
                   provider: "slack",
                   status: "error",
@@ -149,7 +145,7 @@ export const makeSlackOAuthCallbackRouter = () =>
             if (code === null || state === null) {
               return HttpServerResponse.redirect(
                 settingsRedirect({
-                  appUrl: config.appUrl,
+                  appUrl,
                   message: "Slack installation failed.",
                   provider: "slack",
                   status: "error",
@@ -163,7 +159,7 @@ export const makeSlackOAuthCallbackRouter = () =>
             if (Exit.isFailure(completed)) {
               return HttpServerResponse.redirect(
                 settingsRedirect({
-                  appUrl: config.appUrl,
+                  appUrl,
                   message: "Slack installation failed.",
                   provider: "slack",
                   status: "error",
@@ -172,7 +168,7 @@ export const makeSlackOAuthCallbackRouter = () =>
             }
             return HttpServerResponse.redirect(
               settingsRedirect({
-                appUrl: config.appUrl,
+                appUrl,
                 message: "Feeblo is now connected to Slack.",
                 organizationId: completed.value.organizationId,
                 provider: "slack",
@@ -185,13 +181,24 @@ export const makeSlackOAuthCallbackRouter = () =>
   ).pipe(Layer.provide(Database.DatabaseContextLive), Layer.orDie);
 
 /**
- * Complete Slack HTTP surface. The routers provide their own service layers
- * (management, inbound, repositories, database) so the composition root only
- * has to hand over the provider registry.
+ * Server HTTP adapters for the Slack OAuth callback and its interactive
+ * endpoints. Built by the composition root so the provider package never
+ * depends on server configuration (see docs/adr/0002).
  */
-export const makeSlackRouters = (registry: IntegrationProviderRegistry) =>
+export interface SlackRoutersInput {
+  /** Dashboard base URL used for post-installation redirects. */
+  readonly appUrl: string;
+  readonly registry: IntegrationProviderRegistry;
+}
+
+/**
+ * Complete Slack HTTP surface. The routers provide their own database context;
+ * management and inbound services are supplied by the composition root's
+ * service layers.
+ */
+export const makeSlackRouters = (input: SlackRoutersInput) =>
   Layer.mergeAll(
-    makeSlackOAuthCallbackRouter(),
-    makeSlackCommandRouter(registry),
-    makeSlackInteractiveRouter(registry)
+    makeSlackOAuthCallbackRouter(input.appUrl),
+    makeSlackCommandRouter(input.registry),
+    makeSlackInteractiveRouter(input.registry)
   ).pipe(Layer.orDie);

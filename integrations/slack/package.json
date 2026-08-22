@@ -5,26 +5,39 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./manifest": "./src/slack-manifest.ts",
-    "./signature": "./src/slack-signature.ts",
     "./credentials": "./src/slack-credentials.ts",
-    "./blocks": "./src/slack-blocks.ts",
+    "./inbound-live": {
+      "default": "./src/slack-inbound-live.ts"
+    },
     "./inbound-schema": "./src/slack-inbound-schema.ts",
-    "./provider-registration": "./src/slack-provider-registration.ts"
+    "./management-live": {
+      "default": "./src/slack-management-live.ts"
+    },
+    "./manifest": "./src/slack-manifest.ts",
+    "./provider-registration": "./src/slack-provider-registration.ts",
+    "./rpc-handlers": "./src/slack-rpc-handlers.ts",
+    "./routers": "./src/slack-routers.ts",
+    "./signature": "./src/slack-signature.ts",
+    "./slack-feedback-service": "./src/slack-feedback-service.ts",
+    "./slack-user-service": "./src/slack-user-service.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
+    "@feeblo/db": "workspace:*",
+    "@feeblo/domain": "workspace:*",
+    "@feeblo/domain-contracts": "workspace:*",
+    "@feeblo/id": "workspace:*",
     "@feeblo/integration-core": "workspace:*",
     "@feeblo/utils": "workspace:*",
+    "drizzle-orm": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@feeblo/config": "workspace:*",
-    "@feeblo/id": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

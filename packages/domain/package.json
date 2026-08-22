@@ -244,17 +244,8 @@
     "./integration/slack/errors": {
       "default": "./src/integration/slack/errors.ts"
     },
-    "./integration/slack/handlers": {
-      "default": "./src/integration/slack/handlers.ts"
-    },
-    "./integration/slack/inbound-live": {
-      "default": "./src/integration/slack/inbound-live.ts"
-    },
     "./integration/slack/inbound-service": {
       "default": "./src/integration/slack/inbound-service.ts"
-    },
-    "./integration/slack/management-live": {
-      "default": "./src/integration/slack/management-live.ts"
     },
     "./integration/slack/management-service": {
       "default": "./src/integration/slack/management-service.ts"
@@ -339,6 +330,9 @@
     },
     "./post-subscription/schema": {
       "default": "./src/post-subscription/schema.ts"
+    },
+    "./post/embedding-service": {
+      "default": "./src/post/embedding-service.ts"
     },
     "./post/repository": {
       "default": "./src/post/repository.ts"
@@ -448,7 +442,6 @@
     "@feeblo/id": "workspace:*",
     "@feeblo/integration-core": "workspace:*",
     "@feeblo/integration-discord": "workspace:*",
-    "@feeblo/integration-slack": "workspace:*",
     "@feeblo/integration-webhook": "workspace:*",
     "@feeblo/permissions": "workspace:*",
     "@feeblo/transactional": "workspace:*",
