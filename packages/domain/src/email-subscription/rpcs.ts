@@ -8,6 +8,9 @@ import { InternalServerError } from "../rpc-errors";
 import { AuthMiddleware } from "../session-middleware";
 import {
   ChangelogSubscriptionRequest,
+  ChangelogSubscriptionSetRequest,
+  ChangelogSubscriptionStateAccepted,
+  ChangelogSubscriptionStatusRequest,
   EmailSubscriptionRequestAccepted,
   EmailSubscriptionTokenRequest,
   EmailSubscriptionUnsubscribeAccepted,
@@ -39,6 +42,16 @@ export class EmailSubscriptionRpcs extends RpcGroup.make(
     success: EmailSubscriptionUnsubscribeAccepted,
     error: EmailSubscriptionPublicErrors,
   }).middleware(PublicRpcRateLimitMiddleware),
+  Rpc.make("EmailSubscriptionChangelogStatusGet", {
+    payload: ChangelogSubscriptionStatusRequest,
+    success: ChangelogSubscriptionStateAccepted,
+    error: EmailSubscriptionPublicErrors,
+  }).middleware(AuthMiddleware),
+  Rpc.make("EmailSubscriptionChangelogSubscribeSet", {
+    payload: ChangelogSubscriptionSetRequest,
+    success: ChangelogSubscriptionStateAccepted,
+    error: EmailSubscriptionPublicErrors,
+  }).middleware(AuthMiddleware),
   Rpc.make("EmailSubmissionNotificationPreferenceSet", {
     payload: SubmissionNotificationPreferenceRequest,
     success: SubmissionNotificationPreferenceAccepted,

@@ -24,6 +24,7 @@ import { EntitlementPolicy } from "../entitlement/policies";
 import { EmailOutboxConfig } from "./config";
 import {
   emailSubscriptionTopicForIntent,
+  isChangelogPubliclyVisible,
   makeSubmissionNotificationPayload,
   resolveSubscriptionNotificationContent,
 } from "./content";
@@ -654,6 +655,20 @@ const sendDeliveryAttempt = (deliveryId: string) =>
           })
         );
     };
+    // Queued deliveries may wait out throttles and retries; re-check the
+    // changelog read boundary as the last step before provider submission so
+    // content hidden after materialization is never emailed.
+    if (
+      emailSubscriptionTopicForIntent(intent.payload)?.topicType ===
+        "changelog" &&
+      !(yield* isChangelogPubliclyVisible(intent.organizationId))
+    ) {
+      yield* repository.markDeliveryOutcome({
+        id: delivery.id,
+        state: "suppressed",
+      });
+      return { _tag: "terminal" as const };
+    }
     const sent = yield* mailer
       .send({
         ...mailMessage,

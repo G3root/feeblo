@@ -134,6 +134,29 @@ export type ChangelogSubscriptionRequest = Schema.Schema.Type<
   typeof ChangelogSubscriptionRequest
 >;
 
+/** Authenticated status lookup for the current user's changelog subscription. */
+export const ChangelogSubscriptionStatusRequest = Schema.Struct({
+  organizationId: WorkspaceId.schema,
+});
+
+export type ChangelogSubscriptionStatusRequest = Schema.Schema.Type<
+  typeof ChangelogSubscriptionStatusRequest
+>;
+
+/** Authenticated toggle for the current user's changelog subscription. */
+export const ChangelogSubscriptionSetRequest = Schema.Struct({
+  organizationId: WorkspaceId.schema,
+  subscribed: Schema.Boolean,
+});
+
+export type ChangelogSubscriptionSetRequest = Schema.Schema.Type<
+  typeof ChangelogSubscriptionSetRequest
+>;
+
+export const ChangelogSubscriptionStateAccepted = Schema.Struct({
+  subscribed: Schema.Boolean,
+});
+
 /** Opaque token supplied by a public verification or unsubscribe link. */
 export const EmailSubscriptionTokenRequest = Schema.Struct({
   token: Schema.String.pipe(

@@ -2,7 +2,7 @@ import { currentDb, schema } from "@feeblo/db";
 import type { TNotificationEventType } from "@feeblo/db/validation-schema/notification-kind";
 import { NotificationId } from "@feeblo/id";
 import { isString } from "@feeblo/utils/runtime-kind";
-import { and, count, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -193,6 +193,81 @@ const makeNotificationService = Effect.gen(function* () {
           body: context.title,
           href: `/${organizationId}/post/${context.boardSlug}/${context.slug}`,
           deduplicationKey: `feedback.status_changed:${postId}:${statusChangedUuid}`,
+        });
+      }),
+
+    /**
+     * Notifies workspace members who subscribed to the changelog. Recipients
+     * resolve from subscriber user ids first, so a future end-user inbox can
+     * reuse that list before the member mapping; today only members receive
+     * in-app notifications.
+     */
+    notifyChangelogPublished: ({
+      actorMemberId,
+      changelogId,
+      changelogSlug,
+      organizationId,
+      title,
+    }: {
+      readonly actorMemberId?: string | null;
+      readonly changelogId: string;
+      readonly changelogSlug: string;
+      readonly organizationId: string;
+      readonly title: string;
+    }) =>
+      Effect.gen(function* () {
+        const subscriberUsers = yield* db
+          .selectDistinct({ userId: schema.emailContactTable.userId })
+          .from(schema.emailSubscriptionTable)
+          .innerJoin(
+            schema.emailContactTable,
+            eq(
+              schema.emailContactTable.id,
+              schema.emailSubscriptionTable.contactId
+            )
+          )
+          .where(
+            and(
+              eq(schema.emailSubscriptionTable.organizationId, organizationId),
+              eq(schema.emailSubscriptionTable.topicType, "changelog"),
+              isNull(schema.emailSubscriptionTable.topicId),
+              // paused_by_plan subscribers stay subscribed in-app; only email
+              // delivery is plan-gated.
+              inArray(schema.emailSubscriptionTable.state, [
+                "active",
+                "paused_by_plan",
+              ])
+            )
+          );
+        const userIds = subscriberUsers
+          .map((row) => row.userId)
+          .filter((userId): userId is string => isString(userId));
+
+        if (userIds.length === 0) {
+          return;
+        }
+
+        const members = yield* db
+          .select({ id: schema.memberTable.id })
+          .from(schema.memberTable)
+          .where(
+            and(
+              eq(schema.memberTable.organizationId, organizationId),
+              inArray(schema.memberTable.userId, userIds)
+            )
+          );
+
+        yield* create({
+          ...(actorMemberId === undefined ? undefined : { actorMemberId }),
+          organizationId,
+          recipientMemberIds: members.map((member) => member.id),
+          kind: "changelog.published",
+          resourceType: "changelog",
+          resourceId: changelogId,
+          title: "New changelog entry",
+          body: title,
+          href: `/${organizationId}/changelog/edit/${changelogSlug}`,
+          deduplicationKey: `changelog.published:${changelogId}`,
         });
       }),
 

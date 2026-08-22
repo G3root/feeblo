@@ -492,6 +492,37 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     }
   );
 
+  /** Authenticated topic lookup used for toggle-button subscription state. */
+  const findAuthenticatedSubscription = Effect.fn(
+    "EmailSubscriptionRepository.findAuthenticatedSubscription"
+  )(function* ({
+    organizationId,
+    topic,
+    userId,
+  }: {
+    readonly organizationId: string;
+    readonly topic: EmailSubscriptionTopicInput;
+    readonly userId: string;
+  }) {
+    const [row] = yield* db
+      .select({ state: schema.emailSubscriptionTable.state })
+      .from(schema.emailSubscriptionTable)
+      .innerJoin(
+        schema.emailContactTable,
+        eq(schema.emailContactTable.id, schema.emailSubscriptionTable.contactId)
+      )
+      .where(
+        and(
+          eq(schema.emailSubscriptionTable.organizationId, organizationId),
+          topicCondition(schema.emailSubscriptionTable, topic),
+          eq(schema.emailContactTable.organizationId, organizationId),
+          eq(schema.emailContactTable.userId, userId)
+        )
+      )
+      .limit(1);
+    return row ?? null;
+  });
+
   /** Authenticated topic unsubscribe; it never accepts a bearer token. */
   const unsubscribeAuthenticatedSubscription = Effect.fn(
     "EmailSubscriptionRepository.unsubscribeAuthenticatedSubscription"
@@ -683,6 +714,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
   return {
     deriveLinkToken,
     configureSubmissionNotificationRecipient,
+    findAuthenticatedSubscription,
     findSubscription,
     isSuppressed,
     requestSubscription,

@@ -17,11 +17,15 @@ import {
 import { RateLimitService } from "../rate-limit/service";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
+import { SitePolicy } from "../site/policies";
+import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { EmailSubscriptionRepository } from "./repository";
 import { EmailSubscriptionRpcs } from "./rpcs";
 import {
   type ChangelogSubscriptionRequest,
+  type ChangelogSubscriptionSetRequest,
+  type ChangelogSubscriptionStatusRequest,
   type EmailSubscriptionDataError,
   type EmailSubscriptionInputError,
   type EmailSubscriptionTokenRequest,
@@ -159,6 +163,7 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   const consent = yield* EmailSubscriptionConsentHandlersEffect;
   const entitlementPolicy = yield* EntitlementPolicy;
   const repository = yield* EmailSubscriptionRepository;
+  const sitePolicy = yield* SitePolicy;
 
   const internalConsentFailure = (
     error:
@@ -183,6 +188,9 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       organizationId,
     }: ChangelogSubscriptionRequest) =>
       consent.requestChangelogSubscription({ email, organizationId }).pipe(
+        // Public reads gate on changelog visibility; subscriptions must not
+        // leak hidden entries to outside addresses either.
+        Policy.withPublicPolicy(sitePolicy.canViewChangelog(organizationId)),
         Effect.map(({ verificationRequired }) => ({ verificationRequired })),
         Effect.catchTags({
           EmailOutboxDataError: internalConsentFailure,
@@ -206,6 +214,77 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       consent.verifySubscription({ verificationToken: token }).pipe(
         Effect.catchTags({
           EmailSubscriptionDataError: internalConsentFailure,
+          EmailSubscriptionTokenError: internalConsentFailure,
+        }),
+        withRemapDbErrors("EmailSubscription", "update")
+      ),
+    EmailSubscriptionChangelogStatusGet: ({
+      organizationId,
+    }: ChangelogSubscriptionStatusRequest) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const subscription = yield* repository.findAuthenticatedSubscription({
+          organizationId,
+          topic: { topicId: null, topicType: "changelog" },
+          userId: session.session.userId,
+        });
+        return {
+          subscribed:
+            subscription !== null && subscription.state !== "unsubscribed",
+        };
+      }).pipe(
+        Policy.withPolicy(
+          Policy.all(
+            Policy.hasRestrictedOrganizationScope(organizationId),
+            sitePolicy.canViewChangelog(organizationId)
+          )
+        ),
+        withRemapDbErrors("EmailSubscription", "select")
+      ),
+    EmailSubscriptionChangelogSubscribeSet: ({
+      organizationId,
+      subscribed,
+    }: ChangelogSubscriptionSetRequest) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        // Subscribing is available on every plan; only subscriber email
+        // delivery is plan-gated (enforced when intents materialize). The
+        // account email is already verified, so subscribing activates
+        // immediately without the double opt-in round trip.
+        const now = yield* DateTime.nowAsDate;
+        if (subscribed) {
+          yield* transaction(
+            repository.requestSubscription({
+              alreadyVerifiedUser: { userId: session.session.userId },
+              email: session.user.email,
+              now,
+              organizationId,
+              source: "explicit",
+              topic: { topicId: null, topicType: "changelog" },
+              verificationExpiresAt: null,
+            })
+          );
+        } else {
+          yield* transaction(
+            repository.unsubscribeAuthenticatedSubscription({
+              now,
+              organizationId,
+              topic: { topicId: null, topicType: "changelog" },
+              userId: session.session.userId,
+            })
+          );
+        }
+        return { subscribed };
+      }).pipe(
+        Policy.withPolicy(
+          Policy.all(
+            Policy.hasRestrictedOrganizationScope(organizationId),
+            sitePolicy.canViewChangelog(organizationId)
+          )
+        ),
+        Effect.catchTags({
+          EmailSubscriptionDataError: internalConsentFailure,
+          EmailSubscriptionInputError: internalConsentFailure,
           EmailSubscriptionTokenError: internalConsentFailure,
         }),
         withRemapDbErrors("EmailSubscription", "update")
@@ -271,6 +350,8 @@ export const EmailSubscriptionRpcHandlers = EmailSubscriptionRpcs.toLayer(
 ).pipe(
   Layer.provide(EmailSubscriptionRepository.layer),
   Layer.provide(EmailOutboxRepository.layer),
+  Layer.provide(SitePolicy.layer),
+  Layer.provide(SiteRepository.layer),
   Layer.provide(
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   )

@@ -68,7 +68,10 @@ describe("plan feature catalog", () => {
       { key: "roadmap", label: "Roadmap" },
       { key: "changelog", label: "Changelog" },
       { key: "integrations", label: "Integrations" },
-      { key: "subscriberEmails", label: "Subscriber Emails" },
+      {
+        key: "subscriberEmails",
+        label: "Subscriber Email Notifications",
+      },
       { key: "unlimitedEndUsers", label: "Unlimited End Users" },
       { key: "unlimitedPosts", label: "Unlimited Posts" },
       { key: "privateBoards", label: "Private Boards" },

@@ -9,6 +9,10 @@ import * as Redacted from "effect/Redacted";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { RateLimitService } from "../rate-limit/service";
+import type { Session } from "../session-middleware";
+import { CurrentSession } from "../session-middleware";
+import { SitePolicy } from "../site/policies";
+import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import {
   EmailSubscriptionConsentHandlersEffect,
@@ -29,14 +33,32 @@ describe("EmailSubscriptionConsentHandlers", () => {
     ),
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+  const Entitlements = EntitlementPolicy.layer.pipe(
+    Layer.provide(Repositories)
+  );
+  const SiteRepositories = Layer.mergeAll(
+    SiteRepository.layer,
+    WorkspaceRepository.layer
+  ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const TestLayer = Layer.mergeAll(
     Repositories,
-    EntitlementPolicy.layer.pipe(Layer.provide(Repositories)),
+    SiteRepositories,
+    SitePolicy.layer.pipe(
+      Layer.provide(Entitlements),
+      Layer.provide(SiteRepositories)
+    ),
+    Entitlements,
     RateLimitService.layerMemory,
     Database.PgliteDatabaseLive
   );
 
-  const createWorkspace = ({ paid }: { readonly paid: boolean }) =>
+  const createWorkspace = ({
+    changelogVisibility = "PUBLIC",
+    paid,
+  }: {
+    readonly changelogVisibility?: "PUBLIC" | "HIDDEN";
+    readonly paid: boolean;
+  }) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
       const organizationId = yield* WorkspaceId.generate;
@@ -46,6 +68,18 @@ describe("EmailSubscriptionConsentHandlers", () => {
         name: "Subscription workspace",
         slug: organizationId,
         createdAt: now,
+      });
+      yield* db.insert(schema.siteTable).values({
+        id: `site_${organizationId}`,
+        name: "Subscription site",
+        subdomain: `test-${organizationId}`,
+        customDomain: null,
+        changelogVisibility,
+        roadmapVisibility: "PUBLIC",
+        hidePoweredBy: false,
+        organizationId,
+        createdAt: now,
+        updatedAt: now,
       });
       if (!paid) {
         return organizationId;
@@ -81,6 +115,36 @@ describe("EmailSubscriptionConsentHandlers", () => {
       });
       return organizationId;
     });
+
+  /** A signed-in visitor identity; `email_contact.user_id` needs a user row. */
+  const createUser = (organizationId: string) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const userId = `user_${organizationId}`;
+      const email = `owner_${organizationId}@example.com`;
+      yield* db.insert(schema.userTable).values({
+        id: userId,
+        email,
+        name: "Test User",
+      });
+      return { email, userId };
+    });
+
+  const makeSession = (args: {
+    readonly email: string;
+    readonly organizationId: string;
+    readonly userId: string;
+  }): Session => ({
+    user: {
+      id: args.userId,
+      email: args.email,
+      name: "Test User",
+      restrictedToOrganizationId: null,
+    },
+    session: { userId: args.userId, token: "test-token" },
+    organizations: [{ id: args.organizationId }],
+    memberships: [],
+  });
 
   layer(TestLayer)("handlers", (it) => {
     it.effect(
@@ -249,6 +313,170 @@ describe("EmailSubscriptionConsentHandlers", () => {
         });
         expect(post.subscription.state).toBe("pending_verification");
       })
+    );
+
+    it.effect(
+      "toggles the signed-in user's changelog subscription without double opt-in",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* EmailSubscriptionRpcHandlersEffect;
+          const repository = yield* EmailSubscriptionRepository;
+          const organizationId = yield* createWorkspace({ paid: true });
+          const user = yield* createUser(organizationId);
+          const session = makeSession({ ...user, organizationId });
+
+          const statusOf = () =>
+            handlers
+              .EmailSubscriptionChangelogStatusGet({ organizationId })
+              .pipe(Effect.provideService(CurrentSession, session));
+
+          expect(yield* statusOf()).toEqual({ subscribed: false });
+
+          expect(
+            yield* handlers
+              .EmailSubscriptionChangelogSubscribeSet({
+                organizationId,
+                subscribed: true,
+              })
+              .pipe(Effect.provideService(CurrentSession, session))
+          ).toEqual({ subscribed: true });
+          expect(
+            yield* repository.findAuthenticatedSubscription({
+              organizationId,
+              topic: { topicId: null, topicType: "changelog" },
+              userId: user.userId,
+            })
+          ).toMatchObject({ state: "active" });
+          expect(yield* statusOf()).toEqual({ subscribed: true });
+
+          expect(
+            yield* handlers
+              .EmailSubscriptionChangelogSubscribeSet({
+                organizationId,
+                subscribed: false,
+              })
+              .pipe(Effect.provideService(CurrentSession, session))
+          ).toEqual({ subscribed: false });
+          expect(
+            yield* repository.findAuthenticatedSubscription({
+              organizationId,
+              topic: { topicId: null, topicType: "changelog" },
+              userId: user.userId,
+            })
+          ).toMatchObject({ state: "unsubscribed" });
+          expect(yield* statusOf()).toEqual({ subscribed: false });
+        })
+    );
+
+    it.effect(
+      "allows authenticated changelog subscriptions on free workspaces",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* EmailSubscriptionRpcHandlersEffect;
+          const repository = yield* EmailSubscriptionRepository;
+          const organizationId = yield* createWorkspace({ paid: false });
+          const user = yield* createUser(organizationId);
+
+          expect(
+            yield* handlers
+              .EmailSubscriptionChangelogSubscribeSet({
+                organizationId,
+                subscribed: true,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession({ ...user, organizationId })
+                )
+              )
+          ).toEqual({ subscribed: true });
+          // Subscribing activates immediately on every plan; only email
+          // delivery is withheld on free.
+          expect(
+            yield* repository.findAuthenticatedSubscription({
+              organizationId,
+              topic: { topicId: null, topicType: "changelog" },
+              userId: user.userId,
+            })
+          ).toMatchObject({ state: "active" });
+        })
+    );
+
+    it.effect("denies subscriptions to a hidden changelog", () =>
+      Effect.gen(function* () {
+        const handlers = yield* EmailSubscriptionRpcHandlersEffect;
+        const organizationId = yield* createWorkspace({
+          changelogVisibility: "HIDDEN",
+          paid: true,
+        });
+        const user = yield* createUser(organizationId);
+        const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+          effect.pipe(
+            Effect.provideService(
+              CurrentSession,
+              makeSession({ ...user, organizationId })
+            )
+          );
+
+        const subscribeError = yield* Effect.flip(
+          handlers
+            .EmailSubscriptionChangelogSubscribeSet({
+              organizationId,
+              subscribed: true,
+            })
+            .pipe(scoped)
+        );
+        expect(subscribeError._tag).toBe("PolicyDenied");
+
+        const statusError = yield* Effect.flip(
+          handlers
+            .EmailSubscriptionChangelogStatusGet({ organizationId })
+            .pipe(scoped)
+        );
+        expect(statusError._tag).toBe("PolicyDenied");
+      })
+    );
+
+    it.effect(
+      "confines organization-restricted sessions to their own workspace",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* EmailSubscriptionRpcHandlersEffect;
+          const organizationId = yield* createWorkspace({ paid: true });
+          const user = yield* createUser(organizationId);
+          const restrictedSession: Session = {
+            user: {
+              id: user.userId,
+              email: user.email,
+              name: "Test User",
+              restrictedToOrganizationId: "org_some_other_workspace",
+            },
+            session: { userId: user.userId, token: "test-token" },
+            organizations: [{ id: organizationId }],
+            memberships: [],
+          };
+          const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+            effect.pipe(
+              Effect.provideService(CurrentSession, restrictedSession)
+            );
+
+          const subscribeError = yield* Effect.flip(
+            handlers
+              .EmailSubscriptionChangelogSubscribeSet({
+                organizationId,
+                subscribed: true,
+              })
+              .pipe(scoped)
+          );
+          expect(subscribeError._tag).toBe("PolicyDenied");
+
+          const statusError = yield* Effect.flip(
+            handlers
+              .EmailSubscriptionChangelogStatusGet({ organizationId })
+              .pipe(scoped)
+          );
+          expect(statusError._tag).toBe("PolicyDenied");
+        })
     );
   });
 });
