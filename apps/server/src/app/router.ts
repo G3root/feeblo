@@ -1,6 +1,7 @@
 import { makeClientIpGlobalMiddleware } from "@feeblo/domain/client-ip";
 import { HttpRoute } from "@feeblo/domain/http/router";
-import { RpcRoute } from "@feeblo/domain/rpc-router";
+import { makeRpcRoute } from "@feeblo/domain/rpc-router";
+import { GitHubManagementRpcHandlers } from "@feeblo/integration-github/github-rpc-handlers";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
 import * as Layer from "effect/Layer";
 import type * as Ref from "effect/Ref";
@@ -57,7 +58,7 @@ export const makeMergedRoutes = ({
   Layer.mergeAll(
     publicRouters,
     HealthRouter,
-    RpcRoute,
+    makeRpcRoute(GitHubManagementRpcHandlers),
     HttpRoute,
     BetterAuthRouterLive,
     DocsRoute,

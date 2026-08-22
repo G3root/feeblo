@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
-import { isGitHubSyncRuleCombination } from "@feeblo/db/validation-schema/github-integration";
-import { IntegrationProviderKey } from "@feeblo/db/validation-schema/integration";
+import { isGitHubSyncRuleCombination } from "@feeblo/domain-contracts/github-integration";
+import { IntegrationProviderKey } from "@feeblo/domain-contracts/integration";
 import {
   asLegid,
   GitHubSyncRuleId,
@@ -18,27 +18,27 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { EmailOutboxConfig } from "../../email-outbox/config";
+import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
 import {
   BadRequestError,
   InternalServerError,
   NotFoundError,
   UnauthorizedError,
-} from "../../rpc-errors";
+} from "@feeblo/domain/rpc-errors";
 import type {
   ExternalResourceRecord,
   PostExternalResourceLink,
   RecordedPostExternalResourceLink,
   RecordPostExternalResourceLink,
-} from "../external-resource/schema";
-import { ExternalResourceService } from "../external-resource/service";
-import { GitHubIntegrationConfig } from "./config";
+} from "@feeblo/domain/integration/external-resource/schema";
+import { ExternalResourceService } from "@feeblo/domain/integration/external-resource/service";
+import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
 import { GitHubProvider } from "./github-provider";
 import {
   GitHubManagementService,
   type GitHubManagementServiceContract,
-} from "./management-service";
-import { GitHubIssueCreateRouteConfiguration } from "./schema";
+} from "@feeblo/domain/integration/github/management-service";
+import { GitHubIssueCreateRouteConfiguration } from "@feeblo/domain/integration/github/schema";
 
 const databaseError = (operation: string) => () =>
   new InternalServerError({
@@ -144,7 +144,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
         )
       );
   const recordGitHubIssueExternalResource = (input: {
-    readonly issue: import("./schema").GitHubResolvedIssue;
+    readonly issue: import("@feeblo/domain/integration/github/schema").GitHubResolvedIssue;
     readonly organizationId: ExternalResourceRecord["organizationId"];
     readonly postId: RecordPostExternalResourceLink["postId"];
   }): Effect.Effect<

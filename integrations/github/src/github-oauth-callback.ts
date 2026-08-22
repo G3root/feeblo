@@ -1,11 +1,11 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-import { BadRequestError } from "../../rpc-errors";
+import { BadRequestError } from "@feeblo/domain/rpc-errors";
 import {
   GitHubAppInstallationCallback,
   type GitHubAppInstallationCallback as GitHubAppInstallationCallbackType,
-} from "./schema";
+} from "@feeblo/domain/integration/github/schema";
 
 /** Parses the GitHub App installation callback URL without exposing its temporary code in logs or responses. */
 export const parseGitHubAppInstallationCallbackUrl = (

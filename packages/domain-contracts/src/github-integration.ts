@@ -46,3 +46,14 @@ export const isGitHubSyncRuleCombination = (
 ): boolean =>
   (issueMatchMode === "any" && issueState === "open") ||
   (issueMatchMode === "all" && issueState === "closed");
+
+/** A repository and optional Feeblo board selection for automatic issue creation. */
+export const GitHubIssueCreateRouteConfiguration = S.Struct({
+  version: S.Literal(1),
+  repositoryOwner: S.NonEmptyString,
+  repositoryName: S.NonEmptyString,
+  boardId: S.optionalKey(S.NonEmptyString),
+});
+export type TGitHubIssueCreateRouteConfiguration = S.Schema.Type<
+  typeof GitHubIssueCreateRouteConfiguration
+>;

@@ -3,7 +3,7 @@ import { currentDb, Database, schema } from "@feeblo/db";
 import {
   IntegrationExternalResourceType,
   IntegrationProviderKey,
-} from "@feeblo/db/validation-schema/integration";
+} from "@feeblo/domain-contracts/integration";
 import {
   BoardId,
   GitHubSyncRuleId,
@@ -19,11 +19,11 @@ import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { EmailOutboxConfig } from "../../email-outbox/config";
-import { NotificationService } from "../../notification/service";
-import { PostRepository } from "../../post/repository";
-import { GitHubInboundServiceLive } from "./inbound-live";
-import { GitHubInboundService } from "./inbound-service";
+import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
+import { NotificationService } from "@feeblo/domain/notification/service";
+import { PostRepository } from "@feeblo/domain/post/repository";
+import { GitHubInboundServiceLive } from "./github-inbound-live";
+import { GitHubInboundService } from "@feeblo/domain/integration/github/inbound-service";
 
 const TestLayer = Layer.mergeAll(
   GitHubInboundServiceLive.pipe(

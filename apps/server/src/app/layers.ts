@@ -21,8 +21,8 @@ import {
   type ExternalResourceServiceContract,
 } from "@feeblo/domain/integration/external-resource/service";
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
-import { GitHubInboundServiceLive } from "@feeblo/domain/integration/github/inbound-live";
-import { GitHubManagementServiceLive } from "@feeblo/domain/integration/github/management-live";
+import { GitHubInboundServiceLive } from "@feeblo/integration-github/github-inbound-live";
+import { GitHubManagementServiceLive } from "@feeblo/integration-github/github-management-live";
 import {
   SlackFeedbackServiceLive,
   SlackInboundServiceLive,

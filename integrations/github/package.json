@@ -5,11 +5,29 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./manifest": "./src/github-manifest.ts",
     "./credentials": "./src/github-credentials.ts",
-    "./signature": "./src/github-signature.ts",
+    "./github-inbound-live": {
+      "default": "./src/github-inbound-live.ts"
+    },
+    "./github-management-live": {
+      "default": "./src/github-management-live.ts"
+    },
+    "./github-oauth-callback": {
+      "default": "./src/github-oauth-callback.ts"
+    },
+    "./github-provider": {
+      "default": "./src/github-provider.ts"
+    },
+    "./github-rpc-handlers": {
+      "default": "./src/github-rpc-handlers.ts"
+    },
+    "./github-rule-evaluation": {
+      "default": "./src/github-rule-evaluation.ts"
+    },
     "./inbound-schema": "./src/github-inbound-schema.ts",
-    "./provider-registration": "./src/github-provider-registration.ts"
+    "./manifest": "./src/github-manifest.ts",
+    "./provider-registration": "./src/github-provider-registration.ts",
+    "./signature": "./src/github-signature.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",
@@ -17,6 +35,10 @@
   },
   "dependencies": {
     "@distilled.cloud/github": "1.0.0-rc.4",
+    "@feeblo/db": "workspace:*",
+    "@feeblo/domain": "workspace:*",
+    "@feeblo/domain-contracts": "workspace:*",
+    "@feeblo/id": "workspace:*",
     "@feeblo/integration-core": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "effect": "catalog:",

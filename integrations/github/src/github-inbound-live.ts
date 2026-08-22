@@ -7,7 +7,7 @@ import {
 import {
   IntegrationExternalResourceType,
   IntegrationProviderKey,
-} from "@feeblo/db/validation-schema/integration";
+} from "@feeblo/domain-contracts/integration";
 import {
   asLegid,
   BoardId,
@@ -24,17 +24,17 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-import { EmailOutboxConfig } from "../../email-outbox/config";
-import { NotificationService } from "../../notification/service";
-import { PostRepository } from "../../post/repository";
-import { InternalServerError, NotFoundError } from "../../rpc-errors";
-import { recordPostIntegrationEvent } from "../post-event-recording";
+import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
+import { NotificationService } from "@feeblo/domain/notification/service";
+import { PostRepository } from "@feeblo/domain/post/repository";
+import { InternalServerError, NotFoundError } from "@feeblo/domain/rpc-errors";
+import { recordPostIntegrationEvent } from "@feeblo/domain/integration/post-event-recording";
 import {
   GitHubInboundService,
   type GitHubInstallationLifecycleWebhook,
   type GitHubIssueWebhook,
-} from "./inbound-service";
-import { findMatchingGitHubSyncRules } from "./rule-evaluation";
+} from "@feeblo/domain/integration/github/inbound-service";
+import { findMatchingGitHubSyncRules } from "./github-rule-evaluation";
 
 const inboundDatabaseError = (operation: string) => () =>
   new InternalServerError({ message: `GitHub webhook ${operation} failed.` });

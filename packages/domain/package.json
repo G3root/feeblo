@@ -4,119 +4,32 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./src/*": {
-      "default": "./src/*"
-    },
-    "./content-limits": {
-      "default": "./src/content-limits.ts"
-    },
     "./asset/repository": {
       "default": "./src/asset/repository.ts"
     },
     "./asset/service": {
       "default": "./src/asset/service.ts"
     },
-    "./rpc-group": {
-      "default": "./src/rpc-group.ts"
+    "./attribute-definition/errors": {
+      "default": "./src/attribute-definition/errors.ts"
     },
-    "./rpc-router": {
-      "default": "./src/rpc-router.ts"
+    "./attribute-definition/handlers": {
+      "default": "./src/attribute-definition/handlers.ts"
     },
-    "./http/api": {
-      "default": "./src/http/api.ts"
+    "./attribute-definition/repository": {
+      "default": "./src/attribute-definition/repository.ts"
     },
-    "./http/router": {
-      "default": "./src/http/router.ts"
+    "./attribute-definition/rpcs": {
+      "default": "./src/attribute-definition/rpcs.ts"
     },
-    "./notifications/runtime": {
-      "default": "./src/notifications/runtime.ts"
+    "./attribute-definition/schema": {
+      "default": "./src/attribute-definition/schema.ts"
     },
-    "./notifications/batches": {
-      "default": "./src/notifications/batches.ts"
+    "./attribute-definition/validation": {
+      "default": "./src/attribute-definition/validation.ts"
     },
-    "./notification/service": {
-      "default": "./src/notification/service.ts"
-    },
-    "./widget/schema": {
-      "default": "./src/widget/schema.ts"
-    },
-    "./widget/api-contract": {
-      "default": "./src/widget/api-contract.ts"
-    },
-    "./widget/api-live": {
-      "default": "./src/widget/api-live.ts"
-    },
-    "./widget/sso": {
-      "default": "./src/widget/sso.ts"
-    },
-    "./billing/service": {
-      "default": "./src/billing/service.ts"
-    },
-    "./billing/repository": {
-      "default": "./src/billing/repository.ts"
-    },
-    "./rate-limit/service": {
-      "default": "./src/rate-limit/service.ts"
-    },
-    "./rate-limit": {
-      "default": "./src/rate-limit.ts"
-    },
-    "./client-ip": {
-      "default": "./src/client-ip.ts"
-    },
-    "./membership/repository": {
-      "default": "./src/membership/repository.ts"
-    },
-    "./membership/policies": {
-      "default": "./src/membership/policies.ts"
-    },
-    "./membership/schema": {
-      "default": "./src/membership/schema.ts"
-    },
-    "./workspace/repository": {
-      "default": "./src/workspace/repository.ts"
-    },
-    "./plan-entitlements": {
-      "default": "./src/plan-entitlements.ts"
-    },
-    "./pricing/schema": {
-      "default": "./src/pricing/schema.ts"
-    },
-    "./entitlement/policies": {
-      "default": "./src/entitlement/policies.ts"
-    },
-    "./policy": {
-      "default": "./src/policy.ts"
-    },
-    "./session-middleware": {
-      "default": "./src/session-middleware.ts"
-    },
-    "./site/repository": {
-      "default": "./src/site/repository.ts"
-    },
-    "./user/schema": {
-      "default": "./src/user/schema.ts"
-    },
-    "./user/rpcs": {
-      "default": "./src/user/rpcs.ts"
-    },
-    "./user/repository": {
-      "default": "./src/user/repository.ts"
-    },
-    "./user/handlers": {
-      "default": "./src/user/handlers.ts"
-    },
-    "./user/workflows": {
-      "default": "./src/user/workflows.ts"
-    },
-    "./workflows": {
-      "default": "./src/workflows.ts"
-    },
-    "./site/schema": {
-      "default": "./src/site/schema.ts"
-    },
-    "./auth/verification-otp/schema": {
-      "default": "./src/auth/verification-otp/schema.ts"
+    "./auth/verification-otp": {
+      "default": "./src/auth/verification-otp/index.ts"
     },
     "./auth/verification-otp/api": {
       "default": "./src/auth/verification-otp/api.ts"
@@ -124,62 +37,266 @@
     "./auth/verification-otp/live": {
       "default": "./src/auth/verification-otp/live.ts"
     },
+    "./auth/verification-otp/schema": {
+      "default": "./src/auth/verification-otp/schema.ts"
+    },
     "./auth/verification-otp/utils": {
       "default": "./src/auth/verification-otp/utils.ts"
     },
-    "./auth/verification-otp": {
-      "default": "./src/auth/verification-otp/index.ts"
+    "./billing/repository": {
+      "default": "./src/billing/repository.ts"
+    },
+    "./billing/service": {
+      "default": "./src/billing/service.ts"
+    },
+    "./board/repository": {
+      "default": "./src/board/repository.ts"
     },
     "./board/schema": {
       "default": "./src/board/schema.ts"
     },
-    "./roadmap/schema": {
-      "default": "./src/roadmap/schema.ts"
+    "./changelog/schema": {
+      "default": "./src/changelog/schema.ts"
     },
-    "./roadmap/repository": {
-      "default": "./src/roadmap/repository.ts"
-    },
-    "./roadmap-column/schema": {
-      "default": "./src/roadmap-column/schema.ts"
-    },
-    "./roadmap-column/repository": {
-      "default": "./src/roadmap-column/repository.ts"
-    },
-    "./post-status/repository": {
-      "default": "./src/post-status/repository.ts"
-    },
-    "./post/schema": {
-      "default": "./src/post/schema.ts"
-    },
-    "./post-activity/schema": {
-      "default": "./src/post-activity/schema.ts"
-    },
-    "./post-subscription/schema": {
-      "default": "./src/post-subscription/schema.ts"
-    },
-    "./post-status/schema": {
-      "default": "./src/post-status/schema.ts"
-    },
-    "./comments/schema": {
-      "default": "./src/comments/schema.ts"
-    },
-    "./upvote/schema": {
-      "default": "./src/upvote/schema.ts"
+    "./client-ip": {
+      "default": "./src/client-ip.ts"
     },
     "./comment-reaction/schema": {
       "default": "./src/comment-reaction/schema.ts"
     },
-    "./post-reaction/schema": {
-      "default": "./src/post-reaction/schema.ts"
+    "./comments/schema": {
+      "default": "./src/comments/schema.ts"
     },
-    "./changelog/schema": {
-      "default": "./src/changelog/schema.ts"
+    "./company/errors": {
+      "default": "./src/company/errors.ts"
     },
-    "./tag/schema": {
-      "default": "./src/tag/schema.ts"
+    "./company/handlers": {
+      "default": "./src/company/handlers.ts"
     },
-    "./organization/repository": {
-      "default": "./src/organization/repository.ts"
+    "./company/policies": {
+      "default": "./src/company/policies.ts"
+    },
+    "./company/repository": {
+      "default": "./src/company/repository.ts"
+    },
+    "./company/rpcs": {
+      "default": "./src/company/rpcs.ts"
+    },
+    "./company/schema": {
+      "default": "./src/company/schema.ts"
+    },
+    "./contact/errors": {
+      "default": "./src/contact/errors.ts"
+    },
+    "./contact/handlers": {
+      "default": "./src/contact/handlers.ts"
+    },
+    "./contact/policies": {
+      "default": "./src/contact/policies.ts"
+    },
+    "./contact/repository": {
+      "default": "./src/contact/repository.ts"
+    },
+    "./contact/rpcs": {
+      "default": "./src/contact/rpcs.ts"
+    },
+    "./contact/schema": {
+      "default": "./src/contact/schema.ts"
+    },
+    "./content-limits": {
+      "default": "./src/content-limits.ts"
+    },
+    "./email-outbox/config": {
+      "default": "./src/email-outbox/config.ts"
+    },
+    "./email-outbox/repository": {
+      "default": "./src/email-outbox/repository.ts"
+    },
+    "./email-provider-feedback/config": {
+      "default": "./src/email-provider-feedback/config.ts"
+    },
+    "./email-provider-feedback/service": {
+      "default": "./src/email-provider-feedback/service.ts"
+    },
+    "./email-provider-feedback/ses-mapping": {
+      "default": "./src/email-provider-feedback/ses-mapping.ts"
+    },
+    "./email-provider-feedback/ses-webhook": {
+      "default": "./src/email-provider-feedback/ses-webhook.ts"
+    },
+    "./email-subscription/repository": {
+      "default": "./src/email-subscription/repository.ts"
+    },
+    "./entitlement/policies": {
+      "default": "./src/entitlement/policies.ts"
+    },
+    "./feature-flags": {
+      "default": "./src/feature-flags.ts"
+    },
+    "./http/api": {
+      "default": "./src/http/api.ts"
+    },
+    "./http/router": {
+      "default": "./src/http/router.ts"
+    },
+    "./import-export/schema": {
+      "default": "./src/import-export/schema.ts"
+    },
+    "./integration/config": {
+      "default": "./src/integration/config.ts"
+    },
+    "./integration/discord": {
+      "default": "./src/integration/discord/index.ts"
+    },
+    "./integration/discord/config": {
+      "default": "./src/integration/discord/config.ts"
+    },
+    "./integration/discord/errors": {
+      "default": "./src/integration/discord/errors.ts"
+    },
+    "./integration/discord/handlers": {
+      "default": "./src/integration/discord/handlers.ts"
+    },
+    "./integration/discord/inbound-live": {
+      "default": "./src/integration/discord/inbound-live.ts"
+    },
+    "./integration/discord/inbound-service": {
+      "default": "./src/integration/discord/inbound-service.ts"
+    },
+    "./integration/discord/management-live": {
+      "default": "./src/integration/discord/management-live.ts"
+    },
+    "./integration/discord/management-service": {
+      "default": "./src/integration/discord/management-service.ts"
+    },
+    "./integration/discord/rpcs": {
+      "default": "./src/integration/discord/rpcs.ts"
+    },
+    "./integration/discord/schema": {
+      "default": "./src/integration/discord/schema.ts"
+    },
+    "./integration/errors": {
+      "default": "./src/integration/errors.ts"
+    },
+    "./integration/external-resource/handlers": {
+      "default": "./src/integration/external-resource/handlers.ts"
+    },
+    "./integration/external-resource/live": {
+      "default": "./src/integration/external-resource/live.ts"
+    },
+    "./integration/external-resource/rpcs": {
+      "default": "./src/integration/external-resource/rpcs.ts"
+    },
+    "./integration/external-resource/schema": {
+      "default": "./src/integration/external-resource/schema.ts"
+    },
+    "./integration/external-resource/service": {
+      "default": "./src/integration/external-resource/service.ts"
+    },
+    "./integration/github": {
+      "default": "./src/integration/github/index.ts"
+    },
+    "./integration/github/config": {
+      "default": "./src/integration/github/config.ts"
+    },
+    "./integration/github/errors": {
+      "default": "./src/integration/github/errors.ts"
+    },
+    "./integration/github/github-provider": {
+      "default": "./src/integration/github/github-provider.ts"
+    },
+    "./integration/github/inbound-live": {
+      "default": "./src/integration/github/inbound-live.ts"
+    },
+    "./integration/github/inbound-service": {
+      "default": "./src/integration/github/inbound-service.ts"
+    },
+    "./integration/github/management-live": {
+      "default": "./src/integration/github/management-live.ts"
+    },
+    "./integration/github/management-service": {
+      "default": "./src/integration/github/management-service.ts"
+    },
+    "./integration/github/oauth-callback": {
+      "default": "./src/integration/github/oauth-callback.ts"
+    },
+    "./integration/github/rpcs": {
+      "default": "./src/integration/github/rpcs.ts"
+    },
+    "./integration/github/schema": {
+      "default": "./src/integration/github/schema.ts"
+    },
+    "./integration/post-event-recording": {
+      "default": "./src/integration/post-event-recording.ts"
+    },
+    "./integration/rpcs": {
+      "default": "./src/integration/rpcs.ts"
+    },
+    "./integration/schema": {
+      "default": "./src/integration/schema.ts"
+    },
+    "./integration/slack": {
+      "default": "./src/integration/slack/index.ts"
+    },
+    "./integration/slack/config": {
+      "default": "./src/integration/slack/config.ts"
+    },
+    "./integration/slack/errors": {
+      "default": "./src/integration/slack/errors.ts"
+    },
+    "./integration/slack/handlers": {
+      "default": "./src/integration/slack/handlers.ts"
+    },
+    "./integration/slack/inbound-live": {
+      "default": "./src/integration/slack/inbound-live.ts"
+    },
+    "./integration/slack/inbound-service": {
+      "default": "./src/integration/slack/inbound-service.ts"
+    },
+    "./integration/slack/management-live": {
+      "default": "./src/integration/slack/management-live.ts"
+    },
+    "./integration/slack/management-service": {
+      "default": "./src/integration/slack/management-service.ts"
+    },
+    "./integration/slack/rpcs": {
+      "default": "./src/integration/slack/rpcs.ts"
+    },
+    "./integration/slack/schema": {
+      "default": "./src/integration/slack/schema.ts"
+    },
+    "./integration/webhook-management-live": {
+      "default": "./src/integration/webhook-management-live.ts"
+    },
+    "./integration/webhook-management-service": {
+      "default": "./src/integration/webhook-management-service.ts"
+    },
+    "./jwt-secret/repository": {
+      "default": "./src/jwt-secret/repository.ts"
+    },
+    "./jwt-secret/schema": {
+      "default": "./src/jwt-secret/schema.ts"
+    },
+    "./jwt-secret/verification": {
+      "default": "./src/jwt-secret/verification.ts"
+    },
+    "./membership/policies": {
+      "default": "./src/membership/policies.ts"
+    },
+    "./membership/repository": {
+      "default": "./src/membership/repository.ts"
+    },
+    "./membership/schema": {
+      "default": "./src/membership/schema.ts"
+    },
+    "./notification/service": {
+      "default": "./src/notification/service.ts"
+    },
+    "./notifications/batches": {
+      "default": "./src/notifications/batches.ts"
+    },
+    "./notifications/runtime": {
+      "default": "./src/notifications/runtime.ts"
     },
     "./og-image/errors": {
       "default": "./src/og-image/errors.ts"
@@ -196,233 +313,125 @@
     "./og-image/service": {
       "default": "./src/og-image/service.ts"
     },
-    "./services/s3": {
-      "default": "./src/services/s3.ts"
+    "./organization/repository": {
+      "default": "./src/organization/repository.ts"
     },
-    "./feature-flags": {
-      "default": "./src/feature-flags.ts"
+    "./plan-entitlements": {
+      "default": "./src/plan-entitlements.ts"
     },
-    "./import-export/schema": {
-      "default": "./src/import-export/schema.ts"
+    "./policy": {
+      "default": "./src/policy.ts"
     },
-    "./jwt-secret/schema": {
-      "default": "./src/jwt-secret/schema.ts"
+    "./post-activity/schema": {
+      "default": "./src/post-activity/schema.ts"
     },
-    "./jwt-secret/verification": {
-      "default": "./src/jwt-secret/verification.ts"
+    "./post-reaction/schema": {
+      "default": "./src/post-reaction/schema.ts"
     },
-    "./jwt-secret/repository": {
-      "default": "./src/jwt-secret/repository.ts"
+    "./post-status/repository": {
+      "default": "./src/post-status/repository.ts"
     },
-    "./contact/schema": {
-      "default": "./src/contact/schema.ts"
-    },
-    "./contact/rpcs": {
-      "default": "./src/contact/rpcs.ts"
-    },
-    "./contact/handlers": {
-      "default": "./src/contact/handlers.ts"
-    },
-    "./contact/errors": {
-      "default": "./src/contact/errors.ts"
-    },
-    "./contact/repository": {
-      "default": "./src/contact/repository.ts"
-    },
-    "./contact/policies": {
-      "default": "./src/contact/policies.ts"
-    },
-    "./company/schema": {
-      "default": "./src/company/schema.ts"
-    },
-    "./company/rpcs": {
-      "default": "./src/company/rpcs.ts"
-    },
-    "./company/handlers": {
-      "default": "./src/company/handlers.ts"
-    },
-    "./company/errors": {
-      "default": "./src/company/errors.ts"
-    },
-    "./company/repository": {
-      "default": "./src/company/repository.ts"
-    },
-    "./company/policies": {
-      "default": "./src/company/policies.ts"
-    },
-    "./attribute-definition/schema": {
-      "default": "./src/attribute-definition/schema.ts"
-    },
-    "./attribute-definition/rpcs": {
-      "default": "./src/attribute-definition/rpcs.ts"
-    },
-    "./attribute-definition/handlers": {
-      "default": "./src/attribute-definition/handlers.ts"
-    },
-    "./attribute-definition/errors": {
-      "default": "./src/attribute-definition/errors.ts"
-    },
-    "./attribute-definition/repository": {
-      "default": "./src/attribute-definition/repository.ts"
-    },
-    "./attribute-definition/validation": {
-      "default": "./src/attribute-definition/validation.ts"
-    },
-    "./site/subdomain-validation-service": {
-      "default": "./src/site/subdomain/service.ts"
-    },
-    "./integration/schema": {
-      "default": "./src/integration/schema.ts"
-    },
-    "./integration/errors": {
-      "default": "./src/integration/errors.ts"
-    },
-    "./integration/rpcs": {
-      "default": "./src/integration/rpcs.ts"
-    },
-    "./integration/config": {
-      "default": "./src/integration/config.ts"
-    },
-    "./integration/webhook-management-live": {
-      "default": "./src/integration/webhook-management-live.ts"
-    },
-    "./integration/webhook-management-service": {
-      "default": "./src/integration/webhook-management-service.ts"
-    },
-    "./integration/external-resource/schema": {
-      "default": "./src/integration/external-resource/schema.ts"
-    },
-    "./integration/external-resource/service": {
-      "default": "./src/integration/external-resource/service.ts"
-    },
-    "./integration/external-resource/live": {
-      "default": "./src/integration/external-resource/live.ts"
-    },
-    "./integration/external-resource/rpcs": {
-      "default": "./src/integration/external-resource/rpcs.ts"
-    },
-    "./integration/external-resource/handlers": {
-      "default": "./src/integration/external-resource/handlers.ts"
-    },
-    "./email-outbox/repository": {
-      "default": "./src/email-outbox/repository.ts"
-    },
-    "./email-provider-feedback/config": {
-      "default": "./src/email-provider-feedback/config.ts"
-    },
-    "./email-provider-feedback/service": {
-      "default": "./src/email-provider-feedback/service.ts"
-    },
-    "./email-provider-feedback/ses-webhook": {
-      "default": "./src/email-provider-feedback/ses-webhook.ts"
-    },
-    "./email-provider-feedback/ses-mapping": {
-      "default": "./src/email-provider-feedback/ses-mapping.ts"
-    },
-    "./email-subscription/repository": {
-      "default": "./src/email-subscription/repository.ts"
-    },
-    "./rpc-errors": {
-      "default": "./src/rpc-errors.ts"
-    },
-    "./integration/slack": {
-      "default": "./src/integration/slack/index.ts"
-    },
-    "./integration/slack/config": {
-      "default": "./src/integration/slack/config.ts"
-    },
-    "./integration/slack/schema": {
-      "default": "./src/integration/slack/schema.ts"
-    },
-    "./integration/slack/errors": {
-      "default": "./src/integration/slack/errors.ts"
-    },
-    "./integration/slack/management-service": {
-      "default": "./src/integration/slack/management-service.ts"
-    },
-    "./integration/slack/management-live": {
-      "default": "./src/integration/slack/management-live.ts"
-    },
-    "./integration/slack/inbound-service": {
-      "default": "./src/integration/slack/inbound-service.ts"
-    },
-    "./integration/slack/inbound-live": {
-      "default": "./src/integration/slack/inbound-live.ts"
-    },
-    "./integration/slack/rpcs": {
-      "default": "./src/integration/slack/rpcs.ts"
-    },
-    "./integration/slack/handlers": {
-      "default": "./src/integration/slack/handlers.ts"
-    },
-    "./integration/discord": {
-      "default": "./src/integration/discord/index.ts"
-    },
-    "./integration/discord/config": {
-      "default": "./src/integration/discord/config.ts"
-    },
-    "./integration/discord/schema": {
-      "default": "./src/integration/discord/schema.ts"
-    },
-    "./integration/discord/errors": {
-      "default": "./src/integration/discord/errors.ts"
-    },
-    "./integration/discord/management-service": {
-      "default": "./src/integration/discord/management-service.ts"
-    },
-    "./integration/discord/management-live": {
-      "default": "./src/integration/discord/management-live.ts"
-    },
-    "./integration/discord/inbound-service": {
-      "default": "./src/integration/discord/inbound-service.ts"
-    },
-    "./integration/discord/inbound-live": {
-      "default": "./src/integration/discord/inbound-live.ts"
-    },
-    "./integration/discord/rpcs": {
-      "default": "./src/integration/discord/rpcs.ts"
-    },
-    "./integration/discord/handlers": {
-      "default": "./src/integration/discord/handlers.ts"
-    },
-    "./integration/github": {
-      "default": "./src/integration/github/index.ts"
-    },
-    "./integration/github/config": {
-      "default": "./src/integration/github/config.ts"
-    },
-    "./integration/github/github-provider": {
-      "default": "./src/integration/github/github-provider.ts"
-    },
-    "./integration/github/inbound-service": {
-      "default": "./src/integration/github/inbound-service.ts"
-    },
-    "./integration/github/inbound-live": {
-      "default": "./src/integration/github/inbound-live.ts"
-    },
-    "./integration/github/management-live": {
-      "default": "./src/integration/github/management-live.ts"
-    },
-    "./integration/github/management-service": {
-      "default": "./src/integration/github/management-service.ts"
-    },
-    "./integration/github/oauth-callback": {
-      "default": "./src/integration/github/oauth-callback.ts"
-    },
-    "./integration/github/schema": {
-      "default": "./src/integration/github/schema.ts"
-    },
-    "./board/repository": {
-      "default": "./src/board/repository.ts"
-    },
-    "./post/repository": {
-      "default": "./src/post/repository.ts"
+    "./post-status/schema": {
+      "default": "./src/post-status/schema.ts"
     },
     "./post-subscription/repository": {
       "default": "./src/post-subscription/repository.ts"
     },
-    "./email-outbox/config": {
-      "default": "./src/email-outbox/config.ts"
+    "./post-subscription/schema": {
+      "default": "./src/post-subscription/schema.ts"
+    },
+    "./post/repository": {
+      "default": "./src/post/repository.ts"
+    },
+    "./post/schema": {
+      "default": "./src/post/schema.ts"
+    },
+    "./pricing/schema": {
+      "default": "./src/pricing/schema.ts"
+    },
+    "./rate-limit": {
+      "default": "./src/rate-limit.ts"
+    },
+    "./rate-limit/service": {
+      "default": "./src/rate-limit/service.ts"
+    },
+    "./roadmap-column/repository": {
+      "default": "./src/roadmap-column/repository.ts"
+    },
+    "./roadmap-column/schema": {
+      "default": "./src/roadmap-column/schema.ts"
+    },
+    "./roadmap/repository": {
+      "default": "./src/roadmap/repository.ts"
+    },
+    "./roadmap/schema": {
+      "default": "./src/roadmap/schema.ts"
+    },
+    "./rpc-errors": {
+      "default": "./src/rpc-errors.ts"
+    },
+    "./rpc-group": {
+      "default": "./src/rpc-group.ts"
+    },
+    "./rpc-router": {
+      "default": "./src/rpc-router.ts"
+    },
+    "./services/s3": {
+      "default": "./src/services/s3.ts"
+    },
+    "./session-middleware": {
+      "default": "./src/session-middleware.ts"
+    },
+    "./site/repository": {
+      "default": "./src/site/repository.ts"
+    },
+    "./site/schema": {
+      "default": "./src/site/schema.ts"
+    },
+    "./site/subdomain-validation-service": {
+      "default": "./src/site/subdomain/service.ts"
+    },
+    "./src/*": {
+      "default": "./src/*"
+    },
+    "./tag/schema": {
+      "default": "./src/tag/schema.ts"
+    },
+    "./upvote/schema": {
+      "default": "./src/upvote/schema.ts"
+    },
+    "./user/handlers": {
+      "default": "./src/user/handlers.ts"
+    },
+    "./user/repository": {
+      "default": "./src/user/repository.ts"
+    },
+    "./user/rpcs": {
+      "default": "./src/user/rpcs.ts"
+    },
+    "./user/schema": {
+      "default": "./src/user/schema.ts"
+    },
+    "./user/workflows": {
+      "default": "./src/user/workflows.ts"
+    },
+    "./widget/api-contract": {
+      "default": "./src/widget/api-contract.ts"
+    },
+    "./widget/api-live": {
+      "default": "./src/widget/api-live.ts"
+    },
+    "./widget/schema": {
+      "default": "./src/widget/schema.ts"
+    },
+    "./widget/sso": {
+      "default": "./src/widget/sso.ts"
+    },
+    "./workflows": {
+      "default": "./src/workflows.ts"
+    },
+    "./workspace/repository": {
+      "default": "./src/workspace/repository.ts"
     }
   },
   "scripts": {
@@ -439,7 +448,6 @@
     "@feeblo/id": "workspace:*",
     "@feeblo/integration-core": "workspace:*",
     "@feeblo/integration-discord": "workspace:*",
-    "@feeblo/integration-github": "workspace:*",
     "@feeblo/integration-slack": "workspace:*",
     "@feeblo/integration-webhook": "workspace:*",
     "@feeblo/permissions": "workspace:*",

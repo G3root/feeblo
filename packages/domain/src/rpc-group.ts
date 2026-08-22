@@ -57,5 +57,7 @@ export const AllRpcs = PostRpcs.merge(PostActivityRpcs).merge(
   SlackManagementRpcs,
   DiscordManagementRpcs,
   ExternalResourceRpcs,
+  // GitHub RPC definitions are contracts; their handler layer is bound by the
+  // composition root (see docs/adr/0002).
   GitHubManagementRpcs
 );

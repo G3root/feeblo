@@ -1,6 +1,6 @@
-import type { TGitHubIssueState } from "@feeblo/db/validation-schema/github-integration";
+import type { TGitHubIssueState } from "@feeblo/domain-contracts/github-integration";
 
-import type { GitHubSyncRule } from "./schema";
+import type { GitHubSyncRule } from "@feeblo/domain/integration/github/schema";
 
 /** Determines which enabled rules match the current aggregate state of linked GitHub issues. */
 export const findMatchingGitHubSyncRules = (

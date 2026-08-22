@@ -1,7 +1,7 @@
 import { Database } from "@feeblo/db";
 import { GitHubInboundService } from "@feeblo/domain/integration/github/inbound-service";
 import { GitHubManagementService } from "@feeblo/domain/integration/github/management-service";
-import { parseGitHubAppInstallationCallbackUrl } from "@feeblo/domain/integration/github/oauth-callback";
+import { parseGitHubAppInstallationCallbackUrl } from "@feeblo/integration-github/github-oauth-callback";
 import type { IntegrationProviderRegistry } from "@feeblo/integration-core";
 import { ParsedGitHubInboundRequest } from "@feeblo/integration-github/inbound-schema";
 import {

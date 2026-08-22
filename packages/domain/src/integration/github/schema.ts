@@ -13,7 +13,7 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
-import { GitHubIssueCreateRouteConfiguration as IntegrationGitHubIssueCreateRouteConfiguration } from "@feeblo/integration-github/manifest";
+import { GitHubIssueCreateRouteConfiguration as IntegrationGitHubIssueCreateRouteConfiguration } from "@feeblo/domain-contracts/github-integration";
 import * as Schema from "effect/Schema";
 
 /** Safe GitHub App installation details; installation access tokens are never persisted. */

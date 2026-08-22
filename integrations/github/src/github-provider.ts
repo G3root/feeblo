@@ -2,7 +2,7 @@ import type { LegidOf } from "@feeblo/id";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 
-import type { GitHubIntegrationError } from "./errors";
+import type { GitHubIntegrationError } from "@feeblo/domain/integration/github/errors";
 import type {
   GitHubAppInstallationCallback,
   GitHubConnectStarted,
@@ -10,7 +10,7 @@ import type {
   GitHubPostIssueLink,
   GitHubRepository,
   GitHubResolvedIssue,
-} from "./schema";
+} from "@feeblo/domain/integration/github/schema";
 
 /** Narrow GitHub I/O capability implemented by the provider adapter; persistence and policy stay in the domain service. */
 export interface GitHubProviderContract {

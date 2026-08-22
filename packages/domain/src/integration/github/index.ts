@@ -1,4 +1,3 @@
-/** GitHub integration application contracts and pure rule evaluation. */
+/** GitHub integration application contracts. */
 export * from "./management-service";
-export * from "./rule-evaluation";
 export * from "./schema";

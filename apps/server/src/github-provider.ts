@@ -6,7 +6,7 @@ import {
   schema,
 } from "@feeblo/db";
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
-import { GitHubProvider } from "@feeblo/domain/integration/github/github-provider";
+import { GitHubProvider } from "@feeblo/integration-github/github-provider";
 import {
   BadRequestError,
   InternalServerError,

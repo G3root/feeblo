@@ -617,6 +617,18 @@ importers:
       '@distilled.cloud/github':
         specifier: 1.0.0-rc.4
         version: 1.0.0-rc.4(effect@4.0.0-beta.107)
+      '@feeblo/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@feeblo/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@feeblo/domain-contracts':
+        specifier: workspace:*
+        version: link:../../packages/domain-contracts
+      '@feeblo/id':
+        specifier: workspace:*
+        version: link:../../packages/id
       '@feeblo/integration-core':
         specifier: workspace:*
         version: link:../core
@@ -636,9 +648,6 @@ importers:
       '@feeblo/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@feeblo/id':
-        specifier: workspace:*
-        version: link:../../packages/id
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.3
@@ -903,9 +912,6 @@ importers:
       '@feeblo/integration-discord':
         specifier: workspace:*
         version: link:../../integrations/discord
-      '@feeblo/integration-github':
-        specifier: workspace:*
-        version: link:../../integrations/github
       '@feeblo/integration-slack':
         specifier: workspace:*
         version: link:../../integrations/slack
