@@ -683,6 +683,96 @@ describe("EmailOutbox workflows", () => {
     );
 
     it.effect(
+      "suppresses a deferred changelog delivery hidden after its first claim",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer({
+            outcomes: [{ _tag: "temporaryFailure" }, { _tag: "accepted" }],
+          });
+          const { organizationId } = yield* fixture;
+          const db = yield* Database.Database;
+          yield* enableSubscriberEmails(organizationId);
+          const changelogId = `changelog_${organizationId}`;
+          const subscriptions = yield* EmailSubscriptionRepository;
+          const consentNow = new Date("2026-08-11T00:00:00.000Z");
+          const subscriber = yield* subscriptions.requestSubscription({
+            email: `deferred-${organizationId}@example.test`,
+            now: consentNow,
+            organizationId,
+            source: "explicit",
+            topic: { topicId: null, topicType: "changelog" },
+            verificationExpiresAt: new Date(consentNow.getTime() + 86_400_000),
+          });
+          if (Option.isNone(subscriber.verificationToken)) {
+            return yield* Effect.die("Expected a verification token");
+          }
+          yield* subscriptions.verifySubscription({
+            now: consentNow,
+            verificationToken: Redacted.value(
+              subscriber.verificationToken.value
+            ),
+          });
+          yield* db.insert(schema.changelogTable).values({
+            id: changelogId,
+            organizationId,
+            title: "Deferred release",
+            slug: "deferred-release",
+            content: "Release notes",
+            excerpt: "Release notes",
+            status: "published",
+            publishedAt: new Date(),
+            creatorId: null,
+            creatorMemberId: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+          const intent = yield* (yield* EmailOutboxRepository).recordIntent({
+            aggregateId: changelogId,
+            aggregateType: "changelog",
+            deduplicationKey: `changelog.published:${organizationId}:${changelogId}`,
+            expiresAt: null,
+            kind: "changelog.published",
+            organizationId,
+            payload: { kind: "changelog.published", changelogId },
+            scheduledAt: new Date(),
+          });
+          if (intent._tag !== "Inserted") {
+            return yield* Effect.die("Expected changelog intent");
+          }
+          const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
+          const deliveryId = deliveryIds[0];
+          if (deliveryId === undefined) {
+            return yield* Effect.die("Expected a queued delivery");
+          }
+          // The first attempt claims the delivery, renders it, and the
+          // provider fails temporarily, deferring the retry.
+          yield* EmailDeliveryWorkflow.execute(
+            { deliveryId },
+            { discard: true }
+          );
+          yield* waitForDelivery(
+            intent.intent.id,
+            (delivery) =>
+              delivery.state === "deferred" && delivery.attemptCount === 1
+          );
+          // The workspace hides its changelog while the retry waits.
+          yield* db
+            .update(schema.siteTable)
+            .set({ changelogVisibility: "HIDDEN", updatedAt: new Date() })
+            .where(eq(schema.siteTable.organizationId, organizationId));
+          yield* TestClock.adjust("10 seconds");
+          yield* waitForDelivery(
+            intent.intent.id,
+            (delivery) => delivery.state === "suppressed"
+          );
+          // The retry must never reach the provider again.
+          const mailer = yield* testMailerState;
+          expect(mailer.sentMessages).toHaveLength(0);
+          expect(mailer.attempts).toBe(1);
+        })
+    );
+
+    it.effect(
       "delivers a double-opt-in link without persisting its bearer token",
       () =>
         Effect.gen(function* () {
