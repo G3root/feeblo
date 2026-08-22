@@ -55,6 +55,34 @@ const runMigrate = async () => {
   await connection.unsafe(`
     CREATE EXTENSION IF NOT EXISTS pg_trgm
   `);
+  // A failed CONCURRENTLY build leaves an INVALID index behind, which
+  // `IF NOT EXISTS` would then skip forever while the planner ignores it.
+  // Drop such corpses so the creations below rebuild them concurrently.
+  const trigramIndexes = [
+    "contact_email_trgm_idx",
+    "contact_name_trgm_idx",
+    "company_name_trgm_idx",
+  ] as const;
+  for (const indexName of trigramIndexes) {
+    const invalid = await connection.unsafe<
+      Array<{ indisvalid: boolean; indisready: boolean }>
+    >(
+      `SELECT i.indisvalid, i.indisready
+       FROM pg_index i
+       JOIN pg_class c ON c.oid = i.indexrelid
+       WHERE c.relname = $1`,
+      [indexName]
+    );
+    if (
+      invalid[0] !== undefined &&
+      (!invalid[0].indisvalid || !invalid[0].indisready)
+    ) {
+      console.warn(`Dropping invalid index ${indexName} for rebuild`);
+      await connection.unsafe(
+        `DROP INDEX CONCURRENTLY IF EXISTS "${indexName}"`
+      );
+    }
+  }
   await connection.unsafe(`
     CREATE INDEX CONCURRENTLY IF NOT EXISTS "contact_email_trgm_idx"
     ON "contact" USING gin ("email" gin_trgm_ops)

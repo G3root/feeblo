@@ -204,7 +204,7 @@ const addSubscriptionContact = (args: {
     // ((organization_id, email) is unique); the ignored insert above leaves
     // our generated id unused in that case.
     const [existingContact] = yield* db
-      .select({ id: schema.emailContactTable.id })
+      .select({ id: schema.emailContactTable.id, userId: schema.emailContactTable.userId })
       .from(schema.emailContactTable)
       .where(
         and(
@@ -213,7 +213,25 @@ const addSubscriptionContact = (args: {
         )
       )
       .limit(1);
-    const effectiveContactId = existingContact?.id ?? contactId;
+
+    let effectiveContactId = existingContact?.id ?? contactId;
+
+    // Attribution must stay consistent on the conflict path: an unlinked
+    // existing contact adopts the requested user; a contact already owned by
+    // a different user is a fixture bug and fails loudly.
+    if (args.userId && existingContact) {
+      if (existingContact.userId === null) {
+        yield* db
+          .update(schema.emailContactTable)
+          .set({ userId: args.userId, updatedAt: new Date() })
+          .where(eq(schema.emailContactTable.id, effectiveContactId));
+      } else if (existingContact.userId !== args.userId) {
+        return yield* Effect.die(
+          `addSubscriptionContact: ${args.email} is already linked to ${existingContact.userId}, not ${args.userId}`
+        );
+      }
+    }
+
     yield* db.insert(schema.emailSubscriptionTable).values({
       id: subscriptionId,
       organizationId: args.organizationId,

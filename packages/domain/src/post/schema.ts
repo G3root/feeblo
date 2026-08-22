@@ -165,6 +165,19 @@ export const PostMerge = S.Struct({
 export type TPostMerge = S.Schema.Type<typeof PostMerge>;
 
 /**
+ * Minimal deliverability shape for author input: `local@domain.tld`, no
+ * whitespace. Synthetic inboxes are generated internally and never pass
+ * through this input; without the shape check, a direct RPC caller could
+ * persist junk contact emails that can never heal or receive notifications.
+ */
+const AuthorEmail = S.String.check(
+  S.makeFilter(
+    (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
+    { message: "author.email must be a valid email address" }
+  )
+);
+
+/**
  * The customer a dashboard post is attributed to when created on behalf of
  * them (see plan-on-behalf.md). Identifiers are consulted in strict priority
  * order by `ResolvePrincipalService`: `userId` > `contactId` > `externalId` >
@@ -174,7 +187,7 @@ export const PostCreateAuthor = S.Struct({
   userId: S.optional(S.String),
   contactId: S.optional(S.String),
   externalId: S.optional(S.String),
-  email: S.optional(S.String),
+  email: S.optional(AuthorEmail),
   name: S.optional(S.String),
   avatarUrl: S.optional(S.String),
 });
