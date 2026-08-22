@@ -1,7 +1,7 @@
 # On-Behalf Posts, Votes & Comments Plan
 
-> **Status:** Slices 1–8 and 10 are implemented on branch `behalf-user`
-> (commits `78bdc151`…`1cd09bbf`); slice 9 (dashboard UI) is pending. The
+> **Status:** All slices implemented on branch `behalf-user`
+> (commits `78bdc151`…`e8ef9eba`). The
 > canonical feature reference is now `docs/on-behalf.md`; this document
 > records the design decisions and, in "As-built deviations" at the bottom,
 > where implementation deliberately diverged.
@@ -162,7 +162,7 @@ over plain-text columns, so most additions need no column migration.
 
 | Column | Purpose |
 | --- | --- |
-| `metadata` | New nullable jsonb. For on-behalf actions: `{ onBehalfOf: { contactId, userId? }, actorMemberId }`. |
+| `metadata` | New nullable jsonb. For on-behalf actions: `{ onBehalfOf: { contactId, userId? } }`. The actor's member id is already a dedicated top-level column (`actorMemberId`). |
 
 New activity kinds appended to the `PostActivityKind` vocabulary:
 `VOTE_ADDED`, `VOTE_REMOVED`.

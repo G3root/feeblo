@@ -78,8 +78,9 @@ export function VoterPanel() {
           postId: post.id,
         })
       );
-      // The RPC response is empty; the refetches are the invalidation that
-      // brings the new voter row, the vote count and the activity back.
+      // The RPC acknowledges with a payload ({added}); the refetches are the
+      // invalidation that brings the updated voter row, vote count and
+      // activity back.
       await upvoteCollection.utils.refetch();
       await postCollection.utils.refetch();
     },
@@ -95,6 +96,9 @@ export function VoterPanel() {
           userId,
         })
       );
+      // The RPC acknowledges with a payload ({removed}); the refetches are
+      // the invalidation that brings the updated voter row, vote count and
+      // activity back.
       await upvoteCollection.utils.refetch();
       await postCollection.utils.refetch();
     },
@@ -185,7 +189,7 @@ export function VoterPanel() {
                 {canRemove ? (
                   <Button
                     aria-label={`Remove voter ${upvote.user.name ?? "customer"}`}
-                    className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                    className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
                     onClick={() => {
                       if (!upvote.userId) {
                         return;

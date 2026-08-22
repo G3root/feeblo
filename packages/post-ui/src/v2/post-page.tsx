@@ -18,7 +18,15 @@ import { PostTitleUpdateInput } from "./post-title-input";
 import { PostReactionPicker } from "./reaction-picker";
 import { SubscribeCard } from "./subscribe-toggle";
 import { UpvoteButton } from "./upvote-toggle";
-import { VoterPanel } from "./voter-panel";
+
+// Voter management pulls in the picker and its search transport; lazy-load it
+// alongside the other below-the-fold surfaces so display mode stays
+// lightweight.
+const LazyVoterPanel = lazy(() =>
+  import("./voter-panel").then((module) => ({
+    default: module.VoterPanel,
+  }))
+);
 
 // Post content is rendered as sanitized Markdown in display mode and as the
 // rich-text editor in edit mode. Both views are lazy-loaded so the default
@@ -119,7 +127,11 @@ function Vote() {
 }
 
 function Voters() {
-  return <VoterPanel />;
+  return (
+    <Suspense fallback={null}>
+      <LazyVoterPanel />
+    </Suspense>
+  );
 }
 
 function CompactVote() {

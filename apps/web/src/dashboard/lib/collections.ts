@@ -4,6 +4,15 @@ import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { PostSubscription } from "@feeblo/domain/post-subscription/schema";
 import type { TPostCreateAuthor } from "@feeblo/domain/post/schema";
 import type { Upvote } from "@feeblo/domain/upvote/schema";
+
+/**
+ * post-ui attaches a transient `author` to post/comment insert payloads so
+ * on-behalf attribution rides the same onInsert path; it is not a persisted
+ * column (see docs/on-behalf.md).
+ */
+type PostWithTransientAuthor = {
+  author?: TPostCreateAuthor;
+};
 import { hasWindow } from "@feeblo/utils/runtime-kind";
 import {
   getCommentReactionCollectionKey,
@@ -161,10 +170,9 @@ export const postCollection = createCollection(
       const mutation = transaction.mutations[0];
       const { modified: newPost } = mutation;
 
-      // SAFETY: post-ui attaches a transient `author` to the insert payload
-      // so on-behalf attribution rides the same onInsert path; it is not a
-      // persisted column (see docs/on-behalf.md).
-      const author = (newPost as { author?: TPostCreateAuthor }).author;
+      // SAFETY: post-ui attaches the transient author payload declared on
+      // PostWithTransientAuthor above.
+      const author = (newPost as PostWithTransientAuthor).author;
 
       await fetchRpc((rpc) =>
         rpc.PostCreate({
@@ -765,10 +773,9 @@ export const commentCollection = createCollection(
       const mutation = transaction.mutations[0];
       const { modified: newComment } = mutation;
 
-      // SAFETY: post-ui attaches a transient `author` to the insert payload
-      // so on-behalf attribution rides the same onInsert path; it is not a
-      // persisted column (see docs/on-behalf.md).
-      const author = (newComment as { author?: TPostCreateAuthor }).author;
+      // SAFETY: post-ui attaches the transient author payload declared on
+      // PostWithTransientAuthor above.
+      const author = (newComment as PostWithTransientAuthor).author;
 
       await fetchRpc(
         (rpc) =>

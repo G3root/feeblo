@@ -738,8 +738,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               subject.userId === null
                 ? Option.none()
                 : yield* userRepository.getById(subject.userId);
+            // A verified SSO account carries a synthetic sso-* inbox that can
+            // never receive mail, so it must not enter the trusted
+            // subscription path; it defers like any other unresolvable
+            // address.
             const verifiedEmail =
-              Option.isSome(subjectUser) && subjectUser.value.emailVerified
+              Option.isSome(subjectUser) &&
+              subjectUser.value.emailVerified &&
+              !isSyntheticEmail(subjectUser.value.email)
                 ? subjectUser.value.email
                 : undefined;
 

@@ -72,7 +72,11 @@ export const postCreateFormOpts = formOptions({
             parsed.error.issues[0]?.message ?? "Invalid value";
         }
       }
-      return Object.keys(fieldErrors).length > 0 ? fieldErrors : undefined;
+      // Field-scoped errors must ride under `fields` (GlobalFormValidationError);
+      // a flat record would surface as a single global form error.
+      return Object.keys(fieldErrors).length > 0
+        ? { fields: fieldErrors }
+        : undefined;
     },
   },
 });

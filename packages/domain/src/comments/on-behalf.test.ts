@@ -381,7 +381,8 @@ describe("CommentRpcHandlers on-behalf", () => {
           // outbox or the in-app watch list.
           const intents = yield* db
             .select({ id: schema.emailOutboxTable.id })
-            .from(schema.emailOutboxTable);
+            .from(schema.emailOutboxTable)
+            .where(eq(schema.emailOutboxTable.aggregateId, fixture.postId));
           expect(intents).toEqual([]);
           const subscriptions = yield* db
             .select({ id: schema.postSubscriptionTable.id })

@@ -6,8 +6,8 @@
 
 /** Synthetic inboxes of SSO portal and shadow users are never real addresses. */
 export const isSyntheticEmail = (email: string): boolean =>
-  /^behalf-[0-9a-f]+@feeblo\.com$/.test(email) ||
-  /^sso-[0-9a-f]+@feeblo\.com$/.test(email);
+  /^behalf-[0-9a-f]+@feeblo\.com$/.test(email.toLowerCase()) ||
+  /^sso-[0-9a-f]+@feeblo\.com$/.test(email.toLowerCase());
 
 /**
  * Email-local part of the synthetic inboxes backing shadow users. Distinct
@@ -15,4 +15,4 @@ export const isSyntheticEmail = (email: string): boolean =>
  * attribution-only shadows that identity linking may consume.
  */
 export const isShadowUserEmail = (email: string): boolean =>
-  /^behalf-[0-9a-f]+@feeblo\.com$/.test(email);
+  /^behalf-[0-9a-f]+@feeblo\.com$/.test(email.toLowerCase());

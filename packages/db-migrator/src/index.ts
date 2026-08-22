@@ -49,6 +49,24 @@ const runMigrate = async () => {
     ON "post" USING hnsw ("embedding" vector_cosine_ops)
     WHERE "embedding" IS NOT NULL
   `);
+  // Trigram support for the on-behalf people picker (docs/on-behalf.md).
+  // Built outside the transactional migration pass so large contact tables
+  // are never write-locked by index creation.
+  await connection.unsafe(`
+    CREATE EXTENSION IF NOT EXISTS pg_trgm
+  `);
+  await connection.unsafe(`
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS "contact_email_trgm_idx"
+    ON "contact" USING gin ("email" gin_trgm_ops)
+  `);
+  await connection.unsafe(`
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS "contact_name_trgm_idx"
+    ON "contact" USING gin ("name" gin_trgm_ops)
+  `);
+  await connection.unsafe(`
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS "company_name_trgm_idx"
+    ON "company" USING gin ("name" gin_trgm_ops)
+  `);
   await connection.unsafe(`
     ALTER TABLE "post"
     VALIDATE CONSTRAINT "post_embedding_metadata_chk"

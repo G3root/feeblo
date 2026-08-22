@@ -93,7 +93,7 @@ describe("UserRepository", () => {
         const repository = yield* UserRepository;
 
         const shadow = yield* repository.provisionShadowUser({
-          email: "jane@example.com",
+          email: "jane-create@example.com",
           name: "Jane Doe",
           restrictedToOrganizationId: "org-a",
         });
@@ -137,12 +137,12 @@ describe("UserRepository", () => {
         const repository = yield* UserRepository;
 
         const first = yield* repository.provisionShadowUser({
-          email: "jane@example.com",
+          email: "jane-reuse@example.com",
           name: "First",
           restrictedToOrganizationId: "org-a",
         });
         const second = yield* repository.provisionShadowUser({
-          email: "jane@example.com",
+          email: "jane-reuse@example.com",
           name: "Second",
           restrictedToOrganizationId: "org-a",
         });
@@ -158,12 +158,12 @@ describe("UserRepository", () => {
         const repository = yield* UserRepository;
 
         const orgA = yield* repository.provisionShadowUser({
-          email: "jane@example.com",
+          email: "jane-orgs@example.com",
           name: "Org A",
           restrictedToOrganizationId: "org-a",
         });
         const orgB = yield* repository.provisionShadowUser({
-          email: "jane@example.com",
+          email: "jane-orgs@example.com",
           name: "Org B",
           restrictedToOrganizationId: "org-b",
         });

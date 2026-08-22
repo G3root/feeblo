@@ -29,6 +29,9 @@ import type {
   TUpvoteToggle,
 } from "./schema";
 
+/** Verification links for admin-added voter subscriptions stay valid one day. */
+const VERIFICATION_WINDOW_MS = 86_400_000;
+
 export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* UpvoteRepository;
   const upvotePolicy = yield* UpvotePolicy;
@@ -161,7 +164,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
                   source: "admin_added_voter",
                   topic: { topicId: args.postId, topicType: "post" },
                   verificationExpiresAt: new Date(
-                    subscriptionNow.getTime() + 86_400_000
+                    subscriptionNow.getTime() + VERIFICATION_WINDOW_MS
                   ),
                 })
                 .pipe(
@@ -194,7 +197,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
                     source: "admin_added_voter",
                     topic: { topicId: args.postId, topicType: "post" },
                     verificationExpiresAt: new Date(
-                      subscriptionNow.getTime() + 86_400_000
+                      subscriptionNow.getTime() + VERIFICATION_WINDOW_MS
                     ),
                   })
                   .pipe(

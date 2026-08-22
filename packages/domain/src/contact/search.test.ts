@@ -278,14 +278,52 @@ describe("ContactRepository.search", () => {
       Effect.gen(function* () {
         yield* getFixture();
         const repository = yield* ContactRepository;
+        // A competitor whose NAME contains the query string: without
+        // exact-email ranking it would contend for the top spot.
+        yield* insertContact({
+          id: "contact_name_competitor",
+          organizationId: "org_main",
+          name: "bare@acme.com fan club",
+          email: "fanclub@other-domain.com",
+        });
 
         const results = yield* repository.search({
           organizationId: "org_main",
           query: "bare@acme.com",
         });
 
-        expect(results.length).toBeGreaterThan(0);
+        expect(results.length).toBeGreaterThan(1);
         expect(results[0]?.contactId).toBe("contact_bare");
+      })
+    );
+
+    it.effect("treats underscores literally instead of as wildcards", () =>
+      Effect.gen(function* () {
+        yield* getFixture();
+        const repository = yield* ContactRepository;
+        yield* insertContact({
+          id: "contact_underscore",
+          organizationId: "org_main",
+          name: null,
+          email: "jane_doe@acme.com",
+        });
+        // Without LIKE escaping this contact would wrongly match the query's
+        // `_` wildcard.
+        yield* insertContact({
+          id: "contact_wildcard_neighbor",
+          organizationId: "org_main",
+          name: null,
+          email: "janexdoe@acme.com",
+        });
+
+        const results = yield* repository.search({
+          organizationId: "org_main",
+          query: "jane_doe@acme.com",
+        });
+
+        expect(results.map((row) => row.contactId)).toEqual([
+          "contact_underscore",
+        ]);
       })
     );
 

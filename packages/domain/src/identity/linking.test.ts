@@ -846,6 +846,50 @@ describe("identity linking", () => {
         })
     );
 
+    it.effect(
+      "heals a non-member customer signup discovered by contact email alone",
+      () =>
+        Effect.gen(function* () {
+          const n = nextTestRun();
+          const organizationId = yield* makeOrganization();
+          // The customer signs up but never joins the workspace as a member:
+          // discovery must come from the contact record, not memberships.
+          const real = `real_${n}`;
+          yield* insertRealUser({
+            id: real,
+            email: `jane.${n}@example.com`,
+          });
+          const shadow = `shadow_${n}`;
+          yield* insertShadowUser({
+            id: shadow,
+            email: `jane.${n}@example.com`,
+            organizationId,
+          });
+          yield* insertContact({
+            id: `contact_${n}`,
+            organizationId,
+            email: `jane.${n}@example.com`,
+            userId: shadow,
+          });
+          const { boardId, statusId } = yield* makeBoardAndStatus(organizationId);
+          yield* insertPost({
+            id: `post_${n}`,
+            organizationId,
+            boardId,
+            statusId,
+            creatorId: shadow,
+          });
+
+          const summary = yield* healShadowsForVerifiedUser({ userId: real });
+
+          expect(summary.organizationIds).toEqual([organizationId]);
+          expect(summary.totals.contacts).toBe(1);
+          expect(summary.totals.posts).toBe(1);
+          expect(yield* getUserById(shadow)).toBeUndefined();
+          expect((yield* getPostById(`post_${n}`))?.creatorId).toBe(real);
+        })
+    );
+
     it.effect("does nothing when no contact matches the account email", () =>
       Effect.gen(function* () {
         const n = nextTestRun();

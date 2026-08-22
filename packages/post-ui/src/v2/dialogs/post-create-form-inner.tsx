@@ -371,6 +371,7 @@ export function PostCreateForm() {
       {createOnBehalfPolicy.allowed ? (
         <div className="border-border border-t px-1 pt-3">
           <button
+            aria-controls="post-on-behalf-field"
             aria-expanded={isOnBehalfOpen}
             className="text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-1.5 text-sm transition-colors"
             onClick={() => {
@@ -387,7 +388,7 @@ export function PostCreateForm() {
           {isOnBehalfOpen ? (
             <form.AppField name="author">
               {(field) => (
-                <div className="pt-2">
+                <div className="pt-2" id="post-on-behalf-field">
                   <ContactCombobox
                     label="Post on behalf of"
                     onSelect={(next) =>

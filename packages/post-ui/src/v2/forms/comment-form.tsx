@@ -65,9 +65,14 @@ export const commentCreateFormOpts = formOptions({
     onChange: ({ value }) => {
       const contentParsed = CommentContentField.safeParse(value.content);
       if (!contentParsed.success) {
+        // Field-scoped errors must ride under `fields`
+        // (GlobalFormValidationError); a flat record would surface as a
+        // single global form error.
         return {
-          content:
-            contentParsed.error.issues[0]?.message ?? "Invalid comment",
+          fields: {
+            content:
+              contentParsed.error.issues[0]?.message ?? "Invalid comment",
+          },
         };
       }
       return undefined;
@@ -116,6 +121,19 @@ export const useCommentForm = ({
           value.userId === session.user.id
       );
 
+      // Optimistic attribution must mirror the server's resolved identity:
+      // an on-behalf comment is authored by the picked customer, never by
+      // the acting member.
+      const onBehalf = hasOnBehalfAuthorValue(value.author);
+      const optimisticUserId = onBehalf
+        ? (value.author?.userId ?? null)
+        : session.user.id;
+      const optimisticAuthorName = onBehalf
+        ? (value.author?.name ??
+          value.author?.email ??
+          session.user.name)
+        : session.user.name;
+
       const tx = commentCollection.insert({
         id: await CommentId.unsafeGenerate(),
         createdAt: new Date(),
@@ -124,12 +142,12 @@ export const useCommentForm = ({
         visibility: value.visibility,
         parentCommentId: null,
         organizationId,
-        memberId: membership?.membershipId ?? null,
+        memberId: onBehalf ? null : (membership?.membershipId ?? null),
         postId,
         postSlug,
-        userId: session.user.id,
+        userId: optimisticUserId ?? session.user.id,
         user: {
-          name: session.user.name,
+          name: optimisticAuthorName,
         },
         ...(hasOnBehalfAuthorValue(value.author)
           ? { author: toOnBehalfAuthor(value.author) }

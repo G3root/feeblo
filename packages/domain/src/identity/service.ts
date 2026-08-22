@@ -1,7 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import { ContactId } from "@feeblo/id";
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -105,7 +105,9 @@ const makeResolvePrincipalService = Effect.gen(function* () {
     findOneContact(
       and(
         eq(schema.contactTable.organizationId, organizationId),
-        eq(schema.contactTable.email, email)
+        // Stored addresses may vary in case (widget/SSO input); match
+        // case-insensitively so one human still resolves to one contact.
+        sql`lower(${schema.contactTable.email}) = lower(${email})`
       )
     );
 
@@ -119,6 +121,25 @@ const makeResolvePrincipalService = Effect.gen(function* () {
         eq(schema.contactTable.externalId, externalId)
       )
     );
+
+  /**
+   * Runs detectors in order and returns the first match. Insert-conflict
+   * recovery passes one detector per applicable unique key — an insert can
+   * lose the race on any of them, so every key must be re-checked before
+   * giving up.
+   */
+  const firstMatch = <E>(
+    detectors: Array<Effect.Effect<Option.Option<Contact>, E>>
+  ): Effect.Effect<Option.Option<Contact>, E> =>
+    Effect.gen(function* () {
+      for (const detect of detectors) {
+        const found = yield* detect;
+        if (Option.isSome(found)) {
+          return found;
+        }
+      }
+      return Option.none();
+    });
 
   /**
    * Backfills only empty identity fields on an existing contact. Subject
@@ -180,13 +201,28 @@ const makeResolvePrincipalService = Effect.gen(function* () {
       });
 
       const now = yield* DateTime.nowAsDate;
+      // The null-userId predicate prevents replacing a concurrent real-account
+      // link; on a lost race the winner's id is returned instead.
       const [updated = null] = yield* db
         .update(schema.contactTable)
         .set({ userId: shadow.id, updatedAt: now })
-        .where(eq(schema.contactTable.id, contact.id))
+        .where(
+          and(
+            eq(schema.contactTable.id, contact.id),
+            isNull(schema.contactTable.userId)
+          )
+        )
         .returning();
 
-      return updated?.userId ?? shadow.id;
+      if (updated?.userId) {
+        return updated.userId;
+      }
+      const [current] = yield* db
+        .select({ userId: schema.contactTable.userId })
+        .from(schema.contactTable)
+        .where(eq(schema.contactTable.id, contact.id))
+        .limit(1);
+      return current?.userId ?? shadow.id;
     });
 
   /**
@@ -237,6 +273,16 @@ const makeResolvePrincipalService = Effect.gen(function* () {
               message: "No user with this id exists",
             });
           }
+          // Mirrors `findAdoptableByIdentityHash`: an account bound to a
+          // different workspace can never be attributed here.
+          if (
+            user.value.restrictedToOrganizationId != null &&
+            user.value.restrictedToOrganizationId !== organizationId
+          ) {
+            return yield* new SubjectNotFoundError({
+              message: "This account belongs to another workspace",
+            });
+          }
 
           let contact = Option.getOrUndefined(
             yield* findContactByUser(organizationId, user.value.id)
@@ -274,7 +320,13 @@ const makeResolvePrincipalService = Effect.gen(function* () {
                   email: candidateEmail ?? null,
                   avatar: subject.avatarUrl ?? user.value.image ?? null,
                 },
-                () => findContactByUser(organizationId, user.value.id)
+                () =>
+                  firstMatch([
+                    findContactByUser(organizationId, user.value.id),
+                    ...(candidateEmail
+                      ? [findContactByEmail(organizationId, candidateEmail)]
+                      : []),
+                  ])
               );
             }
           }
@@ -326,10 +378,18 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             : undefined;
           if (byEmail) {
             const now = yield* DateTime.nowAsDate;
+            // Claim the external id only when the matched contact has none;
+            // an existing external id (even a different one) is never
+            // overwritten by resolution input.
             const [claimed = null] = yield* db
               .update(schema.contactTable)
               .set({ externalId: subject.externalId, updatedAt: now })
-              .where(eq(schema.contactTable.id, byEmail.id))
+              .where(
+                and(
+                  eq(schema.contactTable.id, byEmail.id),
+                  isNull(schema.contactTable.externalId)
+                )
+              )
               .returning();
             const contact = yield* enrichContact(
               // SAFETY: `byEmail` is narrowed non-null within this branch and
@@ -353,7 +413,11 @@ const makeResolvePrincipalService = Effect.gen(function* () {
               name: subject.name ?? null,
               avatar: subject.avatarUrl ?? null,
             },
-            () => findContactByExternalId(organizationId, subject.externalId!)
+            () =>
+              firstMatch([
+                findContactByExternalId(organizationId, subject.externalId!),
+                ...(email ? [findContactByEmail(organizationId, email)] : []),
+              ])
           );
           const userId = yield* ensureLinkedUser(created, {
             organizationId,

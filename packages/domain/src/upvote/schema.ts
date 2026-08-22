@@ -52,7 +52,7 @@ export type TUpvoteAddOnBehalf = S.Schema.Type<typeof UpvoteAddOnBehalf>;
 export const UpvoteRemoveOnBehalf = S.Struct({
   organizationId: WorkspaceId.schema,
   postId: PostId.schema,
-  userId: S.String,
+  userId: S.String.check(S.isMinLength(1)),
 });
 
 export type TUpvoteRemoveOnBehalf = S.Schema.Type<typeof UpvoteRemoveOnBehalf>;

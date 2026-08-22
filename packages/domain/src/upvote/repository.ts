@@ -174,7 +174,7 @@ const makeUpvoteRepository = Effect.gen(function* () {
           .pipe(Effect.map(EffectArray.get(0)));
 
         const upvoteId = yield* UpvoteId.generate;
-        yield* db
+        const inserted = yield* db
           .insert(schema.upvoteTable)
           .values({
             id: upvoteId,
@@ -183,9 +183,12 @@ const makeUpvoteRepository = Effect.gen(function* () {
             organizationId,
             memberId: Option.getOrNull(member)?.id ?? null,
           })
-          .onConflictDoNothing();
+          .onConflictDoNothing()
+          .returning({ id: schema.upvoteTable.id });
 
-        return { added: true };
+        // A lost race against the unique index is still an idempotent
+        // success, but it must not report as a fresh add.
+        return { added: inserted.length > 0 };
       }),
 
     /**

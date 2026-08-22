@@ -230,7 +230,7 @@ const addSubscriptionContact = (args: {
       createdAt: now,
       updatedAt: now,
     });
-    return { contactId, subscriptionId };
+    return { contactId: effectiveContactId, subscriptionId };
   });
 
 const waitForDelivery = (

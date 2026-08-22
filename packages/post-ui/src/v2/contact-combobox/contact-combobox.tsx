@@ -12,6 +12,7 @@ import {
   ComboboxPopup,
 } from "@feeblo/ui/combobox";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
+import { EmailSchema } from "@feeblo/web-shared/user-validation";
 import { Cancel01Icon, Search01Icon, UserAdd01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState } from "react";
@@ -43,21 +44,19 @@ export type OnBehalfAuthor = z.infer<typeof OnBehalfAuthorSchema>;
 export const emptyOnBehalfAuthor: OnBehalfAuthor = {};
 
 /**
- * Distinguishes a real selection from the empty-object default: hints alone
- * never count as attribution.
+ * Distinguishes a real selection from the empty-object default: only an
+ * identifying value (id or email) counts — enrichment fields like name or
+ * avatar alone are never attribution, mirroring the resolver's own
+ * "at least one identifier" rule.
  */
 export function hasOnBehalfAuthorValue(
   author: OnBehalfAuthor | undefined
 ): author is OnBehalfAuthor {
   return (
     author !== undefined &&
-    [
-      author.avatarUrl,
-      author.contactId,
-      author.email,
-      author.name,
-      author.userId,
-    ].some((value) => value !== undefined)
+    [author.contactId, author.email, author.userId].some(
+      (value) => value !== undefined && value !== ""
+    )
   );
 }
 
@@ -233,8 +232,13 @@ export function ContactCombobox({
   }, [organizationId, postId, query]);
 
   const trimmedQuery = query.trim();
+  // The create-new path feeds the raw query to find-or-create as an EMAIL;
+  // non-email queries (names) only ever surface real search results.
+  const queryLooksLikeEmail =
+    trimmedQuery.length >= MIN_QUERY_LENGTH &&
+    EmailSchema.safeParse(trimmedQuery).success;
   const options: ContactOption[] =
-    trimmedQuery.length >= MIN_QUERY_LENGTH && results.length === 0
+    queryLooksLikeEmail && results.length === 0
       ? [{ kind: "create", email: trimmedQuery }]
       : results.map((contact) => ({ kind: "contact", contact }));
 
@@ -275,7 +279,9 @@ export function ContactCombobox({
 
   // A picked subject replaces the input with a readable summary row so the
   // attribution stays visible until submit; clearing returns to search mode.
-  if (value) {
+  // The empty-object default (no subject picked) must read as "nothing
+  // selected" so the picker opens normally.
+  if (value !== null && hasOnBehalfAuthorValue(value)) {
     const displayName = value.name ?? value.email ?? "Customer";
 
     return (

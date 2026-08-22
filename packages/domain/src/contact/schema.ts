@@ -75,7 +75,14 @@ export const ContactSearch = S.Struct({
   organizationId: WorkspaceId.schema,
   query: S.String,
   postId: S.optional(S.String),
-  limit: S.optional(S.Number),
+  limit: S.optional(
+    S.Int.check(
+      S.isBetween({
+        minimum: 1,
+        maximum: 25,
+      })
+    )
+  ),
 });
 
 export const ContactSearchResult = S.Struct({

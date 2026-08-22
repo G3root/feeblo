@@ -196,8 +196,13 @@ export const linkShadowUser = ({
             realUserId,
             contact.organizationId
           );
+          // The activation must only ever verify an address the surviving
+          // account actually proved; callers may link identities whose emails
+          // differ in case, never in substance.
           const eligible =
+            contact.email !== null &&
             realUser.emailVerified &&
+            realUser.email.toLowerCase() === contact.email.toLowerCase() &&
             (isMember ||
               realUser.restrictedToOrganizationId === contact.organizationId ||
               realUser.restrictedToOrganizationId === null);
@@ -229,6 +234,10 @@ export const linkShadowUser = ({
                   eq(
                     schema.emailSubscriptionTable.contactId,
                     emailContact.id
+                  ),
+                  eq(
+                    schema.emailSubscriptionTable.organizationId,
+                    contact.organizationId
                   ),
                   eq(
                     schema.emailSubscriptionTable.state,
@@ -316,15 +325,24 @@ export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
       return { organizationIds: [], totals: emptyCounts() } satisfies ShadowHealSummary;
     }
 
-    const memberships = yield* db
-      .select({ organizationId: schema.memberTable.organizationId })
-      .from(schema.memberTable)
-      .where(eq(schema.memberTable.userId, userId));
+    // Candidate organizations come from contacts matching the account email,
+    // NOT from memberships: an attributed customer who signs up is rarely a
+    // workspace member, so membership-scoped discovery would heal nothing.
+    // Members keep their own contact matches through the same query.
+    const contactOrganizations = yield* db
+      .select({
+        organizationId: schema.contactTable.organizationId,
+      })
+      .from(schema.contactTable)
+      .where(
+        sql`lower(${schema.contactTable.email}) = ${user.email.toLowerCase()}`
+      )
+      .groupBy(schema.contactTable.organizationId);
 
     const organizationIds: Array<string> = [];
     let totals = emptyCounts();
 
-    for (const { organizationId } of memberships) {
+    for (const { organizationId } of contactOrganizations) {
       const candidates = yield* db
         .select({ id: schema.contactTable.id, userId: schema.contactTable.userId })
         .from(schema.contactTable)
