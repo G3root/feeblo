@@ -20,7 +20,10 @@ import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
-import { ParsedDiscordInboundRequest, DiscordOAuthState } from "./discord-inbound-schema";
+import {
+  ParsedDiscordInboundRequest,
+  DiscordOAuthState,
+} from "./discord-inbound-schema";
 import {
   discordInteractionsCapabilityKey,
   discordProviderKey,

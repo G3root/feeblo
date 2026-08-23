@@ -1,10 +1,10 @@
-import type { DiscordEmbed } from "./discord-embeds";
+import { DiscordInboundFailure } from "@feeblo/domain/integration/discord/errors";
 import { truncate } from "@feeblo/utils/text";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
+import type { DiscordEmbed } from "./discord-embeds";
 import type { DiscordInteractionCallback } from "./discord-inbound-schema";
-import { DiscordInboundFailure } from "@feeblo/domain/integration/discord/errors";
 
 const TITLE_MAX_LENGTH = 200;
 const DETAILS_MAX_LENGTH = 3000;

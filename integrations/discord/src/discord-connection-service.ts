@@ -1,4 +1,12 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
+import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
+import type { DiscordIntegrationError } from "@feeblo/domain/integration/discord/errors";
+import type * as S from "@feeblo/domain/integration/discord/schema";
+import {
+  BadRequestError,
+  InternalServerError,
+  NotFoundError,
+} from "@feeblo/domain/rpc-errors";
 import {
   asLegid,
   IntegrationConnectionId,
@@ -26,20 +34,12 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
 import {
-  BadRequestError,
-  InternalServerError,
-  NotFoundError,
-} from "@feeblo/domain/rpc-errors";
-import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
-import {
   decryptConnectionCredentials,
   findDiscordConnection,
   lockDiscordConnection,
   mapDiscordApiError,
   mapManagementError,
 } from "./discord-management-shared";
-import type { DiscordIntegrationError } from "@feeblo/domain/integration/discord/errors";
-import type * as S from "@feeblo/domain/integration/discord/schema";
 
 const retentionMs = 30 * 24 * 60 * 60 * 1000;
 

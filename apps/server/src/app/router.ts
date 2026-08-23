@@ -1,12 +1,12 @@
 import { makeClientIpGlobalMiddleware } from "@feeblo/domain/client-ip";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { makeRpcRoute } from "@feeblo/domain/rpc-router";
-import { DiscordManagementRpcHandlers } from "@feeblo/integration-discord/rpc-handlers";
 import { makeDiscordRouters } from "@feeblo/integration-discord/routers";
+import { DiscordManagementRpcHandlers } from "@feeblo/integration-discord/rpc-handlers";
 import { makeGitHubRouters } from "@feeblo/integration-github/github-routers";
 import { GitHubManagementRpcHandlers } from "@feeblo/integration-github/github-rpc-handlers";
-import { SlackManagementRpcHandlers } from "@feeblo/integration-slack/rpc-handlers";
 import { makeSlackRouters } from "@feeblo/integration-slack/routers";
+import { SlackManagementRpcHandlers } from "@feeblo/integration-slack/rpc-handlers";
 import { WebhookManagementRpcHandlers } from "@feeblo/integration-webhook/rpc-handlers";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
 import * as Layer from "effect/Layer";
@@ -69,7 +69,10 @@ export const makeMergedRoutes = ({
         GitHubManagementRpcHandlers,
         Layer.merge(
           SlackManagementRpcHandlers,
-          Layer.merge(DiscordManagementRpcHandlers, WebhookManagementRpcHandlers)
+          Layer.merge(
+            DiscordManagementRpcHandlers,
+            WebhookManagementRpcHandlers
+          )
         )
       )
     ),

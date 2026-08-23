@@ -1,4 +1,8 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
+import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
+import type { SlackIntegrationError } from "@feeblo/domain/integration/slack/errors";
+import type * as S from "@feeblo/domain/integration/slack/schema";
+import { InternalServerError, NotFoundError } from "@feeblo/domain/rpc-errors";
 import { IntegrationRouteId } from "@feeblo/id";
 import {
   makeSlackApiClient,
@@ -14,10 +18,6 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-import { InternalServerError, NotFoundError } from "@feeblo/domain/rpc-errors";
-import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
-import type { SlackIntegrationError } from "@feeblo/domain/integration/slack/errors";
-import type * as S from "@feeblo/domain/integration/slack/schema";
 import {
   decryptConnectionCredentials,
   findSlackConnection,

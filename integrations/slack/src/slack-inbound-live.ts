@@ -1,4 +1,12 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
+import { BoardRepository } from "@feeblo/domain/board/repository";
+import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
+import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
+import { SlackInboundFailure } from "@feeblo/domain/integration/slack/errors";
+import {
+  type SlackInboundHttpResponse,
+  SlackInboundService,
+} from "@feeblo/domain/integration/slack/inbound-service";
 import {
   makeSlackApiClient,
   type SlackApiClient,
@@ -19,14 +27,6 @@ import * as Option from "effect/Option";
 import type * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
-import { BoardRepository } from "@feeblo/domain/board/repository";
-import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
-import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
-import { SlackInboundFailure } from "@feeblo/domain/integration/slack/errors";
-import {
-  type SlackInboundHttpResponse,
-  SlackInboundService,
-} from "@feeblo/domain/integration/slack/inbound-service";
 import { SlackFeedbackService } from "./slack-feedback-service";
 import {
   buildFeedbackModal,

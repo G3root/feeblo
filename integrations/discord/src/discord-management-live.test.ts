@@ -1,5 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
+import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
+import { DiscordManagementService } from "@feeblo/domain/integration/discord/management-service";
 import { asLegid, IntegrationConnectionId, WorkspaceId } from "@feeblo/id";
 import {
   type DiscordApiClient,
@@ -19,9 +21,7 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
-import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import { makeDiscordManagementServiceLive } from "./discord-management-live";
-import { DiscordManagementService } from "@feeblo/domain/integration/discord/management-service";
 
 const testChannels: readonly DiscordChannel[] = [
   { id: "C1", name: "general", type: 0 },

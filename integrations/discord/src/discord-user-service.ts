@@ -1,13 +1,12 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
+import { DiscordInboundFailure } from "@feeblo/domain/integration/discord/errors";
+import { isUniqueViolation } from "@feeblo/domain/rpc-errors";
 import { UserId } from "@feeblo/id";
 import { truncate } from "@feeblo/utils/text";
 import { eq } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-
-import { isUniqueViolation } from "@feeblo/domain/rpc-errors";
-import { DiscordInboundFailure } from "@feeblo/domain/integration/discord/errors";
 
 const SYNTHETIC_DISCORD_EMAIL_SUFFIX = "@discord.invalid";
 

@@ -1,4 +1,6 @@
 import { schema } from "@feeblo/db";
+import { DiscordIntegrationErrors } from "@feeblo/domain/integration/discord/errors";
+import { InternalServerError } from "@feeblo/domain/rpc-errors";
 import type { DiscordApiFailure } from "@feeblo/integration-discord";
 import { decryptDiscordCredentialMaterial } from "@feeblo/integration-discord/credentials";
 import { discordProviderKey } from "@feeblo/integration-discord/manifest";
@@ -7,9 +9,6 @@ import type * as PgDrizzle from "drizzle-orm/effect-postgres";
 import * as Effect from "effect/Effect";
 import type * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
-
-import { InternalServerError } from "@feeblo/domain/rpc-errors";
-import { DiscordIntegrationErrors } from "@feeblo/domain/integration/discord/errors";
 
 /**
  * Shared helpers for the Discord management services: connection row lookups

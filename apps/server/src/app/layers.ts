@@ -9,19 +9,13 @@ import { EmailProviderFeedbackService } from "@feeblo/domain/email-provider-feed
 import { SesEmailFeedbackWebhook } from "@feeblo/domain/email-provider-feedback/ses-webhook";
 import { EmailSubscriptionRepository } from "@feeblo/domain/email-subscription/repository";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
-import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
+import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import {
   ExternalResourceService,
   type ExternalResourceServiceContract,
 } from "@feeblo/domain/integration/external-resource/service";
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
-import { SlackInboundServiceLive } from "@feeblo/integration-slack/inbound-live";
-import { SlackManagementServiceLive } from "@feeblo/integration-slack/management-live";
-import { DISCORD_OAUTH_PERMISSIONS, DISCORD_OAUTH_SCOPES } from "@feeblo/integration-discord/manifest";
-import { SLACK_OAUTH_SCOPES } from "@feeblo/integration-slack/manifest";
-import { SlackFeedbackServiceLive } from "@feeblo/integration-slack/slack-feedback-service";
-import { SlackUserServiceLive } from "@feeblo/integration-slack/slack-user-service";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import { NotificationService } from "@feeblo/domain/notification/service";
 import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
@@ -37,9 +31,18 @@ import { DiscordFeedbackServiceLive } from "@feeblo/integration-discord/discord-
 import { DiscordUserServiceLive } from "@feeblo/integration-discord/discord-user-service";
 import { DiscordInboundServiceLive } from "@feeblo/integration-discord/inbound-live";
 import { DiscordManagementServiceLive } from "@feeblo/integration-discord/management-live";
+import {
+  DISCORD_OAUTH_PERMISSIONS,
+  DISCORD_OAUTH_SCOPES,
+} from "@feeblo/integration-discord/manifest";
 import { GitHubInboundServiceLive } from "@feeblo/integration-github/github-inbound-live";
 import { GitHubManagementServiceLive } from "@feeblo/integration-github/github-management-live";
 import { makeGitHubProviderLive } from "@feeblo/integration-github/github-provider-live";
+import { SlackInboundServiceLive } from "@feeblo/integration-slack/inbound-live";
+import { SlackManagementServiceLive } from "@feeblo/integration-slack/management-live";
+import { SLACK_OAUTH_SCOPES } from "@feeblo/integration-slack/manifest";
+import { SlackFeedbackServiceLive } from "@feeblo/integration-slack/slack-feedback-service";
+import { SlackUserServiceLive } from "@feeblo/integration-slack/slack-user-service";
 import type { Mailer } from "@feeblo/transactional/mailer";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
 import * as Effect from "effect/Effect";

@@ -3,6 +3,15 @@ import {
   IntegrationRouteEventSelection,
   SUBSCRIBABLE_INTEGRATION_EVENT_TYPES,
 } from "@feeblo/db/validation-schema/integration";
+import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
+import { WebhookManagementErrors } from "@feeblo/domain/integration/errors";
+import { WebhookDeliveryHistoryPage } from "@feeblo/domain/integration/schema";
+import { WebhookManagementService } from "@feeblo/domain/integration/webhook-management-service";
+import {
+  BadRequestError,
+  InternalServerError,
+  NotFoundError,
+} from "@feeblo/domain/rpc-errors";
 import {
   asLegid,
   BoardId,
@@ -34,16 +43,6 @@ import {
   webhookEventsPostCapabilityKey,
   webhookProviderKey,
 } from "./webhook-manifest";
-
-import {
-  BadRequestError,
-  InternalServerError,
-  NotFoundError,
-} from "@feeblo/domain/rpc-errors";
-import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
-import { WebhookManagementErrors } from "@feeblo/domain/integration/errors";
-import { WebhookDeliveryHistoryPage } from "@feeblo/domain/integration/schema";
-import { WebhookManagementService } from "@feeblo/domain/integration/webhook-management-service";
 
 const retentionMs = 30 * 24 * 60 * 60 * 1000;
 const subscribableEventTypes = SUBSCRIBABLE_INTEGRATION_EVENT_TYPES;

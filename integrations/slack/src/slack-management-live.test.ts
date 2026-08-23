@@ -1,5 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
+import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
+import { SlackManagementService } from "@feeblo/domain/integration/slack/management-service";
 import { asLegid, IntegrationConnectionId, WorkspaceId } from "@feeblo/id";
 import {
   IntegrationProviderPermanentRejection,
@@ -7,16 +9,17 @@ import {
   type SlackConversation,
   SlackOAuthState,
 } from "@feeblo/integration-slack";
-import { slackProviderKey, SLACK_OAUTH_SCOPES } from "@feeblo/integration-slack/manifest";
+import {
+  slackProviderKey,
+  SLACK_OAUTH_SCOPES,
+} from "@feeblo/integration-slack/manifest";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
-import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import { makeSlackManagementServiceLive } from "./slack-management-live";
-import { SlackManagementService } from "@feeblo/domain/integration/slack/management-service";
 
 /** Fake Slack API client; captures calls and answers with canned data. */
 const makeFakeSlackApiClient = (

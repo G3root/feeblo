@@ -1,21 +1,21 @@
 import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
+import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
+import { WebhookManagementService } from "@feeblo/domain/integration/webhook-management-service";
 import {
   IntegrationDeliveryId,
   IntegrationEventId,
   type LegidOf,
   WorkspaceId,
 } from "@feeblo/id";
-import { decryptWebhookCredentialMaterial } from "./index";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 
-import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
+import { decryptWebhookCredentialMaterial } from "./index";
 import { WebhookManagementServiceLive } from "./webhook-management-live";
-import { WebhookManagementService } from "@feeblo/domain/integration/webhook-management-service";
 
 /** Single configuration source for the service tests: shared encryption key and the default policy. */
 const webhookTestConfig = {

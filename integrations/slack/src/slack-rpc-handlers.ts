@@ -1,8 +1,7 @@
-import * as Effect from "effect/Effect";
-
-import * as Policy from "@feeblo/domain/policy";
 import { SlackManagementService } from "@feeblo/domain/integration/slack/management-service";
 import { SlackManagementRpcs } from "@feeblo/domain/integration/slack/rpcs";
+import * as Policy from "@feeblo/domain/policy";
+import * as Effect from "effect/Effect";
 
 /** Authenticated RPC handlers which authorize `integrations.manage` before every service call. */
 export const SlackManagementRpcHandlersEffect = Effect.gen(function* () {

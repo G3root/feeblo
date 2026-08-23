@@ -3,7 +3,6 @@ import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import { ExternalResourceService } from "@feeblo/domain/integration/external-resource/service";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
-import { WebhookManagementServiceLive } from "@feeblo/integration-webhook/management-live";
 import type { WebhookManagementService } from "@feeblo/domain/integration/webhook-management-service";
 import { InternalServerError } from "@feeblo/domain/rpc-errors";
 import {
@@ -40,6 +39,7 @@ import {
   makeWebhookProviderRegistration,
   webhookProviderKey,
 } from "@feeblo/integration-webhook";
+import { WebhookManagementServiceLive } from "@feeblo/integration-webhook/management-live";
 import { eq } from "drizzle-orm";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -296,9 +296,7 @@ export const makeIntegrationLayers: Effect.Effect<
       // The management service's config requirement is resolved here so the
       // runtime layer carries no unresolved configuration (see docs/adr/0002).
       WebhookManagementServiceLive.pipe(
-        Layer.provide(
-          Layer.succeed(WebhookIntegrationConfig, webhookConfig)
-        )
+        Layer.provide(Layer.succeed(WebhookIntegrationConfig, webhookConfig))
       ),
       IntegrationEventRecorderLive
     ),

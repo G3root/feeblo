@@ -1,4 +1,6 @@
 import { schema } from "@feeblo/db";
+import { SlackIntegrationErrors } from "@feeblo/domain/integration/slack/errors";
+import { InternalServerError } from "@feeblo/domain/rpc-errors";
 import type { SlackApiFailure } from "@feeblo/integration-slack";
 import { decryptSlackCredentialMaterial } from "@feeblo/integration-slack/credentials";
 import { slackProviderKey } from "@feeblo/integration-slack/manifest";
@@ -7,9 +9,6 @@ import type * as PgDrizzle from "drizzle-orm/effect-postgres";
 import * as Effect from "effect/Effect";
 import type * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
-
-import { InternalServerError } from "@feeblo/domain/rpc-errors";
-import { SlackIntegrationErrors } from "@feeblo/domain/integration/slack/errors";
 
 /**
  * Shared helpers for the Slack management services: connection row lookups and

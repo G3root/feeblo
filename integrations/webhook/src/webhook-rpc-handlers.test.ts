@@ -1,12 +1,18 @@
 import { describe, expect, it } from "@effect/vitest";
+import {
+  WebhookDeliveryHistoryPage,
+  WebhookEndpoint,
+} from "@feeblo/domain/integration/schema";
+import { WebhookManagementService } from "@feeblo/domain/integration/webhook-management-service";
+import {
+  CurrentSession,
+  type Session,
+} from "@feeblo/domain/session-middleware";
 import { IntegrationConnectionId, WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-import { CurrentSession, type Session } from "@feeblo/domain/session-middleware";
 import { WebhookManagementRpcHandlersEffect } from "./webhook-rpc-handlers";
-import { WebhookDeliveryHistoryPage, WebhookEndpoint } from "@feeblo/domain/integration/schema";
-import { WebhookManagementService } from "@feeblo/domain/integration/webhook-management-service";
 
 const sessionFor = (
   organizationId: string,

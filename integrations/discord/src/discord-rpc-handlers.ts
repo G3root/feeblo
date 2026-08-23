@@ -1,8 +1,7 @@
-import * as Effect from "effect/Effect";
-
-import * as Policy from "@feeblo/domain/policy";
 import { DiscordManagementService } from "@feeblo/domain/integration/discord/management-service";
 import { DiscordManagementRpcs } from "@feeblo/domain/integration/discord/rpcs";
+import * as Policy from "@feeblo/domain/policy";
+import * as Effect from "effect/Effect";
 
 /** Authenticated RPC handlers which authorize `integrations.manage` before every service call. */
 export const DiscordManagementRpcHandlersEffect = Effect.gen(function* () {
