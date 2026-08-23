@@ -3,12 +3,10 @@ import { Dashboard } from "../dashboard/main.tsx";
 import Layout from "../layouts/Layout.astro";
 
 export const prerender = false;
-
-const { authHint } = Astro.locals;
 ---
 
 <Layout title="Dashboard">
   <main>
-    <Dashboard client:only="react" initialHint={authHint} />
+    <Dashboard client:only="react" />
   </main>
 </Layout>

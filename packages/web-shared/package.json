@@ -42,10 +42,6 @@
       "types": "./src/auth/auth-context.tsx",
       "default": "./src/auth/auth-context.tsx"
     },
-    "./auth-hint": {
-      "types": "./src/utils/auth-hint.ts",
-      "default": "./src/utils/auth-hint.ts"
-    },
     "./auth-session": {
       "types": "./src/auth/atoms.ts",
       "default": "./src/auth/atoms.ts"
