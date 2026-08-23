@@ -242,6 +242,54 @@ describe("parseContactCustomAttributes", () => {
     })
   );
 
+  it.effect("ignores array values for custom attributes (scalar-only)", () =>
+    Effect.gen(function* () {
+      const def = makeContactDef({ key: "tags", type: "TEXT" });
+      const result = yield* parseContactCustomAttributes(
+        { customFields: { tags: ["a", "b"] } },
+        [def]
+      );
+      expect(result).toEqual([]);
+    })
+  );
+
+  it.effect(
+    "ignores nested object values for custom attributes (scalar-only)",
+    () =>
+      Effect.gen(function* () {
+        const def = makeContactDef({ key: "address", type: "TEXT" });
+        const result = yield* parseContactCustomAttributes(
+          {
+            customFields: {
+              address: { street: "Main" },
+              city: "Berlin",
+            },
+          },
+          [def, makeContactDef({ key: "city", type: "TEXT" })]
+        );
+        expect(result).toEqual([
+          { definitionId: def.id, key: "city", value: "Berlin" },
+        ]);
+      })
+  );
+
+  it.effect(
+    "ignores non-scalar values for required attributes instead of failing",
+    () =>
+      Effect.gen(function* () {
+        const def = makeContactDef({
+          key: "requiredField",
+          type: "TEXT",
+          isRequired: true,
+        });
+        const result = yield* parseContactCustomAttributes(
+          { customFields: { requiredField: { nested: true } } },
+          [def]
+        );
+        expect(result).toEqual([]);
+      })
+  );
+
   it("fails when required attribute is missing", async () => {
     const def = makeContactDef({
       key: "requiredField",
@@ -340,28 +388,23 @@ describe("parseContactCustomAttributes", () => {
     })
   );
 
-  it("rejects an invalid Date instance for a DATE attribute", async () => {
-    const def = makeContactDef({
-      key: "birthday",
-      type: "DATE",
-    });
-    await expect(
-      Effect.runPromise(
-        parseContactCustomAttributes(
+  it.effect(
+    "ignores an invalid Date instance for a DATE attribute (non-scalar)",
+    () =>
+      Effect.gen(function* () {
+        const def = makeContactDef({
+          key: "birthday",
+          type: "DATE",
+        });
+        // A Date instance cannot occur in a JSON JWT payload; like every other
+        // non-scalar value it is ignored rather than persisted or failed on.
+        const result = yield* parseContactCustomAttributes(
           { customFields: { birthday: new Date(Number.NaN) } },
           [def]
-        )
-      )
-    ).rejects.toBeInstanceOf(DataValidationError);
-    await expect(
-      Effect.runPromise(
-        parseContactCustomAttributes(
-          { customFields: { birthday: new Date(Number.NaN) } },
-          [def]
-        )
-      )
-    ).rejects.toThrow('Invalid value for attribute "birthday"');
-  });
+        );
+        expect(result).toEqual([]);
+      })
+  );
 
   it("rejects a non-date string for a DATE attribute", async () => {
     const def = makeContactDef({

@@ -3,6 +3,7 @@ import { asLegid, type LegidOf, PostId, PostStatusId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
@@ -22,7 +23,11 @@ import { EmailOutboxConfig } from "../email-outbox/config";
 import { Api } from "../http/api";
 import { recordPostIntegrationEvent } from "../integration/post-event-recording";
 import { JwtSecretRepository } from "../jwt-secret/repository";
-import { verifyJwt } from "../jwt-secret/verification";
+import {
+  DEFAULT_MAX_TOKEN_LIFETIME,
+  verifyJwt,
+} from "../jwt-secret/verification";
+import { OrganizationRepository } from "../organization/repository";
 import { PostStatusRepository } from "../post-status/repository";
 import {
   PostEmbeddingService,
@@ -266,6 +271,17 @@ export const WidgetApiLive = HttpApiBuilder.group(
               });
             }
 
+            // Per-workspace lifetime cap overrides the 24h default when set.
+            const organizationRepository = yield* OrganizationRepository;
+            const maxTokenLifetimeMinutes =
+              yield* organizationRepository.findJwtMaxTokenLifetimeMinutes({
+                organizationId,
+              });
+            const maxTokenLifetime =
+              maxTokenLifetimeMinutes !== null
+                ? Duration.minutes(maxTokenLifetimeMinutes)
+                : DEFAULT_MAX_TOKEN_LIFETIME;
+
             const contactDefs =
               // SAFETY: the repository contract returns contact attribute definitions
               // in the canonical domain shape; the cast bridges the DB-row encoding.
@@ -282,7 +298,8 @@ export const WidgetApiLive = HttpApiBuilder.group(
             const jwtPayload = yield* verifyJwt(
               token,
               secrets.map((s) => s.secret),
-              organizationId
+              organizationId,
+              { maxTokenLifetime }
             );
 
             const parsedContact = yield* parsePersonAttributes(
@@ -384,6 +401,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
             CompanyRepository.layer,
             ContactRepository.layer,
             JwtSecretRepository.layer,
+            OrganizationRepository.layer,
             EmailOutboxConfig.layer,
             PostRepository.layer,
             PostStatusRepository.layer,

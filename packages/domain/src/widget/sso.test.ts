@@ -196,19 +196,20 @@ describe("createSsoSession", () => {
       })
     );
 
-    it.effect("accepts a token without an exp claim (exp is optional)", () =>
+    it.effect("rejects a token without an exp claim (exp is required)", () =>
       Effect.gen(function* () {
         const fixture = yield* makeFixture(true);
         const { exp: _exp, ...payloadWithoutExp } = validPayload(fixture);
         const token = yield* signToken(payloadWithoutExp, fixture.secret);
 
-        const result = yield* createSsoSession({
-          clientIp: fixture.clientIp,
-          organizationId: fixture.organizationId,
-          token,
-        });
-
-        expect(result.name).toBe("Ada Lovelace");
+        const error = yield* Effect.flip(
+          createSsoSession({
+            clientIp: fixture.clientIp,
+            organizationId: fixture.organizationId,
+            token,
+          })
+        );
+        expect(error.code).toBe("INVALID_JWT");
       })
     );
 
@@ -232,6 +233,90 @@ describe("createSsoSession", () => {
         );
         expect(error.code).toBe("INVALID_JWT");
       })
+    );
+
+    it.effect(
+      "rejects a token claiming a lifetime beyond the 24h default cap",
+      () =>
+        Effect.gen(function* () {
+          const fixture = yield* makeFixture(true);
+          const token = yield* signToken(
+            {
+              ...validPayload(fixture),
+              iat: Math.floor(Date.now() / 1000),
+              exp: Math.floor(Date.now() / 1000) + 25 * 3600,
+            },
+            fixture.secret
+          );
+
+          const error = yield* Effect.flip(
+            createSsoSession({
+              clientIp: fixture.clientIp,
+              organizationId: fixture.organizationId,
+              token,
+            })
+          );
+          expect(error.code).toBe("INVALID_JWT");
+        })
+    );
+
+    it.effect("enforces a tightened per-organization lifetime cap", () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture(true);
+        const db = yield* currentDb;
+        yield* db
+          .update(schema.organizationTable)
+          .set({ jwtMaxTokenLifetimeMinutes: 60 }) // 1 hour
+          .where(eq(schema.organizationTable.id, fixture.organizationId));
+
+        // 2-hour lifetime: fine under the 24h default, too long for this org.
+        const token = yield* signToken(
+          {
+            ...validPayload(fixture),
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(Date.now() / 1000) + 2 * 3600,
+          },
+          fixture.secret
+        );
+
+        const error = yield* Effect.flip(
+          createSsoSession({
+            clientIp: fixture.clientIp,
+            organizationId: fixture.organizationId,
+            token,
+          })
+        );
+        expect(error.code).toBe("INVALID_JWT");
+      })
+    );
+
+    it.effect(
+      "accepts a token within a tightened per-organization lifetime cap",
+      () =>
+        Effect.gen(function* () {
+          const fixture = yield* makeFixture(true);
+          const db = yield* currentDb;
+          yield* db
+            .update(schema.organizationTable)
+            .set({ jwtMaxTokenLifetimeMinutes: 60 })
+            .where(eq(schema.organizationTable.id, fixture.organizationId));
+
+          const token = yield* signToken(
+            {
+              ...validPayload(fixture),
+              iat: Math.floor(Date.now() / 1000),
+              exp: Math.floor(Date.now() / 1000) + 30 * 60,
+            },
+            fixture.secret
+          );
+
+          const result = yield* createSsoSession({
+            clientIp: fixture.clientIp,
+            organizationId: fixture.organizationId,
+            token,
+          });
+          expect(result.name).toBe("Ada Lovelace");
+        })
     );
 
     it.effect("rejects a token signed with another organization's secret", () =>

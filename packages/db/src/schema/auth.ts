@@ -153,6 +153,8 @@ export const organizationTable = pgTable(
     logo: text("logo"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     metadata: text("metadata"),
+    /** Per-workspace cap on identity-token lifetime, in minutes. NULL means the 24h default. */
+    jwtMaxTokenLifetimeMinutes: integer("jwt_max_token_lifetime_minutes"),
   },
   (table) => [uniqueIndex("organization_slug_uidx").on(table.slug)]
 );

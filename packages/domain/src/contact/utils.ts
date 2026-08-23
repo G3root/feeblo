@@ -1,3 +1,4 @@
+import { isBoolean, isNumber, isString } from "@feeblo/utils/runtime-kind";
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
 import type { JWTPayload } from "jose";
@@ -145,6 +146,7 @@ export type ParsedPersonAttributes = {
 
 const KNOWN_CONTACT_FIELDS = new Set([
   "userId",
+  "sub",
   "email",
   "name",
   "avatar",
@@ -310,6 +312,16 @@ const validateRequiredAttributes = (
     : Effect.void;
 };
 
+/**
+ * Custom attribute values are persisted and rendered client-side, so only
+ * JSON scalars are accepted from untrusted JWT payloads. Arrays and nested
+ * objects are ignored entirely (never stored, never rendered): they are not
+ * valid attribute values and rejecting the whole token for them would let an
+ * attacker with a leaked secret block sign-ins.
+ */
+const isJsonScalar = (value: AttributeSourceValue): boolean =>
+  value === null || isString(value) || isNumber(value) || isBoolean(value);
+
 const parseCustomAttributes = (
   customFields: AttributeSource,
   definitions: readonly AttributeDefinition[],
@@ -327,6 +339,11 @@ const parseCustomAttributes = (
       }
       const definition = defMap.get(key);
       if (!definition) {
+        continue;
+      }
+      if (!isJsonScalar(raw)) {
+        // Arrays and nested objects are not valid attribute values; ignore
+        // them instead of persisting or failing the whole payload on them.
         continue;
       }
       effects.push(
@@ -436,6 +453,44 @@ const parseCompanies = (
       )
     : Effect.succeed([]);
 
+/**
+ * Resolves the user id from the token payload: `sub` is the documented claim
+ * and `userId` is still accepted while customers migrate (both already minted
+ * since 2024). A token carrying both with different values is a conflict and
+ * is rejected — it cannot be a deliberate token.
+ *
+ * `userId` support is scheduled for removal after 2026-12-31; customers are
+ * expected to have switched to `sub` by then.
+ */
+const resolveUserId = (
+  input: AttributeSource
+): Effect.Effect<string | undefined, DataValidationError> => {
+  const sub = input.sub;
+  const userId = input.userId;
+
+  if (sub !== undefined && userId !== undefined && sub !== userId) {
+    return Effect.fail(
+      new DataValidationError({
+        message: `Conflicting identity: "sub" and "userId" claims differ ("${String(
+          sub
+        )}" vs "${String(userId)}"). Use "sub" only; "userId" is deprecated.`,
+      })
+    );
+  }
+
+  // `sub` wins when both agree; `userId` is the legacy fallback. A non-string
+  // value is left for CommonContactFields to reject with a typed error.
+  const resolved = isString(sub)
+    ? sub
+    : isString(userId)
+      ? userId
+      : (sub ?? userId);
+  // SAFETY: `sub`/`userId` are either strings already (kept above) or left
+  // for CommonContactFields to reject; the boxed view is only used so the
+  // attribute contract (string) matches the JWT's own string semantics.
+  return Effect.succeed(resolved as string | undefined);
+};
+
 export function parsePersonAttributes(
   data: JWTPayload | null,
   contactAttributeDefinitions: readonly TContactAttributeDefinition[],
@@ -444,11 +499,13 @@ export function parsePersonAttributes(
   return Effect.gen(function* () {
     const input = asRecord(data);
 
+    const userId = yield* resolveUserId(input);
+
     const commonFields = yield* decodeCommonFields(
       CommonContactFields,
       "contact",
       {
-        userId: input.userId,
+        userId,
         email: input.email,
         name: input.name,
         avatar: input.avatar,
