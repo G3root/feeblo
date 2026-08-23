@@ -117,6 +117,10 @@ describe("AuthProvider session revalidation", () => {
     await expect
       .element(screen.getByText("authenticated:fresh@example.com"))
       .toBeVisible();
+
+    // The confirmed resolution rewrote the hint cookie with the fresh
+    // identity (cookie values are percent-encoded).
+    expect(document.cookie).toContain("fresh%40example.com");
   });
 
   it("clears the hint cookie after a confirmed sign-out", async () => {

@@ -25,7 +25,9 @@ export function AuthGate({ children }: { readonly children: ReactNode }) {
     window.location.assign(signInUrl.toString());
   }, [auth.status]);
 
-  if (auth.status === "authenticated") {
+  // Hint-painted state (data null) is display-only: protected children wait
+  // for the atom's authoritative session.
+  if (auth.status === "authenticated" && auth.data !== null) {
     return <>{children}</>;
   }
 

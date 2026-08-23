@@ -19,11 +19,6 @@ const DASHBOARD_PATH = "/";
 const PUBLIC_BOARD_PATH = "/s";
 const FEEDBACK_WIDGET_PATH = "/feedback-widget";
 const DASHBOARD_SUBDOMAIN = "app";
-// Dashboard auth pages must stay reachable from a public board subdomain:
-// rewriting them under the public board (/s/...) would render the board's
-// not-found page because the board router has no auth routes. Serving them
-// from the dashboard app on the current host keeps sign-in, sign-up, and
-// password recovery working for visitors on public endpoints.
 const DASHBOARD_AUTH_PATHS = new Set([
   "/sign-in",
   "/sign-up",

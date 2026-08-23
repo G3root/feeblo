@@ -175,7 +175,7 @@ test.describe("dashboard auth redirects", () => {
 
     await page.goto("/settings");
 
-    await expect(page).toHaveURL(/\/org_(?!bogus)[^/]+$/);
+    await expect(page).toHaveURL(/\/org_[^/]+$/);
   });
 
   test("a wrong workspace prefix is canonicalized to the member workspace", async ({

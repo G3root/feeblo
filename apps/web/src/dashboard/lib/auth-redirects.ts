@@ -1,6 +1,9 @@
 import type { AuthClientSession } from "@feeblo/auth/client";
 import { extractSubdomain } from "@feeblo/utils/url";
-import { getAuthSession } from "@feeblo/web-shared/auth-session";
+import {
+  getCachedAuthSession,
+  getAuthSession,
+} from "@feeblo/web-shared/auth-session";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 import { redirect } from "@tanstack/react-router";
 
@@ -59,9 +62,15 @@ function normalizePathname(pathname: string) {
 }
 
 function isAppSubdomainHost() {
+  const { appRootDomain } = getRuntimePublicEnv();
+  // Without the configured root domain we cannot tell board hosts from the
+  // dashboard host; do not enforce dashboard-only redirects.
+  if (!appRootDomain) {
+    return false;
+  }
   const subdomain = extractSubdomain({
     url: window.location.href,
-    rootDomain: getRuntimePublicEnv().appRootDomain ?? "",
+    rootDomain: appRootDomain,
   });
   return !subdomain || subdomain.toLowerCase() === DASHBOARD_SUBDOMAIN;
 }
@@ -103,14 +112,20 @@ export async function dashboardAuthBeforeLoad({
     return;
   }
 
-  let session: AuthClientSession | null;
-  try {
-    session = await getAuthSession();
-  } catch {
-    // A transport failure means the session is unknown, not signed-out.
-    // Leave routing untouched: protected routes stay behind their gates and
-    // recover once the atom revalidates.
-    return;
+  // A cached success is authoritative enough for routing decisions; do not
+  // stall navigation behind an in-flight revalidation. Null also covers
+  // cached failures and confirmed sign-outs, which fall through to the await
+  // below — a settled atom resolves there without a network stall.
+  let session: AuthClientSession | null = getCachedAuthSession();
+  if (session === null) {
+    try {
+      session = await getAuthSession();
+    } catch {
+      // A transport failure means the session is unknown, not signed-out.
+      // Leave routing untouched: protected routes stay behind their gates and
+      // recover once the atom revalidates.
+      return;
+    }
   }
 
   // SSO-restricted users are scoped to their board subdomain; on the dashboard
