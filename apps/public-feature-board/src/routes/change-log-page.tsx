@@ -1,4 +1,4 @@
-import { Button } from "@feeblo/ui/button";
+import { Button, buttonVariants } from "@feeblo/ui/button";
 import { DebouncedInputGroupInput } from "@feeblo/ui/debounced-input";
 import {
   Empty,
@@ -14,6 +14,7 @@ import {
 import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { ScrollArea } from "@feeblo/ui/scroll-area";
 import { Separator } from "@feeblo/ui/separator";
+import { cn } from "@feeblo/ui/utils";
 import {
   Cancel01Icon,
   RssIcon,
@@ -35,6 +36,7 @@ import {
   ChangelogTimelineItem,
   formatChangelogDate,
 } from "../components/changelog/changelog-layout";
+import { ChangelogSubscribeButton } from "../components/changelog/changelog-subscribe-button";
 import {
   ChangelogFilterProvider,
   useChangelogFilterStore,
@@ -153,17 +155,23 @@ export function ChangelogPage() {
 
   return (
     <ChangelogPageLayout>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="space-y-3">
           <h2 className="text-base font-semibold tracking-tight">Changelogs</h2>
-          <a
-            aria-label="Subscribe to the changelog RSS feed"
-            className="text-muted-foreground hover:bg-muted hover:text-foreground rounded-md p-1.5 transition-colors"
-            href="/changelog/rss.xml"
-            title="RSS feed"
-          >
-            <HugeiconsIcon icon={RssIcon} />
-          </a>
+          <div className="flex items-center gap-2">
+            <ChangelogSubscribeButton />
+            <a
+              aria-label="Subscribe to the changelog RSS feed"
+              className={cn(
+                buttonVariants({ size: "icon-sm", variant: "ghost" }),
+                "text-muted-foreground hover:text-foreground"
+              )}
+              href="/changelog/rss.xml"
+              title="RSS feed"
+            >
+              <HugeiconsIcon icon={RssIcon} />
+            </a>
+          </div>
         </div>
         <ChangelogFilterToolbar
           hasActiveCategoryFilter={hasActiveCategoryFilter}

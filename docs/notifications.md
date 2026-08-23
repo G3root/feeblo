@@ -21,8 +21,9 @@ The existing submission-email workflow is independent. An in-app row is committe
 | `feedback.submitted` | A feedback post is created from the dashboard or public board | Workspace owners and admins | The post creator, if they are also an owner/admin |
 | `feedback.commented` | A comment is created on a post | The post creator and all post subscribers | The commenter; duplicate recipients are reduced to one notification |
 | `feedback.status_changed` | A post’s status is changed | The post creator and all post subscribers | The member who changed the status; duplicate recipients are reduced to one notification |
+| `changelog.published` | A changelog entry is published | Members subscribed to the changelog (active or paused-by-plan email subscriptions) | The publishing member |
 
-These are the only valid stored notification event types. They are enforced by the PostgreSQL `notification_kind` enum, the domain `NotificationEventType` schema, and the service input type. Adding an event requires updating all three deliberately.
+These are the only valid stored notification event types. They are enforced by the domain `NotificationEventType` schema (the single source of truth for the plain-text `notification.kind` column) and the service input type. Adding an event requires updating both deliberately.
 
 Recipient lists are deduplicated and the actor member is excluded. Consequently, a sole workspace owner who creates a dashboard post will not see a notification for their own action. Mention notifications are not yet implemented because Feeblo does not currently have a canonical member-mention syntax or UI.
 

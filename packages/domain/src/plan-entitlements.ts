@@ -81,7 +81,10 @@ export const PLAN_FEATURE_CATALOG = {
     kind: "capability",
     label: "Remove Feeblo Branding",
   },
-  subscriberEmails: { kind: "capability", label: "Subscriber Emails" },
+  subscriberEmails: {
+    kind: "capability",
+    label: "Subscriber Email Notifications",
+  },
   widgetSso: { kind: "capability", label: "Widget SSO" },
   integrations: {
     kind: "capability",

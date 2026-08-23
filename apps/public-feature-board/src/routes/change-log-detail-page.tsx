@@ -20,6 +20,7 @@ import {
   ChangelogTimelineItem,
   formatChangelogDate,
 } from "../components/changelog/changelog-layout";
+import { ChangelogSubscribeButton } from "../components/changelog/changelog-subscribe-button";
 import { formatPostStatus } from "../lib/utils";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
@@ -184,6 +185,8 @@ export function ChangeLogDetailPage() {
           </header>
 
           <MarkdownContent content={changelog.content} />
+
+          <ChangelogSubscribeButton />
 
           {isLinkedPostsError ? (
             <p className="text-muted-foreground text-sm">
