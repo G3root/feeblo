@@ -1,6 +1,13 @@
 import { makeClientIpGlobalMiddleware } from "@feeblo/domain/client-ip";
 import { HttpRoute } from "@feeblo/domain/http/router";
-import { RpcRoute } from "@feeblo/domain/rpc-router";
+import { makeRpcRoute } from "@feeblo/domain/rpc-router";
+import { DiscordManagementRpcHandlers } from "@feeblo/integration-discord/rpc-handlers";
+import { makeDiscordRouters } from "@feeblo/integration-discord/routers";
+import { makeGitHubRouters } from "@feeblo/integration-github/github-routers";
+import { GitHubManagementRpcHandlers } from "@feeblo/integration-github/github-rpc-handlers";
+import { SlackManagementRpcHandlers } from "@feeblo/integration-slack/rpc-handlers";
+import { makeSlackRouters } from "@feeblo/integration-slack/routers";
+import { WebhookManagementRpcHandlers } from "@feeblo/integration-webhook/rpc-handlers";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
 import * as Layer from "effect/Layer";
 import type * as Ref from "effect/Ref";
@@ -8,8 +15,6 @@ import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
 
 import type { ServerConfigValue } from "../config";
-import { makeDiscordRouters } from "../discord";
-import { makeGitHubRouters } from "../github";
 import { bodySizeLimitMiddleware } from "../http/body-limit";
 import { makeIsAllowedOrigin } from "../http/cors";
 import {
@@ -27,7 +32,6 @@ import {
 import { serverTimingMiddleware } from "../http/server-timing";
 import { makeSesEmailFeedbackRouter } from "../http/ses";
 import type { IntegrationRuntime } from "../integrations";
-import { makeSlackRouters } from "../slack";
 
 export const makePublicRouters = (
   mailbox: Ref.Ref<TestMailerState> | undefined,
@@ -48,22 +52,39 @@ export const makePublicRouters = (
 };
 
 export const makeMergedRoutes = ({
+  appUrl,
   integrationRuntime,
   publicRouters,
 }: {
+  /** Dashboard base URL handed to provider routers for redirects. */
+  readonly appUrl: string;
   readonly integrationRuntime: IntegrationRuntime;
   readonly publicRouters: ReturnType<typeof makePublicRouters>;
 }) =>
   Layer.mergeAll(
     publicRouters,
     HealthRouter,
-    RpcRoute,
+    makeRpcRoute(
+      Layer.merge(
+        GitHubManagementRpcHandlers,
+        Layer.merge(
+          SlackManagementRpcHandlers,
+          Layer.merge(DiscordManagementRpcHandlers, WebhookManagementRpcHandlers)
+        )
+      )
+    ),
     HttpRoute,
     BetterAuthRouterLive,
     DocsRoute,
-    makeSlackRouters(integrationRuntime.registry),
-    makeDiscordRouters(integrationRuntime.registry),
-    makeGitHubRouters(integrationRuntime.registry),
+    makeSlackRouters({
+      appUrl,
+      registry: integrationRuntime.registry,
+    }),
+    makeDiscordRouters({
+      appUrl,
+      registry: integrationRuntime.registry,
+    }),
+    makeGitHubRouters({ appUrl, registry: integrationRuntime.registry }),
     makeSesEmailFeedbackRouter()
   );
 

@@ -1,5 +1,5 @@
-import * as Effect from "effect/Effect";
 import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as HttpApiSchema from "effect/unstable/httpapi/HttpApiSchema";
 

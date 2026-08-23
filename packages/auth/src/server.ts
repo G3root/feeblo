@@ -49,7 +49,7 @@ import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 
-import { drizzleAdapter } from "./adapter/drizzzle-adapter";
+import { drizzleAdapter } from "./adapter/drizzle-adapter";
 import { clientTimeZoneHeader, isValidTimeZone } from "./client-time-zone";
 import { AuthConfig } from "./config";
 import {

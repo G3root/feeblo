@@ -6,9 +6,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./contracts": "./src/integration-contracts.ts",
-    "./registry": "./src/provider-registry.ts",
     "./delivery-policy": "./src/delivery-policy.ts",
+    "./http-inbound": {
+      "default": "./src/http-inbound.ts"
+    },
     "./lifecycle": "./src/integration-lifecycle.ts",
+    "./registry": "./src/provider-registry.ts",
     "./worker-defaults": "./src/delivery-worker-defaults.ts"
   },
   "scripts": {

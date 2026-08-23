@@ -44,7 +44,7 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         Config.option,
         Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
       );
-      const githubEncryptionKey = yield* Config.redacted(
+      const integrationEncryptionKey = yield* Config.redacted(
         "INTEGRATION_ENCRYPTION_KEY"
       ).pipe(
         Config.option,
@@ -55,8 +55,55 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
           })
         )
       );
-      // Outbound-webhook security configuration (encryption key and egress
-      // policy) is owned by WebhookIntegrationConfig in the domain package.
+      // Slack App credentials are optional; the integration only registers
+      // when the client id, client secret, and signing secret are all set.
+      const slackClientId = yield* Config.string("SLACK_CLIENT_ID").pipe(
+        Config.option,
+        Effect.map(Option.getOrUndefined)
+      );
+      const slackClientSecret = yield* Config.redacted(
+        "SLACK_CLIENT_SECRET"
+      ).pipe(
+        Config.option,
+        Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
+      );
+      const slackSigningSecret = yield* Config.redacted(
+        "SLACK_SIGNING_SECRET"
+      ).pipe(
+        Config.option,
+        Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
+      );
+      const slackOauthRedirectUrl = yield* Config.string(
+        "SLACK_OAUTH_REDIRECT_URL"
+      ).pipe(Config.option, Effect.map(Option.getOrUndefined));
+      // Discord App credentials are optional; the integration only registers
+      // when the client id, client secret, bot token, and public key are set.
+      const discordClientId = yield* Config.string("DISCORD_CLIENT_ID").pipe(
+        Config.option,
+        Effect.map(Option.getOrUndefined)
+      );
+      const discordClientSecret = yield* Config.redacted(
+        "DISCORD_CLIENT_SECRET"
+      ).pipe(
+        Config.option,
+        Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
+      );
+      const discordBotToken = yield* Config.redacted("DISCORD_BOT_TOKEN").pipe(
+        Config.option,
+        Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
+      );
+      const discordPublicKey = yield* Config.string("DISCORD_PUBLIC_KEY").pipe(
+        Config.option,
+        Effect.map(Option.getOrUndefined)
+      );
+      const discordOauthRedirectUrl = yield* Config.string(
+        "DISCORD_OAUTH_REDIRECT_URL"
+      ).pipe(Config.option, Effect.map(Option.getOrUndefined));
+      // Outbound-webhook egress policy override: private-network receivers
+      // are honored in development only (see makeWebhookIntegrationConfig).
+      const integrationAllowPrivateNetwork = yield* Config.boolean(
+        "INTEGRATION_ALLOW_PRIVATE_NETWORK"
+      ).pipe(Config.withDefault(false));
       const integrationConnectionConcurrency = yield* Config.schema(
         Schema.Int.check(Schema.isGreaterThan(0)),
         "INTEGRATION_CONNECTION_CONCURRENCY"
@@ -111,7 +158,8 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         githubAppSlug,
         githubClientId,
         githubClientSecret,
-        githubEncryptionKey,
+        integrationEncryptionKey,
+        integrationAllowPrivateNetwork,
         githubPrivateKey,
         githubWebhookSecret,
         integrationConnectionConcurrency,
@@ -121,6 +169,15 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         sentryDsn,
         sentryEnvironment,
         sentryTracesSampleRate,
+        discordBotToken,
+        discordClientId,
+        discordClientSecret,
+        discordOauthRedirectUrl,
+        discordPublicKey,
+        slackClientId,
+        slackClientSecret,
+        slackOauthRedirectUrl,
+        slackSigningSecret,
       } as const;
     }),
   }

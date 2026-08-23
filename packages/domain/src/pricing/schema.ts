@@ -9,30 +9,26 @@ export const PlanKey = S.Literals(["free", "starter", "professional"]);
 
 export type TPlanKey = S.Schema.Type<typeof PlanKey>;
 
-const PlanLimits = S.Struct(
-  {
-    feedbackBoards: S.NullOr(S.Number),
-    privilegedMembers: S.NullOr(S.Number),
-    changelogCategories: S.NullOr(S.Number),
-    submissionNotificationRecipients: S.NullOr(S.Number),
-    crmEntries: S.NullOr(S.Number),
-  } satisfies { readonly [K in LimitFeatureKey]: S.Schema<number | null> }
-);
+const PlanLimits = S.Struct({
+  feedbackBoards: S.NullOr(S.Number),
+  privilegedMembers: S.NullOr(S.Number),
+  changelogCategories: S.NullOr(S.Number),
+  submissionNotificationRecipients: S.NullOr(S.Number),
+  crmEntries: S.NullOr(S.Number),
+} satisfies { readonly [K in LimitFeatureKey]: S.Schema<number | null> });
 
-const PlanCapabilities = S.Struct(
-  {
-    roadmap: S.Boolean,
-    changelog: S.Boolean,
-    unlimitedEndUsers: S.Boolean,
-    unlimitedPosts: S.Boolean,
-    privateBoards: S.Boolean,
-    privateRoadmaps: S.Boolean,
-    removeBranding: S.Boolean,
-    subscriberEmails: S.Boolean,
-    widgetSso: S.Boolean,
-    integrations: S.Boolean,
-  } satisfies { readonly [K in CapabilityFeatureKey]: S.Schema<boolean> }
-);
+const PlanCapabilities = S.Struct({
+  roadmap: S.Boolean,
+  changelog: S.Boolean,
+  unlimitedEndUsers: S.Boolean,
+  unlimitedPosts: S.Boolean,
+  privateBoards: S.Boolean,
+  privateRoadmaps: S.Boolean,
+  removeBranding: S.Boolean,
+  subscriberEmails: S.Boolean,
+  widgetSso: S.Boolean,
+  integrations: S.Boolean,
+} satisfies { readonly [K in CapabilityFeatureKey]: S.Schema<boolean> });
 
 export const PlanPrice = S.Struct({
   productId: S.String,

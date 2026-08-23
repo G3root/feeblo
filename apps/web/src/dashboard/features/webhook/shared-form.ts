@@ -1,4 +1,4 @@
-import { SUBSCRIBABLE_INTEGRATION_EVENT_TYPES } from "@feeblo/db/validation-schema/integration";
+import { SUBSCRIBABLE_INTEGRATION_EVENT_TYPES } from "@feeblo/domain/integration/schema";
 import { formOptions } from "@tanstack/react-form";
 import { z } from "zod";
 

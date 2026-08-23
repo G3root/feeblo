@@ -10,10 +10,10 @@ import {
 } from "@effect/platform-node";
 import { Database } from "@feeblo/db";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
-import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord";
+import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
 import { ExternalResourceService } from "@feeblo/domain/integration/external-resource/service";
-import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack";
+import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import { Mailer } from "@feeblo/transactional/mailer";
 import {
   makeMailerTestLayer,
@@ -30,9 +30,12 @@ import { makeSentryLayer } from "../infra/sentry";
 import { makeIntegrationLayers } from "../integrations";
 import {
   makeAuthLayer,
+  makeDiscordIntegrationConfig,
   makeGitHubConfigLayer,
   makeRateLimitLayer,
   makeServiceLayers,
+  makeSlackIntegrationConfig,
+  makeWebhookIntegrationConfig,
   makeWorkflowLayer,
 } from "./layers";
 import {
@@ -70,21 +73,44 @@ export const program = Effect.gen(function* () {
 
   const integrationRuntime = yield* makeIntegrationLayers.pipe(
     Effect.provideService(ServerConfig, config),
+    Effect.provideService(
+      SlackIntegrationConfig,
+      makeSlackIntegrationConfig(config)
+    ),
+    Effect.provideService(
+      DiscordIntegrationConfig,
+      makeDiscordIntegrationConfig(config)
+    ),
+    Effect.provideService(
+      WebhookIntegrationConfig,
+      makeWebhookIntegrationConfig(config)
+    ),
     Effect.provideService(ExternalResourceService, externalResources)
   );
 
   const GitHubConfigLayer = makeGitHubConfigLayer(config);
+  const SlackConfigLayer = Layer.succeed(
+    SlackIntegrationConfig,
+    makeSlackIntegrationConfig(config)
+  );
+  const DiscordConfigLayer = Layer.succeed(
+    DiscordIntegrationConfig,
+    makeDiscordIntegrationConfig(config)
+  );
 
   const ServiceLayers = makeServiceLayers({
     config,
     externalResourceService: externalResources,
     gitHubConfigLayer: GitHubConfigLayer,
     integrationRuntime,
+    discordConfigLayer: DiscordConfigLayer,
+    slackConfigLayer: SlackConfigLayer,
     workflowLayer: WorkFlowLayer,
   });
 
   const PublicRouters = makePublicRouters(mailbox, config.nodeEnv);
   const MergedRoutes = makeMergedRoutes({
+    appUrl: config.appUrl,
     integrationRuntime,
     publicRouters: PublicRouters,
   });
@@ -131,10 +157,7 @@ export const main = program.pipe(
     Layer.mergeAll(
       SentryLiveLayer,
       Database.DatabaseContextLive,
-      WebhookIntegrationConfig.layer,
-      NodeCrypto.layer,
-      SlackIntegrationConfig.layer,
-      DiscordIntegrationConfig.layer
+      NodeCrypto.layer
     )
   )
 );

@@ -86,8 +86,7 @@ export function formatPlanPrice(
     return "$0 / month";
   }
 
-  const monthlyAmount =
-    interval === "year" ? price.amount / 12 : price.amount;
+  const monthlyAmount = interval === "year" ? price.amount / 12 : price.amount;
 
   return `${formatMoney(monthlyAmount, price.currency)} / month`;
 }

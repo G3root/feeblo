@@ -1,4 +1,4 @@
-import type { TPostStatus } from "@feeblo/db/schema/feedback";
+import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
 import {
   CancelCircleIcon,
   CheckmarkCircle02Icon,
@@ -8,7 +8,7 @@ import {
   PauseCircleIcon,
 } from "@hugeicons/core-free-icons";
 
-export type BoardPostStatus = TPostStatus;
+export type BoardPostStatus = TPostStatusType;
 
 export const BoardIconMap = {
   CLOSED: CancelCircleIcon,

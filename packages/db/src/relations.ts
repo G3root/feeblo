@@ -9,7 +9,6 @@ import {
   changelogCategoryTable,
   changelogPostTable,
   changelogTable,
-  changelogTagTable,
   commentReactionTable,
   commentTable,
   companyAttributeDefinitionTable,
@@ -101,7 +100,6 @@ export const relations = defineRelations(
     changelogCategoryTable,
     changelogTable,
     changelogPostTable,
-    changelogTagTable,
     companyTable,
     contactTable,
     companyAttributeDefinitionTable,
@@ -284,10 +282,6 @@ export const relations = defineRelations(
         from: r.organizationTable.id,
         to: r.changelogCategoryTable.organizationId,
       }),
-      changelogTags: r.many.changelogTagTable({
-        from: r.organizationTable.id,
-        to: r.changelogTagTable.organizationId,
-      }),
       companies: r.many.companyTable({
         from: r.organizationTable.id,
         to: r.companyTable.organizationId,
@@ -383,10 +377,6 @@ export const relations = defineRelations(
       postTags: r.many.postTagTable({
         from: r.tagTable.id,
         to: r.postTagTable.tagId,
-      }),
-      changelogTags: r.many.changelogTagTable({
-        from: r.tagTable.id,
-        to: r.changelogTagTable.tagId,
       }),
     },
     postTagTable: {
@@ -742,10 +732,6 @@ export const relations = defineRelations(
         from: r.changelogTable.id,
         to: r.changelogCategoryLinkTable.changelogId,
       }),
-      changelogTags: r.many.changelogTagTable({
-        from: r.changelogTable.id,
-        to: r.changelogTagTable.changelogId,
-      }),
       changelogPosts: r.many.changelogPostTable({
         from: r.changelogTable.id,
         to: r.changelogPostTable.changelogId,
@@ -780,20 +766,6 @@ export const relations = defineRelations(
       }),
       organization: r.one.organizationTable({
         from: r.changelogPostTable.organizationId,
-        to: r.organizationTable.id,
-      }),
-    },
-    changelogTagTable: {
-      changelog: r.one.changelogTable({
-        from: r.changelogTagTable.changelogId,
-        to: r.changelogTable.id,
-      }),
-      tag: r.one.tagTable({
-        from: r.changelogTagTable.tagId,
-        to: r.tagTable.id,
-      }),
-      organization: r.one.organizationTable({
-        from: r.changelogTagTable.organizationId,
         to: r.organizationTable.id,
       }),
     },

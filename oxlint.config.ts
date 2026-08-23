@@ -116,6 +116,37 @@ export default defineConfig({
     "anti-slop/no-widen-then-assert": "error",
     "anti-slop/require-safety-comment-for-type-assertion": "error",
   },
+
+  // Architecture boundary: client-side packages consume domain schemas, never
+  // DB internals. Server-side code (apps/server, packages/auth, integrations)
+  // is exempt because it legitimately talks to Postgres.
+  overrides: [
+    {
+      files: [
+        "apps/web/src/**",
+        "apps/public-feature-board/src/**",
+        "packages/post-ui/src/**",
+        "packages/web-shared/src/**",
+        "packages/ui/src/**",
+        "packages/feedback-widget/src/**",
+        "packages/sdk/src/**",
+      ],
+      rules: {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: ["@feeblo/db", "@feeblo/db/**"],
+                message:
+                  "Client code must not import @feeblo/db directly. Import schemas/vocabulary from @feeblo/domain instead.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ],
   options: {
     // Revisit once Oxlint's tsgolint path can integrate with @effect/tsgo diagnostics.
     typeAware: false,

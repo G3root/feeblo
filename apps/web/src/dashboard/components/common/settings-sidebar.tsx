@@ -132,11 +132,6 @@ const settingsItems = [
         permission: "changelog-categories.*" as const,
         to: "/$organizationId/settings/changelog-categories" as const,
       },
-      {
-        label: "Tags",
-        icon: Tag01Icon,
-        to: "/$organizationId/settings/changelog-tags" as const,
-      },
     ],
   },
 ];

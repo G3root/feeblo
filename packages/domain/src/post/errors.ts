@@ -25,6 +25,13 @@ export class FailedToDeletePostError extends Schema.TaggedError<FailedToDeletePo
   { httpApiStatus: 500, identifier: "FailedToDeletePostError" }
 ) {}
 
+/** No post matched the given id/board/organization — nothing was deleted. */
+export class PostNotFoundError extends Schema.TaggedError<PostNotFoundError>()(
+  "PostNotFoundError",
+  { message: Schema.optional(Schema.String) },
+  { httpApiStatus: 404, identifier: "PostNotFoundError" }
+) {}
+
 export class FailedToUpdatePostError extends Schema.TaggedError<FailedToUpdatePostError>()(
   "FailedToUpdatePostError",
   {},
@@ -43,6 +50,7 @@ export const PostServiceErrors = Schema.Union([
   InternalServerError,
   PostAlreadyExistsError,
   PolicyDeniedError,
+  PostNotFoundError,
   FailedToCreatePostError,
   FailedToDeletePostError,
   FailedToUpdatePostError,

@@ -24,7 +24,7 @@ import {
   Tag01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import {
   createContext,
@@ -125,12 +125,7 @@ function BoardFilterRoot({
     (q) => {
       return q
         .from({ tags: tagCollection })
-        .where(({ tags }) =>
-          and(
-            eq(tags.organizationId, organizationId),
-            eq(tags.type, "FEEDBACK")
-          )
-        )
+        .where(({ tags }) => eq(tags.organizationId, organizationId))
         .select(({ tags }) => ({
           id: tags.id,
           name: tags.name,

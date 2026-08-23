@@ -1,8 +1,9 @@
-import type { DiscordInteraction } from "@feeblo/integration-discord/inbound-schema";
+import type {
+  DiscordInteraction,
+  DiscordInteractionCallback,
+} from "@feeblo/domain-contracts/discord-inbound";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
-
-import type { DiscordInteractionCallback } from "./discord-modals";
 
 /** HTTP response the server route returns to Discord. */
 export interface DiscordInboundHttpResponse {
