@@ -166,21 +166,18 @@ test(
                 ) => WidgetHandle;
               };
               e2eWidget?: WidgetHandle;
-              addEventListener: (
-                event: string,
-                listener: (event: {
-                  detail: { data: { title: string } };
-                }) => void,
-                options: { once: boolean }
-              ) => void;
               document: { body: { dataset: Record<string, string> } };
             };
 
             browserGlobal.addEventListener(
               "feedbackSubmitted",
               (event) => {
-                browserGlobal.document.body.dataset.submittedFeedback =
-                  event.detail.data.title;
+                // SAFETY: The SDK dispatches "feedbackSubmitted" as a
+                // CustomEvent whose detail carries the submitted title.
+                const { title } = (
+                  event as CustomEvent<{ data: { title: string } }>
+                ).detail.data;
+                browserGlobal.document.body.dataset.submittedFeedback = title;
               },
               { once: true }
             );

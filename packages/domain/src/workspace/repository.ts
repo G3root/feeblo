@@ -100,7 +100,6 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               id: tagId,
               name,
               slug: slugify(name),
-              type: "FEEDBACK",
               organizationId,
               creatorId: args.userId,
               creatorMemberId: memberId,

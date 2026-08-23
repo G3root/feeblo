@@ -21,12 +21,10 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 
 import { getUniqueViolationConstraint, isUniqueViolation } from "../rpc-errors";
 import { FailedToMergePostError, PostAlreadyExistsError } from "./errors";
 import type { TPostAdminUpdate } from "./schema";
-import { scheduleSubmissionNotificationBatch } from "./workflow";
 
 interface TPostUpdateInput {
   boardId?: string;
@@ -202,6 +200,23 @@ const makePostRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows[0]?.statusId)),
 
+    /** Current board/status of a post, used to reject location changes on public paths. */
+    findLocationIds: ({ id, organizationId }: TPostById) =>
+      db
+        .select({
+          boardId: schema.postTable.boardId,
+          statusId: schema.postTable.statusId,
+        })
+        .from(schema.postTable)
+        .where(
+          and(
+            eq(schema.postTable.id, id),
+            eq(schema.postTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0])),
+
     findStatusType: ({
       id,
       organizationId,
@@ -351,6 +366,10 @@ const makePostRepository = Effect.gen(function* () {
     findManyPublic: ({ boardId, organizationId, userId }: TPostFindMany) => {
       const where: SQL[] = [
         eq(schema.postTable.organizationId, organizationId),
+        // Superseded content stays queryable internally but must not remain
+        // publicly listed (same rule as `findSuggestionCandidates`).
+        sql`${schema.postTable.archivedAt} is null`,
+        sql`${schema.postTable.mergedIntoPostId} is null`,
       ];
       if (boardId) {
         where.push(eq(schema.postTable.boardId, boardId));
@@ -610,6 +629,12 @@ const makePostRepository = Effect.gen(function* () {
           .from(schema.postTable)
           .where(postScope)
           .for("update");
+
+        // Nothing matched (missing id or wrong org/board) — report "not
+        // deleted" instead of vacuously comparing two empty lists.
+        if (posts.length === 0) {
+          return false;
+        }
 
         if (onlyIfNew) {
           const newPosts = yield* db
@@ -922,31 +947,6 @@ const makePostRepository = Effect.gen(function* () {
             );
         })
       ),
-
-    enqueueSubmissionNotification: ({
-      postId,
-      organizationId,
-    }: {
-      postId: string;
-      organizationId: string;
-    }) =>
-      db
-        .insert(schema.submissionNotificationQueueTable)
-        .values({ postId, organizationId })
-        .pipe(Effect.asVoid),
-
-    scheduleSubmissionNotification: (organizationId: string) =>
-      Effect.gen(function* () {
-        const engineOption = yield* Effect.serviceOption(WorkflowEngine);
-
-        if (Option.isNone(engineOption)) {
-          return;
-        }
-
-        yield* scheduleSubmissionNotificationBatch(organizationId).pipe(
-          Effect.provideService(WorkflowEngine, engineOption.value)
-        );
-      }),
   };
 });
 

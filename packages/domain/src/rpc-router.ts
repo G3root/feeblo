@@ -13,11 +13,7 @@ import { CommentRpcHandlers } from "./comments/handlers";
 import { CompanyRpcHandlers } from "./company/handlers";
 import { ContactRpcHandlers } from "./contact/handlers";
 import { EmailSubscriptionRpcHandlers } from "./email-subscription/handlers";
-import { DiscordManagementRpcHandlers } from "./integration/discord/handlers";
 import { ExternalResourceRpcHandlers } from "./integration/external-resource/handlers";
-import { GitHubManagementRpcHandlers } from "./integration/github/handlers";
-import { WebhookManagementRpcHandlers } from "./integration/handlers";
-import { SlackManagementRpcHandlers } from "./integration/slack/handlers";
 import { JwtSecretRpcHandlers } from "./jwt-secret/handlers";
 import { MembershipRpcHandlers } from "./membership/handlers";
 import { NotificationRpcHandlers } from "./notification/handlers";
@@ -41,57 +37,70 @@ import { TagRpcHandlers } from "./tag/handlers";
 import { UpvoteRpcHandlers } from "./upvote/handlers";
 import { WorkspaceRpcHandlers } from "./workspace/handlers";
 
-export const RpcRoute = RpcServer.layerHttp({
-  path: "/rpc",
-  protocol: "http",
-  group: AllRpcs,
-}).pipe(
-  Layer.provide(
-    Layer.mergeAll(
-      PostRpcHandlers,
-      PostActivityRpcHandlers,
-      WebhookManagementRpcHandlers,
-      SlackManagementRpcHandlers,
-      DiscordManagementRpcHandlers,
-      ExternalResourceRpcHandlers,
-      GitHubManagementRpcHandlers
-    )
-  ),
-  Layer.provide(BillingRpcHandlers),
-  Layer.provide(Layer.mergeAll(BoardRpcHandlers, ChangelogCategoryRpcHandlers)),
-  Layer.provide(Layer.mergeAll(ChangelogRpcHandlers, ChangelogPostRpcHandlers)),
-  Layer.provide(JwtSecretRpcHandlers),
-  Layer.provide(Layer.mergeAll(MembershipRpcHandlers, NotificationRpcHandlers)),
-  Layer.provide(OrganizationRpcHandlers),
-  Layer.provide(CommentReactionRpcHandlers),
-  Layer.provide(CommentRpcHandlers),
-  Layer.provide(
-    Layer.mergeAll(
-      AttributeDefinitionRpcHandlers,
-      CompanyRpcHandlers,
-      ContactRpcHandlers
-    )
-  ),
-  Layer.provide(Layer.merge(SiteRpcHandlers, EmailSubscriptionRpcHandlers)),
-  Layer.provide(TagRpcHandlers),
-  Layer.provide(UpvoteRpcHandlers),
-  Layer.provide(PostReactionRpcHandlers),
-  Layer.provide(PostStatusRpcHandlers),
-  Layer.provide(
-    Layer.mergeAll(
-      PostSubscriptionRpcHandlers,
-      RoadmapRpcHandlers,
-      RoadmapColumnRpcHandlers
-    )
-  ),
-  Layer.provide(WorkspaceRpcHandlers),
-  Layer.provide(S3UploadServiceLive),
-  Layer.provide(RpcSerialization.layerNdjson),
-  Layer.provide(
-    Layer.mergeAll(
-      AuthMiddlewareLive,
-      OptionalAuthMiddlewareLive,
-      PublicRpcRateLimitMiddlewareLive
-    )
-  )
+/**
+ * Core (non-provider) RPC handlers bound inside the domain package.
+ */
+export const CoreRpcHandlers = Layer.mergeAll(
+  PostRpcHandlers,
+  PostActivityRpcHandlers,
+  ExternalResourceRpcHandlers
 );
+
+/**
+ * Builds the `/rpc` route. Core handlers are bound here; provider-owned
+ * handler layers are supplied by the composition root so the domain package
+ * does not depend on provider packages (see docs/adr/0002).
+ */
+export const makeRpcRoute = <RIn, ROut, E>(
+  providerHandlers: Layer.Layer<ROut, E, RIn>
+) =>
+  RpcServer.layerHttp({
+    path: "/rpc",
+    protocol: "http",
+    group: AllRpcs,
+  }).pipe(
+    Layer.provide(CoreRpcHandlers),
+    Layer.provide(providerHandlers),
+    Layer.provide(BillingRpcHandlers),
+    Layer.provide(
+      Layer.mergeAll(BoardRpcHandlers, ChangelogCategoryRpcHandlers)
+    ),
+    Layer.provide(
+      Layer.mergeAll(ChangelogRpcHandlers, ChangelogPostRpcHandlers)
+    ),
+    Layer.provide(JwtSecretRpcHandlers),
+    Layer.provide(
+      Layer.mergeAll(MembershipRpcHandlers, NotificationRpcHandlers)
+    ),
+    Layer.provide(OrganizationRpcHandlers),
+    Layer.provide(CommentReactionRpcHandlers),
+    Layer.provide(CommentRpcHandlers),
+    Layer.provide(
+      Layer.mergeAll(
+        AttributeDefinitionRpcHandlers,
+        CompanyRpcHandlers,
+        ContactRpcHandlers
+      )
+    ),
+    Layer.provide(Layer.merge(SiteRpcHandlers, EmailSubscriptionRpcHandlers)),
+    Layer.provide(Layer.merge(TagRpcHandlers, UpvoteRpcHandlers)),
+    Layer.provide(PostReactionRpcHandlers),
+    Layer.provide(PostStatusRpcHandlers),
+    Layer.provide(
+      Layer.mergeAll(
+        PostSubscriptionRpcHandlers,
+        RoadmapRpcHandlers,
+        RoadmapColumnRpcHandlers
+      )
+    ),
+    Layer.provide(WorkspaceRpcHandlers),
+    Layer.provide(S3UploadServiceLive),
+    Layer.provide(RpcSerialization.layerNdjson),
+    Layer.provide(
+      Layer.mergeAll(
+        AuthMiddlewareLive,
+        OptionalAuthMiddlewareLive,
+        PublicRpcRateLimitMiddlewareLive
+      )
+    )
+  );

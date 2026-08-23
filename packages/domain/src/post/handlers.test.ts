@@ -42,6 +42,7 @@ import {
   DEFAULT_POST_EMBEDDING_MODEL,
   PostEmbeddingService,
 } from "./embedding-service";
+import { PostNotFoundError } from "./errors";
 import { PostRpcHandlersEffect } from "./handlers";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
@@ -168,6 +169,24 @@ describe("PostRpcHandlers", () => {
         creatorMemberId: fixture.membershipId,
         createdAt: now,
         updatedAt: now,
+      });
+
+      return id;
+    });
+
+  const addStatus = (
+    fixture: Fixture,
+    type: "PENDING" | "IN_PROGRESS" | "COMPLETED" = "COMPLETED"
+  ) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const id = yield* PostStatusId.generate;
+
+      yield* db.insert(schema.postStatusTable).values({
+        id,
+        type,
+        orderIndex: 1,
+        organizationId: fixture.organizationId,
       });
 
       return id;
@@ -311,7 +330,9 @@ describe("PostRpcHandlers", () => {
             expect(posts[0]).toMatchObject({
               id: postId,
               title: "Public feedback",
-              creatorId: fixture.userId,
+              // Creator identifiers are redacted for anonymous callers
+              // (see `public-actor.ts`); the post itself stays visible.
+              creatorId: null,
               creatorMemberId: null,
             });
             expect(posts[0]?.content).toContain("A public idea");
@@ -475,12 +496,7 @@ describe("PostRpcHandlers", () => {
             .select({ id: schema.postTable.id })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
-          const legacyQueue = yield* db
-            .select({ postId: schema.submissionNotificationQueueTable.postId })
-            .from(schema.submissionNotificationQueueTable)
-            .where(eq(schema.submissionNotificationQueueTable.postId, postId));
           expect(posts).toEqual([]);
-          expect(legacyQueue).toEqual([]);
         })
       );
 
@@ -659,6 +675,32 @@ describe("PostRpcHandlers", () => {
       );
     });
 
+    describe("PostDelete", () => {
+      it.effect(
+        "reports NotFound when a privileged delete matches no post",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const missingPostId = yield* PostId.generate;
+
+            const error = yield* Effect.flip(
+              handlers
+                .PostDelete({
+                  id: missingPostId,
+                  organizationId: fixture.organizationId,
+                  boardId: fixture.boardId,
+                })
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                )
+            );
+
+            expect(error).toBeInstanceOf(PostNotFoundError);
+          })
+      );
+    });
+
     describe("PostListPublic", () => {
       it.effect("does not expose posts from private boards", () =>
         Effect.gen(function* () {
@@ -688,6 +730,100 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
           expect(posts.map((post) => post.id)).toEqual([publicPostId]);
+        })
+      );
+
+      it.effect(
+        "redacts creator identifiers except for the session user's own posts",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture("PUBLIC");
+            const postId = yield* PostId.generate;
+            const session = makeSession(fixture);
+
+            yield* handlers
+              .PostCreate(
+                postCreateInput(fixture, postId, "Identifiable feedback")
+              )
+              .pipe(Effect.provideService(CurrentSession, session));
+
+            // Anonymous callers get no creator identifiers.
+            const [anonymousView] = yield* handlers
+              .PostListPublic({
+                organizationId: fixture.organizationId,
+                boardId: null,
+              })
+              .pipe(
+                Effect.provideService(OptionalCurrentSession, Option.none())
+              );
+
+            expect(anonymousView?.creatorId).toBeNull();
+            expect(anonymousView?.creatorMemberId).toBeNull();
+
+            // The creator's own view keeps their identifiers so the client
+            // can compute "did I create this post".
+            const [ownView] = yield* handlers
+              .PostListPublic({
+                organizationId: fixture.organizationId,
+                boardId: null,
+              })
+              .pipe(
+                Effect.provideService(
+                  OptionalCurrentSession,
+                  Option.some(session)
+                )
+              );
+
+            expect(ownView?.creatorId).toBe(fixture.userId);
+            expect(ownView?.creatorMemberId).toBe(fixture.membershipId);
+          })
+      );
+
+      it.effect("does not list archived or merged posts", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const activePostId = yield* PostId.generate;
+          const archivedPostId = yield* PostId.generate;
+          const mergedSourcePostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [activePostId, "Active feedback"],
+            [archivedPostId, "Archived feedback"],
+            [mergedSourcePostId, "Merged feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          yield* handlers
+            .PostAdminUpdate({
+              id: archivedPostId,
+              organizationId: fixture.organizationId,
+              archived: true,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId: mergedSourcePostId,
+              targetPostId: activePostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const posts = yield* handlers
+            .PostListPublic({
+              organizationId: fixture.organizationId,
+              boardId: null,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+          expect(posts.map((post) => post.id)).toEqual([activePostId]);
         })
       );
     });
@@ -1196,6 +1332,66 @@ describe("PostRpcHandlers", () => {
             id: postId,
             title: "Original feedback",
           });
+        })
+      );
+
+      it.effect("denies changing the status of their own public post", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, null);
+          const completedStatusId = yield* addStatus(fixture, "COMPLETED");
+
+          yield* handlers
+            .PostCreatePublic(
+              postCreateInput(fixture, postId, "Original feedback")
+            )
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          // A creator must not be able to mark their own post as completed —
+          // status changes are reserved for `posts.status` holders.
+          const error = yield* Effect.flip(
+            handlers
+              .PostUpdatePublic({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                statusId: completedStatusId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("denies moving their own public post to another board", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, null);
+          const otherBoardId = yield* addBoard(fixture, "PUBLIC");
+
+          yield* handlers
+            .PostCreatePublic(
+              postCreateInput(fixture, postId, "Original feedback")
+            )
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostUpdatePublic({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: otherBoardId,
+                statusId: fixture.statusId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
         })
       );
     });
@@ -1779,12 +1975,14 @@ describe("PostRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
+          // Merge bookkeeping is internal state; the membership-gated list
+          // still returns archived/merged rows (the public list filters them).
           const posts = yield* handlers
-            .PostListPublic({
+            .PostList({
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
             })
-            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           const sourcePost = posts.find((post) => post.id === sourcePostId);
 
           expect(sourcePost).toMatchObject({ mergedIntoPostId: targetPostId });

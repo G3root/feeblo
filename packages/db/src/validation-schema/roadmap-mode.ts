@@ -1,11 +1,2 @@
-import * as S from "effect/Schema";
-
-/**
- * Canonical roadmap-mode vocabulary.
- *
- * The `roadmap.mode` column is plain text (not a Postgres enum) so new modes
- * don't require migrations; this Effect Schema is the single source of truth.
- */
-export const RoadmapMode = S.Literals(["status", "filtered"]);
-
-export type TRoadmapMode = S.Schema.Type<typeof RoadmapMode>;
+// Moved to @feeblo/domain-contracts; re-exported for compatibility (see docs/adr/0002).
+export * from "@feeblo/domain-contracts/roadmap-mode";

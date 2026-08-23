@@ -1,4 +1,4 @@
-import type { TPostActivityKind } from "@feeblo/db/validation-schema/activity-kind";
+import type { TPostActivityKind } from "@feeblo/domain/post-activity/schema";
 import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
 import type { TContact } from "@feeblo/domain/contact/schema";
 import {

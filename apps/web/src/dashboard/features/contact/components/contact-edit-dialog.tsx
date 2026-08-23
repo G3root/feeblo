@@ -22,6 +22,7 @@ import {
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
@@ -31,6 +32,7 @@ import {
   createContactAction,
   getContactCustomAttributeValueChanges,
   getCustomAttributeInputValues,
+  hasMissingRequiredCustomAttributeValues,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -163,6 +165,19 @@ function ContactEditFormFields({
       }),
     },
     onSubmit: async (data) => {
+      if (
+        hasMissingRequiredCustomAttributeValues(
+          definitions,
+          data.value.attributes
+        )
+      ) {
+        toastManager.add({
+          title: "Complete all required custom fields",
+          type: "error",
+        });
+        return;
+      }
+
       try {
         const { createAttribute, upsertAttribute } =
           await getContactCustomAttributeValueChanges({
@@ -172,7 +187,6 @@ function ContactEditFormFields({
             organizationId,
             values: data.value.attributes,
           });
-        //TODO add error validation
         await createContactAction({
           contact: {
             ...contact,
@@ -191,9 +205,12 @@ function ContactEditFormFields({
         trackEvent("contact_updated", { success: true });
         store.send({ type: "setOpen", open: false });
         toastManager.add({ title: "Contact updated", type: "success" });
-      } catch {
+      } catch (error) {
         trackEvent("contact_updated", { success: false });
-        toastManager.add({ title: "Failed to update contact", type: "error" });
+        toastManager.add({
+          title: parseRpcError(error).message,
+          type: "error",
+        });
       }
     },
   });

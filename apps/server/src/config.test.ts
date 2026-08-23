@@ -4,6 +4,7 @@ import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
 
 import { ServerConfig } from "./config";
 
@@ -130,5 +131,49 @@ describe("ServerConfig integration worker concurrency", () => {
       );
       expect(Exit.isFailure(nonNumeric)).toBe(true);
     })
+  );
+});
+
+describe("ServerConfig integration encryption key", () => {
+  it.effect(
+    "falls back to AUTH_ENCRYPTION_KEY when INTEGRATION_ENCRYPTION_KEY is unset",
+    () =>
+      Effect.gen(function* () {
+        const config = yield* loadServerConfig({
+          INTEGRATION_ENCRYPTION_KEY: undefined,
+        });
+
+        expect(Redacted.value(config.integrationEncryptionKey)).toBe(
+          "0123456789abcdef0123456789abcdef"
+        );
+      })
+  );
+
+  it.effect("prefers INTEGRATION_ENCRYPTION_KEY over AUTH_ENCRYPTION_KEY", () =>
+    Effect.gen(function* () {
+      const config = yield* loadServerConfig({
+        AUTH_ENCRYPTION_KEY: "auth-encryption-fallback",
+        INTEGRATION_ENCRYPTION_KEY: "integration-specific-key",
+      });
+
+      expect(Redacted.value(config.integrationEncryptionKey)).toBe(
+        "integration-specific-key"
+      );
+    })
+  );
+
+  it.effect(
+    "fails startup when neither INTEGRATION_ENCRYPTION_KEY nor AUTH_ENCRYPTION_KEY is set",
+    () =>
+      Effect.gen(function* () {
+        const exit = yield* Effect.exit(
+          loadServerConfig({
+            AUTH_ENCRYPTION_KEY: undefined,
+            INTEGRATION_ENCRYPTION_KEY: undefined,
+          })
+        );
+
+        expect(Exit.isFailure(exit)).toBe(true);
+      })
   );
 });

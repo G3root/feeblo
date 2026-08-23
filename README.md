@@ -17,16 +17,20 @@ packages/
   db-migrator/         Migration runner
   domain/              Core domain: users, workspaces, boards, posts, comments,
                        upvotes, reactions, changelogs, tags, billing, S3, RPC router
-  editor/              Rich text editor
   feedback-widget/     SolidJS embeddable widget
   post-ui/             Post rendering components
   id/                  ID generation
+  permissions/         Permission policies
   rpc-client/          Typed RPC client
   sdk/                 Embeddable feedback widget SDK (UMD + ESM)
   transactional/       Transactional email templates
   ui/                  Shared UI primitives (shadcn-style)
   utils/               Shared utilities
   web-shared/          Shared web code
+integrations/
+  core/                Delivery pipeline, provider registry, event recording
+  slack/ discord/      Provider adapters (Slack, Discord, GitHub, webhook)
+  github/ webhook/
 ```
 
 ## Tech stack
@@ -36,8 +40,8 @@ packages/
 - **Auth:** better-auth (with Polar billing integration)
 - **Web:** Astro 7, React 19 + Solid.js islands, TanStack Router/DB/Query/Form, Tailwind v4
 - **SDK:** Framework-agnostic Vite-built widget (Floating UI positioning)
-- **Tooling:** pnpm 11, Turborepo, Biome, Ultracite, TypeScript 6
-- **Infra/Deploy:** Docker, Cloudflare (Workers/Pages via Alchemy + Wrangler)
+- **Tooling:** pnpm 11, Turborepo, oxlint + oxfmt, Vitest, Playwright, TypeScript 6
+- **Infra/Deploy:** Docker, Cloudflare (dashboard via Wrangler)
 
 ## Prerequisites
 
@@ -97,8 +101,6 @@ packages/
 | `pnpm db:studio` | Open Drizzle Studio |
 | `pnpm db:nuke` | Drop and recreate the database |
 | `pnpm db:start` / `pnpm db:stop` / `pnpm db:down` | Start/stop/teardown local DB container |
-| `pnpm deploy` | Deploy via the infra package (Alchemy/Cloudflare) |
-| `pnpm destroy` | Tear down deployed infrastructure |
 | `pnpm format` | Format with Biome |
 | `pnpm check` / `pnpm fix` | Ultracite lint check / autofix |
 
@@ -128,7 +130,7 @@ After adding the webhook to an existing Polar organization, resend `product.crea
 
 ## Deployment
 
-Production deployments use the Docker images referenced in `docker-compose.yml` (`ghcr.io/g3root/feeblo-server` and `ghcr.io/g3root/feeblo-web`). Cloudflare deployments are managed via Alchemy and Wrangler configuration in `apps/web`. Use `pnpm deploy` / `pnpm destroy` to provision and remove infrastructure.
+Production deployments use the Docker images referenced in `docker-compose.yml` (`ghcr.io/g3root/feeblo-server` and `ghcr.io/g3root/feeblo-web`). Images are published automatically to GHCR on pushes to `main` and version tags. The dashboard can alternatively be deployed to Cloudflare using the Wrangler configuration in `apps/web/wrangler.jsonc`.
 
 The Compose database uses the pgvector-enabled PostgreSQL image. Post embeddings default to OpenAI `text-embedding-3-small` at 1536 dimensions. Set `EMBEDDING_API_KEY` to enable embeddings; OpenAI-compatible self-hosted providers can also set `EMBEDDING_API_URL`, `EMBEDDING_MODEL`, and `EMBEDDING_DIMENSIONS`.
 

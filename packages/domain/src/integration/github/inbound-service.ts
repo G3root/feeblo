@@ -1,3 +1,4 @@
+import type { ParsedGitHubInboundRequest } from "@feeblo/domain-contracts/github-inbound";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 
@@ -24,6 +25,14 @@ export interface GitHubInstallationLifecycleWebhook {
 
 /** Applies GitHub webhook state once using the durable inbox record before evaluating linked-issue rules. */
 export interface GitHubInboundServiceContract {
+  /**
+   * Routes one verified webhook delivery to its handler. Deliveries Feeblo
+   * recognizes but intentionally ignores (untracked actions, repository
+   * selection updates) resolve without mutating state.
+   */
+  readonly applyWebhook: (
+    webhook: ParsedGitHubInboundRequest
+  ) => Effect.Effect<void, GitHubIntegrationError>;
   /** Applies GitHub App suspension, restoration, or removal to the linked Feeblo connection. */
   readonly applyInstallationLifecycleWebhook: (
     webhook: GitHubInstallationLifecycleWebhook

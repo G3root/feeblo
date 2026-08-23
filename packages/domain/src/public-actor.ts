@@ -41,3 +41,24 @@ export const redactActorIdentities = <T extends ActorRow>(
   }
   return redacted;
 };
+
+/**
+ * Same contract as `redactActorIdentity` for post rows, whose actor
+ * identifiers are named `creatorId`/`creatorMemberId`. The session user's own
+ * posts keep their identifiers so the client can compute "did I create this"
+ * state; every other row has them nulled.
+ */
+export type CreatorRow = {
+  creatorId: string | null;
+  creatorMemberId: string | null;
+};
+
+export const redactCreatorIdentity = <T extends CreatorRow>(
+  row: T,
+  sessionUserId: string | undefined
+): T => {
+  if (sessionUserId && row.creatorId === sessionUserId) {
+    return row;
+  }
+  return { ...row, creatorId: null, creatorMemberId: null };
+};

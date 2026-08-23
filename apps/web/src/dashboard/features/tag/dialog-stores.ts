@@ -8,7 +8,7 @@ export const [TagDeleteDialogProvider, useTagDeleteDialogContext] =
   });
 
 export const [TagCreateDialogProvider, useTagCreateDialogContext] =
-  createModalStoreContext<{ type: string }>({
+  createModalStoreContext<Record<string, never>>({
     name: "TagCreateDialogContext",
     hookName: "useTagCreateDialogContext",
     providerName: "TagCreateDialogProvider",

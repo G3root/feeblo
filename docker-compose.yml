@@ -58,7 +58,10 @@ services:
       # Public board subdomains require a wildcard for their root domain.
       AUTH_TRUSTED_ORIGINS: ${AUTH_TRUSTED_ORIGINS:-${APP_URL:-http://localhost:3001},${API_URL:-http://localhost:3000},*.${APP_ROOT_DOMAIN:-localhost}}
       DATABASE_URL: ${DATABASE_URL:-postgres://feeblo:password@pg:5432/feeblo}
-      AUTH_ENCRYPTION_KEY: ${AUTH_ENCRYPTION_KEY:-dev-key}
+      # REQUIRED: at-rest encryption key for auth and integration secrets.
+      # Compose fails fast instead of silently starting with a known key.
+      # Generate one with: openssl rand -hex 32
+      AUTH_ENCRYPTION_KEY: "${AUTH_ENCRYPTION_KEY:?AUTH_ENCRYPTION_KEY is required - generate one with: openssl rand -hex 32}"
       # Shared rate-limiter store. Leave unset to fall back to in-memory.
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       # Optional SES feedback webhook: leave unset to keep the route inert (404).

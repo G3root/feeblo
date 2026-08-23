@@ -20,10 +20,6 @@ type TCanSetPostTags = {
   postId: string;
 };
 
-type TCanSetChangelogTags = {
-  organizationId: string;
-  changelogId: string;
-};
 const makeTagPolicy = Effect.gen(function* () {
   const repository = yield* TagRepository;
 
@@ -66,28 +62,11 @@ const makeTagPolicy = Effect.gen(function* () {
       )
     );
 
-  /**
-   * Strictly manager-scoped: contributors can never set changelog tags. No
-   * creator branch — unlike posts, changelog creation itself is manager-only
-   * (changelog.create), so a contributor can never legitimately be a
-   * changelog creator, and a demoted creator shouldn't retain tag rights
-   * they no longer hold for editing.
-   */
-  const canSetChangelogTags = (args: TCanSetChangelogTags) =>
-    Policy.all(
-      Policy.hasMembership(args.organizationId),
-      Policy.any(
-        Policy.canPermission(args.organizationId, "changelog.*"),
-        Policy.canPermission(args.organizationId, "tags.*")
-      )
-    );
-
   return {
     canCreate,
     canDelete,
     canUpdate,
     canSetPostTags,
-    canSetChangelogTags,
   };
 });
 

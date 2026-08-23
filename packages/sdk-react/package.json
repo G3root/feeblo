@@ -1,0 +1,66 @@
+{
+  "name": "@feeblo/sdk-react",
+  "version": "0.0.1",
+  "private": false,
+  "description": "React bindings for the Feeblo feedback widget SDK.",
+  "keywords": [
+    "changelog",
+    "embed",
+    "feeblo",
+    "feedback",
+    "react",
+    "sdk",
+    "widget"
+  ],
+  "homepage": "https://github.com/G3root/feeblo/tree/main/packages/sdk-react",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/G3root/feeblo.git",
+    "directory": "packages/sdk-react"
+  },
+  "files": [
+    "dist/**",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/feeblo-sdk-react.js",
+  "module": "./dist/feeblo-sdk-react.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/feeblo-sdk-react.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@feeblo/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@feeblo/config": "workspace:*",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitest/browser-playwright": "^4.1.10",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "vitest-browser-react": "^2.2.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

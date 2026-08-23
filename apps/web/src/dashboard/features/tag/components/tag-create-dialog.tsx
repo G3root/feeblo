@@ -21,18 +21,15 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
 
 import { useTagCreateDialogContext } from "../dialog-stores";
 
-type TagType = "FEEDBACK" | "CHANGELOG";
-
 export type CreatedTag = {
   id: string;
   name: string;
-  type: TagType;
 };
 
 export function TagCreateDialog({
   onCreated,
 }: {
-  onCreated?: (tag: CreatedTag) => void | Promise<void>;
+  onCreated?: ((tag: CreatedTag) => void | Promise<void>) | undefined;
 }) {
   const store = useTagCreateDialogContext();
   const open = useSelector(store, (state) => state.context.open);
@@ -55,23 +52,19 @@ export function TagCreateDialog({
 function TagCreateForm({
   onCreated,
 }: {
-  onCreated?: (tag: CreatedTag) => void | Promise<void>;
+  onCreated?: ((tag: CreatedTag) => void | Promise<void>) | undefined;
 }) {
   const organizationId = useOrganizationId();
   const { tagCollection } = useDashboardCollections();
   const store = useTagCreateDialogContext();
-  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-  const type = store.get().context.data.type as TagType;
 
   const form = useAppForm({
     defaultValues: {
       name: "",
-      type,
     },
     validators: {
       onSubmit: z.object({
         name: z.string(),
-        type: z.enum(["FEEDBACK", "CHANGELOG"]),
       }),
     },
     onSubmit: async (data) => {
@@ -83,7 +76,6 @@ function TagCreateForm({
           updatedAt: new Date(),
           name: data.value.name,
           slug: slugify(data.value.name),
-          type: data.value.type,
           organizationId,
         });
 
@@ -91,7 +83,6 @@ function TagCreateForm({
         await onCreated?.({
           id,
           name: data.value.name,
-          type: data.value.type,
         });
         form.reset();
         store.send({ type: "toggle" });

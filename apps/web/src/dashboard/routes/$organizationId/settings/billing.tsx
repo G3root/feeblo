@@ -12,7 +12,6 @@ import {
 import { Separator } from "@feeblo/ui/separator";
 import { getAuthSession } from "@feeblo/web-shared/auth-session";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
-import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
@@ -31,18 +30,14 @@ import {
   buildPlanCards,
   formatPlanPrice,
   PLAN_COPY,
-  PLAN_FEATURES,
   type PlanType,
-  type WorkspaceProduct,
 } from "~/features/billing/lib/plans";
 import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePlan } from "~/hooks/use-plan";
-import {
-  workspacePlanCollection,
-  workspaceProductCollection,
-} from "~/lib/collections";
+import { usePlanCatalog } from "~/hooks/use-plan-catalog";
+import { workspacePlanCollection } from "~/lib/collections";
 
 export const Route = createFileRoute("/$organizationId/settings/billing")({
   validateSearch: (search) =>
@@ -58,10 +53,7 @@ export const Route = createFileRoute("/$organizationId/settings/billing")({
       session !== null &&
       hasPermission(params.organizationId, "billing.update")(session)
     ) {
-      await Promise.all([
-        workspaceProductCollection.preload(),
-        workspacePlanCollection.preload(),
-      ]);
+      await workspacePlanCollection.preload();
     }
     return null;
   },
@@ -96,18 +88,11 @@ function BillingSettingsContent({
     "pending" | "delayed" | "error"
   >("pending");
 
-  const {
-    data: products = [],
-    isLoading: productsLoading,
-    isError: productsError,
-  } = useLiveQuery((q) => q.from({ product: workspaceProductCollection }), []);
+  const catalog = usePlanCatalog();
 
   const currentSubscribedPlan = usePlan();
-
-  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-  const productList = products as WorkspaceProduct[];
   const currentPlanType = currentSubscribedPlan.data?.plan ?? "free";
-  const { plans } = buildPlanCards(productList, currentPlanType);
+  const { plans } = buildPlanCards(catalog.data ?? [], currentPlanType);
   const currentPlan = plans.find((plan) => plan.planType === currentPlanType);
   const hasPaidPlan = currentPlanType !== "free";
 
@@ -255,9 +240,9 @@ function BillingSettingsContent({
                 />
               </div>
 
-              {productsLoading ? (
+              {catalog.isPending ? (
                 <PlanGridSkeleton />
-              ) : productsError ? (
+              ) : catalog.isError ? (
                 <Card size="sm">
                   <CardPanel className="text-muted-foreground py-2">
                     Plans are unavailable right now.
@@ -285,8 +270,7 @@ function BillingSettingsContent({
                             <div className="space-y-1">
                               <CardTitle>{plan.name}</CardTitle>
                               <CardDescription>
-                                {selectedProduct?.description ||
-                                  plan.description}
+                                {plan.description}
                               </CardDescription>
                             </div>
                             <div className="flex gap-2">
@@ -308,7 +292,12 @@ function BillingSettingsContent({
                         <CardPanel className="space-y-4">
                           <Separator />
                           <div className="space-y-3">
-                            {PLAN_FEATURES[plan.planType].map((feature) => (
+                            {plan.includesLabel ? (
+                              <div className="text-muted-foreground text-sm font-medium">
+                                {plan.includesLabel}
+                              </div>
+                            ) : null}
+                            {plan.features.map((feature) => (
                               <div className="text-sm" key={feature.key}>
                                 {feature.label}
                               </div>
@@ -349,7 +338,7 @@ function BillingSettingsContent({
                               setLoadingPlanType(plan.planType);
                               const didStart = await startBillingCheckout({
                                 organizationId,
-                                productId: selectedProduct.id,
+                                productId: selectedProduct.productId,
                               });
 
                               if (!didStart) {

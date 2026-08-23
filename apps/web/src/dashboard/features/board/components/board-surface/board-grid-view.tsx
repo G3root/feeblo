@@ -2,6 +2,7 @@ import { KeyboardSensor, PointerSensor } from "@dnd-kit/dom";
 import { type DragDropEventHandlers, DragDropProvider } from "@dnd-kit/react";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { useCallback, useRef, useState } from "react";
 
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -81,6 +82,12 @@ export function BoardGridView({
   groupedPosts: BoardPostLane[];
 }) {
   const { postCollection } = useDashboardCollections();
+  // Dragging a post between lanes changes its status, which the backend
+  // reserves for `posts.status` holders — disable the interaction entirely
+  // for everyone else instead of letting an optimistic move fail with 403.
+  const { allowed: canChangeStatus } = usePolicy(
+    hasPermission(organizationId, "posts.status")
+  );
   const [items, setItems] = useState(groupedPosts);
   const [previousGroupedPosts, setPreviousGroupedPosts] =
     useState(groupedPosts);
@@ -209,7 +216,7 @@ export function BoardGridView({
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
       onDragStart={handleDragStart}
-      sensors={sensors}
+      sensors={canChangeStatus ? sensors : []}
     >
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden p-3 pb-[max(calc(var(--spacing)*3),env(safe-area-inset-bottom))]">
         <div className="grid h-full min-h-0 min-w-max auto-cols-max grid-flow-col gap-4">

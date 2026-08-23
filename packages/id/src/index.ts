@@ -106,10 +106,6 @@ export const PostTagId = makeId("post_tag", "ptg", {
   approximateLength,
 });
 
-export const ChangelogTagId = makeId("changelog_tag", "ctg", {
-  approximateLength,
-});
-
 export const ContactId = makeId("contact", "cnt", {
   approximateLength,
 });

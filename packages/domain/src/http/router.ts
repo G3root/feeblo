@@ -5,6 +5,7 @@ import { AuthApiLive } from "../auth/api-live";
 import { EmailSubscriptionApiLive } from "../email-subscription/api-live";
 import { MediaApiLive } from "../media/api-live";
 import { OrganizationApiLive } from "../organization/api-live";
+import { PricingApiLive } from "../pricing/api-live";
 import { ProfileApiLive } from "../profile/api-live";
 import { WidgetApiLive } from "../widget/api-live";
 import { Api } from "./api";
@@ -16,6 +17,7 @@ export const HttpRoute = HttpApiBuilder.layer(Api, {
   Layer.provide(EmailSubscriptionApiLive),
   Layer.provide(MediaApiLive),
   Layer.provide(OrganizationApiLive),
+  Layer.provide(PricingApiLive),
   Layer.provide(ProfileApiLive),
   Layer.provide(WidgetApiLive)
 );

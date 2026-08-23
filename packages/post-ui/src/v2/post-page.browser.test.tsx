@@ -62,10 +62,19 @@ vi.mock("./upvote-toggle", () => ({
   ),
 }));
 // eslint-disable-next-line anti-slop/no-module-mocking
-vi.mock("./subscribe-toggle", () => ({
-  SubscribeButton: () => <button type="button">subscribe</button>,
-  SubscribeCard: () => <div>subscribe card</div>,
-}));
+vi.mock("./subscribe-toggle", () => {
+  const SubscribeButton = () => <button type="button">subscribe</button>;
+  return {
+    SubscribeButton,
+    // The real card wraps the toggle button; keep the button reachable for
+    // role-based locators.
+    SubscribeCard: () => (
+      <div>
+        <SubscribeButton />
+      </div>
+    ),
+  };
+});
 
 // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 const board = { visibility: "PUBLIC" } as TBoard;
@@ -241,7 +250,9 @@ describe("PostPage composition", () => {
     await expect
       .element(screen.getByRole("button", { name: "compact vote" }))
       .toBeVisible();
-    await expect.element(screen.getByText("subscribe card")).toBeVisible();
+    await expect
+      .element(screen.getByRole("button", { name: "subscribe" }))
+      .toBeVisible();
     await expect.element(screen.getByText("comment composer")).toBeVisible();
     await expect.element(screen.getByText("comments list")).toBeVisible();
   });

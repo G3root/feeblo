@@ -261,29 +261,14 @@ const makeMailerService = (transport: MailerTransport): MailerService => ({
         }),
     });
 
-    const receipt = yield* transport
-      .send({
-        ...message,
-        html,
-        text,
-      })
-      .pipe(
-        Effect.flatMap((transportReceipt) =>
-          Schema.decodeUnknownEffect(MailTransportReceipt)(
-            transportReceipt
-          ).pipe(
-            Effect.mapError(
-              (cause) =>
-                new MailUncertainDeliveryError({
-                  cause,
-                  message: "SMTP provider returned an invalid delivery receipt",
-                  operation: "Mailer.send.decodeReceipt",
-                  provider: "smtp",
-                })
-            )
-          )
-        )
-      );
+    // The transport contract returns an already-validated MailTransportReceipt
+    // (the concrete transport decodes provider output at its own boundary), so
+    // no second decode happens per send.
+    const receipt = yield* transport.send({
+      ...message,
+      html,
+      text,
+    });
     return toMailSendResult(receipt, message.messageId);
   }),
 });

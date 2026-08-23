@@ -1,15 +1,17 @@
 import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 
+import type { WebhookEndpointSecurityPolicy } from "@feeblo/domain-contracts/integration";
 import * as Effect from "effect/Effect";
 
 import { WebhookEndpointSecurityError } from "./webhook-errors";
 
-/** Explicit endpoint security policy; private-network egress is available only to local development receivers. */
-export interface WebhookEndpointSecurityPolicy {
-  readonly allowPrivateNetworkInDevelopment: boolean;
-  readonly environment: "development" | "production" | "test";
-}
+/**
+ * Explicit endpoint security policy; private-network egress is available only
+ * to local development receivers. Canonical definition lives in
+ * @feeblo/domain-contracts (see docs/adr/0002).
+ */
+export type { WebhookEndpointSecurityPolicy };
 
 /** An endpoint after syntax validation, DNS validation, and public-address pinning. */
 export interface ValidatedWebhookEndpoint {

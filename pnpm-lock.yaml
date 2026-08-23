@@ -374,9 +374,6 @@ importers:
       '@feeblo/auth':
         specifier: workspace:*
         version: link:../../packages/auth
-      '@feeblo/db':
-        specifier: workspace:*
-        version: link:../../packages/db
       '@feeblo/domain':
         specifier: workspace:*
         version: link:../../packages/domain
@@ -586,12 +583,27 @@ importers:
 
   integrations/discord:
     dependencies:
+      '@feeblo/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@feeblo/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@feeblo/domain-contracts':
+        specifier: workspace:*
+        version: link:../../packages/domain-contracts
+      '@feeblo/id':
+        specifier: workspace:*
+        version: link:../../packages/id
       '@feeblo/integration-core':
         specifier: workspace:*
         version: link:../core
       '@feeblo/utils':
         specifier: workspace:*
         version: link:../../packages/utils
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0-beta.107(effect@4.0.0-beta.107))(@effect/sql-pglite@4.0.0-beta.107(effect@4.0.0-beta.107))(@electric-sql/pglite@0.5.4)(@opentelemetry/api@1.9.1)(@types/pg@8.21.0)(effect@4.0.0-beta.107)(pg@8.23.0)(postgres@3.4.9)(zod@4.4.3)
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.107
@@ -602,9 +614,6 @@ importers:
       '@feeblo/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@feeblo/id':
-        specifier: workspace:*
-        version: link:../../packages/id
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.3
@@ -620,6 +629,18 @@ importers:
       '@distilled.cloud/github':
         specifier: 1.0.0-rc.4
         version: 1.0.0-rc.4(effect@4.0.0-beta.107)
+      '@feeblo/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@feeblo/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@feeblo/domain-contracts':
+        specifier: workspace:*
+        version: link:../../packages/domain-contracts
+      '@feeblo/id':
+        specifier: workspace:*
+        version: link:../../packages/id
       '@feeblo/integration-core':
         specifier: workspace:*
         version: link:../core
@@ -639,9 +660,6 @@ importers:
       '@feeblo/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@feeblo/id':
-        specifier: workspace:*
-        version: link:../../packages/id
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.3
@@ -654,12 +672,27 @@ importers:
 
   integrations/slack:
     dependencies:
+      '@feeblo/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@feeblo/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@feeblo/domain-contracts':
+        specifier: workspace:*
+        version: link:../../packages/domain-contracts
+      '@feeblo/id':
+        specifier: workspace:*
+        version: link:../../packages/id
       '@feeblo/integration-core':
         specifier: workspace:*
         version: link:../core
       '@feeblo/utils':
         specifier: workspace:*
         version: link:../../packages/utils
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0-beta.107(effect@4.0.0-beta.107))(@effect/sql-pglite@4.0.0-beta.107(effect@4.0.0-beta.107))(@electric-sql/pglite@0.5.4)(@opentelemetry/api@1.9.1)(@types/pg@8.21.0)(effect@4.0.0-beta.107)(pg@8.23.0)(postgres@3.4.9)(zod@4.4.3)
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.107
@@ -670,9 +703,6 @@ importers:
       '@feeblo/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@feeblo/id':
-        specifier: workspace:*
-        version: link:../../packages/id
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.3
@@ -688,12 +718,27 @@ importers:
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.0-beta.107(effect@4.0.0-beta.107)(ioredis@5.11.1)
+      '@feeblo/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@feeblo/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@feeblo/domain-contracts':
+        specifier: workspace:*
+        version: link:../../packages/domain-contracts
+      '@feeblo/id':
+        specifier: workspace:*
+        version: link:../../packages/id
       '@feeblo/integration-core':
         specifier: workspace:*
         version: link:../core
       '@feeblo/utils':
         specifier: workspace:*
         version: link:../../packages/utils
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0-beta.107(effect@4.0.0-beta.107))(@effect/sql-pglite@4.0.0-beta.107(effect@4.0.0-beta.107))(@electric-sql/pglite@0.5.4)(@opentelemetry/api@1.9.1)(@types/pg@8.21.0)(effect@4.0.0-beta.107)(pg@8.23.0)(postgres@3.4.9)(zod@4.4.3)
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.107
@@ -707,9 +752,6 @@ importers:
       '@feeblo/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@feeblo/id':
-        specifier: workspace:*
-        version: link:../../packages/id
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.3
@@ -796,6 +838,9 @@ importers:
       '@electric-sql/pglite-pgvector':
         specifier: ^0.0.5
         version: 0.0.5(@electric-sql/pglite@0.5.4)
+      '@feeblo/domain-contracts':
+        specifier: workspace:*
+        version: link:../domain-contracts
       '@feeblo/permissions':
         specifier: workspace:*
         version: link:../permissions
@@ -891,24 +936,15 @@ importers:
       '@feeblo/db':
         specifier: workspace:*
         version: link:../db
+      '@feeblo/domain-contracts':
+        specifier: workspace:*
+        version: link:../domain-contracts
       '@feeblo/id':
         specifier: workspace:*
         version: link:../id
       '@feeblo/integration-core':
         specifier: workspace:*
         version: link:../../integrations/core
-      '@feeblo/integration-discord':
-        specifier: workspace:*
-        version: link:../../integrations/discord
-      '@feeblo/integration-github':
-        specifier: workspace:*
-        version: link:../../integrations/github
-      '@feeblo/integration-slack':
-        specifier: workspace:*
-        version: link:../../integrations/slack
-      '@feeblo/integration-webhook':
-        specifier: workspace:*
-        version: link:../../integrations/webhook
       '@feeblo/permissions':
         specifier: workspace:*
         version: link:../permissions
@@ -964,6 +1000,19 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(happy-dom@20.11.2)(msw@2.15.0(@types/node@26.2.0)(typescript@6.0.3))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
+
+  packages/domain-contracts:
+    dependencies:
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.107
+    devDependencies:
+      '@feeblo/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
 
   packages/feedback-widget:
     dependencies:
@@ -1060,9 +1109,6 @@ importers:
 
   packages/post-ui:
     dependencies:
-      '@feeblo/db':
-        specifier: workspace:*
-        version: link:../db
       '@feeblo/domain':
         specifier: workspace:*
         version: link:../domain
@@ -1173,6 +1219,43 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(happy-dom@20.11.2)(msw@2.15.0(@types/node@26.2.0)(typescript@6.0.3))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
+
+  packages/sdk-react:
+    dependencies:
+      '@feeblo/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+    devDependencies:
+      '@feeblo/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.4(@types/react@19.2.18)
+      '@vitest/browser-playwright':
+        specifier: ^4.1.10
+        version: 4.1.10(msw@2.15.0(@types/node@26.2.0)(typescript@6.0.3))(playwright@1.62.1)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(vitest@4.1.10)
+      react:
+        specifier: 'catalog:'
+        version: 19.2.8
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(happy-dom@20.11.2)(msw@2.15.0(@types/node@26.2.0)(typescript@6.0.3))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
+      vitest-browser-react:
+        specifier: ^2.2.0
+        version: 2.2.0(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@4.1.10)
 
   packages/transactional:
     dependencies:
@@ -1386,9 +1469,6 @@ importers:
       '@feeblo/auth':
         specifier: workspace:*
         version: link:../auth
-      '@feeblo/db':
-        specifier: workspace:*
-        version: link:../db
       '@feeblo/domain':
         specifier: workspace:*
         version: link:../domain

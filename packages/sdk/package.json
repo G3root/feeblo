@@ -45,9 +45,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check-types": "tsc --noEmit",
-    "lint": "biome check src",
-    "lint:fix": "biome check --write src"
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {},
   "devDependencies": {

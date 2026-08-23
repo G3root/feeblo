@@ -2,6 +2,18 @@ import type { ChannelUpdateMessage } from "@feeblo/integration-core";
 
 export type { ChannelUpdateMessage } from "@feeblo/integration-core";
 
+/**
+ * Rich Discord embed vocabulary; canonical definitions live in
+ * @feeblo/domain-contracts so the interaction callback contract can reference
+ * them (see docs/adr/0002).
+ */
+import type {
+  DiscordEmbed,
+  DiscordEmbedField,
+} from "@feeblo/domain-contracts/discord-inbound";
+
+export type { DiscordEmbed, DiscordEmbedField };
+
 import { truncate } from "@feeblo/utils/text";
 
 /** Discord's maximum aggregate text length across an embed's title, description, and footer. */
@@ -19,24 +31,6 @@ const DISCORD_EMBED_FIELD_MAX = 25;
 
 /** Feeblo brand color rendered as the embed accent. */
 const EMBED_COLOR = 0x11_18_27;
-
-/** Rich Discord embed fields emitted for channel notifications. */
-export interface DiscordEmbed {
-  readonly color: number;
-  readonly description?: string;
-  readonly fields?: readonly DiscordEmbedField[];
-  readonly footer?: { readonly text: string };
-  readonly title: string;
-  readonly type: "rich";
-  readonly url: string;
-}
-
-/** One labelled metadata value displayed inside a Discord embed. */
-export interface DiscordEmbedField {
-  readonly inline: boolean;
-  readonly name: string;
-  readonly value: string;
-}
 
 /** Metadata shown after Discord feedback is successfully submitted. */
 export interface DiscordFeedbackConfirmation {

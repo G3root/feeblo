@@ -39,6 +39,7 @@ import {
   CustomAttributeFields,
   createContactAction,
   getContactCustomAttributeValueChanges,
+  hasMissingRequiredCustomAttributeValues,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useEntitlements } from "~/hooks/use-entitlements";
 import { useOrganizationId } from "~/hooks/use-organization-id";
@@ -121,6 +122,19 @@ function ContactCreateForm() {
       }),
     },
     onSubmit: async (data) => {
+      if (
+        hasMissingRequiredCustomAttributeValues(
+          definitions,
+          data.value.attributes
+        )
+      ) {
+        toastManager.add({
+          title: "Complete all required custom fields",
+          type: "error",
+        });
+        return;
+      }
+
       try {
         const contactId = await ContactId.unsafeGenerate();
         const now = new Date();
@@ -147,7 +161,6 @@ function ContactCreateForm() {
             values: data.value.attributes,
           }
         );
-        //TODO add error validation
         await createContactAction({
           contact,
           createAttribute,

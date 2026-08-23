@@ -7,7 +7,10 @@
     "declarationMap": false,
     "sourceMap": false,
     "rootDir": "./src",
-    "outDir": "dist"
+    "outDir": "dist",
+    // Vite empties dist/ after any previous build; without this, tsc's
+    // incremental state claims the removed declarations are up-to-date.
+    "incremental": false
   },
   "include": ["src/index.ts"],
   "exclude": ["src/preview.ts"]

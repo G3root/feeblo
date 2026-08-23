@@ -5,6 +5,7 @@ import {
   GitHubUpvoterNotificationPolicy,
 } from "@feeblo/db/validation-schema/github-integration";
 import { IntegrationConnectionLifecycleStatus } from "@feeblo/db/validation-schema/integration";
+import { GitHubIssueCreateRouteConfiguration as IntegrationGitHubIssueCreateRouteConfiguration } from "@feeblo/domain-contracts/github-integration";
 import {
   BoardId,
   GitHubSyncRuleId,
@@ -13,7 +14,6 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
-import { GitHubIssueCreateRouteConfiguration as IntegrationGitHubIssueCreateRouteConfiguration } from "@feeblo/integration-github/manifest";
 import * as Schema from "effect/Schema";
 
 /** Safe GitHub App installation details; installation access tokens are never persisted. */

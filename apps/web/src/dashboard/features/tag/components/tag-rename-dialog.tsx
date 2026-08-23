@@ -61,12 +61,10 @@ function TagRenameForm() {
   const form = useAppForm({
     defaultValues: {
       name: tag.name,
-      type: tag.type,
     },
     validators: {
       onSubmit: z.object({
         name: z.string(),
-        type: z.enum(["FEEDBACK", "CHANGELOG"]),
       }),
     },
     onSubmit: async (data) => {
@@ -74,7 +72,6 @@ function TagRenameForm() {
         const tx = tagCollection.update(tagId, (draft) => {
           draft.name = data.value.name;
           draft.slug = slugify(data.value.name);
-          draft.type = data.value.type;
         });
 
         await tx.isPersisted.promise;

@@ -5,5 +5,6 @@ export * from "./discord-embeds";
 export * from "./discord-errors";
 export * from "./discord-inbound-schema";
 export * from "./discord-manifest";
+export * from "./discord-oauth-callback";
 export * from "./discord-provider-registration";
 export * from "./discord-signature";

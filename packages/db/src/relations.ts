@@ -9,7 +9,6 @@ import {
   changelogCategoryTable,
   changelogPostTable,
   changelogTable,
-  changelogTagTable,
   commentReactionTable,
   commentTable,
   companyAttributeDefinitionTable,
@@ -50,8 +49,6 @@ import {
   roadmapTable,
   sessionTable,
   siteTable,
-  submissionNotificationBatchTable,
-  submissionNotificationQueueTable,
   subscriptionTable,
   tagTable,
   twoFactorTable,
@@ -103,15 +100,12 @@ export const relations = defineRelations(
     changelogCategoryTable,
     changelogTable,
     changelogPostTable,
-    changelogTagTable,
     companyTable,
     contactTable,
     companyAttributeDefinitionTable,
     companyAttributeValueTable,
     contactAttributeDefinitionTable,
     contactAttributeValueTable,
-    submissionNotificationBatchTable,
-    submissionNotificationQueueTable,
     emailOutboxTable,
     emailDeliveryTable,
     emailProviderEventTable,
@@ -288,10 +282,6 @@ export const relations = defineRelations(
         from: r.organizationTable.id,
         to: r.changelogCategoryTable.organizationId,
       }),
-      changelogTags: r.many.changelogTagTable({
-        from: r.organizationTable.id,
-        to: r.changelogTagTable.organizationId,
-      }),
       companies: r.many.companyTable({
         from: r.organizationTable.id,
         to: r.companyTable.organizationId,
@@ -335,14 +325,6 @@ export const relations = defineRelations(
       subscriptions: r.many.subscriptionTable({
         from: r.organizationTable.id,
         to: r.subscriptionTable.organizationId,
-      }),
-      submissionNotificationBatch: r.one.submissionNotificationBatchTable({
-        from: r.organizationTable.id,
-        to: r.submissionNotificationBatchTable.organizationId,
-      }),
-      submissionNotificationQueue: r.many.submissionNotificationQueueTable({
-        from: r.organizationTable.id,
-        to: r.submissionNotificationQueueTable.organizationId,
       }),
       assets: r.many.assetTable({
         from: r.organizationTable.id,
@@ -395,10 +377,6 @@ export const relations = defineRelations(
       postTags: r.many.postTagTable({
         from: r.tagTable.id,
         to: r.postTagTable.tagId,
-      }),
-      changelogTags: r.many.changelogTagTable({
-        from: r.tagTable.id,
-        to: r.changelogTagTable.tagId,
       }),
     },
     postTagTable: {
@@ -477,10 +455,6 @@ export const relations = defineRelations(
       subscriptions: r.many.postSubscriptionTable({
         from: r.postTable.id,
         to: r.postSubscriptionTable.postId,
-      }),
-      submissionNotification: r.one.submissionNotificationQueueTable({
-        from: r.postTable.id,
-        to: r.submissionNotificationQueueTable.postId,
       }),
       assets: r.many.postAssetTable({
         from: r.postTable.id,
@@ -758,10 +732,6 @@ export const relations = defineRelations(
         from: r.changelogTable.id,
         to: r.changelogCategoryLinkTable.changelogId,
       }),
-      changelogTags: r.many.changelogTagTable({
-        from: r.changelogTable.id,
-        to: r.changelogTagTable.changelogId,
-      }),
       changelogPosts: r.many.changelogPostTable({
         from: r.changelogTable.id,
         to: r.changelogPostTable.changelogId,
@@ -796,36 +766,6 @@ export const relations = defineRelations(
       }),
       organization: r.one.organizationTable({
         from: r.changelogPostTable.organizationId,
-        to: r.organizationTable.id,
-      }),
-    },
-    submissionNotificationBatchTable: {
-      organization: r.one.organizationTable({
-        from: r.submissionNotificationBatchTable.organizationId,
-        to: r.organizationTable.id,
-      }),
-    },
-    submissionNotificationQueueTable: {
-      organization: r.one.organizationTable({
-        from: r.submissionNotificationQueueTable.organizationId,
-        to: r.organizationTable.id,
-      }),
-      post: r.one.postTable({
-        from: r.submissionNotificationQueueTable.postId,
-        to: r.postTable.id,
-      }),
-    },
-    changelogTagTable: {
-      changelog: r.one.changelogTable({
-        from: r.changelogTagTable.changelogId,
-        to: r.changelogTable.id,
-      }),
-      tag: r.one.tagTable({
-        from: r.changelogTagTable.tagId,
-        to: r.tagTable.id,
-      }),
-      organization: r.one.organizationTable({
-        from: r.changelogTagTable.organizationId,
         to: r.organizationTable.id,
       }),
     },

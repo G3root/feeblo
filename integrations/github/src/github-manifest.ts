@@ -25,12 +25,9 @@ export const GITHUB_APP_PERMISSIONS = {
 export const GitHubConnectionConfiguration = Schema.Struct({});
 
 /** A repository and optional Feeblo board selection for automatic issue creation. */
-export const GitHubIssueCreateRouteConfiguration = Schema.Struct({
-  version: Schema.Literal(1),
-  repositoryOwner: Schema.NonEmptyString,
-  repositoryName: Schema.NonEmptyString,
-  boardId: Schema.optionalKey(Schema.NonEmptyString),
-});
+import { GitHubIssueCreateRouteConfiguration } from "@feeblo/domain-contracts/github-integration";
+
+export { GitHubIssueCreateRouteConfiguration };
 export type GitHubIssueCreateRouteConfiguration = Schema.Schema.Type<
   typeof GitHubIssueCreateRouteConfiguration
 >;

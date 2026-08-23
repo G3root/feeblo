@@ -199,13 +199,8 @@ describe("WorkspaceRpcHandlers", () => {
               .from(schema.tagTable)
               .where(eq(schema.tagTable.organizationId, result.organizationId));
             expect(tags).toHaveLength(2);
-            expect(
-              tags.map((tag) => ({ name: tag.name, type: tag.type }))
-            ).toEqual(
-              expect.arrayContaining([
-                { name: "High Priority", type: "FEEDBACK" },
-                { name: "Low Priority", type: "FEEDBACK" },
-              ])
+            expect(tags.map((tag) => tag.name)).toEqual(
+              expect.arrayContaining(["High Priority", "Low Priority"])
             );
 
             // Verify the primary status roadmap and its ordered columns were created

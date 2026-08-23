@@ -28,7 +28,6 @@
     "@effect/atom-react": "catalog:",
     "@egoist/tailwindcss-icons": "^1.9.2",
     "@feeblo/auth": "workspace:*",
-    "@feeblo/db": "workspace:*",
     "@feeblo/domain": "workspace:*",
     "@feeblo/feedback-widget": "workspace:*",
     "@feeblo/id": "workspace:*",

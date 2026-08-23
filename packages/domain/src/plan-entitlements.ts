@@ -183,6 +183,16 @@ export const PLAN_ENTITLEMENTS = {
   },
 } as const satisfies Record<OrganizationPlan, PlanEntitlements>;
 
+export const PLAN_KEYS = Object.keys(PLAN_ENTITLEMENTS).filter(
+  (plan): plan is OrganizationPlan => plan in PLAN_ENTITLEMENTS
+);
+
+export const PLAN_DISPLAY_NAMES = {
+  free: "Free",
+  starter: "Starter",
+  professional: "Professional",
+} as const satisfies Record<OrganizationPlan, string>;
+
 export const PAID_PLAN_KEYS = Object.keys(PLAN_ENTITLEMENTS).filter(
   (plan): plan is Exclude<OrganizationPlan, "free"> => plan !== "free"
 );
