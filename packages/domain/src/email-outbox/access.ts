@@ -74,10 +74,10 @@ export const evaluateOrganizationAccess = (
       ? "sso"
       : account.restrictedToOrganizationId === null
         ? "global"
-        // Defensive: accounts restricted to a different organization carry
-        // synthetic inboxes, so resolution cannot reach them in practice; if
-        // one ever is reached it grants this workspace nothing.
-        : "shadow";
+        : // Defensive: accounts restricted to a different organization carry
+          // synthetic inboxes, so resolution cannot reach them in practice; if
+          // one ever is reached it grants this workspace nothing.
+          "shadow";
 
   const eligible =
     account.emailVerified &&

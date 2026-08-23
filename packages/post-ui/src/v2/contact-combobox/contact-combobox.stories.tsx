@@ -1,5 +1,4 @@
 import "../../tailwind.css";
-
 import type { TContactSearchResult } from "@feeblo/domain/contact/schema";
 import { useState } from "react";
 
@@ -66,8 +65,9 @@ export default {
 };
 
 export function Default() {
-  const [selection, setSelection] =
-    useState<ContactComboboxSelection | null>(null);
+  const [selection, setSelection] = useState<ContactComboboxSelection | null>(
+    null
+  );
 
   return (
     <div className="bg-background flex min-h-screen items-start justify-center p-8">
@@ -85,8 +85,9 @@ export function Default() {
 }
 
 export function AlreadyVoted() {
-  const [selection, setSelection] =
-    useState<ContactComboboxSelection | null>(null);
+  const [selection, setSelection] = useState<ContactComboboxSelection | null>(
+    null
+  );
 
   return (
     <div className="bg-background flex min-h-screen items-start justify-center p-8">
@@ -105,8 +106,9 @@ export function AlreadyVoted() {
 }
 
 export function NoAccessHint() {
-  const [selection, setSelection] =
-    useState<ContactComboboxSelection | null>(null);
+  const [selection, setSelection] = useState<ContactComboboxSelection | null>(
+    null
+  );
 
   return (
     <div className="bg-background flex min-h-screen items-start justify-center p-8">
@@ -127,8 +129,9 @@ export function NoAccessHint() {
 }
 
 export function EmptyQueryCreatesCustomer() {
-  const [selection, setSelection] =
-    useState<ContactComboboxSelection | null>(null);
+  const [selection, setSelection] = useState<ContactComboboxSelection | null>(
+    null
+  );
 
   return (
     <div className="bg-background flex min-h-screen items-start justify-center p-8">

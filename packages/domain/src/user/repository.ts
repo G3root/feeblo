@@ -11,7 +11,6 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { isShadowUserEmail } from "../identity/emails";
-
 import { UserPersistenceError } from "./errors";
 
 function hashEmail(email: string): string {

@@ -244,7 +244,10 @@ describe("UpvoteRpcHandlers on-behalf", () => {
               .from(schema.contactTable)
               .where(
                 and(
-                  eq(schema.contactTable.organizationId, fixture.organizationId),
+                  eq(
+                    schema.contactTable.organizationId,
+                    fixture.organizationId
+                  ),
                   eq(schema.contactTable.email, "sam@example.com")
                 )
               )

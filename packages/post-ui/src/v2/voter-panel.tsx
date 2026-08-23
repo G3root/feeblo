@@ -7,15 +7,20 @@ import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
-import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
   Cancel01Icon,
   ThumbsUpIcon,
   UserAdd01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, createOptimisticAction, eq, useLiveQuery } from "@tanstack/react-db";
+import {
+  and,
+  createOptimisticAction,
+  eq,
+  useLiveQuery,
+} from "@tanstack/react-db";
 import { useState } from "react";
 
 import {
@@ -134,7 +139,11 @@ export function VoterPanel() {
     <section aria-label="Voters" className="space-y-2">
       <div className="flex items-center justify-between">
         <h2 className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
-          <HugeiconsIcon className="size-3.5" icon={ThumbsUpIcon} strokeWidth={2} />
+          <HugeiconsIcon
+            className="size-3.5"
+            icon={ThumbsUpIcon}
+            strokeWidth={2}
+          />
           Voters ({upvotes.length})
         </h2>
         {session && votesOnBehalfPolicy.allowed ? (

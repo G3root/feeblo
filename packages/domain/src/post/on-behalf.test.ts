@@ -517,7 +517,10 @@ describe("PostRpcHandlers on-behalf", () => {
                 author: { email: `${role}@example.com` },
               })
               .pipe(
-                Effect.provideService(CurrentSession, makeSession(fixture, role))
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, role)
+                )
               );
             const post = yield* getPost(postId);
             expect(post?.contactId).not.toBeNull();
@@ -540,7 +543,10 @@ describe("PostRpcHandlers on-behalf", () => {
             yield* handlers
               .PostCreate(postCreateInput(fixture, postId, `${role} self post`))
               .pipe(
-                Effect.provideService(CurrentSession, makeSession(fixture, role))
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, role)
+                )
               );
 
             const post = yield* getPost(postId);

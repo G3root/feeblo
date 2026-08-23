@@ -583,10 +583,7 @@ const sendDeliveryAttempt = (deliveryId: string) =>
           .where(
             and(
               eq(schema.emailContactTable.id, delivery.contactId),
-              eq(
-                schema.emailContactTable.organizationId,
-                intent.organizationId
-              )
+              eq(schema.emailContactTable.organizationId, intent.organizationId)
             )
           )
           .limit(1);

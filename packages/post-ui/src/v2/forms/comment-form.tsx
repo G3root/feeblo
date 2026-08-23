@@ -1,15 +1,19 @@
 import { COMMENT_CONTENT_MAX_LENGTH } from "@feeblo/domain/content-limits";
 import { CommentId } from "@feeblo/id";
 import { useAppForm, withForm } from "@feeblo/ui/hooks/form";
-import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { toastManager } from "@feeblo/ui/toast";
-import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
+import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { formOptions } from "@tanstack/react-form";
 import type { Dispatch, SetStateAction } from "react";
 import { useState } from "react";
 import z from "zod";
 
+import {
+  CommentComposer,
+  type CommentComposerProviderProps,
+} from "../comment-composer";
 import {
   ContactCombobox,
   describeContactSelection,
@@ -18,10 +22,6 @@ import {
   OnBehalfAuthorSchema,
   toOnBehalfAuthor,
 } from "../contact-combobox/contact-combobox";
-import {
-  CommentComposer,
-  type CommentComposerProviderProps,
-} from "../comment-composer";
 import { usePostCollectionData } from "../post-page-context";
 import { usePostCollections } from "../providers/post-collections-provider";
 
@@ -129,9 +129,7 @@ export const useCommentForm = ({
         ? (value.author?.userId ?? null)
         : session.user.id;
       const optimisticAuthorName = onBehalf
-        ? (value.author?.name ??
-          value.author?.email ??
-          session.user.name)
+        ? (value.author?.name ?? value.author?.email ?? session.user.name)
         : session.user.name;
 
       const tx = commentCollection.insert({

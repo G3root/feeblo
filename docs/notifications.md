@@ -45,15 +45,7 @@ This applies to `NotificationList`, `NotificationUnreadCount`, `NotificationMark
 
 ## Email updates for on-behalf customers
 
-In-app notifications are member-only by design. Customers attributed through
-on-behalf actions (created posts, added voters) are reached over email
-instead, through the durable outbox — and only when they pass the
-organization-access eligibility rule documented in
-[`docs/on-behalf.md`](./on-behalf.md): a verified account that is a workspace
-member, SSO-bound to the organization, or an unrestricted global user on a
-public board. A bare email typed by an admin grants attribution but never
-notification; its subscription sits at `deferred_no_access` until the subject
-gains real access, at which point subsequent updates flow automatically.
+In-app notifications are member-only by design. Customers attributed through on-behalf actions (created posts, added voters) are reached over email instead, through the durable outbox — and only when they pass the organization-access eligibility rule documented in [`docs/on-behalf.md`](./on-behalf.md): a verified account that is a workspace member, SSO-bound to the organization, or an unrestricted global user on a public board. A bare email typed by an admin grants attribution but never notification; its subscription sits at `deferred_no_access` until the subject gains real access, at which point subsequent updates flow automatically.
 
 ## Extending the system
 

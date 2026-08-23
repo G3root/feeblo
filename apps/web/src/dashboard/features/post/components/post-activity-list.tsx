@@ -1,6 +1,6 @@
+import type { TContact } from "@feeblo/domain/contact/schema";
 import type { TPostActivityKind } from "@feeblo/domain/post-activity/schema";
 import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
-import type { TContact } from "@feeblo/domain/contact/schema";
 import {
   ActivityTimeline,
   ActivityTimelineItem,
@@ -58,12 +58,10 @@ type NameLookup = ReadonlyMap<string, string>;
  * shape so provenance lights up without further UI changes.
  */
 type OnBehalfMetadata = {
-  onBehalfOf?:
-    | {
-        contactId?: string | null;
-        userId?: string | null;
-      }
-    | null;
+  onBehalfOf?: {
+    contactId?: string | null;
+    userId?: string | null;
+  } | null;
 };
 
 function getOnBehalfMetadata(activity: TPostActivity): OnBehalfMetadata | null {

@@ -171,10 +171,9 @@ export type TPostMerge = S.Schema.Type<typeof PostMerge>;
  * persist junk contact emails that can never heal or receive notifications.
  */
 const AuthorEmail = S.String.check(
-  S.makeFilter(
-    (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
-    { message: "author.email must be a valid email address" }
-  )
+  S.makeFilter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), {
+    message: "author.email must be a valid email address",
+  })
 );
 
 /**

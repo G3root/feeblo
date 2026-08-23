@@ -424,32 +424,30 @@ describe("createSsoSession", () => {
         })
     );
 
-    it.effect(
-      "leaves native SSO users untouched when they sign in again",
-      () =>
-        Effect.gen(function* () {
-          const fixture = yield* makeFixture(true);
-          const token = yield* signToken(validPayload(fixture), fixture.secret);
+    it.effect("leaves native SSO users untouched when they sign in again", () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture(true);
+        const token = yield* signToken(validPayload(fixture), fixture.secret);
 
-          const first = yield* createSsoSession({
-            clientIp: fixture.clientIp,
-            organizationId: fixture.organizationId,
-            token,
-          });
-          const second = yield* createSsoSession({
-            clientIp: `${fixture.clientIp}-2`,
-            organizationId: fixture.organizationId,
-            token,
-          });
+        const first = yield* createSsoSession({
+          clientIp: fixture.clientIp,
+          organizationId: fixture.organizationId,
+          token,
+        });
+        const second = yield* createSsoSession({
+          clientIp: `${fixture.clientIp}-2`,
+          organizationId: fixture.organizationId,
+          token,
+        });
 
-          expect(second.userId).toBe(first.userId);
-          const db = yield* currentDb;
-          const [user] = yield* db
-            .select()
-            .from(schema.userTable)
-            .where(eq(schema.userTable.id, second.userId));
-          expect(user?.email).toMatch(/^sso-[0-9a-f]{16}@feeblo\.com$/);
-        })
+        expect(second.userId).toBe(first.userId);
+        const db = yield* currentDb;
+        const [user] = yield* db
+          .select()
+          .from(schema.userTable)
+          .where(eq(schema.userTable.id, second.userId));
+        expect(user?.email).toMatch(/^sso-[0-9a-f]{16}@feeblo\.com$/);
+      })
     );
   });
 });

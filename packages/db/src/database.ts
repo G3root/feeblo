@@ -1,8 +1,8 @@
 import * as SQLPG from "@effect/sql-pg";
 import { PgliteClient } from "@effect/sql-pglite";
 import { PGlite } from "@electric-sql/pglite";
-import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { vector } from "@electric-sql/pglite-pgvector";
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { sql } from "drizzle-orm";
 import * as PgDrizzlePglite from "drizzle-orm/effect-pglite";
 import * as PgDrizzle from "drizzle-orm/effect-postgres";

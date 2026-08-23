@@ -23,10 +23,7 @@ import { EmailOutboxRepository } from "../email-outbox/repository";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
-import {
-  InvalidSubjectError,
-  SubjectNotFoundError,
-} from "../identity/errors";
+import { InvalidSubjectError, SubjectNotFoundError } from "../identity/errors";
 import { isSyntheticEmail, ResolvePrincipalService } from "../identity/service";
 import { recordPostIntegrationEvent as recordPostIntegrationEventShared } from "../integration/post-event-recording";
 import { NotificationService } from "../notification/service";
@@ -651,7 +648,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                   .pipe(
                     Effect.mapError(
                       (
-                        error,
+                        error
                       ):
                         | SubjectNotFoundError
                         | InvalidSubjectError
@@ -660,8 +657,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                         error instanceof InvalidSubjectError
                           ? error
                           : new InternalServerError({
-                              message:
-                                "Could not resolve the post author.",
+                              message: "Could not resolve the post author.",
                             })
                     )
                   );

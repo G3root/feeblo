@@ -1,7 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import { ContactId } from "@feeblo/id";
-import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import { and, eq, isNull, sql } from "drizzle-orm";
+import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -88,9 +88,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
       .where(where)
       .limit(1)
       .pipe(
-        Effect.map((rows) =>
-          rows[0] ? Option.some(rows[0]) : Option.none()
-        )
+        Effect.map((rows) => (rows[0] ? Option.some(rows[0]) : Option.none()))
       );
 
   const findContactByUser = (organizationId: string, userId: string) =>
@@ -232,7 +230,10 @@ const makeResolvePrincipalService = Effect.gen(function* () {
    */
   function insertContactToleratingRace(
     values: Omit<ContactInsert, "id" | "createdAt" | "updatedAt">,
-    redetect: () => Effect.Effect<Option.Option<Contact>, EffectDrizzleQueryError>
+    redetect: () => Effect.Effect<
+      Option.Option<Contact>,
+      EffectDrizzleQueryError
+    >
   ) {
     return Effect.gen(function* () {
       const id = yield* ContactId.generate;
@@ -257,11 +258,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
   }
 
   return {
-    resolve: ({
-      organizationId,
-      needsUser,
-      subject,
-    }: ResolvePrincipalInput) =>
+    resolve: ({ organizationId, needsUser, subject }: ResolvePrincipalInput) =>
       Effect.gen(function* () {
         const email = normalizeEmail(subject.email);
 
@@ -495,7 +492,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             "Provide at least one subject identifier: userId, contactId, externalId, or email",
         });
       }),
-  }
+  };
 });
 
 export class ResolvePrincipalService extends Context.Service<ResolvePrincipalService>()(

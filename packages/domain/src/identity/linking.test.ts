@@ -8,9 +8,9 @@ import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { linkAnonymousAccount } from "../widget/sso";
 import { SubjectNotFoundError } from "./errors";
 import { healShadowsForVerifiedUser, linkShadowUser } from "./linking";
-import { linkAnonymousAccount } from "../widget/sso";
 
 const hashEmail = (email: string): string =>
   createHash("sha256").update(email.toLowerCase().trim()).digest("hex");
@@ -505,73 +505,70 @@ describe("identity linking", () => {
       })
     );
 
-    it.effect(
-      "drops duplicate post subscriptions instead of colliding",
-      () =>
-        Effect.gen(function* () {
-          const n = nextTestRun();
-          const organizationId = yield* makeOrganization();
-          const real = `real_${n}`;
-          const shadow = `shadow_${n}`;
-          yield* insertRealUser({
-            id: real,
-            email: `jane.${n}@example.com`,
-          });
-          yield* insertShadowUser({
-            id: shadow,
-            email: `jane.${n}@example.com`,
-            organizationId,
-          });
-          const { boardId, statusId } =
-            yield* makeBoardAndStatus(organizationId);
-          yield* insertPost({
-            id: `post_${n}a`,
-            organizationId,
-            boardId,
-            statusId,
-            creatorId: null,
-          });
-          yield* insertPost({
-            id: `post_${n}b`,
-            organizationId,
-            boardId,
-            statusId,
-            creatorId: null,
-          });
-          yield* insertPostSubscription({
-            id: `post_sub_${n}_real_a`,
-            organizationId,
-            postId: `post_${n}a`,
-            userId: real,
-          });
-          yield* insertPostSubscription({
-            id: `post_sub_${n}_shadow_a`,
-            organizationId,
-            postId: `post_${n}a`,
-            userId: shadow,
-          });
-          yield* insertPostSubscription({
-            id: `post_sub_${n}_shadow_b`,
-            organizationId,
-            postId: `post_${n}b`,
-            userId: shadow,
-          });
+    it.effect("drops duplicate post subscriptions instead of colliding", () =>
+      Effect.gen(function* () {
+        const n = nextTestRun();
+        const organizationId = yield* makeOrganization();
+        const real = `real_${n}`;
+        const shadow = `shadow_${n}`;
+        yield* insertRealUser({
+          id: real,
+          email: `jane.${n}@example.com`,
+        });
+        yield* insertShadowUser({
+          id: shadow,
+          email: `jane.${n}@example.com`,
+          organizationId,
+        });
+        const { boardId, statusId } = yield* makeBoardAndStatus(organizationId);
+        yield* insertPost({
+          id: `post_${n}a`,
+          organizationId,
+          boardId,
+          statusId,
+          creatorId: null,
+        });
+        yield* insertPost({
+          id: `post_${n}b`,
+          organizationId,
+          boardId,
+          statusId,
+          creatorId: null,
+        });
+        yield* insertPostSubscription({
+          id: `post_sub_${n}_real_a`,
+          organizationId,
+          postId: `post_${n}a`,
+          userId: real,
+        });
+        yield* insertPostSubscription({
+          id: `post_sub_${n}_shadow_a`,
+          organizationId,
+          postId: `post_${n}a`,
+          userId: shadow,
+        });
+        yield* insertPostSubscription({
+          id: `post_sub_${n}_shadow_b`,
+          organizationId,
+          postId: `post_${n}b`,
+          userId: shadow,
+        });
 
-          const counts = yield* linkShadowUser({
-            shadowUserId: shadow,
-            realUserId: real,
-            deleteShadowUser: true,
-          });
+        const counts = yield* linkShadowUser({
+          shadowUserId: shadow,
+          realUserId: real,
+          deleteShadowUser: true,
+        });
 
-          expect(counts.postSubscriptionsDropped).toBe(1);
-          expect(counts.postSubscriptionsMoved).toBe(1);
-          expect(yield* listPostSubscriptionsForPost(`post_${n}a`)).toEqual([
-            { userId: real },
-          ]);
-          expect(yield* listPostSubscriptionsForPost(`post_${n}b`)).toEqual([
-            { userId: real },
-          ]);
-        })
+        expect(counts.postSubscriptionsDropped).toBe(1);
+        expect(counts.postSubscriptionsMoved).toBe(1);
+        expect(yield* listPostSubscriptionsForPost(`post_${n}a`)).toEqual([
+          { userId: real },
+        ]);
+        expect(yield* listPostSubscriptionsForPost(`post_${n}b`)).toEqual([
+          { userId: real },
+        ]);
+      })
     );
 
     it.effect(
@@ -871,7 +868,8 @@ describe("identity linking", () => {
             email: `jane.${n}@example.com`,
             userId: shadow,
           });
-          const { boardId, statusId } = yield* makeBoardAndStatus(organizationId);
+          const { boardId, statusId } =
+            yield* makeBoardAndStatus(organizationId);
           yield* insertPost({
             id: `post_${n}`,
             organizationId,

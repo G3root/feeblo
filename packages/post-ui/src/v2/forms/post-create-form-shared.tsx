@@ -11,10 +11,8 @@ import { Switch } from "@feeblo/ui/switch";
 import { formOptions } from "@tanstack/react-form";
 import { z } from "zod";
 
+import { emptyOnBehalfAuthor } from "../contact-combobox/contact-combobox";
 import { PostEditor } from "../post-editor";
-import {
-  emptyOnBehalfAuthor,
-} from "../contact-combobox/contact-combobox";
 import { PostBoardSelect, StatusField } from "../post-field";
 import { PostTitleInput } from "../post-title-input";
 import { usePostCollections } from "../providers/post-collections-provider";
@@ -68,8 +66,7 @@ export const postCreateFormOpts = formOptions({
       for (const [key, fieldSchema, fieldValue] of fieldChecks) {
         const parsed = fieldSchema.safeParse(fieldValue);
         if (!parsed.success) {
-          fieldErrors[key] =
-            parsed.error.issues[0]?.message ?? "Invalid value";
+          fieldErrors[key] = parsed.error.issues[0]?.message ?? "Invalid value";
         }
       }
       // Field-scoped errors must ride under `fields` (GlobalFormValidationError);

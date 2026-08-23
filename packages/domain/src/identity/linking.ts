@@ -3,8 +3,8 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 
-import { SubjectNotFoundError } from "./errors";
 import { isShadowUserEmail, isSyntheticEmail } from "./emails";
+import { SubjectNotFoundError } from "./errors";
 
 /** Row counts produced by one shadow-user healing. */
 export interface HealedIdentityCounts {
@@ -47,8 +47,7 @@ const addCounts = (a: HealedIdentityCounts, b: HealedIdentityCounts) => ({
   postSubscriptionsMoved: a.postSubscriptionsMoved + b.postSubscriptionsMoved,
   postSubscriptionsDropped:
     a.postSubscriptionsDropped + b.postSubscriptionsDropped,
-  subscriptionsActivated:
-    a.subscriptionsActivated + b.subscriptionsActivated,
+  subscriptionsActivated: a.subscriptionsActivated + b.subscriptionsActivated,
 });
 
 /**
@@ -103,7 +102,8 @@ export const linkShadowUser = ({
         const realUser = realUsers[0];
         if (!realUser) {
           return yield* new SubjectNotFoundError({
-            message: "Cannot heal a shadow user into an account that does not exist",
+            message:
+              "Cannot heal a shadow user into an account that does not exist",
           });
         }
 
@@ -231,18 +231,12 @@ export const linkShadowUser = ({
               .set({ state: "active", updatedAt: now, verifiedAt: now })
               .where(
                 and(
-                  eq(
-                    schema.emailSubscriptionTable.contactId,
-                    emailContact.id
-                  ),
+                  eq(schema.emailSubscriptionTable.contactId, emailContact.id),
                   eq(
                     schema.emailSubscriptionTable.organizationId,
                     contact.organizationId
                   ),
-                  eq(
-                    schema.emailSubscriptionTable.state,
-                    "deferred_no_access"
-                  )
+                  eq(schema.emailSubscriptionTable.state, "deferred_no_access")
                 )
               )
               .returning({ id: schema.emailSubscriptionTable.id });
@@ -322,7 +316,10 @@ export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
       .limit(1);
     const user = users[0];
     if (!user || !user.emailVerified) {
-      return { organizationIds: [], totals: emptyCounts() } satisfies ShadowHealSummary;
+      return {
+        organizationIds: [],
+        totals: emptyCounts(),
+      } satisfies ShadowHealSummary;
     }
 
     // Candidate organizations come from contacts matching the account email,
@@ -344,7 +341,10 @@ export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
 
     for (const { organizationId } of contactOrganizations) {
       const candidates = yield* db
-        .select({ id: schema.contactTable.id, userId: schema.contactTable.userId })
+        .select({
+          id: schema.contactTable.id,
+          userId: schema.contactTable.userId,
+        })
         .from(schema.contactTable)
         .where(
           and(

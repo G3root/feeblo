@@ -122,14 +122,14 @@ describe("ContactCombobox", () => {
   it("renders contact rows with badges and selects one", async () => {
     const onSearch = vi.fn().mockResolvedValue([member]);
     const onSelect = vi.fn();
-    const screen = await render(<Harness onSearch={onSearch} onSelect={onSelect} />);
+    const screen = await render(
+      <Harness onSearch={onSearch} onSelect={onSelect} />
+    );
 
     await typeQuery(screen, "sarah");
     const row = screen.getByText("Sarah Chen");
     await expect.element(row).toBeVisible();
-    await expect
-      .element(screen.getByText("Workspace member"))
-      .toBeVisible();
+    await expect.element(screen.getByText("Workspace member")).toBeVisible();
 
     await row.click();
     expect(onSelect).toHaveBeenCalledWith(
@@ -145,7 +145,9 @@ describe("ContactCombobox", () => {
   it("disables rows that already voted and shows the no-access hint", async () => {
     const onSearch = vi.fn().mockResolvedValue([voter, deferred]);
     const onSelect = vi.fn();
-    const screen = await render(<Harness onSearch={onSearch} onSelect={onSelect} />);
+    const screen = await render(
+      <Harness onSearch={onSearch} onSelect={onSelect} />
+    );
 
     // Both fixture emails contain "acme." — long enough for the minimum
     // query length and specific enough to match both rows.
@@ -162,7 +164,9 @@ describe("ContactCombobox", () => {
   it("offers to create a new customer when nothing matches", async () => {
     const onSearch = vi.fn().mockResolvedValue([]);
     const onSelect = vi.fn();
-    const screen = await render(<Harness onSearch={onSearch} onSelect={onSelect} />);
+    const screen = await render(
+      <Harness onSearch={onSearch} onSelect={onSelect} />
+    );
 
     await typeQuery(screen, "nobody@example.com");
     const createRow = screen.getByText(/as new customer/);

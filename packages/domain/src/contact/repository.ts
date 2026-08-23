@@ -304,12 +304,13 @@ const makeContactRepository = Effect.gen(function* () {
           AND b.visibility = 'PUBLIC'
       )`;
 
-      const unrestrictedGlobal = args.postId !== undefined
-        ? sql`(
+      const unrestrictedGlobal =
+        args.postId !== undefined
+          ? sql`(
             ${schema.userTable.restrictedToOrganizationId} IS NULL
             AND ${publicBoardProbe}
           )`
-        : sql`${schema.userTable.restrictedToOrganizationId} IS NULL`;
+          : sql`${schema.userTable.restrictedToOrganizationId} IS NULL`;
 
       // COALESCE guards against SQL three-valued logic: when every branch of
       // the inner OR evaluates to NULL (e.g. an unrestricted user compared
@@ -328,14 +329,15 @@ const makeContactRepository = Effect.gen(function* () {
         FALSE
       )`;
 
-      const alreadyVoted = args.postId !== undefined
-        ? sql<boolean>`EXISTS (
+      const alreadyVoted =
+        args.postId !== undefined
+          ? sql<boolean>`EXISTS (
             SELECT 1 FROM "upvote" uv
             WHERE uv.post_id = ${args.postId}
               AND uv.organization_id = ${args.organizationId}
               AND uv.user_id = ${schema.contactTable.userId}
           )`
-        : sql<boolean>`FALSE`;
+          : sql<boolean>`FALSE`;
 
       return db
         .select({
@@ -370,10 +372,7 @@ const makeContactRepository = Effect.gen(function* () {
         )
         .where(
           and(
-            eq(
-              schema.contactTable.organizationId,
-              args.organizationId
-            ),
+            eq(schema.contactTable.organizationId, args.organizationId),
             sql`(
               ${schema.contactTable.email} ILIKE ${substring} ESCAPE '\\'
               OR ${schema.contactTable.name} ILIKE ${substring} ESCAPE '\\'

@@ -73,14 +73,12 @@ const fixture = Effect.gen(function* () {
     createdAt: now,
   });
   const ownerEmail = `owner-${organizationId}@example.test`;
-  yield* db
-    .insert(schema.userTable)
-    .values({
-      id: userId,
-      email: ownerEmail,
-      name: "Owner",
-      emailVerified: true,
-    });
+  yield* db.insert(schema.userTable).values({
+    id: userId,
+    email: ownerEmail,
+    name: "Owner",
+    emailVerified: true,
+  });
   yield* db.insert(schema.memberTable).values({
     id: ownerId,
     organizationId,
@@ -204,7 +202,10 @@ const addSubscriptionContact = (args: {
     // ((organization_id, email) is unique); the ignored insert above leaves
     // our generated id unused in that case.
     const [existingContact] = yield* db
-      .select({ id: schema.emailContactTable.id, userId: schema.emailContactTable.userId })
+      .select({
+        id: schema.emailContactTable.id,
+        userId: schema.emailContactTable.userId,
+      })
       .from(schema.emailContactTable)
       .where(
         and(
@@ -1173,21 +1174,20 @@ describe("EmailOutbox workflows", () => {
 
     const recordStatusChangeIntent = (organizationId: string, postId: string) =>
       Effect.gen(function* () {
-        const intent = yield* (
-          yield* EmailOutboxRepository
-        ).upsertPendingStatusChange({
-          aggregateId: postId,
-          aggregateType: "post",
-          deduplicationKey: `post.status_changed:${organizationId}:${postId}:gate`,
-          expiresAt: null,
-          organizationId,
-          payload: {
-            kind: "post.status_changed",
-            postId,
-            statusId: `pst_${organizationId}`,
-          },
-          scheduledAt: new Date(),
-        });
+        const intent =
+          yield* (yield* EmailOutboxRepository).upsertPendingStatusChange({
+            aggregateId: postId,
+            aggregateType: "post",
+            deduplicationKey: `post.status_changed:${organizationId}:${postId}:gate`,
+            expiresAt: null,
+            organizationId,
+            payload: {
+              kind: "post.status_changed",
+              postId,
+              statusId: `pst_${organizationId}`,
+            },
+            scheduledAt: new Date(),
+          });
         if (intent._tag !== "Written") {
           return yield* Effect.die("Expected post intent");
         }
@@ -1273,9 +1273,8 @@ describe("EmailOutbox workflows", () => {
             organizationId,
             publicPostId
           );
-          const publicDeliveryIds = yield* materializeEmailIntent(
-            publicIntentId
-          );
+          const publicDeliveryIds =
+            yield* materializeEmailIntent(publicIntentId);
           yield* Effect.forEach(publicDeliveryIds, (deliveryId) =>
             EmailDeliveryWorkflow.execute({ deliveryId })
           );
@@ -1299,9 +1298,8 @@ describe("EmailOutbox workflows", () => {
             organizationId,
             privatePostId
           );
-          const privateDeliveryIds = yield* materializeEmailIntent(
-            privateIntentId
-          );
+          const privateDeliveryIds =
+            yield* materializeEmailIntent(privateIntentId);
           yield* Effect.forEach(privateDeliveryIds, (deliveryId) =>
             EmailDeliveryWorkflow.execute({ deliveryId })
           );
@@ -1372,12 +1370,12 @@ describe("EmailOutbox workflows", () => {
             EmailDeliveryWorkflow.execute({ deliveryId })
           );
           const mailbox = yield* testMailerState;
-          expect(mailbox.sentMessages.map((message) => message.to).sort()).toEqual(
-            [
-              `member-${organizationId}@example.test`.toLowerCase(),
-              `sso-${organizationId}@example.test`.toLowerCase(),
-            ]
-          );
+          expect(
+            mailbox.sentMessages.map((message) => message.to).sort()
+          ).toEqual([
+            `member-${organizationId}@example.test`.toLowerCase(),
+            `sso-${organizationId}@example.test`.toLowerCase(),
+          ]);
         })
     );
 

@@ -10,20 +10,20 @@ import { slugify } from "@feeblo/utils/url";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
-import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { UserAdd01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
-import { usePostCreateDialogContext } from "../dialog-stores/post";
 import {
   ContactCombobox,
   emptyOnBehalfAuthor,
   hasOnBehalfAuthorValue,
   toOnBehalfAuthor,
 } from "../contact-combobox/contact-combobox";
+import { usePostCreateDialogContext } from "../dialog-stores/post";
 import {
   PostBoardField,
   PostContentField,
@@ -382,7 +382,11 @@ export function PostCreateForm() {
             }}
             type="button"
           >
-            <HugeiconsIcon className="size-4" icon={UserAdd01Icon} strokeWidth={2} />
+            <HugeiconsIcon
+              className="size-4"
+              icon={UserAdd01Icon}
+              strokeWidth={2}
+            />
             Post on behalf of a customer
           </button>
           {isOnBehalfOpen ? (

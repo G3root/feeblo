@@ -349,9 +349,7 @@ describe("ContactRepository.search", () => {
           query: "Globex Corp",
         });
 
-        expect(results.map((row) => row.contactId)).toContain(
-          "contact_globex"
-        );
+        expect(results.map((row) => row.contactId)).toContain("contact_globex");
         expect(results[0]?.companyName).toBe("Globex Corporation");
       })
     );

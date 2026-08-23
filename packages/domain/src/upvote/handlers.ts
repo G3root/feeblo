@@ -6,13 +6,10 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
-import {
-  InvalidSubjectError,
-  SubjectNotFoundError,
-} from "../identity/errors";
+import { InvalidSubjectError, SubjectNotFoundError } from "../identity/errors";
 import { isSyntheticEmail, ResolvePrincipalService } from "../identity/service";
-import { PostActivityRepository } from "../post-activity/repository";
 import * as Policy from "../policy";
+import { PostActivityRepository } from "../post-activity/repository";
 import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
@@ -99,7 +96,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
               .pipe(
                 Effect.mapError(
                   (
-                    error,
+                    error
                   ):
                     | SubjectNotFoundError
                     | InvalidSubjectError
@@ -151,10 +148,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
             // nobody, and in-app notifications stay member-only.
             const subscriptionNow = yield* DateTime.nowAsDate;
             const subjectUser = yield* userRepository.getById(subject.userId);
-            if (
-              Option.isSome(subjectUser) &&
-              subjectUser.value.emailVerified
-            ) {
+            if (Option.isSome(subjectUser) && subjectUser.value.emailVerified) {
               yield* emailSubscriptions
                 .requestSubscription({
                   alreadyVerifiedUser: { userId: subject.userId },

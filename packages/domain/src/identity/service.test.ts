@@ -81,23 +81,25 @@ describe("ResolvePrincipalService", () => {
     });
 
   layer(TestLayer)("resolve", (it) => {
-    it.effect("creates a bare contact when nothing matches and no user is needed", () =>
-      Effect.gen(function* () {
-        const service = yield* ResolvePrincipalService;
-        const organizationId = yield* makeOrganization();
+    it.effect(
+      "creates a bare contact when nothing matches and no user is needed",
+      () =>
+        Effect.gen(function* () {
+          const service = yield* ResolvePrincipalService;
+          const organizationId = yield* makeOrganization();
 
-        const resolved = yield* service.resolve({
-          organizationId,
-          needsUser: false,
-          subject: { email: "jane@example.com", name: "Jane Doe" },
-        });
+          const resolved = yield* service.resolve({
+            organizationId,
+            needsUser: false,
+            subject: { email: "jane@example.com", name: "Jane Doe" },
+          });
 
-        const contact = yield* getContactById(resolved.contactId);
-        expect(contact?.email).toBe("jane@example.com");
-        expect(contact?.name).toBe("Jane Doe");
-        expect(contact?.userId).toBeNull();
-        expect(resolved.userId).toBeNull();
-      })
+          const contact = yield* getContactById(resolved.contactId);
+          expect(contact?.email).toBe("jane@example.com");
+          expect(contact?.name).toBe("Jane Doe");
+          expect(contact?.userId).toBeNull();
+          expect(resolved.userId).toBeNull();
+        })
     );
 
     it.effect("provisions a shadow user when a user row is required", () =>
@@ -122,53 +124,60 @@ describe("ResolvePrincipalService", () => {
       })
     );
 
-    it.effect("reuses an existing org contact and enriches only empty fields", () =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        const service = yield* ResolvePrincipalService;
-        const organizationId = yield* makeOrganization();
-        const contactId = yield* ContactId.generate;
+    it.effect(
+      "reuses an existing org contact and enriches only empty fields",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const service = yield* ResolvePrincipalService;
+          const organizationId = yield* makeOrganization();
+          const contactId = yield* ContactId.generate;
 
-        yield* db.insert(schema.contactTable).values({
-          id: contactId,
-          organizationId,
-          name: "Existing Name",
-          email: "jane@example.com",
-        });
-
-        const resolved = yield* service.resolve({
-          organizationId,
-          needsUser: false,
-          subject: {
+          yield* db.insert(schema.contactTable).values({
+            id: contactId,
+            organizationId,
+            name: "Existing Name",
             email: "jane@example.com",
-            name: "Overwritten?",
-            avatarUrl: "https://example.com/a.png",
-          },
-        });
+          });
 
-        expect(resolved.contactId).toBe(contactId);
-        const contact = yield* getContactById(contactId);
-        expect(contact?.name).toBe("Existing Name");
-        expect(contact?.avatar).toBe("https://example.com/a.png");
-      })
+          const resolved = yield* service.resolve({
+            organizationId,
+            needsUser: false,
+            subject: {
+              email: "jane@example.com",
+              name: "Overwritten?",
+              avatarUrl: "https://example.com/a.png",
+            },
+          });
+
+          expect(resolved.contactId).toBe(contactId);
+          const contact = yield* getContactById(contactId);
+          expect(contact?.name).toBe("Existing Name");
+          expect(contact?.avatar).toBe("https://example.com/a.png");
+        })
     );
 
-    it.effect("adopts an unrestricted global account instead of shadowing it", () =>
-      Effect.gen(function* () {
-        const service = yield* ResolvePrincipalService;
-        const organizationId = yield* makeOrganization();
-        yield* insertGlobalUser({ id: "user_global", email: "jane@example.com" });
+    it.effect(
+      "adopts an unrestricted global account instead of shadowing it",
+      () =>
+        Effect.gen(function* () {
+          const service = yield* ResolvePrincipalService;
+          const organizationId = yield* makeOrganization();
+          yield* insertGlobalUser({
+            id: "user_global",
+            email: "jane@example.com",
+          });
 
-        const resolved = yield* service.resolve({
-          organizationId,
-          needsUser: true,
-          subject: { email: "jane@example.com", name: "Jane" },
-        });
+          const resolved = yield* service.resolve({
+            organizationId,
+            needsUser: true,
+            subject: { email: "jane@example.com", name: "Jane" },
+          });
 
-        expect(resolved.userId).toBe("user_global");
-        const contact = yield* getContactById(resolved.contactId);
-        expect(contact?.userId).toBe("user_global");
-      })
+          expect(resolved.userId).toBe("user_global");
+          const contact = yield* getContactById(resolved.contactId);
+          expect(contact?.userId).toBe("user_global");
+        })
     );
 
     it.effect(
@@ -200,7 +209,10 @@ describe("ResolvePrincipalService", () => {
       Effect.gen(function* () {
         const service = yield* ResolvePrincipalService;
         const organizationId = yield* makeOrganization();
-        yield* insertGlobalUser({ id: "user_alice", email: "alice@example.com" });
+        yield* insertGlobalUser({
+          id: "user_alice",
+          email: "alice@example.com",
+        });
 
         const resolved = yield* service.resolve({
           organizationId,
@@ -235,31 +247,33 @@ describe("ResolvePrincipalService", () => {
       })
     );
 
-    it.effect("fails when an explicit contactId is from another organization", () =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        const service = yield* ResolvePrincipalService;
-        const [organizationId, otherOrganizationId] = [
-          yield* makeOrganization(),
-          yield* makeOrganization(),
-        ];
-        const contactId = yield* ContactId.generate;
-        yield* db.insert(schema.contactTable).values({
-          id: contactId,
-          organizationId: otherOrganizationId,
-          email: "cross-org@example.com",
-        });
+    it.effect(
+      "fails when an explicit contactId is from another organization",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const service = yield* ResolvePrincipalService;
+          const [organizationId, otherOrganizationId] = [
+            yield* makeOrganization(),
+            yield* makeOrganization(),
+          ];
+          const contactId = yield* ContactId.generate;
+          yield* db.insert(schema.contactTable).values({
+            id: contactId,
+            organizationId: otherOrganizationId,
+            email: "cross-org@example.com",
+          });
 
-        const error = yield* service
-          .resolve({
-            organizationId,
-            needsUser: false,
-            subject: { contactId },
-          })
-          .pipe(Effect.flip);
+          const error = yield* service
+            .resolve({
+              organizationId,
+              needsUser: false,
+              subject: { contactId },
+            })
+            .pipe(Effect.flip);
 
-        expect(error).toBeInstanceOf(SubjectNotFoundError);
-      })
+          expect(error).toBeInstanceOf(SubjectNotFoundError);
+        })
     );
 
     it.effect("is idempotent for repeated resolutions", () =>
@@ -283,26 +297,28 @@ describe("ResolvePrincipalService", () => {
       })
     );
 
-    it.effect("claims an email-only contact when an external id arrives later", () =>
-      Effect.gen(function* () {
-        const service = yield* ResolvePrincipalService;
-        const organizationId = yield* makeOrganization();
+    it.effect(
+      "claims an email-only contact when an external id arrives later",
+      () =>
+        Effect.gen(function* () {
+          const service = yield* ResolvePrincipalService;
+          const organizationId = yield* makeOrganization();
 
-        const first = yield* service.resolve({
-          organizationId,
-          needsUser: false,
-          subject: { email: "jane@example.com", name: "Jane" },
-        });
-        const second = yield* service.resolve({
-          organizationId,
-          needsUser: false,
-          subject: { externalId: "crm-42", email: "jane@example.com" },
-        });
+          const first = yield* service.resolve({
+            organizationId,
+            needsUser: false,
+            subject: { email: "jane@example.com", name: "Jane" },
+          });
+          const second = yield* service.resolve({
+            organizationId,
+            needsUser: false,
+            subject: { externalId: "crm-42", email: "jane@example.com" },
+          });
 
-        expect(second.contactId).toBe(first.contactId);
-        const contact = yield* getContactById(first.contactId);
-        expect(contact?.externalId).toBe("crm-42");
-      })
+          expect(second.contactId).toBe(first.contactId);
+          const contact = yield* getContactById(first.contactId);
+          expect(contact?.externalId).toBe("crm-42");
+        })
     );
 
     it.effect("fails when a user row is required but no email exists", () =>

@@ -13,7 +13,11 @@ import {
 } from "@feeblo/ui/combobox";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { EmailSchema } from "@feeblo/web-shared/user-validation";
-import { Cancel01Icon, Search01Icon, UserAdd01Icon } from "@hugeicons/core-free-icons";
+import {
+  Cancel01Icon,
+  Search01Icon,
+  UserAdd01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
@@ -76,7 +80,11 @@ export type ContactSearchFn = (input: {
 }) => Promise<readonly TContactSearchResult[]>;
 
 /** Live ContactSearch transport; injectable so stories/tests stay hermetic. */
-export const searchContacts: ContactSearchFn = ({ organizationId, postId, query }) =>
+export const searchContacts: ContactSearchFn = ({
+  organizationId,
+  postId,
+  query,
+}) =>
   fetchRpc((rpc) =>
     rpc.ContactSearch({
       organizationId,
@@ -97,9 +105,7 @@ export function toOnBehalfAuthor(
   // free of explicit undefined values under exactOptionalPropertyTypes.
   return {
     ...(selection.avatarUrl ? { avatarUrl: selection.avatarUrl } : undefined),
-    ...(selection.contactId
-      ? { contactId: selection.contactId }
-      : undefined),
+    ...(selection.contactId ? { contactId: selection.contactId } : undefined),
     ...(selection.email ? { email: selection.email } : undefined),
     ...(selection.name ? { name: selection.name } : undefined),
     ...(selection.userId ? { userId: selection.userId } : undefined),
@@ -202,11 +208,12 @@ export function ContactCombobox({
     let isCurrent = true;
     setIsSearching(true);
     const timer = window.setTimeout(() => {
-      searchRef.current({
-        organizationId,
-        query: trimmed,
-        ...(postId === undefined ? undefined : { postId }),
-      })
+      searchRef
+        .current({
+          organizationId,
+          query: trimmed,
+          ...(postId === undefined ? undefined : { postId }),
+        })
         .then((nextResults) => {
           if (isCurrent && !controller.signal.aborted) {
             setResults(nextResults);
