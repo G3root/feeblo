@@ -23,7 +23,11 @@ import type { ParsedPersonAttributes } from "../contact/utils";
 import { parsePersonAttributes } from "../contact/utils";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { JwtSecretRepository } from "../jwt-secret/repository";
-import { verifyJwt } from "../jwt-secret/verification";
+import {
+  maxTokenLifetimeFromMinutes,
+  verifyJwt,
+} from "../jwt-secret/verification";
+import { OrganizationRepository } from "../organization/repository";
 import { PolicyDeniedError } from "../policy";
 import { RateLimitService } from "../rate-limit/service";
 import { UserRepository } from "../user/repository";
@@ -206,10 +210,26 @@ export const createSsoSession = ({
       });
     }
 
+    // Per-workspace lifetime cap: `organization.jwt_max_token_lifetime_minutes`
+    // tightens (never loosens) the 24h default so a workspace can shorten how
+    // long a leaked token stays replayable. Invalid stored values fall back to
+    // the default. A missing org row (impossible via
+    // the FK) falls back to the default; other failures are normalized by the
+    // outer catch below.
+    const organizationRepository = yield* OrganizationRepository;
+    const maxTokenLifetimeMinutes =
+      yield* organizationRepository.findJwtMaxTokenLifetimeMinutes({
+        organizationId,
+      });
+    const maxTokenLifetime = maxTokenLifetimeFromMinutes(
+      maxTokenLifetimeMinutes
+    );
+
     const jwtPayload = yield* verifyJwt(
       token,
       secrets.map((s) => s.secret),
-      organizationId
+      organizationId,
+      { maxTokenLifetime }
     ).pipe(Effect.mapError(() => new SsoError({ code: "INVALID_JWT" })));
 
     // Bound contact and user provisioning only after a JWT has proved that
@@ -352,5 +372,6 @@ export const SsoRepositoriesLive = Layer.mergeAll(
   CompanyRepository.layer,
   ContactRepository.layer,
   JwtSecretRepository.layer,
+  OrganizationRepository.layer,
   UserRepository.layer
 );

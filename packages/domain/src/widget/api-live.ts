@@ -22,7 +22,11 @@ import { EmailOutboxConfig } from "../email-outbox/config";
 import { Api } from "../http/api";
 import { recordPostIntegrationEvent } from "../integration/post-event-recording";
 import { JwtSecretRepository } from "../jwt-secret/repository";
-import { verifyJwt } from "../jwt-secret/verification";
+import {
+  maxTokenLifetimeFromMinutes,
+  verifyJwt,
+} from "../jwt-secret/verification";
+import { OrganizationRepository } from "../organization/repository";
 import { PostStatusRepository } from "../post-status/repository";
 import {
   PostEmbeddingService,
@@ -266,6 +270,17 @@ export const WidgetApiLive = HttpApiBuilder.group(
               });
             }
 
+            // Per-workspace lifetime cap tightens (never loosens) the 24h
+            // default; invalid stored values fall back to the default.
+            const organizationRepository = yield* OrganizationRepository;
+            const maxTokenLifetimeMinutes =
+              yield* organizationRepository.findJwtMaxTokenLifetimeMinutes({
+                organizationId,
+              });
+            const maxTokenLifetime = maxTokenLifetimeFromMinutes(
+              maxTokenLifetimeMinutes
+            );
+
             const contactDefs =
               // SAFETY: the repository contract returns contact attribute definitions
               // in the canonical domain shape; the cast bridges the DB-row encoding.
@@ -282,7 +297,8 @@ export const WidgetApiLive = HttpApiBuilder.group(
             const jwtPayload = yield* verifyJwt(
               token,
               secrets.map((s) => s.secret),
-              organizationId
+              organizationId,
+              { maxTokenLifetime }
             );
 
             const parsedContact = yield* parsePersonAttributes(
@@ -384,6 +400,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
             CompanyRepository.layer,
             ContactRepository.layer,
             JwtSecretRepository.layer,
+            OrganizationRepository.layer,
             EmailOutboxConfig.layer,
             PostRepository.layer,
             PostStatusRepository.layer,

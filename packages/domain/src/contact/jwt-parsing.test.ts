@@ -66,15 +66,14 @@ describe("JWT payload parsing", () => {
     })
   );
 
-  it.effect("ignores standard JWT claims (iss, sub, iat, exp, aud)", () =>
+  it.effect("ignores standard JWT claims (iss, iat, exp, aud) except sub", () =>
     Effect.gen(function* () {
       const now = Math.floor(Date.now() / 1000);
       const userData = {
-        userId: "user_123",
+        sub: "user_123",
         email: "test@example.com",
         name: "Alice",
         iss: "feeblo",
-        sub: "some-sub",
         iat: now,
         exp: now + 60,
         aud: "feeblo-app",
@@ -93,7 +92,60 @@ describe("JWT payload parsing", () => {
     })
   );
 
-  it("fails when required fields (userId, email, name) are missing", async () => {
+  it.effect("falls back to userId when sub is absent", () =>
+    Effect.gen(function* () {
+      const verified = yield* Effect.promise(() =>
+        signAndVerify({
+          userId: "legacy_user",
+          email: "test@example.com",
+          name: "Alice",
+        })
+      );
+
+      const result = yield* parsePersonAttributes(verified, [], []);
+
+      expect(result.commonFields).toEqual({
+        userId: "legacy_user",
+        email: "test@example.com",
+        name: "Alice",
+      });
+    })
+  );
+
+  it.effect("prefers sub over userId when both agree", () =>
+    Effect.gen(function* () {
+      const verified = yield* Effect.promise(() =>
+        signAndVerify({
+          sub: "user_123",
+          userId: "user_123",
+          email: "test@example.com",
+          name: "Alice",
+        })
+      );
+
+      const result = yield* parsePersonAttributes(verified, [], []);
+
+      expect(result.commonFields.userId).toBe("user_123");
+    })
+  );
+
+  it("rejects a token carrying sub and userId with different values", async () => {
+    const verified = await signAndVerify({
+      sub: "sub_user",
+      userId: "legacy_user",
+      email: "test@example.com",
+      name: "Alice",
+    });
+
+    await expect(
+      Effect.runPromise(parsePersonAttributes(verified, [], []))
+    ).rejects.toBeInstanceOf(DataValidationError);
+    await expect(
+      Effect.runPromise(parsePersonAttributes(verified, [], []))
+    ).rejects.toThrow("Conflicting identity");
+  });
+
+  it("fails when required fields (userId/sub, email, name) are missing", async () => {
     const verified = await signAndVerify({
       sub: "some-sub",
       iss: "feeblo",
