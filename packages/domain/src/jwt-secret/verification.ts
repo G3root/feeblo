@@ -16,10 +16,11 @@ const MAX_JWT_LENGTH = 16 * 1024;
 /**
  * Clock-skew tolerance in seconds. `exp`/`nbf` checks by jose and the `iat`
  * check below all tolerate this much skew between the caller's clock and
- * Feeblo's. 30s keeps mint-on-demand tokens (5-minute `exp`) comfortably
- * inside the cap while still bounding a clock-skewed issuer.
+ * Feeblo's. 10s comfortably absorbs NTP-synced server clocks while keeping
+ * the "expired but accepted" window negligible next to mint-on-demand tokens
+ * (5-minute `exp`).
  */
-const CLOCK_SKEW_LEEWAY_SECONDS = 30;
+export const CLOCK_SKEW_LEEWAY_SECONDS = 10;
 
 /**
  * Default maximum token lifetime (`exp - iat`). Tokens claiming to live
@@ -59,16 +60,17 @@ export const maxTokenLifetimeFromMinutes = (
  * holding a leaked secret could forge a payload for any org and the signature
  * check alone would accept it.
  *
- * The `exp` claim is **required**: a token without it is rejected after the
- * signature verifies (jose only validates `exp` when present, so the absence
- * is checked here). `exp`/`nbf` are checked by jose with a 30s clock-skew
- * tolerance. `iat` is additionally rejected when it lies more than 30s in the
- * future (a fresh token can never legitimately carry a future `iat`).
+ * The `exp` and `iat` claims are **required**: a token without either is
+ * rejected after the signature verifies (jose only validates `exp` when
+ * present, so absence is checked here). `exp`/`nbf` are checked by jose with
+ * a 10s clock-skew tolerance. `iat` is additionally rejected when it lies more
+ * than 10s in the future (a fresh token can never legitimately carry a future
+ * `iat`).
  *
- * The total token lifetime (`exp - iat`, or `exp - now` when `iat` is
- * absent) is capped at {@link DEFAULT_MAX_TOKEN_LIFETIME} or the per-org
- * override in `options.maxTokenLifetime`, so `exp = now + 30 days` is
- * rejected even though the signature is valid.
+ * The total token lifetime (`exp - iat`) is capped at
+ * {@link DEFAULT_MAX_TOKEN_LIFETIME} or the per-org override in
+ * `options.maxTokenLifetime`, so `exp = now + 30 days` is rejected even though
+ * the signature is valid.
  *
  * `iss` is intentionally NOT verified: there is no per-org expected-issuer
  * configuration yet, so checking it against nothing would be theater. The
@@ -84,7 +86,14 @@ export const verifyJwt = (
   token: string,
   secrets: readonly string[],
   expectedOrganizationId: string,
-  options: { readonly maxTokenLifetime?: Duration.Duration } = {}
+  options: {
+    readonly maxTokenLifetime?: Duration.Duration;
+    /**
+     * Test seam: pins "now" (UNIX seconds) for the post-signature time-claim
+     * rules. Production callers omit it; the wall clock is used.
+     */
+    readonly nowSeconds?: number;
+  } = {}
 ): Effect.Effect<jose.JWTPayload, UnauthorizedError> =>
   Effect.gen(function* () {
     if (token.length > MAX_JWT_LENGTH) {
@@ -93,6 +102,7 @@ export const verifyJwt = (
 
     const maxTokenLifetime =
       options.maxTokenLifetime ?? DEFAULT_MAX_TOKEN_LIFETIME;
+    const nowSeconds = options.nowSeconds ?? Math.floor(Date.now() / 1000);
 
     for (const secret of secrets) {
       const key = secretToKey(secret);
@@ -100,13 +110,17 @@ export const verifyJwt = (
       // jwtVerify rejects expired tokens (or tokens with an invalid
       // signature); any failure just moves on to the next candidate secret
       // (active first, then the 24h-grace revoked one). `clockTolerance`
-      // gives both sides a 30s clock-skew allowance.
+      // gives both sides a 10s clock-skew allowance. `currentDate` pins
+      // jose's exp/nbf checks to the same instant as the post-signature
+      // time-claim rules below — the wall clock by default, the test seam's
+      // instant when `options.nowSeconds` is provided.
       const result = yield* Effect.catch(
         Effect.map(
           Effect.tryPromise(() =>
             jose.jwtVerify(token, key, {
               algorithms: ["HS256"],
               clockTolerance: CLOCK_SKEW_LEEWAY_SECONDS,
+              currentDate: new Date(nowSeconds * 1000),
             })
           ),
           (r) => r.payload
@@ -115,7 +129,7 @@ export const verifyJwt = (
       );
 
       if (result !== null && result.aud === expectedOrganizationId) {
-        yield* enforceTimeClaims(result);
+        yield* enforceTimeClaims(result, nowSeconds);
         yield* enforceMaxLifetime(result, maxTokenLifetime);
         return result;
       }
@@ -126,7 +140,8 @@ export const verifyJwt = (
 /**
  * Post-signature time-claim rules that jose does not enforce on its own.
  *
- * - `exp` is required; jose only validates it when present.
+ * - `exp` and `iat` are required; jose only validates `exp` when present.
+ * - Both must be numbers (jose ignores non-numeric time claims).
  * - `iat` must not be more than the skew tolerance into the future.
  *
  * Fails with `UnauthorizedError` mutating nothing, so it can run inside the
@@ -134,7 +149,7 @@ export const verifyJwt = (
  */
 const enforceTimeClaims = (
   payload: jose.JWTPayload,
-  nowSeconds: number = Math.floor(Date.now() / 1000)
+  nowSeconds: number
 ): Effect.Effect<void, UnauthorizedError> =>
   Effect.gen(function* () {
     if (payload.exp === undefined) {
@@ -143,10 +158,25 @@ const enforceTimeClaims = (
       });
     }
 
-    if (
-      isNumber(payload.iat) &&
-      payload.iat > nowSeconds + CLOCK_SKEW_LEEWAY_SECONDS
-    ) {
+    if (!isNumber(payload.exp)) {
+      return yield* new UnauthorizedError({
+        message: "Invalid JWT: exp claim must be a number",
+      });
+    }
+
+    if (payload.iat === undefined) {
+      return yield* new UnauthorizedError({
+        message: "Invalid JWT: missing iat claim",
+      });
+    }
+
+    if (!isNumber(payload.iat)) {
+      return yield* new UnauthorizedError({
+        message: "Invalid JWT: iat claim must be a number",
+      });
+    }
+
+    if (payload.iat > nowSeconds + CLOCK_SKEW_LEEWAY_SECONDS) {
       return yield* new UnauthorizedError({
         message: "Invalid JWT: iat claim is in the future",
       });
@@ -154,26 +184,24 @@ const enforceTimeClaims = (
   });
 
 /**
- * Rejects tokens claiming a lifetime longer than the workspace cap. When
- * `iat` is absent the token is assumed to have been minted now, so the check
- * degrades to `exp - now`, which still stops `exp = now + 30 days` tokens.
+ * Rejects tokens claiming a lifetime longer than the workspace cap. Both
+ * `exp` and `iat` are already enforced as numeric claims by
+ * {@link enforceTimeClaims}; this is a defensive re-check plus the cap math.
  */
 const enforceMaxLifetime = (
   payload: jose.JWTPayload,
-  maxTokenLifetime: Duration.Duration,
-  nowSeconds: number = Math.floor(Date.now() / 1000)
+  maxTokenLifetime: Duration.Duration
 ): Effect.Effect<void, UnauthorizedError> =>
   Effect.gen(function* () {
-    if (!isNumber(payload.exp)) {
-      // enforceTimeClaims already rejected a missing exp; this is defensive
-      // against a non-numeric exp that jose somehow let through.
+    if (!isNumber(payload.exp) || !isNumber(payload.iat)) {
+      // enforceTimeClaims already rejected missing/non-numeric exp or iat;
+      // this is defensive against a payload that somehow got through.
       return yield* new UnauthorizedError({ message: "Invalid JWT" });
     }
 
-    const issuedAt = isNumber(payload.iat) ? payload.iat : nowSeconds;
     const maxLifetimeSeconds = Duration.toSeconds(maxTokenLifetime);
 
-    if (payload.exp - issuedAt > maxLifetimeSeconds) {
+    if (payload.exp - payload.iat > maxLifetimeSeconds) {
       return yield* new UnauthorizedError({
         message: "Invalid JWT: token lifetime exceeds the workspace cap",
       });

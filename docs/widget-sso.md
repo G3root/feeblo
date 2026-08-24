@@ -22,23 +22,25 @@ Secrets are **never auto-created** — merely probing an org id cannot materiali
 | Claim | Value | Why |
 | --- | --- | --- |
 | `aud` | **Your workspace id** (from the widget config) | Pins the token to exactly one workspace. A token minted for workspace A is rejected at workspace B even if both secrets leaked. |
-| `sub` | Your stable id for this user | Used as the contact's `externalId` and to dedupe the SSO user. |
+| `sub` | A stable, unchanging **string** identifier for this user | **The only identity claim** (RFC 7519 subject). Must be a string; non-string values are rejected. Used as the contact's `externalId` and to dedupe the SSO user. |
 | `email` | User's email | Required; the SSO session and contact are keyed on it. |
 | `name` | Display name | Required. |
 | `exp` | UNIX timestamp; keep it short (≤ 5 minutes is plenty) | **Required and enforced.** Tokens without `exp` are rejected. |
+| `iat` | UNIX timestamp of mint time | **Required and enforced.** Tokens without `iat` are rejected, and an `iat` more than 10s in the future is rejected. |
 
 `aud` must be a **single string** — an array or a missing/`iss`-only token is rejected.
 
-`sub` replaced the legacy `userId` claim. `userId` is still **accepted as a fallback** while customers migrate, but a token carrying **both** `sub` and `userId` with different values is rejected as a conflict. The `userId` fallback is scheduled for removal **after 2026-12-31** — mint `sub` in new integrations today.
+There are no legacy fallbacks: the identity must come from `sub`. Any other identity claim (e.g. `userId`) is not read.
 
 ### Enforced at verification time
 
 Beyond the signature and the required claims, `verifyJwt` enforces (all failures map to `INVALID_JWT`):
 
 - **`exp` required** — a token without it is rejected after the signature verifies.
-- **Total lifetime capped**: `exp - iat` (or `exp - now` when `iat` is absent) may not exceed the workspace cap — **24 hours by default**, overridable per workspace via `organization.jwt_max_token_lifetime_minutes` (contact support to tighten it; shortening the cap is the only supported direction). A token claiming `exp = now + 30 days` is rejected even though the signature is valid. Keep minting short-lived tokens (≤ 5 minutes); the cap only bounds the worst case for a leaked token.
-- **`iat` not in the future** — more than 30s ahead of Feeblo's clock is rejected.
-- **30s clock-skew leeway** for `exp`/`nbf`/`iat` checks, so a slightly-skewed issuer clock does not break sign-ins.
+- **`iat` required** — a token without it is rejected after the signature verifies; non-numeric time claims are rejected too.
+- **Total lifetime capped**: `exp - iat` may not exceed the workspace cap — **24 hours by default**, overridable per workspace via `organization.jwt_max_token_lifetime_minutes` (contact support to tighten it; shortening the cap is the only supported direction). A token claiming `exp = now + 30 days` is rejected even though the signature is valid. Keep minting short-lived tokens (≤ 5 minutes); the cap only bounds the worst case for a leaked token.
+- **`iat` not in the future** — more than 10s ahead of Feeblo's clock is rejected.
+- **10s clock-skew leeway** for `exp`/`nbf`/`iat` checks, so a slightly-skewed issuer clock does not break sign-ins.
 
 ### Recommended claims
 
@@ -68,7 +70,7 @@ const token = await new SignJWT({
   .setProtectedHeader({ alg: "HS256" })
   .setAudience(workspaceId) // REQUIRED — binds to the workspace
   .setIssuer("https://app.example.com") // recommended — issuer verification coming
-  .setIssuedAt() // recommended — required for the lifetime cap to use real mint time
+  .setIssuedAt() // REQUIRED — tokens without iat are rejected
   .setExpirationTime("5m") // REQUIRED
   .sign(new Uint8Array(Buffer.from(secret, "hex")));
 ```
@@ -86,7 +88,7 @@ The SSO endpoint maps failures to better-auth errors via the `jwt-auto-login` pl
 | Code | Meaning |
 | --- | --- |
 | `ORGANIZATION_HAS_NO_JWT_SECRET` | No secret generated yet; generate one in Settings → Security. |
-| `INVALID_JWT` | Signature invalid, wrong/missing `aud`, missing `exp`, expired `exp` (beyond leeway), `iat` too far in the future, token lifetime beyond the workspace cap, conflicting `sub`/`userId`, or wrong/leaked secret. |
+| `INVALID_JWT` | Signature invalid, wrong/missing `aud`, missing/non-numeric `exp` or `iat`, expired `exp` (beyond leeway), `iat` too far in the future, token lifetime beyond the workspace cap, or wrong/leaked secret. |
 | `SSO_TOKEN_MISSING_EMAIL_OR_NAME` | Required `email`/`name` (or `sub`) missing. |
 | `FAILED_TO_CREATE_SSO_USER` / `FAILED_TO_CREATE_SSO_CONTACT` | Persistence failure while upserting the user/contact. |
 | `SSO_RATE_LIMITED` | Too many SSO attempts within the rate-limit window (429): unauthenticated attempts are limited by trusted client IP, and verified sign-ins are limited by workspace. |
@@ -104,6 +106,6 @@ The SSO endpoint maps failures to better-auth errors via the `jwt-auto-login` pl
 
 The contract is locked by tests:
 
-- `packages/domain/src/jwt-secret/verification.test.ts` — claim-level rules (wrong/missing `aud`, missing `exp`, expired `exp`, future `iat`, clock-skew leeway, 24h lifetime cap, per-workspace cap override, wrong secret).
-- `packages/domain/src/widget/sso.test.ts` — end-to-end `createSsoSession` against a real database (valid token creates a restricted user; mismatched `aud`, missing `aud`, missing `exp`, expired token, overlifetime token, per-org cap, foreign secret, and no-secret cases all behave as documented).
-- `packages/domain/src/contact/utils.test.ts` / `jwt-parsing.test.ts` — `sub`/`userId` resolution and conflict rejection, scalar-only custom attribute values.
+- `packages/domain/src/jwt-secret/verification.test.ts` — claim-level rules (wrong/missing `aud`, missing `exp`, missing `iat`, expired `exp`, future `iat`, clock-skew leeway, 24h lifetime cap, per-workspace cap override, wrong secret).
+- `packages/domain/src/widget/sso.test.ts` — end-to-end `createSsoSession` against a real database (valid token creates a restricted user; mismatched `aud`, missing `aud`, missing `exp`, missing `iat`, expired token, overlifetime token, per-org cap, foreign secret, and no-secret cases all behave as documented).
+- `packages/domain/src/contact/utils.test.ts` / `jwt-parsing.test.ts` — `sub`-only identity resolution (legacy claims ignored/rejected) and scalar-only custom attribute values.

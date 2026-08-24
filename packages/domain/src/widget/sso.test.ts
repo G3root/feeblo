@@ -103,7 +103,8 @@ describe("createSsoSession", () => {
   const validPayload = (fixture: Fixture) => ({
     aud: fixture.organizationId,
     exp: futureExp,
-    userId: "external_user_1",
+    iat: Math.floor(Date.now() / 1000),
+    sub: "external_user_1",
     email: "ada@example.com",
     name: "Ada Lovelace",
   });
