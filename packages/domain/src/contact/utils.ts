@@ -342,8 +342,16 @@ const parseCustomAttributes = (
         continue;
       }
       if (!isJsonScalar(raw)) {
-        // Arrays and nested objects are not valid attribute values; ignore
-        // them instead of persisting or failing the whole payload on them.
+        // Arrays and nested objects are not valid attribute values. Optional
+        // ones are ignored instead of persisting or failing the whole payload;
+        // a required one must fail here — the key-presence check above already
+        // passed, so ignoring it would silently create records without
+        // workspace-required data.
+        if (definition.isRequired) {
+          return yield* new DataValidationError({
+            message: `Invalid value for required attribute "${definition.key}": must be a string, number, boolean, or null`,
+          });
+        }
         continue;
       }
       effects.push(

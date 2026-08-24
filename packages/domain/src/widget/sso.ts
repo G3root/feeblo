@@ -6,7 +6,6 @@ import {
 } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
-import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -25,7 +24,7 @@ import { parsePersonAttributes } from "../contact/utils";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import {
-  DEFAULT_MAX_TOKEN_LIFETIME,
+  maxTokenLifetimeFromMinutes,
   verifyJwt,
 } from "../jwt-secret/verification";
 import { OrganizationRepository } from "../organization/repository";
@@ -212,8 +211,9 @@ export const createSsoSession = ({
     }
 
     // Per-workspace lifetime cap: `organization.jwt_max_token_lifetime_minutes`
-    // overrides the 24h default so a workspace can tighten (never loosen) how
-    // long a leaked token stays replayable. A missing org row (impossible via
+    // tightens (never loosens) the 24h default so a workspace can shorten how
+    // long a leaked token stays replayable. Invalid stored values fall back to
+    // the default. A missing org row (impossible via
     // the FK) falls back to the default; other failures are normalized by the
     // outer catch below.
     const organizationRepository = yield* OrganizationRepository;
@@ -221,10 +221,9 @@ export const createSsoSession = ({
       yield* organizationRepository.findJwtMaxTokenLifetimeMinutes({
         organizationId,
       });
-    const maxTokenLifetime =
-      maxTokenLifetimeMinutes !== null
-        ? Duration.minutes(maxTokenLifetimeMinutes)
-        : DEFAULT_MAX_TOKEN_LIFETIME;
+    const maxTokenLifetime = maxTokenLifetimeFromMinutes(
+      maxTokenLifetimeMinutes
+    );
 
     const jwtPayload = yield* verifyJwt(
       token,

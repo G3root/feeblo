@@ -3,7 +3,6 @@ import { asLegid, type LegidOf, PostId, PostStatusId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as DateTime from "effect/DateTime";
-import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
@@ -24,7 +23,7 @@ import { Api } from "../http/api";
 import { recordPostIntegrationEvent } from "../integration/post-event-recording";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import {
-  DEFAULT_MAX_TOKEN_LIFETIME,
+  maxTokenLifetimeFromMinutes,
   verifyJwt,
 } from "../jwt-secret/verification";
 import { OrganizationRepository } from "../organization/repository";
@@ -271,16 +270,16 @@ export const WidgetApiLive = HttpApiBuilder.group(
               });
             }
 
-            // Per-workspace lifetime cap overrides the 24h default when set.
+            // Per-workspace lifetime cap tightens (never loosens) the 24h
+            // default; invalid stored values fall back to the default.
             const organizationRepository = yield* OrganizationRepository;
             const maxTokenLifetimeMinutes =
               yield* organizationRepository.findJwtMaxTokenLifetimeMinutes({
                 organizationId,
               });
-            const maxTokenLifetime =
-              maxTokenLifetimeMinutes !== null
-                ? Duration.minutes(maxTokenLifetimeMinutes)
-                : DEFAULT_MAX_TOKEN_LIFETIME;
+            const maxTokenLifetime = maxTokenLifetimeFromMinutes(
+              maxTokenLifetimeMinutes
+            );
 
             const contactDefs =
               // SAFETY: the repository contract returns contact attribute definitions

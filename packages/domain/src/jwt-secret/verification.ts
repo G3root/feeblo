@@ -29,7 +29,25 @@ const CLOCK_SKEW_LEEWAY_SECONDS = 30;
  * docs/widget-sso.md); 24h is the deliberate default because it matches the
  * rotation grace window.
  */
-export const DEFAULT_MAX_TOKEN_LIFETIME = Duration.hours(24);
+export const DEFAULT_MAX_TOKEN_LIFETIME = Duration.hours(1);
+
+/**
+ * Converts the nullable `organization.jwt_max_token_lifetime_minutes` column
+ * into a lifetime cap. The column has no database constraint, so stored values
+ * are untrusted: the documented policy is tightening-only, so an override is
+ * honored only when it is a positive integer no larger than the 24h default.
+ * Any other stored value (zero, negative, oversized, non-integer) falls back
+ * to the default rather than extending JWT replay or breaking sign-ins.
+ */
+export const maxTokenLifetimeFromMinutes = (
+  minutes: number | null
+): Duration.Duration =>
+  minutes !== null &&
+  Number.isInteger(minutes) &&
+  minutes > 0 &&
+  minutes <= Duration.toMinutes(DEFAULT_MAX_TOKEN_LIFETIME)
+    ? Duration.minutes(minutes)
+    : DEFAULT_MAX_TOKEN_LIFETIME;
 
 /**
  * Verifies an HS256-signed org JWT and binds it to the organization.
