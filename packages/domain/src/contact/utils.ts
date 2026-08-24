@@ -145,7 +145,6 @@ export type ParsedPersonAttributes = {
 };
 
 const KNOWN_CONTACT_FIELDS = new Set([
-  "userId",
   "sub",
   "email",
   "name",
@@ -462,43 +461,11 @@ const parseCompanies = (
     : Effect.succeed([]);
 
 /**
- * Resolves the user id from the token payload: `sub` is the documented claim
- * and `userId` is still accepted while customers migrate (both already minted
- * since 2024). A token carrying both with different values is a conflict and
- * is rejected — it cannot be a deliberate token.
- *
- * `userId` support is scheduled for removal after 2026-12-31; customers are
- * expected to have switched to `sub` by then.
+ * The user id comes exclusively from the standard JWT `sub` claim (RFC 7519).
+ * There is no legacy fallback: any other identity claim (e.g. `userId`) is not
+ * read. A non-string `sub` is left for CommonContactFields to reject with a
+ * typed error.
  */
-const resolveUserId = (
-  input: AttributeSource
-): Effect.Effect<string | undefined, DataValidationError> => {
-  const sub = input.sub;
-  const userId = input.userId;
-
-  if (sub !== undefined && userId !== undefined && sub !== userId) {
-    return Effect.fail(
-      new DataValidationError({
-        message: `Conflicting identity: "sub" and "userId" claims differ ("${String(
-          sub
-        )}" vs "${String(userId)}"). Use "sub" only; "userId" is deprecated.`,
-      })
-    );
-  }
-
-  // `sub` wins when both agree; `userId` is the legacy fallback. A non-string
-  // value is left for CommonContactFields to reject with a typed error.
-  const resolved = isString(sub)
-    ? sub
-    : isString(userId)
-      ? userId
-      : (sub ?? userId);
-  // SAFETY: `sub`/`userId` are either strings already (kept above) or left
-  // for CommonContactFields to reject; the boxed view is only used so the
-  // attribute contract (string) matches the JWT's own string semantics.
-  return Effect.succeed(resolved as string | undefined);
-};
-
 export function parsePersonAttributes(
   data: JWTPayload | null,
   contactAttributeDefinitions: readonly TContactAttributeDefinition[],
@@ -507,13 +474,11 @@ export function parsePersonAttributes(
   return Effect.gen(function* () {
     const input = asRecord(data);
 
-    const userId = yield* resolveUserId(input);
-
     const commonFields = yield* decodeCommonFields(
       CommonContactFields,
       "contact",
       {
-        userId,
+        userId: input.sub,
         email: input.email,
         name: input.name,
         avatar: input.avatar,

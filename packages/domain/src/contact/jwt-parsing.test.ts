@@ -23,7 +23,7 @@ describe("JWT payload parsing", () => {
   it.effect("parses a realistic JWT-shaped payload", () =>
     Effect.gen(function* () {
       const userData = {
-        userId: "user_123",
+        sub: "user_123",
         email: "test@example.com",
         name: "Alice",
         avatar: "https://example.com/avatar.png",
@@ -92,32 +92,12 @@ describe("JWT payload parsing", () => {
     })
   );
 
-  it.effect("falls back to userId when sub is absent", () =>
-    Effect.gen(function* () {
-      const verified = yield* Effect.promise(() =>
-        signAndVerify({
-          userId: "legacy_user",
-          email: "test@example.com",
-          name: "Alice",
-        })
-      );
-
-      const result = yield* parsePersonAttributes(verified, [], []);
-
-      expect(result.commonFields).toEqual({
-        userId: "legacy_user",
-        email: "test@example.com",
-        name: "Alice",
-      });
-    })
-  );
-
-  it.effect("prefers sub over userId when both agree", () =>
+  it.effect("ignores a legacy userId claim (only sub is honored)", () =>
     Effect.gen(function* () {
       const verified = yield* Effect.promise(() =>
         signAndVerify({
           sub: "user_123",
-          userId: "user_123",
+          userId: "ignored_legacy_id",
           email: "test@example.com",
           name: "Alice",
         })
@@ -129,9 +109,8 @@ describe("JWT payload parsing", () => {
     })
   );
 
-  it("rejects a token carrying sub and userId with different values", async () => {
+  it("fails when only the legacy userId claim is present (sub is required)", async () => {
     const verified = await signAndVerify({
-      sub: "sub_user",
       userId: "legacy_user",
       email: "test@example.com",
       name: "Alice",
@@ -140,9 +119,6 @@ describe("JWT payload parsing", () => {
     await expect(
       Effect.runPromise(parsePersonAttributes(verified, [], []))
     ).rejects.toBeInstanceOf(DataValidationError);
-    await expect(
-      Effect.runPromise(parsePersonAttributes(verified, [], []))
-    ).rejects.toThrow("Conflicting identity");
   });
 
   it("fails when required fields (userId/sub, email, name) are missing", async () => {

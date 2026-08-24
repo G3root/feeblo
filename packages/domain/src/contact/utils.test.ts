@@ -580,7 +580,7 @@ describe("parsePersonAttributes", () => {
   it.effect("parses minimal valid person data", () =>
     Effect.gen(function* () {
       const result = yield* parsePersonAttributes(
-        { userId: "user_1", email: "a@b.com", name: "Alice" },
+        { sub: "user_1", email: "a@b.com", name: "Alice" },
         contactDefs,
         companyDefs
       );
@@ -606,12 +606,20 @@ describe("parsePersonAttributes", () => {
   it("fails on invalid email type", async () => {
     await expect(
       Effect.runPromise(
-        parsePersonAttributes({ userId: 123 }, contactDefs, companyDefs)
+        parsePersonAttributes(
+          { sub: 123 as unknown as string },
+          contactDefs,
+          companyDefs
+        )
       )
     ).rejects.toBeInstanceOf(DataValidationError);
     await expect(
       Effect.runPromise(
-        parsePersonAttributes({ userId: 123 }, contactDefs, companyDefs)
+        parsePersonAttributes(
+          { sub: 123 as unknown as string },
+          contactDefs,
+          companyDefs
+        )
       )
     ).rejects.toThrow("Invalid contact fields");
   });
@@ -621,7 +629,7 @@ describe("parsePersonAttributes", () => {
       const def = makeContactDef({ key: "city", type: "TEXT" });
       const result = yield* parsePersonAttributes(
         {
-          userId: "user_1",
+          sub: "user_1",
           email: "a@b.com",
           name: "Alice",
           customFields: { city: "London" },
@@ -643,7 +651,7 @@ describe("parsePersonAttributes", () => {
     Effect.gen(function* () {
       const result = yield* parsePersonAttributes(
         {
-          userId: "user_1",
+          sub: "user_1",
           email: "a@b.com",
           name: "Alice",
           companies: [
@@ -674,7 +682,7 @@ describe("parsePersonAttributes", () => {
       });
       const result = yield* parsePersonAttributes(
         {
-          userId: "user_1",
+          sub: "user_1",
           email: "a@b.com",
           name: "Alice",
           companies: [
@@ -704,7 +712,7 @@ describe("parsePersonAttributes", () => {
       Effect.gen(function* () {
         const result = yield* parsePersonAttributes(
           {
-            userId: "user_1",
+            sub: "user_1",
             email: "a@b.com",
             name: "Alice",
             companies: "not-an-array",
@@ -720,7 +728,7 @@ describe("parsePersonAttributes", () => {
     Effect.gen(function* () {
       const result = yield* parsePersonAttributes(
         {
-          userId: "user_1",
+          sub: "user_1",
           email: "a@b.com",
           name: "Alice",
           companies: [],
@@ -742,7 +750,7 @@ describe("parsePersonAttributes", () => {
     Effect.gen(function* () {
       const result = yield* parsePersonAttributes(
         {
-          userId: "user_1",
+          sub: "user_1",
           email: "a@b.com",
           name: "Alice",
           extra: "should-be-ignored",
