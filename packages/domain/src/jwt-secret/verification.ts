@@ -29,7 +29,7 @@ const CLOCK_SKEW_LEEWAY_SECONDS = 30;
  * docs/widget-sso.md); 24h is the deliberate default because it matches the
  * rotation grace window.
  */
-export const DEFAULT_MAX_TOKEN_LIFETIME = Duration.hours(1);
+export const DEFAULT_MAX_TOKEN_LIFETIME = Duration.hours(24);
 
 /**
  * Converts the nullable `organization.jwt_max_token_lifetime_minutes` column
