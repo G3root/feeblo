@@ -273,24 +273,22 @@ describe("parseContactCustomAttributes", () => {
       })
   );
 
-  it.effect(
-    "fails when a required attribute has a non-scalar value",
-    () =>
-      Effect.gen(function* () {
-        const def = makeContactDef({
-          key: "requiredField",
-          type: "TEXT",
-          isRequired: true,
-        });
-        // The key-presence check passes for any value shape, so a required
-        // attribute carrying an object must fail instead of being dropped
-        // (which would create contacts without workspace-required data).
-        const error = yield* parseContactCustomAttributes(
-          { customFields: { requiredField: { nested: true } } },
-          [def]
-        ).pipe(Effect.flip);
-        expect(error).toBeInstanceOf(DataValidationError);
-      })
+  it.effect("fails when a required attribute has a non-scalar value", () =>
+    Effect.gen(function* () {
+      const def = makeContactDef({
+        key: "requiredField",
+        type: "TEXT",
+        isRequired: true,
+      });
+      // The key-presence check passes for any value shape, so a required
+      // attribute carrying an object must fail instead of being dropped
+      // (which would create contacts without workspace-required data).
+      const error = yield* parseContactCustomAttributes(
+        { customFields: { requiredField: { nested: true } } },
+        [def]
+      ).pipe(Effect.flip);
+      expect(error).toBeInstanceOf(DataValidationError);
+    })
   );
 
   it("fails when required attribute is missing", async () => {
