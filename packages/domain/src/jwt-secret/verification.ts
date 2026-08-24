@@ -110,13 +110,17 @@ export const verifyJwt = (
       // jwtVerify rejects expired tokens (or tokens with an invalid
       // signature); any failure just moves on to the next candidate secret
       // (active first, then the 24h-grace revoked one). `clockTolerance`
-      // gives both sides a 10s clock-skew allowance.
+      // gives both sides a 10s clock-skew allowance. `currentDate` pins
+      // jose's exp/nbf checks to the same instant as the post-signature
+      // time-claim rules below — the wall clock by default, the test seam's
+      // instant when `options.nowSeconds` is provided.
       const result = yield* Effect.catch(
         Effect.map(
           Effect.tryPromise(() =>
             jose.jwtVerify(token, key, {
               algorithms: ["HS256"],
               clockTolerance: CLOCK_SKEW_LEEWAY_SECONDS,
+              currentDate: new Date(nowSeconds * 1000),
             })
           ),
           (r) => r.payload

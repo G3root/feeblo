@@ -22,7 +22,7 @@ Secrets are **never auto-created** — merely probing an org id cannot materiali
 | Claim | Value | Why |
 | --- | --- | --- |
 | `aud` | **Your workspace id** (from the widget config) | Pins the token to exactly one workspace. A token minted for workspace A is rejected at workspace B even if both secrets leaked. |
-| `sub` | Your stable id for this user | **The only identity claim** (RFC 7519 subject). Used as the contact's `externalId` and to dedupe the SSO user. |
+| `sub` | A stable, unchanging **string** identifier for this user | **The only identity claim** (RFC 7519 subject). Must be a string; non-string values are rejected. Used as the contact's `externalId` and to dedupe the SSO user. |
 | `email` | User's email | Required; the SSO session and contact are keyed on it. |
 | `name` | Display name | Required. |
 | `exp` | UNIX timestamp; keep it short (≤ 5 minutes is plenty) | **Required and enforced.** Tokens without `exp` are rejected. |

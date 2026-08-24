@@ -81,6 +81,25 @@ describe("verifyJwt", () => {
     ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
+  it("rejects a token expired relative to the pinned nowSeconds (seam drives jose)", async () => {
+    // Valid at mint time, but the verification instant is pinned far enough
+    // ahead that jose must judge it expired. Passes only if `currentDate` is
+    // derived from options.nowSeconds rather than the wall clock.
+    const now = nowSeconds();
+    const token = await signToken(
+      { ...basePayload(), iat: now, exp: now + 3600 },
+      SECRET
+    );
+
+    await expect(
+      Effect.runPromise(
+        verifyJwt(token, [SECRET], ORGANIZATION_ID, {
+          nowSeconds: now + 2 * 3600,
+        })
+      )
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+  });
+
   it("rejects an expired token when exp is present", async () => {
     const token = await signToken({ ...basePayload(), exp: pastExp() }, SECRET);
 
