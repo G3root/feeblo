@@ -101,7 +101,8 @@ export async function logOut(page: Page, userEmail: string) {
   // Open the user menu in the sidebar and click log out.
   await page.getByRole("button", { name: userEmail }).click();
   await page.getByRole("menuitem", { name: "Log out" }).click();
-  await page.waitForURL("/sign-in");
+  // Dashboard redirects preserve the return path in a query parameter.
+  await page.waitForURL(/\/sign-in(?:\?|$)/);
   await expect(
     page.getByRole("button", { name: "Login", exact: true })
   ).toBeVisible();

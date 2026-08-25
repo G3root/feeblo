@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { expect, type Page, test } from "@playwright/test";
 
-import { createAuthenticatedWorkspace } from "../helpers/auth";
+import { createAuthenticatedWorkspace, logOut } from "../helpers/auth";
 import { createTestUser } from "../helpers/test-users";
 
 const signInWithEmailButtonName = /^Sign in with email/;
@@ -29,6 +29,10 @@ test.describe("changelog email subscription", () => {
   }) => {
     const user = createTestUser();
     await createAuthenticatedWorkspace(page, user);
+    // Workspace creation authenticates the owner. Start this scenario as a
+    // signed-out public visitor so it exercises the auth-gated toggle before
+    // signing back in.
+    await logOut(page, user.email);
 
     await openChangelogPage(page, user.workspaceName);
 
@@ -57,6 +61,9 @@ test.describe("changelog email subscription", () => {
       .click();
     expect((await signInResponse).ok()).toBeTruthy();
     await expect(signInDialog).toBeHidden();
+    // The auth dialog returns to the public board root. Re-open the changelog
+    // before asserting the authenticated subscription control.
+    await openChangelogPage(page, user.workspaceName);
 
     await page.getByRole("button", { name: "Subscribe", exact: true }).click();
     await expect(
@@ -64,8 +71,13 @@ test.describe("changelog email subscription", () => {
     ).toBeVisible();
 
     // Unsubscribe again and confirm the choice survives a reload.
-    const unsubscribeResponse = page.waitForResponse((response) =>
-      response.url().includes("EmailSubscriptionChangelogSubscribeSet")
+    const unsubscribeResponse = page.waitForResponse(
+      (response) =>
+        /\/rpc\/?$/.test(response.url()) &&
+        response.request().method() === "POST" &&
+        (response.request().postData() ?? "").includes(
+          "EmailSubscriptionChangelogSubscribeSet"
+        )
     );
     await page
       .getByRole("button", { name: "Unsubscribe", exact: true })

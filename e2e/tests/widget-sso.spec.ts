@@ -26,7 +26,12 @@ function signWidgetToken(
   const now = Math.floor(Date.now() / 1000);
   const payload = Buffer.from(
     JSON.stringify({
-      ...identity,
+      // `sub` is the standard JWT subject claim used as the contact's stable
+      // external id. Keep the browser-side `userId` naming separate from the
+      // token contract.
+      sub: identity.userId,
+      email: identity.email,
+      name: identity.name,
       iat: now,
       exp: now + 5 * 60,
       // Pins the token to exactly one workspace: the server rejects tokens
