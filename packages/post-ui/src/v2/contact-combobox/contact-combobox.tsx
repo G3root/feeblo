@@ -183,6 +183,12 @@ export function ContactCombobox({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<readonly TContactSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  // Whether the latest ContactSearch round-trip failed. While set, the
+  // "no match — create new customer" entry is suppressed: an empty result
+  // list after an error is not evidence that no customer exists.
+  const [searchFailed, setSearchFailed] = useState(false);
+  // Bumped by the retry button to re-run the search effect for the same query.
+  const [retryToken, setRetryToken] = useState(0);
   const [open, setOpen] = useState(false);
 
   // The transport is read through a latest-ref so consumers may pass an
@@ -198,6 +204,7 @@ export function ContactCombobox({
 
     if (trimmed.length < MIN_QUERY_LENGTH) {
       setResults([]);
+      setSearchFailed(false);
       setIsSearching(false);
       return;
     }
@@ -217,11 +224,13 @@ export function ContactCombobox({
         .then((nextResults) => {
           if (isCurrent && !controller.signal.aborted) {
             setResults(nextResults);
+            setSearchFailed(false);
           }
         })
         .catch(() => {
           if (isCurrent && !controller.signal.aborted) {
             setResults([]);
+            setSearchFailed(true);
           }
         })
         .finally(() => {
@@ -236,7 +245,7 @@ export function ContactCombobox({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [organizationId, postId, query]);
+  }, [organizationId, postId, query, retryToken]);
 
   const trimmedQuery = query.trim();
   // The create-new path feeds the raw query to find-or-create as an EMAIL;
@@ -245,7 +254,7 @@ export function ContactCombobox({
     trimmedQuery.length >= MIN_QUERY_LENGTH &&
     EmailSchema.safeParse(trimmedQuery).success;
   const options: ContactOption[] =
-    queryLooksLikeEmail && results.length === 0
+    queryLooksLikeEmail && results.length === 0 && !searchFailed
       ? [{ kind: "create", email: trimmedQuery }]
       : results.map((contact) => ({ kind: "contact", contact }));
 
@@ -373,7 +382,26 @@ export function ContactCombobox({
             Type at least {MIN_QUERY_LENGTH} characters to search.
           </p>
         ) : null}
-        {!isSearching && trimmedQuery.length >= MIN_QUERY_LENGTH ? (
+        {!isSearching &&
+        searchFailed &&
+        trimmedQuery.length >= MIN_QUERY_LENGTH ? (
+          <div className="flex items-center justify-between gap-2 px-3 py-2">
+            <p className="text-muted-foreground text-xs">
+              Couldn't load results.
+            </p>
+            <Button
+              onClick={() => setRetryToken((token) => token + 1)}
+              size="xs"
+              type="button"
+              variant="ghost"
+            >
+              Retry
+            </Button>
+          </div>
+        ) : null}
+        {!isSearching &&
+        !searchFailed &&
+        trimmedQuery.length >= MIN_QUERY_LENGTH ? (
           <ComboboxList>
             {(option) =>
               option.kind === "create" ? (

@@ -262,7 +262,7 @@ Decisions above held; implementation diverged in these places, all recorded in c
 5. **Post subscriptions needed vote-style collision handling too** — they share the `(post_id, user_id)` unique-index shape the ticket flagged only for votes.
 6. **`identity/emails.ts`** holds the synthetic-email predicates as a dependency-free module to avoid a user-repository import cycle.
 7. **Glossary location.** `CONTEXT.md` is scoped to the integration platform domain, so the feature vocabulary (actor/subject, shadow user, deferred subscription) lives in `docs/on-behalf.md` instead.
-8. **Picker `hasAccess` without post context.** With no `postId`, an unrestricted verified global user is reported eligible (board unknown); with `postId`, board visibility participates in the verdict.
+8. **Picker `hasAccess` without post context.** With no `postId`, board visibility cannot participate in the eligibility rule, so an unrestricted verified global user is reported as eligible only provisionally — the verdict is not final until the post's board is known. ContactSearch integrations should pass `postId` whenever post context exists; callers without one must treat `hasAccess` as "not yet determined" rather than a definitive "will be notified" for unrestricted global users.
 
 ## Completion Criteria
 

@@ -878,7 +878,9 @@ export const commentReactionCollection = createCollection(
 
 export const upvoteCollection = createCollection(
   queryCollectionOptions({
-    queryKey: organizationScopedQueryKey("upvote"),
+    // Lazy key: resolved at query time so navigation between organizations
+    // never reuses another organization's cache entry (matches queryFn).
+    queryKey: () => organizationScopedQueryKey("upvote"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 

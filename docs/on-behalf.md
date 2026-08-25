@@ -74,14 +74,15 @@ Consequences:
 When the human behind a shadow user shows up with a real account, attributed data heals automatically (`packages/domain/src/identity/linking.ts`):
 
 - Triggers: signup/email verification matching a contact's email, and SSO session creation for the same (email hash, organization).
-- One transaction reassigns contacts, posts, votes, comments, and subscriptions off the shadow user to the real account; collisions with the real user's existing votes/subscriptions drop the shadow's duplicate; the shadow user is deleted last.
+- Signup/email-verification linking runs one transaction that reassigns contacts, posts, votes, comments, and subscriptions off the shadow user to the real account; collisions with the real user's existing votes/subscriptions drop the shadow's duplicate; the shadow user is deleted last.
+- SSO session creation instead promotes the shadow row in place (`upsertSsoUser`): when a `behalf-*` shadow matches by (email hash, organization), the same row becomes the portal identity — fresh synthetic `sso-*` address, `emailVerified = true` — rather than being reassigned and deleted.
 - Deferred subscriptions activate when the surviving account satisfies the eligibility rule.
 
 Split identities therefore cannot persist: the first time the customer signs up with the email an admin typed, all their attributed history moves to the real account.
 
 ## Picker search
 
-`ContactSearch` backs the author/voter/commenter comboboxes: org-scoped, single-round-trip SQL ranked exact email → email prefix → name prefix → substring over trigram indexes, returning `isMember`, `hasAccess`, and `alreadyVoted` badges so the UI can hint "will/won't be notified" before submitting. An empty result is the create-new-customer entry point.
+`ContactSearch` backs the author/voter/commenter comboboxes: org-scoped, single-round-trip SQL ranked exact email → email prefix → name prefix → substring over trigram indexes, returning `isMember`, `hasAccess`, and `alreadyVoted` badges so the UI can hint "will/won't be notified" before submitting. Without post context the board is unknown, so `hasAccess` for an unrestricted verified global user is provisional — eligibility cannot be determined until the post's board visibility is known (callers with a post pass `postId`). An empty result is the create-new-customer entry point.
 
 ## Where things live
 
