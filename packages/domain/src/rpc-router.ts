@@ -32,6 +32,7 @@ import { S3UploadServiceLive } from "./services/s3";
 import {
   AuthMiddlewareLive,
   OptionalAuthMiddlewareLive,
+  PublicAuthMiddlewareLive,
 } from "./session-middleware";
 import { SiteRpcHandlers } from "./site/handlers";
 import { TagRpcHandlers } from "./tag/handlers";
@@ -105,6 +106,7 @@ export const makeRpcRoute = <RIn, ROut, E>(
       Layer.mergeAll(
         AuthMiddlewareLive,
         OptionalAuthMiddlewareLive,
+        PublicAuthMiddlewareLive,
         PublicRpcRateLimitMiddlewareLive
       )
     )

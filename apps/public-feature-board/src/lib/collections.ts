@@ -61,6 +61,18 @@ function getCurrentPostSlug() {
 }
 
 /**
+ * Session user id, or undefined while signed out / during SSR. Subscription
+ * RPCs scope their results to this user, so it keys their query caches.
+ */
+function getCurrentUserId() {
+  if (!hasWindow()) {
+    return undefined;
+  }
+
+  return getCachedAuthSession()?.user.id;
+}
+
+/**
  * Mutations are always scoped to the organization hosting this public board.
  * A restricted SSO session must never use a client-supplied entity organization
  * id to act on a different board.
@@ -667,7 +679,8 @@ export const publicPostSubscriptionCollection = createCollection(
     queryKey: (opts) =>
       slugScopedQueryKey(
         "public-post-subscription",
-        parseLoadSubsetOptions(opts).filters
+        parseLoadSubsetOptions(opts).filters,
+        getCurrentUserId()
       ),
     syncMode: "on-demand",
     queryFn: async (ctx) => {
@@ -725,7 +738,10 @@ export const publicPostSubscriptionCollection = createCollection(
 export const publicChangelogSubscriptionCollection = createCollection(
   queryCollectionOptions({
     queryKey: () =>
-      organizationScopedQueryKey("public-changelog-subscription"),
+      organizationScopedQueryKey(
+        "public-changelog-subscription",
+        getCurrentUserId()
+      ),
     syncMode: "on-demand",
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
