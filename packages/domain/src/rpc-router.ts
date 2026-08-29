@@ -8,6 +8,7 @@ import { BoardRpcHandlers } from "./board/handlers";
 import { ChangelogCategoryRpcHandlers } from "./changelog-category/handlers";
 import { ChangelogPostRpcHandlers } from "./changelog-post/handlers";
 import { ChangelogRpcHandlers } from "./changelog/handlers";
+import { ChangelogSubscriptionRpcHandlers } from "./changelog-subscription/handlers";
 import { CommentReactionRpcHandlers } from "./comment-reaction/handlers";
 import { CommentRpcHandlers } from "./comments/handlers";
 import { CompanyRpcHandlers } from "./company/handlers";
@@ -66,7 +67,11 @@ export const makeRpcRoute = <RIn, ROut, E>(
       Layer.mergeAll(BoardRpcHandlers, ChangelogCategoryRpcHandlers)
     ),
     Layer.provide(
-      Layer.mergeAll(ChangelogRpcHandlers, ChangelogPostRpcHandlers)
+      Layer.mergeAll(
+        ChangelogRpcHandlers,
+        ChangelogPostRpcHandlers,
+        ChangelogSubscriptionRpcHandlers
+      )
     ),
     Layer.provide(JwtSecretRpcHandlers),
     Layer.provide(

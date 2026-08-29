@@ -76,7 +76,7 @@ test.describe("changelog email subscription", () => {
         /\/rpc\/?$/.test(response.url()) &&
         response.request().method() === "POST" &&
         (response.request().postData() ?? "").includes(
-          "EmailSubscriptionChangelogSubscribeSet"
+          "ChangelogSubscriptionDeletePublic"
         )
     );
     await page

@@ -55,6 +55,21 @@
     "./board/schema": {
       "default": "./src/board/schema.ts"
     },
+    "./changelog-subscription/errors": {
+      "default": "./src/changelog-subscription/errors.ts"
+    },
+    "./changelog-subscription/handlers": {
+      "default": "./src/changelog-subscription/handlers.ts"
+    },
+    "./changelog-subscription/repository": {
+      "default": "./src/changelog-subscription/repository.ts"
+    },
+    "./changelog-subscription/rpcs": {
+      "default": "./src/changelog-subscription/rpcs.ts"
+    },
+    "./changelog-subscription/schema": {
+      "default": "./src/changelog-subscription/schema.ts"
+    },
     "./changelog/schema": {
       "default": "./src/changelog/schema.ts"
     },

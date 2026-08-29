@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import * as Policy from "../policy";
+import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { NotificationPolicy } from "./policies";
@@ -12,25 +13,16 @@ import { NotificationService } from "./service";
 export const NotificationRpcHandlersEffect = Effect.gen(function* () {
   const notifications = yield* NotificationService;
   const notificationPolicy = yield* NotificationPolicy;
-  const currentMembership = (organizationId: string) =>
-    Effect.gen(function* () {
-      const session = yield* CurrentSession;
-      const membership = Policy.getMembership(session, organizationId);
-      if (!membership) {
-        return yield* new Policy.PolicyDeniedError();
-      }
-      return membership;
-    });
 
   return {
     NotificationList: (args: TNotificationList) =>
       Effect.gen(function* () {
-        const membership = yield* currentMembership(args.organizationId);
+        const session = yield* CurrentSession;
         return yield* notifications.list({
           ...(args.cursor === undefined ? undefined : { cursor: args.cursor }),
           ...(args.limit === undefined ? undefined : { limit: args.limit }),
           organizationId: args.organizationId,
-          recipientMemberId: membership.membershipId,
+          recipientUserId: session.session.userId,
         });
       }).pipe(
         Policy.withPolicy(notificationPolicy.canAccess(args.organizationId)),
@@ -38,10 +30,10 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
       ),
     NotificationUnreadCount: ({ organizationId }: { organizationId: string }) =>
       Effect.gen(function* () {
-        const membership = yield* currentMembership(organizationId);
+        const session = yield* CurrentSession;
         const count = yield* notifications.unreadCount({
           organizationId,
-          recipientMemberId: membership.membershipId,
+          recipientUserId: session.session.userId,
         });
         return { count };
       }).pipe(
@@ -50,11 +42,11 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
       ),
     NotificationMarkRead: (args: TNotificationMarkRead) =>
       Effect.gen(function* () {
-        const membership = yield* currentMembership(args.organizationId);
+        const session = yield* CurrentSession;
         yield* notifications.markRead({
           id: args.notificationId,
           organizationId: args.organizationId,
-          recipientMemberId: membership.membershipId,
+          recipientUserId: session.session.userId,
         });
       }).pipe(
         Policy.withPolicy(notificationPolicy.canAccess(args.organizationId)),
@@ -62,13 +54,92 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
       ),
     NotificationMarkAllRead: ({ organizationId }: { organizationId: string }) =>
       Effect.gen(function* () {
-        const membership = yield* currentMembership(organizationId);
+        const session = yield* CurrentSession;
         yield* notifications.markAllRead({
           organizationId,
-          recipientMemberId: membership.membershipId,
+          recipientUserId: session.session.userId,
         });
       }).pipe(
         Policy.withPolicy(notificationPolicy.canAccess(organizationId)),
+        withRemapDbErrors("Notification", "update")
+      ),
+    // Public-board variants for signed-in end users, who may not be workspace
+    // members. Every query is scoped to the session user id, so results can
+    // never leak another user's inbox.
+    NotificationListPublic: (args: TNotificationList) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        return yield* notifications.list({
+          ...(args.cursor === undefined ? undefined : { cursor: args.cursor }),
+          ...(args.limit === undefined ? undefined : { limit: args.limit }),
+          organizationId: args.organizationId,
+          recipientUserId: session.session.userId,
+        });
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "NotificationListPublic",
+          level: "read",
+        }),
+        Policy.withPolicy(
+          Policy.hasRestrictedOrganizationScope(args.organizationId)
+        ),
+        withRemapDbErrors("Notification", "select")
+      ),
+    NotificationUnreadCountPublic: ({
+      organizationId,
+    }: {
+      organizationId: string;
+    }) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const count = yield* notifications.unreadCount({
+          organizationId,
+          recipientUserId: session.session.userId,
+        });
+        return { count };
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "NotificationUnreadCountPublic",
+          level: "read",
+        }),
+        Policy.withPolicy(
+          Policy.hasRestrictedOrganizationScope(organizationId)
+        ),
+        withRemapDbErrors("Notification", "select")
+      ),
+    NotificationMarkReadPublic: (args: TNotificationMarkRead) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        yield* notifications.markRead({
+          id: args.notificationId,
+          organizationId: args.organizationId,
+          recipientUserId: session.session.userId,
+        });
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "NotificationMarkReadPublic",
+          level: "write",
+        }),
+        Policy.withPolicy(
+          Policy.hasRestrictedOrganizationScope(args.organizationId)
+        ),
+        withRemapDbErrors("Notification", "update")
+      ),
+    NotificationMarkAllReadPublic: ({ organizationId }: { organizationId: string }) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        yield* notifications.markAllRead({
+          organizationId,
+          recipientUserId: session.session.userId,
+        });
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "NotificationMarkAllReadPublic",
+          level: "write",
+        }),
+        Policy.withPolicy(
+          Policy.hasRestrictedOrganizationScope(organizationId)
+        ),
         withRemapDbErrors("Notification", "update")
       ),
   };

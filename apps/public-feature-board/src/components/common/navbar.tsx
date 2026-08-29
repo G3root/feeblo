@@ -1,4 +1,5 @@
 import { AuthButton } from "@feeblo/post-ui/auth-dialog";
+import { NotificationsMenu } from "@feeblo/post-ui/notifications-menu";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { cn } from "@feeblo/ui/utils";
 import { useAuth } from "@feeblo/web-shared/auth-context";
@@ -74,12 +75,20 @@ function NavTab({ href, label }: { href: string; label: string }) {
 }
 
 function UserActions() {
+  const site = useSite();
   const auth = useAuth();
   const isAuthenticated = auth.status === "authenticated";
 
   return (
     <div className="flex items-center gap-2">
-      {isAuthenticated ? <UserMenu /> : <AuthButton />}
+      {isAuthenticated ? (
+        <>
+          <NotificationsMenu organizationId={site.organizationId} />
+          <UserMenu />
+        </>
+      ) : (
+        <AuthButton />
+      )}
     </div>
   );
 }

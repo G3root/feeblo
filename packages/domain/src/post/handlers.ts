@@ -416,7 +416,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                   organizationId: args.organizationId,
                   postId: args.id,
                   ...(membership && {
-                    actorMemberId: membership.membershipId,
+                    actorUserId: session.session.userId,
                   }),
                 }),
             });
@@ -720,7 +720,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                 organizationId: args.organizationId,
                 postId: args.id,
                 ...(membership && {
-                  actorMemberId: membership.membershipId,
+                  actorUserId: session.session.userId,
                 }),
               }),
           });

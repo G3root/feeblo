@@ -76,6 +76,10 @@
       "types": "./src/v2/subscribe-toggle.tsx",
       "default": "./src/v2/subscribe-toggle.tsx"
     },
+    "./notifications-menu": {
+      "types": "./src/v2/notifications-menu.tsx",
+      "default": "./src/v2/notifications-menu.tsx"
+    },
     "./post-title-input": {
       "types": "./src/v2/post-title-input.tsx",
       "default": "./src/v2/post-title-input.tsx"
@@ -171,6 +175,7 @@
     "@number-flow/react": "^0.6.1",
     "@tanstack/react-db": "catalog:",
     "@tanstack/react-form": "catalog:",
+    "@tanstack/react-query": "^5.101.0",
     "react": "catalog:",
     "react-dom": "catalog:",
     "zod": "catalog:"
