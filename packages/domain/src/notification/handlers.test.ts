@@ -304,7 +304,7 @@ describe("NotificationRpcHandlers", () => {
     const insertChangelogSubscriber = (
       organizationId: string,
       suffix: string,
-      options: { withMembership?: boolean } = {}
+      options: { withMembership?: boolean; restricted?: boolean } = {}
     ) =>
       Effect.gen(function* () {
         const db = yield* currentDb;
@@ -314,6 +314,9 @@ describe("NotificationRpcHandlers", () => {
           id: userId,
           email: `${userId}@example.com`,
           name: `User ${suffix}`,
+          ...(options.restricted
+            ? { restrictedToOrganizationId: organizationId }
+            : undefined),
         });
         if (options.withMembership) {
           yield* db.insert(schema.memberTable).values({
@@ -401,6 +404,61 @@ describe("NotificationRpcHandlers", () => {
               resourceId: "chg_1",
               href: `/${organizationId}/changelog/edit/release-1`,
               deduplicationKey: "changelog.published:chg_1",
+            });
+          })
+        );
+
+        it.effect("sends restricted members to the public changelog", () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const service = yield* NotificationService;
+            const organizationId = yield* WorkspaceId.generate;
+            yield* db.insert(schema.organizationTable).values({
+              id: organizationId,
+              name: "Changelog org restricted",
+              slug: organizationId,
+              createdAt: new Date(),
+            });
+            const unrestrictedMember = yield* insertChangelogSubscriber(
+              organizationId,
+              "unrestricted_member",
+              { withMembership: true }
+            );
+            // A member restricted to the workspace via SSO cannot open the
+            // dashboard, so their notification links to the public changelog.
+            const restrictedMember = yield* insertChangelogSubscriber(
+              organizationId,
+              "restricted_member",
+              { withMembership: true, restricted: true }
+            );
+
+            yield* service.notifyChangelogPublished({
+              changelogId: "chg_3",
+              changelogSlug: "release-3",
+              organizationId,
+              title: "Release 3",
+            });
+
+            const rows = yield* db
+              .select()
+              .from(schema.notificationTable)
+              .where(
+                eq(schema.notificationTable.organizationId, organizationId)
+              );
+            expect(rows).toHaveLength(2);
+            expect(
+              rows.find(
+                (row) => row.recipientUserId === unrestrictedMember.userId
+              )
+            ).toMatchObject({
+              href: `/${organizationId}/changelog/edit/release-3`,
+            });
+            expect(
+              rows.find(
+                (row) => row.recipientUserId === restrictedMember.userId
+              )
+            ).toMatchObject({
+              href: "/changelog/release-3",
             });
           })
         );

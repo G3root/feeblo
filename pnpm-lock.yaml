@@ -219,6 +219,9 @@ importers:
       '@feeblo/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@feeblo/id':
+        specifier: workspace:*
+        version: link:../../packages/id
       '@feeblo/post-ui':
         specifier: workspace:*
         version: link:../../packages/post-ui

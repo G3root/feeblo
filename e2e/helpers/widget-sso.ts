@@ -195,9 +195,10 @@ export async function signInRestrictedSsoVisitor(
     `JWT auto-login response: ${await response.text()}`
   ).toBeTruthy();
 
+  const boardOrigin = new URL(boardUrl).origin;
   await expect(page).toHaveURL((url) => {
     return (
-      url.origin === boardUrl &&
+      url.origin === boardOrigin &&
       !url.searchParams.has("ssoToken") &&
       !url.hash.includes("ssoToken")
     );

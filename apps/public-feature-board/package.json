@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@feeblo/domain": "workspace:*",
+    "@feeblo/id": "workspace:*",
     "@feeblo/post-ui": "workspace:*",
     "@feeblo/ui": "workspace:*",
     "@feeblo/utils": "workspace:*",

@@ -222,21 +222,38 @@ const makeNotificationService = Effect.gen(function* () {
             eq(schema.changelogSubscriptionTable.organizationId, organizationId)
           );
 
-        // Split recipients by membership: members land on the dashboard edit
-        // page, while non-member subscribers are sent to the public changelog.
+        // Split recipients by dashboard access: members land on the dashboard
+        // edit page, while non-member subscribers and members restricted to
+        // the workspace via SSO (who cannot open the dashboard) are sent to
+        // the public changelog.
         const members = yield* db
-          .select({ userId: schema.memberTable.userId })
+          .select({
+            userId: schema.memberTable.userId,
+            restrictedToOrganizationId:
+              schema.userTable.restrictedToOrganizationId,
+          })
           .from(schema.memberTable)
+          .innerJoin(
+            schema.userTable,
+            eq(schema.userTable.id, schema.memberTable.userId)
+          )
           .where(eq(schema.memberTable.organizationId, organizationId));
         const memberUserIds = new Set(members.map((member) => member.userId));
+        const restrictedUserIds = new Set(
+          members
+            .filter((member) => member.restrictedToOrganizationId !== null)
+            .map((member) => member.userId)
+        );
         const subscriberUserIds = subscribers.map(
           (subscriber) => subscriber.userId
         );
-        const memberRecipients = subscriberUserIds.filter((userId) =>
-          memberUserIds.has(userId)
+        const memberRecipients = subscriberUserIds.filter(
+          (userId) =>
+            memberUserIds.has(userId) && !restrictedUserIds.has(userId)
         );
         const publicRecipients = subscriberUserIds.filter(
-          (userId) => !memberUserIds.has(userId)
+          (userId) =>
+            !memberUserIds.has(userId) || restrictedUserIds.has(userId)
         );
 
         yield* Effect.all([

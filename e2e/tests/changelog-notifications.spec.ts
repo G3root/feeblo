@@ -528,9 +528,16 @@ test.describe("changelog notifications", () => {
         }
       );
 
-      // SAFETY: the RPC endpoint always answers with a single NDJSON Exit
-      // envelope, so the response text parses to it.
-      const foreignExit = JSON.parse(crossOrgResult.foreign.body.trim()) as {
+      // A denied Public RPC still answers with a well-formed NDJSON reply,
+      // so the HTTP status is asserted before any body inspection.
+      expect(crossOrgResult.foreign.status).toBe(200);
+      // SAFETY: the RPC endpoint answers with at least one NDJSON Exit
+      // envelope per request, so the last non-empty line parses to it.
+      const foreignExit = JSON.parse(
+        crossOrgResult.foreign.body
+          .split("\n")
+          .findLast((line) => line.trim().length > 0) ?? ""
+      ) as {
         exit: { _tag: string; cause?: unknown };
       };
       expect(foreignExit.exit._tag).toBe("Failure");
