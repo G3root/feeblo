@@ -175,15 +175,18 @@
     "@number-flow/react": "^0.6.1",
     "@tanstack/react-db": "catalog:",
     "@tanstack/react-form": "catalog:",
-    "@tanstack/react-query": "^5.101.0",
     "react": "catalog:",
     "react-dom": "catalog:",
     "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "catalog:"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
     "@ladle/react": "^5.1.1",
     "@tailwindcss/vite": "catalog:",
+    "@tanstack/react-query": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitest/browser-playwright": "^4.1.10",
