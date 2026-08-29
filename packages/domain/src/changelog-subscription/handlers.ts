@@ -193,10 +193,11 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   };
 });
 
-export const ChangelogSubscriptionRpcHandlers = ChangelogSubscriptionRpcs.toLayer(
-  ChangelogSubscriptionRpcHandlersEffect
-).pipe(
-  Layer.provide(ChangelogSubscriptionRepository.layer),
-  Layer.provide(EmailSubscriptionRepository.layer),
-  Layer.provide(SitePolicy.layer.pipe(Layer.provide(SiteRepository.layer)))
-);
+export const ChangelogSubscriptionRpcHandlers =
+  ChangelogSubscriptionRpcs.toLayer(
+    ChangelogSubscriptionRpcHandlersEffect
+  ).pipe(
+    Layer.provide(ChangelogSubscriptionRepository.layer),
+    Layer.provide(EmailSubscriptionRepository.layer),
+    Layer.provide(SitePolicy.layer.pipe(Layer.provide(SiteRepository.layer)))
+  );

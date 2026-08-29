@@ -61,7 +61,10 @@ const makeChangelogSubscriptionRepository = Effect.gen(function* () {
         .delete(schema.changelogSubscriptionTable)
         .where(
           and(
-            eq(schema.changelogSubscriptionTable.organizationId, organizationId),
+            eq(
+              schema.changelogSubscriptionTable.organizationId,
+              organizationId
+            ),
             eq(schema.changelogSubscriptionTable.userId, userId)
           )
         )
@@ -73,7 +76,10 @@ const makeChangelogSubscriptionRepository = Effect.gen(function* () {
         .from(schema.changelogSubscriptionTable)
         .where(
           and(
-            eq(schema.changelogSubscriptionTable.organizationId, organizationId),
+            eq(
+              schema.changelogSubscriptionTable.organizationId,
+              organizationId
+            ),
             eq(schema.changelogSubscriptionTable.userId, userId)
           )
         )
@@ -93,7 +99,10 @@ const makeChangelogSubscriptionRepository = Effect.gen(function* () {
         .from(schema.changelogSubscriptionTable)
         .where(
           and(
-            eq(schema.changelogSubscriptionTable.organizationId, organizationId),
+            eq(
+              schema.changelogSubscriptionTable.organizationId,
+              organizationId
+            ),
             ...(userId
               ? [eq(schema.changelogSubscriptionTable.userId, userId)]
               : [])

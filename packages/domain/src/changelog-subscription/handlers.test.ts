@@ -1,17 +1,17 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
+import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { and, eq } from "drizzle-orm";
 
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { RateLimitService } from "../rate-limit/service";
-import { SitePolicy } from "../site/policies";
 import { CurrentSession, type Session } from "../session-middleware";
+import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { ChangelogSubscriptionRpcHandlersEffect } from "./handlers";
@@ -171,10 +171,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
   });
 
   /** Finds the user-keyed changelog subscription row, if any. */
-  const findChangelogRow = (args: {
-    organizationId: string;
-    userId: string;
-  }) =>
+  const findChangelogRow = (args: { organizationId: string; userId: string }) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
       return yield* db
@@ -361,9 +358,9 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
         expect(subscribeError._tag).toBe("PolicyDenied");
 
         const listError = yield* Effect.flip(
-          handlers.ChangelogSubscriptionListPublic({ organizationId }).pipe(
-            scoped
-          )
+          handlers
+            .ChangelogSubscriptionListPublic({ organizationId })
+            .pipe(scoped)
         );
         expect(listError._tag).toBe("PolicyDenied");
       })

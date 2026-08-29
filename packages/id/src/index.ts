@@ -50,13 +50,9 @@ export const PostReactionId = makeId("post_reaction", "rct", {
 export const PostSubscriptionId = makeId("post_subscription", "psb", {
   approximateLength,
 });
-export const ChangelogSubscriptionId = makeId(
-  "changelog_subscription",
-  "cgs",
-  {
-    approximateLength,
-  }
-);
+export const ChangelogSubscriptionId = makeId("changelog_subscription", "cgs", {
+  approximateLength,
+});
 export const EmailOutboxId = makeId("email_outbox", "eob", {
   approximateLength,
 });

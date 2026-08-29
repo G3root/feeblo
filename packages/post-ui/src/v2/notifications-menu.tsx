@@ -1,11 +1,11 @@
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
-import { fetchRpc } from "@feeblo/web-shared/runtime";
 import {
   parseRpcError,
   RpcError,
   type ParsedRpcError,
 } from "@feeblo/web-shared/rpc-error";
+import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { BellDotIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -57,10 +57,9 @@ export function NotificationsMenu({
   const { data: unread } = useQuery({
     enabled: Boolean(session),
     queryFn: ({ signal }) =>
-      fetchRpc(
-        (rpc) => rpc.NotificationUnreadCountPublic({ organizationId }),
-        { signal }
-      ),
+      fetchRpc((rpc) => rpc.NotificationUnreadCountPublic({ organizationId }), {
+        signal,
+      }),
     queryKey: [...listKey, "unread"],
     refetchInterval: REFRESH_MS,
     staleTime: REFRESH_MS,
@@ -127,7 +126,12 @@ export function NotificationsMenu({
     <Menu onOpenChange={setOpen} open={open}>
       <MenuTrigger
         render={
-          <Button aria-label="Notifications" className="relative" size="icon-sm" variant="ghost" />
+          <Button
+            aria-label="Notifications"
+            className="relative"
+            size="icon-sm"
+            variant="ghost"
+          />
         }
       >
         <HugeiconsIcon icon={BellDotIcon} />

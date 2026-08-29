@@ -179,9 +179,6 @@
     "react-dom": "catalog:",
     "zod": "catalog:"
   },
-  "peerDependencies": {
-    "@tanstack/react-query": "catalog:"
-  },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
     "@ladle/react": "^5.1.1",
@@ -195,5 +192,8 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "vitest-browser-react": "^2.2.0"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "catalog:"
   }
 }

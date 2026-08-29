@@ -1,52 +1,20 @@
-import { createHmac, randomUUID } from "node:crypto";
-import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 
 import { expect, test } from "@playwright/test";
 
 import { createAuthenticatedWorkspace } from "../helpers/auth";
 import { setPlan } from "../helpers/set-plan";
 import { createTestUser } from "../helpers/test-users";
+import {
+  copyWorkspaceJwtSecret,
+  sdkBundlePath,
+  signWidgetToken,
+} from "../helpers/widget-sso";
 
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3101";
 const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
 const organizationIdPattern = /^org_/;
 const ssoTokenPattern = /ssoToken/;
-const sdkBundlePath = fileURLToPath(
-  new URL("../../packages/sdk/dist/feeblo-sdk.umd.cjs", import.meta.url)
-);
-
-function signWidgetToken(
-  secret: string,
-  identity: { email: string; name: string; userId: string },
-  organizationId: string
-) {
-  const header = Buffer.from(
-    JSON.stringify({ alg: "HS256", typ: "JWT" })
-  ).toString("base64url");
-  const now = Math.floor(Date.now() / 1000);
-  const payload = Buffer.from(
-    JSON.stringify({
-      // `sub` is the standard JWT subject claim used as the contact's stable
-      // external id. Keep the browser-side `userId` naming separate from the
-      // token contract.
-      sub: identity.userId,
-      email: identity.email,
-      name: identity.name,
-      iat: now,
-      exp: now + 5 * 60,
-      // Pins the token to exactly one workspace: the server rejects tokens
-      // without (or with a mismatched) aud claim.
-      aud: organizationId,
-    })
-  ).toString("base64url");
-  const unsignedToken = `${header}.${payload}`;
-  const key = Buffer.from(secret, "hex");
-  const signature = createHmac("sha256", key)
-    .update(unsignedToken)
-    .digest("base64url");
-
-  return `${unsignedToken}.${signature}`;
-}
 
 function publicBoardUrl(workspaceName: string) {
   const subdomain = workspaceName.toLowerCase().replaceAll(" ", "-");
@@ -69,55 +37,16 @@ test(
     }
     expect(organizationId).toMatch(organizationIdPattern);
 
+    let secret = "";
+
     // Widget SSO is a paid capability (Starter plan or higher): a fresh
     // workspace signs up on the free plan, so put it on Starter before
     // exercising the JWT auto-login flow.
     await setPlan(page.request, { organizationId, plan: "starter" });
 
     await test.step("copy the workspace JWT secret", async () => {
-      await page
-        .context()
-        .grantPermissions(["clipboard-read", "clipboard-write"], {
-          origin: baseURL,
-        });
-      await page.goto(`/${organizationId}/settings/security`);
-
-      // Secret creation is explicit: a fresh workspace has no active JWT
-      // secret, so the page offers "Generate Secret" until an admin creates
-      // one. Generate it when needed so the "Copy Secret" button is present.
-      const copySecretButton = page.getByRole("button", {
-        name: "Copy Secret",
-      });
-      const generateSecretButton = page.getByRole("button", {
-        name: "Generate Secret",
-      });
-      await Promise.race([
-        copySecretButton.waitFor({ state: "visible" }),
-        generateSecretButton.waitFor({ state: "visible" }),
-      ]);
-      if (await generateSecretButton.isVisible()) {
-        await generateSecretButton.click();
-        await expect(
-          page.getByText("Secret generated successfully")
-        ).toBeVisible();
-        await expect(copySecretButton).toBeVisible();
-      }
-
-      await copySecretButton.click();
-      await expect(page.getByText("Secret copied to clipboard")).toBeVisible();
+      secret = await copyWorkspaceJwtSecret(page, organizationId);
     });
-
-    const secret = await page.evaluate(() => {
-      // SAFETY: the browser under test always provides clipboard access; the
-      // intersection only narrows the known global shape.
-      const browserNavigator = (
-        globalThis as typeof globalThis & {
-          navigator: { clipboard: { readText: () => Promise<string> } };
-        }
-      ).navigator;
-      return browserNavigator.clipboard.readText();
-    });
-    expect(secret).toHaveLength(64);
 
     const visitor = {
       userId: `visitor-${randomUUID().slice(0, 12)}`,

@@ -112,10 +112,7 @@ describe("verifyJwt", () => {
     Effect.gen(function* () {
       const now = nowSeconds();
       const token = yield* Effect.promise(() =>
-        signToken(
-          { ...basePayload(), iat: now - 60, exp: now - 5 },
-          SECRET
-        )
+        signToken({ ...basePayload(), iat: now - 60, exp: now - 5 }, SECRET)
       );
 
       const payload = yield* verifyJwt(token, [SECRET], ORGANIZATION_ID, {

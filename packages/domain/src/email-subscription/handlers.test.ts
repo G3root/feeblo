@@ -282,6 +282,5 @@ describe("EmailSubscriptionConsentHandlers", () => {
         expect(post.subscription.state).toBe("pending_verification");
       })
     );
-
   });
 });

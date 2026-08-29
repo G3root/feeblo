@@ -743,7 +743,7 @@ export const publicChangelogSubscriptionCollection = createCollection(
         getCurrentUserId()
       ),
     syncMode: "on-demand",
-    queryFn: async (ctx) => {
+    queryFn: async () => {
       const organizationId = getCurrentOrganizationId();
       if (!organizationId) {
         return [];
@@ -761,20 +761,14 @@ export const publicChangelogSubscriptionCollection = createCollection(
     getKey: getChangelogSubscriptionCollectionKey as (
       item: ChangelogSubscriptionRow
     ) => string,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newSubscription } = mutation;
-
+    onInsert: async () => {
       await fetchRpc((rpc) =>
         rpc.ChangelogSubscriptionCreatePublic({
           organizationId: getMutationOrganizationId(),
         })
       );
     },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedSubscription } = mutation;
-
+    onDelete: async () => {
       await fetchRpc((rpc) =>
         rpc.ChangelogSubscriptionDeletePublic({
           organizationId: getMutationOrganizationId(),

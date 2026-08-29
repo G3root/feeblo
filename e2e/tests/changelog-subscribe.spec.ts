@@ -65,7 +65,23 @@ test.describe("changelog email subscription", () => {
     // before asserting the authenticated subscription control.
     await openChangelogPage(page, user.workspaceName);
 
+    // Wait for the optimistic toggle to persist before exercising the
+    // opposite direction: the button swallows clicks while a mutation is in
+    // flight, so a fast follow-up click would otherwise be dropped.
+    const subscribeResponse = page.waitForResponse(
+      (response) =>
+        /\/rpc\/?$/.test(response.url()) &&
+        response.request().method() === "POST" &&
+        (response.request().postData() ?? "").includes(
+          "ChangelogSubscriptionCreatePublic"
+        )
+    );
     await page.getByRole("button", { name: "Subscribe", exact: true }).click();
+    expect((await subscribeResponse).ok()).toBeTruthy();
+    // The anchored success toast is only added once persistence has fully
+    // settled, so it also guarantees the button's re-entrancy guard is clear
+    // before the opposite toggle is clicked.
+    await expect(page.getByText("Subscribed to the changelog!")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Unsubscribe", exact: true })
     ).toBeVisible();

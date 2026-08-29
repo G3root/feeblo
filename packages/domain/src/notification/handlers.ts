@@ -117,7 +117,11 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
         ),
         withRemapDbErrors("Notification", "update")
       ),
-    NotificationMarkAllReadPublic: ({ organizationId }: { organizationId: string }) =>
+    NotificationMarkAllReadPublic: ({
+      organizationId,
+    }: {
+      organizationId: string;
+    }) =>
       markAllReadEffect({ organizationId }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "NotificationMarkAllReadPublic",

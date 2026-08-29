@@ -32,7 +32,12 @@ describe("verifyJwt hex secret handling", () => {
       Effect.gen(function* () {
         const token = yield* Effect.promise(() =>
           signWithHex(
-            { aud: ORGANIZATION_ID, exp: futureExp, iat: nowSeconds, sub: "u1" },
+            {
+              aud: ORGANIZATION_ID,
+              exp: futureExp,
+              iat: nowSeconds,
+              sub: "u1",
+            },
             HEX_SECRET
           )
         );

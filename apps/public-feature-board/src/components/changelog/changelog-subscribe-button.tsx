@@ -92,8 +92,7 @@ export function ChangelogSubscribeButton() {
       });
 
       if (publicChangelogSubscriptionCollection.has(key)) {
-        const transaction =
-          publicChangelogSubscriptionCollection.delete(key);
+        const transaction = publicChangelogSubscriptionCollection.delete(key);
         await transaction.isPersisted.promise;
       } else {
         const id = await ChangelogSubscriptionId.unsafeGenerate();
@@ -108,8 +107,7 @@ export function ChangelogSubscribeButton() {
               (value) => value.organizationId === organizationId
             )?.membershipId ?? null,
         };
-        const transaction =
-          publicChangelogSubscriptionCollection.insert(row);
+        const transaction = publicChangelogSubscriptionCollection.insert(row);
         await transaction.isPersisted.promise;
       }
 

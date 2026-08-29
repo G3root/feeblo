@@ -3,7 +3,7 @@ import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 
 import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
-import { AuthMiddleware } from "../session-middleware";
+import { AuthMiddleware, PublicAuthMiddleware } from "../session-middleware";
 import { ChangelogSubscriptionServiceErrors } from "./errors";
 import {
   ChangelogSubscription,
@@ -23,7 +23,9 @@ export class ChangelogSubscriptionRpcs extends RpcGroup.make(
     success: Schema.Array(ChangelogSubscription),
     error: Schema.Union([ChangelogSubscriptionServiceErrors, RateLimitErrors]),
   })
-    .middleware(AuthMiddleware)
+    // Admits SSO-restricted sessions; the handler authorizes them per
+    // organization via Policy.hasRestrictedOrganizationScope.
+    .middleware(PublicAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("ChangelogSubscriptionCreate", {
     payload: ChangelogSubscriptionCreate,
@@ -39,7 +41,7 @@ export class ChangelogSubscriptionRpcs extends RpcGroup.make(
     }),
     error: Schema.Union([ChangelogSubscriptionServiceErrors, RateLimitErrors]),
   })
-    .middleware(AuthMiddleware)
+    .middleware(PublicAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("ChangelogSubscriptionDelete", {
     payload: ChangelogSubscriptionDelete,
@@ -55,6 +57,6 @@ export class ChangelogSubscriptionRpcs extends RpcGroup.make(
     }),
     error: Schema.Union([ChangelogSubscriptionServiceErrors, RateLimitErrors]),
   })
-    .middleware(AuthMiddleware)
+    .middleware(PublicAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware)
 ) {}

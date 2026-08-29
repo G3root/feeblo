@@ -219,10 +219,7 @@ const makeNotificationService = Effect.gen(function* () {
           .select({ userId: schema.changelogSubscriptionTable.userId })
           .from(schema.changelogSubscriptionTable)
           .where(
-            eq(
-              schema.changelogSubscriptionTable.organizationId,
-              organizationId
-            )
+            eq(schema.changelogSubscriptionTable.organizationId, organizationId)
           );
 
         // Split recipients by membership: members land on the dashboard edit
