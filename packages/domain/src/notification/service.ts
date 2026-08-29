@@ -225,18 +225,48 @@ const makeNotificationService = Effect.gen(function* () {
             )
           );
 
-        yield* create({
-          ...(actorUserId === undefined ? undefined : { actorUserId }),
-          organizationId,
-          recipientUserIds: subscribers.map((subscriber) => subscriber.userId),
-          kind: "changelog.published",
-          resourceType: "changelog",
-          resourceId: changelogId,
-          title: "New changelog entry",
-          body: title,
-          href: `/${organizationId}/changelog/edit/${changelogSlug}`,
-          deduplicationKey: `changelog.published:${changelogId}`,
-        });
+        // Split recipients by membership: members land on the dashboard edit
+        // page, while non-member subscribers are sent to the public changelog.
+        const members = yield* db
+          .select({ userId: schema.memberTable.userId })
+          .from(schema.memberTable)
+          .where(eq(schema.memberTable.organizationId, organizationId));
+        const memberUserIds = new Set(members.map((member) => member.userId));
+        const subscriberUserIds = subscribers.map(
+          (subscriber) => subscriber.userId
+        );
+        const memberRecipients = subscriberUserIds.filter((userId) =>
+          memberUserIds.has(userId)
+        );
+        const publicRecipients = subscriberUserIds.filter(
+          (userId) => !memberUserIds.has(userId)
+        );
+
+        yield* Effect.all([
+          create({
+            ...(actorUserId === undefined ? undefined : { actorUserId }),
+            organizationId,
+            recipientUserIds: memberRecipients,
+            kind: "changelog.published",
+            resourceType: "changelog",
+            resourceId: changelogId,
+            title: "New changelog entry",
+            body: title,
+            href: `/${organizationId}/changelog/edit/${changelogSlug}`,
+            deduplicationKey: `changelog.published:${changelogId}`,
+          }),
+          create({
+            organizationId,
+            recipientUserIds: publicRecipients,
+            kind: "changelog.published",
+            resourceType: "changelog",
+            resourceId: changelogId,
+            title: "New changelog entry",
+            body: title,
+            href: `/changelog/${changelogSlug}`,
+            deduplicationKey: `changelog.published:${changelogId}`,
+          }),
+        ]).pipe(Effect.asVoid);
       }),
 
     /** Notifies only members who upvoted a post; upvoting intentionally does not imply subscription. */

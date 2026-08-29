@@ -25,7 +25,7 @@ const ANCHORED_SUBSCRIBE_TOAST_ID = "changelog-subscribe";
 export function ChangelogSubscribeButton() {
   const site = useSite();
   const authDialogStore = useAuthDialogContext();
-  const { data: session } = useAuthState();
+  const { data: session, isPending: isAuthPending } = useAuthState();
   const organizationId = site.organizationId;
 
   // Re-entrancy guard: blocks a second toggle while the previous mutation is
@@ -54,9 +54,9 @@ export function ChangelogSubscribeButton() {
       [organizationId, session?.user.id]
     );
 
-  // Wait for the authoritative subscription state before rendering, so a
+  // Wait for the authoritative auth/subscription state before rendering, so a
   // signed-in subscriber never sees a stale "Subscribe" flash.
-  if (session && isSubscriptionLoading) {
+  if (isAuthPending || (session && isSubscriptionLoading)) {
     return null;
   }
 

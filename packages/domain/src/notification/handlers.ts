@@ -14,52 +14,66 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
   const notifications = yield* NotificationService;
   const notificationPolicy = yield* NotificationPolicy;
 
+  // -- Shared effect helpers (no policy applied) --
+
+  const listNotificationsEffect = (args: TNotificationList) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      return yield* notifications.list({
+        ...(args.cursor === undefined ? undefined : { cursor: args.cursor }),
+        ...(args.limit === undefined ? undefined : { limit: args.limit }),
+        organizationId: args.organizationId,
+        recipientUserId: session.session.userId,
+      });
+    });
+
+  const unreadCountEffect = ({ organizationId }: { organizationId: string }) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const count = yield* notifications.unreadCount({
+        organizationId,
+        recipientUserId: session.session.userId,
+      });
+      return { count };
+    });
+
+  const markReadEffect = (args: TNotificationMarkRead) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      yield* notifications.markRead({
+        id: args.notificationId,
+        organizationId: args.organizationId,
+        recipientUserId: session.session.userId,
+      });
+    });
+
+  const markAllReadEffect = ({ organizationId }: { organizationId: string }) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      yield* notifications.markAllRead({
+        organizationId,
+        recipientUserId: session.session.userId,
+      });
+    });
+
   return {
     NotificationList: (args: TNotificationList) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        return yield* notifications.list({
-          ...(args.cursor === undefined ? undefined : { cursor: args.cursor }),
-          ...(args.limit === undefined ? undefined : { limit: args.limit }),
-          organizationId: args.organizationId,
-          recipientUserId: session.session.userId,
-        });
-      }).pipe(
+      listNotificationsEffect(args).pipe(
         Policy.withPolicy(notificationPolicy.canAccess(args.organizationId)),
         withRemapDbErrors("Notification", "select")
       ),
     NotificationUnreadCount: ({ organizationId }: { organizationId: string }) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        const count = yield* notifications.unreadCount({
-          organizationId,
-          recipientUserId: session.session.userId,
-        });
-        return { count };
-      }).pipe(
+      unreadCountEffect({ organizationId }).pipe(
         Policy.withPolicy(notificationPolicy.canAccess(organizationId)),
         withRemapDbErrors("Notification", "select")
       ),
     NotificationMarkRead: (args: TNotificationMarkRead) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        yield* notifications.markRead({
-          id: args.notificationId,
-          organizationId: args.organizationId,
-          recipientUserId: session.session.userId,
-        });
-      }).pipe(
+      markReadEffect(args).pipe(
         Policy.withPolicy(notificationPolicy.canAccess(args.organizationId)),
         withRemapDbErrors("Notification", "update")
       ),
     NotificationMarkAllRead: ({ organizationId }: { organizationId: string }) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        yield* notifications.markAllRead({
-          organizationId,
-          recipientUserId: session.session.userId,
-        });
-      }).pipe(
+      markAllReadEffect({ organizationId }).pipe(
         Policy.withPolicy(notificationPolicy.canAccess(organizationId)),
         withRemapDbErrors("Notification", "update")
       ),
@@ -67,15 +81,7 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
     // members. Every query is scoped to the session user id, so results can
     // never leak another user's inbox.
     NotificationListPublic: (args: TNotificationList) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        return yield* notifications.list({
-          ...(args.cursor === undefined ? undefined : { cursor: args.cursor }),
-          ...(args.limit === undefined ? undefined : { limit: args.limit }),
-          organizationId: args.organizationId,
-          recipientUserId: session.session.userId,
-        });
-      }).pipe(
+      listNotificationsEffect(args).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "NotificationListPublic",
           level: "read",
@@ -90,14 +96,7 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
     }: {
       organizationId: string;
     }) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        const count = yield* notifications.unreadCount({
-          organizationId,
-          recipientUserId: session.session.userId,
-        });
-        return { count };
-      }).pipe(
+      unreadCountEffect({ organizationId }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "NotificationUnreadCountPublic",
           level: "read",
@@ -108,14 +107,7 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Notification", "select")
       ),
     NotificationMarkReadPublic: (args: TNotificationMarkRead) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        yield* notifications.markRead({
-          id: args.notificationId,
-          organizationId: args.organizationId,
-          recipientUserId: session.session.userId,
-        });
-      }).pipe(
+      markReadEffect(args).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "NotificationMarkReadPublic",
           level: "write",
@@ -126,13 +118,7 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Notification", "update")
       ),
     NotificationMarkAllReadPublic: ({ organizationId }: { organizationId: string }) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        yield* notifications.markAllRead({
-          organizationId,
-          recipientUserId: session.session.userId,
-        });
-      }).pipe(
+      markAllReadEffect({ organizationId }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "NotificationMarkAllReadPublic",
           level: "write",

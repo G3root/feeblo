@@ -1,6 +1,11 @@
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
+import {
+  parseRpcError,
+  RpcError,
+  type ParsedRpcError,
+} from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { BellDotIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -27,13 +32,17 @@ type NotificationRow = {
  * so the same component serves members and end-user subscribers alike.
  *
  * `onNavigate` lets the host app route notification clicks through its own
- * router; by default the browser navigates to the stored href.
+ * router; by default the browser navigates to the stored href. `onMarkReadError`
+ * lets the host app surface mark-read failures with its own toast; it receives
+ * the already-parsed RPC error.
  */
 export function NotificationsMenu({
   organizationId,
+  onMarkReadError,
   onNavigate,
 }: {
   organizationId: string;
+  onMarkReadError?: (error: ParsedRpcError) => void;
   onNavigate?: (href: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -73,7 +82,14 @@ export function NotificationsMenu({
   const invalidate = () =>
     void queryClient.invalidateQueries({ queryKey: listKey });
 
-  const markRead = useMutation({
+  // `fetchRpc` rejects with `RpcError`; parse it here so hosts receive the
+  // UI-safe `ParsedRpcError` instead of a raw unknown failure.
+  const onError =
+    onMarkReadError === undefined
+      ? undefined
+      : (error: RpcError) => onMarkReadError(parseRpcError(error));
+
+  const markRead = useMutation<unknown, RpcError, string>({
     mutationFn: (notificationId: string) =>
       fetchRpc((rpc) =>
         rpc.NotificationMarkReadPublic({
@@ -81,12 +97,14 @@ export function NotificationsMenu({
           notificationId,
         })
       ),
+    onError,
     onSettled: invalidate,
   });
 
-  const markAllRead = useMutation({
+  const markAllRead = useMutation<unknown, RpcError, void>({
     mutationFn: () =>
       fetchRpc((rpc) => rpc.NotificationMarkAllReadPublic({ organizationId })),
+    onError,
     onSettled: invalidate,
   });
 
@@ -145,10 +163,10 @@ export function NotificationsMenu({
                   className={`hover:bg-accent/60 h-auto rounded-none border-b px-4 py-3 ${isUnread ? "bg-accent/30" : ""}`}
                   key={notification.id}
                   onClick={() => {
-                    navigate(notification.href);
                     if (isUnread) {
                       markRead.mutate(notification.id);
                     }
+                    navigate(notification.href);
                   }}
                 >
                   <div className="min-w-0">
