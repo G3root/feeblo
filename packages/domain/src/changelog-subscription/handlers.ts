@@ -110,6 +110,10 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   return {
     ChangelogSubscriptionList: (args: TChangelogSubscriptionList) =>
       listSubscribersEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "ChangelogSubscriptionList",
+          level: "read",
+        }),
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
         withRemapDbErrors("ChangelogSubscription", "select")
       ),
@@ -141,6 +145,10 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
 
     ChangelogSubscriptionCreate: (args: TChangelogSubscriptionCreate) =>
       subscribeEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "ChangelogSubscriptionCreate",
+          level: "write",
+        }),
         Policy.withPolicy(
           Policy.all(
             Policy.hasMembership(args.organizationId),
@@ -167,6 +175,10 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
 
     ChangelogSubscriptionDelete: (args: TChangelogSubscriptionDelete) =>
       unsubscribeEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "ChangelogSubscriptionDelete",
+          level: "write",
+        }),
         Policy.withPolicy(
           Policy.all(
             Policy.hasMembership(args.organizationId),

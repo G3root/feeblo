@@ -22,23 +22,31 @@ export class NotificationRpcs extends RpcGroup.make(
   Rpc.make("NotificationList", {
     payload: NotificationList,
     success: S.Array(Notification),
-    error: NotificationServiceErrors,
-  }).middleware(AuthMiddleware),
+    error: NotificationPublicErrors,
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("NotificationUnreadCount", {
     payload: NotificationUnreadCount,
     success: S.Struct({ count: S.Number }),
-    error: NotificationServiceErrors,
-  }).middleware(AuthMiddleware),
+    error: NotificationPublicErrors,
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("NotificationMarkRead", {
     payload: NotificationMarkRead,
     success: S.Void,
-    error: NotificationServiceErrors,
-  }).middleware(AuthMiddleware),
+    error: NotificationPublicErrors,
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("NotificationMarkAllRead", {
     payload: NotificationMarkAllRead,
     success: S.Void,
-    error: NotificationServiceErrors,
-  }).middleware(AuthMiddleware),
+    error: NotificationPublicErrors,
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
   // Public-board variants for signed-in end users, who may not be workspace
   // members. Results are always scoped to the session user id. SSO-restricted
   // sessions are authorized per-organization by the handlers' restricted-scope

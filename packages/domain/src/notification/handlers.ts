@@ -59,21 +59,37 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
   return {
     NotificationList: (args: TNotificationList) =>
       listNotificationsEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "NotificationList",
+          level: "read",
+        }),
         Policy.withPolicy(notificationPolicy.canAccess(args.organizationId)),
         withRemapDbErrors("Notification", "select")
       ),
     NotificationUnreadCount: ({ organizationId }: { organizationId: string }) =>
       unreadCountEffect({ organizationId }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "NotificationUnreadCount",
+          level: "read",
+        }),
         Policy.withPolicy(notificationPolicy.canAccess(organizationId)),
         withRemapDbErrors("Notification", "select")
       ),
     NotificationMarkRead: (args: TNotificationMarkRead) =>
       markReadEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "NotificationMarkRead",
+          level: "write",
+        }),
         Policy.withPolicy(notificationPolicy.canAccess(args.organizationId)),
         withRemapDbErrors("Notification", "update")
       ),
     NotificationMarkAllRead: ({ organizationId }: { organizationId: string }) =>
       markAllReadEffect({ organizationId }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "NotificationMarkAllRead",
+          level: "write",
+        }),
         Policy.withPolicy(notificationPolicy.canAccess(organizationId)),
         withRemapDbErrors("Notification", "update")
       ),

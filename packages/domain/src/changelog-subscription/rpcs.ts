@@ -16,8 +16,10 @@ export class ChangelogSubscriptionRpcs extends RpcGroup.make(
   Rpc.make("ChangelogSubscriptionList", {
     payload: ChangelogSubscriptionList,
     success: Schema.Array(ChangelogSubscription),
-    error: ChangelogSubscriptionServiceErrors,
-  }).middleware(AuthMiddleware),
+    error: Schema.Union([ChangelogSubscriptionServiceErrors, RateLimitErrors]),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("ChangelogSubscriptionListPublic", {
     payload: ChangelogSubscriptionList,
     success: Schema.Array(ChangelogSubscription),
@@ -32,8 +34,10 @@ export class ChangelogSubscriptionRpcs extends RpcGroup.make(
     success: Schema.Struct({
       subscribed: Schema.Boolean,
     }),
-    error: ChangelogSubscriptionServiceErrors,
-  }).middleware(AuthMiddleware),
+    error: Schema.Union([ChangelogSubscriptionServiceErrors, RateLimitErrors]),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("ChangelogSubscriptionCreatePublic", {
     payload: ChangelogSubscriptionCreate,
     success: Schema.Struct({
@@ -48,8 +52,10 @@ export class ChangelogSubscriptionRpcs extends RpcGroup.make(
     success: Schema.Struct({
       subscribed: Schema.Boolean,
     }),
-    error: ChangelogSubscriptionServiceErrors,
-  }).middleware(AuthMiddleware),
+    error: Schema.Union([ChangelogSubscriptionServiceErrors, RateLimitErrors]),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("ChangelogSubscriptionDeletePublic", {
     payload: ChangelogSubscriptionDelete,
     success: Schema.Struct({
