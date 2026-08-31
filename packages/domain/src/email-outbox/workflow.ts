@@ -7,6 +7,7 @@ import {
   MailTemporaryDeliveryError,
   MailUncertainDeliveryError,
 } from "@feeblo/transactional/mailer";
+import { createChangelogEmail } from "@feeblo/transactional/templates/changelog";
 import { createEmailSubscriptionVerificationEmail } from "@feeblo/transactional/templates/email-subscription-verification";
 import { createNotificationEmail } from "@feeblo/transactional/templates/notification";
 import { and, eq, gte, isNull, sum } from "drizzle-orm";
@@ -30,6 +31,8 @@ import {
 } from "./content";
 import { EmailOutboxDataError, EmailOutboxRepository } from "./repository";
 import {
+  ChangelogTemplatePayload,
+  EmailUnsubscribeTarget,
   NotificationTemplatePayload,
   SubscriptionVerificationTemplatePayload,
 } from "./schema";
@@ -96,7 +99,7 @@ export const EmailDeliveryWorkflow = W.Workflow.make("EmailDeliveryWorkflow", {
 export const materializeEmailIntent = (outboxId: string) =>
   Effect.gen(function* () {
     const repository = yield* EmailOutboxRepository;
-    const { appUrl } = yield* EmailOutboxConfig;
+    const { appUrl, appRootDomain } = yield* EmailOutboxConfig;
     const policy = yield* EntitlementPolicy;
     const db = yield* Database.Database;
     const now = yield* DateTime.nowAsDate;
@@ -304,7 +307,8 @@ export const materializeEmailIntent = (outboxId: string) =>
       appUrl,
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      intent
+      intent,
+      appRootDomain
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     );
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
@@ -316,52 +320,65 @@ export const materializeEmailIntent = (outboxId: string) =>
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       return [] as readonly string[];
     }
-    const recipients = yield* db
-      .select({
-        contactId: schema.emailContactTable.id,
-        email: schema.emailContactTable.email,
-        subscriptionId: schema.emailSubscriptionTable.id,
-      })
-      .from(schema.emailSubscriptionTable)
-      .innerJoin(
-        schema.emailContactTable,
-        eq(schema.emailContactTable.id, schema.emailSubscriptionTable.contactId)
-      )
-      .leftJoin(
-        schema.emailSuppressionTable,
-        eq(schema.emailSuppressionTable.email, schema.emailContactTable.email)
-      )
-      .leftJoin(
-        schema.emailDeliveryTable,
-        and(
-          eq(schema.emailDeliveryTable.outboxId, intent.id),
-          eq(
-            schema.emailDeliveryTable.recipientEmail,
-            schema.emailContactTable.email
-          )
-        )
-      )
-      .where(
-        and(
-          eq(
-            schema.emailSubscriptionTable.organizationId,
-            intent.organizationId
-          ),
-          eq(schema.emailSubscriptionTable.topicType, content.topic.topicType),
-          content.topic.topicId === null
-            ? isNull(schema.emailSubscriptionTable.topicId)
-            : eq(schema.emailSubscriptionTable.topicId, content.topic.topicId),
-          eq(schema.emailSubscriptionTable.state, "active"),
-          eq(schema.emailContactTable.verificationState, "verified"),
-          isNull(schema.emailSuppressionTable.email),
-          isNull(schema.emailDeliveryTable.id)
-        )
-      )
-      .orderBy(schema.emailSubscriptionTable.id)
-      .limit(materializationBatchSize);
-
     return yield* transaction(
       Effect.gen(function* () {
+        const txDb = yield* Database.Database;
+        const recipients = yield* txDb
+          .select({
+            contactId: schema.emailContactTable.id,
+            email: schema.emailContactTable.email,
+            subscriptionId: schema.emailSubscriptionTable.id,
+          })
+          .from(schema.emailSubscriptionTable)
+          .innerJoin(
+            schema.emailContactTable,
+            eq(
+              schema.emailContactTable.id,
+              schema.emailSubscriptionTable.contactId
+            )
+          )
+          .leftJoin(
+            schema.emailSuppressionTable,
+            eq(
+              schema.emailSuppressionTable.email,
+              schema.emailContactTable.email
+            )
+          )
+          .leftJoin(
+            schema.emailDeliveryTable,
+            and(
+              eq(schema.emailDeliveryTable.outboxId, intent.id),
+              eq(
+                schema.emailDeliveryTable.recipientEmail,
+                schema.emailContactTable.email
+              )
+            )
+          )
+          .where(
+            and(
+              eq(
+                schema.emailSubscriptionTable.organizationId,
+                intent.organizationId
+              ),
+              eq(
+                schema.emailSubscriptionTable.topicType,
+                content.topic.topicType
+              ),
+              content.topic.topicId === null
+                ? isNull(schema.emailSubscriptionTable.topicId)
+                : eq(
+                    schema.emailSubscriptionTable.topicId,
+                    content.topic.topicId
+                  ),
+              eq(schema.emailSubscriptionTable.state, "active"),
+              eq(schema.emailContactTable.verificationState, "verified"),
+              isNull(schema.emailSuppressionTable.email),
+              isNull(schema.emailDeliveryTable.id)
+            )
+          )
+          .orderBy(schema.emailSubscriptionTable.id)
+          .limit(materializationBatchSize);
+
         const created = yield* Effect.forEach(recipients, (recipient) => {
           // Persist only the subscription ID. The purpose-bound bearer token
           // is derived immediately before send and remains hash-only at rest.
@@ -369,7 +386,7 @@ export const materializeEmailIntent = (outboxId: string) =>
             outboxId: intent.id,
             contactId: recipient.contactId,
             recipientEmail: recipient.email,
-            template: "subscription-notification",
+            template: content.template,
             templateVersion: 1,
             templatePayload: {
               ...content.templatePayload,
@@ -563,6 +580,32 @@ const sendDeliveryAttempt = (deliveryId: string) =>
     if (!claimed) {
       return { _tag: "terminal" as const };
     }
+    // Resolves the unsubscribe target into a rendered mail message: settings
+    // targets use their stored URL directly, subscription targets derive a
+    // purpose-bound bearer token and add List-Unsubscribe one-click headers.
+    const resolveUnsubscribedEmail = <
+      Mail extends { readonly subject: string },
+    >(
+      unsubscribe: Schema.Schema.Type<typeof EmailUnsubscribeTarget>,
+      createEmail: (unsubscribeUrl: string) => Mail
+    ) =>
+      Effect.gen(function* () {
+        if (unsubscribe.kind === "settings") {
+          return createEmail(unsubscribe.url);
+        }
+        const token = yield* subscriptions.deriveLinkToken({
+          purpose: "unsubscribe",
+          subscriptionId: unsubscribe.subscriptionId,
+        });
+        const unsubscribeUrl = `${apiUrl}/api/email-subscriptions/unsubscribe?token=${encodeURIComponent(Redacted.value(token))}`;
+        return {
+          ...createEmail(unsubscribeUrl),
+          headers: {
+            "List-Unsubscribe": `<${unsubscribeUrl}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          },
+        };
+      });
     const mailMessage = yield* Effect.gen(function* () {
       if (delivery.template === "subscription-verification") {
         const payload = yield* Schema.decodeUnknownEffect(
@@ -586,6 +629,27 @@ const sendDeliveryAttempt = (deliveryId: string) =>
         return createEmailSubscriptionVerificationEmail({ verificationUrl });
       }
 
+      if (delivery.template === "changelog") {
+        const payload = yield* Schema.decodeUnknownEffect(
+          ChangelogTemplatePayload
+        )(delivery.templatePayload).pipe(
+          Effect.mapError(
+            (cause) =>
+              new MailTemplateRenderError({
+                cause,
+                message:
+                  "Email template rendering failed: invalid changelog payload",
+                operation: "decode changelog payload",
+              })
+          )
+        );
+        // Payload minus `unsubscribe` is structurally ChangelogEmailProps.
+        const { unsubscribe, ...props } = payload;
+        return yield* resolveUnsubscribedEmail(unsubscribe, (unsubscribeUrl) =>
+          createChangelogEmail({ ...props, unsubscribeUrl })
+        );
+      }
+
       const payload = yield* Schema.decodeUnknownEffect(
         NotificationTemplatePayload
       )(delivery.templatePayload).pipe(
@@ -599,24 +663,11 @@ const sendDeliveryAttempt = (deliveryId: string) =>
             })
         )
       );
-      if (payload.unsubscribe.kind === "settings") {
-        return createNotificationEmail({
-          ...payload,
-          unsubscribeUrl: payload.unsubscribe.url,
-        });
-      }
-      const token = yield* subscriptions.deriveLinkToken({
-        purpose: "unsubscribe",
-        subscriptionId: payload.unsubscribe.subscriptionId,
-      });
-      const unsubscribeUrl = `${apiUrl}/api/email-subscriptions/unsubscribe?token=${encodeURIComponent(Redacted.value(token))}`;
-      return {
-        ...createNotificationEmail({ ...payload, unsubscribeUrl }),
-        headers: {
-          "List-Unsubscribe": `<${unsubscribeUrl}>`,
-          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-        },
-      };
+      return yield* resolveUnsubscribedEmail(
+        payload.unsubscribe,
+        (unsubscribeUrl) =>
+          createNotificationEmail({ ...payload, unsubscribeUrl })
+      );
     });
     const mailer = yield* Mailer;
     const deliveryPlan =

@@ -499,8 +499,10 @@ describe("EmailOutbox workflows", () => {
             .from(schema.emailDeliveryTable)
             .where(eq(schema.emailDeliveryTable.outboxId, intent.intent.id));
           expect(delivery?.contactId).toBe(subscriber.contact.id);
+          expect(delivery?.template).toBe("changelog");
           expect(delivery?.templatePayload).toMatchObject({
-            title: "New changelog: New release",
+            title: "New release",
+            actionUrl: `https://outbox-${organizationId}.test.feeblo.example/changelog/new-release`,
             unsubscribe: {
               kind: "subscription",
               subscriptionId: subscriber.subscription.id,
