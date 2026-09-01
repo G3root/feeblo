@@ -1414,9 +1414,7 @@ describe("EmailOutbox workflows with plain-HTTP API_URL", () => {
             organizationId,
             source: "explicit",
             topic: { topicId: null, topicType: "changelog" },
-            verificationExpiresAt: new Date(
-              consentNow.getTime() + 86_400_000
-            ),
+            verificationExpiresAt: new Date(consentNow.getTime() + 86_400_000),
           });
           if (Option.isNone(subscriber.verificationToken)) {
             return yield* Effect.die("Expected a verification token");
