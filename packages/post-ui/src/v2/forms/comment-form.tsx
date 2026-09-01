@@ -95,6 +95,7 @@ export const useCommentForm = ({
         postId,
         postSlug,
         userId: session.user.id,
+        pinnedAt: null,
         user: {
           name: session.user.name,
         },

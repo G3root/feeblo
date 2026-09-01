@@ -37,6 +37,13 @@ type TCanUpdate = {
   source: TSource;
 };
 
+type TCanPin = {
+  organizationId: string;
+  commentId: string;
+  postId: string;
+  source: TSource;
+};
+
 const makeCommentPolicy = Effect.gen(function* () {
   const repository = yield* CommentRepository;
   const postRepository = yield* PostRepository;
@@ -191,10 +198,37 @@ const makeCommentPolicy = Effect.gen(function* () {
     );
   };
 
+  const canPin = (args: TCanPin) => {
+    if (args.source === "public") {
+      return Policy.all(
+        Policy.hasRestrictedOrganizationScope(args.organizationId),
+        Policy.policy(() =>
+          postRepository.isUnlockedPublic({
+            id: args.postId,
+            organizationId: args.organizationId,
+          })
+        ),
+        Policy.canPermission(args.organizationId, "comments.*")
+      );
+    }
+
+    return Policy.all(
+      Policy.hasMembership(args.organizationId),
+      Policy.policy(() =>
+        postRepository.isUnlocked({
+          id: args.postId,
+          organizationId: args.organizationId,
+        })
+      ),
+      Policy.canPermission(args.organizationId, "comments.*")
+    );
+  };
+
   return {
     canCreate,
     canDelete,
     canUpdate,
+    canPin,
   };
 });
 

@@ -11,6 +11,7 @@ export type CommentDisplayState = {
   isAuthor: boolean;
   isEditing: boolean;
   isInternal: boolean;
+  pinnedAt: Date | null;
 };
 
 export type CommentDisplayActions = {
@@ -22,6 +23,7 @@ export type CommentDisplayActions = {
   }) => void | Promise<void>;
   onStartEdit: () => void;
   onToggleVisibility: () => void;
+  onTogglePin: () => void;
   onUpdate: (value: {
     content: string;
     isPrivate: boolean;
@@ -34,6 +36,8 @@ export type CommentDisplayMeta = {
   replyLabel: string;
   toggleToInternalLabel: string;
   toggleToPublicLabel: string;
+  pinLabel: string;
+  unpinLabel: string;
 };
 
 export type CommentDisplayContextValue = {

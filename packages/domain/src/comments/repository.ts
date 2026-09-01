@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import type { InsertComment } from "@feeblo/db/schema/feedback";
-import { and, eq, type SQL } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql, type SQL } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -27,6 +27,18 @@ interface FindByIdComment {
   organizationId: string;
   postId: string;
   userId?: string;
+}
+
+interface PinComment {
+  id: string;
+  organizationId: string;
+  postId: string;
+}
+
+interface UnpinComment {
+  id: string;
+  organizationId: string;
+  postId: string;
 }
 
 interface FindManyComments {
@@ -67,6 +79,7 @@ const makeCommentRepository = Effect.gen(function* () {
             visibility: schema.commentTable.visibility,
             parentCommentId: schema.commentTable.parentCommentId,
             memberId: schema.commentTable.memberId,
+            pinnedAt: schema.commentTable.pinnedAt,
             user: {
               name: schema.userTable.name,
             },
@@ -80,7 +93,11 @@ const makeCommentRepository = Effect.gen(function* () {
             schema.postTable,
             eq(schema.commentTable.postId, schema.postTable.id)
           )
-          .where(and(...where));
+          .where(and(...where))
+          .orderBy(
+            sql`${schema.commentTable.pinnedAt} DESC NULLS LAST`,
+            desc(schema.commentTable.createdAt)
+          );
       }),
     findManyPublic: ({
       organizationId,
@@ -100,6 +117,7 @@ const makeCommentRepository = Effect.gen(function* () {
           visibility: schema.commentTable.visibility,
           parentCommentId: schema.commentTable.parentCommentId,
           memberId: schema.commentTable.memberId,
+          pinnedAt: schema.commentTable.pinnedAt,
           user: {
             name: schema.userTable.name,
           },
@@ -126,6 +144,10 @@ const makeCommentRepository = Effect.gen(function* () {
               : [eq(schema.commentTable.visibility, "PUBLIC")]),
             eq(schema.boardTable.visibility, "PUBLIC")
           )
+        )
+        .orderBy(
+          sql`${schema.commentTable.pinnedAt} DESC NULLS LAST`,
+          desc(schema.commentTable.createdAt)
         ),
     create: (args: InsertComment) =>
       Effect.gen(function* () {
@@ -182,6 +204,7 @@ const makeCommentRepository = Effect.gen(function* () {
         .select({
           id: schema.commentTable.id,
           visibility: schema.commentTable.visibility,
+          pinnedAt: schema.commentTable.pinnedAt,
         })
         .from(schema.commentTable)
         .where(
@@ -195,6 +218,49 @@ const makeCommentRepository = Effect.gen(function* () {
           )
         )
         .pipe(Effect.map(EffectArray.get(0))),
+    pin: (args: PinComment) =>
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        // Unpin any existing pinned comments for this post first
+        yield* db
+          .update(schema.commentTable)
+          .set({ pinnedAt: null })
+          .where(
+            and(
+              eq(schema.commentTable.organizationId, args.organizationId),
+              eq(schema.commentTable.postId, args.postId),
+              isNotNull(schema.commentTable.pinnedAt)
+            )
+          );
+        return yield* db
+          .update(schema.commentTable)
+          .set({ pinnedAt: now, updatedAt: now })
+          .where(
+            and(
+              eq(schema.commentTable.id, args.id),
+              eq(schema.commentTable.organizationId, args.organizationId),
+              eq(schema.commentTable.postId, args.postId)
+            )
+          )
+          .returning()
+          .pipe(Effect.map(EffectArray.get(0)));
+      }),
+    unpin: (args: UnpinComment) =>
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        return yield* db
+          .update(schema.commentTable)
+          .set({ pinnedAt: null, updatedAt: now })
+          .where(
+            and(
+              eq(schema.commentTable.id, args.id),
+              eq(schema.commentTable.organizationId, args.organizationId),
+              eq(schema.commentTable.postId, args.postId)
+            )
+          )
+          .returning()
+          .pipe(Effect.map(EffectArray.get(0)));
+      }),
   };
 });
 

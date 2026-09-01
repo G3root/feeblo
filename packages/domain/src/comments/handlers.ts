@@ -14,6 +14,8 @@ import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import {
   FailedToDeleteCommentError,
+  FailedToPinCommentError,
+  FailedToUnpinCommentError,
   FailedToUpdateCommentError,
 } from "./errors";
 import { CommentPolicy } from "./policies";
@@ -23,6 +25,8 @@ import type {
   TCommentCreate,
   TCommentDelete,
   TCommentList,
+  TCommentPin,
+  TCommentUnpin,
   TCommentUpdate,
 } from "./schema";
 
@@ -162,6 +166,80 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     });
   };
 
+  const pinCommentEffect = (args: TCommentPin) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, args.organizationId);
+
+      const pinned = yield* transaction(
+        Effect.gen(function* () {
+          const result = yield* repository.pin({
+            id: args.id,
+            organizationId: args.organizationId,
+            postId: args.postId,
+          });
+          if (result) {
+            yield* activityRepository.create({
+              organizationId: args.organizationId,
+              postId: args.postId,
+              actorId: session.session.userId,
+              actorMemberId: membership?.membershipId ?? null,
+              kind: "COMMENT_PINNED",
+              commentId: args.id,
+            });
+          }
+          return result;
+        })
+      );
+
+      if (!pinned) {
+        return yield* new FailedToPinCommentError({
+          message: "Failed to pin comment",
+        });
+      }
+
+      return {
+        message: "Comment pinned successfully",
+      };
+    });
+
+  const unpinCommentEffect = (args: TCommentUnpin) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, args.organizationId);
+
+      const unpinned = yield* transaction(
+        Effect.gen(function* () {
+          const result = yield* repository.unpin({
+            id: args.id,
+            organizationId: args.organizationId,
+            postId: args.postId,
+          });
+          if (result) {
+            yield* activityRepository.create({
+              organizationId: args.organizationId,
+              postId: args.postId,
+              actorId: session.session.userId,
+              actorMemberId: membership?.membershipId ?? null,
+              kind: "COMMENT_UNPINNED",
+              commentId: args.id,
+            });
+          }
+          return result;
+        })
+      );
+
+      if (!unpinned) {
+        return yield* new FailedToUnpinCommentError({
+          message: "Failed to unpin comment",
+        });
+      }
+
+      return {
+        message: "Comment unpinned successfully",
+      };
+    });
+
   // -- RPC handlers --
 
   return {
@@ -292,6 +370,32 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             commentId: args.id,
             postId: args.postId,
             source: "public",
+          })
+        ),
+        withRemapDbErrors("Comment", "update")
+      ),
+
+    CommentPin: (args: TCommentPin) =>
+      pinCommentEffect(args).pipe(
+        Policy.withPolicy(
+          commentPolicy.canPin({
+            organizationId: args.organizationId,
+            commentId: args.id,
+            postId: args.postId,
+            source: "dashboard",
+          })
+        ),
+        withRemapDbErrors("Comment", "update")
+      ),
+
+    CommentUnpin: (args: TCommentUnpin) =>
+      unpinCommentEffect(args).pipe(
+        Policy.withPolicy(
+          commentPolicy.canPin({
+            organizationId: args.organizationId,
+            commentId: args.id,
+            postId: args.postId,
+            source: "dashboard",
           })
         ),
         withRemapDbErrors("Comment", "update")

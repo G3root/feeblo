@@ -17,6 +17,7 @@ export const Comment = S.Struct({
   visibility: S.Literals(["PUBLIC", "INTERNAL"]),
   parentCommentId: S.Union([S.String, S.Null]),
   memberId: S.Union([S.String, S.Null]),
+  pinnedAt: S.NullOr(S.DateFromString),
   user: S.Struct({
     name: S.String,
   }),
@@ -59,3 +60,19 @@ export const CommentUpdate = S.Struct({
 });
 
 export type TCommentUpdate = S.Schema.Type<typeof CommentUpdate>;
+
+export const CommentPin = S.Struct({
+  id: CommentId.schema,
+  organizationId: WorkspaceId.schema,
+  postId: PostId.schema,
+});
+
+export type TCommentPin = S.Schema.Type<typeof CommentPin>;
+
+export const CommentUnpin = S.Struct({
+  id: CommentId.schema,
+  organizationId: WorkspaceId.schema,
+  postId: PostId.schema,
+});
+
+export type TCommentUnpin = S.Schema.Type<typeof CommentUnpin>;

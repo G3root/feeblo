@@ -7,6 +7,7 @@ import { usePostCollectionData } from "../post-page-context";
 import { useCommentDisplay } from "./context";
 import { DeleteButton } from "./delete-button";
 import { EditButton } from "./edit-button";
+import { PinButton } from "./pin-button";
 import { ToggleVisibilityButton } from "./toggle-visibility-button";
 
 export function CommentDisplayDropdown() {
@@ -29,6 +30,7 @@ export function CommentDisplayDropdown() {
       <MenuPopup>
         {state.isAuthor ? <EditButton /> : null}
         {state.isAuthor ? <ToggleVisibilityButton /> : null}
+        {canModeratePost ? <PinButton /> : null}
         <DeleteButton />
       </MenuPopup>
     </Menu>

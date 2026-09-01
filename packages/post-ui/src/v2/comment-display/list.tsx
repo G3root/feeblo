@@ -24,7 +24,8 @@ export function CommentsList() {
             ...(isMember ? [] : [eq(comment.visibility, "PUBLIC")])
           )
         )
-        .orderBy((comment) => comment.comment.createdAt, "desc"),
+        .orderBy(({ comment }) => comment.pinnedAt, "desc")
+        .orderBy(({ comment }) => comment.createdAt, "desc"),
     [organizationId, postSlug, isMember]
   );
 
