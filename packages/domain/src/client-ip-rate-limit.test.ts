@@ -138,7 +138,15 @@ it.effect(
               name: "NoClientIpIntegrationTest",
               level: "read",
             });
-            return yield* new RateLimitUnavailableError();
+            // If this sentinel ever surfaces the middleware stopped failing
+            // closed and let the handler run — the response would be 200, so
+            // the 503-expectation below catches the regression.
+            // SAFETY: the RPC middleware success type is the opaque
+            // `SuccessValue` marker; only its type is required because the
+            // caller discards the value via Effect.as. Narrowing the sentinel
+            // to `never` keeps the handler effect assignable while the runtime
+            // value remains the "handler-ran" string.
+            return "handler-ran" as never;
           }),
           {
             client: new Rpc.ServerClient(1),

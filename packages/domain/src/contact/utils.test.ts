@@ -604,22 +604,18 @@ describe("parsePersonAttributes", () => {
   });
 
   it("fails on invalid email type", async () => {
+    // SAFETY: `sub` is a string per JWTPayload, but this fixture deliberately
+    // threads a number through so the contact schema rejects it with a typed
+    // DataValidationError; the runtime value stays 123 (the cast is erased).
+    const invalidEmailPayload = { sub: 123 as never };
     await expect(
       Effect.runPromise(
-        parsePersonAttributes(
-          { sub: 123 as unknown as string },
-          contactDefs,
-          companyDefs
-        )
+        parsePersonAttributes(invalidEmailPayload, contactDefs, companyDefs)
       )
     ).rejects.toBeInstanceOf(DataValidationError);
     await expect(
       Effect.runPromise(
-        parsePersonAttributes(
-          { sub: 123 as unknown as string },
-          contactDefs,
-          companyDefs
-        )
+        parsePersonAttributes(invalidEmailPayload, contactDefs, companyDefs)
       )
     ).rejects.toThrow("Invalid contact fields");
   });
