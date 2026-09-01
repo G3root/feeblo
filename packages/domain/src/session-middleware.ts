@@ -210,8 +210,7 @@ export const HttpApiAuthMiddlewareLive = Layer.effect(
     const cookieName = getSessionCookieName();
     // SAFETY: `ApiKey.key` is typed readonly but is a plain mutable field on a
     // runtime object; patching it here is the intended use of the placeholder.
-    (HttpApiAuthMiddleware.security.cookie as { key: string }).key =
-      cookieName;
+    (HttpApiAuthMiddleware.security.cookie as { key: string }).key = cookieName;
 
     return {
       cookie: (effect, { credential }) =>

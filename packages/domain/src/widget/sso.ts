@@ -388,12 +388,18 @@ export const linkAnonymousAccount = ({
 
         const [anonymousUser, newUser] = yield* Effect.all([
           db
-            .select({ restrictedToOrganizationId: schema.userTable.restrictedToOrganizationId })
+            .select({
+              restrictedToOrganizationId:
+                schema.userTable.restrictedToOrganizationId,
+            })
             .from(schema.userTable)
             .where(eq(schema.userTable.id, anonymousUserId))
             .limit(1),
           db
-            .select({ restrictedToOrganizationId: schema.userTable.restrictedToOrganizationId })
+            .select({
+              restrictedToOrganizationId:
+                schema.userTable.restrictedToOrganizationId,
+            })
             .from(schema.userTable)
             .where(eq(schema.userTable.id, newUserId))
             .limit(1),

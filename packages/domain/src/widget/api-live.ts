@@ -46,11 +46,11 @@ import {
   UnauthorizedError,
   withRemapDbErrors,
 } from "../rpc-errors";
-import { upsertContactFromParsed } from "./sso";
 import {
   type TWidgetFeedbackMetadata,
   WidgetFeedbackMetadataValue,
 } from "./schema";
+import { upsertContactFromParsed } from "./sso";
 
 export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
   organizationId,
