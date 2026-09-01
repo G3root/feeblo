@@ -618,6 +618,37 @@ export const postSubscriptionTable = pgTable(
   ]
 );
 
+export const changelogSubscriptionTable = pgTable(
+  "changelog_subscription",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => userTable.id, { onDelete: "cascade" }),
+    memberId: text("member_id").references(() => memberTable.id, {
+      onDelete: "set null",
+    }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("changelog_subscription_organizationId_idx").on(table.organizationId),
+    index("changelog_subscription_userId_idx").on(table.userId),
+    uniqueIndex("changelog_subscription_organizationId_userId_uidx").on(
+      table.organizationId,
+      table.userId
+    ),
+  ]
+);
+
 export const commentTable = pgTable("comment", {
   id: text("id").primaryKey(),
   content: text("content").notNull(),
@@ -1247,10 +1278,10 @@ export const notificationTable = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
-    recipientMemberId: text("recipient_member_id")
+    recipientUserId: text("recipient_user_id")
       .notNull()
-      .references(() => memberTable.id, { onDelete: "cascade" }),
-    actorMemberId: text("actor_member_id").references(() => memberTable.id, {
+      .references(() => userTable.id, { onDelete: "cascade" }),
+    actorUserId: text("actor_user_id").references(() => userTable.id, {
       onDelete: "set null",
     }),
     kind: text("kind").$type<TNotificationEventType>().notNull(),
@@ -1267,13 +1298,13 @@ export const notificationTable = pgTable(
   },
   (table) => [
     index("notification_recipient_read_created_idx").on(
-      table.recipientMemberId,
+      table.recipientUserId,
       table.readAt,
       table.createdAt
     ),
     index("notification_organization_idx").on(table.organizationId),
     uniqueIndex("notification_recipient_deduplication_uidx").on(
-      table.recipientMemberId,
+      table.recipientUserId,
       table.deduplicationKey
     ),
   ]
@@ -1282,3 +1313,7 @@ export const notificationTable = pgTable(
 export type InsertComment = typeof commentTable.$inferInsert;
 export type PostSubscription = typeof postSubscriptionTable.$inferSelect;
 export type NewPostSubscription = typeof postSubscriptionTable.$inferInsert;
+export type ChangelogSubscription =
+  typeof changelogSubscriptionTable.$inferSelect;
+export type NewChangelogSubscription =
+  typeof changelogSubscriptionTable.$inferInsert;

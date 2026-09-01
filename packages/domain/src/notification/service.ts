@@ -2,7 +2,7 @@ import { currentDb, schema } from "@feeblo/db";
 import type { TNotificationEventType } from "@feeblo/db/validation-schema/notification-kind";
 import { NotificationId } from "@feeblo/id";
 import { isString } from "@feeblo/utils/runtime-kind";
-import { and, count, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, count, desc, eq, isNull, lt, or } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -10,20 +10,20 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 type NotificationInput = {
-  actorMemberId?: string | null;
+  actorUserId?: string | null;
   body?: string | null;
   deduplicationKey: string;
   href: string;
   kind: TNotificationEventType;
   organizationId: string;
-  recipientMemberIds: ReadonlyArray<string | null | undefined>;
+  recipientUserIds: ReadonlyArray<string | null | undefined>;
   resourceId: string;
   resourceType: string;
   title: string;
 };
 
 type PostNotificationInput = {
-  actorMemberId?: string | null;
+  actorUserId?: string | null;
   organizationId: string;
   postId: string;
 };
@@ -33,12 +33,12 @@ const makeNotificationService = Effect.gen(function* () {
 
   const create = (input: NotificationInput) =>
     Effect.gen(function* () {
-      const recipients = [...new Set(input.recipientMemberIds)].filter(
-        (memberId): memberId is string =>
-          isString(memberId) && memberId !== input.actorMemberId
+      const recipients = [...new Set(input.recipientUserIds)].filter(
+        (userId): userId is string =>
+          isString(userId) && userId !== input.actorUserId
       );
 
-      yield* Effect.forEach(recipients, (recipientMemberId) =>
+      yield* Effect.forEach(recipients, (recipientUserId) =>
         Effect.gen(function* () {
           const id = yield* NotificationId.generate;
           yield* db
@@ -46,8 +46,8 @@ const makeNotificationService = Effect.gen(function* () {
             .values({
               id,
               organizationId: input.organizationId,
-              recipientMemberId,
-              actorMemberId: input.actorMemberId ?? null,
+              recipientUserId,
+              actorUserId: input.actorUserId ?? null,
               kind: input.kind,
               resourceType: input.resourceType,
               resourceId: input.resourceId,
@@ -62,12 +62,99 @@ const makeNotificationService = Effect.gen(function* () {
       );
     });
 
+  /**
+   * Fan-out to every changelog subscriber, split by dashboard access:
+   * members land on the dashboard edit page, while non-member subscribers
+   * and members restricted to the workspace via SSO (who cannot open the
+   * dashboard) are sent to the public changelog.
+   */
+  const notifyChangelogSubscribers = (input: {
+    readonly actorUserId?: string | null;
+    readonly changelogId: string;
+    readonly changelogSlug: string;
+    readonly deduplicationKey: string;
+    readonly kind: "changelog.published" | "changelog.updated";
+    readonly notificationTitle: string;
+    readonly organizationId: string;
+    readonly title: string;
+  }) =>
+    Effect.gen(function* () {
+      const subscribers = yield* db
+        .select({ userId: schema.changelogSubscriptionTable.userId })
+        .from(schema.changelogSubscriptionTable)
+        .where(
+          eq(
+            schema.changelogSubscriptionTable.organizationId,
+            input.organizationId
+          )
+        );
+
+      const members = yield* db
+        .select({
+          userId: schema.memberTable.userId,
+          restrictedToOrganizationId:
+            schema.userTable.restrictedToOrganizationId,
+        })
+        .from(schema.memberTable)
+        .innerJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.memberTable.userId)
+        )
+        .where(eq(schema.memberTable.organizationId, input.organizationId));
+      const memberUserIds = new Set(members.map((member) => member.userId));
+      const restrictedUserIds = new Set(
+        members
+          .filter((member) => member.restrictedToOrganizationId !== null)
+          .map((member) => member.userId)
+      );
+      const subscriberUserIds = subscribers.map(
+        (subscriber) => subscriber.userId
+      );
+      const memberRecipients = subscriberUserIds.filter(
+        (userId) => memberUserIds.has(userId) && !restrictedUserIds.has(userId)
+      );
+      const publicRecipients = subscriberUserIds.filter(
+        (userId) => !memberUserIds.has(userId) || restrictedUserIds.has(userId)
+      );
+
+      yield* Effect.all([
+        create({
+          ...(input.actorUserId === undefined
+            ? undefined
+            : { actorUserId: input.actorUserId }),
+          organizationId: input.organizationId,
+          recipientUserIds: memberRecipients,
+          kind: input.kind,
+          resourceType: "changelog",
+          resourceId: input.changelogId,
+          title: input.notificationTitle,
+          body: input.title,
+          href: `/${input.organizationId}/changelog/edit/${input.changelogSlug}`,
+          deduplicationKey: input.deduplicationKey,
+        }),
+        create({
+          ...(input.actorUserId === undefined
+            ? undefined
+            : { actorUserId: input.actorUserId }),
+          organizationId: input.organizationId,
+          recipientUserIds: publicRecipients,
+          kind: input.kind,
+          resourceType: "changelog",
+          resourceId: input.changelogId,
+          title: input.notificationTitle,
+          body: input.title,
+          href: `/changelog/${input.changelogSlug}`,
+          deduplicationKey: input.deduplicationKey,
+        }),
+      ]).pipe(Effect.asVoid);
+    });
+
   const getPostContext = ({ organizationId, postId }: PostNotificationInput) =>
     db
       .select({
         title: schema.postTable.title,
         slug: schema.postTable.slug,
-        creatorMemberId: schema.postTable.creatorMemberId,
+        creatorId: schema.postTable.creatorId,
         boardSlug: schema.boardTable.slug,
       })
       .from(schema.postTable)
@@ -86,7 +173,7 @@ const makeNotificationService = Effect.gen(function* () {
 
   return {
     notifySubmission: ({
-      actorMemberId,
+      actorUserId,
       organizationId,
       postId,
     }: PostNotificationInput) =>
@@ -96,7 +183,7 @@ const makeNotificationService = Effect.gen(function* () {
           return;
         }
         const recipients = yield* db
-          .select({ id: schema.memberTable.id })
+          .select({ userId: schema.memberTable.userId })
           .from(schema.memberTable)
           .where(
             and(
@@ -108,9 +195,9 @@ const makeNotificationService = Effect.gen(function* () {
             )
           );
         yield* create({
-          ...(actorMemberId === undefined ? undefined : { actorMemberId }),
+          ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
-          recipientMemberIds: recipients.map((member) => member.id),
+          recipientUserIds: recipients.map((member) => member.userId),
           kind: "feedback.submitted",
           resourceType: "post",
           resourceId: postId,
@@ -122,7 +209,7 @@ const makeNotificationService = Effect.gen(function* () {
       }),
 
     notifyComment: ({
-      actorMemberId,
+      actorUserId,
       organizationId,
       postId,
       commentId,
@@ -133,7 +220,7 @@ const makeNotificationService = Effect.gen(function* () {
           return;
         }
         const subscribers = yield* db
-          .select({ memberId: schema.postSubscriptionTable.memberId })
+          .select({ userId: schema.postSubscriptionTable.userId })
           .from(schema.postSubscriptionTable)
           .where(
             and(
@@ -142,11 +229,11 @@ const makeNotificationService = Effect.gen(function* () {
             )
           );
         yield* create({
-          ...(actorMemberId === undefined ? undefined : { actorMemberId }),
+          ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
-          recipientMemberIds: [
-            context.creatorMemberId,
-            ...subscribers.map((subscriber) => subscriber.memberId),
+          recipientUserIds: [
+            context.creatorId,
+            ...subscribers.map((subscriber) => subscriber.userId),
           ],
           kind: "feedback.commented",
           resourceType: "comment",
@@ -159,7 +246,7 @@ const makeNotificationService = Effect.gen(function* () {
       }),
 
     notifyPostStatusChanged: ({
-      actorMemberId,
+      actorUserId,
       organizationId,
       postId,
     }: PostNotificationInput) =>
@@ -169,7 +256,7 @@ const makeNotificationService = Effect.gen(function* () {
           return;
         }
         const subscribers = yield* db
-          .select({ memberId: schema.postSubscriptionTable.memberId })
+          .select({ userId: schema.postSubscriptionTable.userId })
           .from(schema.postSubscriptionTable)
           .where(
             and(
@@ -180,11 +267,11 @@ const makeNotificationService = Effect.gen(function* () {
         const crypto = yield* Crypto.Crypto;
         const statusChangedUuid = yield* crypto.randomUUIDv4.pipe(Effect.orDie);
         yield* create({
-          ...(actorMemberId === undefined ? undefined : { actorMemberId }),
+          ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
-          recipientMemberIds: [
-            context.creatorMemberId,
-            ...subscribers.map((subscriber) => subscriber.memberId),
+          recipientUserIds: [
+            context.creatorId,
+            ...subscribers.map((subscriber) => subscriber.userId),
           ],
           kind: "feedback.status_changed",
           resourceType: "post",
@@ -197,83 +284,67 @@ const makeNotificationService = Effect.gen(function* () {
       }),
 
     /**
-     * Notifies workspace members who subscribed to the changelog. Recipients
-     * resolve from subscriber user ids first, so a future end-user inbox can
-     * reuse that list before the member mapping; today only members receive
-     * in-app notifications.
+     * Notifies every user subscribed to the workspace changelog, member or
+     * not. Recipients come straight from `changelog_subscription` (user ids
+     * scoped by organization), so no membership is required to be notified.
      */
     notifyChangelogPublished: ({
-      actorMemberId,
+      actorUserId,
       changelogId,
       changelogSlug,
       organizationId,
       title,
     }: {
-      readonly actorMemberId?: string | null;
+      readonly actorUserId?: string | null;
       readonly changelogId: string;
       readonly changelogSlug: string;
       readonly organizationId: string;
       readonly title: string;
     }) =>
-      Effect.gen(function* () {
-        const subscriberUsers = yield* db
-          .selectDistinct({ userId: schema.emailContactTable.userId })
-          .from(schema.emailSubscriptionTable)
-          .innerJoin(
-            schema.emailContactTable,
-            eq(
-              schema.emailContactTable.id,
-              schema.emailSubscriptionTable.contactId
-            )
-          )
-          .where(
-            and(
-              eq(schema.emailSubscriptionTable.organizationId, organizationId),
-              eq(schema.emailSubscriptionTable.topicType, "changelog"),
-              isNull(schema.emailSubscriptionTable.topicId),
-              // paused_by_plan subscribers stay subscribed in-app; only email
-              // delivery is plan-gated.
-              inArray(schema.emailSubscriptionTable.state, [
-                "active",
-                "paused_by_plan",
-              ])
-            )
-          );
-        const userIds = subscriberUsers
-          .map((row) => row.userId)
-          .filter((userId): userId is string => isString(userId));
+      notifyChangelogSubscribers({
+        ...(actorUserId === undefined ? undefined : { actorUserId }),
+        changelogId,
+        changelogSlug,
+        deduplicationKey: `changelog.published:${changelogId}`,
+        kind: "changelog.published",
+        notificationTitle: "New changelog entry",
+        organizationId,
+        title,
+      }),
 
-        if (userIds.length === 0) {
-          return;
-        }
-
-        const members = yield* db
-          .select({ id: schema.memberTable.id })
-          .from(schema.memberTable)
-          .where(
-            and(
-              eq(schema.memberTable.organizationId, organizationId),
-              inArray(schema.memberTable.userId, userIds)
-            )
-          );
-
-        yield* create({
-          ...(actorMemberId === undefined ? undefined : { actorMemberId }),
-          organizationId,
-          recipientMemberIds: members.map((member) => member.id),
-          kind: "changelog.published",
-          resourceType: "changelog",
-          resourceId: changelogId,
-          title: "New changelog entry",
-          body: title,
-          href: `/${organizationId}/changelog/edit/${changelogSlug}`,
-          deduplicationKey: `changelog.published:${changelogId}`,
-        });
+    /**
+     * Same fan-out as a publish, for "send update" on an already-published
+     * entry. Deduplicated per send-update request so retries stay silent.
+     */
+    notifyChangelogUpdated: ({
+      actorUserId,
+      changelogId,
+      changelogSlug,
+      organizationId,
+      requestId,
+      title,
+    }: {
+      readonly actorUserId?: string | null;
+      readonly changelogId: string;
+      readonly changelogSlug: string;
+      readonly organizationId: string;
+      readonly requestId: string;
+      readonly title: string;
+    }) =>
+      notifyChangelogSubscribers({
+        ...(actorUserId === undefined ? undefined : { actorUserId }),
+        changelogId,
+        changelogSlug,
+        deduplicationKey: `changelog.updated:${changelogId}:${requestId}`,
+        kind: "changelog.updated",
+        notificationTitle: "Changelog update sent",
+        organizationId,
+        title,
       }),
 
     /** Notifies only members who upvoted a post; upvoting intentionally does not imply subscription. */
     notifyPostStatusChangedUpvoters: ({
-      actorMemberId,
+      actorUserId,
       organizationId,
       postId,
       deduplicationKey,
@@ -284,7 +355,7 @@ const makeNotificationService = Effect.gen(function* () {
           return;
         }
         const upvoters = yield* db
-          .select({ memberId: schema.upvoteTable.memberId })
+          .select({ userId: schema.upvoteTable.userId })
           .from(schema.upvoteTable)
           .where(
             and(
@@ -293,9 +364,9 @@ const makeNotificationService = Effect.gen(function* () {
             )
           );
         yield* create({
-          ...(actorMemberId === undefined ? undefined : { actorMemberId }),
+          ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
-          recipientMemberIds: upvoters.map((upvoter) => upvoter.memberId),
+          recipientUserIds: upvoters.map((upvoter) => upvoter.userId),
           kind: "feedback.status_changed",
           resourceType: "post",
           resourceId: postId,
@@ -308,21 +379,21 @@ const makeNotificationService = Effect.gen(function* () {
 
     list: ({
       organizationId,
-      recipientMemberId,
+      recipientUserId,
       cursor,
       limit = 20,
     }: {
       cursor?: Date;
       limit?: number;
       organizationId: string;
-      recipientMemberId: string;
+      recipientUserId: string;
     }) =>
       db
         .select({
           id: schema.notificationTable.id,
           organizationId: schema.notificationTable.organizationId,
-          recipientMemberId: schema.notificationTable.recipientMemberId,
-          actorMemberId: schema.notificationTable.actorMemberId,
+          recipientUserId: schema.notificationTable.recipientUserId,
+          actorUserId: schema.notificationTable.actorUserId,
           kind: schema.notificationTable.kind,
           resourceType: schema.notificationTable.resourceType,
           resourceId: schema.notificationTable.resourceId,
@@ -336,7 +407,7 @@ const makeNotificationService = Effect.gen(function* () {
         .where(
           and(
             eq(schema.notificationTable.organizationId, organizationId),
-            eq(schema.notificationTable.recipientMemberId, recipientMemberId),
+            eq(schema.notificationTable.recipientUserId, recipientUserId),
             ...(cursor ? [lt(schema.notificationTable.createdAt, cursor)] : [])
           )
         )
@@ -345,10 +416,10 @@ const makeNotificationService = Effect.gen(function* () {
 
     unreadCount: ({
       organizationId,
-      recipientMemberId,
+      recipientUserId,
     }: {
       organizationId: string;
-      recipientMemberId: string;
+      recipientUserId: string;
     }) =>
       db
         .select({ count: count() })
@@ -356,7 +427,7 @@ const makeNotificationService = Effect.gen(function* () {
         .where(
           and(
             eq(schema.notificationTable.organizationId, organizationId),
-            eq(schema.notificationTable.recipientMemberId, recipientMemberId),
+            eq(schema.notificationTable.recipientUserId, recipientUserId),
             isNull(schema.notificationTable.readAt)
           )
         )
@@ -365,11 +436,11 @@ const makeNotificationService = Effect.gen(function* () {
     markRead: ({
       id,
       organizationId,
-      recipientMemberId,
+      recipientUserId,
     }: {
       id: string;
       organizationId: string;
-      recipientMemberId: string;
+      recipientUserId: string;
     }) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
@@ -380,17 +451,17 @@ const makeNotificationService = Effect.gen(function* () {
             and(
               eq(schema.notificationTable.id, id),
               eq(schema.notificationTable.organizationId, organizationId),
-              eq(schema.notificationTable.recipientMemberId, recipientMemberId)
+              eq(schema.notificationTable.recipientUserId, recipientUserId)
             )
           );
       }),
 
     markAllRead: ({
       organizationId,
-      recipientMemberId,
+      recipientUserId,
     }: {
       organizationId: string;
-      recipientMemberId: string;
+      recipientUserId: string;
     }) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
@@ -400,7 +471,7 @@ const makeNotificationService = Effect.gen(function* () {
           .where(
             and(
               eq(schema.notificationTable.organizationId, organizationId),
-              eq(schema.notificationTable.recipientMemberId, recipientMemberId),
+              eq(schema.notificationTable.recipientUserId, recipientUserId),
               isNull(schema.notificationTable.readAt)
             )
           );

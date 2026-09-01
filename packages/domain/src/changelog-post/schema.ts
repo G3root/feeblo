@@ -8,8 +8,6 @@ export const ChangelogPost = S.Struct({
   createdAt: S.DateFromString,
 });
 
-export type TChangelogPost = S.Schema.Type<typeof ChangelogPost>;
-
 export const ChangelogPostList = S.Struct({
   organizationId: WorkspaceId.schema,
 });

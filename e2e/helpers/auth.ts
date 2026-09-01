@@ -29,7 +29,10 @@ export async function signUpProgrammatically(page: Page, user: TestUser) {
       maxRetries: 2,
     });
 
-  expect(response.ok()).toBeTruthy();
+  expect(
+    response.ok(),
+    `Sign-up response for ${user.email}: ${response.status()} ${await response.text()}`
+  ).toBeTruthy();
 
   const email = await waitForVerificationEmail(page.request, user.email);
   const verificationResponse = await page

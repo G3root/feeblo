@@ -69,7 +69,7 @@ describe("NotificationRpcHandlers", () => {
     fixture: Fixture,
     options: {
       createdAt?: Date;
-      recipientMemberId?: string;
+      recipientUserId?: string;
     } = {}
   ) =>
     Effect.gen(function* () {
@@ -78,8 +78,8 @@ describe("NotificationRpcHandlers", () => {
       yield* db.insert(schema.notificationTable).values({
         id,
         organizationId: fixture.organizationId,
-        recipientMemberId: options.recipientMemberId ?? fixture.memberId,
-        actorMemberId: null,
+        recipientUserId: options.recipientUserId ?? fixture.userId,
+        actorUserId: null,
         kind: "feedback.commented",
         resourceType: "comment",
         resourceId: "comment_1",
@@ -187,7 +187,7 @@ describe("NotificationRpcHandlers", () => {
             yield* insertNotification(fixture);
             yield* insertNotification(fixture);
             yield* insertNotification(fixture, {
-              recipientMemberId: otherMember.memberId,
+              recipientUserId: otherMember.userId,
             });
             const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
               effect.pipe(
@@ -234,7 +234,7 @@ describe("NotificationRpcHandlers", () => {
               createdAt: new Date("2026-01-01T00:02:00.000Z"),
             });
             yield* insertNotification(fixture, {
-              recipientMemberId: otherMember.memberId,
+              recipientUserId: otherMember.userId,
               createdAt: new Date("2026-01-01T00:03:00.000Z"),
             });
             const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
@@ -266,7 +266,7 @@ describe("NotificationRpcHandlers", () => {
           const fixture = yield* makeFixture();
           const otherMember = yield* addMember(fixture);
           const otherId = yield* insertNotification(fixture, {
-            recipientMemberId: otherMember.memberId,
+            recipientUserId: otherMember.userId,
           });
           const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
             effect.pipe(
@@ -300,57 +300,48 @@ describe("NotificationRpcHandlers", () => {
       Layer.provide(Database.PgliteDatabaseLive)
     );
 
-    /** A changelog subscriber: contact row linked to a user, plus membership. */
+    /** A changelog subscriber: user row plus a changelog subscription. */
     const insertChangelogSubscriber = (
       organizationId: string,
       suffix: string,
-      state: "active" | "paused_by_plan" | "unsubscribed"
+      options: { withMembership?: boolean; restricted?: boolean } = {}
     ) =>
       Effect.gen(function* () {
         const db = yield* currentDb;
         const userId = `user_${suffix}`;
-        const memberId = `member_${suffix}`;
         const now = new Date();
         yield* db.insert(schema.userTable).values({
           id: userId,
           email: `${userId}@example.com`,
           name: `User ${suffix}`,
+          ...(options.restricted
+            ? { restrictedToOrganizationId: organizationId }
+            : undefined),
         });
-        yield* db.insert(schema.memberTable).values({
-          id: memberId,
+        if (options.withMembership) {
+          yield* db.insert(schema.memberTable).values({
+            id: `member_${suffix}`,
+            organizationId,
+            userId,
+            role: "manager",
+            createdAt: now,
+          });
+        }
+        yield* db.insert(schema.changelogSubscriptionTable).values({
+          id: `chgsub_${suffix}`,
           organizationId,
           userId,
-          role: "manager",
-          createdAt: now,
-        });
-        yield* db.insert(schema.emailContactTable).values({
-          id: `contact_${suffix}`,
-          organizationId,
-          userId,
-          email: `${userId}@example.com`,
-          verificationState: "verified",
-          verifiedAt: now,
+          memberId: options.withMembership ? `member_${suffix}` : null,
           createdAt: now,
           updatedAt: now,
         });
-        yield* db.insert(schema.emailSubscriptionTable).values({
-          id: `subscription_${suffix}`,
-          organizationId,
-          contactId: `contact_${suffix}`,
-          topicType: "changelog",
-          topicId: null,
-          source: "explicit",
-          state,
-          createdAt: now,
-          updatedAt: now,
-        });
-        return { memberId, userId };
+        return { userId };
       });
 
     layer(Layer.merge(TestLayer, Database.PgliteDatabaseLive))(
       "changelog published notifications",
       (it) => {
-        it.effect("notifies subscribed members and skips the rest", () =>
+        it.effect("notifies every subscriber regardless of membership", () =>
           Effect.gen(function* () {
             const db = yield* currentDb;
             const service = yield* NotificationService;
@@ -361,21 +352,30 @@ describe("NotificationRpcHandlers", () => {
               slug: organizationId,
               createdAt: new Date(),
             });
-            const subscribed = yield* insertChangelogSubscriber(
+            const subscribedMember = yield* insertChangelogSubscriber(
               organizationId,
-              "subscribed",
-              "active"
+              "subscribed_member",
+              { withMembership: true }
             );
-            const paused = yield* insertChangelogSubscriber(
+            // A signed-in visitor who never joined the workspace still gets
+            // the in-app notification.
+            const subscribedVisitor = yield* insertChangelogSubscriber(
               organizationId,
-              "paused",
-              "paused_by_plan"
+              "subscribed_visitor"
             );
-            yield* insertChangelogSubscriber(
+            // A workspace member who never subscribed is not notified.
+            yield* db.insert(schema.userTable).values({
+              id: `user_unsubscribed`,
+              email: `user_unsubscribed@example.com`,
+              name: "Unsubscribed",
+            });
+            yield* db.insert(schema.memberTable).values({
+              id: `member_unsubscribed`,
               organizationId,
-              "unsubscribed",
-              "unsubscribed"
-            );
+              userId: `user_unsubscribed`,
+              role: "manager",
+              createdAt: new Date(),
+            });
 
             yield* service.notifyChangelogPublished({
               changelogId: "chg_1",
@@ -391,11 +391,13 @@ describe("NotificationRpcHandlers", () => {
                 eq(schema.notificationTable.organizationId, organizationId)
               );
             expect(rows).toHaveLength(2);
-            expect(rows.map((row) => row.recipientMemberId).sort()).toEqual(
-              [subscribed.memberId, paused.memberId].sort()
+            expect(rows.map((row) => row.recipientUserId).sort()).toEqual(
+              [subscribedMember.userId, subscribedVisitor.userId].sort()
             );
             expect(
-              rows.find((row) => row.recipientMemberId === subscribed.memberId)
+              rows.find(
+                (row) => row.recipientUserId === subscribedMember.userId
+              )
             ).toMatchObject({
               kind: "changelog.published",
               resourceType: "changelog",
@@ -406,7 +408,62 @@ describe("NotificationRpcHandlers", () => {
           })
         );
 
-        it.effect("excludes the publishing member from recipients", () =>
+        it.effect("sends restricted members to the public changelog", () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const service = yield* NotificationService;
+            const organizationId = yield* WorkspaceId.generate;
+            yield* db.insert(schema.organizationTable).values({
+              id: organizationId,
+              name: "Changelog org restricted",
+              slug: organizationId,
+              createdAt: new Date(),
+            });
+            const unrestrictedMember = yield* insertChangelogSubscriber(
+              organizationId,
+              "unrestricted_member",
+              { withMembership: true }
+            );
+            // A member restricted to the workspace via SSO cannot open the
+            // dashboard, so their notification links to the public changelog.
+            const restrictedMember = yield* insertChangelogSubscriber(
+              organizationId,
+              "restricted_member",
+              { withMembership: true, restricted: true }
+            );
+
+            yield* service.notifyChangelogPublished({
+              changelogId: "chg_3",
+              changelogSlug: "release-3",
+              organizationId,
+              title: "Release 3",
+            });
+
+            const rows = yield* db
+              .select()
+              .from(schema.notificationTable)
+              .where(
+                eq(schema.notificationTable.organizationId, organizationId)
+              );
+            expect(rows).toHaveLength(2);
+            expect(
+              rows.find(
+                (row) => row.recipientUserId === unrestrictedMember.userId
+              )
+            ).toMatchObject({
+              href: `/${organizationId}/changelog/edit/release-3`,
+            });
+            expect(
+              rows.find(
+                (row) => row.recipientUserId === restrictedMember.userId
+              )
+            ).toMatchObject({
+              href: "/changelog/release-3",
+            });
+          })
+        );
+
+        it.effect("excludes the publishing user from recipients", () =>
           Effect.gen(function* () {
             const db = yield* currentDb;
             const service = yield* NotificationService;
@@ -420,16 +477,15 @@ describe("NotificationRpcHandlers", () => {
             const publisher = yield* insertChangelogSubscriber(
               organizationId,
               "publisher",
-              "active"
+              { withMembership: true }
             );
             const reader = yield* insertChangelogSubscriber(
               organizationId,
-              "reader",
-              "active"
+              "reader"
             );
 
             yield* service.notifyChangelogPublished({
-              actorMemberId: publisher.memberId,
+              actorUserId: publisher.userId,
               changelogId: "chg_2",
               changelogSlug: "release-2",
               organizationId,
@@ -444,7 +500,7 @@ describe("NotificationRpcHandlers", () => {
               );
             expect(rows).toHaveLength(1);
             expect(rows[0]).toMatchObject({
-              recipientMemberId: reader.memberId,
+              recipientUserId: reader.userId,
             });
           })
         );

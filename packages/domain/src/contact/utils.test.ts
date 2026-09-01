@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import type { JWTPayload } from "jose";
 
 import type {
   TCompanyAttributeDefinition,
@@ -604,22 +605,17 @@ describe("parsePersonAttributes", () => {
   });
 
   it("fails on invalid email type", async () => {
+    // SAFETY: The test intentionally feeds a malformed JWT payload whose `sub`
+    // claim is a number; parsing at the boundary keeps the single cast honest.
+    const malformedPayload = JSON.parse('{"sub":123}') as JWTPayload;
     await expect(
       Effect.runPromise(
-        parsePersonAttributes(
-          { sub: 123 as unknown as string },
-          contactDefs,
-          companyDefs
-        )
+        parsePersonAttributes(malformedPayload, contactDefs, companyDefs)
       )
     ).rejects.toBeInstanceOf(DataValidationError);
     await expect(
       Effect.runPromise(
-        parsePersonAttributes(
-          { sub: 123 as unknown as string },
-          contactDefs,
-          companyDefs
-        )
+        parsePersonAttributes(malformedPayload, contactDefs, companyDefs)
       )
     ).rejects.toThrow("Invalid contact fields");
   });

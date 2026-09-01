@@ -48,3 +48,13 @@ export function getPostSubscriptionCollectionKey(subscription: {
     ? `${subscription.postId}:${subscription.userId}`
     : (subscription.id ?? subscription.postId);
 }
+
+export function getChangelogSubscriptionCollectionKey(subscription: {
+  id?: string;
+  organizationId: string;
+  userId: string | null;
+}) {
+  return subscription.userId
+    ? `${subscription.organizationId}:${subscription.userId}`
+    : (subscription.id ?? subscription.organizationId);
+}

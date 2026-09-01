@@ -494,9 +494,15 @@ describe("EmailSubscriptionRepository", () => {
               reason: "hard_bounce",
             })
           ).toEqual({ _tag: "DuplicateEvent" });
-          expect(
-            yield* repository.isSuppressed({ email: "SUBSCRIBER@example.com" })
-          ).toBe(true);
+          const db = yield* currentDb;
+          const [suppressed] = yield* db
+            .select({ email: schema.emailSuppressionTable.email })
+            .from(schema.emailSuppressionTable)
+            .where(
+              eq(schema.emailSuppressionTable.email, "subscriber@example.com")
+            )
+            .limit(1);
+          expect(suppressed?.email).toBe("subscriber@example.com");
         })
     );
 

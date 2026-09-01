@@ -1,3 +1,4 @@
+import type { ChangelogSubscription } from "@feeblo/domain/changelog-subscription/schema";
 import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { PostSubscription } from "@feeblo/domain/post-subscription/schema";
@@ -9,6 +10,7 @@ import {
   postSlugFromPath,
 } from "@feeblo/web-shared/collections";
 import {
+  getChangelogSubscriptionCollectionKey,
   getCommentReactionCollectionKey,
   getPostReactionCollectionKey,
   getPostSubscriptionCollectionKey,
@@ -23,6 +25,9 @@ import type * as Schema from "effect/Schema";
 import { getContext } from "../integrations/tanstack-query/root-provider";
 
 type CommentReactionRow = Schema.Schema.Type<typeof CommentReaction>;
+type ChangelogSubscriptionRow = Schema.Schema.Type<
+  typeof ChangelogSubscription
+>;
 type PostReactionRow = Schema.Schema.Type<typeof PostReaction>;
 type PostSubscriptionRow = Schema.Schema.Type<typeof PostSubscription>;
 type UpvoteRow = Schema.Schema.Type<typeof Upvote>;
@@ -53,6 +58,18 @@ function getCurrentPostSlug() {
   }
 
   return postSlugFromPath(window.location.pathname, "p", 1);
+}
+
+/**
+ * Session user id, or undefined while signed out / during SSR. Subscription
+ * RPCs scope their results to this user, so it keys their query caches.
+ */
+function getCurrentUserId() {
+  if (!hasWindow()) {
+    return undefined;
+  }
+
+  return getCachedAuthSession()?.user.id;
 }
 
 /**
@@ -662,7 +679,8 @@ export const publicPostSubscriptionCollection = createCollection(
     queryKey: (opts) =>
       slugScopedQueryKey(
         "public-post-subscription",
-        parseLoadSubsetOptions(opts).filters
+        parseLoadSubsetOptions(opts).filters,
+        getCurrentUserId()
       ),
     syncMode: "on-demand",
     queryFn: async (ctx) => {
@@ -717,6 +735,49 @@ export const publicPostSubscriptionCollection = createCollection(
   })
 );
 
+export const publicChangelogSubscriptionCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () =>
+      organizationScopedQueryKey(
+        "public-changelog-subscription",
+        getCurrentUserId()
+      ),
+    syncMode: "on-demand",
+    queryFn: async () => {
+      const organizationId = getCurrentOrganizationId();
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc((rpc) =>
+        rpc.ChangelogSubscriptionListPublic({ organizationId })
+      );
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      return [...data];
+    },
+    // SAFETY: The endpoint/API contract guarantees this response shape.
+    queryClient,
+    // SAFETY: The endpoint/API contract guarantees this response shape.
+    getKey: getChangelogSubscriptionCollectionKey as (
+      item: ChangelogSubscriptionRow
+    ) => string,
+    onInsert: async () => {
+      await fetchRpc((rpc) =>
+        rpc.ChangelogSubscriptionCreatePublic({
+          organizationId: getMutationOrganizationId(),
+        })
+      );
+    },
+    onDelete: async () => {
+      await fetchRpc((rpc) =>
+        rpc.ChangelogSubscriptionDeletePublic({
+          organizationId: getMutationOrganizationId(),
+        })
+      );
+    },
+  })
+);
+
 export const publicCollections = {
   publicBoardCollection,
   publicChangelogCategoryCollection,
@@ -729,6 +790,7 @@ export const publicCollections = {
   publicPostReactionCollection,
   publicPostStatusCollection,
   publicPostSubscriptionCollection,
+  publicChangelogSubscriptionCollection,
   publicPostTagCollection,
   publicRoadmapCollection,
   publicRoadmapColumnCollection,

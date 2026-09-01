@@ -4,8 +4,6 @@ import * as S from "effect/Schema";
 
 export const ChangelogStatus = S.Literals(["draft", "scheduled", "published"]);
 
-export type TChangelogStatus = S.Schema.Type<typeof ChangelogStatus>;
-
 export const Changelog = S.Struct({
   assetIds: S.optional(S.Array(S.String)),
   coverImage: S.NullOr(S.String),

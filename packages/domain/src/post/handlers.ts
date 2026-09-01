@@ -415,9 +415,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                 service.notifyPostStatusChanged({
                   organizationId: args.organizationId,
                   postId: args.id,
-                  ...(membership && {
-                    actorMemberId: membership.membershipId,
-                  }),
+                  actorUserId: session.session.userId,
                 }),
             });
           }
@@ -719,9 +717,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               service.notifySubmission({
                 organizationId: args.organizationId,
                 postId: args.id,
-                ...(membership && {
-                  actorMemberId: membership.membershipId,
-                }),
+                actorUserId: session.session.userId,
               }),
           });
 

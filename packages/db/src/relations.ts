@@ -8,6 +8,7 @@ import {
   changelogCategoryLinkTable,
   changelogCategoryTable,
   changelogPostTable,
+  changelogSubscriptionTable,
   changelogTable,
   commentReactionTable,
   commentTable,
@@ -100,6 +101,7 @@ export const relations = defineRelations(
     changelogCategoryTable,
     changelogTable,
     changelogPostTable,
+    changelogSubscriptionTable,
     companyTable,
     contactTable,
     companyAttributeDefinitionTable,
@@ -165,6 +167,10 @@ export const relations = defineRelations(
       postSubscriptions: r.many.postSubscriptionTable({
         from: r.userTable.id,
         to: r.postSubscriptionTable.userId,
+      }),
+      changelogSubscriptions: r.many.changelogSubscriptionTable({
+        from: r.userTable.id,
+        to: r.changelogSubscriptionTable.userId,
       }),
       assets: r.many.assetTable({
         from: r.userTable.id,
@@ -301,6 +307,10 @@ export const relations = defineRelations(
       emailSubscriptions: r.many.emailSubscriptionTable({
         from: r.organizationTable.id,
         to: r.emailSubscriptionTable.organizationId,
+      }),
+      changelogSubscriptions: r.many.changelogSubscriptionTable({
+        from: r.organizationTable.id,
+        to: r.changelogSubscriptionTable.organizationId,
       }),
       contactAttributeDefinitions: r.many.contactAttributeDefinitionTable({
         from: r.organizationTable.id,
@@ -490,6 +500,20 @@ export const relations = defineRelations(
       }),
       organization: r.one.organizationTable({
         from: r.postSubscriptionTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+    },
+    changelogSubscriptionTable: {
+      user: r.one.userTable({
+        from: r.changelogSubscriptionTable.userId,
+        to: r.userTable.id,
+      }),
+      member: r.one.memberTable({
+        from: r.changelogSubscriptionTable.memberId,
+        to: r.memberTable.id,
+      }),
+      organization: r.one.organizationTable({
+        from: r.changelogSubscriptionTable.organizationId,
         to: r.organizationTable.id,
       }),
     },
