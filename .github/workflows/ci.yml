@@ -56,8 +56,30 @@ jobs:
           API_URL: http://localhost:3100
           CLOUDFLARE_ADAPTER: "false"
 
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm --filter @feeblo/e2e exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright browsers
+        id: playwright-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install Playwright browser
         run: pnpm --filter @feeblo/e2e exec playwright install --with-deps chromium
+
+      # Saved right after the install instead of in a post step so the browsers
+      # are cached even when a later step fails or the job is cancelled.
+      - name: Save Playwright browsers
+        if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
       - name: Run end-to-end tests using built apps
         run: pnpm --filter @feeblo/e2e test:ci
@@ -101,19 +123,33 @@ jobs:
       - name: Copy env
         run: cp .env.example .env
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm --filter @feeblo/post-ui exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright browsers
+        id: playwright-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
           restore-keys: |
             ${{ runner.os }}-playwright-
 
       - name: Install Playwright browser
         run: pnpm --filter @feeblo/post-ui exec playwright install --with-deps chromium
 
-      # - name: Typecheck
-      #   run: pnpm exec turbo check-types --concurrency=4
+      # Saved right after the install instead of in a post step so the browsers
+      # are cached even when a later step fails or the job is cancelled.
+      - name: Save Playwright browsers
+        if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+      - name: Typecheck
+        run: pnpm exec turbo check-types --concurrency=4
 
       - name: Unit tests
         run: pnpm exec turbo run test --filter=!@feeblo/e2e --concurrency=4
