@@ -712,7 +712,12 @@ const sendDeliveryAttempt = (deliveryId: string) =>
     if (
       emailSubscriptionTopicForIntent(intent.payload)?.topicType ===
         "changelog" &&
-      !(yield* isChangelogPubliclyVisible(intent.organizationId))
+      !(yield* isChangelogPubliclyVisible(
+        intent.organizationId,
+        // SAFETY: a changelog topic implies a changelog payload variant,
+        // which always carries the changelogId.
+        "changelogId" in intent.payload ? intent.payload.changelogId : undefined
+      ))
     ) {
       yield* repository.markDeliveryOutcome({
         id: delivery.id,

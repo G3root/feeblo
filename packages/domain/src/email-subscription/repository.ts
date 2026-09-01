@@ -690,18 +690,6 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         );
   });
 
-  const isSuppressed = Effect.fn("EmailSubscriptionRepository.isSuppressed")(
-    function* ({ email }: { readonly email: string }) {
-      const normalizedEmail = yield* parseEmailAddress(email, "isSuppressed");
-      const [suppression] = yield* db
-        .select({ email: schema.emailSuppressionTable.email })
-        .from(schema.emailSuppressionTable)
-        .where(eq(schema.emailSuppressionTable.email, normalizedEmail))
-        .limit(1);
-      return suppression !== undefined;
-    }
-  );
-
   const deriveLinkToken = Effect.fn(
     "EmailSubscriptionRepository.deriveLinkToken"
   )(
@@ -716,7 +704,6 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     configureSubmissionNotificationRecipient,
     findAuthenticatedSubscription,
     findSubscription,
-    isSuppressed,
     requestSubscription,
     unsubscribe,
     unsubscribeAuthenticatedSubscription,

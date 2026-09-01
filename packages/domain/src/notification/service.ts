@@ -62,6 +62,93 @@ const makeNotificationService = Effect.gen(function* () {
       );
     });
 
+  /**
+   * Fan-out to every changelog subscriber, split by dashboard access:
+   * members land on the dashboard edit page, while non-member subscribers
+   * and members restricted to the workspace via SSO (who cannot open the
+   * dashboard) are sent to the public changelog.
+   */
+  const notifyChangelogSubscribers = (input: {
+    readonly actorUserId?: string | null;
+    readonly changelogId: string;
+    readonly changelogSlug: string;
+    readonly deduplicationKey: string;
+    readonly kind: "changelog.published" | "changelog.updated";
+    readonly notificationTitle: string;
+    readonly organizationId: string;
+    readonly title: string;
+  }) =>
+    Effect.gen(function* () {
+      const subscribers = yield* db
+        .select({ userId: schema.changelogSubscriptionTable.userId })
+        .from(schema.changelogSubscriptionTable)
+        .where(
+          eq(
+            schema.changelogSubscriptionTable.organizationId,
+            input.organizationId
+          )
+        );
+
+      const members = yield* db
+        .select({
+          userId: schema.memberTable.userId,
+          restrictedToOrganizationId:
+            schema.userTable.restrictedToOrganizationId,
+        })
+        .from(schema.memberTable)
+        .innerJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.memberTable.userId)
+        )
+        .where(eq(schema.memberTable.organizationId, input.organizationId));
+      const memberUserIds = new Set(members.map((member) => member.userId));
+      const restrictedUserIds = new Set(
+        members
+          .filter((member) => member.restrictedToOrganizationId !== null)
+          .map((member) => member.userId)
+      );
+      const subscriberUserIds = subscribers.map(
+        (subscriber) => subscriber.userId
+      );
+      const memberRecipients = subscriberUserIds.filter(
+        (userId) => memberUserIds.has(userId) && !restrictedUserIds.has(userId)
+      );
+      const publicRecipients = subscriberUserIds.filter(
+        (userId) => !memberUserIds.has(userId) || restrictedUserIds.has(userId)
+      );
+
+      yield* Effect.all([
+        create({
+          ...(input.actorUserId === undefined
+            ? undefined
+            : { actorUserId: input.actorUserId }),
+          organizationId: input.organizationId,
+          recipientUserIds: memberRecipients,
+          kind: input.kind,
+          resourceType: "changelog",
+          resourceId: input.changelogId,
+          title: input.notificationTitle,
+          body: input.title,
+          href: `/${input.organizationId}/changelog/edit/${input.changelogSlug}`,
+          deduplicationKey: input.deduplicationKey,
+        }),
+        create({
+          ...(input.actorUserId === undefined
+            ? undefined
+            : { actorUserId: input.actorUserId }),
+          organizationId: input.organizationId,
+          recipientUserIds: publicRecipients,
+          kind: input.kind,
+          resourceType: "changelog",
+          resourceId: input.changelogId,
+          title: input.notificationTitle,
+          body: input.title,
+          href: `/changelog/${input.changelogSlug}`,
+          deduplicationKey: input.deduplicationKey,
+        }),
+      ]).pipe(Effect.asVoid);
+    });
+
   const getPostContext = ({ organizationId, postId }: PostNotificationInput) =>
     db
       .select({
@@ -214,73 +301,45 @@ const makeNotificationService = Effect.gen(function* () {
       readonly organizationId: string;
       readonly title: string;
     }) =>
-      Effect.gen(function* () {
-        const subscribers = yield* db
-          .select({ userId: schema.changelogSubscriptionTable.userId })
-          .from(schema.changelogSubscriptionTable)
-          .where(
-            eq(schema.changelogSubscriptionTable.organizationId, organizationId)
-          );
+      notifyChangelogSubscribers({
+        ...(actorUserId === undefined ? undefined : { actorUserId }),
+        changelogId,
+        changelogSlug,
+        deduplicationKey: `changelog.published:${changelogId}`,
+        kind: "changelog.published",
+        notificationTitle: "New changelog entry",
+        organizationId,
+        title,
+      }),
 
-        // Split recipients by dashboard access: members land on the dashboard
-        // edit page, while non-member subscribers and members restricted to
-        // the workspace via SSO (who cannot open the dashboard) are sent to
-        // the public changelog.
-        const members = yield* db
-          .select({
-            userId: schema.memberTable.userId,
-            restrictedToOrganizationId:
-              schema.userTable.restrictedToOrganizationId,
-          })
-          .from(schema.memberTable)
-          .innerJoin(
-            schema.userTable,
-            eq(schema.userTable.id, schema.memberTable.userId)
-          )
-          .where(eq(schema.memberTable.organizationId, organizationId));
-        const memberUserIds = new Set(members.map((member) => member.userId));
-        const restrictedUserIds = new Set(
-          members
-            .filter((member) => member.restrictedToOrganizationId !== null)
-            .map((member) => member.userId)
-        );
-        const subscriberUserIds = subscribers.map(
-          (subscriber) => subscriber.userId
-        );
-        const memberRecipients = subscriberUserIds.filter(
-          (userId) =>
-            memberUserIds.has(userId) && !restrictedUserIds.has(userId)
-        );
-        const publicRecipients = subscriberUserIds.filter(
-          (userId) =>
-            !memberUserIds.has(userId) || restrictedUserIds.has(userId)
-        );
-
-        yield* Effect.all([
-          create({
-            ...(actorUserId === undefined ? undefined : { actorUserId }),
-            organizationId,
-            recipientUserIds: memberRecipients,
-            kind: "changelog.published",
-            resourceType: "changelog",
-            resourceId: changelogId,
-            title: "New changelog entry",
-            body: title,
-            href: `/${organizationId}/changelog/edit/${changelogSlug}`,
-            deduplicationKey: `changelog.published:${changelogId}`,
-          }),
-          create({
-            organizationId,
-            recipientUserIds: publicRecipients,
-            kind: "changelog.published",
-            resourceType: "changelog",
-            resourceId: changelogId,
-            title: "New changelog entry",
-            body: title,
-            href: `/changelog/${changelogSlug}`,
-            deduplicationKey: `changelog.published:${changelogId}`,
-          }),
-        ]).pipe(Effect.asVoid);
+    /**
+     * Same fan-out as a publish, for "send update" on an already-published
+     * entry. Deduplicated per send-update request so retries stay silent.
+     */
+    notifyChangelogUpdated: ({
+      actorUserId,
+      changelogId,
+      changelogSlug,
+      organizationId,
+      requestId,
+      title,
+    }: {
+      readonly actorUserId?: string | null;
+      readonly changelogId: string;
+      readonly changelogSlug: string;
+      readonly organizationId: string;
+      readonly requestId: string;
+      readonly title: string;
+    }) =>
+      notifyChangelogSubscribers({
+        ...(actorUserId === undefined ? undefined : { actorUserId }),
+        changelogId,
+        changelogSlug,
+        deduplicationKey: `changelog.updated:${changelogId}:${requestId}`,
+        kind: "changelog.updated",
+        notificationTitle: "Changelog update sent",
+        organizationId,
+        title,
       }),
 
     /** Notifies only members who upvoted a post; upvoting intentionally does not imply subscription. */

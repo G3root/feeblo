@@ -16,11 +16,6 @@ interface TUnsubscribe {
   userId: string;
 }
 
-interface TIsSubscribed {
-  organizationId: string;
-  userId: string;
-}
-
 interface TFindSubscribers {
   organizationId: string;
   /** Restricts the list to the given user's own subscription (public endpoints). */
@@ -69,22 +64,6 @@ const makeChangelogSubscriptionRepository = Effect.gen(function* () {
           )
         )
         .pipe(Effect.asVoid),
-
-    isSubscribed: ({ organizationId, userId }: TIsSubscribed) =>
-      db
-        .select({ id: schema.changelogSubscriptionTable.id })
-        .from(schema.changelogSubscriptionTable)
-        .where(
-          and(
-            eq(
-              schema.changelogSubscriptionTable.organizationId,
-              organizationId
-            ),
-            eq(schema.changelogSubscriptionTable.userId, userId)
-          )
-        )
-        .limit(1)
-        .pipe(Effect.map((rows) => rows.length > 0)),
 
     findSubscribers: ({ organizationId, userId }: TFindSubscribers) =>
       db

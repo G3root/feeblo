@@ -1,5 +1,5 @@
 import { Database, schema, transaction } from "@feeblo/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 
 import type { EmailSubscriptionTopic } from "../email-subscription/schema";
@@ -10,21 +10,17 @@ import type {
   NotificationTemplatePayload,
 } from "./schema";
 
-export type ChangelogNotificationContent = {
+type ChangelogNotificationContent = {
   readonly template: "changelog";
   readonly templatePayload: Omit<ChangelogTemplatePayload, "unsubscribe">;
   readonly topic: EmailSubscriptionTopic;
 };
 
-export type PostNotificationContent = {
+type PostNotificationContent = {
   readonly template: "subscription-notification";
   readonly templatePayload: Omit<NotificationTemplatePayload, "unsubscribe">;
   readonly topic: EmailSubscriptionTopic;
 };
-
-export type EmailNotificationContent =
-  | ChangelogNotificationContent
-  | PostNotificationContent;
 
 /** Builds the immutable administrative submission-notification snapshot. */
 export const makeSubmissionNotificationPayload = (
@@ -81,7 +77,10 @@ export const emailSubscriptionTopicForIntent = (
 };
 
 /** Whether the workspace changelog may currently be delivered by email. */
-export const isChangelogPubliclyVisible = (organizationId: string) =>
+export const isChangelogPubliclyVisible = (
+  organizationId: string,
+  changelogId?: string
+) =>
   transaction(
     Effect.gen(function* () {
       const db = yield* Database.Database;
@@ -92,7 +91,26 @@ export const isChangelogPubliclyVisible = (organizationId: string) =>
         .from(schema.siteTable)
         .where(eq(schema.siteTable.organizationId, organizationId))
         .limit(1);
-      return Boolean(site && site.changelogVisibility === "PUBLIC");
+      if (!(site && site.changelogVisibility === "PUBLIC")) {
+        return false;
+      }
+      // When the intent targets one entry, the entry itself must still be
+      // published: an unpublish between intent recording and send must not
+      // email subscribers a dead link.
+      if (changelogId === undefined) {
+        return true;
+      }
+      const [entry] = yield* db
+        .select({ status: schema.changelogTable.status })
+        .from(schema.changelogTable)
+        .where(
+          and(
+            eq(schema.changelogTable.id, changelogId),
+            eq(schema.changelogTable.organizationId, organizationId)
+          )
+        )
+        .limit(1);
+      return entry?.status === "published";
     })
   );
 
@@ -143,6 +161,9 @@ export const resolveSubscriptionNotificationContent = (
               where: {
                 id: changelogId,
                 organizationId: intent.organizationId,
+                // Unpublishing (or a still-scheduled entry) closes delivery
+                // for intents recorded before the transition.
+                status: "published",
               },
               columns: {
                 coverImage: true,
