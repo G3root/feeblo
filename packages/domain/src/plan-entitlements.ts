@@ -1,5 +1,16 @@
 export type OrganizationPlan = "free" | "starter" | "professional";
 
+/**
+ * Providers whose connections and outbound deliveries require the `integrations`
+ * capability. Webhook endpoints stay available on every plan and are therefore
+ * excluded from integration over-limit counts and delivery pauses.
+ */
+export const INTEGRATION_CAPABILITY_PROVIDER_KEYS = [
+  "slack",
+  "discord",
+  "github",
+] as const;
+
 export type LimitFeatureKey =
   | "feedbackBoards"
   | "privilegedMembers"

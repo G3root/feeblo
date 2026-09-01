@@ -8,24 +8,34 @@ import { z } from "zod";
 import {
   type DiscordConnection,
   connectionsAtom as discordConnectionsAtom,
+  disconnectDiscordConnectionAtom,
+  discordReactivityKeys,
   discordStatusAtom,
   startDiscordConnectAtom,
 } from "~/features/discord/atoms";
 import {
   type GitHubConnection,
+  disconnectGitHubConnectionAtom,
   gitHubConnectionsAtom,
   gitHubIntegrationStatusAtom,
+  gitHubReactivityKeys,
   startGitHubConnectAtom,
 } from "~/features/github/atoms";
 import {
   IntegrationCard,
   type IntegrationCardConfig,
 } from "~/features/integrations/components/integration-card";
+import {
+  PausedIntegrationsCard,
+  type PausedIntegrationsProviderConfig,
+} from "~/features/integrations/components/paused-integrations-card";
 import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import {
   connectionsAtom,
+  disconnectSlackConnectionAtom,
   type SlackConnection,
+  slackReactivityKeys,
   slackStatusAtom,
   startSlackConnectAtom,
 } from "~/features/slack/atoms";
@@ -77,6 +87,49 @@ const gitHubConfig: IntegrationCardConfig<GitHubConnection> = {
     connecting ? "Opening GitHub…" : "Install GitHub App",
   configureTo: "/$organizationId/settings/integrations/github",
 };
+
+const pausedProviders: readonly PausedIntegrationsProviderConfig<
+  SlackConnection | DiscordConnection | GitHubConnection
+>[] = [
+  {
+    name: "Slack",
+    // SAFETY: each provider list contains only that provider's connection shape; the shared cleanup card reads the common id/lifecycle fields.
+    connectionsAtom: connectionsAtom as PausedIntegrationsProviderConfig<
+      SlackConnection | DiscordConnection | GitHubConnection
+    >["connectionsAtom"],
+    disconnectAtom: disconnectSlackConnectionAtom,
+    reactivityKeys: slackReactivityKeys,
+    connectionLabel: (connection) =>
+      "teamName" in connection ? connection.teamName : connection.id,
+    disconnectErrorMessage: "Could not disconnect Slack",
+  },
+  {
+    name: "Discord",
+    // SAFETY: each provider list contains only that provider's connection shape; the shared cleanup card reads the common id/lifecycle fields.
+    connectionsAtom: discordConnectionsAtom as PausedIntegrationsProviderConfig<
+      SlackConnection | DiscordConnection | GitHubConnection
+    >["connectionsAtom"],
+    disconnectAtom: disconnectDiscordConnectionAtom,
+    reactivityKeys: discordReactivityKeys,
+    connectionLabel: (connection) =>
+      "guildName" in connection ? connection.guildName : connection.id,
+    disconnectErrorMessage: "Could not disconnect Discord",
+  },
+  {
+    name: "GitHub",
+    // SAFETY: each provider list contains only that provider's connection shape; the shared cleanup card reads the common id/lifecycle fields.
+    connectionsAtom: gitHubConnectionsAtom as PausedIntegrationsProviderConfig<
+      SlackConnection | DiscordConnection | GitHubConnection
+    >["connectionsAtom"],
+    disconnectAtom: disconnectGitHubConnectionAtom,
+    reactivityKeys: gitHubReactivityKeys,
+    connectionLabel: (connection) =>
+      "login" in connection
+        ? (connection.login ?? connection.id)
+        : connection.id,
+    disconnectErrorMessage: "Could not disconnect GitHub",
+  },
+];
 
 export const Route = createFileRoute("/$organizationId/settings/integrations/")(
   {
@@ -170,6 +223,10 @@ function IntegrationsSettingsRoute() {
       </SettingsLayout.Header>
       <SettingsLayout.Content>
         <div className="grid gap-4">
+          <PausedIntegrationsCard
+            organizationId={organizationId}
+            providers={pausedProviders}
+          />
           <IntegrationCard
             config={slackConfig}
             organizationId={organizationId}

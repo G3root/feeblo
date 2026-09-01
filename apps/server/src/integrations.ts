@@ -4,6 +4,7 @@ import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/con
 import { ExternalResourceService } from "@feeblo/domain/integration/external-resource/service";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import type { WebhookManagementService } from "@feeblo/domain/integration/webhook-management-service";
+import { INTEGRATION_CAPABILITY_PROVIDER_KEYS } from "@feeblo/domain/plan-entitlements";
 import { InternalServerError } from "@feeblo/domain/rpc-errors";
 import {
   IntegrationDeliveryWorkerPersistenceError,
@@ -247,31 +248,34 @@ export const makeIntegrationLayers: Effect.Effect<
   }
   const workerRepository = yield* makeIntegrationDeliveryWorkerRepository(
     claimableCapabilityKeysByProvider,
-    ({ connection, drafts, event }) =>
-      Effect.forEach(drafts, (draft) =>
-        externalResources.recordPostLink({
-          postId: draft.postId,
-          resource: {
-            connectionId: connection.id,
-            displayKey: draft.displayKey ?? null,
-            organizationId: event.organizationId,
-            remoteId: draft.remoteId,
-            remoteUrl: draft.remoteUrl,
-            resourceType: draft.resourceType,
-            safeMetadata: draft.safeMetadata,
-            stateKey: draft.stateKey ?? null,
-            title: draft.title ?? null,
-          },
-        })
-      ).pipe(
-        Effect.asVoid,
-        Effect.mapError(
-          () =>
-            new IntegrationDeliveryWorkerPersistenceError({
-              operation: "record_external_resource_drafts",
-            })
-        )
-      )
+    {
+      planGatedProviders: [...INTEGRATION_CAPABILITY_PROVIDER_KEYS],
+      recordExternalResourceDrafts: ({ connection, drafts, event }) =>
+        Effect.forEach(drafts, (draft) =>
+          externalResources.recordPostLink({
+            postId: draft.postId,
+            resource: {
+              connectionId: connection.id,
+              displayKey: draft.displayKey ?? null,
+              organizationId: event.organizationId,
+              remoteId: draft.remoteId,
+              remoteUrl: draft.remoteUrl,
+              resourceType: draft.resourceType,
+              safeMetadata: draft.safeMetadata,
+              stateKey: draft.stateKey ?? null,
+              title: draft.title ?? null,
+            },
+          })
+        ).pipe(
+          Effect.asVoid,
+          Effect.mapError(
+            () =>
+              new IntegrationDeliveryWorkerPersistenceError({
+                operation: "record_external_resource_drafts",
+              })
+          )
+        ),
+    }
   );
   const lifecycleRepository = yield* makeIntegrationManagementRepository;
   const crypto = yield* Crypto.Crypto;

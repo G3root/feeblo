@@ -252,6 +252,68 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     return entitlements.limits.submissionNotificationRecipients;
   });
 
+  /** Whether the workspace plan currently permits Slack, Discord, and GitHub integrations. */
+  const mayUseIntegrations = Effect.fn("EntitlementPolicy.mayUseIntegrations")(
+    function* (organizationId: string) {
+      const { entitlements } = yield* findEntitlements(organizationId);
+      return entitlements.capabilities.integrations;
+    }
+  );
+
+  /**
+   * Policy gate denying new Slack, Discord, and GitHub connections on plans
+   * without integrations. Database failures surface as `EffectDrizzleQueryError`
+   * for the caller's boundary to remap.
+   */
+  const canUseIntegrations = (organizationId: string) =>
+    Effect.flatMap(mayUseIntegrations(organizationId), (allowed) =>
+      allowed
+        ? Effect.void
+        : Effect.fail(
+            new Policy.PolicyDeniedError({
+              reason: "Integrations require the Starter plan or higher.",
+            })
+          )
+    );
+
+  /**
+   * Derived downgrade view for a workspace: whether the free plan now holds
+   * integration connections it can no longer use, and whether a paid plan is
+   * scheduled to end at the current period boundary. Never persisted; every
+   * call re-derives the state from the subscription row and live counts.
+   */
+  const getDowngradeState = Effect.fn("EntitlementPolicy.getDowngradeState")(
+    function* (organizationId: string) {
+      const planState = yield* workspaceRepository.findPlanByOrganizationId({
+        organizationId,
+      });
+      const integrationCount =
+        yield* workspaceRepository.countPlanGatedIntegrationConnections({
+          organizationId,
+        });
+      const entitlements = PLAN_ENTITLEMENTS[planState.plan];
+
+      const subscription = planState.subscription;
+      const scheduledDowngrade =
+        subscription?.status === "active" &&
+        subscription.cancelAtPeriodEnd &&
+        subscription.currentPeriodEnd !== null
+          ? {
+              cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+              currentPeriodEnd: subscription.currentPeriodEnd,
+            }
+          : null;
+
+      return {
+        integrationCount,
+        integrationLimit: entitlements.capabilities.integrations ? null : 0,
+        isDowngraded: planState.plan === "free" && integrationCount > 0,
+        plan: planState.plan,
+        scheduledDowngrade,
+      };
+    }
+  );
+
   return {
     canCreateBoard,
     canUpdateBoardVisibility,
@@ -265,6 +327,9 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     mayCreatePublicEmailSubscriptions,
     mayMaterializeEmailIntent,
     submissionNotificationRecipientLimit,
+    mayUseIntegrations,
+    canUseIntegrations,
+    getDowngradeState,
   };
 });
 

@@ -1,8 +1,9 @@
 import { currentDb, schema } from "@feeblo/db";
+import { entitledSubscriptionCondition } from "@feeblo/db/schema/billing";
 import { SubscriptionId } from "@feeblo/id";
 import type { WebhookProductCreatedPayload } from "@polar-sh/sdk/models/components/webhookproductcreatedpayload";
 import type { WebhookSubscriptionCreatedPayload } from "@polar-sh/sdk/models/components/webhooksubscriptioncreatedpayload";
-import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -27,15 +28,6 @@ interface TFindSubscriptionByOrganizationId {
 interface TFindCheckoutProduct {
   productId: string;
 }
-
-const currentlyEntitledSubscription = (now: Date) =>
-  or(
-    inArray(schema.subscriptionTable.status, ["active", "trialing"]),
-    and(
-      eq(schema.subscriptionTable.status, "past_due"),
-      gt(schema.subscriptionTable.currentPeriodEnd, now)
-    )
-  );
 
 const DbSubscriptionStatus = Schema.Literals([
   "incomplete",
@@ -244,7 +236,7 @@ const makeBillingRepository = Effect.gen(function* () {
           .where(
             and(
               eq(schema.subscriptionTable.organizationId, organizationId),
-              currentlyEntitledSubscription(now)
+              entitledSubscriptionCondition(now)
             )
           )
           .orderBy(

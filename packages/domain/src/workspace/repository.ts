@@ -1,4 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
+import { entitledSubscriptionCondition } from "@feeblo/db/schema/billing";
+import type { TIntegrationConnectionLifecycleStatus } from "@feeblo/db/validation-schema/integration";
+import { IntegrationProviderKey } from "@feeblo/domain-contracts/integration";
 import {
   BoardId,
   ChangelogCategoryId,
@@ -11,7 +14,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
-import { and, desc, eq, gt, inArray, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, notInArray } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -19,6 +22,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { INTEGRATION_CAPABILITY_PROVIDER_KEYS } from "../plan-entitlements";
 import { FailedToCreateWorkspaceError } from "./errors";
 
 interface CreateWorkspaceArgs {
@@ -238,6 +242,9 @@ const makeWorkspaceRepository = Effect.gen(function* () {
           .select({
             organizationId: schema.subscriptionTable.organizationId,
             plan: schema.productTable.metadata,
+            cancelAtPeriodEnd: schema.subscriptionTable.cancelAtPeriodEnd,
+            currentPeriodEnd: schema.subscriptionTable.currentPeriodEnd,
+            status: schema.subscriptionTable.status,
           })
           .from(schema.subscriptionTable)
           .innerJoin(
@@ -247,16 +254,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
           .where(
             and(
               eq(schema.subscriptionTable.organizationId, args.organizationId),
-              or(
-                inArray(schema.subscriptionTable.status, [
-                  "active",
-                  "trialing",
-                ]),
-                and(
-                  eq(schema.subscriptionTable.status, "past_due"),
-                  gt(schema.subscriptionTable.currentPeriodEnd, now)
-                )
-              )
+              entitledSubscriptionCondition(now)
             )
           )
           .orderBy(
@@ -268,15 +266,60 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             Effect.map(EffectArray.get(0)),
             Effect.map(
               Option.match({
-                onNone: () => "free" as const,
-                onSome: (subscription) => subscription.plan?.plan ?? "free",
+                onNone: () => null,
+                onSome: (subscription) => ({
+                  organizationId: args.organizationId,
+                  plan: subscription.plan?.plan ?? ("free" as const),
+                  subscription: {
+                    cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+                    currentPeriodEnd: subscription.currentPeriodEnd,
+                    status: subscription.status,
+                  },
+                }),
               })
             ),
-            Effect.map((plan) => ({
-              organizationId: args.organizationId,
-              plan,
-            }))
+            Effect.map(
+              (state) =>
+                state ?? {
+                  organizationId: args.organizationId,
+                  plan: "free" as const,
+                  subscription: null,
+                }
+            )
           );
+      }),
+
+    /**
+     * Counts integration connections of providers gated by the `integrations`
+     * capability that the workspace still holds — every lifecycle except the
+     * terminal `archived`. Webhook connections stay available on every plan
+     * and are never counted.
+     */
+    countPlanGatedIntegrationConnections: (
+      args: FindPlanByOrganizationIdArgs
+    ) =>
+      Effect.gen(function* () {
+        const [result] = yield* db
+          .select({ total: count() })
+          .from(schema.integrationConnectionTable)
+          .where(
+            and(
+              eq(
+                schema.integrationConnectionTable.organizationId,
+                args.organizationId
+              ),
+              inArray(
+                schema.integrationConnectionTable.provider,
+                INTEGRATION_CAPABILITY_PROVIDER_KEYS.map((key) =>
+                  IntegrationProviderKey.make(key)
+                )
+              ),
+              notInArray(schema.integrationConnectionTable.lifecycle, [
+                "archived",
+              ] satisfies readonly TIntegrationConnectionLifecycleStatus[])
+            )
+          );
+        return result?.total ?? 0;
       }),
   };
 });

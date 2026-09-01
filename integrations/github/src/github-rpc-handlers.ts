@@ -1,11 +1,14 @@
+import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { GitHubManagementService } from "@feeblo/domain/integration/github/management-service";
 import { GitHubManagementRpcs } from "@feeblo/domain/integration/github/rpcs";
 import * as Policy from "@feeblo/domain/policy";
+import { withRemapDbErrors } from "@feeblo/domain/rpc-errors";
 import * as Effect from "effect/Effect";
 
 /** RPC handlers authorize GitHub management before delegating provider-specific work to the application service. */
 export const GitHubManagementRpcHandlersEffect = Effect.gen(function* () {
   const service = yield* GitHubManagementService;
+  const entitlementPolicy = yield* EntitlementPolicy;
   const authorize = (organizationId: string) =>
     Policy.withPolicy(
       Policy.canPermission(organizationId, "integrations.manage")
@@ -16,7 +19,14 @@ export const GitHubManagementRpcHandlersEffect = Effect.gen(function* () {
       input: Parameters<typeof service.listConnections>[0]
     ) => service.listConnections(input).pipe(authorize(input.organizationId)),
     GitHubConnectStart: (input: Parameters<typeof service.connectStart>[0]) =>
-      service.connectStart(input).pipe(authorize(input.organizationId)),
+      Effect.gen(function* () {
+        // Starting an App installation additionally requires the plan's integrations capability.
+        yield* entitlementPolicy.canUseIntegrations(input.organizationId);
+        return yield* service.connectStart(input);
+      }).pipe(
+        authorize(input.organizationId),
+        withRemapDbErrors("Integration", "select")
+      ),
     GitHubConnectionDisconnect: (
       input: Parameters<typeof service.disconnect>[0]
     ) => service.disconnect(input).pipe(authorize(input.organizationId)),

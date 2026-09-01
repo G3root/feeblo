@@ -8,6 +8,7 @@ import {
   PostId,
   PostStatusId,
   WorkspaceId,
+  type LegidOf,
 } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
@@ -26,22 +27,38 @@ const TestLayer = IntegrationEventRecorderLive.pipe(
   Layer.provideMerge(Database.PgliteDatabaseLive)
 );
 
+/** Seeds an organization row and returns its id. */
+const seedOrganization = Effect.fn("test.seedOrganization")(function* (
+  name: string
+) {
+  const db = yield* currentDb;
+  const organizationId = yield* WorkspaceId.generate;
+  yield* db.insert(schema.organizationTable).values({
+    createdAt: new Date(),
+    id: organizationId,
+    name,
+    slug: organizationId,
+  });
+  return organizationId;
+});
+
 const seedRoute = ({
   capabilityKey = "events.post",
+  provider = "webhook",
+  organizationId: existingOrganizationId,
 }: {
   readonly capabilityKey?: string;
+  readonly provider?: string;
+  /** Seeds the route into an existing organization instead of a fresh one. */
+  readonly organizationId?: LegidOf<"WorkspaceId">;
 } = {}) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
-    const organizationId = yield* WorkspaceId.generate;
+    const organizationId =
+      existingOrganizationId ??
+      (yield* seedOrganization("Integration persistence test"));
     const connectionId = yield* IntegrationConnectionId.generate;
     const routeId = yield* IntegrationRouteId.generate;
-    yield* db.insert(schema.organizationTable).values({
-      createdAt: new Date(),
-      id: organizationId,
-      name: "Integration persistence test",
-      slug: organizationId,
-    });
     yield* db.insert(schema.integrationConnectionTable).values({
       credentialGeneration: 1,
       credentialsCiphertext: "encrypted-test-value",
@@ -49,7 +66,7 @@ const seedRoute = ({
       lifecycle: "active",
       name: "Test endpoint",
       organizationId,
-      provider: IntegrationProviderKey.make("webhook"),
+      provider: IntegrationProviderKey.make(provider),
       safeDisplayMetadata: { hostname: "example.com" },
     });
     yield* db.insert(schema.integrationRouteTable).values({
@@ -95,6 +112,39 @@ const makePostCreatedEvent = Effect.gen(function* () {
     },
   };
 });
+
+/** Seeds an entitled `starter` subscription whose period ends in the future. */
+const seedEntitledPlan = (organizationId: LegidOf<"WorkspaceId">) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const now = new Date();
+    yield* db.insert(schema.productTable).values({
+      id: `product_${organizationId}`,
+      name: "Starter",
+      isRecurring: true,
+      isArchived: false,
+      externalOrganizationId: "feeblo",
+      visibility: "public",
+      metadata: { plan: "starter", variant: "monthly" },
+      createdAt: now,
+      updatedAt: now,
+    });
+    yield* db.insert(schema.subscriptionTable).values({
+      id: `subscription_${organizationId}`,
+      externalId: `external_${organizationId}`,
+      organizationId,
+      amount: 2900,
+      cancelAtPeriodEnd: false,
+      currency: "usd",
+      recurringInterval: "month",
+      recurringIntervalCount: 1,
+      status: "active",
+      currentPeriodStart: now,
+      currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+      customerId: `customer_${organizationId}`,
+      productId: `product_${organizationId}`,
+    });
+  });
 
 describe("integration persistence", () => {
   layer(TestLayer)("event recording and delivery leases", (it) => {
@@ -143,7 +193,8 @@ describe("integration persistence", () => {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
           const repository = yield* makeIntegrationDeliveryWorkerRepository(
-            new Map([["webhook", ["events.post"]]])
+            new Map([["webhook", ["events.post"]]]),
+            {}
           );
           const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
@@ -212,7 +263,8 @@ describe("integration persistence", () => {
           );
 
           const kernel = yield* makeIntegrationDeliveryWorkerRepository(
-            new Map([["webhook", ["other.capability"]]])
+            new Map([["webhook", ["other.capability"]]]),
+            {}
           );
           const unclaimed = yield* kernel.claimDueDeliveries({
             leaseDurationMs: 60_000,
@@ -222,7 +274,8 @@ describe("integration persistence", () => {
           expect(unclaimed).toHaveLength(0);
 
           const webhookKernel = yield* makeIntegrationDeliveryWorkerRepository(
-            new Map([["webhook", ["events.post"]]])
+            new Map([["webhook", ["events.post"]]]),
+            {}
           );
           const claimed = yield* webhookKernel.claimDueDeliveries({
             leaseDurationMs: 60_000,
@@ -230,6 +283,94 @@ describe("integration persistence", () => {
             limit: 10,
           });
           expect(claimed).toHaveLength(1);
+        })
+    );
+
+    it.effect(
+      "cancels plan-gated deliveries of workspaces without an entitled paid plan",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const recorder = yield* IntegrationEventRecorder;
+          const organizationId = yield* seedOrganization(
+            "Plan-gated workspace"
+          );
+          const slackRoute = yield* seedRoute({
+            capabilityKey: "channel.notifications",
+            organizationId,
+            provider: "slack",
+          });
+          const webhookRoute = yield* seedRoute({ organizationId });
+          const input = yield* makePostCreatedEvent;
+          yield* transaction(
+            recorder.recordIntegrationEvent({
+              event: { ...input.event, organizationId },
+            })
+          );
+
+          const repository = yield* makeIntegrationDeliveryWorkerRepository(
+            new Map([
+              ["slack", ["channel.notifications"]],
+              ["webhook", ["events.post"]],
+            ]),
+            { planGatedProviders: ["slack"] }
+          );
+          const claimed = yield* repository.claimDueDeliveries({
+            leaseDurationMs: 60_000,
+            leaseOwner: "plan-gate",
+            limit: 10,
+          });
+          // Only the ungated webhook delivery stays claimable.
+          expect(
+            claimed.map((delivery) => delivery.input.connection.id)
+          ).toEqual([webhookRoute.connectionId]);
+
+          const deliveries = yield* db
+            .select()
+            .from(schema.integrationDeliveryTable)
+            .where(
+              eq(schema.integrationDeliveryTable.organizationId, organizationId)
+            );
+          const slackDelivery = deliveries.find(
+            (delivery) => delivery.connectionId === slackRoute.connectionId
+          );
+          expect(slackDelivery?.state).toBe("canceled");
+          expect(slackDelivery?.lastError).toEqual({
+            errorTag: "paused_by_plan",
+          });
+        })
+    );
+
+    it.effect(
+      "claims plan-gated deliveries once the workspace holds an entitled paid plan",
+      () =>
+        Effect.gen(function* () {
+          const recorder = yield* IntegrationEventRecorder;
+          const organizationId = yield* seedOrganization("Entitled workspace");
+          const slackRoute = yield* seedRoute({
+            capabilityKey: "channel.notifications",
+            organizationId,
+            provider: "slack",
+          });
+          yield* seedEntitledPlan(organizationId);
+          const input = yield* makePostCreatedEvent;
+          yield* transaction(
+            recorder.recordIntegrationEvent({
+              event: { ...input.event, organizationId },
+            })
+          );
+
+          const repository = yield* makeIntegrationDeliveryWorkerRepository(
+            new Map([["slack", ["channel.notifications"]]]),
+            { planGatedProviders: ["slack"] }
+          );
+          const claimed = yield* repository.claimDueDeliveries({
+            leaseDurationMs: 60_000,
+            leaseOwner: "plan-entitled",
+            limit: 10,
+          });
+          expect(claimed).toHaveLength(1);
+          expect(claimed[0]?.input.connection.id).toBe(slackRoute.connectionId);
         })
     );
 
@@ -275,7 +416,8 @@ describe("integration persistence", () => {
             new Map([
               ["webhook", ["events.post"]],
               ["slack", ["commands"]],
-            ])
+            ]),
+            {}
           );
           const claimed = yield* repository.claimDueDeliveries({
             leaseDurationMs: 60_000,
@@ -295,7 +437,8 @@ describe("integration persistence", () => {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
           const repository = yield* makeIntegrationDeliveryWorkerRepository(
-            new Map([["webhook", ["events.post"]]])
+            new Map([["webhook", ["events.post"]]]),
+            {}
           );
           const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
@@ -379,7 +522,8 @@ describe("integration persistence", () => {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
           const repository = yield* makeIntegrationDeliveryWorkerRepository(
-            new Map([["webhook", ["events.post"]]])
+            new Map([["webhook", ["events.post"]]]),
+            {}
           );
           const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
@@ -429,7 +573,8 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const recorder = yield* IntegrationEventRecorder;
           const repository = yield* makeIntegrationDeliveryWorkerRepository(
-            new Map([["webhook", ["events.post"]]])
+            new Map([["webhook", ["events.post"]]]),
+            {}
           );
           const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
@@ -464,7 +609,8 @@ describe("integration persistence", () => {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
           const repository = yield* makeIntegrationDeliveryWorkerRepository(
-            new Map([["webhook", ["events.post"]]])
+            new Map([["webhook", ["events.post"]]]),
+            {}
           );
           const route = yield* seedRoute();
           for (let count = 0; count < 11; count++) {
@@ -524,7 +670,8 @@ describe("integration persistence", () => {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
           const repository = yield* makeIntegrationDeliveryWorkerRepository(
-            new Map([["webhook", ["events.post"]]])
+            new Map([["webhook", ["events.post"]]]),
+            {}
           );
           const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;

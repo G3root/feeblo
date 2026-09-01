@@ -1,10 +1,12 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { WorkspaceId } from "@feeblo/id";
+import type { TIntegrationProviderKey } from "@feeblo/db/validation-schema/integration";
+import { IntegrationConnectionId, WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import { CurrentSession, type Session } from "../session-middleware";
 import { ReservedSubdomainError } from "../site/subdomain/errors";
 import { SubdomainValidationService } from "../site/subdomain/service";
@@ -93,6 +95,11 @@ describe("WorkspaceRpcHandlers", () => {
     Layer.provide(Database.PgliteDatabaseLive)
   );
 
+  const EntitlementPolicyTest = EntitlementPolicy.layer.pipe(
+    Layer.provide(WorkspaceRepository.layer),
+    Layer.provide(Database.PgliteDatabaseLive)
+  );
+
   const MockSubdomainValidationLayer = Layer.effect(
     SubdomainValidationService,
     Effect.succeed({
@@ -114,6 +121,7 @@ describe("WorkspaceRpcHandlers", () => {
 
   const TestLayer = Layer.mergeAll(
     RepositoryTest,
+    EntitlementPolicyTest,
     Database.PgliteDatabaseLive,
     MockSubdomainValidationLayer
   );
@@ -365,19 +373,63 @@ describe("WorkspaceRpcHandlers", () => {
     });
 
     describe("WorkspacePlanGet", () => {
-      it.effect('returns "free" when no active subscription exists', () =>
-        Effect.gen(function* () {
-          const handlers = yield* WorkspaceRpcHandlersEffect;
-          const fixture = yield* makeFixture();
-          const plan = yield* handlers
-            .WorkspacePlanGet({ organizationId: fixture.organizationId })
-            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+      it.effect(
+        "returns free with an empty downgrade state when no subscription exists",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* WorkspaceRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const plan = yield* handlers
+              .WorkspacePlanGet({ organizationId: fixture.organizationId })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
 
-          expect(plan).toEqual({
-            organizationId: fixture.organizationId,
-            plan: "free",
-          });
-        })
+            expect(plan).toEqual({
+              organizationId: fixture.organizationId,
+              plan: "free",
+              downgradeState: {
+                isDowngraded: false,
+                integrationCount: 0,
+                integrationLimit: 0,
+                scheduledDowngrade: null,
+              },
+            });
+          })
+      );
+
+      it.effect(
+        "reports a downgraded workspace while it holds integration connections",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* WorkspaceRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const db = yield* currentDb;
+            const connectionId = yield* IntegrationConnectionId.generate;
+
+            yield* db.insert(schema.integrationConnectionTable).values({
+              id: connectionId,
+              organizationId: fixture.organizationId,
+              // SAFETY: the provider column stores the canonical provider vocabulary; "slack" is a fixed member of it.
+              provider: "slack" as TIntegrationProviderKey,
+              name: "Test Slack connection",
+              lifecycle: "active",
+            });
+
+            const plan = yield* handlers
+              .WorkspacePlanGet({ organizationId: fixture.organizationId })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            expect(plan.plan).toBe("free");
+            expect(plan.downgradeState).toMatchObject({
+              isDowngraded: true,
+              integrationCount: 1,
+              integrationLimit: 0,
+              scheduledDowngrade: null,
+            });
+          })
       );
 
       it.effect("rejects users without a membership", () =>
@@ -439,9 +491,11 @@ describe("WorkspaceRpcHandlers", () => {
             .WorkspacePlanGet({ organizationId: fixture.organizationId })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
-          expect(plan).toEqual({
-            organizationId: fixture.organizationId,
-            plan: "starter",
+          expect(plan.plan).toBe("starter");
+          expect(plan.downgradeState).toMatchObject({
+            isDowngraded: false,
+            integrationLimit: null,
+            scheduledDowngrade: null,
           });
         })
       );
