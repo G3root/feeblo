@@ -1350,3 +1350,127 @@ describe("EmailOutbox workflows", () => {
     );
   });
 });
+
+describe("EmailOutbox workflows with plain-HTTP API_URL", () => {
+  layer(
+    EmailOutboxWorkflowLayer.pipe(
+      Layer.provideMerge(
+        EmailOutboxConfig.layerTest(
+          new URL("https://test.feeblo.example"),
+          new URL("http://insecure.feeblo.example")
+        )
+      ),
+      Layer.provideMerge(MailerTestLayer),
+      Layer.provideMerge(EmailOutboxRepository.layer),
+      Layer.provideMerge(
+        EmailSubscriptionRepository.layerWithoutDependencies.pipe(
+          Layer.provide(
+            EmailSubscriptionTokenService.layerTest(
+              "email-outbox-workflow-test-signing-secret"
+            )
+          )
+        )
+      ),
+      Layer.provideMerge(
+        EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
+      ),
+      Layer.provideMerge(WorkflowEngine.layerMemory),
+      Layer.provideMerge(Database.PgliteDatabaseLive)
+    )
+  )("memory workflow engine", (it) => {
+    it.effect(
+      "fails changelog deliveries terminally instead of emailing an HTTP tokenized link",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const db = yield* Database.Database;
+          const now = new Date("2026-08-11T00:00:00.000Z");
+          const organizationId = yield* WorkspaceId.generate;
+          yield* db.insert(schema.organizationTable).values({
+            id: organizationId,
+            name: "Outbox",
+            slug: organizationId,
+            createdAt: now,
+          });
+          yield* db.insert(schema.siteTable).values({
+            id: `site_${organizationId}`,
+            name: "Outbox site",
+            subdomain: `outbox-${organizationId}`,
+            customDomain: null,
+            changelogVisibility: "PUBLIC",
+            roadmapVisibility: "PUBLIC",
+            hidePoweredBy: false,
+            organizationId,
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* enableSubscriberEmails(organizationId);
+          const changelogId = `changelog_${organizationId}`;
+          const subscriptions = yield* EmailSubscriptionRepository;
+          const consentNow = new Date("2026-08-11T00:00:00.000Z");
+          const subscriber = yield* subscriptions.requestSubscription({
+            email: `changelog-${organizationId}@example.test`,
+            now: consentNow,
+            organizationId,
+            source: "explicit",
+            topic: { topicId: null, topicType: "changelog" },
+            verificationExpiresAt: new Date(
+              consentNow.getTime() + 86_400_000
+            ),
+          });
+          if (Option.isNone(subscriber.verificationToken)) {
+            return yield* Effect.die("Expected a verification token");
+          }
+          yield* subscriptions.verifySubscription({
+            now: consentNow,
+            verificationToken: Redacted.value(
+              subscriber.verificationToken.value
+            ),
+          });
+          yield* db.insert(schema.changelogTable).values({
+            id: changelogId,
+            organizationId,
+            title: "New release",
+            slug: "new-release",
+            content: "Release notes",
+            excerpt: "Release notes",
+            status: "published",
+            publishedAt: new Date(),
+            creatorId: null,
+            creatorMemberId: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+          const intent = yield* (yield* EmailOutboxRepository).recordIntent({
+            aggregateId: changelogId,
+            aggregateType: "changelog",
+            deduplicationKey: `changelog.published:${organizationId}:${changelogId}`,
+            expiresAt: null,
+            kind: "changelog.published",
+            organizationId,
+            payload: { kind: "changelog.published", changelogId },
+            scheduledAt: new Date(),
+          });
+          if (intent._tag !== "Inserted") {
+            return yield* Effect.die("Expected changelog intent");
+          }
+          const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            EmailDeliveryWorkflow.execute({ deliveryId })
+          );
+          yield* waitForDelivery(
+            intent.intent.id,
+            (delivery) => delivery.state === "failed"
+          );
+          const [delivery] = yield* db
+            .select()
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, intent.intent.id));
+          expect(delivery?.lastError).toMatchObject({
+            tag: "MailTemplateRenderError",
+          });
+          expect((yield* testMailerState).sentMessages).toHaveLength(0);
+        })
+    );
+  });
+});

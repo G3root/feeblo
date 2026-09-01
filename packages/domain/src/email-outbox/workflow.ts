@@ -63,6 +63,11 @@ const materializationBatchSize = 100;
 const reconciliationBatchSize = 100;
 const sendingLeaseRecoveryDelayMs = 5 * 60 * 1000;
 
+// Tokenized unsubscribe/verification links carry a bearer token in the query
+// string, so they must never be rendered against a plain-HTTP origin. Loopback
+// hosts stay allowed so local development keeps working.
+const loopbackHostPattern = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/;
+
 const retryDelayMs = (deliveryId: string, attempt: number): number => {
   const exponential = Math.min(60 * 60 * 1000, 1000 * 2 ** (attempt - 1));
   let hash = 0;
@@ -419,6 +424,27 @@ const sendDeliveryAttempt = (deliveryId: string) =>
     const db = yield* Database.Database;
     const config = yield* EmailOutboxConfig;
     const { apiUrl } = config;
+    // Builds an API-origin link embedding a purpose-bound token, but only
+    // over HTTPS (loopback excepted); otherwise the send fails terminally.
+    const deriveTokenizedUrl = (path: string, token: string) =>
+      Effect.gen(function* () {
+        const url = yield* Effect.try({
+          try: () => new URL(`${apiUrl}${path}`),
+          catch: (cause) =>
+            new MailTemplateRenderError({
+              cause,
+              message: "Email link derivation failed: invalid API URL",
+              operation: "derive tokenized link",
+            }),
+        });
+        if (url.protocol !== "https:" && !loopbackHostPattern.test(url.host)) {
+          return yield* new MailTemplateRenderError({
+            message: `Email link derivation failed: API_URL must use HTTPS, got ${url.protocol}`,
+            operation: "derive tokenized link",
+          });
+        }
+        return `${url.origin}${url.pathname}?token=${encodeURIComponent(token)}`;
+      });
     const now = yield* DateTime.nowAsDate;
     const delivery = yield* repository.findDeliveryById(deliveryId);
     if (
@@ -597,7 +623,10 @@ const sendDeliveryAttempt = (deliveryId: string) =>
           purpose: "unsubscribe",
           subscriptionId: unsubscribe.subscriptionId,
         });
-        const unsubscribeUrl = `${apiUrl}/api/email-subscriptions/unsubscribe?token=${encodeURIComponent(Redacted.value(token))}`;
+        const unsubscribeUrl = yield* deriveTokenizedUrl(
+          "/api/email-subscriptions/unsubscribe",
+          Redacted.value(token)
+        );
         return {
           ...createEmail(unsubscribeUrl),
           headers: {
@@ -606,7 +635,7 @@ const sendDeliveryAttempt = (deliveryId: string) =>
           },
         };
       });
-    const mailMessage = yield* Effect.gen(function* () {
+    const resolvedMailMessage = yield* Effect.gen(function* () {
       if (delivery.template === "subscription-verification") {
         const payload = yield* Schema.decodeUnknownEffect(
           SubscriptionVerificationTemplatePayload
@@ -625,7 +654,10 @@ const sendDeliveryAttempt = (deliveryId: string) =>
           purpose: "verification",
           subscriptionId: payload.subscriptionId,
         });
-        const verificationUrl = `${apiUrl}/api/email-subscriptions/verify?token=${encodeURIComponent(Redacted.value(token))}`;
+        const verificationUrl = yield* deriveTokenizedUrl(
+          "/api/email-subscriptions/verify",
+          Redacted.value(token)
+        );
         return createEmailSubscriptionVerificationEmail({ verificationUrl });
       }
 
@@ -668,7 +700,24 @@ const sendDeliveryAttempt = (deliveryId: string) =>
         (unsubscribeUrl) =>
           createNotificationEmail({ ...payload, unsubscribeUrl })
       );
-    });
+    }).pipe(
+      Effect.map(Option.some),
+      // Template/link derivation failures are permanent (including insecure
+      // API_URL): mark the delivery failed instead of churning through
+      // infrastructure retries, and finish the attempt terminally.
+      Effect.catchTag("MailTemplateRenderError", (error) =>
+        repository
+          .markDeliveryOutcome({
+            id: delivery.id,
+            state: "failed",
+            lastError: { tag: error._tag },
+          })
+          .pipe(Effect.as(Option.none()))
+      )
+    );
+    if (Option.isNone(resolvedMailMessage)) {
+      return { _tag: "terminal" as const };
+    }
     const mailer = yield* Mailer;
     const deliveryPlan =
       (yield* policy.submissionNotificationRecipientLimit(
@@ -727,7 +776,7 @@ const sendDeliveryAttempt = (deliveryId: string) =>
     }
     const sent = yield* mailer
       .send({
-        ...mailMessage,
+        ...resolvedMailMessage.value,
         messageId: delivery.messageId,
         to: delivery.recipientEmail,
       })
