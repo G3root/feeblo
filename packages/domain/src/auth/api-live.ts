@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect";
+import * as Duration from "effect/Duration";
 import * as HttpEffect from "effect/unstable/http/HttpEffect";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
@@ -142,18 +143,33 @@ function getVerificationOtp(): Effect.Effect<
 
 function deleteVerificationOtp(): Effect.Effect<
   { success: boolean },
-  never,
+  InternalServerError,
   HttpServerRequest.HttpServerRequest
 > {
   return Effect.gen(function* () {
-    const cookieData = generateVerificationOTPCookieData(false);
+    const { appUrl } = yield* VerificationOtpConfig;
+    // Mirror the cookie set by postVerificationOtp: same name, path, and
+    // Secure flag so the client actually clears it. (Secure is not part of
+    // cookie identity, but emitting an identically-Secure Max-Age=0 is the
+    // most reliable cross-browser clear.) `removeCookie` would be a no-op
+    // here — it only drops a cookie from this response's own collection and
+    // never emits a Set-Cookie — leaving the OTP state alive until its
+    // 10-minute maxAge elapsed.
+    const cookieData = generateVerificationOTPCookieData(
+      appUrl.startsWith("https://")
+    );
 
     yield* HttpEffect.appendPreResponseHandler((_request, response) =>
       Effect.succeed(
-        response.pipe(HttpServerResponse.removeCookie(cookieData.name))
+        response.pipe(
+          HttpServerResponse.setCookieUnsafe(cookieData.name, "", {
+            ...cookieData.attributes,
+            maxAge: Duration.seconds(0),
+          })
+        )
       )
     );
 
     return { success: true };
-  });
+  }).pipe(Effect.provide(VerificationOtpConfig.layer));
 }

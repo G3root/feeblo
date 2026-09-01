@@ -188,7 +188,11 @@ export class HttpApiAuthMiddleware extends HttpApiMiddleware.Service<
   security: {
     cookie: HttpApiSecurity.apiKey({
       in: "cookie",
-      key: getSessionCookieName(),
+      // Placeholder only: the real cookie name is resolved from the
+      // environment at composition time by `HttpApiAuthMiddlewareLive` (see
+      // the patch below). It must NOT be resolved here — `getSessionCookieName()`
+      // reads process.env, which may not be populated at module load.
+      key: getSessionCookieNameForUrl(undefined),
     }),
   },
 }) {}
@@ -197,6 +201,18 @@ export const HttpApiAuthMiddlewareLive = Layer.effect(
   HttpApiAuthMiddleware,
   Effect.gen(function* () {
     const auth = yield* Auth;
+
+    // Resolve and patch the session cookie name at composition time (env is
+    // loaded by then) instead of at module load. The HttpApi security scheme
+    // is consumed lazily by `HttpApiBuilder` when the router is assembled —
+    // after this layer has run — so the patch is guaranteed to be in effect
+    // before any credential is decoded.
+    const cookieName = getSessionCookieName();
+    // SAFETY: `ApiKey.key` is typed readonly but is a plain mutable field on a
+    // runtime object; patching it here is the intended use of the placeholder.
+    (HttpApiAuthMiddleware.security.cookie as { key: string }).key =
+      cookieName;
+
     return {
       cookie: (effect, { credential }) =>
         getValidatedSessionFromToken(auth, Redacted.value(credential)).pipe(

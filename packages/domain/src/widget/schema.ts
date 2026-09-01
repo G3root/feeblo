@@ -27,6 +27,24 @@ export const WidgetBoardList = S.Struct({
 
 export type TWidgetBoardList = S.Schema.Type<typeof WidgetBoardList>;
 
+/**
+ * Widget feedback metadata: flat string→string map bounded by
+ * {@link content-limits} (max 20 properties, keys ≤ 64 chars, values
+ * ≤ 500 chars). The bounds are enforced here at the public wire boundary and
+ * re-applied in the handler so the stored JSONB and downstream webhook/email
+ * payloads never carry hostile shapes even if the endpoint schema drifts.
+ */
+export const WidgetFeedbackMetadataValue = S.Record(
+  S.String.pipe(S.check(S.isMaxLength(WIDGET_METADATA_KEY_MAX_LENGTH))),
+  S.String.check(S.isMaxLength(WIDGET_METADATA_VALUE_MAX_LENGTH))
+).check(S.isMaxProperties(WIDGET_METADATA_MAX_PROPERTIES));
+
+export const WidgetFeedbackMetadata = S.optional(WidgetFeedbackMetadataValue);
+
+export type TWidgetFeedbackMetadata = S.Schema.Type<
+  typeof WidgetFeedbackMetadataValue
+>;
+
 export const WidgetFeedbackCreate = S.Struct({
   boardId: BoardId.schema,
   organizationId: WorkspaceId.schema,
@@ -35,12 +53,7 @@ export const WidgetFeedbackCreate = S.Struct({
   // content flows into storage, embeddings, subscriber emails and webhook
   // payloads, so keep it aligned with the suggestions cap instead of 100k.
   content: S.String.pipe(S.check(S.isMaxLength(WIDGET_CONTENT_MAX_LENGTH))),
-  metadata: S.optional(
-    S.Record(
-      S.String.pipe(S.check(S.isMaxLength(WIDGET_METADATA_KEY_MAX_LENGTH))),
-      S.String.check(S.isMaxLength(WIDGET_METADATA_VALUE_MAX_LENGTH))
-    ).check(S.isMaxProperties(WIDGET_METADATA_MAX_PROPERTIES))
-  ),
+  metadata: WidgetFeedbackMetadata,
   token: S.optional(
     S.String.pipe(S.check(S.isMaxLength(WIDGET_TOKEN_MAX_LENGTH)))
   ),

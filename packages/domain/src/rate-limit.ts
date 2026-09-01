@@ -4,14 +4,9 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import * as Headers from "effect/unstable/http/Headers";
 import * as RpcMiddleware from "effect/unstable/rpc/RpcMiddleware";
 
-import {
-  ClientIp,
-  type ClientIpValue,
-  getClientIpFromHeaders,
-} from "./client-ip";
+import { ClientIp, type ClientIpValue } from "./client-ip";
 import { RateLimitService } from "./rate-limit/service";
 
 export const publicRpcLimits = {
@@ -149,17 +144,23 @@ export const PublicRpcRateLimitMiddlewareLive = Layer.effect(
   Effect.gen(function* () {
     const rateLimitService = yield* RateLimitService;
 
-    return PublicRpcRateLimitMiddleware.of((effect, options) =>
+    return PublicRpcRateLimitMiddleware.of((effect) =>
       Effect.gen(function* () {
-        // Prefer the peer-anchored client IP provided by the global HTTP
-        // middleware. Only fall back to the headers when that is not
-        // installed; without a TCP peer, getClientIpFromHeaders cannot
-        // validate the provenance of any forwarded header and returns the
-        // shared "unknown" bucket rather than accepting spoofable values.
-        const clientIpOption = yield* Effect.serviceOption(ClientIp);
-        const clientIp = Option.isSome(clientIpOption)
-          ? clientIpOption.value
-          : getClientIpFromHeaders(Headers.fromInput(options.headers));
+        // Fail closed: without the global ClientIp middleware there is no
+        // trustworthy per-request identity, so limits cannot be partitioned per
+        // client. The former header fallback always produced the shared
+        // "unavailable" bucket — `getClientIpFromHeaders` requires a TCP peer —
+        // so every public request collapsed into one global bucket that a
+        // single attacker could exhaust for everyone (or hide their own volume
+        // in). Refuse the request instead; the composition root must install
+        // `makeClientIpGlobalMiddleware` before the RPC route.
+        const clientIp = yield* Option.match(
+          yield* Effect.serviceOption(ClientIp),
+          {
+            onNone: () => Effect.fail(new RateLimitUnavailableError()),
+            onSome: Effect.succeed,
+          }
+        );
 
         return yield* Effect.provideService(
           effect,

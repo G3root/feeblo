@@ -20,7 +20,7 @@ describe("withRemapDbErrors", () => {
             },
           })
         ).pipe(
-          withRemapDbErrors("Post", "create", undefined, {
+          withRemapDbErrors("Post", "create", {
             uniqueViolationMessage: "A post with this slug already exists",
           })
         )

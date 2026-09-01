@@ -1,5 +1,5 @@
 import { NodeCrypto } from "@effect/platform-node";
-import { describe, expect, layer } from "@effect/vitest";
+import { describe, expect, it, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
@@ -12,6 +12,7 @@ import { RateLimitService } from "../rate-limit/service";
 import { WorkspaceRepository } from "../workspace/repository";
 import {
   createSsoSession,
+  linkAnonymousAccount,
   SsoRepositoriesLive,
   WIDGET_SSO_ATTEMPT_RATE_LIMIT,
   WIDGET_SSO_SIGN_IN_RATE_LIMIT,
@@ -415,4 +416,143 @@ describe("createSsoSession", () => {
       })
     );
   });
+});
+
+describe("linkAnonymousAccount", () => {
+  const makeLinkFixture = () =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const organizationId = yield* WorkspaceId.generate;
+      const anonymousUserId = yield* WorkspaceId.generate; // ids are opaque strings
+      const newUserId = yield* WorkspaceId.generate;
+      const contactId = yield* WorkspaceId.generate;
+      const now = new Date();
+
+      yield* db.insert(schema.organizationTable).values({
+        id: organizationId,
+        name: "Test organization",
+        slug: organizationId,
+        createdAt: now,
+      });
+      yield* db.insert(schema.userTable).values({
+        id: anonymousUserId,
+        email: `widget+${anonymousUserId}@example.com`,
+        name: "Widget User",
+        restrictedToOrganizationId: organizationId,
+      });
+      yield* db.insert(schema.userTable).values({
+        id: newUserId,
+        email: `real+${newUserId}@example.com`,
+        name: "Real User",
+      });
+      yield* db.insert(schema.contactTable).values({
+        id: contactId,
+        organizationId,
+        userId: anonymousUserId,
+        name: "Widget Contact",
+        createdAt: now,
+      });
+
+      return { anonymousUserId, contactId, newUserId };
+    });
+
+  const contactOwner = (contactId: string) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const rows = yield* db
+        .select({ userId: schema.contactTable.userId })
+        .from(schema.contactTable)
+        .where(eq(schema.contactTable.id, contactId));
+      return rows[0]?.userId ?? null;
+    });
+
+  it.effect("re-assigns contacts and posts to the real user", () =>
+    Effect.gen(function* () {
+      const { anonymousUserId, contactId, newUserId } =
+        yield* makeLinkFixture();
+
+      yield* linkAnonymousAccount({ anonymousUserId, newUserId });
+
+      expect(yield* contactOwner(contactId)).toBe(newUserId);
+    }).pipe(Effect.provide(TestLayer))
+  );
+
+  it.effect("is a no-op when both ids are the same", () =>
+    Effect.gen(function* () {
+      const { anonymousUserId, contactId } = yield* makeLinkFixture();
+
+      yield* linkAnonymousAccount({
+        anonymousUserId,
+        newUserId: anonymousUserId,
+      });
+
+      expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
+    }).pipe(Effect.provide(TestLayer))
+  );
+
+  it.effect("refuses to link a non-restricted user's data", () =>
+    Effect.gen(function* () {
+      const { anonymousUserId, contactId, newUserId } =
+        yield* makeLinkFixture();
+      const db = yield* currentDb;
+      const attackerId = yield* WorkspaceId.generate;
+      yield* db.insert(schema.userTable).values({
+        id: attackerId,
+        email: `attacker+${attackerId}@example.com`,
+        name: "Attacker",
+      });
+
+      const error = yield* Effect.flip(
+        linkAnonymousAccount({ anonymousUserId: attackerId, newUserId })
+      );
+      expect(error.code).toBe("ANONYMOUS_USER_NOT_RESTRICTED");
+      expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
+    }).pipe(Effect.provide(TestLayer))
+  );
+
+  it.effect("refuses to link data to an anonymous target", () =>
+    Effect.gen(function* () {
+      const { anonymousUserId, contactId, newUserId } =
+        yield* makeLinkFixture();
+      const db = yield* currentDb;
+      yield* db
+        .update(schema.userTable)
+        .set({ restrictedToOrganizationId: "another_org" })
+        .where(eq(schema.userTable.id, newUserId));
+
+      const error = yield* Effect.flip(
+        linkAnonymousAccount({ anonymousUserId, newUserId })
+      );
+      expect(error.code).toBe("NEW_USER_IS_ANONYMOUS");
+      expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
+    }).pipe(Effect.provide(TestLayer))
+  );
+
+  it.effect("refuses to link a missing anonymous user", () =>
+    Effect.gen(function* () {
+      const { anonymousUserId, contactId, newUserId } =
+        yield* makeLinkFixture();
+
+      const error = yield* Effect.flip(
+        linkAnonymousAccount({ anonymousUserId: "does-not-exist", newUserId })
+      );
+      expect(error.code).toBe("ANONYMOUS_USER_NOT_FOUND");
+      expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
+    }).pipe(Effect.provide(TestLayer))
+  );
+
+  it.effect("refuses to link to a missing real user", () =>
+    Effect.gen(function* () {
+      const { anonymousUserId, contactId } = yield* makeLinkFixture();
+
+      const error = yield* Effect.flip(
+        linkAnonymousAccount({
+          anonymousUserId,
+          newUserId: "does-not-exist",
+        })
+      );
+      expect(error.code).toBe("NEW_USER_NOT_FOUND");
+      expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
+    }).pipe(Effect.provide(TestLayer))
+  );
 });
