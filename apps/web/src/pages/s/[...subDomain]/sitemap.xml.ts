@@ -67,8 +67,18 @@ export const GET: APIRoute = async ({ locals, url }) => {
   }
 
   const pageParam = url.searchParams.get("page");
-  const page = pageParam === null ? null : Number.parseInt(pageParam, 10);
-  const xml = renderSitemap(urls, origin, Number.isNaN(page) ? null : page);
+  // Only a complete decimal integer selects a page slice: `Number.parseInt`
+  // accepts trailing junk ("1junk") and decimals ("1.5") as page 1, which
+  // would duplicate the base sitemap instead of the documented 404. A
+  // missing param stays `null` (single sitemap or index); any malformed
+  // value fails `renderSitemap`'s integer check and 404s.
+  const page =
+    pageParam === null
+      ? null
+      : /^\d+$/.test(pageParam)
+        ? Number.parseInt(pageParam, 10)
+        : Number.NaN;
+  const xml = renderSitemap(urls, origin, page);
 
   if (xml === null) {
     return new Response("Not found", { status: 404 });

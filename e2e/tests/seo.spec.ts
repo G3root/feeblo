@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { createWorkspace } from "../helpers/auth";
 import {
@@ -15,13 +15,13 @@ import { publicBoardUrl } from "../helpers/urls";
 /**
  * The structured-data scripts rendered into the initial HTML by the server.
  * The board is a client-rendered SPA, so everything a crawler sees must be
- * present before hydration.
+ * present before hydration; crawlers read the raw response body, so the
+ * scripts are extracted from that body rather than from the hydrated DOM.
  */
-function jsonLdScripts(page: Page): Promise<string[]> {
-  return page.evaluate(() =>
-    Array.from(
-      document.querySelectorAll('script[type="application/ld+json"]')
-    ).map((script) => script.textContent ?? "")
+function jsonLdScripts(html: string): string[] {
+  return Array.from(
+    html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g),
+    (match) => match[1] ?? ""
   );
 }
 
@@ -86,14 +86,11 @@ test.describe("public board SEO", () => {
       )?.[1];
     expect(postUrl).toBeTruthy();
 
-    // The post detail page carries per-page metadata and structured data.
-    await page.goto(postUrl!);
-    await expect(page).toHaveTitle(`${title} — ${user.workspaceName}`);
-    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
-      "href",
-      postUrl!
-    );
-    const postScripts = await jsonLdScripts(page);
+    // The post detail page carries per-page metadata and structured data in
+    // the raw server response — exactly what a crawler receives.
+    const postResponse = await page.request.get(postUrl!);
+    expect(postResponse.status()).toBe(200);
+    const postScripts = jsonLdScripts(await postResponse.text());
     // Every node must remain parseable JSON: the HTML-delimiter escaping
     // keeps the embedded serialization intact inside the script element.
     for (const script of postScripts) {
@@ -113,8 +110,28 @@ test.describe("public board SEO", () => {
     expect(postNode).toContain('"datePublished":"');
     expect(postNode).toMatch(/"author":\{"@type":"Person","name":"[^"]+"\}/);
 
-    // The changelog detail page is an Article with the same treatment.
+    // Client-visible behavior: the browser document carries the same title
+    // and canonical URL.
+    await page.goto(postUrl!);
+    await expect(page).toHaveTitle(`${title} — ${user.workspaceName}`);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      postUrl!
+    );
+
+    // The changelog detail page is an Article with the same treatment: the
+    // structured data is asserted against the raw response body.
     const changelogUrl = `${boardUrl}/changelog/${changelogSlug}`;
+    const changelogResponse = await page.request.get(changelogUrl);
+    expect(changelogResponse.status()).toBe(200);
+    const changelogScripts = jsonLdScripts(await changelogResponse.text());
+    const articleNode = changelogScripts.find((script) =>
+      script.includes('"@type":"Article"')
+    );
+    expect(articleNode).toBeDefined();
+    expect(articleNode).toContain(`"headline":"${changelogTitle}"`);
+    expect(articleNode).toContain(`"url":"${changelogUrl}"`);
+
     await page.goto(changelogUrl);
     await expect(page).toHaveTitle(
       `${changelogTitle} — ${user.workspaceName} changelog`
@@ -123,13 +140,6 @@ test.describe("public board SEO", () => {
       "href",
       changelogUrl
     );
-    const changelogScripts = await jsonLdScripts(page);
-    const articleNode = changelogScripts.find((script) =>
-      script.includes('"@type":"Article"')
-    );
-    expect(articleNode).toBeDefined();
-    expect(articleNode).toContain(`"headline":"${changelogTitle}"`);
-    expect(articleNode).toContain(`"url":"${changelogUrl}"`);
 
     // The home page canonical is the site root, not the rewrite target.
     await page.goto(`${boardUrl}/`);

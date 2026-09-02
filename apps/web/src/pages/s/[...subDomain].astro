@@ -14,41 +14,58 @@ import PublicBoardLayout from "../../layouts/PublicBoardLayout.astro";
 export const prerender = false;
 
 /**
- * Fetch the content behind the current public path for per-page metadata and
- * JSON-LD. Only detail pages carry per-page content; every other route keeps
- * the site-level defaults. Any RPC failure (including a missing or hidden
- * entity) falls back to the defaults instead of breaking the page — the SPA
- * renders its own not-found state.
+ * Outcome of a detail-page lookup, keeping the three cases the page must
+ * respond to apart: found content renders with per-page metadata, a missing
+ * or hidden entity is a hard 404, and any other RPC failure means the
+ * content backend is unavailable.
  */
+type DetailContent =
+  | {
+      readonly kind: "found";
+      readonly post: TPost | null;
+      readonly changelog: TChangelog | null;
+    }
+  | { readonly kind: "not-found" }
+  | { readonly kind: "rpc-unavailable" };
+
 async function resolvePageContent(
   publicPath: string,
   site: TSite
-): Promise<{ post: TPost | null; changelog: TChangelog | null }> {
+): Promise<DetailContent> {
   const postMatch = /^\/p\/([^/]+)$/.exec(publicPath);
   const changelogMatch = /^\/changelog\/([^/]+)$/.exec(publicPath);
 
   if (!postMatch && !changelogMatch) {
-    return { post: null, changelog: null };
+    return { kind: "found", post: null, changelog: null };
   }
 
   try {
     // Lazy-load the Effect RPC runtime so it stays out of the worker's
     // startup module graph (same pattern as rss.xml.ts).
     const { fetchRpcServer } = await import("~/lib/runtime-server");
+    const Effect = await import("effect/Effect");
 
     if (postMatch) {
+      // Missing and hidden (non-public board) posts both fail the RPC with
+      // the typed PostNotFoundError; translate that one tag into an explicit
+      // not-found instead of swallowing it into the default metadata.
       const post = await fetchRpcServer((rpc) =>
         rpc.PostGetPublic({
           organizationId: site.organizationId,
           // SAFETY: The capture group matched, so the index is present.
           slug: postMatch[1]!,
-        })
+        }).pipe(
+          Effect.catchTag("PostNotFoundError", () => Effect.succeed(null))
+        )
       );
-      return { post, changelog: null };
+      return post === null
+        ? { kind: "not-found" }
+        : { kind: "found", post, changelog: null };
     }
 
     if (site.changelogVisibility !== "PUBLIC") {
-      return { post: null, changelog: null };
+      // The entry is only reachable through a hidden changelog section.
+      return { kind: "not-found" };
     }
 
     // SAFETY: `postMatch` is null here, so `changelogMatch` matched.
@@ -58,12 +75,15 @@ async function resolvePageContent(
     const entries = await fetchRpcServer((rpc) =>
       rpc.ChangelogListPublic({ organizationId: site.organizationId })
     );
-    return {
-      post: null,
-      changelog: entries.find((entry) => entry.slug === changelogSlug) ?? null,
-    };
+    const changelog =
+      entries.find((entry) => entry.slug === changelogSlug) ?? null;
+    return changelog === null
+      ? { kind: "not-found" }
+      : { kind: "found", post: null, changelog };
   } catch {
-    return { post: null, changelog: null };
+    // Anything other than the translated not-found tag (transport errors,
+    // rate limits, internal server errors) is an unexpected RPC failure.
+    return { kind: "rpc-unavailable" };
   }
 }
 
@@ -91,7 +111,22 @@ let pageDescription = `Share feedback, follow the roadmap, and read product upda
 
 // The board is a client-rendered SPA; this server-resolved metadata gives
 // crawlers per-page titles, descriptions, and structured data.
-const { post, changelog } = await resolvePageContent(publicPath, site);
+const detail = await resolvePageContent(publicPath, site);
+
+if (detail.kind === "not-found") {
+  // Missing or hidden detail content: a hard 404 keeps crawlers (and
+  // visitors) off URLs that would otherwise render the SPA's not-found
+  // state behind a 200.
+  return new Response("Not found", { status: 404 });
+}
+
+if (detail.kind === "rpc-unavailable") {
+  // Same status convention as the sibling rss.xml/sitemap.xml endpoints:
+  // the RPC server is a downstream service, so its failures are 502s.
+  return new Response("Content unavailable", { status: 502 });
+}
+
+const { post, changelog } = detail;
 
 if (post) {
   pageTitle = `${post.title} — ${site.name}`;

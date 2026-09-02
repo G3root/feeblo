@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
  * Types content into a ProseMirror rich-text editor. Clicking can race a
@@ -11,9 +11,11 @@ import { expect, type Page } from "@playwright/test";
 export async function fillEditor(
   page: Page,
   content: string,
-  options: { index?: number } = {}
+  options: { index?: number; scope?: Locator } = {}
 ) {
-  const editor = page.locator(".ProseMirror").nth(options.index ?? 0);
+  const editor = (options.scope ?? page)
+    .locator(".ProseMirror")
+    .nth(options.index ?? 0);
   await expect(editor).toBeVisible();
 
   await expect(async () => {
@@ -40,12 +42,11 @@ export async function createPost(page: Page, title: string, content: string) {
 
   await dialog.getByLabel("Post Title").fill(title);
 
-  // The rich-text editor currently has no accessible name, so scope this
-  // implementation-level locator to the create-post dialog only.
-  const editor = dialog.locator(".ProseMirror");
-  await expect(editor).toBeVisible();
-  await editor.click();
-  await page.keyboard.insertText(content);
+  // The rich-text editor currently has no accessible name, so scope the
+  // implementation-level locator to the create-post dialog only, reusing
+  // fillEditor's focus-and-content confirmation so a dropped insertion can
+  // never reach the submit against an empty form.
+  await fillEditor(page, content, { scope: dialog });
 
   await dialog.getByRole("combobox").first().click();
   await page.getByRole("option", { name: "Features 💡" }).click();
@@ -53,8 +54,12 @@ export async function createPost(page: Page, title: string, content: string) {
   await dialog.getByRole("button", { name: "Create Post" }).click();
   await expect(dialog).toBeHidden();
 
+  // The recent-posts card link's accessible name is its aria-label
+  // ("View <title>"), so match it exactly instead of a RegExp built from
+  // the title (which misfires on regex metacharacters and substring
+  // collisions with other post titles).
   await expect(
-    page.getByRole("link", { name: new RegExp(title) })
+    page.getByRole("link", { name: `View ${title}`, exact: true })
   ).toBeVisible();
 }
 
@@ -62,6 +67,8 @@ export async function createPost(page: Page, title: string, content: string) {
  * Opens a post's dashboard detail page from the post list by its title.
  */
 export async function openPost(page: Page, title: string) {
-  await page.getByRole("link", { name: new RegExp(title) }).click();
+  // Same accessible name as createPost's assertion: the recent-posts card
+  // link is aria-labelled "View <title>".
+  await page.getByRole("link", { name: `View ${title}`, exact: true }).click();
   await expect(page.getByLabel("Post Title")).toHaveValue(title);
 }
