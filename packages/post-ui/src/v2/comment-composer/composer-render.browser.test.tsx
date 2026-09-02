@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
 import { useCommentComposer, useCommentComposerIsDisabled } from "./context";
-import { useCommentComposerState } from "./store";
 import { CommentComposer } from "./index";
+import { useCommentComposerState } from "./store";
 
 // Render counters for faithful proxies of the composer's consumer components.
 // Each proxy subscribes to exactly what the real component subscribes to

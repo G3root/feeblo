@@ -48,7 +48,10 @@ const createCommentComposerStore = (
       }),
       // A host-driven reset (resetKey prop) also clears the store-owned text
       // so a stale draft can never be re-submitted after the editor clears.
-      resetKeyChanged: (context, event: { clearContent: boolean; resetKey: number }) => ({
+      resetKeyChanged: (
+        context,
+        event: { clearContent: boolean; resetKey: number }
+      ) => ({
         ...context,
         resetKey: event.resetKey,
         ...(event.clearContent && { content: "" }),

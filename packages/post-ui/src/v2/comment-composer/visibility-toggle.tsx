@@ -8,10 +8,7 @@ import {
 import { CircleLockIcon, CircleUnlockIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
-import {
-  useCommentComposer,
-  useCommentComposerIsDisabled,
-} from "./context";
+import { useCommentComposer, useCommentComposerIsDisabled } from "./context";
 import { useCommentComposerState } from "./store";
 
 export function VisibilityToggle() {

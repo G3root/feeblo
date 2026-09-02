@@ -15,10 +15,7 @@ import { getBoardStatusIndicatorColor } from "@feeblo/web-shared/board/constants
 import { MoreVerticalIcon, Close } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
-import {
-  useCommentComposer,
-  useCommentComposerIsDisabled,
-} from "./context";
+import { useCommentComposer, useCommentComposerIsDisabled } from "./context";
 import { useCommentComposerState } from "./store";
 
 export function SubmitButton() {

@@ -7,10 +7,7 @@ import {
   type CommentComposerContextValue,
   type TPostStatusOption,
 } from "./context";
-import {
-  CommentComposerStoreProvider,
-  useCommentComposerStore,
-} from "./store";
+import { CommentComposerStoreProvider, useCommentComposerStore } from "./store";
 
 export type CommentComposerSubmitValue = {
   content: string;
