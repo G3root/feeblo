@@ -20,6 +20,11 @@ import { createTestUser } from "../helpers/test-users";
  *    activity, the picker resets after posting, and commenting with the
  *    status the post already sits in is a no-op (no label, no activity).
  *
+ * 3. Comment management — the author can edit (with a cancel affordance
+ *    that only exists in the edit form), delete, and make a comment
+ *    internal; each round-trips through the comment collection sync and
+ *    survives a reload.
+ *
  * The workspace creator is the owner, so both `comments.*` and `posts.status`
  * are granted (see `ROLE_PERMISSIONS`). All flows run against the dashboard
  * post page, which renders the v2 comment display/composer.
@@ -129,14 +134,25 @@ function commentCard(page: Page, commentText: string) {
     .first();
 }
 
-/** Opens the per-comment overflow menu and clicks the given menu item. */
-async function togglePin(page: Page, card: ReturnType<typeof commentCard>) {
+/**
+ * Opens the per-comment overflow menu and clicks the menu item whose
+ * accessible name contains `name`. The item click auto-waits for the popup,
+ * but the explicit visibility assertion keeps the failure point readable.
+ */
+async function clickCommentMenuItem(
+  page: Page,
+  card: ReturnType<typeof commentCard>,
+  name: string | RegExp
+) {
   await card.locator('[data-slot="menu-trigger"]').click();
-  const item = page
-    .getByRole("menuitem")
-    .filter({ hasText: /Pin comment|Unpin comment/ });
+  const item = page.getByRole("menuitem").filter({ hasText: name });
   await expect(item).toBeVisible();
   await item.click();
+}
+
+/** Opens the per-comment overflow menu and clicks the given menu item. */
+async function togglePin(page: Page, card: ReturnType<typeof commentCard>) {
+  await clickCommentMenuItem(page, card, /Pin comment|Unpin comment/);
 }
 
 /** A whole activity timeline entry, e.g. "Test User pinned a comment". */
@@ -313,6 +329,211 @@ test.describe("comment as status update", () => {
         activityItem(page, /changed the status from pending to in progress/)
       ).toHaveCount(1);
       await expect(activityItem(page, /added a comment/)).toHaveCount(3);
+    }
+  );
+});
+
+test.describe("comment management", () => {
+  /**
+   * Parks the pointer away from a toast and waits for it to auto-dismiss.
+   * Lingering toasts (their timers pause while hovered/expanded) can overlap
+   * the comment menu popup and intercept menu-item clicks.
+   */
+  async function dismissToast(page: Page, title: string) {
+    await page.mouse.move(0, 0);
+    await expect(page.getByText(title, { exact: true })).toBeHidden();
+  }
+
+  /** Replaces the whole document of a comment-display editor (prefilled with the comment's current text). */
+  async function replaceCommentContent(
+    page: Page,
+    editor: Locator,
+    content: string
+  ) {
+    await expect(async () => {
+      await editor.click();
+      await expect(editor).toBeFocused();
+    }).toPass();
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.insertText(content);
+    // Keystrokes can be dropped in a just-focused editor; retry until the
+    // text actually landed so Save never fires against stale content.
+    await expect(async () => {
+      expect((await editor.innerText()).trim()).toBe(content);
+    }).toPass();
+  }
+
+  test(
+    "edits a comment; cancel discards without a server round-trip",
+    { tag: "@critical" },
+    async ({ page }) => {
+      await createWorkspace(page);
+      const title = `Edit post ${randomUUID().slice(0, 8)}`;
+      const original = `Original text ${randomUUID().slice(0, 8)}`;
+      const edited = `Edited text ${randomUUID().slice(0, 8)}`;
+
+      await createPost(page, title, "Post to exercise comment editing.");
+      await openPost(page, title);
+      await addComment(page, original);
+
+      const card = commentCard(page, original);
+      await expect(card).toBeVisible();
+
+      // The cancel affordance belongs to the edit form only: the main
+      // composer (no `onCancel` handler) must not show one.
+      await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+
+      // Track CommentUpdate round-trips so "cancel" is proven to not update.
+      let commentUpdates = 0;
+      page.on("response", (response) => {
+        if (
+          response.url().includes("/rpc") &&
+          response.request().postData()?.includes("CommentUpdate")
+        ) {
+          commentUpdates += 1;
+        }
+      });
+
+      // Cancel first: the edit form closes and the server is untouched.
+      await clickCommentMenuItem(page, card, "Edit");
+      const editEditor = card.locator(".ProseMirror");
+      await expect(editEditor).toBeVisible();
+      await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(1);
+
+      await page.getByRole("button", { name: "Cancel" }).click();
+      await expect(editEditor).toHaveCount(0);
+      await expect(card).toContainText(original);
+      await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+      expect(commentUpdates).toBe(0);
+
+      // Edit again and save: the card shows the new text and the form closes.
+      await clickCommentMenuItem(page, card, "Edit");
+
+      // The edit composer mounts a fresh ProseKit instance whose initial
+      // content lands asynchronously; keep the editor reference stable while
+      // typing (the card's text changes, so a hasText-filtered locator would
+      // stop matching) and wait for the prefilled text before editing.
+      const editCard = page.locator('[data-slot="card"]').first();
+      const secondEditEditor = editCard.locator(".ProseMirror");
+      await expect(secondEditEditor).toContainText(original);
+      await replaceCommentContent(page, secondEditEditor, edited);
+
+      const update = waitForRpc(page, "CommentUpdate");
+      // The post content editor also exposes a Save button; scope to the card.
+      await editCard.getByRole("button", { name: "Save" }).click();
+      await update;
+
+      const editedCard = commentCard(page, edited);
+      await expect(editedCard).toBeVisible();
+      await expect(editedCard).not.toContainText(original);
+      await expect(editCard.locator(".ProseMirror")).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+      expect(commentUpdates).toBe(1);
+    }
+  );
+
+  test(
+    "deletes a comment after confirming the destructive dialog",
+    { tag: "@critical" },
+    async ({ page }) => {
+      await createWorkspace(page);
+      const title = `Delete post ${randomUUID().slice(0, 8)}`;
+      const doomed = `Doomed comment ${randomUUID().slice(0, 8)}`;
+      const survivor = `Survivor comment ${randomUUID().slice(0, 8)}`;
+
+      await createPost(page, title, "Post to exercise comment deletion.");
+      // The success toast lingers while hovered and can overlap the
+      // comment menu of lower cards; let it dismiss before opening menus.
+      await dismissToast(page, "Post created successfully");
+      await openPost(page, title);
+
+      await addComment(page, doomed);
+      await addComment(page, survivor);
+
+      const doomedCard = commentCard(page, doomed);
+      const survivorCard = commentCard(page, survivor);
+      await expect(doomedCard).toBeVisible();
+      await expect(survivorCard).toBeVisible();
+
+      // Dialog Cancel leaves the comment intact.
+      await clickCommentMenuItem(page, doomedCard, "Delete");
+      const dialog = page.getByRole("alertdialog", {
+        name: "Delete Comment",
+      });
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByText(/permanently delete/)).toBeVisible();
+      await dialog.getByRole("button", { name: "Cancel" }).click();
+      await expect(dialog).toBeHidden();
+      await expect(doomedCard).toBeVisible();
+
+      // Confirming deletes it for good; the sibling comment stays.
+      await clickCommentMenuItem(page, doomedCard, "Delete");
+      const deleted = waitForRpc(page, "CommentDelete");
+      await page
+        .getByRole("alertdialog", { name: "Delete Comment" })
+        .getByRole("button", { name: "Continue" })
+        .click();
+      await deleted;
+
+      await expect(doomedCard).toHaveCount(0);
+      await expect(survivorCard).toBeVisible();
+    }
+  );
+
+  test(
+    "makes a comment internal and persists the visibility",
+    { tag: "@critical" },
+    async ({ page }) => {
+      await createWorkspace(page);
+      const title = `Visibility post ${randomUUID().slice(0, 8)}`;
+      const commentText = `Internal comment ${randomUUID().slice(0, 8)}`;
+
+      await createPost(page, title, "Post to exercise comment visibility.");
+      await openPost(page, title);
+      await addComment(page, commentText);
+
+      const card = commentCard(page, commentText);
+      await expect(card).toBeVisible();
+      await expect(card.getByText("Internal", { exact: true })).toHaveCount(0);
+
+      // Dialog Cancel keeps the comment public.
+      await clickCommentMenuItem(page, card, "Make internal");
+      const dialog = page.getByRole("alertdialog", {
+        name: "Make comment internal",
+      });
+      await expect(dialog).toBeVisible();
+      await expect(
+        dialog.getByText(/only be visible to members/)
+      ).toBeVisible();
+      await dialog.getByRole("button", { name: "Cancel" }).click();
+      await expect(dialog).toBeHidden();
+      await expect(card.getByText("Internal", { exact: true })).toHaveCount(0);
+
+      // Confirming flips the visibility: the Internal badge appears and the
+      // menu now offers to make the comment public again.
+      await clickCommentMenuItem(page, card, "Make internal");
+      const updated = waitForRpc(page, "CommentUpdate");
+      await page
+        .getByRole("alertdialog", { name: "Make comment internal" })
+        .getByRole("button", { name: "Continue" })
+        .click();
+      await updated;
+
+      await expect(card.getByText("Internal", { exact: true })).toBeVisible();
+      // The confirmation toast can overlap the menu trigger; dismiss it
+      // before reopening the menu.
+      await dismissToast(page, "Comment is now internal");
+
+      // The menu now offers to make the comment public again.
+      await card.locator('[data-slot="menu-trigger"]').click();
+      await expect(
+        page.getByRole("menuitem", { name: "Make public" })
+      ).toBeVisible();
+      await page.keyboard.press("Escape");
+
+      // The visibility survived the round-trip: still internal after reload.
+      await page.reload();
+      await expect(card.getByText("Internal", { exact: true })).toBeVisible();
     }
   );
 });

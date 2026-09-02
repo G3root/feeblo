@@ -169,10 +169,10 @@ function CommentComposerController(props: CommentComposerProviderProps) {
   }, [store]);
 
   const hasSubmit = props.onSubmit !== undefined;
+  const hasCancel = props.onCancel !== undefined;
 
   const actions = useMemo<CommentComposerActions>(() => {
     const composed: CommentComposerActions = {
-      onCancel: () => latest.current.onCancel?.(),
       onContentChange: (doc: string) => {
         // The store owns the text only when the host doesn't pass `content`.
         if (latest.current.content === undefined) {
@@ -194,12 +194,19 @@ function CommentComposerController(props: CommentComposerProviderProps) {
       },
     };
 
+    // Action closures exist only when the host opted in, so consumers can
+    // detect them (the submit bar shows the cancel button only when an
+    // onCancel handler was provided).
+    if (hasCancel) {
+      composed.onCancel = () => latest.current.onCancel?.();
+    }
+
     if (hasSubmit) {
       composed.onSubmit = handleSubmit;
     }
 
     return composed;
-  }, [handleSubmit, hasSubmit, store]);
+  }, [handleSubmit, hasCancel, hasSubmit, store]);
 
   const contextValue = useMemo<CommentComposerContextValue>(
     () => ({
