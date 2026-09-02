@@ -15,7 +15,7 @@ import {
   BOARD_LANE_COLOR_MAP,
   BoardIconMap,
   type BoardPostStatus,
-  getBoardStatusLabel,
+  formatPostStatus,
 } from "@feeblo/web-shared/board/constants";
 import { DashedLine02Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -44,12 +44,14 @@ export function StatusField({
   disabled = false,
 }: {
   currentStatusId: string;
-  statuses: Pick<TPostStatus, "id" | "type">[];
-  onValueChange: (status: Pick<TPostStatus, "id" | "type"> | null) => void;
+  statuses: Pick<TPostStatus, "id" | "label" | "type">[];
+  onValueChange: (
+    status: Pick<TPostStatus, "id" | "label" | "type"> | null
+  ) => void;
   disabled?: boolean;
 }) {
   const items = statuses.map((postStatus) => ({
-    label: getBoardStatusLabel(postStatus.type),
+    label: postStatus.label || formatPostStatus(postStatus.type),
     type: postStatus.type,
     value: postStatus.id,
   }));
@@ -58,7 +60,9 @@ export function StatusField({
   );
   const defaultValue = {
     value: currentStatusId,
-    label: currentStatus ? getBoardStatusLabel(currentStatus.type) : "",
+    label: currentStatus
+      ? currentStatus.label || formatPostStatus(currentStatus.type)
+      : "",
     type: currentStatus?.type ?? "PLANNED",
   };
 
@@ -73,6 +77,7 @@ export function StatusField({
           value
             ? {
                 id: value.value,
+                label: value.label,
                 // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
                 type: value.type as BoardPostStatus,
               }

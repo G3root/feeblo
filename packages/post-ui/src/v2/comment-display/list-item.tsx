@@ -38,7 +38,10 @@ export function CommentDisplayItem({
 
     [data.statusUpdateId]
   );
-  const statusUpdateType = statusUpdateRows?.[0]?.type ?? null;
+  const statusUpdate = statusUpdateRows?.[0];
+  const statusUpdateType = statusUpdate?.type ?? null;
+  const statusUpdateLabel = statusUpdate?.label ?? null;
+  const statusUpdateColor = statusUpdate?.color ?? null;
 
   const togglePinAction = createOptimisticAction({
     onMutate: () => {
@@ -103,6 +106,8 @@ export function CommentDisplayItem({
       isInternal={data.visibility === "INTERNAL"}
       pinnedAt={data.pinnedAt}
       statusUpdateType={statusUpdateType}
+      statusUpdateLabel={statusUpdateLabel}
+      statusUpdateColor={statusUpdateColor}
       onDelete={() => {}}
       onReply={() => {}}
       onTogglePin={async () => {

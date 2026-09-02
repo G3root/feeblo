@@ -25,6 +25,7 @@ export function RoadmapGrid<TPost extends RoadmapPost>({
         {lanes.map((lane, columnIndex) => (
           <RoadmapLaneColumn
             key={lane.statusId}
+            label={lane.label}
             name={lane.name}
             status={lane.status}
             totalPosts={lane.posts.length}

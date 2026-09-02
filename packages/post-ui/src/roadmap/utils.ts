@@ -25,6 +25,7 @@ export function groupRoadmapPostsByStatus<TPost extends RoadmapPost>(
     orderedColumns.map((column) => [
       column.statusId,
       {
+        label: column.label,
         name: column.name,
         posts: [],
         status: column.type,

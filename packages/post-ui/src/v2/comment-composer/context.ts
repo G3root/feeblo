@@ -11,6 +11,8 @@ export type TPostStatusOption = {
   type: TPostStatusType;
   /** Human-readable label (e.g. "Completed"). */
   label: string;
+  /** Status color (oklch string) when the org set a custom one. */
+  color?: string | null;
 };
 
 /**

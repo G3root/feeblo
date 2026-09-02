@@ -19,15 +19,6 @@ export const BoardIconMap = {
   IN_PROGRESS: CircleIcon,
 } satisfies Record<BoardPostStatus, typeof CancelCircleIcon>;
 
-export const BOARD_LANE_COLUMN_MAP = {
-  PENDING: "Pending",
-  REVIEW: "Review",
-  PLANNED: "Planned",
-  IN_PROGRESS: "In Progress",
-  COMPLETED: "Completed",
-  CLOSED: "Closed",
-} satisfies Record<BoardPostStatus, string>;
-
 export const BOARD_LANE_COLOR_MAP = {
   // Muted, dark-safe hues model the low-saturation status language of Linear.
   PENDING: "text-neutral-500 dark:text-neutral-400",
@@ -38,23 +29,14 @@ export const BOARD_LANE_COLOR_MAP = {
   CLOSED: "text-red-600 dark:text-red-400",
 } satisfies Record<BoardPostStatus, string>;
 
-export const BOARD_STATUS_INDICATOR_COLOR_MAP = {
-  PENDING: "bg-neutral-500 dark:bg-neutral-400",
-  REVIEW: "bg-amber-600 dark:bg-amber-400",
-  PLANNED: "bg-indigo-600 dark:bg-indigo-400",
-  IN_PROGRESS: "bg-yellow-600 dark:bg-yellow-400",
-  COMPLETED: "bg-emerald-600 dark:bg-emerald-400",
-  CLOSED: "bg-red-600 dark:bg-red-400",
-} satisfies Record<BoardPostStatus, string>;
-
-export function getBoardStatusIndicatorColor(status: string) {
-  return (
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    BOARD_STATUS_INDICATOR_COLOR_MAP[status as BoardPostStatus] ??
-    "bg-muted-foreground/40"
-  );
-}
-
-export function getBoardStatusLabel(status: BoardPostStatus) {
-  return BOARD_LANE_COLUMN_MAP[status];
+/**
+ * Fallback display label derived from the status type, used only when a
+ * status row's `label` is empty (e.g. pre-migration rows).
+ */
+export function formatPostStatus(status: string) {
+  return status
+    .toLowerCase()
+    .split("_")
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
 }

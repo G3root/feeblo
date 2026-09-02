@@ -20,6 +20,7 @@ import {
   FeedbackBrowseLayoutMain,
   FeedbackBrowseLayoutSidebar,
 } from "../components/layout/feedback-browse-layout";
+import { formatPostStatus } from "../lib/utils";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
@@ -116,6 +117,8 @@ export function BoardPage() {
           },
           postStatus: {
             type: postStatus.type,
+            label: postStatus.label,
+            color: postStatus.color,
           },
         }));
     },
@@ -198,7 +201,10 @@ export function BoardPage() {
               pageType="PublicPage"
               post={post}
             >
-              <FeedbackCard status={postStatus.type} />
+              <FeedbackCard
+                color={postStatus.color ?? undefined}
+                label={postStatus.label || formatPostStatus(postStatus.type)}
+              />
             </PostCollectionDataProvider>
           ))}
         </div>

@@ -1,7 +1,6 @@
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { cn } from "@feeblo/ui/utils";
-import { getBoardStatusIndicatorColor } from "@feeblo/web-shared/board/constants";
 import { Link } from "@tanstack/react-router";
 
 // ---------------------------------------------------------------------------
@@ -9,33 +8,23 @@ import { Link } from "@tanstack/react-router";
 // Composition over boolean props. Add a checkbox as child of Root; omit when not needed.
 // ---------------------------------------------------------------------------
 
-function formatPostStatus(status: string) {
-  return status
-    .toLowerCase()
-    .split("_")
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(" ");
-}
-
-function StatusIndicator({ status }: { status: string }) {
+function StatusIndicator({ label, color }: { label: string; color?: string }) {
   return (
     <div
       className="flex items-center gap-1.5"
       data-slot="post-card-status"
-      title={formatPostStatus(status)}
+      title={label}
     >
       <span
-        className={cn(
-          "size-2 shrink-0 rounded-full",
-          getBoardStatusIndicatorColor(status)
-        )}
+        className="size-2 shrink-0 rounded-full"
         data-slot="post-card-status-dot"
+        style={color ? { backgroundColor: color } : undefined}
       />
       <span
         className="text-muted-foreground text-xs whitespace-nowrap"
         data-slot="post-card-status-label"
       >
-        {formatPostStatus(status)}
+        {label}
       </span>
     </div>
   );
@@ -192,8 +181,14 @@ export function PostCardAuthor({
   );
 }
 
-export function PostCardStatus({ status }: { status: string }) {
-  return <StatusIndicator status={status} />;
+export function PostCardStatus({
+  label,
+  color,
+}: {
+  label: string;
+  color?: string;
+}) {
+  return <StatusIndicator color={color} label={label} />;
 }
 
 export function PostCardMobileMeta({

@@ -1,10 +1,7 @@
 import { COMMENT_CONTENT_MAX_LENGTH } from "@feeblo/domain/content-limits";
 import { CommentId } from "@feeblo/id";
 import { useAppForm, withForm } from "@feeblo/ui/hooks/form";
-import {
-  getBoardStatusLabel,
-  type BoardPostStatus,
-} from "@feeblo/web-shared/board/constants";
+import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { formOptions } from "@tanstack/react-form";
@@ -79,8 +76,8 @@ export function useCommentComposerStatusOptions(): readonly TPostStatusOption[] 
       (postStatuses ?? []).map((postStatus) => ({
         id: postStatus.id,
         type: postStatus.type,
-        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-        label: getBoardStatusLabel(postStatus.type as BoardPostStatus),
+        label: postStatus.label || formatPostStatus(postStatus.type),
+        color: postStatus.color ?? null,
       })),
     [postStatuses]
   );
