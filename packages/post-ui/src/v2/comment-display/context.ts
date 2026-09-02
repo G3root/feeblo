@@ -15,6 +15,10 @@ export type CommentDisplayState = {
   pinnedAt: Date | null;
   /** Post status moved by this comment, when posted as a status update. */
   statusUpdateType: TPostStatusType | null;
+  /** Status row label for the status update, when the org set a custom one. */
+  statusUpdateLabel: string | null;
+  /** Status row color (oklch string) for the status update, when set. */
+  statusUpdateColor: string | null;
 };
 
 export type CommentDisplayActions = {

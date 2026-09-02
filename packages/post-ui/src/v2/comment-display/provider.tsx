@@ -22,6 +22,8 @@ export type CommentDisplayProviderProps = {
   isInternal?: boolean;
   pinnedAt?: Date | null;
   statusUpdateType?: TPostStatusType | null;
+  statusUpdateColor?: string | null;
+  statusUpdateLabel?: string | null;
   onCancelEdit?: () => void;
   onDelete: () => void;
   onReply: (value: {
@@ -68,6 +70,8 @@ export function CommentDisplayProvider({
   isInternal = false,
   pinnedAt = null,
   statusUpdateType = null,
+  statusUpdateColor = null,
+  statusUpdateLabel = null,
   onCancelEdit = defaultCallbacks.onCancelEdit,
   onDelete,
   onReply,
@@ -114,6 +118,8 @@ export function CommentDisplayProvider({
         postId,
         postSlug,
         statusUpdateType,
+        statusUpdateColor,
+        statusUpdateLabel,
       },
     }),
     [
@@ -139,6 +145,8 @@ export function CommentDisplayProvider({
       postSlug,
       replyLabel,
       statusUpdateType,
+      statusUpdateColor,
+      statusUpdateLabel,
       toggleToInternalLabel,
       toggleToPublicLabel,
       pinLabel,

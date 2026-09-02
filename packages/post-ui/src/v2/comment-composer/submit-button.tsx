@@ -10,8 +10,6 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "@feeblo/ui/menu";
-import { cn } from "@feeblo/ui/utils";
-import { getBoardStatusIndicatorColor } from "@feeblo/web-shared/board/constants";
 import { MoreVerticalIcon, Close } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
@@ -85,11 +83,12 @@ function StatusUpdateMenu() {
         {selectedStatus ? (
           <span
             aria-hidden="true"
-            className={cn(
-              // Half-in, half-out on the trigger's top-right corner.
-              "ring-background absolute -top-0.75 -right-0.75 size-1.5 rounded-full ring-2",
-              getBoardStatusIndicatorColor(selectedStatus.type)
-            )}
+            className="ring-background absolute -top-0.75 -right-0.75 size-1.5 rounded-full ring-2"
+            style={
+              selectedStatus.color
+                ? { backgroundColor: selectedStatus.color }
+                : undefined
+            }
           />
         ) : null}
       </MenuTrigger>
@@ -115,10 +114,12 @@ function StatusUpdateMenu() {
               <span className="flex items-center gap-2">
                 <span
                   aria-hidden="true"
-                  className={cn(
-                    "size-2 shrink-0 rounded-full",
-                    getBoardStatusIndicatorColor(option.type)
-                  )}
+                  className="size-2 shrink-0 rounded-full"
+                  style={
+                    option.color
+                      ? { backgroundColor: option.color }
+                      : undefined
+                  }
                 />
                 {option.label}
               </span>
