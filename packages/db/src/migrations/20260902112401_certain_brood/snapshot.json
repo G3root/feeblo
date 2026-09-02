@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "8df4a2ec-470f-4ce6-8e0f-460619cbbc0f",
+  "id": "260821d4-4fec-4e19-9966-61b55e5f0c35",
   "prevIds": [
     "1e931769-a44e-42dd-88b6-73c355f6df6d"
   ],
@@ -2686,7 +2686,7 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "status_update_type",
+      "name": "status_update_id",
       "entityType": "columns",
       "schema": "public",
       "table": "comment"
@@ -11693,6 +11693,23 @@
       "onUpdate": "NO ACTION",
       "onDelete": "SET NULL",
       "name": "comment_member_id_member_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "comment"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "status_update_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "post_status",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "comment_status_update_id_post_status_id_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "comment"
