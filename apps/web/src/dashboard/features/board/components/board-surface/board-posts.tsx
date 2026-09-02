@@ -51,6 +51,7 @@ export function BoardPosts({
     postStatuses.map((postStatus) => ({
       id: postStatus.id,
       type: postStatus.type,
+      label: postStatus.label,
     }))
   );
 

@@ -1,3 +1,4 @@
+import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import { AuthButton } from "@feeblo/post-ui/auth-dialog";
 import { PostCommentGuestPrompt } from "@feeblo/post-ui/post-comment-composer";
 import { PostPage as ComposedPostPage } from "@feeblo/post-ui/post-page";
@@ -12,9 +13,7 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
-import { cn } from "@feeblo/ui/utils";
 import { isString } from "@feeblo/utils/runtime-kind";
-import { getBoardStatusIndicatorColor } from "@feeblo/web-shared/board/constants";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, useParams } from "@tanstack/react-router";
 import type { ReactNode } from "react";
@@ -35,17 +34,17 @@ function RootLayout({ children }: { children: ReactNode }) {
   );
 }
 
-function StatusPill({ status }: { status: string }) {
+function StatusPill({ postStatus }: { postStatus: TPostStatus }) {
+  const color = postStatus.color ?? undefined;
+
   return (
     <div className="border-border/70 bg-muted/40 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5">
       <span
-        className={cn(
-          "size-1.5 shrink-0 rounded-full",
-          getBoardStatusIndicatorColor(status)
-        )}
+        className="size-1.5 shrink-0 rounded-full"
+        style={color ? { backgroundColor: color } : undefined}
       />
       <span className="text-muted-foreground text-xs font-medium">
-        {formatPostStatus(status)}
+        {postStatus.label || formatPostStatus(postStatus.type)}
       </span>
     </div>
   );
@@ -215,7 +214,7 @@ export function PostPage() {
           <PostMetaSidebar.Root>
             <PostMetaSidebar.Voters />
             <PostMetaSidebar.Board />
-            <PostMetaSidebar.Status status={postStatus?.type ?? "PLANNED"} />
+            <PostMetaSidebar.Status postStatus={postStatus} />
             <PostMetaSidebar.Tags tags={selectedTags} />
             <PostMetaSidebar.Author />
             <PostMetaSidebar.PublishedOn />
@@ -288,10 +287,14 @@ function PostMetaSidebarBoard() {
   );
 }
 
-function PostMetaSidebarStatus({ status }: { status: string }) {
+function PostMetaSidebarStatus({ postStatus }: { postStatus?: TPostStatus }) {
+  if (!postStatus) {
+    return null;
+  }
+
   return (
     <PostMetaSidebarSection title="Status">
-      <StatusPill status={status} />
+      <StatusPill postStatus={postStatus} />
     </PostMetaSidebarSection>
   );
 }

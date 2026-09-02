@@ -44,6 +44,8 @@ interface Board {
 interface Status {
   id: string;
   type: string;
+  label: string;
+  color?: string | null;
 }
 
 interface RecentPostsSectionProps {
@@ -123,7 +125,12 @@ export function RecentPostsSection({
                   />
                 </PostCard.Body>
                 <PostCard.DesktopMeta>
-                  {status && <PostCard.Status status={status.type} />}
+                  {status && (
+                    <PostCard.Status
+                      color={status.color ?? undefined}
+                      label={status.label || status.type}
+                    />
+                  )}
                   {board?.name && (
                     <PostCard.BoardBadge>{board.name}</PostCard.BoardBadge>
                   )}

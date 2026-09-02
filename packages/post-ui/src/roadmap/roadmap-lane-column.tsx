@@ -1,6 +1,6 @@
 import { ScrollArea } from "@feeblo/ui/scroll-area";
 import { cn } from "@feeblo/ui/utils";
-import { getBoardStatusLabel } from "@feeblo/web-shared/board/constants";
+import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import type { ReactNode, Ref } from "react";
 
 import { RoadmapStatusIcon } from "./roadmap-status-icon";
@@ -11,6 +11,7 @@ interface RoadmapLaneColumnProps {
   children?: ReactNode;
   contentRef?: Ref<HTMLDivElement>;
   isHighlighted?: boolean;
+  label?: string;
   name?: string;
   status: RoadmapStatus;
   totalPosts?: number;
@@ -21,11 +22,12 @@ export function RoadmapLaneColumn({
   children,
   contentRef,
   isHighlighted = false,
+  label,
   name,
   status,
   totalPosts,
 }: RoadmapLaneColumnProps) {
-  const readableStatus = getBoardStatusLabel(status);
+  const readableStatus = name ?? label ?? formatPostStatus(status);
   const resolvedAction =
     action ??
     (totalPosts !== undefined ? (
@@ -40,7 +42,7 @@ export function RoadmapLaneColumn({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <RoadmapStatusIcon status={status} />
-            <h3 className="text-sm font-medium">{name ?? readableStatus}</h3>
+            <h3 className="text-sm font-medium">{readableStatus}</h3>
           </div>
           {resolvedAction}
         </div>

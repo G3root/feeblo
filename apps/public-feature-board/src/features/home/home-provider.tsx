@@ -177,6 +177,8 @@ export function HomeProvider({ children }: { children: ReactNode }) {
           },
           status: {
             type: status.type,
+            label: status.label,
+            color: status.color,
           },
           createdAt: post.createdAt,
           upvoteCount: coalesce(upvoteCounts.upvoteCount, 0),

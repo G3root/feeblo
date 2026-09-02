@@ -105,7 +105,13 @@ export const PostCard = {
 };
 
 // Convenience wrapper for feedback-page / board-page reuse
-export function FeedbackCard({ status }: { status: string }) {
+export function FeedbackCard({
+  label,
+  color,
+}: {
+  label: string;
+  color?: string;
+}) {
   return (
     <PostCard.Root>
       <PostCard.Link />
@@ -116,7 +122,7 @@ export function FeedbackCard({ status }: { status: string }) {
         <PostCard.MobileMeta />
       </PostCard.Body>
       <PostCard.DesktopMeta>
-        <PostCard.Status status={status} />
+        <PostCard.Status color={color} label={label} />
         <PostCard.BoardBadge />
         <PostCard.Author />
       </PostCard.DesktopMeta>

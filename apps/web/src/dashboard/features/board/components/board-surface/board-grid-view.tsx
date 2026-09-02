@@ -230,6 +230,7 @@ export function BoardGridView({
                 id={laneId}
                 index={columnIndex}
                 key={lane.statusId}
+                label={lane.label}
                 status={column}
                 statusId={lane.statusId}
                 totalPosts={rows.length}

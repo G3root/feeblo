@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
-import { getBoardStatusLabel } from "@feeblo/web-shared/board/constants";
+import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import {
   ChevronDownIcon,
   Delete02Icon,
@@ -106,7 +106,8 @@ export function RoadmapColumnItem({
                                   (option) => option.id === value
                                 );
                                 return status
-                                  ? getBoardStatusLabel(status.type)
+                                  ? status.label ||
+                                      formatPostStatus(status.type)
                                   : "Select a status";
                               }}
                             </SelectValue>
@@ -121,7 +122,7 @@ export function RoadmapColumnItem({
                                 key={status.id}
                                 value={status.id}
                               >
-                                {getBoardStatusLabel(status.type)}
+                                {status.label || formatPostStatus(status.type)}
                               </SelectItem>
                             ))}
                           </SelectPopup>

@@ -20,6 +20,7 @@ export const groupPostsByStatus = (
   orderedStatuses: ReadonlyArray<{
     id: string;
     type: BoardPostStatus;
+    label: string;
   }>
 ) => {
   const map = new Map<
@@ -28,6 +29,7 @@ export const groupPostsByStatus = (
       posts: BoardPostRow[];
       status: BoardPostStatus;
       statusId: string;
+      label: string;
     }
   >(
     orderedStatuses.map((status) => [
@@ -36,6 +38,7 @@ export const groupPostsByStatus = (
         posts: [],
         status: status.type,
         statusId: status.id,
+        label: status.label,
       },
     ])
   );
@@ -52,6 +55,7 @@ export const groupPostsByStatus = (
       posts: [post],
       status: post.status,
       statusId: post.statusId,
+      label: "",
     });
   }
 
@@ -64,6 +68,7 @@ export const groupPostsByStatus = (
       status: lane.status,
       statusId: lane.statusId,
       posts: lane.posts,
+      label: lane.label,
     });
   }
 

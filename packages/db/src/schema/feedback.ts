@@ -1,3 +1,4 @@
+import { DEFAULT_POST_STATUS_COLORS } from "@feeblo/domain-contracts/post-status-colors";
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
@@ -69,15 +70,47 @@ export type TPostStatus = TPostStatusType;
 export const POST_STATUS_TYPES = PostStatusType.literals;
 
 export const DEFAULT_POST_STATUSES = [
-  { orderIndex: 0, type: "PENDING" },
-  { orderIndex: 1, type: "REVIEW" },
-  { orderIndex: 2, type: "PLANNED" },
-  { orderIndex: 3, type: "IN_PROGRESS" },
-  { orderIndex: 4, type: "COMPLETED" },
-  { orderIndex: 5, type: "CLOSED" },
+  {
+    orderIndex: 0,
+    type: "PENDING",
+    label: "Pending",
+    color: DEFAULT_POST_STATUS_COLORS.PENDING,
+  },
+  {
+    orderIndex: 1,
+    type: "REVIEW",
+    label: "Review",
+    color: DEFAULT_POST_STATUS_COLORS.REVIEW,
+  },
+  {
+    orderIndex: 2,
+    type: "PLANNED",
+    label: "Planned",
+    color: DEFAULT_POST_STATUS_COLORS.PLANNED,
+  },
+  {
+    orderIndex: 3,
+    type: "IN_PROGRESS",
+    label: "In Progress",
+    color: DEFAULT_POST_STATUS_COLORS.IN_PROGRESS,
+  },
+  {
+    orderIndex: 4,
+    type: "COMPLETED",
+    label: "Completed",
+    color: DEFAULT_POST_STATUS_COLORS.COMPLETED,
+  },
+  {
+    orderIndex: 5,
+    type: "CLOSED",
+    label: "Closed",
+    color: DEFAULT_POST_STATUS_COLORS.CLOSED,
+  },
 ] as const satisfies ReadonlyArray<{
   orderIndex: number;
   type: TPostStatus;
+  label: string;
+  color: string;
 }>;
 
 export const DEFAULT_CHANGELOG_CATEGORIES = [
@@ -191,6 +224,14 @@ export const postStatusTable = pgTable(
   {
     id: text("id").primaryKey(),
     type: text("type").$type<TPostStatusType>().notNull(),
+    // User-facing label; empty by default so pre-existing rows stay valid
+    // until a workspace customizes them.
+    label: text("label").notNull().default(""),
+    // oklch() color used for status indicators; null until a workspace
+    // customizes the status.
+    color: text("color"),
+    // Reserved for future icon payloads; kept in the db schema only.
+    icon: text("icon"),
     orderIndex: integer("order_index").notNull(),
     organizationId: text("organization_id")
       .notNull()

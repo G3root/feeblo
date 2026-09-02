@@ -15,7 +15,7 @@ import {
 import { cn } from "@feeblo/ui/utils";
 import {
   type BoardPostStatus,
-  getBoardStatusLabel,
+  formatPostStatus,
 } from "@feeblo/web-shared/board/constants";
 import {
   Cancel01Icon,
@@ -55,7 +55,7 @@ type BoardFilterContextValue = {
   organizationId: string;
   setStatusOperator: (operator: BoardStatusOperator) => void;
   setTagOperator: (operator: BoardTagOperator) => void;
-  postStatuses: Array<{ id: string; type: BoardPostStatus }>;
+  postStatuses: Array<{ id: string; type: BoardPostStatus; label: string }>;
   tags: FilterTag[];
   toggleStatus: (status: BoardPostStatus) => void;
   toggleTag: (tagId: string) => void;
@@ -118,6 +118,7 @@ function BoardFilterRoot({
         .select(({ postStatus }) => ({
           id: postStatus.id,
           type: postStatus.type,
+          label: postStatus.label,
         })),
     [organizationId]
   );
@@ -244,7 +245,7 @@ function BoardFilterTrigger() {
                       toggleStatus(postStatus.type);
                     }}
                   >
-                    {getBoardStatusLabel(postStatus.type)}
+                    {postStatus.label || formatPostStatus(postStatus.type)}
                   </MenuCheckboxItem>
                 ))}
               </MenuSubPopup>
@@ -327,9 +328,9 @@ function BoardFilterStatusGroup() {
         items={postStatuses.map((postStatus) => ({
           checked: selectedStatuses.has(postStatus.type),
           key: postStatus.type,
-          label: getBoardStatusLabel(postStatus.type),
+          label: postStatus.label || formatPostStatus(postStatus.type),
         }))}
-        label={getStatusSummary(filters.statuses)}
+        label={getStatusSummary(filters.statuses, postStatuses)}
         onToggle={(status) => {
           // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
           toggleStatus(status as BoardPostStatus);
@@ -514,9 +515,15 @@ function BoardFilterClearButton({
   );
 }
 
-function getStatusSummary(statuses: BoardPostStatus[]) {
+function getStatusSummary(
+  statuses: BoardPostStatus[],
+  postStatuses: Array<{ id: string; type: BoardPostStatus; label: string }>
+) {
   if (statuses.length === 1) {
-    return getBoardStatusLabel(statuses[0]);
+    return (
+      postStatuses.find((postStatus) => postStatus.type === statuses[0])
+        ?.label ?? formatPostStatus(statuses[0])
+    );
   }
 
   return `${statuses.length} statuses`;

@@ -18,6 +18,7 @@ import {
   FeedbackBrowseLayoutContent,
   FeedbackBrowseLayoutMain,
 } from "../../components/layout/feedback-browse-layout";
+import { formatPostStatus } from "../../lib/utils";
 import { HomeBoardSelect } from "./components/board-select";
 import { HomeFilterList } from "./components/filter-list";
 import { HomeGiveFeedbackButton } from "./components/give-feedback-button";
@@ -131,7 +132,10 @@ function HomeList() {
                     <PostCard.MobileMeta />
                   </PostCard.Body>
                   <PostCard.DesktopMeta>
-                    <PostCard.Status status={status.type} />
+                    <PostCard.Status
+                      color={status.color ?? undefined}
+                      label={status.label || formatPostStatus(status.type)}
+                    />
                     <PostCard.BoardBadge />
                     <PostCard.Author />
                   </PostCard.DesktopMeta>

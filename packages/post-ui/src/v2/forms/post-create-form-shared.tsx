@@ -162,7 +162,7 @@ export const PostStatusField = withForm({
   props: {
     // SAFETY: [] satisfies the statuses contract; consumers always provide the
     // real status list when mounting the field.
-    statuses: [] as Pick<TPostStatus, "id" | "type">[],
+    statuses: [] as Pick<TPostStatus, "id" | "label" | "type">[],
   },
   render: ({ form, statuses }) => {
     return (
