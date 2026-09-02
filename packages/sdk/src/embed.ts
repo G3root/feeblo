@@ -58,16 +58,28 @@ function parseIncomingMessage(value: unknown): IncomingMessage | null {
       if (data !== undefined && data !== null) {
         if (!isRecord(data)) return null;
         if (data.code !== undefined && !isStringValue(data.code)) return null;
-        if (data.message !== undefined && !isStringValue(data.message)) return null;
+        if (data.message !== undefined && !isStringValue(data.message))
+          return null;
       }
-      return { event: "ERROR", data: data as IncomingMessage extends { event: "ERROR" } ? IncomingMessage["data"] : never };
+      return {
+        event: "ERROR",
+        data: data as IncomingMessage extends { event: "ERROR" }
+          ? IncomingMessage["data"]
+          : never,
+      };
     }
     case "PAGE_HEIGHT": {
       if (data !== undefined && data !== null) {
         if (!isRecord(data)) return null;
-        if (data.height !== undefined && !isNumberValue(data.height)) return null;
+        if (data.height !== undefined && !isNumberValue(data.height))
+          return null;
       }
-      return { event: "PAGE_HEIGHT", data: data as IncomingMessage extends { event: "PAGE_HEIGHT" } ? IncomingMessage["data"] : never };
+      return {
+        event: "PAGE_HEIGHT",
+        data: data as IncomingMessage extends { event: "PAGE_HEIGHT" }
+          ? IncomingMessage["data"]
+          : never,
+      };
     }
     case "CLOSE":
       return { event: "CLOSE" };
@@ -76,20 +88,45 @@ function parseIncomingMessage(value: unknown): IncomingMessage | null {
     case "WIDGET_OPENED": {
       if (data !== undefined && data !== null) {
         if (!isRecord(data)) return null;
-        if (data.module !== undefined && data.module !== "feedback" && data.module !== "updates") return null;
+        if (
+          data.module !== undefined &&
+          data.module !== "feedback" &&
+          data.module !== "updates"
+        )
+          return null;
       }
-      return { event: "WIDGET_OPENED", data: data as IncomingMessage extends { event: "WIDGET_OPENED" } ? IncomingMessage["data"] : never };
+      return {
+        event: "WIDGET_OPENED",
+        data: data as IncomingMessage extends { event: "WIDGET_OPENED" }
+          ? IncomingMessage["data"]
+          : never,
+      };
     }
     case "IDENTITY_CHANGED": {
       if (data !== undefined && data !== null && !isRecord(data)) return null;
-      return { event: "IDENTITY_CHANGED", data: data as IncomingMessage extends { event: "IDENTITY_CHANGED" } ? IncomingMessage["data"] : never };
+      return {
+        event: "IDENTITY_CHANGED",
+        data: data as IncomingMessage extends { event: "IDENTITY_CHANGED" }
+          ? IncomingMessage["data"]
+          : never,
+      };
     }
     case "FEEDBACK_SUBMITTED": {
       if (data !== undefined && data !== null) {
         if (!isRecord(data)) return null;
-        if (data.post !== undefined && data.post !== null && !isRecord(data.post)) return null;
+        if (
+          data.post !== undefined &&
+          data.post !== null &&
+          !isRecord(data.post)
+        )
+          return null;
       }
-      return { event: "FEEDBACK_SUBMITTED", data: data as IncomingMessage extends { event: "FEEDBACK_SUBMITTED" } ? IncomingMessage["data"] : never };
+      return {
+        event: "FEEDBACK_SUBMITTED",
+        data: data as IncomingMessage extends { event: "FEEDBACK_SUBMITTED" }
+          ? IncomingMessage["data"]
+          : never,
+      };
     }
     default:
       return null;

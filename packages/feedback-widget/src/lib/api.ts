@@ -36,7 +36,8 @@ function getWidgetEnv(): Record<string, unknown> | null {
   // SAFETY: window.__ENV is a JSON object injected by the server; validated via string checks below
   const w = window as unknown as { global?: { __ENV?: unknown } };
   const env = w.global?.__ENV;
-  if (env === null || typeof env !== "object" || Array.isArray(env)) return null;
+  if (env === null || typeof env !== "object" || Array.isArray(env))
+    return null;
   // SAFETY: checked that env is a non-null non-array object
   return env as Record<string, unknown>;
 }
@@ -84,7 +85,11 @@ export const fetchBoards = query(async (): Promise<WidgetBoard[]> => {
   if (!Array.isArray(json)) throw new Error("Invalid boards response");
   // Validate each board is a record with required string fields at the boundary
   for (const item of json) {
-    if (!isRecord(item) || typeof item.id !== "string" || typeof item.name !== "string") {
+    if (
+      !isRecord(item) ||
+      typeof item.id !== "string" ||
+      typeof item.name !== "string"
+    ) {
       throw new Error("Invalid board entry");
     }
   }
@@ -101,7 +106,11 @@ export const fetchUpdates = query(async (): Promise<WidgetUpdate[]> => {
   const json: unknown = await res.json();
   if (!Array.isArray(json)) throw new Error("Invalid updates response");
   for (const item of json) {
-    if (!isRecord(item) || typeof item.id !== "string" || typeof item.title !== "string") {
+    if (
+      !isRecord(item) ||
+      typeof item.id !== "string" ||
+      typeof item.title !== "string"
+    ) {
       throw new Error("Invalid update entry");
     }
   }
@@ -119,8 +128,10 @@ export async function fetchSuggestions(
   if (typeof input.boardId !== "string" || input.boardId.trim().length === 0) {
     throw new Error("boardId is required");
   }
-  if (typeof input.title !== "string") throw new Error("title must be a string");
-  if (typeof input.content !== "string") throw new Error("content must be a string");
+  if (typeof input.title !== "string")
+    throw new Error("title must be a string");
+  if (typeof input.content !== "string")
+    throw new Error("content must be a string");
   const response = await fetch(`${getApiBaseUrl()}/suggestions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -133,7 +144,11 @@ export async function fetchSuggestions(
   const json: unknown = await response.json();
   if (!Array.isArray(json)) throw new Error("Invalid suggestions response");
   for (const item of json) {
-    if (!isRecord(item) || typeof item.id !== "string" || typeof item.title !== "string") {
+    if (
+      !isRecord(item) ||
+      typeof item.id !== "string" ||
+      typeof item.title !== "string"
+    ) {
       throw new Error("Invalid suggestion entry");
     }
   }
@@ -189,7 +204,11 @@ export const createFeedBackAction = action(
       let message = "Failed to submit feedback";
       try {
         const json: unknown = await response.json();
-        if (isRecord(json) && typeof json.message === "string" && json.message.trim().length > 0) {
+        if (
+          isRecord(json) &&
+          typeof json.message === "string" &&
+          json.message.trim().length > 0
+        ) {
           message = json.message.trim();
         }
       } catch {

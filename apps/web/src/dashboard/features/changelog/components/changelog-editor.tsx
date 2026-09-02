@@ -42,6 +42,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, queryOnce, useLiveQuery } from "@tanstack/react-db";
 import { Link, useNavigate } from "@tanstack/react-router";
+import * as Schema from "effect/Schema";
 import {
   createContext,
   type ReactNode,
@@ -52,7 +53,6 @@ import {
   useRef,
   useState,
 } from "react";
-import * as Schema from "effect/Schema";
 import { z } from "zod";
 
 import { usePublicSiteUrl } from "~/hooks/use-site";

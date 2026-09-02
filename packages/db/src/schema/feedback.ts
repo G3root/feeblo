@@ -53,9 +53,7 @@ const embeddingVector = (dimensions: number) =>
   }>({
     dataType: () => `vector(${dimensions})`,
     fromDriver: (value) =>
-      Array.from(
-        Schema.decodeSync(Schema.fromJsonString(VectorValues))(value)
-      ),
+      Array.from(Schema.decodeSync(Schema.fromJsonString(VectorValues))(value)),
     toDriver: (value) =>
       JSON.stringify(Schema.decodeUnknownSync(VectorValues)(value)),
   });
