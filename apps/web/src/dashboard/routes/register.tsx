@@ -14,6 +14,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
 import { RegisterShell } from "~/features/register/components/register-shell";
+import { m } from "@/paraglide/messages";
 import { RegisterWorkspaceStep } from "~/features/register/components/register-workspace-step";
 import { fetchRpc } from "~/lib/runtime";
 
@@ -45,7 +46,7 @@ function RegisterRoute() {
         if (result.organizationId) {
           trackEvent("org_created", { success: true });
           toastManager.add({
-            title: "Workspace created successfully",
+            title: m.otter_yarrow_zephyr(),
             type: "success",
           });
           await refetch();
@@ -58,7 +59,7 @@ function RegisterRoute() {
       } catch {
         trackEvent("org_created", { success: false });
         toastManager.add({
-          title: "Failed to create workspace",
+          title: m.glacier_indigo_summit(),
           type: "error",
         });
         return;
@@ -70,10 +71,8 @@ function RegisterRoute() {
     <RegisterShell>
       <Card>
         <CardHeader>
-          <CardTitle>Create a new Workspace</CardTitle>
-          <CardDescription>
-            create a new workspace to get started
-          </CardDescription>
+          <CardTitle>{m.kettle_ledge_rustic()}</CardTitle>
+          <CardDescription>{m.cobalt_heath_thicket()}</CardDescription>
         </CardHeader>
 
         <CardPanel>
@@ -104,7 +103,7 @@ function RegisterRoute() {
             size="lg"
             type="submit"
           >
-            Create Workspace
+            {m.crimson_tide_willow()}
           </Button>
         )}
       </form.Subscribe>

@@ -16,6 +16,8 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { z } from "zod";
 
+import { m } from "@/paraglide/messages";
+
 const SearchSchema = z.object({
   redirectTo: z.string().optional(),
 });
@@ -105,24 +107,26 @@ function RouteComponent() {
                   </span>
                   <span className="sr-only">Acme Inc.</span>
                 </Link>
-                <h1 className="text-xl font-bold">Enter verification code</h1>
+                <h1 className="text-xl font-bold">{m.ember_spruce_vale()}</h1>
                 <FieldDescription>
-                  We sent a 6-digit code to your email address
+                  {m.basil_canyon_fern()}
                 </FieldDescription>
               </Field>
-              <OtpFormFields form={form} submitLabel="Verify">
+              <OtpFormFields form={form} submitLabel={m.cedar_gale_grove()}>
                 <OtpResend
                   onResend={resend}
-                  successMessage="Verification code sent"
+                  successMessage={m.comet_dell_yucca()}
                 />
               </OtpFormFields>
             </FieldGroup>
           </AuthForm>
           <Field>
             <FieldDescription className="px-6 text-center">
-              By clicking continue, you agree to our{" "}
-              <Link to="/sign-up">Terms of Service</Link> and{" "}
-              <Link to="/sign-up">Privacy Policy</Link>.
+              {m.boulder_field_maple()}{" "}
+              <Link to="/sign-up">{m.kite_purple_raven()}</Link>{" "}
+              {m.estuary_purple_wetland()}{" "}
+              <Link to="/sign-up">{m.knoll_quiet_velvet()}</Link>
+              {m.fjord_jasper_plume()}
             </FieldDescription>
           </Field>
         </div>

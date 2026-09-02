@@ -26,23 +26,21 @@ Every message key is **three random English words, lowercase, underscore-separat
 
 - Keys are **random**: generate them, do not derive them from the text. Semantic keys (`sign_in_title`) are forbidden — they encode placement/copy, which invites renaming when a button changes label or a component moves, and a rename orphans translation history, comments, and QA context attached to the key.
 - **Flat keys only — no dots, no nesting.** Nested catalogs force bracket access `m["nav.home"]()` and lose go-to-definition/auto-import. If you encounter legacy dot-keys, leave them as they are.
-- All three words must be distinct **across recently added keys** (avoid `dawn` twice in one batch).
+- The **full triplet must be unique across the catalog**. Within one small batch, vary the words so search stays unambiguous; reusing individual words across a large batch is fine.
 - **Never share a key across unrelated contexts — even when the text is identical today.** Two buttons that both say "OK" evolve independently tomorrow; sharing a key means changing one changes both. Each independently evolving message gets its own key.
 - Copy may change freely under a key without renaming it — that is the whole point.
 - **Never rename an existing key** to make it random or restyle it. Stability beats convention; only change IDs in a deliberate migration that updates every locale, call site, and translation tool together.
 
-Generate a batch (keep words distinct across the batch):
+Generate a batch:
 
 ```bash
 node -e '
-const words = ["amber","basil","cedar","ember","fjord","gale","harbor","iris","jade","kite","lunar","maple","nettle","opal","pine","quartz","river","sage","tide","umbra","velvet","willow","yarrow","zephyr","cobalt","crimson","eager","fable","gentle","hollow","ivory","jolly","kindle","mellow","north","orbit","plume","quiet","rustic","silent","timber","vivid","wander","yonder","zenith","clover","dune","fern","glade","heath","kelp","lark","moss","noble","otter","pearl","quill","penguin","purple","shoe","raven","spruce","tulip"];
-const keys = []; const used = new Set();
-while (keys.length < 6) {
-  const pick = [...words].sort(() => Math.random() - 0.5).slice(0,3);
-  if (pick.some(w => used.has(w))) continue;
-  pick.forEach(w => used.add(w)); keys.push(pick.join("_"));
+const words = ["amber","basil","cedar","ember","fjord","gale","harbor","iris","jade","kite","lunar","maple","nettle","opal","pine","quartz","river","sage","tide","umbra","velvet","willow","yarrow","zephyr","cobalt","crimson","eager","fable","gentle","hollow","ivory","jolly","kindle","mellow","north","orbit","plume","quiet","rustic","silent","timber","vivid","wander","yonder","zenith","clover","dune","fern","glade","heath","kelp","lark","moss","noble","otter","pearl","quill","penguin","purple","shoe","raven","spruce","tulip","aspen","birch","comet","drift","estuary","flint","grove","husk","indigo","juniper","kettle","lantern","meadow","nimbus","orchard","petal","quarry","reef","saffron","thicket","upland","vine","wharf","xenon","yucca","zinnia","boulder","canyon","delta","elm","frost","glacier","hill","inlet","jasper","knoll","ledge","marsh","nectar","oasis","prairie","ridge","summit","tundra","vale","wetland","beacon","coast","dell","east","field","gulf"];
+const keys = new Set();
+while (keys.size < Number(process.argv[1])) {
+  keys.add([...words].sort(() => Math.random() - 0.5).slice(0,3).join("_"));
 }
-console.log(keys.join("\n"));'
+console.log([...keys].join("\n"));' 6
 ```
 
 ## Finding a message by its copy
@@ -81,7 +79,8 @@ const planLabels = {
 4. If the dev server is not running, compile:
    `cd apps/web && pnpm build:paraglide`
 5. Strings with params: `{username}` in the JSON, `{ username: "…" }` at the call site. Plurals/selectors use message-format `match` syntax.
-6. For JSX sentences containing a link (e.g. "Don't have an account? **Sign up**"), split into adjacent messages (lead-in text + link label) rather than embedding markup in translations.
+6. For JSX sentences containing a link (e.g. "Don't have an account? **Sign up**"), split into adjacent messages (lead-in text + link label) rather than embedding markup in translations. Params (`{email}`) and plain placeholders work; the plugin does **not** support ICU `plural` — for count-dependent copy emit two adjacent messages ("…in {minutes} minute." / "…in {minutes} minutes.") and pick in code.
+7. Brand names (e.g. sr-only "Acme Inc.") stay hardcoded — brands are not translated.
 
 ## Gotchas
 

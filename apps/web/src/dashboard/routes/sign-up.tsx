@@ -16,6 +16,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 
 import { AuthShell } from "~/features/auth/components/auth-shell";
+import { m } from "@/paraglide/messages";
 
 export const Route = createFileRoute("/sign-up")({
   validateSearch: (search) =>
@@ -73,7 +74,7 @@ function RouteComponent() {
           onSubmit: {
             fields: {
               email: {
-                message: "Please complete the security verification",
+                message: m.fable_quartz_sage(),
               },
             },
           },
@@ -105,22 +106,22 @@ function RouteComponent() {
   });
   return (
     <AuthShell
-      description="Start your workspace with a new account."
+      description={m.lark_opal_tundra()}
       footer={
         <div className="text-center text-sm">
-          Already have an account?{" "}
+          {m.ivory_jolly_vivid()}{" "}
           <Link className="underline underline-offset-4" to="/sign-in">
-            Sign in
+            {m.canyon_juniper_wharf()}
           </Link>
         </div>
       }
-      title="Create account"
+      title={m.oasis_orchard_wharf()}
     >
       <AuthForm form={form}>
         <SignUpFields
           disabled={turnstile.isEnabled && !turnstile.token}
           form={form}
-          submitLabel="Sign up"
+          submitLabel={m.harbor_opal_prairie()}
         >
           <TurnstileField
             onError={turnstile.handleError}
