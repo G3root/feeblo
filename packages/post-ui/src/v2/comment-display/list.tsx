@@ -24,7 +24,14 @@ export function CommentsList() {
             ...(isMember ? [] : [eq(comment.visibility, "PUBLIC")])
           )
         )
-        .orderBy(({ comment }) => comment.pinnedAt, "desc")
+        // `nulls: "last"` matters: TanStack DB's desc default is NULLS FIRST
+        // (matching Postgres), so without it unpinned comments (pinnedAt =
+        // null) would sort above the pinned one. Mirrors the SQL
+        // `pinnedAt DESC NULLS LAST, createdAt DESC` in the repository.
+        .orderBy(({ comment }) => comment.pinnedAt, {
+          direction: "desc",
+          nulls: "last",
+        })
         .orderBy(({ comment }) => comment.createdAt, "desc"),
     [organizationId, postSlug, isMember]
   );
