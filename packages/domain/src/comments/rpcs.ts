@@ -10,6 +10,8 @@ import {
   CommentCreate,
   CommentDelete,
   CommentList,
+  CommentPin,
+  CommentUnpin,
   CommentUpdate,
 } from "./schema";
 
@@ -73,5 +75,19 @@ export class CommentRpcs extends RpcGroup.make(
     payload: CommentUpdate,
   })
     .middleware(AuthMiddleware)
-    .middleware(PublicRpcRateLimitMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+  Rpc.make("CommentPin", {
+    success: Schema.Struct({
+      message: Schema.String,
+    }),
+    error: CommentServiceErrors,
+    payload: CommentPin,
+  }).middleware(AuthMiddleware),
+  Rpc.make("CommentUnpin", {
+    success: Schema.Struct({
+      message: Schema.String,
+    }),
+    error: CommentServiceErrors,
+    payload: CommentUnpin,
+  }).middleware(AuthMiddleware)
 ) {}

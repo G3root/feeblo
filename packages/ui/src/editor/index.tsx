@@ -11,13 +11,16 @@
 import "prosekit/basic/style.css";
 import "./typeset.css";
 import { markdownToHtml } from "@feeblo/utils/markdown";
-import { createEditor } from "prosekit/core";
+import { createEditor, type Editor as ProseKitEditor } from "prosekit/core";
+import { definePlaceholder } from "prosekit/extensions/placeholder";
+import { defineReadonly } from "prosekit/extensions/readonly";
 import { ProseKit } from "prosekit/react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
+import { useIsomorphicLayoutEffect } from "../hooks/use-isomorphic-layout-effect";
 import { cn } from "../utils";
 import { useEditorContext } from "./editor-store";
-import { defineExtension } from "./extension";
+import { DEFAULT_PLACEHOLDER, defineExtension } from "./extension";
 import useContentChange from "./hooks/use-content-change";
 import { BlockHandle } from "./ui/block-handle";
 import { DropIndicator } from "./ui/drop-indicator";
@@ -28,6 +31,8 @@ import { TableHandle } from "./ui/table-handle/index";
 export interface EditorProps {
   className?: string;
   deferUploads?: boolean;
+  /** Receives the live ProseKit editor instance (null on unmount). */
+  editorRef?: (editor: ProseKitEditor | null) => void;
   editorScope?: string;
   minimal?: boolean;
   onChange?: (doc: string) => void;
@@ -45,13 +50,15 @@ export function Editor(props: EditorProps) {
     return markdown ? markdownToHtml(markdown) : undefined;
   }, []);
 
+  // The editor instance is created once from the mount-time props. The
+  // runtime-tunable props (placeholder, readOnly) are applied to the live
+  // instance below instead: rebuilding the editor when they change would
+  // discard the user's current draft.
   const editor = useMemo(() => {
     const extension = defineExtension({
       deferUploads: props.deferUploads,
       editorScope: props.editorScope,
       organizationId: props.organizationId,
-      placeholder: props.placeholder,
-      readonly: props.readOnly,
     });
     return createEditor({
       extension,
@@ -61,12 +68,33 @@ export function Editor(props: EditorProps) {
     props.deferUploads,
     props.editorScope,
     props.organizationId,
-    props.placeholder,
-    props.readOnly,
     defaultContent,
   ]);
 
+  // Apply placeholder and readOnly through the live ProseKit instance. Both
+  // are plain plugins, so `editor.use` reconfigures the state in place
+  // (preserving the document) — no new editor instance is created.
+  useIsomorphicLayoutEffect(() => {
+    const disposePlaceholder = editor.use(
+      definePlaceholder({
+        placeholder: props.placeholder ?? DEFAULT_PLACEHOLDER,
+      })
+    );
+    const disposeReadonly = props.readOnly
+      ? editor.use(defineReadonly())
+      : null;
+    return () => {
+      disposePlaceholder();
+      disposeReadonly?.();
+    };
+  }, [editor, props.placeholder, props.readOnly]);
+
   useContentChange(editor, props.onChange);
+
+  useEffect(() => {
+    props.editorRef?.(editor);
+    return () => props.editorRef?.(null);
+  }, [editor, props.editorRef]);
 
   return (
     <ProseKit editor={editor}>
