@@ -15,20 +15,26 @@ import { getBoardStatusIndicatorColor } from "@feeblo/web-shared/board/constants
 import { MoreVerticalIcon, Close } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
-import { useCommentComposer } from "./context";
+import {
+  useCommentComposer,
+  useCommentComposerIsDisabled,
+} from "./context";
+import { useCommentComposerState } from "./store";
 
 export function SubmitButton() {
   const { actions, meta, state } = useCommentComposer();
+  const isPrivate = useCommentComposerState((context) => context.isPrivate);
+  const isDisabled = useCommentComposerIsDisabled();
 
   const hasStatusOptions = state.statusOptions.length > 0;
 
   return (
     <Group>
       <Button
-        disabled={state.disabled}
+        disabled={isDisabled}
         size="sm"
         type={actions.onSubmit ? "button" : "submit"}
-        // variant={state.isPrivate ? "default" : "outline"}
+        // variant={isPrivate ? "default" : "outline"}
         {...(actions?.onSubmit
           ? {
               onClick: actions.onSubmit,
@@ -36,7 +42,7 @@ export function SubmitButton() {
           : {})}
       >
         {meta.submitLabel ??
-          (state.isPrivate
+          (isPrivate
             ? `Comment ${meta.privateLabel}`
             : `Comment ${meta.publicLabel}`)}
       </Button>
@@ -52,13 +58,16 @@ export function SubmitButton() {
 
 function StatusUpdateMenu() {
   const { actions, meta, state } = useCommentComposer();
+  const statusUpdateId = useCommentComposerState(
+    (context) => context.statusUpdateId
+  );
+  const isDisabled = useCommentComposerIsDisabled();
 
   const selectedStatus =
-    state.statusUpdateId === null
+    statusUpdateId === null
       ? null
-      : (state.statusOptions.find(
-          (option) => option.id === state.statusUpdateId
-        ) ?? null);
+      : (state.statusOptions.find((option) => option.id === statusUpdateId) ??
+        null);
 
   return (
     <Menu>
@@ -70,7 +79,7 @@ function StatusUpdateMenu() {
                 ? `Status update: ${selectedStatus.label}`
                 : "Comment options"
             }
-            disabled={state.disabled}
+            disabled={isDisabled}
             size="icon-sm"
           />
         }
@@ -90,7 +99,7 @@ function StatusUpdateMenu() {
       <MenuPopup align="end" className="w-56">
         <MenuRadioGroup
           // SAFETY: `null` maps to "nothing selected" for Base UI radio groups.
-          value={state.statusUpdateId ?? undefined}
+          value={statusUpdateId ?? undefined}
           onValueChange={(value) =>
             // SAFETY: values come from the `option.id` strings below.
             actions.onStatusUpdateIdChange(value as string | null)

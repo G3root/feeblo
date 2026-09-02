@@ -1,6 +1,8 @@
 import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
 import { createContext, use } from "react";
 
+import { useCommentComposerState } from "./store";
+
 /** One selectable post status in the "comment as status update" picker. */
 export type TPostStatusOption = {
   /** Org-scoped post_status id (foreign key stored on the comment). */
@@ -11,15 +13,16 @@ export type TPostStatusOption = {
   label: string;
 };
 
+/**
+ * Prop-derived state only. Mutable composer state (content, visibility,
+ * status update, reset counter, submit-in-flight) lives in the xstate store;
+ * select it with `useCommentComposerState` so components re-render only when
+ * the slices they use actually change.
+ */
 export type CommentComposerState = {
-  content: string;
   disabled: boolean;
-  isPrivate: boolean;
-  placeholder: string;
-  resetKey: number;
+  placeholder: string | undefined;
   showVisibilityToggle: boolean;
-  /** Post status (FK id) this comment moves the post to; null = plain comment. */
-  statusUpdateId: string | null;
   /** Options rendered in the "comment as status update" picker. */
   statusOptions: readonly TPostStatusOption[];
 };
@@ -58,4 +61,27 @@ export function useCommentComposer() {
   }
 
   return value;
+}
+
+/**
+ * The composer is inert while the host disables it or while a submit started
+ * by the composer itself is still in flight.
+ */
+export function useCommentComposerIsDisabled(): boolean {
+  const { state } = useCommentComposer();
+  const isSubmitting = useCommentComposerState(
+    (context) => context.isSubmitting
+  );
+
+  return state.disabled || isSubmitting;
+}
+
+export function useCommentComposerPlaceholder(): string {
+  const { state } = useCommentComposer();
+  const isPrivate = useCommentComposerState((context) => context.isPrivate);
+
+  return (
+    state.placeholder ??
+    (isPrivate ? "Add an internal note..." : "Add a comment...")
+  );
 }
