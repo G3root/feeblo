@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import type { InsertComment } from "@feeblo/db/schema/feedback";
-import { and, desc, eq, isNotNull, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, sql, type SQL } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
