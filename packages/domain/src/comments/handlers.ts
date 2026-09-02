@@ -235,7 +235,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             organizationId: args.organizationId,
             postId: args.postId,
           });
-          if (deleted) {
+          if (Option.isSome(deleted)) {
             yield* activityRepository.create({
               organizationId: args.organizationId,
               postId: args.postId,
@@ -249,7 +249,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
         })
       );
 
-      if (!deletedComment) {
+      if (Option.isNone(deletedComment)) {
         return yield* new FailedToDeleteCommentError({
           message: "Failed to delete comment",
         });
@@ -278,7 +278,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             userId: session.session.userId,
             ...(membership && { visibility: args.visibility }),
           });
-          if (updated) {
+          if (Option.isSome(updated)) {
             yield* activityRepository.create({
               organizationId: args.organizationId,
               postId: args.postId,
@@ -293,7 +293,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
         })
       );
 
-      if (!updatedComment) {
+      if (Option.isNone(updatedComment)) {
         return yield* new FailedToUpdateCommentError({
           message: "Failed to update comment",
         });
