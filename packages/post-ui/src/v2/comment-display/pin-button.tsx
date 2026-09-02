@@ -1,31 +1,17 @@
 import { MenuItem } from "@feeblo/ui/menu";
+import { PinOffIcon, Pin02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 import { useCommentDisplay } from "./context";
 
 export function PinButton() {
   const { actions, meta, state } = useCommentDisplay();
+  const isPinned = state.pinnedAt != null;
 
   return (
     <MenuItem onClick={actions.onTogglePin}>
-      <PinIcon />
-      {state.pinnedAt != null ? meta.unpinLabel : meta.pinLabel}
+      <HugeiconsIcon icon={isPinned ? PinOffIcon : Pin02Icon} />
+      {isPinned ? meta.unpinLabel : meta.pinLabel}
     </MenuItem>
-  );
-}
-
-function PinIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="size-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      viewBox="0 0 24 24"
-    >
-      <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" />
-      <path d="M12 15v6" />
-      <path d="M9 21h6" />
-    </svg>
   );
 }
