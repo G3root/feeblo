@@ -1,6 +1,6 @@
 import { createAuthClient } from "@feeblo/auth/client";
 import { hasWindow } from "@feeblo/utils/runtime-kind";
-import { z } from "zod";
+import * as Schema from "effect/Schema";
 
 import { getClientTimeZone } from "./client-hints";
 import { getRuntimePublicEnv } from "./runtime-public-env";
@@ -23,13 +23,17 @@ export const organizationLogoUploadEndpoint = `${baseUrl}api/organization/logo`;
 export const editorMediaUploadEndpoint = `${baseUrl}api/media/upload`;
 export const plansEndpoint = `${baseUrl}api/plans`;
 
-export const uploadedEditorMediaSchema = z.object({
-  assetId: z.string(),
-  bucket: z.string(),
-  key: z.string(),
-  kind: z.literal("image"),
-  url: z.url(),
+export const uploadedEditorMediaSchema = Schema.Struct({
+  assetId: Schema.String,
+  bucket: Schema.String,
+  key: Schema.String,
+  kind: Schema.Literal("image"),
+  url: Schema.String,
 });
+
+export type UploadedEditorMedia = Schema.Schema.Type<
+  typeof uploadedEditorMediaSchema
+>;
 
 export type EditorMediaUploadOptions = {
   readonly organizationId?: string;

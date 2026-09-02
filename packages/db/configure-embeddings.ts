@@ -1,3 +1,4 @@
+/* eslint-disable anti-slop/no-runtime-typeof, anti-slop/require-safety-comment-for-type-assertion, anti-slop/no-unsafe-dictionary-type -- CLI boundary validation for DB rows */
 import { parseArgs } from "node:util";
 
 import { PGlite } from "@electric-sql/pglite";
@@ -35,7 +36,13 @@ const makeClient = (databaseUrl: string): SqlClient => {
 };
 
 const parseDimensions = (value: string | undefined): number => {
-  const dimensions = Number(value ?? DEFAULT_DIMENSIONS);
+  const raw = (value ?? String(DEFAULT_DIMENSIONS)).trim();
+  if (!/^\d+$/.test(raw)) {
+    throw new TypeError(
+      `Embedding dimensions must be an integer between 1 and ${MAX_VECTOR_DIMENSIONS}.`
+    );
+  }
+  const dimensions = Number(raw);
   if (
     !Number.isSafeInteger(dimensions) ||
     dimensions < 1 ||
@@ -53,7 +60,16 @@ const readCount = (rows: readonly unknown[]): number => {
   if (!(isObject(row) && "count" in row)) {
     throw new TypeError("Database returned an invalid count.");
   }
-  const count = Number(row.count);
+  // SAFETY: isObject + "count" in row establishes row is a record with a count property
+  const rawCount = (row as Record<string, unknown>).count;
+  if (typeof rawCount !== "string" && typeof rawCount !== "number") {
+    throw new TypeError("Database returned an invalid count.");
+  }
+  const trimmed = typeof rawCount === "string" ? rawCount.trim() : rawCount;
+  if (typeof trimmed === "string" && !/^\d+$/.test(trimmed)) {
+    throw new TypeError("Database returned an invalid count.");
+  }
+  const count = Number(trimmed);
   if (!Number.isSafeInteger(count) || count < 0) {
     throw new TypeError("Database returned an invalid count.");
   }

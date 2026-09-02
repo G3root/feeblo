@@ -42,6 +42,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, queryOnce, useLiveQuery } from "@tanstack/react-db";
 import { Link, useNavigate } from "@tanstack/react-router";
+import * as Schema from "effect/Schema";
 import {
   createContext,
   type ReactNode,
@@ -541,7 +542,9 @@ async function uploadChangelogCoverImage(
     throw new Error(`Cover image upload failed with status ${response.status}`);
   }
 
-  return uploadedEditorMediaSchema.parse(await response.json());
+  return Schema.decodeUnknownSync(uploadedEditorMediaSchema)(
+    await response.json()
+  );
 }
 
 export function ChangelogEditorSubmitAction() {

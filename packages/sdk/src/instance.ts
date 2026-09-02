@@ -1,3 +1,4 @@
+/* eslint-disable anti-slop/no-unsafe-dictionary-type, anti-slop/no-unknown-parameters, anti-slop/no-runtime-typeof, anti-slop/require-safety-comment-for-type-assertion, anti-slop/no-conditional-empty-object-spread -- SDK boundary uses plain JS validation (no Effect dependency) */
 import { normalizeWidgetConfig, widgetConfigKey } from "./config";
 import { banner } from "./debug";
 import { Embed } from "./embed";
@@ -14,32 +15,33 @@ import type {
 } from "./types";
 import { isBrowser } from "./utils";
 
-/** Boxed-prototype classification for untrusted runtime values (no `typeof`). */
-const boxedKind = <T>(value: T): string | null => {
-  if (value === null || value === undefined) return null;
-  // SAFETY: Object.getPrototypeOf always returns an object or null; every
-  // prototype carries a constructor whose name identifies the built-in.
-  const prototype = Object.getPrototypeOf(Object(value)) as {
-    constructor?: { name?: string };
-  } | null;
-  return prototype?.constructor?.name ?? null;
-};
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
 
-const isStringValue = <T>(value: T): value is T & string =>
-  boxedKind(value) === "String";
+function isStringValue(value: unknown): value is string {
+  return typeof value === "string";
+}
 
-const isObjectValue = <T>(value: T): boolean => {
-  const kind = boxedKind(value);
-  return (
-    kind !== null &&
-    kind !== "String" &&
-    kind !== "Number" &&
-    kind !== "Boolean" &&
-    kind !== "Symbol" &&
-    kind !== "BigInt" &&
-    kind !== "Function"
-  );
-};
+function parseExternalMessageData(value: unknown): ExternalMessageData | null {
+  if (!isRecord(value)) return null;
+  const target = value.target;
+  const data = value.data;
+  if (!isStringValue(target) || target !== "FeebloWidget") return null;
+  if (!isRecord(data)) return null;
+  const action = data.action;
+  if (!isStringValue(action) || action.length === 0) return null;
+  const setBoard = data.setBoard;
+  if (setBoard !== undefined && !isStringValue(setBoard)) return null;
+  const parsedData: ExternalMessageData["data"] = { action };
+  if (isStringValue(setBoard) && setBoard.length > 0) {
+    parsedData.setBoard = setBoard;
+  }
+  return {
+    target,
+    data: parsedData,
+  };
+}
 
 let currentEmbed: Embed | null = null;
 let currentOrgId: string | null = null;
@@ -52,17 +54,8 @@ function setupGlobalListeners(): void {
   }
 
   const handleExternalMessage = (e: MessageEvent<unknown>) => {
-    // SAFETY: the message contract is established by the guards below (object
-    // value, FeebloWidget target, non-empty data) before any field is read.
-    const msg = e.data as ExternalMessageData;
-    if (
-      !msg ||
-      !isObjectValue(msg) ||
-      msg.target !== "FeebloWidget" ||
-      !msg.data
-    ) {
-      return;
-    }
+    const msg = parseExternalMessageData(e.data);
+    if (msg === null) return;
     if (msg.data.action === "openFeedbackWidget" && currentEmbed) {
       if (msg.data.setBoard) {
         currentEmbed.setBoard(msg.data.setBoard);
