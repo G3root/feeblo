@@ -9,6 +9,12 @@ import {
 } from "./context";
 import { CommentComposerStoreProvider, useCommentComposerStore } from "./store";
 
+// Stable identity for the default status options so the provider's
+// contextValue memo isn't invalidated on renders where callers omit
+// statusOptions (a fresh `[]` literal would break the memo's reference
+// equality check every render).
+const EMPTY_STATUS_OPTIONS: readonly TPostStatusOption[] = [];
+
 export type CommentComposerSubmitValue = {
   content: string;
   isPrivate: boolean;
@@ -80,7 +86,7 @@ function CommentComposerController(props: CommentComposerProviderProps) {
     showVisibilityToggle = true,
     statusUpdateLabel = "Comment as status update",
     statusUpdateId,
-    statusOptions = [],
+    statusOptions = EMPTY_STATUS_OPTIONS,
     submitLabel,
   } = props;
 

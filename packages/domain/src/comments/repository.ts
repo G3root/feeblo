@@ -270,7 +270,10 @@ const makeCommentRepository = Effect.gen(function* () {
               .where(
                 and(
                   eq(schema.commentTable.organizationId, args.organizationId),
-                  eq(schema.commentTable.postId, args.postId)
+                  eq(schema.commentTable.postId, args.postId),
+                  // Only an actually pinned row transitions; unpinned rows
+                  // are left untouched so concurrent pins don't churn them.
+                  isNotNull(schema.commentTable.pinnedAt)
                 )
               );
 
