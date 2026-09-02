@@ -3,41 +3,18 @@ import { randomUUID } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 
 import { createAuthenticatedWorkspace } from "../helpers/auth";
+import { createPost } from "../helpers/posts";
 import {
   verificationCodeFromEmail,
   waitForVerificationEmail,
 } from "../helpers/test-mailbox";
 import { createTestUser } from "../helpers/test-users";
+import { publicBoardUrl } from "../helpers/urls";
 
 const signInWithEmailButtonName = /^Sign in with email/;
 const signUpWithEmailButtonName = /^Sign up with email/;
 const authDialogName = "Sign in / Sign up";
 const authButtonName = "Sign in / Sign up";
-
-async function createPost(page: Page, title: string, content: string) {
-  await page.getByRole("button", { name: "New post" }).click();
-
-  const dialog = page.getByRole("dialog", { name: "Create Post" });
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel("Post Title").fill(title);
-
-  // The rich-text editor currently has no accessible name, so scope this
-  // implementation-level locator to the create-post dialog only.
-  const editor = dialog.locator(".ProseMirror");
-  await expect(editor).toBeVisible();
-  await editor.fill(content);
-
-  await dialog.getByRole("combobox").first().click();
-  await page.getByRole("option", { name: "Features 💡" }).click();
-  await dialog.getByRole("button", { name: "Create Post" }).click();
-  await expect(dialog).toBeHidden();
-}
-
-function publicBoardUrl(workspaceName: string) {
-  const subdomain = workspaceName.toLowerCase().replaceAll(" ", "-");
-  const baseURL = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3101");
-  return `${baseURL.protocol}//${subdomain}.${baseURL.hostname}${baseURL.port ? `:${baseURL.port}` : ""}`;
-}
 
 async function signInThroughPublicBoard(
   page: Page,

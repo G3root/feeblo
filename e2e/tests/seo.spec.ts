@@ -2,62 +2,15 @@ import { randomUUID } from "node:crypto";
 
 import { expect, type Page, test } from "@playwright/test";
 
-import { createAuthenticatedWorkspace } from "../helpers/auth";
+import { createWorkspace } from "../helpers/auth";
+import {
+  createChangelogDraft,
+  openChangelogEntry,
+  publishOpenChangelogEntry,
+} from "../helpers/changelog";
+import { createPost } from "../helpers/posts";
 import { createTestUser } from "../helpers/test-users";
-
-function publicBoardUrl(workspaceName: string) {
-  const subdomain = workspaceName.toLowerCase().replaceAll(" ", "-");
-  const baseURL = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3101");
-  return `${baseURL.protocol}//${subdomain}.${baseURL.hostname}${baseURL.port ? `:${baseURL.port}` : ""}`;
-}
-
-async function fillEditor(page: Page, content: string) {
-  const editor = page.locator(".ProseMirror").first();
-  await expect(editor).toBeVisible();
-  await editor.click();
-  await page.keyboard.insertText(content);
-}
-
-async function createPost(page: Page, title: string) {
-  await page.getByRole("button", { name: "New post" }).click();
-
-  const dialog = page.getByRole("dialog", { name: "Create Post" });
-  await expect(dialog).toBeVisible();
-
-  await dialog.getByLabel("Post Title").fill(title);
-  await fillEditor(page, "Published from an SEO e2e test.");
-
-  await dialog.getByRole("combobox").first().click();
-  await page.getByRole("option", { name: "Features 💡" }).click();
-
-  await dialog.getByRole("button", { name: "Create Post" }).click();
-  await expect(dialog).toBeHidden();
-
-  await expect(
-    page.getByRole("link", { name: new RegExp(title) })
-  ).toBeVisible();
-}
-
-async function publishChangelogEntry(page: Page, title: string, slug: string) {
-  await page.getByRole("link", { name: "Changelog", exact: true }).click();
-  await page.getByRole("button", { name: "New Entry" }).click();
-
-  await page.getByLabel("Post Title").fill(title);
-  await fillEditor(page, "Changelog entry from an SEO e2e test.");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByText("Changes saved")).toBeVisible();
-
-  await page.getByRole("link", { name: "Changelog", exact: true }).click();
-  await page.getByRole("link", { name: title }).click();
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
-
-  const dialog = page.getByRole("alertdialog", { name: "Save changelog" });
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel("Slug").fill(slug);
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(dialog).toBeHidden();
-  await expect(page.getByText("Changelog published")).toBeVisible();
-}
+import { publicBoardUrl } from "../helpers/urls";
 
 /**
  * The structured-data scripts rendered into the initial HTML by the server.
@@ -77,15 +30,20 @@ test.describe("public board SEO", () => {
     page,
   }) => {
     const user = createTestUser();
-    const workspace = await createAuthenticatedWorkspace(page, user);
-    await expect(page).toHaveURL(workspace.organizationUrl);
+    await createWorkspace(page, user);
 
     const title = `SEO post ${randomUUID().slice(0, 8)}`;
-    await createPost(page, title);
+    await createPost(page, title, "Published from an SEO e2e test.");
 
     const changelogTitle = `SEO changelog ${randomUUID().slice(0, 8)}`;
     const changelogSlug = `seo-${randomUUID().slice(0, 8)}`;
-    await publishChangelogEntry(page, changelogTitle, changelogSlug);
+    await createChangelogDraft(
+      page,
+      changelogTitle,
+      "Changelog entry from an SEO e2e test."
+    );
+    await openChangelogEntry(page, changelogTitle);
+    await publishOpenChangelogEntry(page, changelogSlug);
 
     const boardUrl = publicBoardUrl(user.workspaceName);
 
@@ -185,8 +143,7 @@ test.describe("public board SEO", () => {
     page,
   }) => {
     const user = createTestUser();
-    const workspace = await createAuthenticatedWorkspace(page, user);
-    await expect(page).toHaveURL(workspace.organizationUrl);
+    const workspace = await createWorkspace(page, user);
 
     await page.goto(`${workspace.organizationUrl}/settings/customize`);
     const indexingCard = page

@@ -6,12 +6,18 @@ import {
   createAuthenticatedWorkspace,
   signUpProgrammatically,
 } from "../helpers/auth";
+import {
+  createChangelogDraft,
+  openChangelogPage,
+  publishOpenChangelogEntry,
+} from "../helpers/changelog";
 import { setPlan } from "../helpers/set-plan";
 import {
   invitationIdFromEmail,
   waitForTestEmail,
 } from "../helpers/test-mailbox";
 import { createTestUser, type TestUser } from "../helpers/test-users";
+import { publicBoardUrl } from "../helpers/urls";
 import {
   copyWorkspaceJwtSecret,
   signInRestrictedSsoVisitor,
@@ -23,12 +29,6 @@ const appOrigin = new URL(baseURL).origin;
 const authDialogName = "Sign in / Sign up";
 const signInWithEmailButtonName = /^Sign in with email/;
 
-function publicBoardUrl(workspaceName: string) {
-  const subdomain = workspaceName.toLowerCase().replaceAll(" ", "-");
-  const url = new URL(baseURL);
-  return `${url.protocol}//${subdomain}.${url.hostname}${url.port ? `:${url.port}` : ""}`;
-}
-
 function organizationIdFromUrl(organizationUrl: string): string {
   const organizationId = new URL(organizationUrl).pathname
     .split("/")
@@ -37,35 +37,6 @@ function organizationIdFromUrl(organizationUrl: string): string {
     throw new Error("Workspace URL did not contain an organization id");
   }
   return organizationId;
-}
-
-async function openChangelogPage(page: Page, workspaceName: string) {
-  await page.goto(`${publicBoardUrl(workspaceName)}/changelog`);
-  await expect(
-    page.getByRole("link", { name: "Subscribe to the changelog RSS feed" })
-  ).toBeVisible();
-}
-
-async function publishChangelogEntry(
-  page: Page,
-  entry: { slug: string; title: string }
-) {
-  await page.getByRole("link", { name: "Changelog", exact: true }).click();
-  await page.getByRole("button", { name: "New Entry" }).click();
-  await page.getByLabel("Post Title").fill(entry.title);
-
-  const editor = page.locator(".ProseMirror");
-  await expect(editor).toBeVisible();
-  await editor.click();
-  await page.keyboard.insertText("Body for the notifications e2e test.");
-
-  await page.getByRole("button", { name: "Publish", exact: true }).click();
-  const dialog = page.getByRole("alertdialog", { name: "Save changelog" });
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel("Slug").fill(entry.slug);
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(dialog).toBeHidden();
-  await expect(page.getByText("Changelog published")).toBeVisible();
 }
 
 /**
@@ -207,7 +178,12 @@ test.describe("changelog notifications", () => {
       ).toBeVisible();
 
       // Publishing happens in the owner's separate session.
-      await publishChangelogEntry(ownerPage, entry);
+      await createChangelogDraft(
+        ownerPage,
+        entry.title,
+        "Body for the notifications e2e test."
+      );
+      await publishOpenChangelogEntry(ownerPage, entry.slug);
 
       // A fresh load picks up the notification created at publish time.
       await openChangelogPage(page, owner.workspaceName);
@@ -351,7 +327,12 @@ test.describe("changelog notifications", () => {
         title: `Member publish ${randomUUID().slice(0, 8)}`,
       };
       await memberPage.goto(workspace.organizationUrl);
-      await publishChangelogEntry(memberPage, entry);
+      await createChangelogDraft(
+        memberPage,
+        entry.title,
+        "Body for the notifications e2e test."
+      );
+      await publishOpenChangelogEntry(memberPage, entry.slug);
 
       // The owner's dashboard bell picks the notification up.
       await page.goto(workspace.organizationUrl);
@@ -427,7 +408,12 @@ test.describe("changelog notifications", () => {
       // Publishing happens from the dashboard; the owner page sits on the
       // security settings after the JWT secret setup, so go back first.
       await ownerPage.goto(workspace.organizationUrl);
-      await publishChangelogEntry(ownerPage, entry);
+      await createChangelogDraft(
+        ownerPage,
+        entry.title,
+        "Body for the notifications e2e test."
+      );
+      await publishOpenChangelogEntry(ownerPage, entry.slug);
 
       await visitorPage.reload();
       await expect(notificationsBell(visitorPage)).toContainText("1");

@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
-import { createAuthenticatedWorkspace } from "../helpers/auth";
-import { createTestUser } from "../helpers/test-users";
+import { createWorkspace } from "../helpers/auth";
+import { createPost, fillEditor, openPost } from "../helpers/posts";
 
 /**
  * E2E coverage for the two comment features added on the comment-features
@@ -29,67 +29,6 @@ import { createTestUser } from "../helpers/test-users";
  * are granted (see `ROLE_PERMISSIONS`). All flows run against the dashboard
  * post page, which renders the v2 comment display/composer.
  */
-
-async function fillEditor(
-  page: Page,
-  content: string,
-  options: { index?: number } = {}
-) {
-  const editor = page.locator(".ProseMirror").nth(options.index ?? 0);
-  await expect(editor).toBeVisible();
-
-  // Clicking can race a re-render that relocates the editor (comment cards
-  // land right after a submit), so the click may land on the surrounding tab
-  // panel instead of the contenteditable. Poll until the editor actually has
-  // focus instead of waiting fixed timeouts between attempts.
-  await expect(async () => {
-    await editor.click();
-    await expect(editor).toBeFocused();
-  }).toPass();
-
-  // Keystrokes typed into a just-created editor can be dropped; keep
-  // inserting until the content actually landed so the submit is never fired
-  // against an empty form.
-  await expect(async () => {
-    await page.keyboard.insertText(content);
-    expect((await editor.innerText()).trim().length).toBeGreaterThan(0);
-  }).toPass();
-}
-
-async function createWorkspace(page: Page) {
-  const user = createTestUser();
-  const workspace = await createAuthenticatedWorkspace(page, user);
-
-  await expect(page).toHaveURL(workspace.organizationUrl);
-  await expect(page.getByRole("button", { name: user.email })).toBeVisible();
-
-  return workspace;
-}
-
-async function createPost(page: Page, title: string, content: string) {
-  await page.getByRole("button", { name: "New post" }).click();
-
-  const dialog = page.getByRole("dialog", { name: "Create Post" });
-  await expect(dialog).toBeVisible();
-
-  await dialog.getByLabel("Post Title").fill(title);
-  await fillEditor(page, content);
-
-  await dialog.getByRole("combobox").first().click();
-  await page.getByRole("option", { name: "Features 💡" }).click();
-
-  await dialog.getByRole("button", { name: "Create Post" }).click();
-  await expect(dialog).toBeHidden();
-
-  await expect(
-    page.getByRole("link", { name: new RegExp(title) })
-  ).toBeVisible();
-}
-
-async function openPost(page: Page, title: string) {
-  await page.getByRole("link", { name: new RegExp(title) }).click();
-  await expect(page.getByLabel("Post Title")).toHaveValue(title);
-}
 
 /**
  * The post page mounts two rich-text editors: the post content editor

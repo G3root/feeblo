@@ -5,6 +5,7 @@ import { expect, test } from "@playwright/test";
 import { createAuthenticatedWorkspace } from "../helpers/auth";
 import { setPlan } from "../helpers/set-plan";
 import { createTestUser } from "../helpers/test-users";
+import { publicBoardUrl } from "../helpers/urls";
 import {
   copyWorkspaceJwtSecret,
   sdkBundlePath,
@@ -15,12 +16,6 @@ const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3101";
 const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
 const organizationIdPattern = /^org_/;
 const ssoTokenPattern = /ssoToken/;
-
-function publicBoardUrl(workspaceName: string) {
-  const subdomain = workspaceName.toLowerCase().replaceAll(" ", "-");
-  const url = new URL(baseURL);
-  return `${url.protocol}//${subdomain}.${url.hostname}${url.port ? `:${url.port}` : ""}`;
-}
 
 test(
   "identified users can submit widget feedback and sign in with SSO",
