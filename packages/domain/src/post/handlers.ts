@@ -758,6 +758,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           userId: session.session.userId,
         });
       }).pipe(
+        Effect.tap(
+          Effect.annotateCurrentSpan({
+            "rpc.organization_id": args.organizationId,
+            ...(args.boardId != null && {
+              "rpc.board_id": args.boardId,
+            }),
+          })
+        ),
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
         withRemapDbErrors("Post", "select")
       );
@@ -782,6 +790,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         // on the session user's own rows so "did I create this" still works.
         return posts.map((post) => redactCreatorIdentity(post, userId));
       }).pipe(
+        Effect.tap(
+          Effect.annotateCurrentSpan({
+            "rpc.organization_id": args.organizationId,
+            ...(args.boardId != null && {
+              "rpc.board_id": args.boardId,
+            }),
+          })
+        ),
         RateLimit.withPublicRpcRateLimit({
           name: "PostListPublic",
           level: "read",

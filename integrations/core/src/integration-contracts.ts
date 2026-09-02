@@ -100,6 +100,9 @@ export const IntegrationEventOrigin = Schema.Struct({
   provider: Schema.optionalKey(IntegrationProviderKey),
   connectionId: Schema.optionalKey(IntegrationConnectionId.schema),
   routeId: Schema.optionalKey(IntegrationRouteId.schema),
+  // W3C traceparent captured from the recording request's span so async
+  // delivery workers can link their spans back to the originating trace.
+  traceparent: Schema.optionalKey(Schema.NonEmptyString),
 });
 export interface IntegrationEventOrigin extends Schema.Schema.Type<
   typeof IntegrationEventOrigin

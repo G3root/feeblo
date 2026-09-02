@@ -25,15 +25,23 @@ export const ChangelogPostRpcHandlersEffect = Effect.gen(function* () {
 
   return {
     ChangelogPostList: (args: TChangelogPostList) =>
-      repository
-        .findMany(args)
-        .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("ChangelogPost", "select")
+      repository.findMany(args).pipe(
+        Effect.tap(
+          Effect.annotateCurrentSpan({
+            "rpc.organization_id": args.organizationId,
+          })
         ),
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("ChangelogPost", "select")
+      ),
 
     ChangelogPostListPublic: (args: TChangelogPostList) =>
       repository.findManyPublished(args).pipe(
+        Effect.tap(
+          Effect.annotateCurrentSpan({
+            "rpc.organization_id": args.organizationId,
+          })
+        ),
         RateLimit.withPublicRpcRateLimit({
           name: "ChangelogPostListPublic",
           level: "read",
