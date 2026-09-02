@@ -16,7 +16,7 @@ export function CommentDisplayHeader() {
       </span>
       {state.pinnedAt != null && (
         <Badge
-          className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-800"
+          className="border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
           variant="default"
         >
           <svg

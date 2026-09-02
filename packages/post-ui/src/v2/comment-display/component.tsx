@@ -4,11 +4,10 @@ import { useState } from "react";
 import { CommentDisplayActions } from "./actions";
 import { CommentDisplayAvatar } from "./avatar";
 import { CommentDisplayBody } from "./body";
+import { useCommentDisplay } from "./context";
 import { CommentDisplayDropdown } from "./dropdown";
 import { CommentDisplayHeader } from "./header";
 import { CommentDisplayProvider } from "./provider";
-
-import { useCommentDisplay } from "./context";
 
 type CommentDisplayRootProps = Omit<
   React.ComponentProps<typeof CommentDisplayProvider>,
