@@ -148,9 +148,12 @@ export const useCommentForm = ({
 
       await tx.isPersisted.promise;
 
-      // Status updates are one-shot: never re-apply the last chosen status to
-      // a following comment.
-      formApi.setFieldValue("statusUpdateId", null);
+      // Reset the whole form (not just the editor) so the next comment starts
+      // from a clean slate: a stale `content` value here would otherwise be
+      // re-submitted with the following comment once the editor re-mounts
+      // without emitting a change. Resetting also clears the chosen status
+      // update, which is one-shot and must never be re-applied.
+      formApi.reset();
       setEditorKey((val) => val + 1);
     },
   });
@@ -161,44 +164,53 @@ export const CommentComposerField = withForm({
   ...commentCreateFormOpts,
   // SAFETY: Empty-state placeholder for the generic container until real data is set.
   props: {} as CommentComposerProviderProps & { showStatusUpdate?: boolean },
-  render: ({ form, ...rest }) => {
+  render: ({ form, disabled, ...rest }) => {
+    // Keep the composer inert while the comment persists server-side: the
+    // editor is only cleared after the CommentCreate RPC settles, so text
+    // typed in that window would otherwise be wiped by the reset — and could
+    // race the optimistic insert itself.
     return (
-      <form.AppField name="content">
-        {(field) => (
-          <form.AppField name="visibility">
-            {(visibility) => (
-              <form.AppField name="statusUpdateId">
-                {(statusUpdate) => (
-                  <CommentComposerStatusOptions
-                    enabled={rest.showStatusUpdate ?? false}
-                  >
-                    {(statusOptions) => (
-                      <CommentComposer.Provider
-                        isPrivate={visibility.state.value === "INTERNAL"}
-                        onContentChange={field.handleChange}
-                        onStatusUpdateIdChange={statusUpdate.handleChange}
-                        onVisibilityChange={(isPrivate) =>
-                          visibility.handleChange(
-                            isPrivate ? "INTERNAL" : "PUBLIC"
-                          )
-                        }
-                        statusOptions={statusOptions}
-                        statusUpdateId={statusUpdate.state.value}
-                        {...rest}
+      <form.Subscribe selector={(state) => state.isSubmitting}>
+        {(isSubmitting) => (
+          <form.AppField name="content">
+            {(field) => (
+              <form.AppField name="visibility">
+                {(visibility) => (
+                  <form.AppField name="statusUpdateId">
+                    {(statusUpdate) => (
+                      <CommentComposerStatusOptions
+                        enabled={rest.showStatusUpdate ?? false}
                       >
-                        <div className="border-border rounded-md border p-3">
-                          <CommentComposer.Editor />
-                          <CommentComposer.Submit />
-                        </div>
-                      </CommentComposer.Provider>
+                        {(statusOptions) => (
+                          <CommentComposer.Provider
+                            disabled={disabled || isSubmitting}
+                            isPrivate={visibility.state.value === "INTERNAL"}
+                            onContentChange={field.handleChange}
+                            onStatusUpdateIdChange={statusUpdate.handleChange}
+                            onVisibilityChange={(isPrivate) =>
+                              visibility.handleChange(
+                                isPrivate ? "INTERNAL" : "PUBLIC"
+                              )
+                            }
+                            statusOptions={statusOptions}
+                            statusUpdateId={statusUpdate.state.value}
+                            {...rest}
+                          >
+                            <div className="border-border rounded-md border p-3">
+                              <CommentComposer.Editor />
+                              <CommentComposer.Submit />
+                            </div>
+                          </CommentComposer.Provider>
+                        )}
+                      </CommentComposerStatusOptions>
                     )}
-                  </CommentComposerStatusOptions>
+                  </form.AppField>
                 )}
               </form.AppField>
             )}
           </form.AppField>
         )}
-      </form.AppField>
+      </form.Subscribe>
     );
   },
 });

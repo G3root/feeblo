@@ -57,6 +57,11 @@ function CommentComposerComponent({
     string | null
   >(null);
   const [resetKey, setResetKey] = useState(0);
+  // While a comment persists, the editor is disabled: the reset that clears
+  // it only runs once the submit settles, so typing in that window would be
+  // wiped by the clear (and, on the dashboard form path, race the
+  // comment's optimistic insert).
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isContentControlled = externalContent !== undefined;
   const isVisibilityControlled = externalIsPrivate !== undefined;
@@ -90,20 +95,25 @@ function CommentComposerComponent({
   };
 
   const handleSubmit = async () => {
-    if (!onSubmit) {
+    if (!onSubmit || isSubmitting) {
       return;
     }
-    await onSubmit({
-      content,
-      isPrivate,
-      statusUpdateId: internalStatusUpdateId,
-    });
-    setResetKey((k) => k + 1);
-    // Clear both the local state and the host callback so a chosen status is
-    // never re-applied to the next comment.
-    handleStatusUpdateIdChange(null);
-    if (!isContentControlled) {
-      setInternalContent("");
+    setIsSubmitting(true);
+    try {
+      await onSubmit({
+        content,
+        isPrivate,
+        statusUpdateId: internalStatusUpdateId,
+      });
+      setResetKey((k) => k + 1);
+      // Clear both the local state and the host callback so a chosen status
+      // is never re-applied to the next comment.
+      handleStatusUpdateIdChange(null);
+      if (!isContentControlled) {
+        setInternalContent("");
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -111,7 +121,7 @@ function CommentComposerComponent({
     <CommentComposerProvider
       cancelLabel={cancelLabel}
       content={content}
-      disabled={disabled}
+      disabled={disabled || isSubmitting}
       isPrivate={isPrivate}
       onCancel={onCancel}
       onContentChange={handleContentChange}

@@ -98,7 +98,14 @@ function StatusUpdateMenu() {
         >
           <MenuGroupLabel>{meta.statusUpdateLabel}</MenuGroupLabel>
           {state.statusOptions.map((option) => (
-            <MenuRadioItem key={option.id} value={option.id}>
+            <MenuRadioItem
+              key={option.id}
+              // Base UI's MenuRadioItem defaults to `closeOnClick: false`,
+              // which would leave the menu's modal inert overlay in place and
+              // block the “Comment Public” submit button next to it.
+              closeOnClick
+              value={option.id}
+            >
               <span className="flex items-center gap-2">
                 <span
                   aria-hidden="true"

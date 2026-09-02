@@ -11,9 +11,9 @@
 import "prosekit/basic/style.css";
 import "./typeset.css";
 import { markdownToHtml } from "@feeblo/utils/markdown";
-import { createEditor } from "prosekit/core";
+import { createEditor, type Editor as ProseKitEditor } from "prosekit/core";
 import { ProseKit } from "prosekit/react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import { cn } from "../utils";
 import { useEditorContext } from "./editor-store";
@@ -28,6 +28,8 @@ import { TableHandle } from "./ui/table-handle/index";
 export interface EditorProps {
   className?: string;
   deferUploads?: boolean;
+  /** Receives the live ProseKit editor instance (null on unmount). */
+  editorRef?: (editor: ProseKitEditor | null) => void;
   editorScope?: string;
   minimal?: boolean;
   onChange?: (doc: string) => void;
@@ -67,6 +69,11 @@ export function Editor(props: EditorProps) {
   ]);
 
   useContentChange(editor, props.onChange);
+
+  useEffect(() => {
+    props.editorRef?.(editor);
+    return () => props.editorRef?.(null);
+  }, [editor, props.editorRef]);
 
   return (
     <ProseKit editor={editor}>
