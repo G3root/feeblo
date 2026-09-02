@@ -597,6 +597,85 @@ describe("CommentRpcHandlers", () => {
           })
       );
 
+      it.effect("rejects status updates from non-members", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const commentId = yield* CommentId.generate;
+          const completedStatusId = yield* PostStatusId.generate;
+          const db = yield* currentDb;
+          yield* db.insert(schema.postStatusTable).values({
+            id: completedStatusId,
+            type: "COMPLETED",
+            orderIndex: 1,
+            organizationId: fixture.organizationId,
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .CommentCreatePublic({
+                ...commentCreateInput(fixture, commentId, "Shipped it"),
+                statusUpdateId: completedStatusId,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+
+          const [post] = yield* db
+            .select({ statusId: schema.postTable.statusId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, fixture.postId));
+          // The post status is untouched by the rejected request.
+          expect(post?.statusId).toBe(fixture.statusId);
+        })
+      );
+
+      it.effect("rejects status updates from contributors", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const commentId = yield* CommentId.generate;
+          const completedStatusId = yield* PostStatusId.generate;
+          const db = yield* currentDb;
+          yield* db.insert(schema.postStatusTable).values({
+            id: completedStatusId,
+            type: "COMPLETED",
+            orderIndex: 1,
+            organizationId: fixture.organizationId,
+          });
+
+          // Contributors can move posts (posts.move) but never change status.
+          const error = yield* Effect.flip(
+            handlers
+              .CommentCreatePublic({
+                ...commentCreateInput(fixture, commentId, "Shipped it"),
+                statusUpdateId: completedStatusId,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "contributor")
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+
+          const [post] = yield* db
+            .select({ statusId: schema.postTable.statusId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, fixture.postId));
+          // The post status is untouched by the rejected request.
+          expect(post?.statusId).toBe(fixture.statusId);
+        })
+      );
+
       it.effect("keeps the session user's identity on the public list", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
@@ -1506,6 +1585,81 @@ describe("CommentRpcHandlers", () => {
             .from(schema.commentTable)
             .where(eq(schema.commentTable.id, replyId));
           expect(comment?.statusUpdateId).toBeNull();
+        })
+      );
+
+      it.effect(
+        "applies a status update from a manager via the public endpoint",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* CommentRpcHandlersEffect;
+            const fixture = yield* makeFixture("PUBLIC");
+            const commentId = yield* CommentId.generate;
+            const completedStatusId = yield* makeStatus(
+              fixture,
+              "COMPLETED",
+              1
+            );
+
+            yield* handlers
+              .CommentCreatePublic({
+                ...commentCreateInput(fixture, commentId, "Shipped it"),
+                statusUpdateId: completedStatusId,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "manager")
+                )
+              );
+
+            const db = yield* currentDb;
+            const [post] = yield* db
+              .select({ statusId: schema.postTable.statusId })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, fixture.postId));
+            expect(post?.statusId).toBe(completedStatusId);
+
+            const [comment] = yield* db
+              .select({ statusUpdateId: schema.commentTable.statusUpdateId })
+              .from(schema.commentTable)
+              .where(eq(schema.commentTable.id, commentId));
+            expect(comment?.statusUpdateId).toBe(completedStatusId);
+          })
+      );
+
+      it.effect("rejects status updates from contributors", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const commentId = yield* CommentId.generate;
+          const completedStatusId = yield* makeStatus(fixture, "COMPLETED", 1);
+
+          // Contributors can move posts (posts.move) but never change status,
+          // on the dashboard path too.
+          const error = yield* Effect.flip(
+            handlers
+              .CommentCreate({
+                ...commentCreateInput(fixture, commentId, "Shipped it"),
+                statusUpdateId: completedStatusId,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "contributor")
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+
+          const db = yield* currentDb;
+          const [post] = yield* db
+            .select({ statusId: schema.postTable.statusId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, fixture.postId));
+          // The post status is untouched by the rejected request.
+          expect(post?.statusId).toBe(fixture.statusId);
         })
       );
     });

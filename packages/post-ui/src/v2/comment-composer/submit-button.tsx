@@ -70,6 +70,7 @@ function StatusUpdateMenu() {
                 ? `Status update: ${selectedStatus.label}`
                 : "Comment options"
             }
+            disabled={state.disabled}
             size="icon-sm"
           />
         }

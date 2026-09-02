@@ -35,6 +35,7 @@ export function CommentDisplayItem({
         .where(({ postStatus }) =>
           eq(postStatus.id, data.statusUpdateId ?? "")
         ),
+
     [data.statusUpdateId]
   );
   const statusUpdateType = statusUpdateRows?.[0]?.type ?? null;

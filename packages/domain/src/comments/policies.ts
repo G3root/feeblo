@@ -21,6 +21,8 @@ type TCanCreate = {
   postId: string;
   source: TSource;
   parentCommentId?: string | null;
+  /** Post status (org-scoped FK) this comment moves the post to. */
+  statusUpdateId?: string | null | undefined;
 };
 
 type TCanDelete = {
@@ -96,7 +98,12 @@ const makeCommentPolicy = Effect.gen(function* () {
           Policy.hasMembership(args.organizationId),
           Policy.policy(() => Effect.succeed(args.visibility === "PUBLIC"))
         ),
-        canReplyToParent({ ...args, publicOnly: true })
+        canReplyToParent({ ...args, publicOnly: true }),
+        // Moving the post from the public page is a manager+ privilege: the
+        // same permission the post editor enforces for status transitions.
+        args.statusUpdateId != null
+          ? Policy.canPermission(args.organizationId, "posts.status")
+          : Policy.policy(() => Effect.succeed(true))
       );
     }
 
@@ -108,7 +115,12 @@ const makeCommentPolicy = Effect.gen(function* () {
           organizationId: args.organizationId,
         })
       ),
-      canReplyToParent({ ...args, publicOnly: false })
+      canReplyToParent({ ...args, publicOnly: false }),
+      // Moving the post via a comment is a manager+ privilege everywhere,
+      // matching the post editor's status transition gate.
+      args.statusUpdateId != null
+        ? Policy.canPermission(args.organizationId, "posts.status")
+        : Policy.policy(() => Effect.succeed(true))
     );
   };
 

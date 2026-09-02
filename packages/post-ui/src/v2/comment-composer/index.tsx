@@ -99,7 +99,9 @@ function CommentComposerComponent({
       statusUpdateId: internalStatusUpdateId,
     });
     setResetKey((k) => k + 1);
-    setInternalStatusUpdateId(null);
+    // Clear both the local state and the host callback so a chosen status is
+    // never re-applied to the next comment.
+    handleStatusUpdateIdChange(null);
     if (!isContentControlled) {
       setInternalContent("");
     }

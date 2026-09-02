@@ -109,10 +109,26 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
         return null;
       }
 
-      yield* db
+      // Compare-and-update keyed by the previously read status: only the
+      // transaction that observes the post still in that status may apply the
+      // transition, so concurrent changes cannot persist history with a stale
+      // previousStatusId.
+      const transitionedPost = yield* db
         .update(schema.postTable)
         .set({ statusId: statusRow.value.id })
-        .where(eq(schema.postTable.id, args.postId));
+        .where(
+          and(
+            eq(schema.postTable.id, args.postId),
+            eq(schema.postTable.statusId, postRow.value.statusId)
+          )
+        )
+        .returning({ id: schema.postTable.id })
+        .pipe(Effect.map(EffectArray.get(0)));
+      if (Option.isNone(transitionedPost)) {
+        // A concurrent transition won the race: keep the comment but do not
+        // label it a status update or record stale history.
+        return null;
+      }
 
       yield* activityRepository.create({
         organizationId: args.organizationId,
@@ -338,7 +354,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             organizationId: args.organizationId,
             postId: args.postId,
           });
-          if (result) {
+          if (Option.isSome(result)) {
             yield* activityRepository.create({
               organizationId: args.organizationId,
               postId: args.postId,
@@ -352,7 +368,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
         })
       );
 
-      if (!unpinned) {
+      if (Option.isNone(unpinned)) {
         return yield* new FailedToUnpinCommentError({
           message: "Failed to unpin comment",
         });
@@ -413,6 +429,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             visibility: args.visibility,
             postId: args.postId,
             parentCommentId: args.parentCommentId,
+            statusUpdateId: args.statusUpdateId,
             source: "dashboard",
           })
         ),
@@ -431,6 +448,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             visibility: args.visibility,
             postId: args.postId,
             parentCommentId: args.parentCommentId,
+            statusUpdateId: args.statusUpdateId,
             source: "public",
           })
         ),

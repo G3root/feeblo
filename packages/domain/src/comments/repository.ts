@@ -1,6 +1,6 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
 import type { InsertComment } from "@feeblo/db/schema/feedback";
-import { and, desc, eq, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql, type SQL } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -304,7 +304,10 @@ const makeCommentRepository = Effect.gen(function* () {
             and(
               eq(schema.commentTable.id, args.id),
               eq(schema.commentTable.organizationId, args.organizationId),
-              eq(schema.commentTable.postId, args.postId)
+              eq(schema.commentTable.postId, args.postId),
+              // Only an actually pinned row transitions; repeated unpin
+              // requests match nothing and emit no COMMENT_UNPINNED.
+              isNotNull(schema.commentTable.pinnedAt)
             )
           )
           .returning()
