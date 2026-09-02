@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -266,6 +268,13 @@ const makeMailerService = (transport: MailerTransport): MailerService => ({
     // no second decode happens per send.
     const receipt = yield* transport.send({
       ...message,
+      // Outlook groups emails with the same subject into one conversation
+      // thread; a unique per-send X-Entity-Ref-ID keeps unrelated transactional
+      // emails separate. Caller-supplied headers take precedence.
+      headers: {
+        "X-Entity-Ref-ID": randomUUID(),
+        ...message.headers,
+      },
       html,
       text,
     });
