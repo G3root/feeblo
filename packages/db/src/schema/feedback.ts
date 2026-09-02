@@ -690,6 +690,9 @@ export const commentTable = pgTable(
       table.postId
     ),
     index("comment_postId_pinnedAt_idx").on(table.postId, table.pinnedAt),
+    uniqueIndex("comment_post_pinned_uidx")
+      .on(table.postId)
+      .where(sql`${table.pinnedAt} IS NOT NULL`),
   ]
 );
 

@@ -221,20 +221,12 @@ const makeCommentRepository = Effect.gen(function* () {
     pin: (args: PinComment) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
-        // Unpin any existing pinned comments for this post first
-        yield* db
-          .update(schema.commentTable)
-          .set({ pinnedAt: null })
-          .where(
-            and(
-              eq(schema.commentTable.organizationId, args.organizationId),
-              eq(schema.commentTable.postId, args.postId),
-              isNotNull(schema.commentTable.pinnedAt)
-            )
-          );
-        return yield* db
-          .update(schema.commentTable)
-          .set({ pinnedAt: now, updatedAt: now })
+        // Ensure target comment exists and belongs to this post/org before
+        // clearing other pins - prevents accidental unpin when targeting a
+        // non-existent comment.
+        const target = yield* db
+          .select({ id: schema.commentTable.id })
+          .from(schema.commentTable)
           .where(
             and(
               eq(schema.commentTable.id, args.id),
@@ -242,7 +234,25 @@ const makeCommentRepository = Effect.gen(function* () {
               eq(schema.commentTable.postId, args.postId)
             )
           )
-          .returning()
+          .pipe(Effect.map(EffectArray.get(0)));
+        if (!target) {
+          return undefined;
+        }
+        // Atomic single-statement pin: clears all other pins for this post
+        // and pins the target. Using one UPDATE avoids the race where two
+        // concurrent pins both clear then both pin, leaving two pinned rows.
+        // The statement locks all rows for this post, so the second concurrent
+        // pin will overwrite the first - last writer wins, exactly one pinned.
+        yield* db.execute(
+          sql`UPDATE "comment" SET "pinned_at" = CASE WHEN "id" = ${args.id} THEN ${now}::timestamptz ELSE NULL END, "updated_at" = CASE WHEN "id" = ${args.id} THEN ${now}::timestamptz ELSE "updated_at" END WHERE "organization_id" = ${args.organizationId} AND "post_id" = ${args.postId}`
+        );
+        return yield* db
+          .select({
+            id: schema.commentTable.id,
+            pinnedAt: schema.commentTable.pinnedAt,
+          })
+          .from(schema.commentTable)
+          .where(eq(schema.commentTable.id, args.id))
           .pipe(Effect.map(EffectArray.get(0)));
       }),
     unpin: (args: UnpinComment) =>
