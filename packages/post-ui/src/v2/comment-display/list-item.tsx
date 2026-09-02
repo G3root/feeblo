@@ -1,6 +1,13 @@
 import type { TComment } from "@feeblo/domain/src/comments/schema.js";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
-import { createOptimisticAction } from "@tanstack/react-db";
+import {
+  and,
+  createOptimisticAction,
+  eq,
+  isNull,
+  not,
+  queryOnce,
+} from "@tanstack/react-db";
 
 import { usePostCollections } from "../providers/post-collections-provider";
 import { CommentDisplayComponent } from "./component";
@@ -25,24 +32,29 @@ export function CommentDisplayItem({
         draft.pinnedAt = willPinned ? new Date() : null;
       });
       // Optimistically unpin other comments in the same post so only one
-      // appears pinned before the server round-trip completes.
-      // TanStack DB collections are iterable; fall back gracefully if not.
-      try {
-        const all = (commentCollection as unknown as { toArray?: () => TComment[]; values?: () => Iterable<TComment> }).toArray?.() ?? [];
-        for (const other of all as TComment[]) {
-          if (
-            other.id !== data.id &&
-            other.postId === data.postId &&
-            other.pinnedAt != null
-          ) {
+      // appears pinned before the server round-trip completes. Query the
+      // pinned siblings with queryOnce instead of scanning the collection.
+      queryOnce((q) =>
+        q
+          .from({ comment: commentCollection })
+          .where(({ comment }) =>
+            and(
+              eq(comment.postId, data.postId),
+              not(isNull(comment.pinnedAt)),
+              not(eq(comment.id, data.id))
+            )
+          )
+      )
+        .then((pinnedSiblings) => {
+          for (const other of pinnedSiblings) {
             commentCollection.update(other.id, (draft) => {
               draft.pinnedAt = null;
             });
           }
-        }
-      } catch {
-        // Optimistic unpin of siblings is best-effort; server will reconcile.
-      }
+        })
+        .catch(() => {
+          // Optimistic unpin of siblings is best-effort; server will reconcile.
+        });
     },
     mutationFn: async () => {
       if (data.pinnedAt == null) {

@@ -1,6 +1,6 @@
-import { currentDb, schema } from "@feeblo/db";
+import { currentDb, schema, transaction } from "@feeblo/db";
 import type { InsertComment } from "@feeblo/db/schema/feedback";
-import { and, desc, eq, exists, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, sql, type SQL } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -222,53 +222,75 @@ const makeCommentRepository = Effect.gen(function* () {
     pin: (args: PinComment) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
-        // Single atomic statement: pins the target comment and clears every
-        // other pin for the post in one UPDATE. The EXISTS guard means a
-        // missing or foreign comment touches no rows (existing pins are
-        // preserved) - an explicit pre-check would race with a concurrent
-        // delete, wiping all pins after the check passed. The whole statement
-        // runs against one snapshot, so two concurrent pins can't both
-        // survive: the second overwrites the first - last writer wins,
-        // exactly one pinned.
-        const target = yield* db
-          .update(schema.commentTable)
-          .set({
-            // Drizzle has no per-row conditional assignment, so the
-            // clear-others-and-pin-target behavior stays an SQL CASE:
-            // non-target rows get NULL, the target gets the new timestamp.
-            pinnedAt: sql`CASE WHEN ${schema.commentTable.id} = ${args.id} THEN ${now}::timestamptz ELSE NULL END`,
-            updatedAt: sql`CASE WHEN ${schema.commentTable.id} = ${args.id} THEN ${now}::timestamptz ELSE ${schema.commentTable.updatedAt} END`,
-          })
-          .where(
-            and(
-              eq(schema.commentTable.organizationId, args.organizationId),
-              eq(schema.commentTable.postId, args.postId),
-              exists(
-                db
-                  .select({ id: schema.commentTable.id })
-                  .from(schema.commentTable)
-                  .where(
-                    and(
-                      eq(schema.commentTable.id, args.id),
-                      eq(
-                        schema.commentTable.organizationId,
-                        args.organizationId
-                      ),
-                      eq(schema.commentTable.postId, args.postId)
-                    )
-                  )
+        // Replace the previous single UPDATE (CASE) with explicit steps inside
+        // one transaction: lock the post's comments so concurrent pins
+        // serialize (and a concurrent delete of the target blocks until this
+        // commits), then clear the existing pin and set the target's pin in
+        // separate statements - the clear runs before the target update so a
+        // failing target can't leave a stale pin behind.
+        return yield* transaction(
+          Effect.gen(function* () {
+            // Lock every comment for the post; after this no other pin or
+            // delete can touch these rows until the transaction commits.
+            yield* db
+              .select({ id: schema.commentTable.id })
+              .from(schema.commentTable)
+              .where(
+                and(
+                  eq(schema.commentTable.organizationId, args.organizationId),
+                  eq(schema.commentTable.postId, args.postId)
+                )
               )
-            )
-          )
-          .returning({
-            id: schema.commentTable.id,
-            pinnedAt: schema.commentTable.pinnedAt,
+              .for("update");
+
+            // A missing or foreign target must not touch any rows (existing
+            // pins are preserved). Checking under the row lock closes the
+            // race the old single-statement EXISTS guard had to paper over.
+            const targetExists = yield* db
+              .select({ id: schema.commentTable.id })
+              .from(schema.commentTable)
+              .where(
+                and(
+                  eq(schema.commentTable.id, args.id),
+                  eq(schema.commentTable.organizationId, args.organizationId),
+                  eq(schema.commentTable.postId, args.postId)
+                )
+              )
+              .pipe(Effect.map(EffectArray.get(0)));
+            if (Option.isNone(targetExists)) {
+              return Option.none();
+            }
+
+            // Clear the existing pinned comment before pinning the target.
+            yield* db
+              .update(schema.commentTable)
+              .set({ pinnedAt: null })
+              .where(
+                and(
+                  eq(schema.commentTable.organizationId, args.organizationId),
+                  eq(schema.commentTable.postId, args.postId)
+                )
+              );
+
+            // Pin the target comment; the clear above guarantees it is the
+            // only pinned comment for the post.
+            return yield* db
+              .update(schema.commentTable)
+              .set({ pinnedAt: now, updatedAt: now })
+              .where(
+                and(
+                  eq(schema.commentTable.id, args.id),
+                  eq(schema.commentTable.organizationId, args.organizationId),
+                  eq(schema.commentTable.postId, args.postId)
+                )
+              )
+              .returning({
+                id: schema.commentTable.id,
+                pinnedAt: schema.commentTable.pinnedAt,
+              })
+              .pipe(Effect.map(EffectArray.get(0)));
           })
-          .pipe(Effect.map(EffectArray.get(0)));
-        if (Option.isNone(target)) {
-          return Option.none();
-        }
-        return target;
+        );
       }),
     unpin: (args: UnpinComment) =>
       Effect.gen(function* () {
