@@ -1,11 +1,12 @@
 import { currentDb, schema } from "@feeblo/db";
 import type { InsertComment } from "@feeblo/db/schema/feedback";
-import { and, desc, eq, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, exists, sql, type SQL } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
 interface DeleteComment {
   id: string;
@@ -221,39 +222,53 @@ const makeCommentRepository = Effect.gen(function* () {
     pin: (args: PinComment) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
-        // Ensure target comment exists and belongs to this post/org before
-        // clearing other pins - prevents accidental unpin when targeting a
-        // non-existent comment.
+        // Single atomic statement: pins the target comment and clears every
+        // other pin for the post in one UPDATE. The EXISTS guard means a
+        // missing or foreign comment touches no rows (existing pins are
+        // preserved) - an explicit pre-check would race with a concurrent
+        // delete, wiping all pins after the check passed. The whole statement
+        // runs against one snapshot, so two concurrent pins can't both
+        // survive: the second overwrites the first - last writer wins,
+        // exactly one pinned.
         const target = yield* db
-          .select({ id: schema.commentTable.id })
-          .from(schema.commentTable)
+          .update(schema.commentTable)
+          .set({
+            // Drizzle has no per-row conditional assignment, so the
+            // clear-others-and-pin-target behavior stays an SQL CASE:
+            // non-target rows get NULL, the target gets the new timestamp.
+            pinnedAt: sql`CASE WHEN ${schema.commentTable.id} = ${args.id} THEN ${now}::timestamptz ELSE NULL END`,
+            updatedAt: sql`CASE WHEN ${schema.commentTable.id} = ${args.id} THEN ${now}::timestamptz ELSE ${schema.commentTable.updatedAt} END`,
+          })
           .where(
             and(
-              eq(schema.commentTable.id, args.id),
               eq(schema.commentTable.organizationId, args.organizationId),
-              eq(schema.commentTable.postId, args.postId)
+              eq(schema.commentTable.postId, args.postId),
+              exists(
+                db
+                  .select({ id: schema.commentTable.id })
+                  .from(schema.commentTable)
+                  .where(
+                    and(
+                      eq(schema.commentTable.id, args.id),
+                      eq(
+                        schema.commentTable.organizationId,
+                        args.organizationId
+                      ),
+                      eq(schema.commentTable.postId, args.postId)
+                    )
+                  )
+              )
             )
           )
-          .pipe(Effect.map(EffectArray.get(0)));
-        if (!target) {
-          return undefined;
-        }
-        // Atomic single-statement pin: clears all other pins for this post
-        // and pins the target. Using one UPDATE avoids the race where two
-        // concurrent pins both clear then both pin, leaving two pinned rows.
-        // The statement locks all rows for this post, so the second concurrent
-        // pin will overwrite the first - last writer wins, exactly one pinned.
-        yield* db.execute(
-          sql`UPDATE "comment" SET "pinned_at" = CASE WHEN "id" = ${args.id} THEN ${now}::timestamptz ELSE NULL END, "updated_at" = CASE WHEN "id" = ${args.id} THEN ${now}::timestamptz ELSE "updated_at" END WHERE "organization_id" = ${args.organizationId} AND "post_id" = ${args.postId}`
-        );
-        return yield* db
-          .select({
+          .returning({
             id: schema.commentTable.id,
             pinnedAt: schema.commentTable.pinnedAt,
           })
-          .from(schema.commentTable)
-          .where(eq(schema.commentTable.id, args.id))
           .pipe(Effect.map(EffectArray.get(0)));
+        if (Option.isNone(target)) {
+          return Option.none();
+        }
+        return target;
       }),
     unpin: (args: UnpinComment) =>
       Effect.gen(function* () {

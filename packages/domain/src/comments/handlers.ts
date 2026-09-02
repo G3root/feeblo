@@ -178,7 +178,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             organizationId: args.organizationId,
             postId: args.postId,
           });
-          if (result) {
+          if (Option.isSome(result)) {
             yield* activityRepository.create({
               organizationId: args.organizationId,
               postId: args.postId,
@@ -192,7 +192,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
         })
       );
 
-      if (!pinned) {
+      if (Option.isNone(pinned)) {
         return yield* new FailedToPinCommentError({
           message: "Failed to pin comment",
         });
