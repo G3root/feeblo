@@ -163,9 +163,7 @@ describe("Mailer", () => {
         expect(capturedHeaders?.["x-entity-ref-id"]).toBe(
           "caller-supplied-lowercase"
         );
-        expect(Object.keys(capturedHeaders ?? {})).toEqual([
-          "x-entity-ref-id",
-        ]);
+        expect(Object.keys(capturedHeaders ?? {})).toEqual(["x-entity-ref-id"]);
       })
   );
 
