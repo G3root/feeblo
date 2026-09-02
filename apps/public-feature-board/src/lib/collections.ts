@@ -465,6 +465,7 @@ export const publicCommentCollection = createCollection(
           postId: newComment.postId,
           parentCommentId: newComment.parentCommentId,
           id: newComment.id,
+          statusUpdateId: newComment.statusUpdateId ?? null,
         })
       );
       await publicPostCollection.utils.refetch();

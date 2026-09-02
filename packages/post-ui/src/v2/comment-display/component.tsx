@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CommentDisplayActions } from "./actions";
 import { CommentDisplayAvatar } from "./avatar";
 import { CommentDisplayBody } from "./body";
+import { useCommentDisplay } from "./context";
 import { CommentDisplayDropdown } from "./dropdown";
 import { CommentDisplayHeader } from "./header";
 import { CommentDisplayProvider } from "./provider";
@@ -25,7 +26,7 @@ export function CommentDisplayComponent(props: CommentDisplayRootProps) {
       onCancelEdit={() => setIsEditing(false)}
       onStartEdit={() => setIsEditing(true)}
     >
-      <Card>
+      <PinnedCardWrapper>
         <div className="flex items-start gap-3 p-4">
           <CommentDisplayAvatar />
           <div className="min-w-0 flex-1">
@@ -37,7 +38,19 @@ export function CommentDisplayComponent(props: CommentDisplayRootProps) {
             <CommentDisplayActions />
           </div>
         </div>
-      </Card>
+      </PinnedCardWrapper>
     </CommentDisplayProvider>
   );
+}
+
+function PinnedCardWrapper({ children }: { children: React.ReactNode }) {
+  const { state } = useCommentDisplay();
+  if (state.pinnedAt != null) {
+    return (
+      <Card className="border-amber-300 bg-amber-50/50 shadow-sm ring-1 ring-amber-200 dark:border-amber-800 dark:bg-amber-950/20 dark:ring-amber-900">
+        {children}
+      </Card>
+    );
+  }
+  return <Card>{children}</Card>;
 }

@@ -41,13 +41,19 @@ const useContentChange = (
     updatePostContent(markdown);
   }, [editor, updatePostContent]);
 
-  // Determine debounce delay based on document size
-  const delay = largeDocument ? DEBOUNCE_DELAY : 0;
+  // Only large documents are debounced. The debouncer schedules via
+  // `setTimeout` even at `wait: 0`, and its pending timer can outlive a
+  // component re-mount (e.g. the comment composer resets its editor after a
+  // submit), firing late with a stale document and clobbering the next
+  // comment. Small documents propagate synchronously instead, so the doc
+  // change order is deterministic (mount-empty, then typed content).
   const debouncedSetContent = useDebouncedCallback(serializeContent, {
-    wait: delay,
+    wait: DEBOUNCE_DELAY,
   });
 
-  useDocChange(debouncedSetContent, { editor });
+  useDocChange(largeDocument ? debouncedSetContent : serializeContent, {
+    editor,
+  });
 };
 
 export default useContentChange;

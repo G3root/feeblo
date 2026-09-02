@@ -1,3 +1,4 @@
+import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
 import { createContext, use } from "react";
 
 export type CommentDisplayState = {
@@ -11,6 +12,9 @@ export type CommentDisplayState = {
   isAuthor: boolean;
   isEditing: boolean;
   isInternal: boolean;
+  pinnedAt: Date | null;
+  /** Post status moved by this comment, when posted as a status update. */
+  statusUpdateType: TPostStatusType | null;
 };
 
 export type CommentDisplayActions = {
@@ -22,6 +26,7 @@ export type CommentDisplayActions = {
   }) => void | Promise<void>;
   onStartEdit: () => void;
   onToggleVisibility: () => void;
+  onTogglePin: () => void;
   onUpdate: (value: {
     content: string;
     isPrivate: boolean;
@@ -34,6 +39,8 @@ export type CommentDisplayMeta = {
   replyLabel: string;
   toggleToInternalLabel: string;
   toggleToPublicLabel: string;
+  pinLabel: string;
+  unpinLabel: string;
 };
 
 export type CommentDisplayContextValue = {

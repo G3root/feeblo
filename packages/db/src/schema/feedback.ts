@@ -649,38 +649,57 @@ export const changelogSubscriptionTable = pgTable(
   ]
 );
 
-export const commentTable = pgTable("comment", {
-  id: text("id").primaryKey(),
-  content: text("content").notNull(),
-  organizationId: text("organization_id")
-    .notNull()
-    .references(() => organizationTable.id, { onDelete: "cascade" }),
-  postId: text("post_id")
-    .notNull()
-    .references(() => postTable.id, { onDelete: "cascade" }),
-  userId: text("user_id")
-    .notNull()
-    .references(() => userTable.id, { onDelete: "cascade" }),
-  memberId: text("member_id").references(() => memberTable.id, {
-    onDelete: "set null",
-  }),
-  visibility: postCommentVisibilityEnum("visibility")
-    .default("PUBLIC")
-    .notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .defaultNow()
-    .$onUpdate(() => /* @__PURE__ */ new Date())
-    .notNull(),
-  parentCommentId: text("parent_comment_id").references(
-    (): AnyPgColumn => commentTable.id,
-    {
-      onDelete: "cascade",
-    }
-  ),
-});
+export const commentTable = pgTable(
+  "comment",
+  {
+    id: text("id").primaryKey(),
+    content: text("content").notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    postId: text("post_id")
+      .notNull()
+      .references(() => postTable.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => userTable.id, { onDelete: "cascade" }),
+    memberId: text("member_id").references(() => memberTable.id, {
+      onDelete: "set null",
+    }),
+    visibility: postCommentVisibilityEnum("visibility")
+      .default("PUBLIC")
+      .notNull(),
+    /** Post status this comment moved the post to, when posted as a status update. */
+    statusUpdateId: text("status_update_id").references(
+      () => postStatusTable.id,
+      { onDelete: "set null" }
+    ),
+    pinnedAt: timestamp("pinned_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    parentCommentId: text("parent_comment_id").references(
+      (): AnyPgColumn => commentTable.id,
+      {
+        onDelete: "cascade",
+      }
+    ),
+  },
+  (table) => [
+    index("comment_organizationId_postId_idx").on(
+      table.organizationId,
+      table.postId
+    ),
+    index("comment_postId_pinnedAt_idx").on(table.postId, table.pinnedAt),
+    uniqueIndex("comment_post_pinned_uidx")
+      .on(table.postId)
+      .where(sql`${table.pinnedAt} IS NOT NULL`),
+  ]
+);
 
 export const commentReactionTable = pgTable(
   "comment_reaction",
