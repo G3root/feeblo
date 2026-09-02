@@ -116,9 +116,7 @@ function StatusUpdateMenu() {
                   aria-hidden="true"
                   className="size-2 shrink-0 rounded-full"
                   style={
-                    option.color
-                      ? { backgroundColor: option.color }
-                      : undefined
+                    option.color ? { backgroundColor: option.color } : undefined
                   }
                 />
                 {option.label}

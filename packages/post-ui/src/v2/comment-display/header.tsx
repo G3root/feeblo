@@ -16,8 +16,7 @@ export function CommentDisplayHeader() {
       {state.statusUpdateType != null && (
         <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
           changed status to{" "}
-          {state.statusUpdateLabel ||
-            formatPostStatus(state.statusUpdateType)}
+          {state.statusUpdateLabel || formatPostStatus(state.statusUpdateType)}
           <span
             aria-hidden="true"
             className="size-1.5 shrink-0 rounded-full"
