@@ -142,6 +142,34 @@ describe("Mailer", () => {
   );
 
   it.effect(
+    "treats the X-Entity-Ref-ID header name case-insensitively when callers override it",
+    () =>
+      Effect.gen(function* () {
+        let capturedHeaders: Readonly<Record<string, string>> | undefined;
+        yield* sendWith(
+          {
+            send: (rendered) =>
+              Effect.sync(() => {
+                capturedHeaders = rendered.headers;
+                return transportReceipt;
+              }),
+          },
+          {
+            ...message,
+            headers: { "x-entity-ref-id": "caller-supplied-lowercase" },
+          }
+        );
+
+        expect(capturedHeaders?.["x-entity-ref-id"]).toBe(
+          "caller-supplied-lowercase"
+        );
+        expect(Object.keys(capturedHeaders ?? {})).toEqual([
+          "x-entity-ref-id",
+        ]);
+      })
+  );
+
+  it.effect(
     "preserves temporary transport failures as typed retryable failures",
     () =>
       Effect.gen(function* () {
