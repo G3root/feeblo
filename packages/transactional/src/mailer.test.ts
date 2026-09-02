@@ -4,6 +4,7 @@ import * as React from "react";
 
 import {
   Mailer,
+  type MailMessage,
   type MailerTransport,
   MailPermanentDeliveryError,
   MailTemporaryDeliveryError,
@@ -20,10 +21,19 @@ const message = {
   messageId,
 } as const;
 
-const sendWith = (transport: MailerTransport) =>
+const transportReceipt = {
+  acceptedRecipientCount: 1,
+  messageId: "<provider_456@notifications.feeblo>",
+  rejectedRecipientCount: 0,
+} as const;
+
+const sendWith = (
+  transport: MailerTransport,
+  sentMessage: MailMessage = message
+) =>
   Effect.gen(function* () {
     const mailer = yield* Mailer;
-    return yield* mailer.send(message);
+    return yield* mailer.send(sentMessage);
   }).pipe(Effect.provide(makeMailerLayer(transport)));
 
 describe("Mailer", () => {
@@ -80,6 +90,82 @@ describe("Mailer", () => {
         });
         expect(Object.keys(sent.providerMetadata)).not.toContain("response");
         expect(Object.keys(sent.providerMetadata)).not.toContain("recipient");
+      })
+  );
+
+  it.effect(
+    "adds a unique X-Entity-Ref-ID header to every send so Outlook does not thread emails",
+    () =>
+      Effect.gen(function* () {
+        const entityRefIds: string[] = [];
+        const transport: MailerTransport = {
+          send: (rendered) =>
+            Effect.sync(() => {
+              const entityRefId = rendered.headers?.["X-Entity-Ref-ID"];
+              if (entityRefId !== undefined) {
+                entityRefIds.push(entityRefId);
+              }
+              return transportReceipt;
+            }),
+        };
+
+        yield* sendWith(transport);
+        yield* sendWith(transport);
+
+        expect(entityRefIds).toHaveLength(2);
+        expect(entityRefIds[0]).toBeTruthy();
+        expect(entityRefIds[1]).not.toBe(entityRefIds[0]);
+      })
+  );
+
+  it.effect(
+    "lets caller-supplied headers override the default X-Entity-Ref-ID",
+    () =>
+      Effect.gen(function* () {
+        let capturedHeaders: Readonly<Record<string, string>> | undefined;
+        yield* sendWith(
+          {
+            send: (rendered) =>
+              Effect.sync(() => {
+                capturedHeaders = rendered.headers;
+                return transportReceipt;
+              }),
+          },
+          {
+            ...message,
+            headers: { "X-Entity-Ref-ID": "caller-supplied" },
+          }
+        );
+
+        expect(capturedHeaders?.["X-Entity-Ref-ID"]).toBe("caller-supplied");
+      })
+  );
+
+  it.effect(
+    "treats the X-Entity-Ref-ID header name case-insensitively when callers override it",
+    () =>
+      Effect.gen(function* () {
+        let capturedHeaders: Readonly<Record<string, string>> | undefined;
+        yield* sendWith(
+          {
+            send: (rendered) =>
+              Effect.sync(() => {
+                capturedHeaders = rendered.headers;
+                return transportReceipt;
+              }),
+          },
+          {
+            ...message,
+            headers: { "x-entity-ref-id": "caller-supplied-lowercase" },
+          }
+        );
+
+        expect(capturedHeaders?.["x-entity-ref-id"]).toBe(
+          "caller-supplied-lowercase"
+        );
+        expect(Object.keys(capturedHeaders ?? {})).toEqual([
+          "x-entity-ref-id",
+        ]);
       })
   );
 

@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -240,6 +242,15 @@ const toMailSendResult = (
   },
 });
 
+// Email header names are case-insensitive (RFC 5322), so a caller-supplied
+// entity ref header in any casing must suppress the generated default.
+const findEntityRefIdHeaderName = (
+  headers: Readonly<Record<string, string>> | undefined
+): string | undefined =>
+  Object.keys(headers ?? {}).find(
+    (name) => name.toLowerCase() === "x-entity-ref-id"
+  );
+
 const makeMailerService = (transport: MailerTransport): MailerService => ({
   send: Effect.fn("Mailer.send")(function* (message: MailMessage) {
     const html = yield* Effect.tryPromise({
@@ -266,6 +277,15 @@ const makeMailerService = (transport: MailerTransport): MailerService => ({
     // no second decode happens per send.
     const receipt = yield* transport.send({
       ...message,
+      // Outlook groups emails with the same subject into one conversation
+      // thread; a unique per-send X-Entity-Ref-ID keeps unrelated transactional
+      // emails separate. Caller-supplied headers take precedence in any casing.
+      headers: {
+        ...(findEntityRefIdHeaderName(message.headers) === undefined && {
+          "X-Entity-Ref-ID": randomUUID(),
+        }),
+        ...message.headers,
+      },
       html,
       text,
     });
