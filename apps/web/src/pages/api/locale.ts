@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+
 import { cookieName, locales } from "@/paraglide/runtime";
 
 /**
@@ -9,7 +10,9 @@ export const POST: APIRoute = ({ cookies, request, redirect }) => {
   const params = new URL(request.url).searchParams;
   const redirectTo = params.get("redirectTo") ?? "/";
   // find() doubles as the locale validation and avoids a type assertion.
-  const knownLocale = locales.find((candidate) => candidate === params.get("locale"));
+  const knownLocale = locales.find(
+    (candidate) => candidate === params.get("locale")
+  );
 
   if (knownLocale) {
     cookies.set(cookieName, knownLocale, {

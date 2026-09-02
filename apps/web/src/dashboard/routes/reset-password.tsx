@@ -25,8 +25,8 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 
-import { AuthShell } from "~/features/auth/components/auth-shell";
 import { m } from "@/paraglide/messages";
+import { AuthShell } from "~/features/auth/components/auth-shell";
 
 const SearchSchema = z.object({
   redirectTo: z.string().optional(),
@@ -207,15 +207,11 @@ function RouteComponent() {
       >
         <AuthForm form={passwordForm}>
           <passwordForm.AppField name="password">
-            {(field) => (
-              <field.PasswordField label={m.coast_field_tulip()} />
-            )}
+            {(field) => <field.PasswordField label={m.coast_field_tulip()} />}
           </passwordForm.AppField>
 
           <passwordForm.AppField name="confirmPassword">
-            {(field) => (
-              <field.PasswordField label={m.cinder_dune_north()} />
-            )}
+            {(field) => <field.PasswordField label={m.cinder_dune_north()} />}
           </passwordForm.AppField>
 
           <passwordForm.AppForm>

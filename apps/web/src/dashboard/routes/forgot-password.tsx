@@ -9,8 +9,8 @@ import { EmailSchema } from "@feeblo/web-shared/user-validation";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 
-import { AuthShell } from "~/features/auth/components/auth-shell";
 import { m } from "@/paraglide/messages";
+import { AuthShell } from "~/features/auth/components/auth-shell";
 
 const SearchSchema = z.object({
   redirectTo: z.string().optional(),

@@ -108,9 +108,7 @@ function RouteComponent() {
                   <span className="sr-only">Acme Inc.</span>
                 </Link>
                 <h1 className="text-xl font-bold">{m.ember_spruce_vale()}</h1>
-                <FieldDescription>
-                  {m.basil_canyon_fern()}
-                </FieldDescription>
+                <FieldDescription>{m.basil_canyon_fern()}</FieldDescription>
               </Field>
               <OtpFormFields form={form} submitLabel={m.cedar_gale_grove()}>
                 <OtpResend

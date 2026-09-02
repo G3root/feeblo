@@ -13,8 +13,8 @@ import { useAppForm } from "@feeblo/ui/hooks/form";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 
-import { AuthShell } from "~/features/auth/components/auth-shell";
 import { m } from "@/paraglide/messages";
+import { AuthShell } from "~/features/auth/components/auth-shell";
 
 export const Route = createFileRoute("/sign-in")({
   validateSearch: (search) =>
