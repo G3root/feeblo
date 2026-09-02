@@ -1,4 +1,9 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
-  "example_message": "Hello world {username}"
+  "amber_spruce_yarrow": "Forgot password?",
+  "basil_iris_fern": "Don't have an account?",
+  "hollow_umbra_lark": "Enter your account credentials to continue.",
+  "ivory_kite_plume": "Sign up",
+  "jolly_north_otter": "Sign in",
+  "mellow_harbor_gentle": "Login"
 }

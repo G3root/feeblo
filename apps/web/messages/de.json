@@ -1,4 +1,9 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
-  "example_message": "Guten Tag {username}"
+  "amber_spruce_yarrow": "Passwort vergessen?",
+  "basil_iris_fern": "Du hast noch kein Konto?",
+  "hollow_umbra_lark": "Gib deine Kontodaten ein, um fortzufahren.",
+  "ivory_kite_plume": "Registrieren",
+  "jolly_north_otter": "Anmelden",
+  "mellow_harbor_gentle": "Anmelden"
 }

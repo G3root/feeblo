@@ -14,6 +14,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 
 import { AuthShell } from "~/features/auth/components/auth-shell";
+import { m } from "@/paraglide/messages";
 
 export const Route = createFileRoute("/sign-in")({
   validateSearch: (search) =>
@@ -68,25 +69,25 @@ function RouteComponent() {
 
   return (
     <AuthShell
-      description="Enter your account credentials to continue."
+      description={m.hollow_umbra_lark()}
       footer={
         <div className="text-center text-sm">
-          Don&apos;t have an account?{" "}
+          {m.basil_iris_fern()}{" "}
           <Link className="underline underline-offset-4" to="/sign-up">
-            Sign up
+            {m.ivory_kite_plume()}
           </Link>
         </div>
       }
-      title="Sign in"
+      title={m.jolly_north_otter()}
     >
       <AuthForm form={form}>
-        <SignInFields form={form} submitLabel="Login">
+        <SignInFields form={form} submitLabel={m.mellow_harbor_gentle()}>
           <Link
             className="text-muted-foreground text-sm underline underline-offset-4"
             search={{ redirectTo: search.redirectTo }}
             to="/forgot-password"
           >
-            Forgot password?
+            {m.amber_spruce_yarrow()}
           </Link>
         </SignInFields>
       </AuthForm>
