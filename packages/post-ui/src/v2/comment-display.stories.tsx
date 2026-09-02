@@ -271,6 +271,26 @@ export function TimelineComposition() {
   );
 }
 
+export function StatusUpdate() {
+  return (
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
+      <div className="w-full max-w-xl">
+        <CommentDisplay
+          authorName="Jane Smith"
+          commentId="4"
+          content={SAMPLE_HTML}
+          createdAt={new Date(Date.now() - 1000 * 60 * 15)}
+          onDelete={() => {}}
+          onReply={noopReply}
+          postId="post-1"
+          postSlug="post-1"
+          statusUpdateType="COMPLETED"
+        />
+      </div>
+    </div>
+  );
+}
+
 function formatRelativeTime(date: Date): string {
   const diffMs = date.getTime() - Date.now();
   const diffSeconds = Math.round(diffMs / 1000);

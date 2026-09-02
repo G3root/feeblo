@@ -1,4 +1,4 @@
-import { CommentId, PostId, WorkspaceId } from "@feeblo/id";
+import { CommentId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
 import { COMMENT_CONTENT_MAX_LENGTH } from "../content-limits";
@@ -17,6 +17,8 @@ export const Comment = S.Struct({
   visibility: S.Literals(["PUBLIC", "INTERNAL"]),
   parentCommentId: S.Union([S.String, S.Null]),
   memberId: S.Union([S.String, S.Null]),
+  /** Post status (org-scoped FK) this comment moved the post to, when posted as a status update. */
+  statusUpdateId: S.NullOr(S.String),
   pinnedAt: S.NullOr(S.DateFromString),
   user: S.Struct({
     name: S.String,
@@ -39,6 +41,8 @@ export const CommentCreate = S.Struct({
   content: S.String.check(S.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)),
   visibility: S.Literals(["PUBLIC", "INTERNAL"]),
   parentCommentId: S.Union([CommentId.schema, S.Null]),
+  /** Optional post status (org-scoped FK) this comment moves the post to. */
+  statusUpdateId: S.optional(S.NullOr(PostStatusId.schema)),
 });
 
 export type TCommentCreate = S.Schema.Type<typeof CommentCreate>;

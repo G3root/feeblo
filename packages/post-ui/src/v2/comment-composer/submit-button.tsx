@@ -1,25 +1,128 @@
 import { Button } from "@feeblo/ui/button";
+import { Group, GroupSeparator } from "@feeblo/ui/group";
+import {
+  Menu,
+  MenuGroupLabel,
+  MenuItem,
+  MenuPopup,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
+  MenuTrigger,
+} from "@feeblo/ui/menu";
+import { cn } from "@feeblo/ui/utils";
+import { getBoardStatusIndicatorColor } from "@feeblo/web-shared/board/constants";
+import { MoreVerticalIcon, Close } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 import { useCommentComposer } from "./context";
 
 export function SubmitButton() {
   const { actions, meta, state } = useCommentComposer();
+
+  const hasStatusOptions = state.statusOptions.length > 0;
+
   return (
-    <Button
-      disabled={state.disabled}
-      size="sm"
-      type={actions.onSubmit ? "button" : "submit"}
-      variant={state.isPrivate ? "default" : "outline"}
-      {...(actions?.onSubmit
-        ? {
-            onClick: actions.onSubmit,
+    <Group>
+      <Button
+        disabled={state.disabled}
+        size="sm"
+        type={actions.onSubmit ? "button" : "submit"}
+        // variant={state.isPrivate ? "default" : "outline"}
+        {...(actions?.onSubmit
+          ? {
+              onClick: actions.onSubmit,
+            }
+          : {})}
+      >
+        {meta.submitLabel ??
+          (state.isPrivate
+            ? `Comment ${meta.privateLabel}`
+            : `Comment ${meta.publicLabel}`)}
+      </Button>
+      {hasStatusOptions ? (
+        <>
+          <GroupSeparator className="bg-primary/72" />
+          <StatusUpdateMenu />
+        </>
+      ) : null}
+    </Group>
+  );
+}
+
+function StatusUpdateMenu() {
+  const { actions, meta, state } = useCommentComposer();
+
+  const selectedStatus =
+    state.statusUpdateId === null
+      ? null
+      : (state.statusOptions.find(
+          (option) => option.id === state.statusUpdateId
+        ) ?? null);
+
+  return (
+    <Menu>
+      <MenuTrigger
+        render={
+          <Button
+            aria-label={
+              selectedStatus
+                ? `Status update: ${selectedStatus.label}`
+                : "Comment options"
+            }
+            size="icon-sm"
+          />
+        }
+      >
+        <HugeiconsIcon icon={MoreVerticalIcon} />
+        {selectedStatus ? (
+          <span
+            aria-hidden="true"
+            className={cn(
+              // Half-in, half-out on the trigger's top-right corner.
+              "ring-background absolute -top-0.75 -right-0.75 size-1.5 rounded-full ring-2",
+              getBoardStatusIndicatorColor(selectedStatus.type)
+            )}
+          />
+        ) : null}
+      </MenuTrigger>
+      <MenuPopup align="end" className="w-56">
+        <MenuRadioGroup
+          // SAFETY: `null` maps to "nothing selected" for Base UI radio groups.
+          value={state.statusUpdateId ?? undefined}
+          onValueChange={(value) =>
+            // SAFETY: values come from the `option.id` strings below.
+            actions.onStatusUpdateIdChange(value as string | null)
           }
-        : {})}
-    >
-      {meta.submitLabel ??
-        (state.isPrivate
-          ? `Comment ${meta.privateLabel}`
-          : `Comment ${meta.publicLabel}`)}
-    </Button>
+        >
+          <MenuGroupLabel>{meta.statusUpdateLabel}</MenuGroupLabel>
+          {state.statusOptions.map((option) => (
+            <MenuRadioItem key={option.id} value={option.id}>
+              <span className="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "size-2 shrink-0 rounded-full",
+                    getBoardStatusIndicatorColor(option.type)
+                  )}
+                />
+                {option.label}
+              </span>
+            </MenuRadioItem>
+          ))}
+        </MenuRadioGroup>
+        {selectedStatus ? (
+          <>
+            <MenuSeparator />
+            <MenuItem
+              closeOnClick
+              onClick={() => actions.onStatusUpdateIdChange(null)}
+            >
+              <HugeiconsIcon icon={Close} /> Remove status update
+            </MenuItem>
+          </>
+        ) : null}
+      </MenuPopup>
+    </Menu>
   );
 }

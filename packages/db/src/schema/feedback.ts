@@ -669,6 +669,11 @@ export const commentTable = pgTable(
     visibility: postCommentVisibilityEnum("visibility")
       .default("PUBLIC")
       .notNull(),
+    /** Post status this comment moved the post to, when posted as a status update. */
+    statusUpdateId: text("status_update_id").references(
+      () => postStatusTable.id,
+      { onDelete: "set null" }
+    ),
     pinnedAt: timestamp("pinned_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

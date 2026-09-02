@@ -7,6 +7,7 @@ import {
   isNull,
   not,
   queryOnce,
+  useLiveQuery,
 } from "@tanstack/react-db";
 
 import { usePostCollections } from "../providers/post-collections-provider";
@@ -22,8 +23,21 @@ export function CommentDisplayItem({
   currentUserId,
 }: CommentDisplayItemProps) {
   const {
-    collections: { commentCollection },
+    collections: { commentCollection, postStatusCollection },
   } = usePostCollections();
+
+  // Derive the status-update type by joining the comment's FK onto the
+  // org-scoped post status collection (labels/colors live client-side).
+  const { data: statusUpdateRows } = useLiveQuery(
+    (q) =>
+      q
+        .from({ postStatus: postStatusCollection })
+        .where(({ postStatus }) =>
+          eq(postStatus.id, data.statusUpdateId ?? "")
+        ),
+    [data.statusUpdateId]
+  );
+  const statusUpdateType = statusUpdateRows?.[0]?.type ?? null;
 
   const togglePinAction = createOptimisticAction({
     onMutate: () => {
@@ -87,6 +101,7 @@ export function CommentDisplayItem({
       isAuthor={currentUserId ? data.userId === currentUserId : false}
       isInternal={data.visibility === "INTERNAL"}
       pinnedAt={data.pinnedAt}
+      statusUpdateType={statusUpdateType}
       onDelete={() => {}}
       onReply={() => {}}
       onTogglePin={async () => {

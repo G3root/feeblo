@@ -80,6 +80,7 @@ const makeCommentRepository = Effect.gen(function* () {
             visibility: schema.commentTable.visibility,
             parentCommentId: schema.commentTable.parentCommentId,
             memberId: schema.commentTable.memberId,
+            statusUpdateId: schema.commentTable.statusUpdateId,
             pinnedAt: schema.commentTable.pinnedAt,
             user: {
               name: schema.userTable.name,
@@ -118,6 +119,7 @@ const makeCommentRepository = Effect.gen(function* () {
           visibility: schema.commentTable.visibility,
           parentCommentId: schema.commentTable.parentCommentId,
           memberId: schema.commentTable.memberId,
+          statusUpdateId: schema.commentTable.statusUpdateId,
           pinnedAt: schema.commentTable.pinnedAt,
           user: {
             name: schema.userTable.name,

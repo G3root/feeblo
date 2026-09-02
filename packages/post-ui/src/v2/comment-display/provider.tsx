@@ -1,3 +1,4 @@
+import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
 import { type ReactNode, useMemo } from "react";
 
 import {
@@ -20,6 +21,7 @@ export type CommentDisplayProviderProps = {
   isEditing?: boolean;
   isInternal?: boolean;
   pinnedAt?: Date | null;
+  statusUpdateType?: TPostStatusType | null;
   onCancelEdit?: () => void;
   onDelete: () => void;
   onReply: (value: {
@@ -65,6 +67,7 @@ export function CommentDisplayProvider({
   isEditing = false,
   isInternal = false,
   pinnedAt = null,
+  statusUpdateType = null,
   onCancelEdit = defaultCallbacks.onCancelEdit,
   onDelete,
   onReply,
@@ -110,6 +113,7 @@ export function CommentDisplayProvider({
         pinnedAt,
         postId,
         postSlug,
+        statusUpdateType,
       },
     }),
     [
@@ -134,6 +138,7 @@ export function CommentDisplayProvider({
       postId,
       postSlug,
       replyLabel,
+      statusUpdateType,
       toggleToInternalLabel,
       toggleToPublicLabel,
       pinLabel,

@@ -3,6 +3,7 @@ import { type ReactNode, useMemo } from "react";
 import {
   CommentComposerContext,
   type CommentComposerContextValue,
+  type TPostStatusOption,
 } from "./context";
 
 export type CommentComposerProviderProps = {
@@ -14,12 +15,16 @@ export type CommentComposerProviderProps = {
   onCancel?: () => void;
   onContentChange?: (content: string) => void;
   onSubmit?: () => void;
+  onStatusUpdateIdChange?: (id: string | null) => void;
   onVisibilityChange?: (isPrivate: boolean) => void;
   placeholder?: string;
   privateLabel?: string;
   publicLabel?: string;
   resetKey?: number;
   showVisibilityToggle?: boolean;
+  statusUpdateLabel?: string;
+  statusUpdateId?: string | null;
+  statusOptions?: readonly TPostStatusOption[];
   submitLabel?: string;
 };
 
@@ -32,12 +37,16 @@ export function CommentComposerProvider({
   onCancel,
   onContentChange,
   onSubmit,
+  onStatusUpdateIdChange,
   onVisibilityChange,
   placeholder,
   privateLabel = "Internal",
   publicLabel = "Public",
   resetKey = 0,
   showVisibilityToggle = true,
+  statusUpdateLabel = "Comment as status update",
+  statusUpdateId = null,
+  statusOptions = [],
   submitLabel,
 }: CommentComposerProviderProps) {
   const contextValue = useMemo<CommentComposerContextValue>(
@@ -46,9 +55,16 @@ export function CommentComposerProvider({
         onCancel,
         onContentChange: onContentChange ?? (() => {}),
         onSubmit,
+        onStatusUpdateIdChange: onStatusUpdateIdChange ?? (() => {}),
         onVisibilityChange: onVisibilityChange ?? (() => {}),
       },
-      meta: { cancelLabel, privateLabel, publicLabel, submitLabel },
+      meta: {
+        cancelLabel,
+        privateLabel,
+        publicLabel,
+        statusUpdateLabel,
+        submitLabel,
+      },
       state: {
         content,
         disabled,
@@ -58,6 +74,8 @@ export function CommentComposerProvider({
           (isPrivate ? "Add an internal note..." : "Add a comment..."),
         resetKey,
         showVisibilityToggle,
+        statusUpdateId,
+        statusOptions,
       },
     }),
     [
@@ -68,12 +86,16 @@ export function CommentComposerProvider({
       onCancel,
       onContentChange,
       onSubmit,
+      onStatusUpdateIdChange,
       onVisibilityChange,
       placeholder,
       privateLabel,
       publicLabel,
       resetKey,
       showVisibilityToggle,
+      statusUpdateLabel,
+      statusUpdateId,
+      statusOptions,
       submitLabel,
     ]
   );

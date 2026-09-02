@@ -73,6 +73,61 @@ export function CustomLabels() {
   );
 }
 
+export function StatusUpdate() {
+  const statusOptions = [
+    { id: "s1", type: "PENDING", label: "Pending" },
+    { id: "s2", type: "REVIEW", label: "Review" },
+    { id: "s3", type: "PLANNED", label: "Planned" },
+    { id: "s4", type: "IN_PROGRESS", label: "In Progress" },
+    { id: "s5", type: "COMPLETED", label: "Completed" },
+    { id: "s6", type: "CLOSED", label: "Closed" },
+  ] as const;
+  return (
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
+      <div className="w-full max-w-xl">
+        <CommentComposer
+          onSubmit={async ({ content, isPrivate, statusUpdateId }) => {
+            console.log({
+              content,
+              isPrivate: isPrivate ? "Internal" : "Public",
+              statusUpdateId,
+            });
+          }}
+          statusOptions={statusOptions}
+        />
+      </div>
+    </div>
+  );
+}
+
+export function StatusUpdatePrivate() {
+  const statusOptions = [
+    { id: "s1", type: "PENDING", label: "Pending" },
+    { id: "s2", type: "REVIEW", label: "Review" },
+    { id: "s3", type: "PLANNED", label: "Planned" },
+    { id: "s4", type: "IN_PROGRESS", label: "In Progress" },
+    { id: "s5", type: "COMPLETED", label: "Completed" },
+    { id: "s6", type: "CLOSED", label: "Closed" },
+  ] as const;
+  return (
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
+      <div className="w-full max-w-xl">
+        <CommentComposer
+          isPrivate
+          onSubmit={async ({ content, isPrivate, statusUpdateId }) => {
+            console.log({
+              content,
+              isPrivate: isPrivate ? "Internal" : "Public",
+              statusUpdateId,
+            });
+          }}
+          statusOptions={statusOptions}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function ControlledState() {
   const [content, setContent] = useState("Pre-filled content...");
   const [isPrivate, setIsPrivate] = useState(false);

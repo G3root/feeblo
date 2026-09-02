@@ -1,3 +1,4 @@
+import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
 import { createContext, use } from "react";
 
 export type CommentDisplayState = {
@@ -12,6 +13,8 @@ export type CommentDisplayState = {
   isEditing: boolean;
   isInternal: boolean;
   pinnedAt: Date | null;
+  /** Post status moved by this comment, when posted as a status update. */
+  statusUpdateType: TPostStatusType | null;
 };
 
 export type CommentDisplayActions = {

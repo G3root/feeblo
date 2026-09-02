@@ -1,9 +1,14 @@
-import { transaction } from "@feeblo/db";
+import { currentDb, schema, transaction } from "@feeblo/db";
+import { BoardId, PostStatusId } from "@feeblo/id";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import { and, eq } from "drizzle-orm";
+import * as EffectArray from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { EmailOutboxConfig } from "../email-outbox/config";
+import { recordPostIntegrationEvent as recordPostIntegrationEventShared } from "../integration/post-event-recording";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import { PostActivityRepository } from "../post-activity/repository";
@@ -13,6 +18,7 @@ import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import {
+  FailedToCreateCommentError,
   FailedToDeleteCommentError,
   FailedToPinCommentError,
   FailedToUnpinCommentError,
@@ -40,6 +46,117 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
 
   // -- Shared effect helpers (no policy applied) --
 
+  /**
+   * Moves a post to the org-scoped status referenced by `statusUpdateId` and
+   * records the `STATUS_CHANGED` activity + integration event, mirroring the
+   * post editor path. Runs inside the caller's transaction. Returns the id to
+   * store on the comment (null when nothing actually changed, so a comment on
+   * a post that already sits in that status is not labeled a status update).
+   */
+  const applyStatusUpdateEffect = (
+    args: TCommentCreate,
+    context: { actorId: string; actorMemberId: string | null }
+  ) => {
+    const statusUpdateId = args.statusUpdateId ?? null;
+    return Effect.gen(function* () {
+      if (statusUpdateId === null || args.parentCommentId !== null) {
+        // Replies and plain comments never move the post's status.
+        return null;
+      }
+      const db = yield* currentDb;
+
+      // Resolve the org-scoped status row the request refers to.
+      const statusRow = yield* db
+        .select({ id: schema.postStatusTable.id })
+        .from(schema.postStatusTable)
+        .where(
+          and(
+            eq(schema.postStatusTable.organizationId, args.organizationId),
+            eq(schema.postStatusTable.id, statusUpdateId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map(EffectArray.get(0)));
+      if (Option.isNone(statusRow)) {
+        // Unknown status for this organization: keep the comment but do not
+        // pretend it changed anything.
+        return null;
+      }
+
+      const postRow = yield* db
+        .select({
+          id: schema.postTable.id,
+          boardId: schema.postTable.boardId,
+          slug: schema.postTable.slug,
+          title: schema.postTable.title,
+          statusId: schema.postTable.statusId,
+        })
+        .from(schema.postTable)
+        .where(
+          and(
+            eq(schema.postTable.id, args.postId),
+            eq(schema.postTable.organizationId, args.organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map(EffectArray.get(0)));
+
+      if (
+        Option.isNone(postRow) ||
+        postRow.value.statusId === statusRow.value.id
+      ) {
+        // Post missing, or already in the requested status: nothing to apply.
+        return null;
+      }
+
+      yield* db
+        .update(schema.postTable)
+        .set({ statusId: statusRow.value.id })
+        .where(eq(schema.postTable.id, args.postId));
+
+      yield* activityRepository.create({
+        organizationId: args.organizationId,
+        postId: args.postId,
+        actorId: context.actorId,
+        actorMemberId: context.actorMemberId,
+        kind: "STATUS_CHANGED",
+        previousStatusId: postRow.value.statusId,
+        nextStatusId: statusRow.value.id,
+      });
+
+      yield* recordPostIntegrationEventShared({
+        actor:
+          context.actorMemberId === null
+            ? { kind: "end_user" }
+            : { kind: "member", memberId: context.actorMemberId },
+        boardId: yield* BoardId.parse(postRow.value.boardId),
+        eventType: "feedback.post.status_changed",
+        organizationId: args.organizationId,
+        postId: args.postId,
+        postSlug: postRow.value.slug,
+        previousStatusId: yield* PostStatusId.parse(postRow.value.statusId),
+        statusId: yield* PostStatusId.parse(statusRow.value.id),
+        title: postRow.value.title,
+      }).pipe(
+        Effect.mapError(
+          () =>
+            new FailedToCreateCommentError({
+              message: "Failed to apply status update to post",
+            })
+        )
+      );
+
+      return statusUpdateId;
+    }).pipe(
+      Effect.mapError(
+        () =>
+          new FailedToCreateCommentError({
+            message: "Failed to apply status update to post",
+          })
+      )
+    );
+  };
+
   const createCommentEffect = (args: TCommentCreate) => {
     const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
     return Effect.gen(function* () {
@@ -48,9 +165,15 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
 
       yield* transaction(
         Effect.gen(function* () {
+          const statusUpdateId = yield* applyStatusUpdateEffect(args, {
+            actorId: session.session.userId,
+            actorMemberId: membership?.membershipId ?? null,
+          });
+
           yield* repository.create({
             ...args,
             content: sanitizedMarkdown,
+            statusUpdateId,
             userId: session.session.userId,
             ...(membership && { memberId: membership.membershipId }),
           });
@@ -411,5 +534,6 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
   Layer.provide(PostRepository.layer),
   Layer.provide(CommentRepository.layer),
   Layer.provide(PostActivityRepository.layer),
-  Layer.provide(NotificationService.layer)
+  Layer.provide(NotificationService.layer),
+  Layer.provide(EmailOutboxConfig.layer)
 );

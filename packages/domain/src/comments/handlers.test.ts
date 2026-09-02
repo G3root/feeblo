@@ -1,3 +1,4 @@
+import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import {
@@ -8,11 +9,14 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import { IntegrationEventRecorder } from "@feeblo/integration-core";
+import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { BoardRepository } from "../board/repository";
+import { EmailOutboxConfig } from "../email-outbox/config";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { PostPolicy } from "../post/policies";
@@ -27,6 +31,8 @@ import { CommentPolicy } from "./policies";
 import { CommentRepository } from "./repository";
 
 describe("CommentRpcHandlers", () => {
+  const recordedIntegrationEvents: Array<unknown> = [];
+
   type Fixture = {
     boardId: LegidOf<"BoardId">;
     membershipId: string;
@@ -189,7 +195,21 @@ describe("CommentRpcHandlers", () => {
     PostPolicy.layer
   ).pipe(Layer.provideMerge(RepositoriesTest));
 
-  const TestLayer = Layer.merge(HandlerTest, Database.PgliteDatabaseLive);
+  const TestLayer = Layer.mergeAll(
+    HandlerTest,
+    Database.PgliteDatabaseLive,
+    NodeCrypto.layer,
+    EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
+    Layer.succeed(
+      IntegrationEventRecorder,
+      IntegrationEventRecorder.of({
+        recordIntegrationEvent: ({ event }) =>
+          Effect.sync(() => {
+            recordedIntegrationEvents.push(event);
+          }).pipe(Effect.as({ deliveryCount: 0, eventRecorded: false })),
+      })
+    )
+  );
 
   layer(TestLayer)("handlers", (it) => {
     describe("CommentList", () => {
@@ -1310,5 +1330,184 @@ describe("CommentRpcHandlers", () => {
         expect(isSubscribed).toBe(false);
       })
     );
+
+    describe("status updates", () => {
+      const makeStatus = (
+        fixture: Fixture,
+        type:
+          | "PENDING"
+          | "REVIEW"
+          | "PLANNED"
+          | "IN_PROGRESS"
+          | "COMPLETED"
+          | "CLOSED",
+        orderIndex: number
+      ) =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const id = yield* PostStatusId.generate;
+          yield* db.insert(schema.postStatusTable).values({
+            id,
+            type,
+            orderIndex,
+            organizationId: fixture.organizationId,
+          });
+          return id;
+        });
+
+      it.effect(
+        "moves the post to the requested status and labels the comment",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* CommentRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const commentId = yield* CommentId.generate;
+            const completedStatusId = yield* makeStatus(
+              fixture,
+              "COMPLETED",
+              1
+            );
+
+            yield* handlers
+              .CommentCreate({
+                ...commentCreateInput(fixture, commentId, "Shipped it"),
+                statusUpdateId: completedStatusId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const db = yield* currentDb;
+            const [post] = yield* db
+              .select({ statusId: schema.postTable.statusId })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, fixture.postId));
+            expect(post?.statusId).toBe(completedStatusId);
+
+            const [comment] = yield* db
+              .select({
+                statusUpdateId: schema.commentTable.statusUpdateId,
+              })
+              .from(schema.commentTable)
+              .where(eq(schema.commentTable.id, commentId));
+            expect(comment?.statusUpdateId).toBe(completedStatusId);
+
+            const statusActivity = yield* db
+              .select({
+                previousValue: schema.postActivityTable.previousValue,
+                nextValue: schema.postActivityTable.nextValue,
+              })
+              .from(schema.postActivityTable)
+              .where(
+                and(
+                  eq(schema.postActivityTable.postId, fixture.postId),
+                  eq(schema.postActivityTable.kind, "STATUS_CHANGED")
+                )
+              );
+            expect(statusActivity).toEqual([
+              {
+                previousValue: fixture.statusId,
+                nextValue: completedStatusId,
+              },
+            ]);
+          })
+      );
+
+      it.effect(
+        "records a post.status_changed integration event for the update",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* CommentRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const commentId = yield* CommentId.generate;
+            const completedStatusId = yield* makeStatus(
+              fixture,
+              "COMPLETED",
+              1
+            );
+
+            yield* handlers
+              .CommentCreate({
+                ...commentCreateInput(fixture, commentId, "Shipped it"),
+                statusUpdateId: completedStatusId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const event = recordedIntegrationEvents.find(
+              (candidate) =>
+                // SAFETY: The recorded envelope exposes `type` for the event.
+                (candidate as { type?: string }).type ===
+                "feedback.post.status_changed"
+            );
+            expect(event).toBeDefined();
+          })
+      );
+
+      it.effect(
+        "does not re-label a comment when the post already has the status",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* CommentRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const commentId = yield* CommentId.generate;
+
+            // The fixture post already sits in PENDING.
+            yield* handlers
+              .CommentCreate({
+                ...commentCreateInput(fixture, commentId, "Still pending"),
+                statusUpdateId: fixture.statusId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const db = yield* currentDb;
+            const [comment] = yield* db
+              .select({
+                statusUpdateId: schema.commentTable.statusUpdateId,
+              })
+              .from(schema.commentTable)
+              .where(eq(schema.commentTable.id, commentId));
+            expect(comment?.statusUpdateId).toBeNull();
+          })
+      );
+
+      it.effect("ignores status updates on replies", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const parentCommentId = yield* CommentId.generate;
+          const completedStatusId = yield* makeStatus(fixture, "COMPLETED", 1);
+
+          yield* handlers
+            .CommentCreate(
+              commentCreateInput(fixture, parentCommentId, "Parent")
+            )
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          const replyId = yield* CommentId.generate;
+          yield* handlers
+            .CommentCreate({
+              ...commentCreateInput(fixture, replyId, "Reply"),
+              parentCommentId,
+              statusUpdateId: completedStatusId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const db = yield* currentDb;
+          const [post] = yield* db
+            .select({ statusId: schema.postTable.statusId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, fixture.postId));
+          expect(post?.statusId).toBe(fixture.statusId);
+          const [comment] = yield* db
+            .select({ statusUpdateId: schema.commentTable.statusUpdateId })
+            .from(schema.commentTable)
+            .where(eq(schema.commentTable.id, replyId));
+          expect(comment?.statusUpdateId).toBeNull();
+        })
+      );
+    });
   });
 });

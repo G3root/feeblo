@@ -1,10 +1,12 @@
 import { useState } from "react";
 
+import type { TPostStatusOption } from "./context";
 import { CommentComposerEditor } from "./editor";
 import { CommentComposerProvider } from "./provider";
 import { CommentComposerSubmit } from "./submit";
 
 export { type CommentComposerProviderProps } from "./provider";
+export { type TPostStatusOption } from "./context";
 
 type CommentComposerRootProps = {
   cancelLabel?: string;
@@ -16,12 +18,16 @@ type CommentComposerRootProps = {
   onSubmit?: (value: {
     content: string;
     isPrivate: boolean;
+    statusUpdateId: string | null;
   }) => void | Promise<void>;
+  onStatusUpdateIdChange?: (id: string | null) => void;
   onVisibilityChange?: (isPrivate: boolean) => void;
   placeholder?: string;
   privateLabel?: string;
   publicLabel?: string;
   showVisibilityToggle?: boolean;
+  statusOptions?: readonly TPostStatusOption[];
+  statusUpdateLabel?: string;
   submitLabel?: string;
 };
 
@@ -33,17 +39,23 @@ function CommentComposerComponent({
   onCancel,
   onContentChange: externalOnContentChange,
   onSubmit,
+  onStatusUpdateIdChange: externalOnStatusUpdateIdChange,
   onVisibilityChange: externalOnVisibilityChange,
   placeholder,
   privateLabel,
   publicLabel,
   showVisibilityToggle,
+  statusOptions,
+  statusUpdateLabel,
   submitLabel,
 }: CommentComposerRootProps) {
   const [internalContent, setInternalContent] = useState(externalContent ?? "");
   const [internalIsPrivate, setInternalIsPrivate] = useState(
     externalIsPrivate ?? false
   );
+  const [internalStatusUpdateId, setInternalStatusUpdateId] = useState<
+    string | null
+  >(null);
   const [resetKey, setResetKey] = useState(0);
 
   const isContentControlled = externalContent !== undefined;
@@ -72,12 +84,22 @@ function CommentComposerComponent({
     externalOnVisibilityChange?.(checked);
   };
 
+  const handleStatusUpdateIdChange = (id: string | null) => {
+    setInternalStatusUpdateId(id);
+    externalOnStatusUpdateIdChange?.(id);
+  };
+
   const handleSubmit = async () => {
     if (!onSubmit) {
       return;
     }
-    await onSubmit({ content, isPrivate });
+    await onSubmit({
+      content,
+      isPrivate,
+      statusUpdateId: internalStatusUpdateId,
+    });
     setResetKey((k) => k + 1);
+    setInternalStatusUpdateId(null);
     if (!isContentControlled) {
       setInternalContent("");
     }
@@ -92,12 +114,16 @@ function CommentComposerComponent({
       onCancel={onCancel}
       onContentChange={handleContentChange}
       onSubmit={onSubmit ? handleSubmit : undefined}
+      onStatusUpdateIdChange={handleStatusUpdateIdChange}
       onVisibilityChange={handleVisibilityChange}
       placeholder={placeholder}
       privateLabel={privateLabel}
       publicLabel={publicLabel}
       resetKey={resetKey}
       showVisibilityToggle={showVisibilityToggle}
+      statusOptions={statusOptions}
+      statusUpdateId={internalStatusUpdateId}
+      statusUpdateLabel={statusUpdateLabel}
       submitLabel={submitLabel}
     >
       <div className="border-border rounded-md border p-3">

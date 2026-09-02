@@ -48,6 +48,7 @@ export function PostCommentComposer({
         disabled={disabled}
         form={form}
         resetKey={editorKey}
+        showStatusUpdate={isMember}
         showVisibilityToggle={isMember}
       />
       {isLocked && (
