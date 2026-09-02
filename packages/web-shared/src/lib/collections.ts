@@ -1,3 +1,5 @@
+import { isString } from "@feeblo/utils/runtime-kind";
+
 /**
  * Shared infrastructure for TanStack DB collections backed by the RPC API.
  *
@@ -42,8 +44,12 @@ export function eqFilterValue(
 ): string | undefined {
   for (const { field, operator, value } of filters) {
     if (operator === "eq" && field.join(".") === fieldName) {
-      // SAFETY: The upstream contract guarantees a string here.
-      return value as string;
+      // Parse at the TanStack DB filter boundary: `value` is `unknown` and
+      // may come from a user-controlled query key.
+      if (isString(value) && value.length > 0) {
+        return value;
+      }
+      return undefined;
     }
   }
 
@@ -91,9 +97,10 @@ export function postSlugFromPath(
     return undefined;
   }
 
+  const rawSegment = segments[markerIndex + slugOffset];
+  if (!isString(rawSegment)) return undefined;
   try {
-    // SAFETY: The index bounds are checked by the surrounding condition.
-    return decodeURIComponent(segments[markerIndex + slugOffset] as string);
+    return decodeURIComponent(rawSegment);
   } catch {
     return undefined;
   }

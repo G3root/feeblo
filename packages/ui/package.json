@@ -23,6 +23,7 @@
     "@base-ui/react": "catalog:",
     "@feeblo/utils": "workspace:*",
     "@feeblo/web-shared": "workspace:*",
+    "effect": "catalog:",
     "@hugeicons/core-free-icons": "^4.1.1",
     "@hugeicons/react": "^1.1.6",
     "@tanstack/react-form": "catalog:",

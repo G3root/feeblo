@@ -52,6 +52,7 @@ import {
   useRef,
   useState,
 } from "react";
+import * as Schema from "effect/Schema";
 import { z } from "zod";
 
 import { usePublicSiteUrl } from "~/hooks/use-site";
@@ -541,7 +542,9 @@ async function uploadChangelogCoverImage(
     throw new Error(`Cover image upload failed with status ${response.status}`);
   }
 
-  return uploadedEditorMediaSchema.parse(await response.json());
+  return Schema.decodeUnknownSync(uploadedEditorMediaSchema)(
+    await response.json()
+  );
 }
 
 export function ChangelogEditorSubmitAction() {

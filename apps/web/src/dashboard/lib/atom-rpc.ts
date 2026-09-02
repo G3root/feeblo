@@ -1,5 +1,6 @@
 import { AllRpcs } from "@feeblo/domain/rpc-group";
 import { createRpcProtocolLive } from "@feeblo/rpc-client";
+import { isString } from "@feeblo/utils/runtime-kind";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 import type * as Duration from "effect/Duration";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
@@ -11,7 +12,13 @@ export class DashboardClient extends AtomRpc.Service<DashboardClient>()(
   "DashboardClient",
   {
     group: AllRpcs,
-    protocol: () => createRpcProtocolLive(getRuntimePublicEnv().apiUrl),
+    protocol: () => {
+      const apiUrl = getRuntimePublicEnv().apiUrl;
+      if (!isString(apiUrl) || apiUrl.length === 0) {
+        throw new Error("API_URL is not configured");
+      }
+      return createRpcProtocolLive(apiUrl);
+    },
   }
 ) {}
 

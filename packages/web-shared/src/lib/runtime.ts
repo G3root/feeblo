@@ -1,11 +1,16 @@
 import { createRuntime, type RpcClientType, withRpc } from "@feeblo/rpc-client";
+import { isString } from "@feeblo/utils/runtime-kind";
 import type * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 
 import { RpcError } from "./rpc-error";
 import { getRuntimePublicEnv } from "./runtime-public-env";
 
-const runtime = createRuntime(getRuntimePublicEnv().apiUrl);
+const rawApiUrl = getRuntimePublicEnv().apiUrl;
+if (!isString(rawApiUrl) || rawApiUrl.length === 0) {
+  throw new Error("API_URL is not configured");
+}
+const runtime = createRuntime(rawApiUrl);
 
 /**
  * Runs an Effect with the default runtime and optional AbortSignal.

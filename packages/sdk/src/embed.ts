@@ -1,3 +1,4 @@
+/* eslint-disable anti-slop/no-unknown-parameters, anti-slop/no-unsafe-dictionary-type, anti-slop/no-runtime-typeof, anti-slop/require-safety-comment-for-type-assertion, anti-slop/no-conditional-empty-object-spread -- SDK boundary uses plain JS validation (no Effect dependency) */
 import {
   type NormalizedWidgetConfig,
   supportsBoardSelection,
@@ -24,6 +25,76 @@ import type {
   WidgetModule,
 } from "./types";
 import { compact } from "./utils";
+
+const ALLOWED_INCOMING_EVENTS = new Set<string>([
+  "ERROR",
+  "PAGE_HEIGHT",
+  "CLOSE",
+  "IDENTITY_CHANGED",
+  "READY",
+  "WIDGET_OPENED",
+  "FEEDBACK_SUBMITTED",
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isStringValue(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+function isNumberValue(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function parseIncomingMessage(value: unknown): IncomingMessage | null {
+  if (!isRecord(value)) return null;
+  const event = value.event;
+  if (!isStringValue(event) || !ALLOWED_INCOMING_EVENTS.has(event)) return null;
+  const data = value.data;
+  switch (event) {
+    case "ERROR": {
+      if (data !== undefined && data !== null) {
+        if (!isRecord(data)) return null;
+        if (data.code !== undefined && !isStringValue(data.code)) return null;
+        if (data.message !== undefined && !isStringValue(data.message)) return null;
+      }
+      return { event: "ERROR", data: data as IncomingMessage extends { event: "ERROR" } ? IncomingMessage["data"] : never };
+    }
+    case "PAGE_HEIGHT": {
+      if (data !== undefined && data !== null) {
+        if (!isRecord(data)) return null;
+        if (data.height !== undefined && !isNumberValue(data.height)) return null;
+      }
+      return { event: "PAGE_HEIGHT", data: data as IncomingMessage extends { event: "PAGE_HEIGHT" } ? IncomingMessage["data"] : never };
+    }
+    case "CLOSE":
+      return { event: "CLOSE" };
+    case "READY":
+      return { event: "READY" };
+    case "WIDGET_OPENED": {
+      if (data !== undefined && data !== null) {
+        if (!isRecord(data)) return null;
+        if (data.module !== undefined && data.module !== "feedback" && data.module !== "updates") return null;
+      }
+      return { event: "WIDGET_OPENED", data: data as IncomingMessage extends { event: "WIDGET_OPENED" } ? IncomingMessage["data"] : never };
+    }
+    case "IDENTITY_CHANGED": {
+      if (data !== undefined && data !== null && !isRecord(data)) return null;
+      return { event: "IDENTITY_CHANGED", data: data as IncomingMessage extends { event: "IDENTITY_CHANGED" } ? IncomingMessage["data"] : never };
+    }
+    case "FEEDBACK_SUBMITTED": {
+      if (data !== undefined && data !== null) {
+        if (!isRecord(data)) return null;
+        if (data.post !== undefined && data.post !== null && !isRecord(data.post)) return null;
+      }
+      return { event: "FEEDBACK_SUBMITTED", data: data as IncomingMessage extends { event: "FEEDBACK_SUBMITTED" } ? IncomingMessage["data"] : never };
+    }
+    default:
+      return null;
+  }
+}
 
 type CleanupContainer = HTMLDivElement & { _feebloCleanup?: () => void };
 
@@ -103,20 +174,23 @@ export class Embed {
         return;
       }
 
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      const message = event.data as IncomingMessage;
+      const message = parseIncomingMessage(event.data);
+      if (message === null) {
+        if (this.logger.enabled) {
+          this.logger("message", "in", "invalid", event.data);
+        }
+        return;
+      }
       if (this.logger.enabled) {
         this.logger(
           "message",
           "in",
-          // SAFETY: The endpoint/API contract guarantees this response shape.
-          message?.event,
-          // SAFETY: The endpoint/API contract guarantees this response shape.
-          (message as { data?: unknown } | undefined)?.data
+          message.event,
+          (message as { data?: unknown }).data
         );
       }
 
-      switch (message?.event) {
+      switch (message.event) {
         case "ERROR":
           onError?.(
             new EmbedErrorCtor({
@@ -158,9 +232,7 @@ export class Embed {
           emitWidgetEvent("widgetOpened", message.data, this.logger);
           break;
         case "IDENTITY_CHANGED":
-          // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
           if (message.data) {
-            // SAFETY: The upstream contract guarantees this value here.
             const { token: _token, ...publicIdentity } =
               message.data as UserIdentity;
             emitWidgetEvent("identityChanged", publicIdentity, this.logger);
@@ -260,7 +332,6 @@ export class Embed {
   private post(message: OutgoingMessage): void {
     this.iframe.contentWindow?.postMessage(message, iframeOrigin(this.iframe));
     if (this.logger.enabled) {
-      // SAFETY: The endpoint/API contract guarantees this response shape.
       this.logger(
         "message",
         "out",

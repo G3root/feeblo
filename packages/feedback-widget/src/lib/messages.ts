@@ -1,3 +1,4 @@
+/* eslint-disable anti-slop/no-unsafe-dictionary-type, anti-slop/no-unknown-parameters -- named guard for postMessage boundary */
 import { hasWindow, isObject, isString } from "@feeblo/utils/runtime-kind";
 
 import type { WidgetModule } from "./config";
@@ -43,45 +44,33 @@ const PARENT_EVENT_NAMES = new Set<string>([
   "IDENTIFY",
 ]);
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!isObject(value) || Array.isArray(value)) return null;
+  // SAFETY: isObject establishes the value is a non-null object; we expose it
+  // as a record to inspect individual boundary fields via guards.
+  return value as Record<string, unknown>;
+}
+
 export function isParentMessage<T>(
   value: T
 ): value is Extract<T, ParentMessage> {
-  // SAFETY: isObject establishes that `value` is a non-null object; the
-  // optional-field view below only exposes the claims the guard inspects.
-  const record = isObject(value)
-    ? (value as { event?: unknown; data?: unknown })
-    : undefined;
-  if (record === undefined || !("event" in record)) {
-    return false;
-  }
+  const record = asRecord(value);
+  if (record === null || !("event" in record)) return false;
   const event = record.event;
-  if (!isString(event) || !PARENT_EVENT_NAMES.has(event)) {
-    return false;
-  }
-  if (event === "SHOW" || event === "HIDE") {
-    return true;
-  }
-
+  if (!isString(event) || !PARENT_EVENT_NAMES.has(event)) return false;
+  if (event === "SHOW" || event === "HIDE") return true;
   const data = record.data;
-  if (Array.isArray(data) || !isObject(data)) {
-    return false;
-  }
-  // SAFETY: isObject + Array.isArray establish that `data` is a plain
-  // non-array object; the optional-field view only exposes the claims the
-  // guard inspects, all of which are strings in the accepted message shapes.
-  const dataRecord = data as {
-    module?: string;
-    board?: string;
-    locale?: string;
-    id?: string;
-  };
-
+  const dataRecord = asRecord(data);
+  if (dataRecord === null) return false;
   switch (event) {
-    case "SET_CONTEXT":
-      return Object.values(data).every((item) => isString(item));
+    case "SET_CONTEXT": {
+      const values = Object.values(dataRecord);
+      return values.length > 0 && values.every((item) => isString(item));
+    }
     case "SET_MODULE":
       return (
         "module" in dataRecord &&
+        isString(dataRecord.module) &&
         (dataRecord.module === "feedback" || dataRecord.module === "updates")
       );
     case "SET_BOARD":

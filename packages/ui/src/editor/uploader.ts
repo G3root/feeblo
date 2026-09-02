@@ -3,6 +3,7 @@ import {
   editorMediaUploadEndpoint,
   uploadedEditorMediaSchema,
 } from "@feeblo/web-shared/auth-client";
+import * as Schema from "effect/Schema";
 import type { Uploader } from "prosekit/extensions/file";
 
 type PendingEditorUpload = {
@@ -50,9 +51,11 @@ const uploadEditorMediaFile = ({
     xhr.addEventListener("load", () => {
       if (xhr.status === 200) {
         try {
-          const json = JSON.parse(xhr.responseText);
-          const { assetId, url } = uploadedEditorMediaSchema.parse(json);
-          resolve({ assetId, url });
+          // Parse at the XHR boundary with Effect Schema; xhr.responseText is untrusted JSON.
+          const decoded = Schema.decodeUnknownSync(
+            Schema.fromJsonString(uploadedEditorMediaSchema)
+          )(xhr.responseText);
+          resolve({ assetId: decoded.assetId, url: decoded.url });
         } catch (error) {
           reject(new Error("Failed to parse response", { cause: error }));
         }
