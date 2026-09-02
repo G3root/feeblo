@@ -229,7 +229,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
       { count: totalPosts, label: "All statuses", value: "all" },
       ...statuses.map((status) => ({
         count: countMap.get(status.id) ?? 0,
-        label: formatPostStatus(status.type),
+        label: status.label || formatPostStatus(status.type),
         value: status.id,
       })),
     ];

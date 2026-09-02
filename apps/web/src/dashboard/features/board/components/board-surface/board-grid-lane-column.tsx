@@ -2,7 +2,10 @@ import { CollisionPriority } from "@dnd-kit/abstract";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { RoadmapLaneColumn } from "@feeblo/post-ui/roadmap/roadmap-lane-column";
 import { Button } from "@feeblo/ui/button";
-import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
+import {
+  formatPostStatus,
+  type BoardPostStatus,
+} from "@feeblo/web-shared/board/constants";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo } from "react";
@@ -31,6 +34,7 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
   label,
 }: BoardGridLaneColumnProps) {
   const store = usePostCreateDialogContext();
+  const effectiveLabel = label || formatPostStatus(status);
   const { ref, isDropTarget } = useSortable({
     id,
     accept: "item",
@@ -44,7 +48,7 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
     <RoadmapLaneColumn
       action={
         <Button
-          aria-label={`Add post to ${label}`}
+          aria-label={`Add post to ${effectiveLabel}`}
           onClick={() => {
             store.send({
               type: "toggle",
@@ -64,7 +68,7 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
       }
       contentRef={ref}
       isHighlighted={isDropTarget}
-      label={label}
+      label={effectiveLabel}
       status={status}
       totalPosts={totalPosts}
     >

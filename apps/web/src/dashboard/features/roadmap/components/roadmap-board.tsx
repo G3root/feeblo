@@ -257,7 +257,7 @@ const RoadmapBoardLane = memo(function RoadmapBoardLane({
             {lane.posts.length}
           </span>
           <Button
-            aria-label={`Add post to ${lane.name ?? lane.label ?? formatPostStatus(lane.status)}`}
+            aria-label={`Add post to ${lane.name || lane.label || formatPostStatus(lane.status)}`}
             onClick={() => {
               createPostStore.send({
                 type: "toggle",

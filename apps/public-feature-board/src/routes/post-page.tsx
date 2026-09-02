@@ -93,7 +93,7 @@ export function PostPage() {
         .join(
           { postStatus: publicPostStatusCollection },
           ({ post, postStatus }) => eq(post.statusId, postStatus.id),
-          "inner"
+          "left"
         )
         .join(
           { board: publicBoardCollection },

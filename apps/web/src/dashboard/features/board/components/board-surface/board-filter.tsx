@@ -522,7 +522,7 @@ function getStatusSummary(
   if (statuses.length === 1) {
     return (
       postStatuses.find((postStatus) => postStatus.type === statuses[0])
-        ?.label ?? formatPostStatus(statuses[0])
+        ?.label || formatPostStatus(statuses[0])
     );
   }
 

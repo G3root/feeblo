@@ -1,5 +1,6 @@
 import { PostCard } from "@feeblo/post-ui/post/post-card";
 import { StandaloneUpvoteButton } from "@feeblo/post-ui/upvote-toggle";
+import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import { Button } from "@feeblo/ui/button";
 import {
   Empty,
@@ -128,7 +129,7 @@ export function RecentPostsSection({
                   {status && (
                     <PostCard.Status
                       color={status.color ?? undefined}
-                      label={status.label || status.type}
+                      label={status.label || formatPostStatus(status.type)}
                     />
                   )}
                   {board?.name && (

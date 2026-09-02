@@ -27,7 +27,7 @@ export function RoadmapLaneColumn({
   status,
   totalPosts,
 }: RoadmapLaneColumnProps) {
-  const readableStatus = name ?? label ?? formatPostStatus(status);
+  const readableStatus = name || label || formatPostStatus(status);
   const resolvedAction =
     action ??
     (totalPosts !== undefined ? (
