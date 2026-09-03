@@ -5,7 +5,9 @@ import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import * as HttpTraceContext from "effect/unstable/http/HttpTraceContext";
 
 import {
   IntegrationCapabilityKey,
@@ -87,6 +89,18 @@ const makeIntegrationEventRecorder = Effect.gen(function* () {
     const retentionExpiresAt = DateTime.toDate(
       DateTime.addDuration(now, Duration.days(30))
     );
+    // Persist the recording request's W3C trace context so the async delivery
+    // worker can link its spans back to the originating trace. Optional: spans
+    // may be absent (e.g. unsampled or provider-triggered ingresses).
+    const originTraceparent = yield* Effect.currentSpan.pipe(
+      Effect.option,
+      Effect.map(
+        Option.match({
+          onNone: () => undefined,
+          onSome: (span) => HttpTraceContext.toHeaders(span).traceparent,
+        })
+      )
+    );
     yield* db.insert(schema.integrationEventTable).values({
       causalHopCount: event.causalHopCount,
       causationId: event.causationId ?? null,
@@ -94,7 +108,12 @@ const makeIntegrationEventRecorder = Effect.gen(function* () {
       id: event.id,
       occurredAt,
       organizationId: event.organizationId,
-      origin: event.origin,
+      origin: {
+        ...event.origin,
+        ...(originTraceparent !== undefined && {
+          traceparent: originTraceparent,
+        }),
+      },
       payload: event.data,
       retentionExpiresAt,
       type: event.type,

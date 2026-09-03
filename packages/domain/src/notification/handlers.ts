@@ -59,6 +59,11 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
   return {
     NotificationList: (args: TNotificationList) =>
       listNotificationsEffect(args).pipe(
+        Effect.tap(
+          Effect.annotateCurrentSpan({
+            "rpc.organization_id": args.organizationId,
+          })
+        ),
         RateLimit.withPublicRpcRateLimit({
           name: "NotificationList",
           level: "read",
@@ -68,6 +73,11 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
       ),
     NotificationUnreadCount: ({ organizationId }: { organizationId: string }) =>
       unreadCountEffect({ organizationId }).pipe(
+        Effect.tap(
+          Effect.annotateCurrentSpan({
+            "rpc.organization_id": organizationId,
+          })
+        ),
         RateLimit.withPublicRpcRateLimit({
           name: "NotificationUnreadCount",
           level: "read",

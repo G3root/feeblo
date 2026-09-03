@@ -1,8 +1,12 @@
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
+import type * as Tracer from "effect/Tracer";
+import * as Headers from "effect/unstable/http/Headers";
+import * as HttpTraceContext from "effect/unstable/http/HttpTraceContext";
 
 import {
   classifyIntegrationProviderDeliveryFailure,
@@ -30,6 +34,27 @@ export class IntegrationDeliveryWorkerPersistenceError extends Schema.TaggedErro
   "IntegrationDeliveryWorkerPersistenceError",
   { operation: Schema.String }
 ) {}
+
+/**
+ * Builds a span link back to the request that recorded the event, decoded
+ * from the W3C traceparent persisted in the event origin. A link (instead of
+ * a parent span) keeps worker batch traces independently sampled while still
+ * connecting them to the originating request's trace.
+ */
+const makeOriginSpanLinks = (
+  traceparent: string | undefined
+): ReadonlyArray<Tracer.SpanLink> =>
+  traceparent === undefined
+    ? []
+    : Option.match(
+        HttpTraceContext.fromHeaders(Headers.fromInput({ traceparent })),
+        {
+          onNone: () => [],
+          onSome: (span) => [
+            { span, attributes: { "integration.origin_trace": true } },
+          ],
+        }
+      );
 
 /** PostgreSQL-backed worker repository boundary. Claim implementations use FOR UPDATE SKIP LOCKED in a short transaction. */
 export interface IntegrationDeliveryWorkerRepository {
@@ -148,6 +173,9 @@ export const runIntegrationDeliveryWorkerPoll = ({
                                 delivery.input.connection.provider,
                               "integration.route_id": delivery.input.route.id,
                             },
+                            links: makeOriginSpanLinks(
+                              delivery.input.event.origin.traceparent
+                            ),
                           }),
                           Effect.match({
                             onFailure: (failure) => ({

@@ -24,6 +24,12 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
           organizationId: args.organizationId,
         })
         .pipe(
+          Effect.tap(
+            Effect.annotateCurrentSpan({
+              "rpc.organization_id": args.organizationId,
+              ...(args.postId && { "rpc.post_id": args.postId }),
+            })
+          ),
           Policy.withPolicy(
             upvotePolicy.canList({
               organizationId: args.organizationId,
@@ -45,6 +51,12 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
 
         return result;
       }).pipe(
+        Effect.tap(
+          Effect.annotateCurrentSpan({
+            "rpc.organization_id": args.organizationId,
+            "rpc.post_id": args.postId,
+          })
+        ),
         Policy.withPolicy(
           upvotePolicy.canToggle({
             organizationId: args.organizationId,
@@ -71,6 +83,12 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         // Never leak internal voter identifiers to public callers.
         return redactActorIdentities(upvotes, sessionUserId);
       }).pipe(
+        Effect.tap(
+          Effect.annotateCurrentSpan({
+            "rpc.organization_id": args.organizationId,
+            ...(args.postId && { "rpc.post_id": args.postId }),
+          })
+        ),
         RateLimit.withPublicRpcRateLimit({
           name: "UpvoteListPublic",
           level: "read",
@@ -92,6 +110,12 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
 
         return result;
       }).pipe(
+        Effect.tap(
+          Effect.annotateCurrentSpan({
+            "rpc.organization_id": args.organizationId,
+            "rpc.post_id": args.postId,
+          })
+        ),
         RateLimit.withPublicRpcRateLimit({
           name: "UpvoteTogglePublic",
           level: "write",

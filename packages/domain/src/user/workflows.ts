@@ -22,7 +22,13 @@ export const WelcomeUserWorkflow = W.Workflow.make("WelcomeUserWorkflow", {
 });
 
 export const WelcomeUserWorkflowLayer = WelcomeUserWorkflow.toLayer(
-  Effect.fnUntraced(function* (payload, executionId) {
+  Effect.fn("WelcomeUserWorkflow.execute")(function* (payload, executionId) {
+    // Named Effect.fn: each (re)execution of the durable workflow emits a
+    // tracing span, keeping welcome-email deliveries visible in traces.
+    yield* Effect.annotateCurrentSpan({
+      "workflow.execution_id": executionId,
+      "workflow.user_id": payload.userId,
+    });
     yield* Effect.annotateLogsScoped({
       userId: payload.userId,
       email: payload.email,

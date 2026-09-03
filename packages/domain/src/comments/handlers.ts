@@ -389,6 +389,12 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
           slug: args.slug,
         })
         .pipe(
+          Effect.tap(
+            Effect.annotateCurrentSpan({
+              "rpc.organization_id": args.organizationId,
+              "rpc.slug": args.slug,
+            })
+          ),
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Comment", "select")
         ),
@@ -414,6 +420,12 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
         // Never leak internal commenter identifiers to public callers.
         return redactActorIdentities(comments, sessionUserId);
       }).pipe(
+        Effect.tap(
+          Effect.annotateCurrentSpan({
+            "rpc.organization_id": args.organizationId,
+            "rpc.slug": args.slug,
+          })
+        ),
         RateLimit.withPublicRpcRateLimit({
           name: "CommentListPublic",
           level: "read",
@@ -423,6 +435,12 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
 
     CommentCreate: (args: TCommentCreate) =>
       createCommentEffect(args).pipe(
+        Effect.tap(
+          Effect.annotateCurrentSpan({
+            "rpc.organization_id": args.organizationId,
+            "rpc.post_id": args.postId,
+          })
+        ),
         Policy.withPolicy(
           commentPolicy.canCreate({
             organizationId: args.organizationId,
@@ -438,6 +456,12 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
 
     CommentCreatePublic: (args: TCommentCreate) =>
       createCommentEffect(args).pipe(
+        Effect.tap(
+          Effect.annotateCurrentSpan({
+            "rpc.organization_id": args.organizationId,
+            "rpc.post_id": args.postId,
+          })
+        ),
         RateLimit.withPublicRpcRateLimit({
           name: "CommentCreatePublic",
           level: "expensive",

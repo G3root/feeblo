@@ -485,6 +485,13 @@ const sendDeliveryAttempt = (deliveryId: string) =>
       yield* Effect.logWarning(
         "Email delivery paused by internal circuit breaker"
       ).pipe(
+        Effect.tap(
+          Effect.annotateCurrentSpan({
+            "email.delivery_id": deliveryId,
+            "email.organization_id": intent.organizationId,
+            "email.throttle_reason": reason,
+          })
+        ),
         Effect.annotateLogs({
           deliveryId,
           organizationId: intent.organizationId,
@@ -514,6 +521,13 @@ const sendDeliveryAttempt = (deliveryId: string) =>
       yield* Effect.logWarning(
         "Email delivery paused by monthly volume limit"
       ).pipe(
+        Effect.tap(
+          Effect.annotateCurrentSpan({
+            "email.delivery_id": deliveryId,
+            "email.organization_id": intent.organizationId,
+            "email.throttle_reason": "monthly_volume_limit",
+          })
+        ),
         Effect.annotateLogs({
           deliveryId,
           organizationId: intent.organizationId,
@@ -1177,6 +1191,12 @@ export const wakeEmailOutboxBestEffort = (
   outboxId === undefined
     ? Effect.void
     : wakeEmailOutbox(outboxId).pipe(
+        Effect.tap(
+          Effect.annotateCurrentSpan({
+            "email.organization_id": organizationId,
+            "email.outbox_id": outboxId,
+          })
+        ),
         Effect.annotateLogs({ organizationId, outboxId })
       );
 

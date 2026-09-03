@@ -114,6 +114,15 @@ export const withGlobalMiddleware = <A, E, R>(
     Layer.provide(
       HttpRouter.middleware(serverTimingMiddleware, { global: true })
     ),
+    // Effect-native server span for every request: parents from inbound
+    // W3C traceparent / B3 headers (cross-service traces join into one
+    // trace) and records http.request/response attributes. The router adds
+    // `http.route` to it once a route matches.
+    Layer.provide(
+      HttpRouter.middleware(HttpMiddleware.tracer, { global: true })
+    ),
+    // Keep the tracer span noise down for the always-on health probe.
+    Layer.provide(HttpMiddleware.layerTracerDisabledForUrls(["/health"])),
     // Provides the peer-anchored client IP (socket remoteAddress) to every
     // route, including RPC middleware, so public rate limits are keyed on an
     // IP the client cannot spoof via forwarding headers.

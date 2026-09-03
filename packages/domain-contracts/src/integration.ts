@@ -156,6 +156,9 @@ export const StoredIntegrationEventOrigin = S.Struct({
   provider: S.optionalKey(IntegrationProviderKey),
   connectionId: S.optionalKey(S.NonEmptyString),
   routeId: S.optionalKey(S.NonEmptyString),
+  // W3C traceparent of the request that recorded the event; optional so rows
+  // persisted before tracing propagation keep decoding.
+  traceparent: S.optionalKey(S.NonEmptyString),
 });
 export type TStoredIntegrationEventOrigin = S.Schema.Type<
   typeof StoredIntegrationEventOrigin
