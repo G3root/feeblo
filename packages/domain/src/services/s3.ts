@@ -1,10 +1,8 @@
 import { S3 } from "@effect-aws/client-s3";
-import { S3FileSystem } from "@effect-aws/s3";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 
 import { S3Config } from "./s3-config";
@@ -36,13 +34,28 @@ const ORGANIZATION_LOGO_PREFIX = "organization-logos";
 const EDITOR_MEDIA_PREFIX = "editor-media";
 export const TEMPORARY_EDITOR_MEDIA_PREFIX = `tmp/${EDITOR_MEDIA_PREFIX}`;
 
+// Every object key embeds a timestamp and UUID, so the content at any given
+// URL never changes. Cache forever: immutable responses are never revalidated
+// while fresh, so replacing an avatar/logo just writes a new URL to the
+// database and abandons the old one. No SWR tags or cache purging needed.
+const IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
+const CONTENT_TYPE_BY_EXTENSION: Readonly<Record<string, string>> = {
+  gif: "image/gif",
+  jpg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+};
+
+const contentTypeForExtension = (extension: string): string =>
+  CONTENT_TYPE_BY_EXTENSION[extension] ?? "application/octet-stream";
+
 export const isTemporaryEditorMediaKey = (key: string) =>
   key.startsWith(`${TEMPORARY_EDITOR_MEDIA_PREFIX}/`);
 
 const makeS3UploadService = Effect.gen(function* () {
   const config = yield* S3Config;
   const bucket = config.publicBucketName;
-  const fileSystem = yield* FileSystem.FileSystem;
   const s3 = yield* S3;
   const resolvePublicUrl = (fileKey: string) => {
     const encodedKey = fileKey
@@ -75,7 +88,13 @@ const makeS3UploadService = Effect.gen(function* () {
         const crypto = yield* Crypto.Crypto;
         const now = yield* DateTime.now;
         const fileKey = `${PROFILE_IMAGE_PREFIX}/${userId}/${now.epochMilliseconds}-${yield* crypto.randomUUIDv4}.${extension}`;
-        yield* fileSystem.writeFile(fileKey, bytes);
+        yield* s3.putObject({
+          Bucket: bucket,
+          Key: fileKey,
+          Body: bytes,
+          ContentType: contentTypeForExtension(extension),
+          CacheControl: IMMUTABLE_CACHE_CONTROL,
+        });
         return resolvePublicUrl(fileKey);
       }),
     uploadOrganizationLogo: ({
@@ -91,7 +110,13 @@ const makeS3UploadService = Effect.gen(function* () {
         const crypto = yield* Crypto.Crypto;
         const now = yield* DateTime.now;
         const fileKey = `${ORGANIZATION_LOGO_PREFIX}/${organizationId}/${now.epochMilliseconds}-${yield* crypto.randomUUIDv4}.${extension}`;
-        yield* fileSystem.writeFile(fileKey, bytes);
+        yield* s3.putObject({
+          Bucket: bucket,
+          Key: fileKey,
+          Body: bytes,
+          ContentType: contentTypeForExtension(extension),
+          CacheControl: IMMUTABLE_CACHE_CONTROL,
+        });
         return resolvePublicUrl(fileKey);
       }),
     uploadEditorMedia: ({
@@ -109,7 +134,13 @@ const makeS3UploadService = Effect.gen(function* () {
         const crypto = yield* Crypto.Crypto;
         const now = yield* DateTime.now;
         const fileKey = `${TEMPORARY_EDITOR_MEDIA_PREFIX}/${userId}/${kind}/${now.epochMilliseconds}-${yield* crypto.randomUUIDv4}.${extension}`;
-        yield* fileSystem.writeFile(fileKey, bytes);
+        yield* s3.putObject({
+          Bucket: bucket,
+          Key: fileKey,
+          Body: bytes,
+          ContentType: contentTypeForExtension(extension),
+          CacheControl: IMMUTABLE_CACHE_CONTROL,
+        });
         return resolvePublicUrl(fileKey);
       }),
     promoteEditorMedia: ({
@@ -144,16 +175,6 @@ export class S3UploadService extends Context.Service<S3UploadService>()(
   static readonly layer = Layer.effect(this, this.make);
 }
 
-export const S3UploadServiceLive = Layer.unwrap(
-  Effect.gen(function* () {
-    const { publicBucketName } = yield* S3Config;
-    const S3FileSystemLive = S3FileSystem.layer({
-      bucketName: publicBucketName,
-    }).pipe(Layer.provide(S3Layer));
-
-    return S3UploadService.layer.pipe(
-      Layer.provide(S3FileSystemLive),
-      Layer.provide(S3Layer)
-    );
-  }).pipe(Effect.provide(S3Config.layer))
+export const S3UploadServiceLive = S3UploadService.layer.pipe(
+  Layer.provide(S3Layer)
 );
