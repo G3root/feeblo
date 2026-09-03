@@ -206,6 +206,16 @@ export const invitationTable = pgTable(
   ]
 );
 
+/** Polar subscription lifecycle persisted in `subscription.status`. */
+export type SubscriptionStatus =
+  | "incomplete"
+  | "incomplete_expired"
+  | "trialing"
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "unpaid";
+
 export const subscriptionTable = pgTable("subscription", {
   id: text("id").primaryKey(),
   externalId: text("external_id").unique().notNull(),
@@ -217,17 +227,7 @@ export const subscriptionTable = pgTable("subscription", {
   currency: text("currency").notNull(),
   recurringInterval: text("recurring_interval").notNull(),
   recurringIntervalCount: integer("recurring_interval_count").notNull(),
-  status: text("status")
-    .$type<
-      | "incomplete"
-      | "incomplete_expired"
-      | "trialing"
-      | "active"
-      | "past_due"
-      | "canceled"
-      | "unpaid"
-    >()
-    .notNull(),
+  status: text("status").$type<SubscriptionStatus>().notNull(),
 
   currentPeriodStart: timestamp("current_period_start", {
     withTimezone: true,

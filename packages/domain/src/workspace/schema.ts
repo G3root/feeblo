@@ -4,9 +4,27 @@ export const WorkspaceInput = S.Struct({
   organizationId: S.String,
 });
 
+/** Derived downgrade state: which paid capability the free plan now over-holds. */
+export const WorkspacePlanDowngradeState = S.Struct({
+  /** The workspace holds integration connections the free plan no longer covers. */
+  isDowngraded: S.Boolean,
+  /** Held integration connections of providers the capability governs. */
+  integrationCount: S.Number,
+  /** `0` when the plan excludes integrations, `null` when unlimited. */
+  integrationLimit: S.NullOr(S.Number),
+  /** Set while an active subscription is canceled at the end of its period. */
+  scheduledDowngrade: S.NullOr(
+    S.Struct({
+      currentPeriodEnd: S.DateFromString,
+      cancelAtPeriodEnd: S.Boolean,
+    })
+  ),
+});
+
 export const WorkspacePlan = S.Struct({
   organizationId: S.String,
   plan: S.Literals(["free", "starter", "professional"]),
+  downgradeState: WorkspacePlanDowngradeState,
 });
 
 export const CreateWorkspaceInput = S.Struct({
@@ -30,6 +48,9 @@ export const WorkspaceSlugCheckOutput = S.Struct({
 export type TCreateWorkspaceInput = S.Schema.Type<typeof CreateWorkspaceInput>;
 export type TWorkspaceInput = S.Schema.Type<typeof WorkspaceInput>;
 export type TWorkspacePlan = S.Schema.Type<typeof WorkspacePlan>;
+export type TWorkspacePlanDowngradeState = S.Schema.Type<
+  typeof WorkspacePlanDowngradeState
+>;
 export type TWorkspaceSlugCheckInput = S.Schema.Type<
   typeof WorkspaceSlugCheckInput
 >;

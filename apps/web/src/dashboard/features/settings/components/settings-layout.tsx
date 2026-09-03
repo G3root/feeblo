@@ -1,5 +1,7 @@
 import { cn } from "@feeblo/ui/utils";
 
+import { DowngradeBanner } from "~/features/integrations/components/downgrade-banner";
+
 interface RootProps extends React.ComponentProps<"div"> {
   children: React.ReactNode;
   size?: "default" | "large";
@@ -15,6 +17,7 @@ function Root({ children, className, size = "default", ...props }: RootProps) {
       )}
       {...props}
     >
+      <DowngradeBanner />
       {children}
     </div>
   );

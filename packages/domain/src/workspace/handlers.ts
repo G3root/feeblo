@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
@@ -13,11 +14,13 @@ import { WorkspaceRpcs } from "./rpcs";
 import type {
   TCreateWorkspaceInput,
   TWorkspaceInput,
+  TWorkspacePlanDowngradeState,
   TWorkspaceSlugCheckInput,
 } from "./schema";
 
 export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* WorkspaceRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
   const { validate: validateSubdomain } = yield* SubdomainValidationService;
 
   return {
@@ -61,14 +64,20 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
     WorkspaceProductList: () =>
       repository.findProducts().pipe(withRemapDbErrors("Workspace", "select")),
     WorkspacePlanGet: (args: TWorkspaceInput) =>
-      repository
-        .findPlanByOrganizationId({
+      entitlementPolicy.getDowngradeState(args.organizationId).pipe(
+        Effect.map((state) => ({
           organizationId: args.organizationId,
-        })
-        .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("Workspace", "select")
-        ),
+          plan: state.plan,
+          downgradeState: {
+            isDowngraded: state.isDowngraded,
+            integrationCount: state.integrationCount,
+            integrationLimit: state.integrationLimit,
+            scheduledDowngrade: state.scheduledDowngrade,
+          } satisfies TWorkspacePlanDowngradeState,
+        })),
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Workspace", "select")
+      ),
     WorkspaceSlugCheck: (args: TWorkspaceSlugCheckInput) =>
       validateSubdomain(args.slug).pipe(
         Effect.matchEffect({
@@ -107,5 +116,8 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
   WorkspaceRpcHandlersEffect
 ).pipe(
   Layer.provide(WorkspaceRepository.layer),
+  Layer.provide(
+    EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
+  ),
   Layer.provide(SubdomainValidationService.layerEnv)
 );
