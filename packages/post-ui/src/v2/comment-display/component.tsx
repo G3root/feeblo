@@ -1,10 +1,8 @@
-import { Card } from "@feeblo/ui/card";
 import { useState } from "react";
 
 import { CommentDisplayActions } from "./actions";
 import { CommentDisplayAvatar } from "./avatar";
 import { CommentDisplayBody } from "./body";
-import { useCommentDisplay } from "./context";
 import { CommentDisplayDropdown } from "./dropdown";
 import { CommentDisplayHeader } from "./header";
 import { CommentDisplayProvider } from "./provider";
@@ -16,6 +14,11 @@ type CommentDisplayRootProps = Omit<
   children?: never;
 };
 
+/**
+ * Minimal, dense comment row: no card chrome — just avatar, header, body and
+ * actions. The row is a hover `group` so the overflow menu can reveal itself
+ * on desktop; `data-slot="comment"` gives tests and consumers a stable hook.
+ */
 export function CommentDisplayComponent(props: CommentDisplayRootProps) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -26,31 +29,17 @@ export function CommentDisplayComponent(props: CommentDisplayRootProps) {
       onCancelEdit={() => setIsEditing(false)}
       onStartEdit={() => setIsEditing(true)}
     >
-      <PinnedCardWrapper>
-        <div className="flex items-start gap-3 p-4">
-          <CommentDisplayAvatar />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between">
-              <CommentDisplayHeader />
-              <CommentDisplayDropdown />
-            </div>
-            <CommentDisplayBody />
-            <CommentDisplayActions />
+      <div className="group flex items-start gap-2 py-1" data-slot="comment">
+        <CommentDisplayAvatar />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <CommentDisplayHeader />
+            <CommentDisplayDropdown />
           </div>
+          <CommentDisplayBody />
+          <CommentDisplayActions />
         </div>
-      </PinnedCardWrapper>
+      </div>
     </CommentDisplayProvider>
   );
-}
-
-function PinnedCardWrapper({ children }: { children: React.ReactNode }) {
-  const { state } = useCommentDisplay();
-  if (state.pinnedAt != null) {
-    return (
-      <Card className="border-amber-300 bg-amber-50/50 shadow-sm ring-1 ring-amber-200 dark:border-amber-800 dark:bg-amber-950/20 dark:ring-amber-900">
-        {children}
-      </Card>
-    );
-  }
-  return <Card>{children}</Card>;
 }

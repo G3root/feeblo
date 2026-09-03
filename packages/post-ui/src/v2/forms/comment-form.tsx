@@ -6,6 +6,7 @@ import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { formOptions } from "@tanstack/react-form";
 import {
+  useCallback,
   useMemo,
   type Dispatch,
   type ReactNode,
@@ -83,16 +84,21 @@ export function useCommentComposerStatusOptions(): readonly TPostStatusOption[] 
   );
 }
 
-interface useCommentFormProps {
-  defaultValues?: Partial<TSchema>;
-  setEditorKey: Dispatch<SetStateAction<number>>;
-  showVisibilityPicker: boolean;
-}
+type TCreateCommentInput = {
+  content: string;
+  visibility: TVisibilitySchema;
+  /** Set for replies; omitted/null for top-level comments. */
+  parentCommentId?: string | null;
+  statusUpdateId?: string | null;
+};
 
-export const useCommentForm = ({
-  defaultValues,
-  setEditorKey,
-}: useCommentFormProps) => {
+/**
+ * Shared optimistic-insert action for top-level comments and replies.
+ * Resolves to `false` when there is no session (the host's
+ * `onAuthRequired` fires instead) so callers can skip their success side
+ * effects — clearing the composer, closing the reply form.
+ */
+export function useCreateCommentAction() {
   const { post, organizationId } = usePostCollectionData();
   const postId = post.id;
   const postSlug = post.slug;
@@ -100,22 +106,18 @@ export const useCommentForm = ({
     collections: { commentCollection },
     onAuthRequired,
   } = usePostCollections();
-
   const { data: session } = useAuthState();
 
-  return useAppForm({
-    ...commentCreateFormOpts,
-    defaultValues: {
-      content: "",
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      visibility: defaultVisibility as TVisibilitySchema,
-      statusUpdateId: null,
-      ...(defaultValues ? defaultValues : undefined),
-    },
-    onSubmit: async ({ formApi, value }) => {
+  return useCallback(
+    async ({
+      content,
+      visibility,
+      parentCommentId = null,
+      statusUpdateId = null,
+    }: TCreateCommentInput) => {
       if (!session) {
         onAuthRequired?.();
-        return;
+        return false;
       }
 
       const membership = session.memberships.find(
@@ -128,10 +130,10 @@ export const useCommentForm = ({
         id: await CommentId.unsafeGenerate(),
         createdAt: new Date(),
         updatedAt: new Date(),
-        content: value.content,
-        visibility: value.visibility,
-        statusUpdateId: value.statusUpdateId ?? null,
-        parentCommentId: null,
+        content,
+        visibility,
+        statusUpdateId,
+        parentCommentId,
         organizationId,
         memberId: membership?.membershipId ?? null,
         postId,
@@ -144,6 +146,51 @@ export const useCommentForm = ({
       });
 
       await tx.isPersisted.promise;
+
+      return true;
+    },
+    [
+      commentCollection,
+      onAuthRequired,
+      organizationId,
+      postId,
+      postSlug,
+      session,
+    ]
+  );
+}
+
+interface useCommentFormProps {
+  defaultValues?: Partial<TSchema>;
+  setEditorKey: Dispatch<SetStateAction<number>>;
+  showVisibilityPicker: boolean;
+}
+
+export const useCommentForm = ({
+  defaultValues,
+  setEditorKey,
+}: useCommentFormProps) => {
+  const createComment = useCreateCommentAction();
+
+  return useAppForm({
+    ...commentCreateFormOpts,
+    defaultValues: {
+      content: "",
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      visibility: defaultVisibility as TVisibilitySchema,
+      statusUpdateId: null,
+      ...(defaultValues ? defaultValues : undefined),
+    },
+    onSubmit: async ({ formApi, value }) => {
+      const created = await createComment({
+        content: value.content,
+        visibility: value.visibility,
+        statusUpdateId: value.statusUpdateId,
+      });
+
+      if (!created) {
+        return;
+      }
 
       // Reset the whole form (not just the editor) so the next comment starts
       // from a clean slate: a stale `content` value here would otherwise be

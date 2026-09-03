@@ -211,6 +211,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
                 organizationId: args.organizationId,
                 postId: args.postId,
                 commentId: args.id,
+                parentCommentId: args.parentCommentId,
                 actorUserId: session.session.userId,
               }),
           });

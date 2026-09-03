@@ -213,7 +213,12 @@ const makeNotificationService = Effect.gen(function* () {
       organizationId,
       postId,
       commentId,
-    }: PostNotificationInput & { commentId: string }) =>
+      parentCommentId = null,
+    }: PostNotificationInput & {
+      commentId: string;
+      /** Set when the comment is a reply; the parent's author is notified. */
+      parentCommentId?: string | null;
+    }) =>
       Effect.gen(function* () {
         const context = yield* getPostContext({ organizationId, postId });
         if (!context) {
@@ -228,11 +233,27 @@ const makeNotificationService = Effect.gen(function* () {
               eq(schema.postSubscriptionTable.postId, postId)
             )
           );
+        // A reply also notifies the author of the comment being replied to;
+        // create() drops the actor and dedupes, so self-replies stay silent.
+        const parentAuthors =
+          parentCommentId == null
+            ? []
+            : yield* db
+                .select({ userId: schema.commentTable.userId })
+                .from(schema.commentTable)
+                .where(
+                  and(
+                    eq(schema.commentTable.id, parentCommentId),
+                    eq(schema.commentTable.organizationId, organizationId),
+                    eq(schema.commentTable.postId, postId)
+                  )
+                );
         yield* create({
           ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
           recipientUserIds: [
             context.creatorId,
+            ...parentAuthors.map((parent) => parent.userId),
             ...subscribers.map((subscriber) => subscriber.userId),
           ],
           kind: "feedback.commented",
