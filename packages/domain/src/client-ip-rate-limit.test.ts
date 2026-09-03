@@ -115,3 +115,95 @@ it.effect(
     }).pipe(Effect.provide(TestRuntime), Effect.scoped);
   }
 );
+
+it.effect(
+  "public RPC rate limit fails closed (503) when the global ClientIp middleware is not installed",
+  () => {
+    const proxyTrustResult = parseClientIpProxyTrust({
+      trustAllHeaders: true,
+      trustedProxyCidrs: [],
+    });
+    if (proxyTrustResult._tag === "Failure") {
+      return Effect.die(proxyTrustResult.failure);
+    }
+
+    const Route = HttpRouter.add("GET", "/no-client-ip", (request) =>
+      Effect.gen(function* () {
+        const middleware = yield* PublicRpcRateLimitMiddleware;
+        return yield* middleware(
+          Effect.gen(function* () {
+            // Never runs: the middleware must fail closed on the missing
+            // ClientIp service before touching the handler.
+            yield* publicRpc({
+              name: "NoClientIpIntegrationTest",
+              level: "read",
+            });
+            // If this sentinel ever surfaces the middleware stopped failing
+            // closed and let the handler run — the response would be 200, so
+            // the 503-expectation below catches the regression.
+            // SAFETY: the RPC middleware success type is the opaque
+            // `SuccessValue` marker; only its type is required because the
+            // caller discards the value via Effect.as. Narrowing the sentinel
+            // to `never` keeps the handler effect assignable while the runtime
+            // value remains the "handler-ran" string.
+            return "handler-ran" as never;
+          }),
+          {
+            client: new Rpc.ServerClient(1),
+            requestId: RpcMessage.RequestId("client-ip-rate-limit-test"),
+            rpc: TestRpc,
+            payload: undefined,
+            headers: request.headers,
+          }
+        ).pipe(
+          Effect.as(HttpServerResponse.text("ok")),
+          Effect.catchTag("RateLimitUnavailableError", () =>
+            Effect.succeed(
+              HttpServerResponse.text("unavailable", { status: 503 })
+            )
+          )
+        );
+      }).pipe(
+        Effect.catchTag("RateLimitExceededError", () =>
+          Effect.succeed(HttpServerResponse.text("limited", { status: 429 }))
+        ),
+        Effect.catchCause(() =>
+          Effect.succeed(HttpServerResponse.text("failed", { status: 500 }))
+        )
+      )
+    );
+    const RpcRateLimitHttpMiddleware = HttpRouter.middleware<{
+      provides: PublicRpcRateLimitMiddleware;
+    }>()(
+      Effect.map(
+        PublicRpcRateLimitMiddleware,
+        (middleware) => (effect) =>
+          Effect.provideService(
+            effect,
+            PublicRpcRateLimitMiddleware,
+            middleware
+          )
+      )
+    ).layer.pipe(
+      Layer.provide(PublicRpcRateLimitMiddlewareLive),
+      Layer.provide(RateLimitService.layerMemory)
+    );
+    // Deliberately NO makeClientIpGlobalMiddleware: the middleware must refuse
+    // the request rather than falling back to a shared global bucket.
+    const TestApp = Route.pipe(Layer.provide(RpcRateLimitHttpMiddleware));
+    const TestRuntime = TestApp.pipe(Layer.provideMerge(HttpRouter.layer));
+    const request = HttpServerRequest.fromWeb(
+      new Request("http://localhost/no-client-ip")
+    );
+
+    return Effect.gen(function* () {
+      const response = yield* Effect.flatMap(HttpRouter.HttpRouter, (router) =>
+        router.asHttpEffect()
+      ).pipe(
+        Effect.provideService(HttpServerRequest.HttpServerRequest, request)
+      );
+
+      expect(response.status).toBe(503);
+    }).pipe(Effect.provide(TestRuntime), Effect.scoped);
+  }
+);

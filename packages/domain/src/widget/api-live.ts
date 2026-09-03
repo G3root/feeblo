@@ -5,6 +5,7 @@ import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
@@ -45,6 +46,10 @@ import {
   UnauthorizedError,
   withRemapDbErrors,
 } from "../rpc-errors";
+import {
+  type TWidgetFeedbackMetadata,
+  WidgetFeedbackMetadataValue,
+} from "./schema";
 import { upsertContactFromParsed } from "./sso";
 
 export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
@@ -197,6 +202,26 @@ export const WidgetApiLive = HttpApiBuilder.group(
             yield* AttributeDefinitionRepository;
           const postRepository = yield* PostRepository;
 
+          // Defense-in-depth re-validation of the public request metadata
+          // before it is stored / delivered downstream (webhooks, email,
+          // embeddings). The endpoint schema already bounds this at the wire,
+          // but re-applying the same limits here guarantees the persisted
+          // JSONB and every derived payload stay bounded even if the endpoint
+          // schema is ever widened.
+          const validatedMetadata: TWidgetFeedbackMetadata | undefined =
+            metadata === undefined
+              ? undefined
+              : yield* Schema.decodeUnknownEffect(WidgetFeedbackMetadataValue)(
+                  metadata
+                ).pipe(
+                  Effect.mapError(
+                    () =>
+                      new DataValidationError({
+                        message: "Invalid feedback metadata",
+                      })
+                  )
+                );
+
           const recordWidgetPostCreatedEvent = ({
             postSlug,
             statusId,
@@ -211,7 +236,9 @@ export const WidgetApiLive = HttpApiBuilder.group(
               eventType: "feedback.post.created",
               organizationId,
               postId: id,
-              ...(metadata === undefined ? undefined : { metadata }),
+              ...(validatedMetadata === undefined
+                ? undefined
+                : { metadata: validatedMetadata }),
               postSlug,
               statusId,
               title,
@@ -330,7 +357,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   statusId: defaultStatus.id,
                   excerpt,
                   contactId: contactId ?? null,
-                  metadata: metadata ?? {},
+                  metadata: validatedMetadata ?? {},
                   source: "WIDGET",
                 });
                 yield* recordWidgetPostCreatedEvent({
@@ -351,7 +378,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   statusId: defaultStatus.id,
                   excerpt,
                   contactId: null,
-                  metadata: metadata ?? {},
+                  metadata: validatedMetadata ?? {},
                   source: "WIDGET",
                 })
                 .pipe(

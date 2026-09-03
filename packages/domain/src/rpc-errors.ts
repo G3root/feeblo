@@ -80,7 +80,6 @@ export type RemapDbErrorsOptions = {
 export type RemapDbErrorsConfig<UniqueViolationError = never> = {
   readonly entity: string;
   readonly action: DbAction;
-  readonly entityId?: unknown | { value: unknown; key: string }[];
   readonly onUniqueViolation?: () => UniqueViolationError;
   readonly uniqueViolationMessage?: string;
 };
@@ -136,13 +135,11 @@ export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
 export function withRemapDbErrors<R, E, A>(
   entityType: string,
   action: DbAction,
-  entityId?: unknown | { value: unknown; key: string }[],
   options?: RemapDbErrorsOptions
 ): (effect: Effect.Effect<R, E, A>) => RemappedDbEffect<R, E, A, never>;
 export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
   entityOrConfig: string | RemapDbErrorsConfig<UniqueViolationError>,
   action?: DbAction,
-  entityId?: unknown | { value: unknown; key: string }[],
   options?: RemapDbErrorsOptions
 ) {
   let config: RemapDbErrorsConfig<UniqueViolationError>;
@@ -153,7 +150,6 @@ export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
     config = {
       action,
       entity: entityOrConfig,
-      ...(entityId === undefined ? undefined : { entityId }),
       ...(options?.uniqueViolationMessage !== undefined && {
         uniqueViolationMessage: options.uniqueViolationMessage,
       }),
@@ -171,11 +167,7 @@ export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
       Effect.fail(
         new InternalServerError({
           message: `Error ${config.action}ing ${config.entity}`,
-          detail: constructDetailMessage(
-            detailPrefix,
-            config.entity,
-            config.entityId
-          ),
+          detail: constructDetailMessage(detailPrefix, config.entity),
         })
       );
 
@@ -232,19 +224,15 @@ export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
   };
 }
 
-const constructDetailMessage = (
-  title: string,
-  entityType: string,
-  entityId?: unknown | { value: unknown; key: string }[]
-) => {
-  if (entityId) {
-    if (Array.isArray(entityId)) {
-      return `${title} the ${entityType} with values ${entityId
-        .map((value) => `${value.key}: ${value.value}`)
-        .join(", ")}`;
-    }
-    return `${title} the ${entityType} with id ${entityId}`;
-  }
-
-  return `${title} the ${entityType}`;
-};
+/**
+ * Builds the `detail` string for a remapped database error.
+ *
+ * `detail` is serialized into the API 500 response body, so it deliberately
+ * never includes the request-supplied entity id: echoing caller-controlled
+ * values back would (a) reflect arbitrary input verbatim into the response
+ * and (b) turn the error path into an existence oracle ("id came back in the
+ * detail ⇒ the row exists"). Ids remain available server-side via the
+ * original `EffectDrizzleQueryError` in logs.
+ */
+const constructDetailMessage = (title: string, entityType: string) =>
+  `${title} the ${entityType}`;

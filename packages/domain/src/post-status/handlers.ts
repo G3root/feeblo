@@ -23,6 +23,12 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("PostStatus", "select")
         ),
     PostStatusListPublic: (args: TPostStatusList) =>
+      // Statuses are org-public by design: the public portal renders every
+      // post with its status label, so the status catalog must be readable
+      // without a session (a member-only status list would leak nothing more
+      // but would break the portal's rendering for anonymous visitors). The
+      // endpoint is per-IP rate limited; no PII is returned (id/name/color/
+      // kind only).
       repository
         .findMany({
           organizationId: args.organizationId,

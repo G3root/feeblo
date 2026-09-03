@@ -167,6 +167,16 @@ const ipAddressInCidr = (
   candidate.address.kind() === cidr.address.address.kind() &&
   candidate.address.match(cidr.address.address, cidr.prefixLength);
 
+/**
+ * Cloudflare edge IPv4/IPv6 ranges trusted for `cf-connecting-ip`.
+ *
+ * Source: https://www.cloudflare.com/ips/ (fetched 2024-11). Cloudflare
+ * occasionally adds edge ranges, so this list should be refreshed on a
+ * schedule — an out-of-date list means cf-connecting-ip is silently ignored
+ * for new ranges and the client falls back to the peer IP or proxy config,
+ * it never accepts a spoofable header. `client-ip.test.ts` pins the
+ * well-known ranges so an accidental truncation fails loudly.
+ */
 const CLOUDFLARE_IP_RANGES = [
   "173.245.48.0/20",
   "103.21.244.0/22",
