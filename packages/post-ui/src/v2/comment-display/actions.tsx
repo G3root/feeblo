@@ -1,6 +1,4 @@
 import { Button } from "@feeblo/ui/button";
-import { MailReply01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 
 import { CommentComposer } from "../comment-composer";
@@ -60,14 +58,23 @@ export function CommentDisplayActions() {
         <div className="pt-1">
           <CommentComposer
             onSubmit={async (value) => {
-              await actions.onReply({
+              // Close the composer only when the reply actually persisted;
+              // when authentication is required the host's onAuthRequired
+              // fires instead and the draft stays in the composer.
+              const created = await actions.onReply({
                 content: value.content,
                 isPrivate: value.isPrivate,
               });
-              setIsReplying(false);
+              if (created) {
+                setIsReplying(false);
+              }
             }}
             placeholder={`Reply to ${state.authorName}...`}
-            showVisibilityToggle={isMember}
+            // A reply under an INTERNAL comment continues member-only
+            // context: force it INTERNAL and hide the toggle (the policy
+            // denies PUBLIC replies under an INTERNAL parent).
+            isPrivate={state.isInternal ? true : undefined}
+            showVisibilityToggle={isMember && !state.isInternal}
             submitLabel="Reply"
           />
         </div>

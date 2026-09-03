@@ -2,7 +2,7 @@ import { currentDb, schema } from "@feeblo/db";
 import type { TNotificationEventType } from "@feeblo/db/validation-schema/notification-kind";
 import { NotificationId } from "@feeblo/id";
 import { isString } from "@feeblo/utils/runtime-kind";
-import { and, count, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -214,10 +214,12 @@ const makeNotificationService = Effect.gen(function* () {
       postId,
       commentId,
       parentCommentId = null,
+      visibility,
     }: PostNotificationInput & {
       commentId: string;
       /** Set when the comment is a reply; the parent's author is notified. */
       parentCommentId?: string | null;
+      visibility: "PUBLIC" | "INTERNAL";
     }) =>
       Effect.gen(function* () {
         const context = yield* getPostContext({ organizationId, postId });
@@ -248,12 +250,36 @@ const makeNotificationService = Effect.gen(function* () {
                     eq(schema.commentTable.postId, postId)
                   )
                 );
+        // An INTERNAL reply is visible to members only, so a parent author
+        // who cannot see it (a non-member commenter) must not be notified;
+        // member parent authors still are.
+        const parentAuthorUserIds = parentAuthors.map(
+          (parent) => parent.userId
+        );
+        let replyRecipientUserIds = parentAuthorUserIds;
+        if (visibility === "INTERNAL" && parentAuthorUserIds.length > 0) {
+          const memberParentAuthors = yield* db
+            .select({ userId: schema.memberTable.userId })
+            .from(schema.memberTable)
+            .where(
+              and(
+                eq(schema.memberTable.organizationId, organizationId),
+                inArray(schema.memberTable.userId, parentAuthorUserIds)
+              )
+            );
+          const memberUserIds = new Set(
+            memberParentAuthors.map((member) => member.userId)
+          );
+          replyRecipientUserIds = parentAuthorUserIds.filter((userId) =>
+            memberUserIds.has(userId)
+          );
+        }
         yield* create({
           ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
           recipientUserIds: [
             context.creatorId,
-            ...parentAuthors.map((parent) => parent.userId),
+            ...replyRecipientUserIds,
             ...subscribers.map((subscriber) => subscriber.userId),
           ],
           kind: "feedback.commented",

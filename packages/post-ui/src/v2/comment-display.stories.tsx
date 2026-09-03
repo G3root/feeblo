@@ -19,7 +19,7 @@ const SAMPLE_HTML =
 const SAMPLE_MARKDOWN =
   "This is a sample comment with **bold** text and a [link](https://example.com).";
 
-const noopReply = async () => {};
+const noopReply = async () => true;
 
 export function Default() {
   return (
@@ -78,6 +78,7 @@ export function AsAuthor() {
           }}
           onReply={async ({ content, isPrivate }) => {
             console.log("Reply", { content, isPrivate });
+            return true;
           }}
           onToggleVisibility={() => setIsInternal((prev) => !prev)}
           onUpdate={({ content }) => {
@@ -148,6 +149,7 @@ export function Composed() {
           }}
           onReply={async ({ content, isPrivate }) => {
             console.log("Reply", { content, isPrivate });
+            return true;
           }}
           onToggleVisibility={() => setIsInternal((prev) => !prev)}
           onUpdate={({ content, isPrivate }) => {
@@ -241,10 +243,11 @@ export function TimelineComposition() {
                   console.log(`Delete ${comment.commentId}`);
                 }}
                 onReply={async ({ content, isPrivate }) => {
-                  console.log(`Reply to ${comment.commentId}`, {
+                  console.log(`Reply to `, {
                     content,
                     isPrivate,
                   });
+                  return true;
                 }}
                 onToggleVisibility={() => {
                   setInternalComments((prev) => {

@@ -134,6 +134,9 @@ export function useCreateCommentAction() {
         visibility,
         statusUpdateId,
         parentCommentId,
+        // Optimistic row nests under its raw parent (always visible at
+        // creation time); the server re-resolves it for restricted lists.
+        resolvedParentCommentId: null,
         organizationId,
         memberId: membership?.membershipId ?? null,
         postId,

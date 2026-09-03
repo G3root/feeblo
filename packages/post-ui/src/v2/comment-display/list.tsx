@@ -28,8 +28,9 @@ interface CommentThread {
  * (path compression), so deep reply chains cost one walk total, not per
  * comment. Replies to replies are flattened under their root ancestor, so
  * a parent hidden from the current viewer (e.g. toggled INTERNAL for public
- * guests) cannot orphan its descendants — they surface under the nearest
- * visible ancestor.
+ * guests) cannot orphan its descendants: the public list carries each
+ * comment's `resolvedParentCommentId`, re-anchored to the nearest visible
+ * ancestor, so they surface beneath it rather than as unrelated roots.
  *
  * Thread roots keep the query order (pinned first, then newest). Replies
  * inside a thread read chronologically (oldest first), with a pinned reply
@@ -51,13 +52,15 @@ function buildThreads(comments: readonly TComment[]): CommentThread[] {
     let rootId = rootIdByCommentId.get(current.id);
     while (rootId === undefined) {
       path.push(current);
-      const parent =
-        current.parentCommentId == null
-          ? undefined
-          : byId.get(current.parentCommentId);
+      // The list carries the nearest visible ancestor (`resolvedParentCommentId`)
+      // for callers who cannot see every comment; fall back to the raw parent
+      // for rows where the server sent no resolution.
+      const parentId =
+        current.resolvedParentCommentId ?? current.parentCommentId;
+      const parent = parentId == null ? undefined : byId.get(parentId);
       if (!parent) {
-        // Top-level comment, or a reply whose parent is hidden from the
-        // current viewer: it roots its own thread.
+        // Top-level comment, or a reply with no visible ancestor left: it
+        // roots its own thread.
         rootId = current.id;
       } else {
         current = parent;
@@ -102,7 +105,11 @@ function CommentThreadRow({
   replies,
   currentUserId,
 }: CommentThread & { currentUserId?: string }) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(
+    // A pinned reply is the post-wide highlighted comment: start its thread
+    // expanded so the pin is not hidden behind the collapsed accordion.
+    () => replies.some((reply) => reply.pinnedAt != null)
+  );
   const expandReplies = useCallback(() => setIsExpanded(true), []);
 
   return (

@@ -111,13 +111,13 @@ export function CommentDisplayItem({
       statusUpdateLabel={statusUpdateLabel}
       statusUpdateColor={statusUpdateColor}
       onDelete={() => {}}
-      onReply={async ({ content, isPrivate }) => {
-        await createComment({
+      onReply={({ content, isPrivate }) =>
+        createComment({
           content,
           visibility: isPrivate ? "INTERNAL" : "PUBLIC",
           parentCommentId: data.id,
-        });
-      }}
+        })
+      }
       onTogglePin={async () => {
         const tx = togglePinAction({});
         await tx.isPersisted.promise;
