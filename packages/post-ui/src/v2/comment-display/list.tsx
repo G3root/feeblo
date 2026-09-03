@@ -109,8 +109,7 @@ function CommentThreadRow({
   // expanded so the pin is not hidden behind the collapsed accordion.
   const hasPinnedReply = replies.some((reply) => reply.pinnedAt != null);
   const [isExpanded, setIsExpanded] = useState(hasPinnedReply);
-  const [prevHasPinnedReply, setPrevHasPinnedReply] =
-    useState(hasPinnedReply);
+  const [prevHasPinnedReply, setPrevHasPinnedReply] = useState(hasPinnedReply);
   // Latch open on the false -> true transition (e.g. a reply is pinned
   // after mount). Derived during render instead of an effect: other replies
   // updates keep the current state, manual collapses stick, and an unpin

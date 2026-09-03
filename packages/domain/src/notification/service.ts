@@ -267,8 +267,8 @@ const makeNotificationService = Effect.gen(function* () {
         if (visibility === "INTERNAL") {
           const candidateUserIds = [
             ...new Set(
-              recipientUserIds.filter(
-                (userId): userId is string => isString(userId)
+              recipientUserIds.filter((userId): userId is string =>
+                isString(userId)
               )
             ),
           ];
