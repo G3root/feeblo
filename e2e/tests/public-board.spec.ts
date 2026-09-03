@@ -136,9 +136,7 @@ test(
       await visitorPage.goto(boardUrl);
       await signInThroughPublicBoard(visitorPage, user.email, user.password);
 
-      await visitorPage
-        .getByRole("button", { name: "Give Feedback" })
-        .click();
+      await visitorPage.getByRole("button", { name: "Give Feedback" }).click();
       const dialog = visitorPage.getByRole("dialog", {
         name: "Create Post",
       });
@@ -147,9 +145,7 @@ test(
       await dialog.getByLabel("Post Title").fill(title);
       await fillEditor(visitorPage, content, { scope: dialog });
       await dialog.getByRole("combobox").first().click();
-      await visitorPage
-        .getByRole("option", { name: "Features 💡" })
-        .click();
+      await visitorPage.getByRole("option", { name: "Features 💡" }).click();
 
       await dialog.getByRole("button", { name: "Create Post" }).click();
       await expect(dialog).toBeHidden();

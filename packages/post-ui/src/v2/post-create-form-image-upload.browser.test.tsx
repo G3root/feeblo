@@ -73,7 +73,7 @@ vi.mock("@tanstack/react-db", () => ({
           await options.mutationFn(variables);
         })();
         return { isPersisted: { promise } };
-      },
+      }
   ),
   eq: () => ({ __eq: true }),
   queryOnce: vi.fn(),
@@ -110,11 +110,10 @@ vi.mock("@feeblo/id", () => ({
   PostId: { unsafeGenerate: vi.fn().mockResolvedValue("post-1") },
 }));
 
-import type { PostCreateActionInput } from "./dialogs/post-create-form-inner";
-import type { PersistPostInput } from "./providers/post-collections-provider";
-
 import { PostCreateDialogProvider } from "./dialog-stores/post";
+import type { PostCreateActionInput } from "./dialogs/post-create-form-inner";
 import { PostCreateForm } from "./dialogs/post-create-form-inner";
+import type { PersistPostInput } from "./providers/post-collections-provider";
 import { PostCollectionsProvider } from "./providers/post-collections-provider";
 
 class MockXMLHttpRequest {
