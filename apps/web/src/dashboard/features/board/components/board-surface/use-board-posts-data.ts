@@ -8,7 +8,16 @@ import {
   not,
   useLiveQuery,
 } from "@tanstack/react-db";
+import { useMemo } from "react";
 
+import {
+  boardCollection,
+  postCollection,
+  postStatusCollection,
+  postTagCollection,
+  tagCollection,
+  upvoteCollection,
+} from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import type {
@@ -17,6 +26,23 @@ import type {
   BoardTagOperator,
 } from "../../state/board-store-context";
 import type { BoardPostRow } from "./types";
+
+/**
+ * Warms exactly the collections `useBoardPostsData` subscribes to. Board
+ * and feedback routes call this in `beforeLoad` so lane data arrives with
+ * the route instead of after mount; the layout only preloads shell-level
+ * collections (organization, board, plan).
+ */
+export async function preloadBoardPostsDataCollections(): Promise<void> {
+  await Promise.all([
+    boardCollection.preload(),
+    postCollection.preload(),
+    postStatusCollection.preload(),
+    tagCollection.preload(),
+    postTagCollection.preload(),
+    upvoteCollection.preload(),
+  ]);
+}
 
 const STATUSES_BY_PRESET = {
   active: ["PLANNED", "IN_PROGRESS"],
@@ -250,26 +276,42 @@ export function useBoardPostsData({
     [organizationId]
   );
 
-  const boardById = new Map(
-    (boardsQuery.data ?? []).map((board) => [board.id, board])
-  );
+  const boardsData = boardsQuery.data;
+  const upvotesData = upvotesQuery.data;
+  const postsData = postsQuery.data;
+  const postStatusesData = postStatusesQuery.data;
 
-  const upvoteCountByPostId = new Map<string, number>();
-
-  for (const upvote of upvotesQuery.data ?? []) {
-    upvoteCountByPostId.set(
-      upvote.postId,
-      (upvoteCountByPostId.get(upvote.postId) ?? 0) + 1
+  // Derived maps and rows are rebuilt only when their source query data
+  // changes. Without this every render allocates new arrays/objects, which
+  // defeats the `memo` on lane/row components below and re-renders the
+  // whole board on unrelated store updates (selection, dialogs).
+  const posts: BoardPostRow[] = useMemo(() => {
+    const boardById = new Map(
+      (boardsData ?? []).map((board) => [board.id, board])
     );
-  }
 
-  const posts: BoardPostRow[] = (postsQuery.data ?? []).map((post) => ({
-    ...post,
-    boardName: boardById.get(post.boardId)?.name ?? "",
-    boardSlug: boardById.get(post.boardId)?.slug ?? "",
-    upvoteCount: upvoteCountByPostId.get(post.id) ?? 0,
-    user: post.user,
-  }));
+    const upvoteCountByPostId = new Map<string, number>();
+
+    for (const upvote of upvotesData ?? []) {
+      upvoteCountByPostId.set(
+        upvote.postId,
+        (upvoteCountByPostId.get(upvote.postId) ?? 0) + 1
+      );
+    }
+
+    return (postsData ?? []).map((post) => ({
+      ...post,
+      boardName: boardById.get(post.boardId)?.name ?? "",
+      boardSlug: boardById.get(post.boardId)?.slug ?? "",
+      upvoteCount: upvoteCountByPostId.get(post.id) ?? 0,
+      user: post.user,
+    }));
+  }, [boardsData, upvotesData, postsData]);
+
+  const postStatuses = useMemo(
+    () => filterPostStatusesByPreset(postStatusesData ?? [], postStatusFilter),
+    [postStatusesData, postStatusFilter]
+  );
 
   return {
     hasError:
@@ -284,10 +326,7 @@ export function useBoardPostsData({
       postsQuery.isLoading ||
       upvotesQuery.isLoading ||
       (tagIds.length > 0 && matchingTagPostsQuery.isLoading),
-    postStatuses: filterPostStatusesByPreset(
-      postStatusesQuery.data ?? [],
-      postStatusFilter
-    ),
+    postStatuses,
     posts,
   };
 }

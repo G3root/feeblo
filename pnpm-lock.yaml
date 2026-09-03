@@ -416,9 +416,6 @@ importers:
       '@marsidev/react-turnstile':
         specifier: ^1.5.4
         version: 1.6.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@posthog/react':
-        specifier: ^1.10.3
-        version: 1.10.3(@types/react@19.2.18)(posthog-js@1.416.0)(react@19.2.8)
       '@tanstack/query-db-collection':
         specifier: 'catalog:'
         version: 1.2.4(@tanstack/query-core@5.101.4)(typescript@6.0.3)
@@ -3994,16 +3991,6 @@ packages:
 
   '@posthog/core@1.47.1':
     resolution: {integrity: sha512-d38C5DulL3gCox4g0VGyb/Lhn548fBvj9f35LZGVasPspOs3jyApxROJyDXoWwIRivOjCOIShZQAdYkZVn9J3w==}
-
-  '@posthog/react@1.10.3':
-    resolution: {integrity: sha512-Qu//fGQmVlX0B9kTA3LLg67e7AYLEmeuA0Bf1qSyUM0uUILcRQGjQezhNQPLYSTakOqvXEnl6fM2iQBF6Toxrw==}
-    peerDependencies:
-      '@types/react': '>=16.8.0'
-      posthog-js: '>=1.257.2'
-      react: '>=16.8.0'
-    peerDependenciesMeta:
-      '@types/react':
-        optional: true
 
   '@posthog/types@1.403.0':
     resolution: {integrity: sha512-QbkO0epmdq38xhxwP214YRi0vgpZiXqhamaTjKT6kVGJYTtsE5qZ1GTgLp12IYehg/rd+whYYErH3/DeX8pj3Q==}
@@ -12167,13 +12154,6 @@ snapshots:
   '@posthog/core@1.47.1':
     dependencies:
       '@posthog/types': 1.403.0
-
-  '@posthog/react@1.10.3(@types/react@19.2.18)(posthog-js@1.416.0)(react@19.2.8)':
-    dependencies:
-      posthog-js: 1.416.0
-      react: 19.2.8
-    optionalDependencies:
-      '@types/react': 19.2.18
 
   '@posthog/types@1.403.0': {}
 
