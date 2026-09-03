@@ -11,6 +11,8 @@ export {
 export const PostStatus = S.Struct({
   id: S.String,
   type: PostStatusType,
+  label: S.String,
+  color: S.optional(S.NullOr(S.String)),
   orderIndex: S.Number,
   organizationId: S.String,
   createdAt: S.DateFromString,

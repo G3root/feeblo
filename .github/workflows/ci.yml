@@ -56,8 +56,30 @@ jobs:
           API_URL: http://localhost:3100
           CLOUDFLARE_ADAPTER: "false"
 
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm --filter @feeblo/e2e exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright browsers
+        id: playwright-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install Playwright browser
         run: pnpm --filter @feeblo/e2e exec playwright install --with-deps chromium
+
+      # Saved right after the install instead of in a post step so the browsers
+      # are cached even when a later step fails or the job is cancelled.
+      - name: Save Playwright browsers
+        if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
       - name: Run end-to-end tests using built apps
         run: pnpm --filter @feeblo/e2e test:ci
@@ -80,7 +102,7 @@ jobs:
   test:
     name: Typecheck & Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
@@ -88,7 +110,7 @@ jobs:
           egress-policy: audit
           disable-telemetry: true
           allowed-endpoints: >
-            api.github.com:443 github.com:443 nodejs.org:443
+            api.github.com:443 github.com:443 nodejs.org:443 storage.googleapis.com:443 cdn.playwright.dev:443 archive.ubuntu.com:443 security.ubuntu.com:443 ppa.launchpad.net:443
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -101,14 +123,36 @@ jobs:
       - name: Copy env
         run: cp .env.example .env
 
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm --filter @feeblo/post-ui exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright browsers
+        id: playwright-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install Playwright browser
         run: pnpm --filter @feeblo/post-ui exec playwright install --with-deps chromium
 
+      # Saved right after the install instead of in a post step so the browsers
+      # are cached even when a later step fails or the job is cancelled.
+      - name: Save Playwright browsers
+        if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
       - name: Typecheck
-        run: pnpm check-types
+        run: pnpm exec turbo check-types --concurrency=4
 
       - name: Unit tests
-        run: pnpm test
+        run: pnpm exec turbo run test --filter=!@feeblo/e2e --concurrency=4
 
   docker_smoke_test:
     name: Docker Smoke Test

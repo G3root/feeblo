@@ -109,10 +109,15 @@ export interface RpcCollectionHelpers {
   resolvePostSlug(
     filters?: ReadonlyArray<CollectionEqFilter>
   ): string | undefined;
-  /** Query key for a slug-scoped scope ("comment", "post-reaction", …). */
+  /**
+   * Query key for a slug-scoped scope ("comment", "post-reaction", …).
+   * Extra parts (e.g. a session user id for user-scoped data) are appended so
+   * identity-specific results never share a cache entry across users.
+   */
   slugScopedQueryKey(
     scope: string,
-    filters?: ReadonlyArray<CollectionEqFilter>
+    filters?: ReadonlyArray<CollectionEqFilter>,
+    ...parts: ReadonlyArray<string | undefined>
   ): string[];
 }
 
@@ -130,13 +135,14 @@ export function createRpcCollectionHelpers(
 
   const slugScopedQueryKey = (
     scope: string,
-    filters?: ReadonlyArray<CollectionEqFilter>
+    filters?: ReadonlyArray<CollectionEqFilter>,
+    ...parts: ReadonlyArray<string | undefined>
   ) => {
     const slug = resolvePostSlug(filters);
 
     return slug
-      ? organizationScopedQueryKey(scope, "postSlug", slug)
-      : organizationScopedQueryKey(scope);
+      ? organizationScopedQueryKey(scope, "postSlug", slug, ...parts)
+      : organizationScopedQueryKey(scope, ...parts);
   };
 
   return { organizationScopedQueryKey, resolvePostSlug, slugScopedQueryKey };

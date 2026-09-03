@@ -17,6 +17,8 @@ const makePostStatusRepository = Effect.gen(function* () {
         .select({
           id: schema.postStatusTable.id,
           type: schema.postStatusTable.type,
+          label: schema.postStatusTable.label,
+          color: schema.postStatusTable.color,
           orderIndex: schema.postStatusTable.orderIndex,
           organizationId: schema.postStatusTable.organizationId,
           createdAt: schema.postStatusTable.createdAt,

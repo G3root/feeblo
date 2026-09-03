@@ -695,6 +695,7 @@ export const commentCollection = createCollection(
             postId: newComment.postId,
             parentCommentId: newComment.parentCommentId,
             id: newComment.id,
+            statusUpdateId: newComment.statusUpdateId ?? null,
           }),
         {}
       );

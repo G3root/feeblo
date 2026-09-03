@@ -46,7 +46,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
 
   /** In-app notification for subscribed members; email stays outbox-driven. */
   const notifyChangelogPublished = (args: {
-    readonly actorMemberId?: string | null;
+    readonly actorUserId?: string | null;
     readonly changelogId: string;
     readonly changelogSlug: string;
     readonly organizationId: string;
@@ -163,7 +163,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                 : undefined;
             if (args.status === "published") {
               yield* notifyChangelogPublished({
-                ...(isMember && { actorMemberId: isMember.membershipId }),
+                ...(isMember && { actorUserId: session.session.userId }),
                 changelogId: args.id,
                 changelogSlug: args.slug,
                 organizationId: args.organizationId,
@@ -256,7 +256,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               : undefined;
             if (publishedNow) {
               yield* notifyChangelogPublished({
-                ...(membership && { actorMemberId: membership.membershipId }),
+                ...(membership && { actorUserId: session.session.userId }),
                 changelogId: args.id,
                 changelogSlug: args.slug,
                 organizationId: args.organizationId,
@@ -294,6 +294,8 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
 
     ChangelogSendUpdate: (args: TChangelogSendUpdate) =>
       Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
         const outboxId = yield* transaction(
           Effect.gen(function* () {
             const status = yield* repository.findStatus({
@@ -351,6 +353,30 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                     })
                 )
               );
+            // Subscribers with email suppressed still see the update in-app;
+            // deduplicated per request so retries stay silent.
+            if (result._tag === "Inserted") {
+              const context = yield* repository.findNotificationContext({
+                id: args.id,
+                organizationId: args.organizationId,
+              });
+              if (context) {
+                yield* Option.match(notifications, {
+                  onNone: () => Effect.void,
+                  onSome: (service) =>
+                    service.notifyChangelogUpdated({
+                      ...(membership && {
+                        actorUserId: session.session.userId,
+                      }),
+                      changelogId: args.id,
+                      changelogSlug: context.slug,
+                      organizationId: args.organizationId,
+                      requestId: args.requestId,
+                      title: context.title,
+                    }),
+                });
+              }
+            }
             return result._tag === "Inserted" ? result.intent.id : undefined;
           })
         );

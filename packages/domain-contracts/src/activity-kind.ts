@@ -26,6 +26,8 @@ export const PostActivityKind = S.Literals([
   "COMMENT_CREATED",
   "COMMENT_UPDATED",
   "COMMENT_DELETED",
+  "COMMENT_PINNED",
+  "COMMENT_UNPINNED",
 ]);
 
 export type TPostActivityKind = S.Schema.Type<typeof PostActivityKind>;

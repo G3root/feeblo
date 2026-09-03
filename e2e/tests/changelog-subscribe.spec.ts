@@ -1,25 +1,13 @@
 import { randomUUID } from "node:crypto";
 
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { createAuthenticatedWorkspace, logOut } from "../helpers/auth";
+import { openChangelogPage } from "../helpers/changelog";
 import { createTestUser } from "../helpers/test-users";
 
 const signInWithEmailButtonName = /^Sign in with email/;
 const authDialogName = "Sign in / Sign up";
-
-function publicBoardUrl(workspaceName: string) {
-  const subdomain = workspaceName.toLowerCase().replaceAll(" ", "-");
-  const baseURL = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3101");
-  return `${baseURL.protocol}//${subdomain}.${baseURL.hostname}${baseURL.port ? `:${baseURL.port}` : ""}`;
-}
-
-async function openChangelogPage(page: Page, workspaceName: string) {
-  await page.goto(`${publicBoardUrl(workspaceName)}/changelog`);
-  await expect(
-    page.getByRole("link", { name: "Subscribe to the changelog RSS feed" })
-  ).toBeVisible();
-}
 
 test.describe("changelog email subscription", () => {
   // Subscribing is available on every plan — only subscriber email delivery
@@ -65,7 +53,23 @@ test.describe("changelog email subscription", () => {
     // before asserting the authenticated subscription control.
     await openChangelogPage(page, user.workspaceName);
 
+    // Wait for the optimistic toggle to persist before exercising the
+    // opposite direction: the button swallows clicks while a mutation is in
+    // flight, so a fast follow-up click would otherwise be dropped.
+    const subscribeResponse = page.waitForResponse(
+      (response) =>
+        /\/rpc\/?$/.test(response.url()) &&
+        response.request().method() === "POST" &&
+        (response.request().postData() ?? "").includes(
+          "ChangelogSubscriptionCreatePublic"
+        )
+    );
     await page.getByRole("button", { name: "Subscribe", exact: true }).click();
+    expect((await subscribeResponse).ok()).toBeTruthy();
+    // The anchored success toast is only added once persistence has fully
+    // settled, so it also guarantees the button's re-entrancy guard is clear
+    // before the opposite toggle is clicked.
+    await expect(page.getByText("Subscribed to the changelog!")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Unsubscribe", exact: true })
     ).toBeVisible();
@@ -76,7 +80,7 @@ test.describe("changelog email subscription", () => {
         /\/rpc\/?$/.test(response.url()) &&
         response.request().method() === "POST" &&
         (response.request().postData() ?? "").includes(
-          "EmailSubscriptionChangelogSubscribeSet"
+          "ChangelogSubscriptionDeletePublic"
         )
     );
     await page

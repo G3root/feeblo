@@ -18,6 +18,7 @@ export type BoardPostRow = {
 };
 
 export type BoardPostLane = {
+  label: string;
   posts: BoardPostRow[];
   statusId: string;
   status: BoardPostStatus;

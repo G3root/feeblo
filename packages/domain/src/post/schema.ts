@@ -56,6 +56,13 @@ export const PostList = S.Struct({
 
 export type TPostList = S.Schema.Type<typeof PostList>;
 
+export const PostGet = S.Struct({
+  organizationId: S.String,
+  slug: S.String,
+});
+
+export type TPostGet = S.Schema.Type<typeof PostGet>;
+
 export const PostSuggestions = S.Struct({
   boardId: S.optional(BoardId.schema),
   content: S.String,

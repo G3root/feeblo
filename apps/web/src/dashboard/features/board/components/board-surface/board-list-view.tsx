@@ -15,7 +15,7 @@ import {
 } from "@feeblo/ui/context-menu";
 import {
   type BoardPostStatus,
-  getBoardStatusLabel,
+  formatPostStatus,
 } from "@feeblo/web-shared/board/constants";
 import { hasMembership, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import {
@@ -123,7 +123,7 @@ function BoardListLaneHeader({
               />
               <StatusIcon status={lane.status} />
               <h3 className="text-sm font-medium">
-                {getBoardStatusLabel(lane.status)}
+                {lane.label || formatPostStatus(lane.status)}
               </h3>
               <span className="text-muted-foreground text-xs">
                 {lane.posts.length}
@@ -137,6 +137,7 @@ function BoardListLaneHeader({
               <AddPostButton
                 boardId={boardId}
                 disabled={!allowed}
+                label={lane.label || formatPostStatus(lane.status)}
                 status={lane.status}
                 statusId={lane.statusId}
               />
@@ -217,11 +218,13 @@ function useLaneSelectedCount(posts: BoardPostRow[]) {
 function AddPostButton({
   boardId,
   disabled = false,
+  label,
   status,
   statusId,
 }: {
   boardId?: string;
   disabled?: boolean;
+  label: string;
   status: BoardPostStatus;
   statusId: string;
 }) {
@@ -229,7 +232,7 @@ function AddPostButton({
 
   return (
     <Button
-      aria-label={`Add post to ${getBoardStatusLabel(status)}`}
+      aria-label={`Add post to ${label}`}
       className="absolute top-1/2 right-6 -translate-y-1/2"
       disabled={disabled}
       onClick={(event) => {

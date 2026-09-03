@@ -17,16 +17,9 @@ import {
   FieldLabel,
   FieldTitle,
 } from "@feeblo/ui/field";
-import {
-  Item,
-  ItemContent,
-  ItemGroup,
-  ItemMedia,
-  ItemTitle,
-} from "@feeblo/ui/item";
 import { Radio, RadioGroup } from "@feeblo/ui/radio-group";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
-import { SparklesIcon, StarIcon } from "@hugeicons/core-free-icons";
+import { SparklesIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
@@ -142,6 +135,18 @@ function UpgradePlanDialogContent({
   const selectedPlan =
     plans.find((p) => p.planType === selectedPlanType) ?? plans[0];
   const isCurrentPlan = selectedPlanType === currentPlanType;
+  const [showAllFeatures, setShowAllFeatures] = useState(false);
+
+  // Reset expanded state when switching plans so the list stays compact.
+  const handlePlanTypeChange = (value: PlanType) => {
+    setSelectedPlanType(value);
+    setShowAllFeatures(false);
+  };
+
+  const visibleFeatures = showAllFeatures
+    ? selectedPlan.features
+    : selectedPlan.features.slice(0, 6);
+  const hiddenCount = selectedPlan.features.length - visibleFeatures.length;
 
   return (
     <DialogPopup className="max-w-5xl">
@@ -175,7 +180,7 @@ function UpgradePlanDialogContent({
                 className="gap-3"
                 onValueChange={(value) =>
                   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-                  setSelectedPlanType(value as PlanType)
+                  handlePlanTypeChange(value as PlanType)
                 }
                 value={selectedPlanType}
               >
@@ -241,18 +246,40 @@ function UpgradePlanDialogContent({
               </div>
             ) : null}
 
-            <ItemGroup className="mt-2 gap-1">
-              {selectedPlan.features.map((feature) => (
-                <Item key={feature.key} size="sm" variant="outline">
-                  <ItemMedia>
-                    <HugeiconsIcon icon={StarIcon} />
-                  </ItemMedia>
-                  <ItemContent>
-                    <ItemTitle>{feature.label}</ItemTitle>
-                  </ItemContent>
-                </Item>
+            <ul className="mt-3 space-y-2">
+              {visibleFeatures.map((feature) => (
+                <li
+                  className="flex items-start gap-2.5 text-[13px] leading-5"
+                  key={feature.key}
+                >
+                  <span className="bg-primary/10 text-primary mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full">
+                    <HugeiconsIcon
+                      className="size-3"
+                      icon={Tick02Icon}
+                      strokeWidth={2.2}
+                    />
+                  </span>
+                  <span className="text-foreground/80">{feature.label}</span>
+                </li>
               ))}
-            </ItemGroup>
+            </ul>
+            {hiddenCount > 0 ? (
+              <button
+                className="text-muted-foreground hover:text-foreground mt-3 text-left text-[13px] font-medium underline-offset-4 hover:underline"
+                onClick={() => setShowAllFeatures(true)}
+                type="button"
+              >
+                + {hiddenCount} more feature{hiddenCount > 1 ? "s" : ""}
+              </button>
+            ) : selectedPlan.features.length > 6 ? (
+              <button
+                className="text-muted-foreground hover:text-foreground mt-3 text-left text-[13px] font-medium underline-offset-4 hover:underline"
+                onClick={() => setShowAllFeatures(false)}
+                type="button"
+              >
+                Show less
+              </button>
+            ) : null}
           </aside>
         </div>
       </DialogPanel>

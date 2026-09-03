@@ -1,6 +1,5 @@
 import rss, { type RSSFeedItem } from "@astrojs/rss";
 import type { TChangelog } from "@feeblo/domain/changelog/schema";
-import { markdownToHtml } from "@feeblo/utils/markdown";
 import type { APIRoute } from "astro";
 
 export const prerender = false;
@@ -60,6 +59,11 @@ export const GET: APIRoute = async ({ locals, url }) => {
   } catch {
     return new Response("Feed unavailable", { status: 502 });
   }
+
+  // Lazy-load the markdown pipeline (unified/remark/rehype) with the request
+  // so it stays out of the worker's startup module graph (same pattern as the
+  // RPC runtime import above).
+  const { markdownToHtml } = await import("@feeblo/utils/markdown");
 
   const items: RSSFeedItem[] = changelogs.map((changelog, index) => {
     const content = markdownToHtml(changelog.content).trim();

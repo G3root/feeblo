@@ -118,6 +118,24 @@ export type NotificationTemplatePayload = Schema.Schema.Type<
   typeof NotificationTemplatePayload
 >;
 
+/** Immutable renderer input for the dedicated changelog email. */
+export const ChangelogTemplatePayload = Schema.Struct({
+  actionLabel: Schema.String,
+  actionUrl: Schema.String,
+  body: Schema.String,
+  categories: Schema.optional(Schema.Array(Schema.String)),
+  coverImageUrl: Schema.optional(Schema.NullOr(Schema.String)),
+  eyebrow: Schema.String,
+  organizationName: Schema.optional(Schema.NullOr(Schema.String)),
+  publishedAtLabel: Schema.optional(Schema.NullOr(Schema.String)),
+  title: Schema.String,
+  unsubscribe: EmailUnsubscribeTarget,
+});
+
+export type ChangelogTemplatePayload = Schema.Schema.Type<
+  typeof ChangelogTemplatePayload
+>;
+
 /** Stored payload for one double-opt-in verification email. */
 export const SubscriptionVerificationTemplatePayload = Schema.Struct({
   subscriptionId: EmailSubscriptionId.schema,

@@ -29,7 +29,10 @@ export async function signUpProgrammatically(page: Page, user: TestUser) {
       maxRetries: 2,
     });
 
-  expect(response.ok()).toBeTruthy();
+  expect(
+    response.ok(),
+    `Sign-up response for ${user.email}: ${response.status()} ${await response.text()}`
+  ).toBeTruthy();
 
   const email = await waitForVerificationEmail(page.request, user.email);
   const verificationResponse = await page
@@ -95,6 +98,22 @@ export async function createAuthenticatedWorkspace(
   ]);
 
   return { ...user, organizationUrl: page.url() };
+}
+
+/**
+ * Creates a verified user and workspace through the sign-up flow and
+ * resolves once the dashboard is loaded and signed in.
+ */
+export async function createWorkspace(
+  page: Page,
+  user: TestUser = createTestUser()
+): Promise<AuthenticatedUser> {
+  const workspace = await createAuthenticatedWorkspace(page, user);
+
+  await expect(page).toHaveURL(workspace.organizationUrl);
+  await expect(page.getByRole("button", { name: user.email })).toBeVisible();
+
+  return workspace;
 }
 
 export async function logOut(page: Page, userEmail: string) {

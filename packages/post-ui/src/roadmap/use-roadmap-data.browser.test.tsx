@@ -29,6 +29,7 @@ type TestPost = {
 type TestPostStatus = {
   createdAt: Date;
   id: string;
+  label: string;
   orderIndex: number;
   organizationId: string;
   type:
@@ -165,6 +166,7 @@ function createCollections(
         {
           createdAt: new Date("2024-01-01"),
           id: "st-planned",
+          label: "Planned",
           orderIndex: 0,
           organizationId: ORGANIZATION_ID,
           type: "PLANNED",
@@ -173,6 +175,7 @@ function createCollections(
         {
           createdAt: new Date("2024-01-01"),
           id: "st-in-progress",
+          label: "In Progress",
           orderIndex: 1,
           organizationId: ORGANIZATION_ID,
           type: "IN_PROGRESS",
@@ -181,6 +184,7 @@ function createCollections(
         {
           createdAt: new Date("2024-01-01"),
           id: "st-completed",
+          label: "Completed",
           orderIndex: 2,
           organizationId: ORGANIZATION_ID,
           type: "COMPLETED",
@@ -189,6 +193,7 @@ function createCollections(
         {
           createdAt: new Date("2024-01-01"),
           id: "st-closed",
+          label: "Closed",
           orderIndex: 3,
           organizationId: ORGANIZATION_ID,
           type: "CLOSED",

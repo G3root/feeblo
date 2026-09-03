@@ -14,7 +14,7 @@ export type HomeFilterItem = {
 export type HomePost = {
   board: TBoard;
   post: TPost;
-  status: { type: TPostStatus["type"] };
+  status: Pick<TPostStatus, "color" | "label" | "type">;
 };
 
 export type HomeFilters = {

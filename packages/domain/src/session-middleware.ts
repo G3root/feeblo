@@ -88,6 +88,18 @@ export class OptionalAuthMiddleware extends RpcMiddleware.Service<
   error: UnauthorizedError,
 }) {}
 
+/**
+ * Requires an authenticated session but, unlike AuthMiddleware, admits
+ * SSO-restricted sessions. Use for public-board endpoints whose handlers
+ * authorize restricted users via Policy.hasRestrictedOrganizationScope.
+ */
+export class PublicAuthMiddleware extends RpcMiddleware.Service<
+  PublicAuthMiddleware,
+  { provides: CurrentSession }
+>()("@feeblo/api/PublicAuthMiddleware", {
+  error: UnauthorizedError,
+}) {}
+
 function getValidatedSessionFromToken(
   auth: AuthHandler,
   token: string
@@ -174,6 +186,26 @@ export const OptionalAuthMiddlewareLive = Layer.effect(
         Effect.catch(() => Effect.succeed(Option.none())),
         Effect.flatMap((session) =>
           effect.pipe(Effect.provideService(OptionalCurrentSession, session))
+        )
+      );
+    });
+  })
+);
+
+export const PublicAuthMiddlewareLive = Layer.effect(
+  PublicAuthMiddleware,
+  Effect.gen(function* () {
+    const auth = yield* Auth;
+
+    return PublicAuthMiddleware.of((effect, options) => {
+      const cookieHeader = isString(options.headers?.cookie)
+        ? options.headers.cookie
+        : options.headers?.Cookie;
+      const token = getSessionTokenFromCookieHeader(cookieHeader);
+
+      return getValidatedSessionFromToken(auth, token ?? "").pipe(
+        Effect.flatMap((session) =>
+          effect.pipe(Effect.provideService(CurrentSession, session))
         )
       );
     });

@@ -1,105 +1,24 @@
-import { useState } from "react";
-
 import { CommentComposerEditor } from "./editor";
-import { CommentComposerProvider } from "./provider";
+import {
+  CommentComposerProvider,
+  type CommentComposerProviderProps,
+} from "./provider";
 import { CommentComposerSubmit } from "./submit";
 
-export { type CommentComposerProviderProps } from "./provider";
+export { type TPostStatusOption } from "./context";
+export {
+  CommentComposerProvider,
+  type CommentComposerProviderProps,
+  type CommentComposerSubmitValue,
+} from "./provider";
 
-type CommentComposerRootProps = {
-  cancelLabel?: string;
-  content?: string;
-  disabled?: boolean;
-  isPrivate?: boolean;
-  onCancel?: () => void;
-  onContentChange?: (content: string) => void;
-  onSubmit?: (value: {
-    content: string;
-    isPrivate: boolean;
-  }) => void | Promise<void>;
-  onVisibilityChange?: (isPrivate: boolean) => void;
-  placeholder?: string;
-  privateLabel?: string;
-  publicLabel?: string;
-  showVisibilityToggle?: boolean;
-  submitLabel?: string;
-};
-
-function CommentComposerComponent({
-  cancelLabel,
-  content: externalContent,
-  disabled,
-  isPrivate: externalIsPrivate,
-  onCancel,
-  onContentChange: externalOnContentChange,
-  onSubmit,
-  onVisibilityChange: externalOnVisibilityChange,
-  placeholder,
-  privateLabel,
-  publicLabel,
-  showVisibilityToggle,
-  submitLabel,
-}: CommentComposerRootProps) {
-  const [internalContent, setInternalContent] = useState(externalContent ?? "");
-  const [internalIsPrivate, setInternalIsPrivate] = useState(
-    externalIsPrivate ?? false
-  );
-  const [resetKey, setResetKey] = useState(0);
-
-  const isContentControlled = externalContent !== undefined;
-  const isVisibilityControlled = externalIsPrivate !== undefined;
-
-  // SAFETY: the content is controlled only when the host passes a string.
-  const content = isContentControlled
-    ? (externalContent as string)
-    : internalContent;
-  // SAFETY: The upstream contract guarantees a boolean here.
-  const isPrivate = isVisibilityControlled
-    ? (externalIsPrivate as boolean)
-    : internalIsPrivate;
-
-  const handleContentChange = (doc: string) => {
-    if (!isContentControlled) {
-      setInternalContent(doc);
-    }
-    externalOnContentChange?.(doc);
-  };
-
-  const handleVisibilityChange = (checked: boolean) => {
-    if (!isVisibilityControlled) {
-      setInternalIsPrivate(checked);
-    }
-    externalOnVisibilityChange?.(checked);
-  };
-
-  const handleSubmit = async () => {
-    if (!onSubmit) {
-      return;
-    }
-    await onSubmit({ content, isPrivate });
-    setResetKey((k) => k + 1);
-    if (!isContentControlled) {
-      setInternalContent("");
-    }
-  };
-
+/**
+ * All mutable composer state lives in the provider's store; the root only
+ * supplies the default layout.
+ */
+function CommentComposerComponent(props: CommentComposerProviderProps) {
   return (
-    <CommentComposerProvider
-      cancelLabel={cancelLabel}
-      content={content}
-      disabled={disabled}
-      isPrivate={isPrivate}
-      onCancel={onCancel}
-      onContentChange={handleContentChange}
-      onSubmit={onSubmit ? handleSubmit : undefined}
-      onVisibilityChange={handleVisibilityChange}
-      placeholder={placeholder}
-      privateLabel={privateLabel}
-      publicLabel={publicLabel}
-      resetKey={resetKey}
-      showVisibilityToggle={showVisibilityToggle}
-      submitLabel={submitLabel}
-    >
+    <CommentComposerProvider {...props}>
       <div className="border-border rounded-md border p-3">
         <CommentComposerEditor />
         <CommentComposerSubmit />

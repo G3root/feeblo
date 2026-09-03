@@ -24,7 +24,11 @@ const STATUSES_BY_PRESET = {
 } satisfies Record<Exclude<BoardPostStatusFilter, "all">, BoardPostStatus[]>;
 
 function filterPostStatusesByPreset(
-  statuses: ReadonlyArray<{ id: string; type: BoardPostStatus }>,
+  statuses: ReadonlyArray<{
+    id: string;
+    type: BoardPostStatus;
+    label: string;
+  }>,
   filter: BoardPostStatusFilter
 ) {
   if (filter === "all") {
@@ -80,6 +84,7 @@ export function useBoardPostsData({
         .select(({ postStatus }) => ({
           id: postStatus.id,
           type: postStatus.type,
+          label: postStatus.label,
         }));
     },
     [organizationId]

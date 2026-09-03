@@ -11,6 +11,7 @@ import {
   PostCreate,
   PostDelete,
   PostDeletePublic,
+  PostGet,
   PostList,
   PostMerge,
   PostOfficialUpdatePublish,
@@ -36,6 +37,14 @@ export class PostRpcs extends RpcGroup.make(
   Rpc.make("PostListPublic", {
     payload: PostList,
     success: Schema.Array(Post),
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+
+  Rpc.make("PostGetPublic", {
+    payload: PostGet,
+    success: Post,
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   })
     .middleware(OptionalAuthMiddleware)

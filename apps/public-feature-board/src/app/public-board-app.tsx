@@ -1,5 +1,6 @@
 import type { TSite } from "@feeblo/domain/site/schema";
 import { AuthDialogProvider } from "@feeblo/post-ui/dialog-stores";
+import { AnchoredToastProvider, ToastProvider } from "@feeblo/ui/toast";
 import { AuthProvider } from "@feeblo/web-shared/auth-context";
 import { RouterProvider } from "@tanstack/react-router";
 
@@ -20,7 +21,13 @@ export function PublicBoardApp({ site }: PublicBoardAppProps) {
       <AuthDialogProvider>
         <Provider queryClient={getContext().queryClient}>
           <SiteProvider site={site}>
-            <RouterProvider router={router} />
+            {/* Anchored toasts render the subscribe feedback next to the
+                toggle; global toasts surface persistence failures. */}
+            <ToastProvider>
+              <AnchoredToastProvider>
+                <RouterProvider router={router} />
+              </AnchoredToastProvider>
+            </ToastProvider>
           </SiteProvider>
         </Provider>
       </AuthDialogProvider>

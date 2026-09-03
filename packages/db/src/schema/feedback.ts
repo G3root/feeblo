@@ -1,3 +1,4 @@
+import { DEFAULT_POST_STATUS_COLORS } from "@feeblo/domain-contracts/post-status-colors";
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
@@ -69,15 +70,47 @@ export type TPostStatus = TPostStatusType;
 export const POST_STATUS_TYPES = PostStatusType.literals;
 
 export const DEFAULT_POST_STATUSES = [
-  { orderIndex: 0, type: "PENDING" },
-  { orderIndex: 1, type: "REVIEW" },
-  { orderIndex: 2, type: "PLANNED" },
-  { orderIndex: 3, type: "IN_PROGRESS" },
-  { orderIndex: 4, type: "COMPLETED" },
-  { orderIndex: 5, type: "CLOSED" },
+  {
+    orderIndex: 0,
+    type: "PENDING",
+    label: "Pending",
+    color: DEFAULT_POST_STATUS_COLORS.PENDING,
+  },
+  {
+    orderIndex: 1,
+    type: "REVIEW",
+    label: "Review",
+    color: DEFAULT_POST_STATUS_COLORS.REVIEW,
+  },
+  {
+    orderIndex: 2,
+    type: "PLANNED",
+    label: "Planned",
+    color: DEFAULT_POST_STATUS_COLORS.PLANNED,
+  },
+  {
+    orderIndex: 3,
+    type: "IN_PROGRESS",
+    label: "In Progress",
+    color: DEFAULT_POST_STATUS_COLORS.IN_PROGRESS,
+  },
+  {
+    orderIndex: 4,
+    type: "COMPLETED",
+    label: "Completed",
+    color: DEFAULT_POST_STATUS_COLORS.COMPLETED,
+  },
+  {
+    orderIndex: 5,
+    type: "CLOSED",
+    label: "Closed",
+    color: DEFAULT_POST_STATUS_COLORS.CLOSED,
+  },
 ] as const satisfies ReadonlyArray<{
   orderIndex: number;
   type: TPostStatus;
+  label: string;
+  color: string;
 }>;
 
 export const DEFAULT_CHANGELOG_CATEGORIES = [
@@ -191,6 +224,14 @@ export const postStatusTable = pgTable(
   {
     id: text("id").primaryKey(),
     type: text("type").$type<TPostStatusType>().notNull(),
+    // User-facing label; empty by default so pre-existing rows stay valid
+    // until a workspace customizes them.
+    label: text("label").notNull().default(""),
+    // oklch() color used for status indicators; null until a workspace
+    // customizes the status.
+    color: text("color"),
+    // Reserved for future icon payloads; kept in the db schema only.
+    icon: text("icon"),
     orderIndex: integer("order_index").notNull(),
     organizationId: text("organization_id")
       .notNull()
@@ -618,38 +659,88 @@ export const postSubscriptionTable = pgTable(
   ]
 );
 
-export const commentTable = pgTable("comment", {
-  id: text("id").primaryKey(),
-  content: text("content").notNull(),
-  organizationId: text("organization_id")
-    .notNull()
-    .references(() => organizationTable.id, { onDelete: "cascade" }),
-  postId: text("post_id")
-    .notNull()
-    .references(() => postTable.id, { onDelete: "cascade" }),
-  userId: text("user_id")
-    .notNull()
-    .references(() => userTable.id, { onDelete: "cascade" }),
-  memberId: text("member_id").references(() => memberTable.id, {
-    onDelete: "set null",
-  }),
-  visibility: postCommentVisibilityEnum("visibility")
-    .default("PUBLIC")
-    .notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .defaultNow()
-    .$onUpdate(() => /* @__PURE__ */ new Date())
-    .notNull(),
-  parentCommentId: text("parent_comment_id").references(
-    (): AnyPgColumn => commentTable.id,
-    {
-      onDelete: "cascade",
-    }
-  ),
-});
+export const changelogSubscriptionTable = pgTable(
+  "changelog_subscription",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => userTable.id, { onDelete: "cascade" }),
+    memberId: text("member_id").references(() => memberTable.id, {
+      onDelete: "set null",
+    }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("changelog_subscription_organizationId_idx").on(table.organizationId),
+    index("changelog_subscription_userId_idx").on(table.userId),
+    uniqueIndex("changelog_subscription_organizationId_userId_uidx").on(
+      table.organizationId,
+      table.userId
+    ),
+  ]
+);
+
+export const commentTable = pgTable(
+  "comment",
+  {
+    id: text("id").primaryKey(),
+    content: text("content").notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    postId: text("post_id")
+      .notNull()
+      .references(() => postTable.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => userTable.id, { onDelete: "cascade" }),
+    memberId: text("member_id").references(() => memberTable.id, {
+      onDelete: "set null",
+    }),
+    visibility: postCommentVisibilityEnum("visibility")
+      .default("PUBLIC")
+      .notNull(),
+    /** Post status this comment moved the post to, when posted as a status update. */
+    statusUpdateId: text("status_update_id").references(
+      () => postStatusTable.id,
+      { onDelete: "set null" }
+    ),
+    pinnedAt: timestamp("pinned_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    parentCommentId: text("parent_comment_id").references(
+      (): AnyPgColumn => commentTable.id,
+      {
+        onDelete: "cascade",
+      }
+    ),
+  },
+  (table) => [
+    index("comment_organizationId_postId_idx").on(
+      table.organizationId,
+      table.postId
+    ),
+    index("comment_postId_pinnedAt_idx").on(table.postId, table.pinnedAt),
+    uniqueIndex("comment_post_pinned_uidx")
+      .on(table.postId)
+      .where(sql`${table.pinnedAt} IS NOT NULL`),
+  ]
+);
 
 export const commentReactionTable = pgTable(
   "comment_reaction",
@@ -1247,10 +1338,10 @@ export const notificationTable = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
-    recipientMemberId: text("recipient_member_id")
+    recipientUserId: text("recipient_user_id")
       .notNull()
-      .references(() => memberTable.id, { onDelete: "cascade" }),
-    actorMemberId: text("actor_member_id").references(() => memberTable.id, {
+      .references(() => userTable.id, { onDelete: "cascade" }),
+    actorUserId: text("actor_user_id").references(() => userTable.id, {
       onDelete: "set null",
     }),
     kind: text("kind").$type<TNotificationEventType>().notNull(),
@@ -1267,13 +1358,13 @@ export const notificationTable = pgTable(
   },
   (table) => [
     index("notification_recipient_read_created_idx").on(
-      table.recipientMemberId,
+      table.recipientUserId,
       table.readAt,
       table.createdAt
     ),
     index("notification_organization_idx").on(table.organizationId),
     uniqueIndex("notification_recipient_deduplication_uidx").on(
-      table.recipientMemberId,
+      table.recipientUserId,
       table.deduplicationKey
     ),
   ]
@@ -1282,3 +1373,7 @@ export const notificationTable = pgTable(
 export type InsertComment = typeof commentTable.$inferInsert;
 export type PostSubscription = typeof postSubscriptionTable.$inferSelect;
 export type NewPostSubscription = typeof postSubscriptionTable.$inferInsert;
+export type ChangelogSubscription =
+  typeof changelogSubscriptionTable.$inferSelect;
+export type NewChangelogSubscription =
+  typeof changelogSubscriptionTable.$inferInsert;

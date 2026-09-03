@@ -26,9 +26,8 @@
     "@feeblo/web-shared": "workspace:*",
     "@solidjs/router": "catalog:",
     "class-variance-authority": "catalog:",
-    "clsx": "catalog:",
-    "solid-js": "catalog:",
-    "tailwind-merge": "catalog:"
+    "cn": "catalog:",
+    "solid-js": "catalog:"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",

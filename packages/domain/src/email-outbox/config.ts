@@ -23,6 +23,18 @@ const EstimatedSendCostMicros = Config.number(
 const PausedWorkspaceIds = Config.string(
   "EMAIL_OUTBOX_PAUSED_WORKSPACE_IDS"
 ).pipe(Config.withDefault(""));
+const AppRootDomain = Config.string("APP_ROOT_DOMAIN").pipe(
+  Config.withDefault("")
+);
+
+const resolveAppRootDomain = (appUrl: URL, configured: string): string => {
+  if (configured.trim().length > 0) {
+    return configured.replace(trailingSlashPattern, "");
+  }
+  // Fallback to the host of APP_URL (e.g. https://test.feeblo.example → test.feeblo.example)
+  // so local/test environments still build a usable public subdomain URL.
+  return appUrl.host;
+};
 
 /** Runtime URLs used when snapshotting links into email delivery payloads. */
 export class EmailOutboxConfig extends Context.Service<EmailOutboxConfig>()(
@@ -31,6 +43,7 @@ export class EmailOutboxConfig extends Context.Service<EmailOutboxConfig>()(
     make: Effect.gen(function* () {
       const appUrl = yield* AppUrl;
       const apiUrl = yield* ApiUrl;
+      const configuredRootDomain = yield* AppRootDomain;
       const globalDeliveryPaused = yield* GlobalDeliveryPaused;
       const maxConcurrentSends = yield* MaxConcurrentSends;
       const monthlySendLimit = yield* MonthlySendLimit;
@@ -39,6 +52,7 @@ export class EmailOutboxConfig extends Context.Service<EmailOutboxConfig>()(
       return {
         apiUrl: apiUrl.href.replace(trailingSlashPattern, ""),
         appUrl: appUrl.href.replace(trailingSlashPattern, ""),
+        appRootDomain: resolveAppRootDomain(appUrl, configuredRootDomain),
         estimatedSendCostMicros: Math.max(0, estimatedSendCostMicros),
         globalDeliveryPaused,
         maxConcurrentSends: Math.max(1, maxConcurrentSends),
@@ -60,6 +74,7 @@ export class EmailOutboxConfig extends Context.Service<EmailOutboxConfig>()(
     appUrl: URL,
     apiUrl = appUrl,
     controls: {
+      readonly appRootDomain?: string;
       readonly estimatedSendCostMicros?: number;
       readonly globalDeliveryPaused?: boolean;
       readonly maxConcurrentSends?: number;
@@ -72,6 +87,8 @@ export class EmailOutboxConfig extends Context.Service<EmailOutboxConfig>()(
       this.of({
         apiUrl: apiUrl.href.replace(trailingSlashPattern, ""),
         appUrl: appUrl.href.replace(trailingSlashPattern, ""),
+        appRootDomain:
+          controls.appRootDomain ?? resolveAppRootDomain(appUrl, ""),
         estimatedSendCostMicros: controls.estimatedSendCostMicros ?? 100,
         globalDeliveryPaused: controls.globalDeliveryPaused ?? false,
         maxConcurrentSends: controls.maxConcurrentSends ?? 10,

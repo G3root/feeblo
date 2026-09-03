@@ -76,6 +76,10 @@
       "types": "./src/v2/subscribe-toggle.tsx",
       "default": "./src/v2/subscribe-toggle.tsx"
     },
+    "./notifications-menu": {
+      "types": "./src/v2/notifications-menu.tsx",
+      "default": "./src/v2/notifications-menu.tsx"
+    },
     "./post-title-input": {
       "types": "./src/v2/post-title-input.tsx",
       "default": "./src/v2/post-title-input.tsx"
@@ -179,6 +183,7 @@
     "@feeblo/config": "workspace:*",
     "@ladle/react": "^5.1.1",
     "@tailwindcss/vite": "catalog:",
+    "@tanstack/react-query": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitest/browser-playwright": "^4.1.10",
@@ -187,5 +192,8 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "vitest-browser-react": "^2.2.0"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "catalog:"
   }
 }
