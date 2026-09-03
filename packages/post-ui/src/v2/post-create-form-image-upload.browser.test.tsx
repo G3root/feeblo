@@ -240,7 +240,22 @@ async function fillForm(screen: RenderScreen) {
 }
 
 async function pasteImage(screen: RenderScreen, text: string) {
+  // The rich-text editor lazy-loads inside the form (see PostContentField),
+  // so its textbox may not exist yet when the dialog opens. Wait for it
+  // instead of assuming synchronous mount — otherwise this flakes wherever
+  // the editor chunk resolves slowly.
+  await vi.waitFor(
+    () => {
+      expect(
+        screen.getByRole("textbox", { name: "" }).all().length
+      ).toBeGreaterThanOrEqual(2);
+    },
+    { timeout: 10_000 }
+  );
   const editor = screen.getByRole("textbox", { name: "" }).all()[1];
+  if (!editor) {
+    throw new Error("expected the post content editor to be mounted");
+  }
   await editor.click();
   await editor.fill(text);
 
