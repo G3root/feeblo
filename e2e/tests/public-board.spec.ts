@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 
 import { createAuthenticatedWorkspace } from "../helpers/auth";
+import { assertNoPageErrors, trackPageErrors } from "../helpers/page-errors";
 import { createPost, fillEditor } from "../helpers/posts";
 import {
   verificationCodeFromEmail,
@@ -58,6 +59,14 @@ async function signOutFromPublicBoard(page: Page) {
     page.getByRole("button", { name: authButtonName })
   ).toBeVisible();
 }
+
+test.beforeEach(({ page }) => {
+  trackPageErrors(page);
+});
+
+test.afterEach(async ({ page }) => {
+  await assertNoPageErrors(page);
+});
 
 test(
   "visitors can sign in from the sign-in page on a public board subdomain",
@@ -131,6 +140,7 @@ test(
 
     const visitorContext = await browser.newContext();
     const visitorPage = await visitorContext.newPage();
+    trackPageErrors(visitorPage);
 
     try {
       await visitorPage.goto(boardUrl);
@@ -153,6 +163,7 @@ test(
       await expect(
         visitorPage.getByRole("link", { name: `View ${title}`, exact: true })
       ).toBeVisible();
+      await assertNoPageErrors(visitorPage);
     } finally {
       await visitorContext.close();
     }

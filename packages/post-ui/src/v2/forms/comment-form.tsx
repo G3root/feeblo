@@ -244,7 +244,10 @@ export const CommentComposerField = withForm({
                             statusUpdateId={statusUpdate.state.value}
                             {...rest}
                           >
-                            <div className={commentComposerBoxClassName}>
+                            <div
+                              className={commentComposerBoxClassName}
+                              data-slot="comment-composer"
+                            >
                               <CommentComposer.Editor />
                               <CommentComposer.Submit />
                             </div>
