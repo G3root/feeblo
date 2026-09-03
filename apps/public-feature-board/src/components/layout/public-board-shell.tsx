@@ -78,14 +78,13 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
   // visibility rules, restricted-session scoping) inside its optimistic
   // action; the list row itself carries no body.
   const persistPost = useCallback<PostCollectionsValue["persistPost"]>(
-    async (input) => {
-      await fetchRpc((rpc) =>
+    async (input) =>
+      fetchRpc((rpc) =>
         rpc.PostCreatePublic({
           ...input,
           organizationId: getMutationOrganizationId(),
         })
-      );
-    },
+      ),
     []
   );
 

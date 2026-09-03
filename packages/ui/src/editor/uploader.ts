@@ -161,7 +161,10 @@ export const finalizeEditorContent = async (
   // cost one upload latency instead of N. Replacement application stays
   // sequential below (string read-modify-write would race otherwise) in
   // the original paste order, preserving today's result exactly.
-  const uploadedEntries = await Promise.all(
+  // allSettled (not all) so one rejection still records its successful
+  // siblings in pendingEditorUploads; the retry then reuses them instead of
+  // re-uploading (which would orphan the first asset).
+  const settledEntries = await Promise.allSettled(
     eligible.map(async ({ pending, previewUrl }) => ({
       pending,
       previewUrl,
@@ -179,7 +182,13 @@ export const finalizeEditorContent = async (
     }))
   );
 
-  for (const { pending, previewUrl, uploaded } of uploadedEntries) {
+  let firstError: unknown;
+  for (const settled of settledEntries) {
+    if (settled.status === "rejected") {
+      firstError ??= settled.reason;
+      continue;
+    }
+    const { pending, previewUrl, uploaded } = settled.value;
     const uploadedPending = { ...pending, uploaded };
     pendingEditorUploads.set(previewUrl, uploadedPending);
     finalizedContent = finalizedContent.split(previewUrl).join(uploaded.url);
@@ -187,6 +196,10 @@ export const finalizeEditorContent = async (
       assetIds.push(uploaded.assetId);
     }
     finalizedUploads.push({ pending: uploadedPending, previewUrl });
+  }
+
+  if (firstError !== undefined) {
+    throw firstError;
   }
 
   return {

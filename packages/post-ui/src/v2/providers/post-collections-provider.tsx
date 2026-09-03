@@ -59,7 +59,7 @@ export interface PostCollectionsValue {
    * into `collections.postCollection` by the action itself, so the full
    * body travels as action input rather than through the list row.
    */
-  persistPost: (input: PersistPostInput) => Promise<void>;
+  persistPost: (input: PersistPostInput) => Promise<string>;
   suggestPosts?: (input: {
     boardId?: string;
     content: string;

@@ -83,9 +83,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     [organizationId]
   );
   const persistPost = useCallback<PostCollectionsValue["persistPost"]>(
-    async (input) => {
-      await fetchRpc((rpc) => rpc.PostCreate(input));
-    },
+    async (input) => fetchRpc((rpc) => rpc.PostCreate(input)),
     []
   );
   return (

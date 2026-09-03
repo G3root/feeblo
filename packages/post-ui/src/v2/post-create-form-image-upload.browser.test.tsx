@@ -188,8 +188,8 @@ const insertSpy = vi.fn().mockReturnValue({
 // passes (row fields plus finalized body); the RPC transport itself stays
 // mocked (see the `@feeblo/web-shared/runtime` mock above).
 const persistSpy = vi
-  .fn<(input: PersistPostInput) => Promise<void>>()
-  .mockResolvedValue(undefined);
+  .fn<(input: PersistPostInput) => Promise<string>>()
+  .mockResolvedValue("my-great-idea");
 
 function FormHarness() {
   const [, forceRender] = useState(0);

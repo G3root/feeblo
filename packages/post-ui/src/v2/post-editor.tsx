@@ -396,6 +396,14 @@ export function PostContentUpdateInput() {
     },
   });
 
+  if (detail.isError) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        Post content could not be loaded.
+      </p>
+    );
+  }
+
   if (detail.isLoading || detail.content === undefined) {
     return <ContentSkeleton />;
   }
