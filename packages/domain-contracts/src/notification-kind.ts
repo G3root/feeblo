@@ -12,6 +12,8 @@ export const NotificationEventType = S.Literals([
   "feedback.submitted",
   "feedback.commented",
   "feedback.status_changed",
+  "changelog.published",
+  "changelog.updated",
 ]);
 
 export type TNotificationEventType = S.Schema.Type<

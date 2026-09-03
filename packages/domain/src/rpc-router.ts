@@ -7,6 +7,7 @@ import { BillingRpcHandlers } from "./billing/handlers";
 import { BoardRpcHandlers } from "./board/handlers";
 import { ChangelogCategoryRpcHandlers } from "./changelog-category/handlers";
 import { ChangelogPostRpcHandlers } from "./changelog-post/handlers";
+import { ChangelogSubscriptionRpcHandlers } from "./changelog-subscription/handlers";
 import { ChangelogRpcHandlers } from "./changelog/handlers";
 import { CommentReactionRpcHandlers } from "./comment-reaction/handlers";
 import { CommentRpcHandlers } from "./comments/handlers";
@@ -31,6 +32,7 @@ import { S3UploadServiceLive } from "./services/s3";
 import {
   AuthMiddlewareLive,
   OptionalAuthMiddlewareLive,
+  PublicAuthMiddlewareLive,
 } from "./session-middleware";
 import { SiteRpcHandlers } from "./site/handlers";
 import { TagRpcHandlers } from "./tag/handlers";
@@ -66,7 +68,11 @@ export const makeRpcRoute = <RIn, ROut, E>(
       Layer.mergeAll(BoardRpcHandlers, ChangelogCategoryRpcHandlers)
     ),
     Layer.provide(
-      Layer.mergeAll(ChangelogRpcHandlers, ChangelogPostRpcHandlers)
+      Layer.mergeAll(
+        ChangelogRpcHandlers,
+        ChangelogPostRpcHandlers,
+        ChangelogSubscriptionRpcHandlers
+      )
     ),
     Layer.provide(JwtSecretRpcHandlers),
     Layer.provide(
@@ -100,6 +106,7 @@ export const makeRpcRoute = <RIn, ROut, E>(
       Layer.mergeAll(
         AuthMiddlewareLive,
         OptionalAuthMiddlewareLive,
+        PublicAuthMiddlewareLive,
         PublicRpcRateLimitMiddlewareLive
       )
     )

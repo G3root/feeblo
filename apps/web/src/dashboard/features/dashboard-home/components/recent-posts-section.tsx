@@ -10,6 +10,7 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import * as dayjs from "@feeblo/utils/dayjs";
+import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import { MessageMultiple01Icon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
@@ -44,6 +45,8 @@ interface Board {
 interface Status {
   id: string;
   type: string;
+  label: string;
+  color?: string | null;
 }
 
 interface RecentPostsSectionProps {
@@ -123,7 +126,12 @@ export function RecentPostsSection({
                   />
                 </PostCard.Body>
                 <PostCard.DesktopMeta>
-                  {status && <PostCard.Status status={status.type} />}
+                  {status && (
+                    <PostCard.Status
+                      color={status.color ?? undefined}
+                      label={status.label || formatPostStatus(status.type)}
+                    />
+                  )}
                   {board?.name && (
                     <PostCard.BoardBadge>{board.name}</PostCard.BoardBadge>
                   )}

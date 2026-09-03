@@ -2,54 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { expect, type Page, test } from "@playwright/test";
 
-import { createAuthenticatedWorkspace } from "../helpers/auth";
-import { createTestUser } from "../helpers/test-users";
-
-async function fillEditor(
-  page: Page,
-  content: string,
-  options: { index?: number } = {}
-) {
-  const editor = page.locator(".ProseMirror").nth(options.index ?? 0);
-  await expect(editor).toBeVisible();
-  await editor.click();
-  await page.keyboard.insertText(content);
-}
-
-async function createWorkspace(page: Page) {
-  const user = createTestUser();
-  const workspace = await createAuthenticatedWorkspace(page, user);
-
-  await expect(page).toHaveURL(workspace.organizationUrl);
-  await expect(page.getByRole("button", { name: user.email })).toBeVisible();
-
-  return workspace;
-}
-
-async function createPost(page: Page, title: string, content: string) {
-  await page.getByRole("button", { name: "New post" }).click();
-
-  const dialog = page.getByRole("dialog", { name: "Create Post" });
-  await expect(dialog).toBeVisible();
-
-  await dialog.getByLabel("Post Title").fill(title);
-  await fillEditor(page, content);
-
-  await dialog.getByRole("combobox").first().click();
-  await page.getByRole("option", { name: "Features 💡" }).click();
-
-  await dialog.getByRole("button", { name: "Create Post" }).click();
-  await expect(dialog).toBeHidden();
-
-  await expect(
-    page.getByRole("link", { name: new RegExp(title) })
-  ).toBeVisible();
-}
-
-async function openPost(page: Page, title: string) {
-  await page.getByRole("link", { name: new RegExp(title) }).click();
-  await expect(page.getByLabel("Post Title")).toHaveValue(title);
-}
+import { createWorkspace } from "../helpers/auth";
+import { createPost, fillEditor, openPost } from "../helpers/posts";
 
 /** Resolves when the given subscription RPC completes on the wire. */
 function waitForSubscriptionRpc(
@@ -121,9 +75,11 @@ test.describe("feedback workflow", () => {
       const commentBody = page.getByText(comment).last();
       await expect(commentBody).toBeVisible();
 
-      const commentCard = commentBody.locator(
-        "xpath=ancestor::div[contains(@class, 'rounded-2xl')][1]"
-      );
+      // The v2 comment display renders each comment as a dense row
+      // (`data-slot="comment"`), not a rounded card.
+      const commentCard = page
+        .locator('[data-slot="comment"]')
+        .filter({ hasText: comment });
       await commentCard.getByRole("button", { name: "Add reaction" }).click();
       await page
         .locator('[role="dialog"]:visible')

@@ -1,3 +1,4 @@
+import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
 import { type ReactNode, useMemo } from "react";
 
 import {
@@ -19,14 +20,19 @@ export type CommentDisplayProviderProps = {
   isAuthor?: boolean;
   isEditing?: boolean;
   isInternal?: boolean;
+  pinnedAt?: Date | null;
+  statusUpdateType?: TPostStatusType | null;
+  statusUpdateColor?: string | null;
+  statusUpdateLabel?: string | null;
   onCancelEdit?: () => void;
   onDelete: () => void;
   onReply: (value: {
     content: string;
     isPrivate: boolean;
-  }) => void | Promise<void>;
+  }) => boolean | Promise<boolean>;
   onStartEdit?: () => void;
   onToggleVisibility?: () => void;
+  onTogglePin?: () => void;
   onUpdate?: (value: {
     content: string;
     isPrivate: boolean;
@@ -34,6 +40,8 @@ export type CommentDisplayProviderProps = {
   replyLabel?: string;
   toggleToInternalLabel?: string;
   toggleToPublicLabel?: string;
+  pinLabel?: string;
+  unpinLabel?: string;
 };
 
 const noop = () => undefined;
@@ -42,6 +50,7 @@ const defaultCallbacks = {
   onCancelEdit: noop,
   onStartEdit: noop,
   onToggleVisibility: noop,
+  onTogglePin: noop,
   onUpdate: noop,
 };
 
@@ -59,15 +68,22 @@ export function CommentDisplayProvider({
   isAuthor = false,
   isEditing = false,
   isInternal = false,
+  pinnedAt = null,
+  statusUpdateType = null,
+  statusUpdateColor = null,
+  statusUpdateLabel = null,
   onCancelEdit = defaultCallbacks.onCancelEdit,
   onDelete,
   onReply,
   onStartEdit = defaultCallbacks.onStartEdit,
   onToggleVisibility = defaultCallbacks.onToggleVisibility,
+  onTogglePin = defaultCallbacks.onTogglePin,
   onUpdate = defaultCallbacks.onUpdate,
   replyLabel = "Reply",
   toggleToInternalLabel = "Make internal",
   toggleToPublicLabel = "Make public",
+  pinLabel = "Pin comment",
+  unpinLabel = "Unpin comment",
 }: CommentDisplayProviderProps) {
   const contextValue = useMemo<CommentDisplayContextValue>(
     () => ({
@@ -77,6 +93,7 @@ export function CommentDisplayProvider({
         onReply,
         onStartEdit,
         onToggleVisibility,
+        onTogglePin,
         onUpdate,
       },
       meta: {
@@ -85,6 +102,8 @@ export function CommentDisplayProvider({
         replyLabel,
         toggleToInternalLabel,
         toggleToPublicLabel,
+        pinLabel,
+        unpinLabel,
       },
       state: {
         authorName,
@@ -95,8 +114,12 @@ export function CommentDisplayProvider({
         isAuthor,
         isEditing,
         isInternal,
+        pinnedAt,
         postId,
         postSlug,
+        statusUpdateType,
+        statusUpdateColor,
+        statusUpdateLabel,
       },
     }),
     [
@@ -110,17 +133,24 @@ export function CommentDisplayProvider({
       isAuthor,
       isEditing,
       isInternal,
+      pinnedAt,
       onCancelEdit,
       onDelete,
       onReply,
       onStartEdit,
       onToggleVisibility,
+      onTogglePin,
       onUpdate,
       postId,
       postSlug,
       replyLabel,
+      statusUpdateType,
+      statusUpdateColor,
+      statusUpdateLabel,
       toggleToInternalLabel,
       toggleToPublicLabel,
+      pinLabel,
+      unpinLabel,
     ]
   );
 

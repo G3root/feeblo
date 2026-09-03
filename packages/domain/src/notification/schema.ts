@@ -5,8 +5,8 @@ import * as S from "effect/Schema";
 export const Notification = S.Struct({
   id: S.String,
   organizationId: S.String,
-  recipientMemberId: S.String,
-  actorMemberId: S.NullOr(S.String),
+  recipientUserId: S.String,
+  actorUserId: S.NullOr(S.String),
   kind: NotificationEventType,
   resourceType: S.String,
   resourceId: S.String,

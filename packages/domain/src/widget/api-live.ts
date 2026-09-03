@@ -5,6 +5,7 @@ import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
@@ -22,7 +23,11 @@ import { EmailOutboxConfig } from "../email-outbox/config";
 import { Api } from "../http/api";
 import { recordPostIntegrationEvent } from "../integration/post-event-recording";
 import { JwtSecretRepository } from "../jwt-secret/repository";
-import { verifyJwt } from "../jwt-secret/verification";
+import {
+  maxTokenLifetimeFromMinutes,
+  verifyJwt,
+} from "../jwt-secret/verification";
+import { OrganizationRepository } from "../organization/repository";
 import { PostStatusRepository } from "../post-status/repository";
 import {
   PostEmbeddingService,
@@ -41,6 +46,10 @@ import {
   UnauthorizedError,
   withRemapDbErrors,
 } from "../rpc-errors";
+import {
+  type TWidgetFeedbackMetadata,
+  WidgetFeedbackMetadataValue,
+} from "./schema";
 import { upsertContactFromParsed } from "./sso";
 
 export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
@@ -193,6 +202,26 @@ export const WidgetApiLive = HttpApiBuilder.group(
             yield* AttributeDefinitionRepository;
           const postRepository = yield* PostRepository;
 
+          // Defense-in-depth re-validation of the public request metadata
+          // before it is stored / delivered downstream (webhooks, email,
+          // embeddings). The endpoint schema already bounds this at the wire,
+          // but re-applying the same limits here guarantees the persisted
+          // JSONB and every derived payload stay bounded even if the endpoint
+          // schema is ever widened.
+          const validatedMetadata: TWidgetFeedbackMetadata | undefined =
+            metadata === undefined
+              ? undefined
+              : yield* Schema.decodeUnknownEffect(WidgetFeedbackMetadataValue)(
+                  metadata
+                ).pipe(
+                  Effect.mapError(
+                    () =>
+                      new DataValidationError({
+                        message: "Invalid feedback metadata",
+                      })
+                  )
+                );
+
           const recordWidgetPostCreatedEvent = ({
             postSlug,
             statusId,
@@ -207,7 +236,9 @@ export const WidgetApiLive = HttpApiBuilder.group(
               eventType: "feedback.post.created",
               organizationId,
               postId: id,
-              ...(metadata === undefined ? undefined : { metadata }),
+              ...(validatedMetadata === undefined
+                ? undefined
+                : { metadata: validatedMetadata }),
               postSlug,
               statusId,
               title,
@@ -266,6 +297,17 @@ export const WidgetApiLive = HttpApiBuilder.group(
               });
             }
 
+            // Per-workspace lifetime cap tightens (never loosens) the 24h
+            // default; invalid stored values fall back to the default.
+            const organizationRepository = yield* OrganizationRepository;
+            const maxTokenLifetimeMinutes =
+              yield* organizationRepository.findJwtMaxTokenLifetimeMinutes({
+                organizationId,
+              });
+            const maxTokenLifetime = maxTokenLifetimeFromMinutes(
+              maxTokenLifetimeMinutes
+            );
+
             const contactDefs =
               // SAFETY: the repository contract returns contact attribute definitions
               // in the canonical domain shape; the cast bridges the DB-row encoding.
@@ -282,7 +324,8 @@ export const WidgetApiLive = HttpApiBuilder.group(
             const jwtPayload = yield* verifyJwt(
               token,
               secrets.map((s) => s.secret),
-              organizationId
+              organizationId,
+              { maxTokenLifetime }
             );
 
             const parsedContact = yield* parsePersonAttributes(
@@ -314,7 +357,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   statusId: defaultStatus.id,
                   excerpt,
                   contactId: contactId ?? null,
-                  metadata: metadata ?? {},
+                  metadata: validatedMetadata ?? {},
                   source: "WIDGET",
                 });
                 yield* recordWidgetPostCreatedEvent({
@@ -335,7 +378,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   statusId: defaultStatus.id,
                   excerpt,
                   contactId: null,
-                  metadata: metadata ?? {},
+                  metadata: validatedMetadata ?? {},
                   source: "WIDGET",
                 })
                 .pipe(
@@ -384,6 +427,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
             CompanyRepository.layer,
             ContactRepository.layer,
             JwtSecretRepository.layer,
+            OrganizationRepository.layer,
             EmailOutboxConfig.layer,
             PostRepository.layer,
             PostStatusRepository.layer,

@@ -32,6 +32,22 @@ export class FailedToCreateCommentError extends Schema.TaggedError<FailedToCreat
   { httpApiStatus: 500, identifier: "FailedToCreateCommentError" }
 ) {}
 
+export class FailedToPinCommentError extends Schema.TaggedError<FailedToPinCommentError>()(
+  "FailedToPinCommentError",
+  {
+    message: Schema.optional(Schema.String),
+  },
+  { httpApiStatus: 500, identifier: "FailedToPinCommentError" }
+) {}
+
+export class FailedToUnpinCommentError extends Schema.TaggedError<FailedToUnpinCommentError>()(
+  "FailedToUnpinCommentError",
+  {
+    message: Schema.optional(Schema.String),
+  },
+  { httpApiStatus: 500, identifier: "FailedToUnpinCommentError" }
+) {}
+
 export const CommentServiceErrors = Schema.Union([
   BadRequestError,
   UnauthorizedError,
@@ -44,4 +60,6 @@ export const CommentServiceErrors = Schema.Union([
   // identifiers with the shared identity failures.
   SubjectNotFoundError,
   InvalidSubjectError,
+  FailedToPinCommentError,
+  FailedToUnpinCommentError,
 ]);

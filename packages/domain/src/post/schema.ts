@@ -56,6 +56,13 @@ export const PostList = S.Struct({
 
 export type TPostList = S.Schema.Type<typeof PostList>;
 
+export const PostGet = S.Struct({
+  organizationId: S.String,
+  slug: S.String,
+});
+
+export type TPostGet = S.Schema.Type<typeof PostGet>;
+
 export const PostSuggestions = S.Struct({
   boardId: S.optional(BoardId.schema),
   content: S.String,
@@ -197,10 +204,10 @@ export const PostCreate = S.Struct({
   assetIds: S.Array(S.String),
   id: PostId.schema,
   boardId: BoardId.schema,
-  // Bound only: the original `S.String` shape (no trim, no min length) is
-  // preserved so this stays a defense-in-depth cap rather than a semantic
-  // change to how titles are parsed.
-  title: S.String.check(S.isMaxLength(POST_TITLE_MAX_LENGTH)),
+  // Same shape as PostUpdateTitle.title: trimmed, non-empty, and bounded so a
+  // created post can never carry a whitespace/empty title that the update
+  // path (or slug/excerpt derivation) would reject or render invisibly.
+  title: PostTitle,
   // Content is sanitized and then stored, embedded, emailed and webhook-
   // delivered; cap it so a single post cannot carry unbounded payloads.
   content: S.String.check(S.isMaxLength(POST_CONTENT_MAX_LENGTH)),

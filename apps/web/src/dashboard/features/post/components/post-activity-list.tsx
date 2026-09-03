@@ -23,6 +23,8 @@ import {
   MessageEdit01Icon,
   MoveIcon,
   NoteEditIcon,
+  PinIcon,
+  PinOffIcon,
   SquareLock02Icon,
   SquareUnlock02Icon,
   StatusIcon,
@@ -108,6 +110,8 @@ const activityIconMap = {
   COMMENT_DELETED: CommentRemove01Icon,
   VOTE_ADDED: ThumbsUpIcon,
   VOTE_REMOVED: UserMinus01Icon,
+  COMMENT_PINNED: PinIcon,
+  COMMENT_UNPINNED: PinOffIcon,
 } satisfies Record<TPostActivityKind, typeof FileAddIcon>;
 
 const ETA_PATTERN = /^(\d{4})-Q([1-4])$/;
@@ -156,6 +160,8 @@ function getActivityDescription({
     COMMENT_DELETED: "deleted a comment",
     VOTE_ADDED: "added a voter",
     VOTE_REMOVED: "removed a voter",
+    COMMENT_PINNED: "pinned a comment",
+    COMMENT_UNPINNED: "unpinned a comment",
   } satisfies Record<TPostActivityKind, string>;
 
   return descriptions[activity.kind];

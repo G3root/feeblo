@@ -521,6 +521,8 @@ const ensureOrganization = (userId: string, name = "Personal") =>
           id: postStatusId,
           organizationId: org.id,
           type: postStatusDefinition.type,
+          label: postStatusDefinition.label,
+          color: postStatusDefinition.color,
           orderIndex: postStatusDefinition.orderIndex,
           createdAt: new Date(),
           updatedAt: new Date(),

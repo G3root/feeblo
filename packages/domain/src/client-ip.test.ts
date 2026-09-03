@@ -71,6 +71,25 @@ describe("getClientIpFromHeaders", () => {
     );
   });
 
+  it("pins the well-known Cloudflare edge ranges so the hardcoded list cannot silently shrink", () => {
+    const headers = Headers.fromInput({
+      "cf-connecting-ip": "203.0.113.9",
+    });
+    // v4: 104.16.0.0/13 covers 104.16.0.1; v6: 2606:4700::/32 covers
+    // 2606:4700:3037::1. These anchors move only when Cloudflare's published
+    // list changes, so a stale/truncated CLOUDFLARE_IP_RANGES fails here.
+    expect(getClientIpFromHeaders(headers, { peer: "104.24.0.7" })).toBe(
+      "203.0.113.9"
+    );
+    expect(getClientIpFromHeaders(headers, { peer: "2606:4700:3037::1" })).toBe(
+      "203.0.113.9"
+    );
+    // A range that Cloudflare does not own must never be trusted.
+    expect(getClientIpFromHeaders(headers, { peer: "198.51.100.1" })).toBe(
+      "unknown"
+    );
+  });
+
   it("rejects cf-connecting-ip from a non-Cloudflare peer", () => {
     const headers = Headers.fromInput({ "cf-connecting-ip": "203.0.113.1" });
 

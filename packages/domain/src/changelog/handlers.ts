@@ -4,6 +4,7 @@ import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
 import {
   cleanupOrphanedEditorAssets,
@@ -16,6 +17,7 @@ import {
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
@@ -40,6 +42,20 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
   const entitlementPolicy = yield* EntitlementPolicy;
   const changelogPolicy = yield* ChangelogPolicy;
   const sitePolicy = yield* SitePolicy;
+  const notifications = yield* Effect.serviceOption(NotificationService);
+
+  /** In-app notification for subscribed members; email stays outbox-driven. */
+  const notifyChangelogPublished = (args: {
+    readonly actorUserId?: string | null;
+    readonly changelogId: string;
+    readonly changelogSlug: string;
+    readonly organizationId: string;
+    readonly title: string;
+  }) =>
+    Option.match(notifications, {
+      onNone: () => Effect.void,
+      onSome: (service) => service.notifyChangelogPublished(args),
+    });
 
   const recordChangelogPublishedIntent = Effect.fn(
     "Changelog.recordPublishedEmailIntent"
@@ -145,6 +161,15 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                     organizationId: args.organizationId,
                   })
                 : undefined;
+            if (args.status === "published") {
+              yield* notifyChangelogPublished({
+                ...(isMember && { actorUserId: session.session.userId }),
+                changelogId: args.id,
+                changelogSlug: args.slug,
+                organizationId: args.organizationId,
+                title: args.title,
+              });
+            }
             yield* commitPreparedEditorAssets(prepared.promotions);
             yield* syncChangelogAssetReferences({
               changelogId: args.id,
@@ -200,6 +225,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
       );
       return Effect.gen(function* () {
         const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
         const prepared = yield* prepareEditorAssetContent({
           organizationId: args.organizationId,
           userId: session.session.userId,
@@ -220,13 +246,23 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               coverImage: prepared.coverImage,
               excerpt: htmlToExcerpt(sanitizedHtml),
             });
-            const createdOutboxId =
-              previousStatus !== "published" && args.status === "published"
-                ? yield* recordChangelogPublishedIntent({
-                    changelogId: args.id,
-                    organizationId: args.organizationId,
-                  })
-                : undefined;
+            const publishedNow =
+              previousStatus !== "published" && args.status === "published";
+            const createdOutboxId = publishedNow
+              ? yield* recordChangelogPublishedIntent({
+                  changelogId: args.id,
+                  organizationId: args.organizationId,
+                })
+              : undefined;
+            if (publishedNow) {
+              yield* notifyChangelogPublished({
+                ...(membership && { actorUserId: session.session.userId }),
+                changelogId: args.id,
+                changelogSlug: args.slug,
+                organizationId: args.organizationId,
+                title: args.title,
+              });
+            }
             yield* commitPreparedEditorAssets(prepared.promotions);
             yield* syncChangelogAssetReferences({
               changelogId: args.id,
@@ -258,6 +294,8 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
 
     ChangelogSendUpdate: (args: TChangelogSendUpdate) =>
       Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
         const outboxId = yield* transaction(
           Effect.gen(function* () {
             const status = yield* repository.findStatus({
@@ -315,6 +353,30 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                     })
                 )
               );
+            // Subscribers with email suppressed still see the update in-app;
+            // deduplicated per request so retries stay silent.
+            if (result._tag === "Inserted") {
+              const context = yield* repository.findNotificationContext({
+                id: args.id,
+                organizationId: args.organizationId,
+              });
+              if (context) {
+                yield* Option.match(notifications, {
+                  onNone: () => Effect.void,
+                  onSome: (service) =>
+                    service.notifyChangelogUpdated({
+                      ...(membership && {
+                        actorUserId: session.session.userId,
+                      }),
+                      changelogId: args.id,
+                      changelogSlug: context.slug,
+                      organizationId: args.organizationId,
+                      requestId: args.requestId,
+                      title: context.title,
+                    }),
+                });
+              }
+            }
             return result._tag === "Inserted" ? result.intent.id : undefined;
           })
         );
@@ -340,5 +402,6 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(SiteRepository.layer),
   Layer.provide(ChangelogRepository.layer),
-  Layer.provide(EmailOutboxRepository.layer)
+  Layer.provide(EmailOutboxRepository.layer),
+  Layer.provide(NotificationService.layer)
 );

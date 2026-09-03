@@ -7,6 +7,7 @@ import { usePostCollectionData } from "../post-page-context";
 import { useCommentDisplay } from "./context";
 import { DeleteButton } from "./delete-button";
 import { EditButton } from "./edit-button";
+import { PinButton } from "./pin-button";
 import { ToggleVisibilityButton } from "./toggle-visibility-button";
 
 export function CommentDisplayDropdown() {
@@ -21,7 +22,12 @@ export function CommentDisplayDropdown() {
     <Menu>
       <MenuTrigger
         render={
-          <Button size="icon-sm" variant="ghost">
+          <Button
+            aria-label="Comment menu"
+            className="transition-opacity data-popup-open:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
+            size="icon-sm"
+            variant="ghost"
+          >
             <HugeiconsIcon icon={Ellipsis} />
           </Button>
         }
@@ -29,6 +35,7 @@ export function CommentDisplayDropdown() {
       <MenuPopup>
         {state.isAuthor ? <EditButton /> : null}
         {state.isAuthor ? <ToggleVisibilityButton /> : null}
+        {canModeratePost ? <PinButton /> : null}
         <DeleteButton />
       </MenuPopup>
     </Menu>

@@ -3,6 +3,7 @@ import { BillingRpcs } from "./billing/rpcs";
 import { BoardRpcs } from "./board/rpcs";
 import { ChangelogCategoryRpcs } from "./changelog-category/rpcs";
 import { ChangelogPostRpcs } from "./changelog-post/rpcs";
+import { ChangelogSubscriptionRpcs } from "./changelog-subscription/rpcs";
 import { ChangelogRpcs } from "./changelog/rpcs";
 import { CommentReactionRpcs } from "./comment-reaction/rpcs";
 import { CommentRpcs } from "./comments/rpcs";
@@ -34,7 +35,9 @@ export const AllRpcs = PostRpcs.merge(PostActivityRpcs).merge(
   AttributeDefinitionRpcs,
   BillingRpcs,
   BoardRpcs,
-  ChangelogRpcs.merge(ChangelogPostRpcs, ChangelogCategoryRpcs),
+  ChangelogRpcs.merge(ChangelogPostRpcs, ChangelogCategoryRpcs).merge(
+    ChangelogSubscriptionRpcs
+  ),
   JwtSecretRpcs,
   MembershipRpcs,
   NotificationRpcs,

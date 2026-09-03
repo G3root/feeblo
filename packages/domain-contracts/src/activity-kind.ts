@@ -30,6 +30,8 @@ export const PostActivityKind = S.Literals([
   // staff member; the subject is recorded in `post_activity.metadata`.
   "VOTE_ADDED",
   "VOTE_REMOVED",
+  "COMMENT_PINNED",
+  "COMMENT_UNPINNED",
 ]);
 
 export type TPostActivityKind = S.Schema.Type<typeof PostActivityKind>;

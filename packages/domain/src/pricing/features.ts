@@ -38,7 +38,10 @@ export const PLAN_PRICING_FEATURES = {
     },
     { key: "crmEntries", label: "Unlimited CRM Entries" },
     { key: "integrations", label: "Integrations" },
-    { key: "subscriberEmails", label: "Subscriber Emails" },
+    {
+      key: "subscriberEmails",
+      label: "Subscriber Email Notifications",
+    },
     { key: "privateBoards", label: "Private Boards" },
     { key: "privateRoadmaps", label: "Private Roadmaps" },
     { key: "removeBranding", label: "Remove Feeblo Branding" },

@@ -251,6 +251,29 @@ const makeChangelogRepository = Effect.gen(function* () {
           .pipe(Effect.asVoid);
       }),
 
+    /** Notification context (title + slug) for one changelog entry. */
+    findNotificationContext: ({
+      id,
+      organizationId,
+    }: {
+      readonly id: string;
+      readonly organizationId: string;
+    }) =>
+      db
+        .select({
+          title: schema.changelogTable.title,
+          slug: schema.changelogTable.slug,
+        })
+        .from(schema.changelogTable)
+        .where(
+          and(
+            eq(schema.changelogTable.id, id),
+            eq(schema.changelogTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0])),
+
     delete: ({ id, organizationId }: TChangelogDelete) =>
       db
         .delete(schema.changelogTable)

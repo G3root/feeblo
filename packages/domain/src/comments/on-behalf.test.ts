@@ -9,12 +9,14 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { ResolvePrincipalService } from "../identity/service";
+import { EmailOutboxConfig } from "../email-outbox/config";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostRepository } from "../post/repository";
 import {
@@ -190,7 +192,15 @@ describe("CommentRpcHandlers on-behalf", () => {
   const TestLayer = Layer.mergeAll(
     HandlerTest,
     Database.PgliteDatabaseLive,
-    NodeCrypto.layer
+    NodeCrypto.layer,
+    EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
+    Layer.succeed(
+      IntegrationEventRecorder,
+      IntegrationEventRecorder.of({
+        recordIntegrationEvent: () =>
+          Effect.succeed({ deliveryCount: 0, eventRecorded: false as const }),
+      })
+    )
   );
 
   layer(TestLayer)("handlers", (it) => {

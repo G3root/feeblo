@@ -1,0 +1,1 @@
+ALTER TABLE "organization" ADD COLUMN "jwt_max_token_lifetime_minutes" integer;

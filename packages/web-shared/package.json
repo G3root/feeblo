@@ -42,10 +42,6 @@
       "types": "./src/auth/auth-context.tsx",
       "default": "./src/auth/auth-context.tsx"
     },
-    "./auth-hint": {
-      "types": "./src/utils/auth-hint.ts",
-      "default": "./src/utils/auth-hint.ts"
-    },
     "./auth-session": {
       "types": "./src/auth/atoms.ts",
       "default": "./src/auth/atoms.ts"
@@ -82,6 +78,14 @@
       "types": "./src/lib/collections.ts",
       "default": "./src/lib/collections.ts"
     },
+    "./sitemap": {
+      "types": "./src/lib/sitemap.ts",
+      "default": "./src/lib/sitemap.ts"
+    },
+    "./json-ld": {
+      "types": "./src/lib/json-ld.ts",
+      "default": "./src/lib/json-ld.ts"
+    },
     "./integrations/tanstack-query/root-provider": {
       "types": "./src/integrations/tanstack-query/root-provider.tsx",
       "default": "./src/integrations/tanstack-query/root-provider.tsx"
@@ -107,7 +111,7 @@
     "@feeblo/permissions": "workspace:*",
     "@feeblo/rpc-client": "workspace:*",
     "@feeblo/utils": "workspace:*",
-    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-query": "catalog:",
     "@tanstack/react-router": "catalog:",
     "effect": "catalog:",
     "react": "catalog:",

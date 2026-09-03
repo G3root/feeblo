@@ -1,3 +1,4 @@
+import { isBoolean, isNumber, isString } from "@feeblo/utils/runtime-kind";
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
 import type { JWTPayload } from "jose";
@@ -144,7 +145,7 @@ export type ParsedPersonAttributes = {
 };
 
 const KNOWN_CONTACT_FIELDS = new Set([
-  "userId",
+  "sub",
   "email",
   "name",
   "avatar",
@@ -310,6 +311,16 @@ const validateRequiredAttributes = (
     : Effect.void;
 };
 
+/**
+ * Custom attribute values are persisted and rendered client-side, so only
+ * JSON scalars are accepted from untrusted JWT payloads. Arrays and nested
+ * objects are ignored entirely (never stored, never rendered): they are not
+ * valid attribute values and rejecting the whole token for them would let an
+ * attacker with a leaked secret block sign-ins.
+ */
+const isJsonScalar = (value: AttributeSourceValue): boolean =>
+  value === null || isString(value) || isNumber(value) || isBoolean(value);
+
 const parseCustomAttributes = (
   customFields: AttributeSource,
   definitions: readonly AttributeDefinition[],
@@ -327,6 +338,19 @@ const parseCustomAttributes = (
       }
       const definition = defMap.get(key);
       if (!definition) {
+        continue;
+      }
+      if (!isJsonScalar(raw)) {
+        // Arrays and nested objects are not valid attribute values. Optional
+        // ones are ignored instead of persisting or failing the whole payload;
+        // a required one must fail here — the key-presence check above already
+        // passed, so ignoring it would silently create records without
+        // workspace-required data.
+        if (definition.isRequired) {
+          return yield* new DataValidationError({
+            message: `Invalid value for required attribute "${definition.key}": must be a string, number, boolean, or null`,
+          });
+        }
         continue;
       }
       effects.push(
@@ -436,6 +460,12 @@ const parseCompanies = (
       )
     : Effect.succeed([]);
 
+/**
+ * The user id comes exclusively from the standard JWT `sub` claim (RFC 7519).
+ * There is no legacy fallback: any other identity claim (e.g. `userId`) is not
+ * read. A non-string `sub` is left for CommonContactFields to reject with a
+ * typed error.
+ */
 export function parsePersonAttributes(
   data: JWTPayload | null,
   contactAttributeDefinitions: readonly TContactAttributeDefinition[],
@@ -448,7 +478,7 @@ export function parsePersonAttributes(
       CommonContactFields,
       "contact",
       {
-        userId: input.userId,
+        userId: input.sub,
         email: input.email,
         name: input.name,
         avatar: input.avatar,

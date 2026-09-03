@@ -1,4 +1,3 @@
-import { Card } from "@feeblo/ui/card";
 import { useState } from "react";
 
 import { CommentDisplayActions } from "./actions";
@@ -15,6 +14,11 @@ type CommentDisplayRootProps = Omit<
   children?: never;
 };
 
+/**
+ * Minimal, dense comment row: no card chrome — just avatar, header, body and
+ * actions. The row is a hover `group` so the overflow menu can reveal itself
+ * on desktop; `data-slot="comment"` gives tests and consumers a stable hook.
+ */
 export function CommentDisplayComponent(props: CommentDisplayRootProps) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -25,19 +29,17 @@ export function CommentDisplayComponent(props: CommentDisplayRootProps) {
       onCancelEdit={() => setIsEditing(false)}
       onStartEdit={() => setIsEditing(true)}
     >
-      <Card>
-        <div className="flex items-start gap-3 p-4">
-          <CommentDisplayAvatar />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between">
-              <CommentDisplayHeader />
-              <CommentDisplayDropdown />
-            </div>
-            <CommentDisplayBody />
-            <CommentDisplayActions />
+      <div className="group flex items-start gap-2 py-1.5" data-slot="comment">
+        <CommentDisplayAvatar />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <CommentDisplayHeader />
+            <CommentDisplayDropdown />
           </div>
+          <CommentDisplayBody />
+          <CommentDisplayActions />
         </div>
-      </Card>
+      </div>
     </CommentDisplayProvider>
   );
 }

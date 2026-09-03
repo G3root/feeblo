@@ -1,5 +1,6 @@
 import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { MessageLock01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type FormEvent, type ReactNode, useCallback, useState } from "react";
@@ -21,8 +22,14 @@ export function PostCommentComposer({
   showVisibilityPicker = false,
 }: PostCommentComposerProps) {
   const { data: session } = useAuthState();
-  const { isLocked, isMember } = usePostCollectionData();
+  const { isLocked, isMember, organizationId } = usePostCollectionData();
+  // Status updates move the post, so the picker is a manager+ privilege
+  // (posts.status) everywhere — mirroring the post editor and backend policy.
+  const { allowed: canStatusUpdate } = usePolicy(
+    hasPermission(organizationId, "posts.status")
+  );
   const disabled = isLocked || !session;
+  const showStatusUpdate = isMember && canStatusUpdate;
   const [editorKey, setEditorKey] = useState(0);
 
   const form = useCommentForm({
@@ -43,11 +50,12 @@ export function PostCommentComposer({
   );
 
   return (
-    <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
+    <form className="flex flex-col gap-2" onSubmit={handleSubmit}>
       <CommentComposerField
         disabled={disabled}
         form={form}
         resetKey={editorKey}
+        showStatusUpdate={showStatusUpdate}
         showVisibilityToggle={isMember}
       />
       {isLocked && (

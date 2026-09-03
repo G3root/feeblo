@@ -29,7 +29,10 @@ type PostRowLike = Pick<
   | "updatedAt"
 >;
 
-type PostStatusRowLike = Pick<TPostStatus, "id" | "organizationId" | "type">;
+type PostStatusRowLike = Pick<
+  TPostStatus,
+  "id" | "label" | "organizationId" | "type"
+>;
 
 type RoadmapRowLike = Pick<
   TRoadmap,
@@ -208,6 +211,7 @@ export function useRoadmapData<
           roadmapId: column.roadmapId,
           statusId: postStatus.id,
           type: postStatus.type,
+          label: postStatus.label,
         }))
         .orderBy(({ column }) => column.position, "asc");
     },

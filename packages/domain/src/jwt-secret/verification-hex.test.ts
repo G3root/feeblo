@@ -5,7 +5,8 @@ import * as jose from "jose";
 import { verifyJwt } from "./verification";
 
 const ORGANIZATION_ID = "org_test_hex";
-const futureExp = Math.floor(Date.now() / 1000) + 3600;
+const nowSeconds = Math.floor(Date.now() / 1000);
+const futureExp = nowSeconds + 3600;
 
 // 32 random bytes as 64-char hex (the format JwtSecretRepository generates)
 const HEX_SECRET = "a".repeat(64); // 64 hex chars -> 00...
@@ -31,7 +32,12 @@ describe("verifyJwt hex secret handling", () => {
       Effect.gen(function* () {
         const token = yield* Effect.promise(() =>
           signWithHex(
-            { aud: ORGANIZATION_ID, exp: futureExp, sub: "u1" },
+            {
+              aud: ORGANIZATION_ID,
+              exp: futureExp,
+              iat: nowSeconds,
+              sub: "u1",
+            },
             HEX_SECRET
           )
         );
@@ -55,7 +61,7 @@ describe("verifyJwt hex secret handling", () => {
     Effect.gen(function* () {
       const token = yield* Effect.promise(() =>
         signWithHex(
-          { aud: ORGANIZATION_ID, exp: futureExp, sub: "u2" },
+          { aud: ORGANIZATION_ID, exp: futureExp, iat: nowSeconds, sub: "u2" },
           HEX_SECRET_2
         )
       );

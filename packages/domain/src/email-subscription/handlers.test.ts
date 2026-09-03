@@ -9,6 +9,8 @@ import * as Redacted from "effect/Redacted";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { RateLimitService } from "../rate-limit/service";
+import { SitePolicy } from "../site/policies";
+import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import {
   EmailSubscriptionConsentHandlersEffect,
@@ -29,14 +31,32 @@ describe("EmailSubscriptionConsentHandlers", () => {
     ),
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+  const Entitlements = EntitlementPolicy.layer.pipe(
+    Layer.provide(Repositories)
+  );
+  const SiteRepositories = Layer.mergeAll(
+    SiteRepository.layer,
+    WorkspaceRepository.layer
+  ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const TestLayer = Layer.mergeAll(
     Repositories,
-    EntitlementPolicy.layer.pipe(Layer.provide(Repositories)),
+    SiteRepositories,
+    SitePolicy.layer.pipe(
+      Layer.provide(Entitlements),
+      Layer.provide(SiteRepositories)
+    ),
+    Entitlements,
     RateLimitService.layerMemory,
     Database.PgliteDatabaseLive
   );
 
-  const createWorkspace = ({ paid }: { readonly paid: boolean }) =>
+  const createWorkspace = ({
+    changelogVisibility = "PUBLIC",
+    paid,
+  }: {
+    readonly changelogVisibility?: "PUBLIC" | "HIDDEN";
+    readonly paid: boolean;
+  }) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
       const organizationId = yield* WorkspaceId.generate;
@@ -46,6 +66,18 @@ describe("EmailSubscriptionConsentHandlers", () => {
         name: "Subscription workspace",
         slug: organizationId,
         createdAt: now,
+      });
+      yield* db.insert(schema.siteTable).values({
+        id: `site_${organizationId}`,
+        name: "Subscription site",
+        subdomain: `test-${organizationId}`,
+        customDomain: null,
+        changelogVisibility,
+        roadmapVisibility: "PUBLIC",
+        hidePoweredBy: false,
+        organizationId,
+        createdAt: now,
+        updatedAt: now,
       });
       if (!paid) {
         return organizationId;

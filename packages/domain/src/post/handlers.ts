@@ -61,6 +61,7 @@ import type {
   TPostAdminUpdate,
   TPostCreate,
   TPostDelete,
+  TPostGet,
   TPostList,
   TPostMerge,
   TPostOfficialUpdatePublish,
@@ -421,9 +422,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                 service.notifyPostStatusChanged({
                   organizationId: args.organizationId,
                   postId: args.id,
-                  ...(membership && {
-                    actorMemberId: membership.membershipId,
-                  }),
+                  actorUserId: session.session.userId,
                 }),
             });
           }
@@ -855,9 +854,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               service.notifySubmission({
                 organizationId: args.organizationId,
                 postId: args.id,
-                ...(membership && {
-                  actorMemberId: membership.membershipId,
-                }),
+                actorUserId: session.session.userId,
               }),
           });
 
@@ -924,6 +921,38 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "PostListPublic",
+          level: "read",
+        }),
+        withRemapDbErrors("Post", "select")
+      );
+    },
+
+    PostGetPublic: (args: TPostGet) => {
+      return Effect.gen(function* () {
+        const sessionOption = yield* OptionalCurrentSession;
+        const userId =
+          sessionOption._tag === "Some"
+            ? sessionOption.value.session.userId
+            : undefined;
+        // Same visibility rule as PostListPublic: board visibility is
+        // enforced inside `findPublicBySlug` (public boards only). No
+        // site-policy gate needed here.
+        const post = yield* repository.findPublicBySlug({
+          organizationId: args.organizationId,
+          slug: args.slug,
+          userId,
+        });
+        if (post === undefined) {
+          return yield* new PostNotFoundError({
+            message: "Post not found",
+          });
+        }
+        // Same PII rule as PostListPublic: creator identifiers are only
+        // meaningful for the session user's own row.
+        return redactCreatorIdentity(post, userId);
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostGetPublic",
           level: "read",
         }),
         withRemapDbErrors("Post", "select")

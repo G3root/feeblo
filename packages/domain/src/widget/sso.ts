@@ -1,9 +1,10 @@
-import { transaction } from "@feeblo/db";
+import { currentDb, schema, transaction } from "@feeblo/db";
 import {
   CompanyAttributeDefinitionId,
   ContactAttributeDefinitionId,
   WorkspaceId,
 } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -22,7 +23,11 @@ import { parsePersonAttributes } from "../contact/utils";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { linkShadowUser } from "../identity/linking";
 import { JwtSecretRepository } from "../jwt-secret/repository";
-import { verifyJwt } from "../jwt-secret/verification";
+import {
+  maxTokenLifetimeFromMinutes,
+  verifyJwt,
+} from "../jwt-secret/verification";
+import { OrganizationRepository } from "../organization/repository";
 import { PolicyDeniedError } from "../policy";
 import { RateLimitService } from "../rate-limit/service";
 import { UserRepository } from "../user/repository";
@@ -47,6 +52,30 @@ export class SsoError extends S.TaggedError<SsoError>()("SsoError", {
 }) {}
 
 export type SsoErrorCode = S.Schema.Type<(typeof SsoError)["fields"]["code"]>;
+
+/**
+ * Tagged error raised when anonymous-account linking cannot be proven safe.
+ * The caller (better-auth jwt-auto-login plugin) logs and skips the anonymous
+ * user cleanup on failure, so the widget user's data is preserved for a later
+ * retry instead of being orphaned or misattributed.
+ */
+export class LinkAnonymousAccountError extends S.TaggedError<LinkAnonymousAccountError>()(
+  "LinkAnonymousAccountError",
+  {
+    code: S.Literals([
+      "ANONYMOUS_USER_NOT_FOUND",
+      "ANONYMOUS_USER_NOT_RESTRICTED",
+      "NEW_USER_NOT_FOUND",
+      "NEW_USER_IS_ANONYMOUS",
+      "LINK_FAILED",
+    ]),
+    message: S.optional(S.String),
+  }
+) {}
+
+export type LinkAnonymousAccountErrorCode = S.Schema.Type<
+  (typeof LinkAnonymousAccountError)["fields"]["code"]
+>;
 
 export interface SsoSessionResult {
   email: string;
@@ -205,10 +234,26 @@ export const createSsoSession = ({
       });
     }
 
+    // Per-workspace lifetime cap: `organization.jwt_max_token_lifetime_minutes`
+    // tightens (never loosens) the 24h default so a workspace can shorten how
+    // long a leaked token stays replayable. Invalid stored values fall back to
+    // the default. A missing org row (impossible via
+    // the FK) falls back to the default; other failures are normalized by the
+    // outer catch below.
+    const organizationRepository = yield* OrganizationRepository;
+    const maxTokenLifetimeMinutes =
+      yield* organizationRepository.findJwtMaxTokenLifetimeMinutes({
+        organizationId,
+      });
+    const maxTokenLifetime = maxTokenLifetimeFromMinutes(
+      maxTokenLifetimeMinutes
+    );
+
     const jwtPayload = yield* verifyJwt(
       token,
       secrets.map((s) => s.secret),
-      organizationId
+      organizationId,
+      { maxTokenLifetime }
     ).pipe(Effect.mapError(() => new SsoError({ code: "INVALID_JWT" })));
 
     // Bound contact and user provisioning only after a JWT has proved that
@@ -308,9 +353,23 @@ export const createSsoSession = ({
 /**
  * Re-assigns widget portal data from the restricted SSO user to the real user
  * created during a global sign-in. Delegates to the shared identity-linking
- * program (see {@link linkShadowUser}); the caller deletes the restricted
- * user afterwards so contact ownership survives the cascade
- * (`contact.userId` is `ON DELETE SET NULL`).
+ * program (see {@link linkShadowUser}) for the comprehensive healing
+ * (contacts, posts, upvotes, comments, subscriptions) so contact ownership
+ * survives the cascade (`contact.userId` is `ON DELETE SET NULL`); the caller
+ * deletes the restricted user afterwards.
+ *
+ * The function is defense-in-depth hardened against misuse: it must never
+ * reassign another user's data, so both ids are verified against the user
+ * table before any row is touched. The anonymous side must be a restricted
+ * SSO user (widget portal identity) and the target must be a real account —
+ * linking two anonymous accounts or claiming a non-restricted user's data is
+ * rejected. No same-organization membership is required: a widget user may
+ * legitimately sign in globally before joining the workspace, and the
+ * restricted flag is the invariant that proves portal identity.
+ *
+ * Failures are reported via {@link LinkAnonymousAccountError} (no partial
+ * transfer); the caller logs and skips the anonymous user cleanup so the data
+ * is preserved for a later retry.
  */
 export const linkAnonymousAccount = ({
   anonymousUserId,
@@ -319,11 +378,85 @@ export const linkAnonymousAccount = ({
   anonymousUserId: string;
   newUserId: string;
 }) =>
-  linkShadowUser({
-    shadowUserId: anonymousUserId,
-    realUserId: newUserId,
-    deleteShadowUser: false,
-  });
+  Effect.gen(function* () {
+    if (anonymousUserId === newUserId) {
+      return;
+    }
+
+    const db = yield* currentDb;
+    const [anonymousUser, newUser] = yield* Effect.all([
+      db
+        .select({
+          restrictedToOrganizationId:
+            schema.userTable.restrictedToOrganizationId,
+        })
+        .from(schema.userTable)
+        .where(eq(schema.userTable.id, anonymousUserId))
+        .limit(1),
+      db
+        .select({
+          restrictedToOrganizationId:
+            schema.userTable.restrictedToOrganizationId,
+        })
+        .from(schema.userTable)
+        .where(eq(schema.userTable.id, newUserId))
+        .limit(1),
+    ]);
+    const anonymous = anonymousUser[0];
+    const target = newUser[0];
+
+    if (!anonymous) {
+      return yield* new LinkAnonymousAccountError({
+        code: "ANONYMOUS_USER_NOT_FOUND",
+      });
+    }
+    if (!anonymous.restrictedToOrganizationId) {
+      return yield* new LinkAnonymousAccountError({
+        code: "ANONYMOUS_USER_NOT_RESTRICTED",
+      });
+    }
+    if (!target) {
+      return yield* new LinkAnonymousAccountError({
+        code: "NEW_USER_NOT_FOUND",
+      });
+    }
+    if (target.restrictedToOrganizationId) {
+      return yield* new LinkAnonymousAccountError({
+        code: "NEW_USER_IS_ANONYMOUS",
+      });
+    }
+
+    yield* linkShadowUser({
+      shadowUserId: anonymousUserId,
+      realUserId: newUserId,
+      deleteShadowUser: false,
+    }).pipe(
+      Effect.mapError((error) =>
+        error instanceof LinkAnonymousAccountError
+          ? error
+          : new LinkAnonymousAccountError({
+              code: "LINK_FAILED",
+              message:
+                "Failed to transfer widget portal data to the real account",
+            })
+      )
+    );
+  }).pipe(
+    // Normalize transport failures (unexpected database/SQL errors) into the
+    // typed error while preserving link-specific rejections byte-for-byte, so
+    // the caller sees a single error channel it can log and retry safely.
+    Effect.catch((error) =>
+      error instanceof LinkAnonymousAccountError
+        ? Effect.fail(error)
+        : Effect.fail(
+            new LinkAnonymousAccountError({
+              code: "LINK_FAILED",
+              message:
+                "Failed to transfer widget portal data to the real account",
+            })
+          )
+    )
+  );
 
 /**
  * Convenience layer bundling the repositories the SSO programs need. Compose
@@ -335,5 +468,6 @@ export const SsoRepositoriesLive = Layer.mergeAll(
   CompanyRepository.layer,
   ContactRepository.layer,
   JwtSecretRepository.layer,
+  OrganizationRepository.layer,
   UserRepository.layer
 );

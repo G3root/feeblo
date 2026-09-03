@@ -3,24 +3,26 @@ import type { AuthClientSession } from "@feeblo/auth/client";
 import { hasWindow } from "@feeblo/utils/runtime-kind";
 import * as Option from "effect/Option";
 import * as Result from "effect/unstable/reactivity/AsyncResult";
+import * as AtomRegistry from "effect/unstable/reactivity/AtomRegistry";
 import type React from "react";
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 
-import type { AuthHint } from "../utils/auth-hint";
 import { authAtomRegistry, meAtom } from "./atoms";
+import { readAuthHintFromCookie } from "./hint-cookie";
 
 // ---------------------------------------------------------------------------
 // Shared auth seam for Feeblo's dashboard and public-board apps.
 //
 // The authoritative state comes from `meAtom`, which calls Better Auth's
-// custom session endpoint. While that request is in flight, the server-verified
-// initial hint can paint known display identity immediately. The hint is never
-// authorization: it contains no session token or membership roles, and the
-// atom's resolved response always replaces it.
+// custom session endpoint. Auth is resolved entirely on the client: the
+// session starts in a loading state on every full page load and reconciles
+// once the atom's request finishes.
 //
-// Astro middleware already resolves the session for document requests. It
-// passes the corresponding hint as a serialized island prop, allowing the
-// client-only React root to paint consistently before the atom finishes.
+// While that request is in flight, the display-only hint cookie (written by
+// the atom itself after previous confirmed resolutions) paints the last known
+// identity immediately. Like the atom's response it is never authorization:
+// it contains no session token or membership roles, and the resolved response
+// always replaces it.
 // ---------------------------------------------------------------------------
 
 export type AuthUser = Pick<AuthClientSession["user"], "email" | "name"> & {
@@ -42,12 +44,11 @@ const AuthContext = createContext<AuthState>({ status: "loading" });
 export const useAuth = () => useContext(AuthContext);
 
 /**
- * Authoritative session state from the atom, ignoring the display-only hint.
+ * Authoritative session state from the atom.
  *
- * The provider renders through this state so the hint can paint before the
- * atom resolves; hosts that need to react to a *confirmed* resolution
- * (analytics identify, redirects, …) subscribe to this hook directly instead
- * of receiving data back through a parent callback in an effect.
+ * Hosts that need to react to a *confirmed* resolution (analytics identify,
+ * redirects, …) subscribe to this hook directly instead of receiving data
+ * back through a parent callback in an effect.
  */
 const resolveAuthState = (
   session: Result.AsyncResult<AuthClientSession | null, unknown>
@@ -55,8 +56,8 @@ const resolveAuthState = (
   Result.builder(session)
     .onInitial((): AuthState => ({ status: "loading" }))
     // A failed revalidation is not evidence that the user signed out. Keep the
-    // last authoritative result when available; otherwise remain in the
-    // reconciliation state so an initial server hint can continue to paint.
+    // last authoritative result when available; otherwise remain loading so
+    // consumers can wait for a confirmed resolution.
     .onFailure((_, { previousSuccess }): AuthState =>
       Option.match(previousSuccess, {
         onNone: (): AuthState => ({ status: "loading" }),
@@ -68,15 +69,6 @@ const resolveAuthState = (
 
 export const useResolvedAuth = (): AuthState =>
   useAtomValue(meAtom, resolveAuthState);
-
-const hintState = (hint: AuthHint | null): AuthState | null =>
-  hint === null
-    ? null
-    : {
-        status: "authenticated",
-        data: null,
-        user: hint.user,
-      };
 
 const sessionState = (session: AuthClientSession): AuthState => ({
   status: "authenticated",
@@ -91,14 +83,18 @@ const sessionState = (session: AuthClientSession): AuthState => ({
 const confirmedState = (session: AuthClientSession | null): AuthState =>
   session === null ? { status: "unauthenticated" } : sessionState(session);
 
+const hintState = (hint: AuthUser | null): AuthState | null =>
+  hint === null ? null : { status: "authenticated", data: null, user: hint };
+
 function AuthProviderClient({
   children,
-  initialHint,
 }: {
   readonly children: React.ReactNode;
-  readonly initialHint: AuthHint | null;
 }) {
   const resolved = useResolvedAuth();
+  // Read once per mount: the cookie only changes through the atom itself, so
+  // a re-render can never observe a fresher hint than the in-flight request.
+  const [initialHint] = useState(() => readAuthHintFromCookie());
 
   const state = useMemo<AuthState>(
     () =>
@@ -113,31 +109,23 @@ function AuthProviderClient({
 
 export function AuthProvider({
   children,
-  initialHint,
+  registry = authAtomRegistry,
 }: {
   readonly children: React.ReactNode;
-  readonly initialHint: AuthHint | null;
+  /** Test seam: defaults to the shared app-wide registry. */
+  readonly registry?: AtomRegistry.AtomRegistry;
 }) {
-  // The server renders the app shell once per request, but consumers still
-  // need a stable value identity.
-  const serverState = useMemo<AuthState>(
-    () => hintState(initialHint) ?? { status: "loading" },
-    [initialHint]
-  );
-
   if (!hasWindow()) {
     return (
-      <AuthContext.Provider value={serverState}>
+      <AuthContext.Provider value={{ status: "loading" }}>
         {children}
       </AuthContext.Provider>
     );
   }
 
   return (
-    <RegistryContext.Provider value={authAtomRegistry}>
-      <AuthProviderClient initialHint={initialHint}>
-        {children}
-      </AuthProviderClient>
+    <RegistryContext.Provider value={registry}>
+      <AuthProviderClient>{children}</AuthProviderClient>
     </RegistryContext.Provider>
   );
 }

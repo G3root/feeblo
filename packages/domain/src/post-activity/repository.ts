@@ -82,6 +82,8 @@ export type PostActivityInput = PostActivityActor &
     | { readonly kind: "COMMENT_DELETED"; readonly commentId: string }
     | { readonly kind: "VOTE_ADDED" }
     | { readonly kind: "VOTE_REMOVED" }
+    | { readonly kind: "COMMENT_PINNED"; readonly commentId: string }
+    | { readonly kind: "COMMENT_UNPINNED"; readonly commentId: string }
   );
 
 type PostActivityRow = {
@@ -165,6 +167,8 @@ const toRow = (input: PostActivityInput): PostActivityRow => {
         commentId: input.commentId,
       };
     case "COMMENT_DELETED":
+    case "COMMENT_PINNED":
+    case "COMMENT_UNPINNED":
       return {
         kind: input.kind,
         previousValue: null,

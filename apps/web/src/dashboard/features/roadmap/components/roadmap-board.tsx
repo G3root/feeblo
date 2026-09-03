@@ -8,7 +8,7 @@ import type { RoadmapLane, RoadmapPost } from "@feeblo/post-ui/roadmap/types";
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
-import { getBoardStatusLabel } from "@feeblo/web-shared/board/constants";
+import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -257,7 +257,7 @@ const RoadmapBoardLane = memo(function RoadmapBoardLane({
             {lane.posts.length}
           </span>
           <Button
-            aria-label={`Add post to ${lane.name ?? getBoardStatusLabel(lane.status)}`}
+            aria-label={`Add post to ${lane.name || lane.label || formatPostStatus(lane.status)}`}
             onClick={() => {
               createPostStore.send({
                 type: "toggle",
@@ -277,6 +277,7 @@ const RoadmapBoardLane = memo(function RoadmapBoardLane({
       }
       contentRef={ref}
       isHighlighted={isDropTarget}
+      label={lane.label}
       name={lane.name}
       status={lane.status}
     >

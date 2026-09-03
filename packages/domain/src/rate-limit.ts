@@ -4,14 +4,9 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import * as Headers from "effect/unstable/http/Headers";
 import * as RpcMiddleware from "effect/unstable/rpc/RpcMiddleware";
 
-import {
-  ClientIp,
-  type ClientIpValue,
-  getClientIpFromHeaders,
-} from "./client-ip";
+import { ClientIp, type ClientIpValue } from "./client-ip";
 import { RateLimitService } from "./rate-limit/service";
 
 export const publicRpcLimits = {
@@ -79,14 +74,19 @@ export const makePublicRpcRateLimiter = ({
   readonly rateLimitService: RateLimitService["Service"];
 }): PublicRpcRateLimiterService => ({
   consume: ({ name, level, limit, window }) => {
-    const defaults = publicRpcLimits[level];
-    const isUnavailable = clientIp._tag !== "ClientIpAddress";
+    // Fail closed: without a ClientIpAddress the request cannot be assigned a
+    // per-client bucket. The former shared "unavailable" bucket was a DoS
+    // vector — a single client could exhaust the limit for everyone — so
+    // reject before invoking RateLimitService.consume, matching the
+    // middleware's onNone fail-closed behavior.
+    if (clientIp._tag !== "ClientIpAddress") {
+      return Effect.fail(new RateLimitUnavailableError());
+    }
 
-    const consumeEffect = rateLimitService
+    const defaults = publicRpcLimits[level];
+    return rateLimitService
       .consume({
-        key: `public-rpc:${name}:${
-          clientIp._tag === "ClientIpAddress" ? clientIp.address : "unavailable"
-        }`,
+        key: `public-rpc:${name}:${clientIp.address}`,
         limit: limit ?? defaults.limit,
         window: window ?? defaults.window,
       })
@@ -99,19 +99,6 @@ export const makePublicRpcRateLimiter = ({
           )
         )
       );
-
-    // Shared "unavailable" bucket is a DoS vector when remoteAddress is
-    // missing or proxy trust is misconfigured. Emit a warning so operators
-    // can detect a spike and fix proxy config; do not block the request.
-    return isUnavailable
-      ? consumeEffect.pipe(
-          Effect.tap(() =>
-            Effect.logWarning(
-              "Public RPC rate-limit used shared unavailable bucket — check ClientIp proxy trust / remoteAddress"
-            ).pipe(Effect.annotateLogs({ rpc: name }))
-          )
-        )
-      : consumeEffect;
   },
 });
 
@@ -149,17 +136,29 @@ export const PublicRpcRateLimitMiddlewareLive = Layer.effect(
   Effect.gen(function* () {
     const rateLimitService = yield* RateLimitService;
 
-    return PublicRpcRateLimitMiddleware.of((effect, options) =>
+    return PublicRpcRateLimitMiddleware.of((effect) =>
       Effect.gen(function* () {
-        // Prefer the peer-anchored client IP provided by the global HTTP
-        // middleware. Only fall back to the headers when that is not
-        // installed; without a TCP peer, getClientIpFromHeaders cannot
-        // validate the provenance of any forwarded header and returns the
-        // shared "unknown" bucket rather than accepting spoofable values.
-        const clientIpOption = yield* Effect.serviceOption(ClientIp);
-        const clientIp = Option.isSome(clientIpOption)
-          ? clientIpOption.value
-          : getClientIpFromHeaders(Headers.fromInput(options.headers));
+        // Fail closed: without the global ClientIp middleware there is no
+        // trustworthy per-request identity, so limits cannot be partitioned per
+        // client. The former header fallback always produced the shared
+        // "unavailable" bucket — `getClientIpFromHeaders` requires a TCP peer —
+        // so every public request collapsed into one global bucket that a
+        // single attacker could exhaust for everyone (or hide their own volume
+        // in). Refuse the request instead; the composition root must install
+        // `makeClientIpGlobalMiddleware` before the RPC route.
+        const clientIp = yield* Option.match(
+          yield* Effect.serviceOption(ClientIp),
+          {
+            onNone: () => Effect.fail(new RateLimitUnavailableError()),
+            // Accept only a resolved ClientIpAddress; a ClientIpUnavailable
+            // value (no peer) is rejected just like a missing service rather
+            // than being routed to a shared bucket.
+            onSome: (value) =>
+              value._tag === "ClientIpAddress"
+                ? Effect.succeed(value)
+                : Effect.fail(new RateLimitUnavailableError()),
+          }
+        );
 
         return yield* Effect.provideService(
           effect,

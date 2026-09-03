@@ -11,6 +11,7 @@ import {
   PostCreate,
   PostDelete,
   PostDeletePublic,
+  PostGet,
   PostList,
   PostMerge,
   PostOfficialUpdatePublish,
@@ -22,6 +23,11 @@ import {
 } from "./schema";
 
 export class PostRpcs extends RpcGroup.make(
+  // Naming note: `*Public` here means "public portal" (widget/feedback board),
+  // NOT anonymous. Every `*Public` RPC below still requires AuthMiddleware
+  // (or OptionalAuthMiddleware for reads) plus PublicRpcRateLimitMiddleware.
+  // Removing AuthMiddleware would make portal posts writable by unauthenticated
+  // callers — do not do that without adding an explicit anonymous-identity path.
   Rpc.make("PostList", {
     payload: PostList,
     success: Schema.Array(Post),
@@ -31,6 +37,14 @@ export class PostRpcs extends RpcGroup.make(
   Rpc.make("PostListPublic", {
     payload: PostList,
     success: Schema.Array(Post),
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+
+  Rpc.make("PostGetPublic", {
+    payload: PostGet,
+    success: Post,
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   })
     .middleware(OptionalAuthMiddleware)

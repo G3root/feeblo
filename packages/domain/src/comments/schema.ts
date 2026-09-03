@@ -1,4 +1,4 @@
-import { CommentId, PostId, WorkspaceId } from "@feeblo/id";
+import { CommentId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
 import { COMMENT_CONTENT_MAX_LENGTH } from "../content-limits";
@@ -17,7 +17,17 @@ export const Comment = S.Struct({
   userId: S.NullOr(S.String),
   visibility: S.Literals(["PUBLIC", "INTERNAL"]),
   parentCommentId: S.Union([S.String, S.Null]),
+  /**
+   * Parent re-resolved to the nearest ancestor the caller can see; equal to
+   * parentCommentId when no ancestor is hidden from them. Public lists
+   * rewrite it past INTERNAL (member-only) intermediaries so a public reply
+   * still nests beneath its nearest visible ancestor.
+   */
+  resolvedParentCommentId: S.Union([S.String, S.Null]),
   memberId: S.Union([S.String, S.Null]),
+  /** Post status (org-scoped FK) this comment moved the post to, when posted as a status update. */
+  statusUpdateId: S.NullOr(S.String),
+  pinnedAt: S.NullOr(S.DateFromString),
   user: S.Struct({
     name: S.String,
   }),
@@ -41,6 +51,8 @@ export const CommentCreate = S.Struct({
   parentCommentId: S.Union([CommentId.schema, S.Null]),
   /** Present ⇒ the comment is created on behalf of the resolved customer. */
   author: S.optional(PostCreateAuthor),
+  /** Optional post status (org-scoped FK) this comment moves the post to. */
+  statusUpdateId: S.optional(S.NullOr(PostStatusId.schema)),
 });
 
 export type TCommentCreate = S.Schema.Type<typeof CommentCreate>;
@@ -62,3 +74,19 @@ export const CommentUpdate = S.Struct({
 });
 
 export type TCommentUpdate = S.Schema.Type<typeof CommentUpdate>;
+
+export const CommentPin = S.Struct({
+  id: CommentId.schema,
+  organizationId: WorkspaceId.schema,
+  postId: PostId.schema,
+});
+
+export type TCommentPin = S.Schema.Type<typeof CommentPin>;
+
+export const CommentUnpin = S.Struct({
+  id: CommentId.schema,
+  organizationId: WorkspaceId.schema,
+  postId: PostId.schema,
+});
+
+export type TCommentUnpin = S.Schema.Type<typeof CommentUnpin>;

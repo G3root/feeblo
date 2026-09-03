@@ -1,7 +1,7 @@
 import { RoadmapColumnId } from "@feeblo/id";
 import { withForm } from "@feeblo/ui/hooks/form";
 import { Separator } from "@feeblo/ui/separator";
-import { getBoardStatusLabel } from "@feeblo/web-shared/board/constants";
+import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useState } from "react";
 
@@ -96,7 +96,7 @@ const RoadmapColumnsSection = withForm({
                     form.pushFieldValue("columns", {
                       id,
                       name: nextStatus
-                        ? getBoardStatusLabel(nextStatus.type)
+                        ? nextStatus.label || formatPostStatus(nextStatus.type)
                         : "",
                       statusId: nextStatus?.id ?? "",
                     });

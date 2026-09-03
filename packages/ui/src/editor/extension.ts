@@ -15,22 +15,28 @@ import { defineCodeBlockView } from "./ui/code-block-view/index.js";
 import { defineImageView } from "./ui/image-view/index.js";
 import { createEditorUploader } from "./uploader";
 
+// The placeholder text applied when the Editor is used without an explicit
+// placeholder prop. Kept here as the single source of truth for the default.
+export const DEFAULT_PLACEHOLDER = "Press / for commands...";
+
 export function defineExtension({
   deferUploads = false,
   editorScope,
   organizationId,
   readonly = false,
-  placeholder = "Press / for commands...",
+  placeholder,
 }: {
   deferUploads?: boolean | undefined;
   editorScope?: string | undefined;
   organizationId?: string | undefined;
   readonly?: boolean | undefined;
+  // Optional so callers can leave the placeholder out entirely (the Editor
+  // applies the placeholder plugin dynamically; passing it here would create
+  // a second plugin with the same key later).
   placeholder?: string | undefined;
 } = {}) {
   const extensions = [
     defineBasicExtension(),
-    definePlaceholder({ placeholder }),
     defineMention(),
     // defineMath({
     //   renderMathBlock: renderKaTeXMathBlock,
@@ -53,6 +59,10 @@ export function defineExtension({
       ),
     }),
   ];
+
+  if (placeholder !== undefined) {
+    extensions.push(definePlaceholder({ placeholder }));
+  }
 
   if (readonly) {
     extensions.push(defineReadonly());

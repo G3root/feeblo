@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import type { JWTPayload } from "jose";
 
 import type {
   TCompanyAttributeDefinition,
@@ -242,6 +243,55 @@ describe("parseContactCustomAttributes", () => {
     })
   );
 
+  it.effect("ignores array values for custom attributes (scalar-only)", () =>
+    Effect.gen(function* () {
+      const def = makeContactDef({ key: "tags", type: "TEXT" });
+      const result = yield* parseContactCustomAttributes(
+        { customFields: { tags: ["a", "b"] } },
+        [def]
+      );
+      expect(result).toEqual([]);
+    })
+  );
+
+  it.effect(
+    "ignores nested object values for custom attributes (scalar-only)",
+    () =>
+      Effect.gen(function* () {
+        const def = makeContactDef({ key: "address", type: "TEXT" });
+        const result = yield* parseContactCustomAttributes(
+          {
+            customFields: {
+              address: { street: "Main" },
+              city: "Berlin",
+            },
+          },
+          [def, makeContactDef({ key: "city", type: "TEXT" })]
+        );
+        expect(result).toEqual([
+          { definitionId: def.id, key: "city", value: "Berlin" },
+        ]);
+      })
+  );
+
+  it.effect("fails when a required attribute has a non-scalar value", () =>
+    Effect.gen(function* () {
+      const def = makeContactDef({
+        key: "requiredField",
+        type: "TEXT",
+        isRequired: true,
+      });
+      // The key-presence check passes for any value shape, so a required
+      // attribute carrying an object must fail instead of being dropped
+      // (which would create contacts without workspace-required data).
+      const error = yield* parseContactCustomAttributes(
+        { customFields: { requiredField: { nested: true } } },
+        [def]
+      ).pipe(Effect.flip);
+      expect(error).toBeInstanceOf(DataValidationError);
+    })
+  );
+
   it("fails when required attribute is missing", async () => {
     const def = makeContactDef({
       key: "requiredField",
@@ -340,28 +390,23 @@ describe("parseContactCustomAttributes", () => {
     })
   );
 
-  it("rejects an invalid Date instance for a DATE attribute", async () => {
-    const def = makeContactDef({
-      key: "birthday",
-      type: "DATE",
-    });
-    await expect(
-      Effect.runPromise(
-        parseContactCustomAttributes(
+  it.effect(
+    "ignores an invalid Date instance for a DATE attribute (non-scalar)",
+    () =>
+      Effect.gen(function* () {
+        const def = makeContactDef({
+          key: "birthday",
+          type: "DATE",
+        });
+        // A Date instance cannot occur in a JSON JWT payload; like every other
+        // non-scalar value it is ignored rather than persisted or failed on.
+        const result = yield* parseContactCustomAttributes(
           { customFields: { birthday: new Date(Number.NaN) } },
           [def]
-        )
-      )
-    ).rejects.toBeInstanceOf(DataValidationError);
-    await expect(
-      Effect.runPromise(
-        parseContactCustomAttributes(
-          { customFields: { birthday: new Date(Number.NaN) } },
-          [def]
-        )
-      )
-    ).rejects.toThrow('Invalid value for attribute "birthday"');
-  });
+        );
+        expect(result).toEqual([]);
+      })
+  );
 
   it("rejects a non-date string for a DATE attribute", async () => {
     const def = makeContactDef({
@@ -536,7 +581,7 @@ describe("parsePersonAttributes", () => {
   it.effect("parses minimal valid person data", () =>
     Effect.gen(function* () {
       const result = yield* parsePersonAttributes(
-        { userId: "user_1", email: "a@b.com", name: "Alice" },
+        { sub: "user_1", email: "a@b.com", name: "Alice" },
         contactDefs,
         companyDefs
       );
@@ -560,14 +605,17 @@ describe("parsePersonAttributes", () => {
   });
 
   it("fails on invalid email type", async () => {
+    // SAFETY: The test intentionally feeds a malformed JWT payload whose `sub`
+    // claim is a number; parsing at the boundary keeps the single cast honest.
+    const malformedPayload = JSON.parse('{"sub":123}') as JWTPayload;
     await expect(
       Effect.runPromise(
-        parsePersonAttributes({ userId: 123 }, contactDefs, companyDefs)
+        parsePersonAttributes(malformedPayload, contactDefs, companyDefs)
       )
     ).rejects.toBeInstanceOf(DataValidationError);
     await expect(
       Effect.runPromise(
-        parsePersonAttributes({ userId: 123 }, contactDefs, companyDefs)
+        parsePersonAttributes(malformedPayload, contactDefs, companyDefs)
       )
     ).rejects.toThrow("Invalid contact fields");
   });
@@ -577,7 +625,7 @@ describe("parsePersonAttributes", () => {
       const def = makeContactDef({ key: "city", type: "TEXT" });
       const result = yield* parsePersonAttributes(
         {
-          userId: "user_1",
+          sub: "user_1",
           email: "a@b.com",
           name: "Alice",
           customFields: { city: "London" },
@@ -599,7 +647,7 @@ describe("parsePersonAttributes", () => {
     Effect.gen(function* () {
       const result = yield* parsePersonAttributes(
         {
-          userId: "user_1",
+          sub: "user_1",
           email: "a@b.com",
           name: "Alice",
           companies: [
@@ -630,7 +678,7 @@ describe("parsePersonAttributes", () => {
       });
       const result = yield* parsePersonAttributes(
         {
-          userId: "user_1",
+          sub: "user_1",
           email: "a@b.com",
           name: "Alice",
           companies: [
@@ -660,7 +708,7 @@ describe("parsePersonAttributes", () => {
       Effect.gen(function* () {
         const result = yield* parsePersonAttributes(
           {
-            userId: "user_1",
+            sub: "user_1",
             email: "a@b.com",
             name: "Alice",
             companies: "not-an-array",
@@ -676,7 +724,7 @@ describe("parsePersonAttributes", () => {
     Effect.gen(function* () {
       const result = yield* parsePersonAttributes(
         {
-          userId: "user_1",
+          sub: "user_1",
           email: "a@b.com",
           name: "Alice",
           companies: [],
@@ -698,7 +746,7 @@ describe("parsePersonAttributes", () => {
     Effect.gen(function* () {
       const result = yield* parsePersonAttributes(
         {
-          userId: "user_1",
+          sub: "user_1",
           email: "a@b.com",
           name: "Alice",
           extra: "should-be-ignored",

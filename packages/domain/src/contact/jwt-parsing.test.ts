@@ -23,7 +23,7 @@ describe("JWT payload parsing", () => {
   it.effect("parses a realistic JWT-shaped payload", () =>
     Effect.gen(function* () {
       const userData = {
-        userId: "user_123",
+        sub: "user_123",
         email: "test@example.com",
         name: "Alice",
         avatar: "https://example.com/avatar.png",
@@ -66,15 +66,14 @@ describe("JWT payload parsing", () => {
     })
   );
 
-  it.effect("ignores standard JWT claims (iss, sub, iat, exp, aud)", () =>
+  it.effect("ignores standard JWT claims (iss, iat, exp, aud) except sub", () =>
     Effect.gen(function* () {
       const now = Math.floor(Date.now() / 1000);
       const userData = {
-        userId: "user_123",
+        sub: "user_123",
         email: "test@example.com",
         name: "Alice",
         iss: "feeblo",
-        sub: "some-sub",
         iat: now,
         exp: now + 60,
         aud: "feeblo-app",
@@ -93,7 +92,36 @@ describe("JWT payload parsing", () => {
     })
   );
 
-  it("fails when required fields (userId, email, name) are missing", async () => {
+  it.effect("ignores a legacy userId claim (only sub is honored)", () =>
+    Effect.gen(function* () {
+      const verified = yield* Effect.promise(() =>
+        signAndVerify({
+          sub: "user_123",
+          userId: "ignored_legacy_id",
+          email: "test@example.com",
+          name: "Alice",
+        })
+      );
+
+      const result = yield* parsePersonAttributes(verified, [], []);
+
+      expect(result.commonFields.userId).toBe("user_123");
+    })
+  );
+
+  it("fails when only the legacy userId claim is present (sub is required)", async () => {
+    const verified = await signAndVerify({
+      userId: "legacy_user",
+      email: "test@example.com",
+      name: "Alice",
+    });
+
+    await expect(
+      Effect.runPromise(parsePersonAttributes(verified, [], []))
+    ).rejects.toBeInstanceOf(DataValidationError);
+  });
+
+  it("fails when required fields (userId/sub, email, name) are missing", async () => {
     const verified = await signAndVerify({
       sub: "some-sub",
       iss: "feeblo",

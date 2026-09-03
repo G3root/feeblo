@@ -21,6 +21,10 @@ interface TFindMemberRole {
   userId: string;
 }
 
+interface TFindJwtMaxTokenLifetime {
+  organizationId: string;
+}
+
 const makeOrganizationRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
@@ -56,6 +60,22 @@ const makeOrganizationRepository = Effect.gen(function* () {
           createdAt: schema.organizationTable.createdAt,
         })
         .pipe(Effect.map(EffectArray.get(0))),
+    findJwtMaxTokenLifetimeMinutes: ({
+      organizationId,
+    }: TFindJwtMaxTokenLifetime) =>
+      db
+        .select({
+          jwtMaxTokenLifetimeMinutes:
+            schema.organizationTable.jwtMaxTokenLifetimeMinutes,
+        })
+        .from(schema.organizationTable)
+        .where(eq(schema.organizationTable.id, organizationId))
+        .pipe(
+          Effect.map((rows) => {
+            const [row] = rows;
+            return row?.jwtMaxTokenLifetimeMinutes ?? null;
+          })
+        ),
     findMemberRole: ({ organizationId, userId }: TFindMemberRole) =>
       db
         .select({

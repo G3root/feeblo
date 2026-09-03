@@ -3,8 +3,8 @@ import { useSortable } from "@dnd-kit/react/sortable";
 import { RoadmapLaneColumn } from "@feeblo/post-ui/roadmap/roadmap-lane-column";
 import { Button } from "@feeblo/ui/button";
 import {
+  formatPostStatus,
   type BoardPostStatus,
-  getBoardStatusLabel,
 } from "@feeblo/web-shared/board/constants";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -17,6 +17,7 @@ interface BoardGridLaneColumnProps {
   children?: React.ReactNode;
   id: string;
   index: number;
+  label: string;
   status: BoardPostStatus;
   statusId: string;
   totalPosts: number;
@@ -30,8 +31,10 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
   status,
   statusId,
   boardId,
+  label,
 }: BoardGridLaneColumnProps) {
   const store = usePostCreateDialogContext();
+  const effectiveLabel = label || formatPostStatus(status);
   const { ref, isDropTarget } = useSortable({
     id,
     accept: "item",
@@ -45,7 +48,7 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
     <RoadmapLaneColumn
       action={
         <Button
-          aria-label={`Add post to ${getBoardStatusLabel(status)}`}
+          aria-label={`Add post to ${effectiveLabel}`}
           onClick={() => {
             store.send({
               type: "toggle",
@@ -65,6 +68,7 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
       }
       contentRef={ref}
       isHighlighted={isDropTarget}
+      label={effectiveLabel}
       status={status}
       totalPosts={totalPosts}
     >

@@ -18,7 +18,7 @@ export function CommentComposerSubmit() {
       ) : null}
       <div
         className={cn(
-          "flex items-center pt-2",
+          "flex items-center pt-3",
           hasLeftControls ? "justify-between" : "justify-end"
         )}
       >
