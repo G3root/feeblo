@@ -45,6 +45,9 @@ catalogs:
     '@floating-ui/dom':
       specifier: ^1.8.0
       version: 1.8.0
+    '@isaacs/ttlcache':
+      specifier: ^2.1.5
+      version: 2.1.5
     '@polar-sh/better-auth':
       specifier: ^1.8.3
       version: 1.8.4
@@ -954,6 +957,9 @@ importers:
       '@feeblo/utils':
         specifier: workspace:*
         version: link:../utils
+      '@isaacs/ttlcache':
+        specifier: 'catalog:'
+        version: 2.1.5
       '@polar-sh/sdk':
         specifier: 'catalog:'
         version: 0.47.1
@@ -1378,6 +1384,9 @@ importers:
       '@better-auth/utils':
         specifier: 'catalog:'
         version: 0.4.3
+      '@isaacs/ttlcache':
+        specifier: 'catalog:'
+        version: 2.1.5
       '@noble/ciphers':
         specifier: ^2.0.1
         version: 2.3.0
@@ -3255,6 +3264,10 @@ packages:
   '@isaacs/cliui@9.0.0':
     resolution: {integrity: sha512-AokJm4tuBHillT+FpMtxQ60n8ObyXBatq7jD2/JA9dxbDDokKQm8KMht5ibGzLVU9IJDIKK4TPKgMHEYMn3lMg==}
     engines: {node: '>=18'}
+
+  '@isaacs/ttlcache@2.1.5':
+    resolution: {integrity: sha512-VwGZqqjAWPICTmxUZnbpEfO60LhPWzquik+bmyXGY7pYRn6diEvCI5i6Ca+J6o2y4vS73HrpuMTo2dOvUevH8w==}
+    engines: {node: '>=12'}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -11536,6 +11549,8 @@ snapshots:
       wrap-ansi-cjs: wrap-ansi@7.0.0
 
   '@isaacs/cliui@9.0.0': {}
+
+  '@isaacs/ttlcache@2.1.5': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:

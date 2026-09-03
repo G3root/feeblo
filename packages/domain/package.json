@@ -447,6 +447,7 @@
     "@feeblo/permissions": "workspace:*",
     "@feeblo/transactional": "workspace:*",
     "@feeblo/utils": "workspace:*",
+    "@isaacs/ttlcache": "catalog:",
     "@polar-sh/sdk": "catalog:",
     "better-auth": "catalog:",
     "cookie-es": "^3.1.1",
