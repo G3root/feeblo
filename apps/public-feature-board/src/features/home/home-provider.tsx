@@ -12,7 +12,13 @@ import {
   or,
   useLiveQuery,
 } from "@tanstack/react-db";
-import { type ReactNode, useMemo, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useDeferredValue,
+  useMemo,
+  useState,
+} from "react";
 
 import { useHomePageFilters } from "../../hooks/use-home-page-filters";
 import { formatPostStatus } from "../../lib/utils";
@@ -32,6 +38,9 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const normalizedSearch = search.trim();
+  // Defer the DB filter off the urgent keystroke path: the input stays
+  // responsive while the live query re-runs at a lower priority.
+  const deferredSearch = useDeferredValue(normalizedSearch);
 
   const organizationId = site.organizationId;
   const {
@@ -154,12 +163,12 @@ export function HomeProvider({ children }: { children: ReactNode }) {
             condition = and(condition, eq(status.id, selectedStatus));
           }
 
-          if (normalizedSearch) {
+          if (deferredSearch) {
             condition = and(
               condition,
               or(
-                ilike(post.title, `%${normalizedSearch}%`),
-                ilike(post.excerpt, `%${normalizedSearch}%`)
+                ilike(post.title, `%${deferredSearch}%`),
+                ilike(post.excerpt, `%${deferredSearch}%`)
               )
             );
           }
@@ -217,7 +226,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
       selectedBoard,
       selectedStatus,
       sortBy,
-      normalizedSearch,
+      deferredSearch,
     ]
   );
 
@@ -270,7 +279,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   const isLoading = statusLoading || boardLoading || filteredPostsLoading;
   const isError = statusError || boardError || filteredPostsError;
 
-  const openGiveFeedback = () => {
+  const openGiveFeedback = useCallback(() => {
     if (session) {
       postCreateStore.send({
         type: "toggle",
@@ -286,22 +295,44 @@ export function HomeProvider({ children }: { children: ReactNode }) {
         data: { variant: "sign-in" },
       });
     }
-  };
+  }, [session, postCreateStore, authDialogStore, activeBoardId]);
 
-  const value: HomeContextValue = {
-    actions: {
+  // Memoized so keystrokes (search input) don't re-render every consumer of
+  // unrelated slices; `setSearch`/`setSearchFocused` are stable setters.
+  const value = useMemo<HomeContextValue>(
+    () => ({
+      actions: {
+        openGiveFeedback,
+        setSearch,
+        setSearchFocused,
+        updateFilters,
+      },
+      meta: { organizationId },
+      state: {
+        activeBoardId,
+        activeBoardLabel,
+        boardItems,
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+        filteredPosts: filteredPosts as HomePost[],
+        isError,
+        isLoading,
+        normalizedSearch,
+        search,
+        searchFocused,
+        selectedBoard,
+        selectedStatus,
+        sortBy,
+        statusItems,
+      },
+    }),
+    [
       openGiveFeedback,
-      setSearch,
-      setSearchFocused,
       updateFilters,
-    },
-    meta: { organizationId },
-    state: {
+      organizationId,
       activeBoardId,
       activeBoardLabel,
       boardItems,
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      filteredPosts: filteredPosts as HomePost[],
+      filteredPosts,
       isError,
       isLoading,
       normalizedSearch,
@@ -311,8 +342,8 @@ export function HomeProvider({ children }: { children: ReactNode }) {
       selectedStatus,
       sortBy,
       statusItems,
-    },
-  };
+    ]
+  );
 
   return <HomeContext value={value}>{children}</HomeContext>;
 }

@@ -54,27 +54,6 @@ export interface FeebloProviderProps {
   user?: UserIdentity | undefined;
 }
 
-/**
- * Fields that require tearing down and recreating the underlying embed when
- * they change. Deliberately excludes `user` (handled by `identify`), the
- * event callbacks (read through refs), and `root` (compared by reference in
- * the effect dependencies below — DOM elements do not serialize).
- */
-function configKeyOf(props: FeebloProviderProps): string {
-  return JSON.stringify([
-    props.organizationId,
-    props.baseUrl,
-    props.containerStyles,
-    props.debug,
-    props.defaultBoard,
-    props.locale,
-    props.mode,
-    props.modules,
-    props.placement,
-    props.theme,
-  ]);
-}
-
 export function FeebloProvider(props: FeebloProviderProps): ReactNode {
   const { children, user } = props;
 
@@ -95,15 +74,13 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
   // identity is meaningful.
   const identityRef = useRef<UserIdentity | undefined>(undefined);
 
+  // Single pass: keep all SDK callback seams pointing at the latest props
+  // without re-creating the widget.
   useEffect(() => {
     closeRef.current = props.onClose;
-  });
-  useEffect(() => {
     errorRef.current = props.onError;
-  });
-  useEffect(() => {
     heightRef.current = props.onHeightChange;
-  });
+  }, []);
 
   const handleSelfClose = useCallback(() => {
     closeRef.current?.();
@@ -115,25 +92,71 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
     heightRef.current?.(height);
   }, []);
 
-  const configKey = configKeyOf(props);
+  // Serialized key for the fields that require tearing down and recreating
+  // the underlying embed when they change. Deliberately excludes `user`
+  // (handled by `identify`), the event callbacks (read through refs), and
+  // compares `root` by reference below — DOM elements do not serialize.
+  // Memoized: stringifying ten fields (including objects like
+  // `containerStyles`) on every render allocates for nothing when props are
+  // referentially stable. Callers should still stabilize object props.
+  const {
+    organizationId,
+    baseUrl,
+    containerStyles,
+    debug,
+    defaultBoard,
+    locale,
+    mode,
+    modules,
+    placement,
+    theme,
+    root,
+  } = props;
+  const configKey = useMemo(
+    () =>
+      JSON.stringify([
+        organizationId,
+        baseUrl,
+        containerStyles,
+        debug,
+        defaultBoard,
+        locale,
+        mode,
+        modules,
+        placement,
+        theme,
+      ]),
+    [
+      organizationId,
+      baseUrl,
+      containerStyles,
+      debug,
+      defaultBoard,
+      locale,
+      mode,
+      modules,
+      placement,
+      theme,
+    ]
+  );
 
   useEffect(() => {
     const options: EmbedOptions = {
-      baseUrl: props.baseUrl,
-      containerStyles: props.containerStyles,
-      debug: props.debug,
-      defaultBoard: props.defaultBoard,
-      locale: props.locale,
-      mode: props.mode,
-      modules: props.modules,
+      baseUrl,
+      containerStyles,
+      debug,
+      defaultBoard,
+      locale,
+      mode,
+      modules,
       onClose: handleSelfClose,
       onError: handleError,
       onHeightChange: handleHeightChange,
-      placement: props.placement,
-      root: props.root,
-      theme: props.theme,
+      placement,
+      root,
+      theme,
     };
-    const next = Feeblo.init(props.organizationId, options);
+    const next = Feeblo.init(organizationId, options);
     // Replay the remembered identity onto the fresh embed; without this an
     // imperative identify() would be lost across recreation.
     if (identityRef.current !== undefined) {
@@ -151,7 +174,8 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
     // callback identities are irrelevant because they are consumed through
     // stable ref wrappers. `root` must be compared by reference: DOM elements
     // all serialize identically, so it cannot live in the config key.
-  }, [configKey, props.root]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configKey, root]);
 
   // Mirror the widget's lifecycle events into reactive state so consumers can
   // render off `isReady`/`isOpen` without subscribing manually.
