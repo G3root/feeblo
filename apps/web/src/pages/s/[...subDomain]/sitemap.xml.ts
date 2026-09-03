@@ -94,11 +94,34 @@ async function collectUrls(
 ): Promise<ReadonlyArray<SitemapUrl>> {
   const urls: SitemapUrl[] = [{ loc: `${origin}/` }];
 
+  // The four list fetches are independent, so fire them together and pay
+  // one RPC round-trip instead of four sequential ones. Visibility-gated
+  // lists resolve to empty without a request.
+
+  const [roadmaps, entries, boards, posts] = await Promise.all([
+    site.roadmapVisibility === "PUBLIC"
+      ? fetchRpcServer((rpc) =>
+          rpc.RoadmapListPublic({ organizationId: site.organizationId })
+        )
+      : Promise.resolve([]),
+    site.changelogVisibility === "PUBLIC"
+      ? fetchRpcServer((rpc) =>
+          rpc.ChangelogListPublic({ organizationId: site.organizationId })
+        )
+      : Promise.resolve([]),
+    fetchRpcServer((rpc) =>
+      rpc.BoardListPublic({ organizationId: site.organizationId })
+    ),
+    fetchRpcServer((rpc) =>
+      rpc.PostListPublic({
+        organizationId: site.organizationId,
+        boardId: null,
+      })
+    ),
+  ]);
+
   if (site.roadmapVisibility === "PUBLIC") {
     urls.push({ loc: `${origin}/roadmap` });
-    const roadmaps = await fetchRpcServer((rpc) =>
-      rpc.RoadmapListPublic({ organizationId: site.organizationId })
-    );
     for (const roadmap of roadmaps) {
       urls.push({
         loc: `${origin}/roadmap/${roadmap.slug}`,
@@ -109,9 +132,6 @@ async function collectUrls(
 
   if (site.changelogVisibility === "PUBLIC") {
     urls.push({ loc: `${origin}/changelog` });
-    const entries = await fetchRpcServer((rpc) =>
-      rpc.ChangelogListPublic({ organizationId: site.organizationId })
-    );
     for (const entry of entries) {
       urls.push({
         loc: `${origin}/changelog/${entry.slug}`,
@@ -120,16 +140,10 @@ async function collectUrls(
     }
   }
 
-  const boards = await fetchRpcServer((rpc) =>
-    rpc.BoardListPublic({ organizationId: site.organizationId })
-  );
   for (const board of boards) {
     urls.push({ loc: `${origin}/b/${board.slug}` });
   }
 
-  const posts = await fetchRpcServer((rpc) =>
-    rpc.PostListPublic({ organizationId: site.organizationId, boardId: null })
-  );
   // Deterministic order keeps `?page=N` slices stable across requests, so
   // crawlers never see URLs migrate between sitemap pages.
   const sortedPosts = posts.toSorted((left, right) =>

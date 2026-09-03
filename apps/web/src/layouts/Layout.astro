@@ -10,6 +10,7 @@ const { title = "feeblo" } = Astro.props;
 import { getSecret } from "astro:env/server";
 import { getClientHintCheckScript } from "@feeblo/web-shared/client-hints";
 import { getLocale, getTextDirection } from "../paraglide/runtime";
+import { apiPreconnectOrigins } from "../dashboard/lib/server-runtime-public-env";
 import CommonHead from "./CommonHead.astro";
 import EnvScript from "./EnvScript.astro";
 import ThemeScript from "./ThemeScript.astro";
@@ -24,6 +25,7 @@ const noIndex = Boolean(getSecret("NO_INDEX"));
     clientHintCheckScript={clientHintCheckScript}
     title={title}
     noIndex={noIndex}
+    preconnectOrigins={apiPreconnectOrigins()}
   />
 
   <style is:global>
