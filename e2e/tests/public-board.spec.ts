@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 
 import { createAuthenticatedWorkspace } from "../helpers/auth";
-import { createPost } from "../helpers/posts";
+import { createPost, fillEditor } from "../helpers/posts";
 import {
   verificationCodeFromEmail,
   waitForVerificationEmail,
@@ -109,6 +109,54 @@ test(
       await expect(
         visitorPage.getByRole("button", { name: authButtonName })
       ).toHaveCount(0);
+    } finally {
+      await visitorContext.close();
+    }
+  }
+);
+
+test(
+  "a signed-in visitor can submit feedback from the public board",
+  { tag: "@critical" },
+  async ({ browser, page }) => {
+    const user = createTestUser();
+    await createAuthenticatedWorkspace(page, user);
+
+    // Submitting through the public dialog exercises the public create
+    // path end to end (shared optimistic form → `PostCreatePublic`), as
+    // opposed to the dashboard dialog covered by the feedback specs.
+    const title = `Visitor feedback ${randomUUID().slice(0, 8)}`;
+    const content = "Submitted from the public board dialog.";
+    const boardUrl = publicBoardUrl(user.workspaceName);
+
+    const visitorContext = await browser.newContext();
+    const visitorPage = await visitorContext.newPage();
+
+    try {
+      await visitorPage.goto(boardUrl);
+      await signInThroughPublicBoard(visitorPage, user.email, user.password);
+
+      await visitorPage
+        .getByRole("button", { name: "Give Feedback" })
+        .click();
+      const dialog = visitorPage.getByRole("dialog", {
+        name: "Create Post",
+      });
+      await expect(dialog).toBeVisible();
+
+      await dialog.getByLabel("Post Title").fill(title);
+      await fillEditor(visitorPage, content, { scope: dialog });
+      await dialog.getByRole("combobox").first().click();
+      await visitorPage
+        .getByRole("option", { name: "Features 💡" })
+        .click();
+
+      await dialog.getByRole("button", { name: "Create Post" }).click();
+      await expect(dialog).toBeHidden();
+
+      await expect(
+        visitorPage.getByRole("link", { name: `View ${title}`, exact: true })
+      ).toBeVisible();
     } finally {
       await visitorContext.close();
     }

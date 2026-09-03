@@ -331,7 +331,19 @@ describe("PostRpcHandlers", () => {
               creatorId: null,
               creatorMemberId: null,
             });
-            expect(posts[0]?.content).toContain("A public idea");
+            // List rows carry the excerpt, not the full body; the body
+            // resolves through the detail RPC.
+            expect(posts[0]?.excerpt).not.toHaveLength(0);
+            const detail = yield* handlers
+              .PostGetPublic({
+                organizationId: fixture.organizationId,
+                // SAFETY: The length check above guarantees the row.
+                slug: posts[0]!.slug,
+              })
+              .pipe(
+                Effect.provideService(OptionalCurrentSession, Option.none())
+              );
+            expect(detail.content).toContain("A public idea");
           })
       );
 
@@ -792,6 +804,63 @@ describe("PostRpcHandlers", () => {
       );
     });
 
+    describe("PostGet", () => {
+      it.effect("returns the full post including content for members", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(
+              postCreateInput(fixture, postId, "Detailed feedback", "Full body")
+            )
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const created = yield* handlers
+            .PostList({
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          const createdPost = created.find((post) => post.id === postId);
+
+          expect(createdPost).toBeDefined();
+          // List rows intentionally omit the body.
+          expect("content" in (createdPost ?? {})).toBe(false);
+
+          const post = yield* handlers
+            .PostGet({
+              organizationId: fixture.organizationId,
+              // SAFETY: The existence check above guarantees the slug.
+              slug: createdPost!.slug,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          expect(post.id).toBe(postId);
+          expect(post.content).toContain("Full body");
+        })
+      );
+
+      it.effect("reports not found for unknown slugs", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostGet({
+                organizationId: fixture.organizationId,
+                slug: "no-such-post-slug",
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+
+          expect(error._tag).toBe("PostNotFoundError");
+        })
+      );
+    });
+
     describe("PostListPublic", () => {
       it.effect("does not expose posts from private boards", () =>
         Effect.gen(function* () {
@@ -1201,9 +1270,20 @@ describe("PostRpcHandlers", () => {
               boardId: fixture.boardId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
-
-          expect(post).toMatchObject({ id: postId, title: "Updated feedback" });
-          expect(post?.content).toContain("Updated content");
+          expect(post).toMatchObject({
+            id: postId,
+            title: "Updated feedback",
+          });
+          // Content updates are visible through the detail RPC; list rows
+          // only carry the excerpt.
+          const detail = yield* handlers
+            .PostGetPublic({
+              organizationId: fixture.organizationId,
+              // SAFETY: The update above guarantees the row exists.
+              slug: post!.slug,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+          expect(detail.content).toContain("Updated content");
         })
       );
     });

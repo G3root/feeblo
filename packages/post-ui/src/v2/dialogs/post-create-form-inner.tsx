@@ -1,8 +1,8 @@
 import type { TPost } from "@feeblo/domain/post/schema";
+import type { TPostListItem } from "@feeblo/domain/post/schema";
 import { PostId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
 import { DialogFooter, DialogPanel } from "@feeblo/ui/dialog";
-import { finalizeEditorContent } from "@feeblo/ui/editor";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import { htmlToExcerpt } from "@feeblo/utils/html";
@@ -11,7 +11,12 @@ import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import {
+  and,
+  createOptimisticAction,
+  eq,
+  useLiveQuery,
+} from "@tanstack/react-db";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { usePostCreateDialogContext } from "../dialog-stores/post";
@@ -134,9 +139,15 @@ function SimilarPosts({
   );
 }
 
+export interface PostCreateActionInput {
+  readonly content: string;
+  readonly row: TPostListItem;
+}
+
 export function PostCreateForm() {
   const store = usePostCreateDialogContext();
-  const { collections, onAuthRequired, organizationId } = usePostCollections();
+  const { collections, onAuthRequired, organizationId, persistPost } =
+    usePostCollections();
   const {
     boardCollection,
     membersCollection,
@@ -206,6 +217,27 @@ export function PostCreateForm() {
   const [contentEditorKey, setContentEditorKey] = useState(0);
   const [editorScope] = useState(() => crypto.randomUUID());
 
+  // Creation persists through the surface's `persistPost` RPC while the
+  // slim list row (no `content`) inserts optimistically in the same
+  // transaction. The body travels as action input — never through the
+  // list row or a side channel — and a failed RPC rolls the row back.
+  const createPost = createOptimisticAction<PostCreateActionInput>({
+    onMutate: ({ row }) => {
+      postCollection.insert(row);
+    },
+    mutationFn: async ({ content, row }) => {
+      await persistPost({
+        assetIds: [...(row.assetIds ?? [])],
+        boardId: row.boardId,
+        content,
+        id: row.id,
+        organizationId: row.organizationId,
+        statusId: row.statusId,
+        title: row.title,
+      });
+    },
+  });
+
   const form = useAppForm({
     ...postCreateFormOpts,
     defaultValues: {
@@ -228,6 +260,10 @@ export function PostCreateForm() {
         const postId = await PostId.unsafeGenerate();
         const title = value.title.trim();
         const assetOrganizationId = member ? organizationId : undefined;
+        // Imported on submit rather than with the dialog chunk: asset
+        // finalization rides the editor chunk, already warm from the open
+        // editor, so submit pays no extra load.
+        const { finalizeEditorContent } = await import("@feeblo/ui/editor");
         const finalized = await finalizeEditorContent(
           value.content,
           assetOrganizationId,
@@ -241,28 +277,32 @@ export function PostCreateForm() {
         if (!selectedPostStatus) {
           throw new Error("Post status not found");
         }
-        const tx = postCollection.insert({
-          id: postId,
-          assetIds,
-          archivedAt: null,
-          boardId: value.boardId,
-          title,
-          slug: slugify(title) || "untitled",
+        // The list row carries no body; it travels as action input to the
+        // surface's `persistPost` RPC instead.
+        const tx = createPost({
           content,
-          excerpt: htmlToExcerpt(content),
-          lockedAt: null,
-          mergedAt: null,
-          mergedIntoPostId: null,
-          etaQuarter: null,
-          statusId: selectedPostStatus.id,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          organizationId,
-          creatorId: session?.user?.id ?? null,
-          creatorMemberId: member?.id ?? null,
-          user: {
-            name: session?.user?.name ?? null,
-            image: session?.user?.image ?? null,
+          row: {
+            id: postId,
+            assetIds,
+            archivedAt: null,
+            boardId: value.boardId,
+            title,
+            slug: slugify(title) || "untitled",
+            excerpt: htmlToExcerpt(content),
+            lockedAt: null,
+            mergedAt: null,
+            mergedIntoPostId: null,
+            etaQuarter: null,
+            statusId: selectedPostStatus.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            organizationId,
+            creatorId: session?.user?.id ?? null,
+            creatorMemberId: member?.id ?? null,
+            user: {
+              name: session?.user?.name ?? null,
+              image: session?.user?.image ?? null,
+            },
           },
         });
 

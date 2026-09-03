@@ -47,6 +47,7 @@ import {
   commentReactionCollection,
   membersCollection,
   postCollection,
+  postDetailCollection,
   postReactionCollection,
   postStatusCollection,
   postSubscriptionCollection,
@@ -81,6 +82,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       ),
     [organizationId]
   );
+  const persistPost = useCallback<PostCollectionsValue["persistPost"]>(
+    async (input) => {
+      await fetchRpc((rpc) => rpc.PostCreate(input));
+    },
+    []
+  );
   return (
     <UpgradePlanDialogProvider>
       <PostCollectionsProvider
@@ -89,6 +96,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           commentCollection,
           membersCollection,
           postCollection,
+          postDetailCollection,
           postStatusCollection,
           postSubscriptionCollection,
           upvoteCollection,
@@ -97,6 +105,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         }}
         getPostHref={getPostHref}
         organizationId={organizationId}
+        persistPost={persistPost}
         suggestPosts={suggestPosts}
       >
         <PostCreateDialogProvider>

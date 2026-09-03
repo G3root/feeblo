@@ -49,6 +49,43 @@ export const Post = S.Struct({
 
 export type TPost = S.Schema.Type<typeof Post>;
 
+/**
+ * Slim list projection of {@link Post} for `PostList`/`PostListPublic`.
+ *
+ * `content` (full Markdown/HTML bodies) dominates list payloads but no list
+ * UI renders it — cards, boards, and roadmaps show `excerpt`, and detail
+ * pages resolve the body through `PostGet`/`PostGetPublic` instead. Keep in
+ * sync with {@link Post} minus `content`; the compiler enforces the shape
+ * at each RPC boundary, not the field-by-field correspondence.
+ */
+export const PostListItem = S.Struct({
+  assetIds: S.optional(S.Array(S.String)),
+  id: S.String,
+  boardId: S.String,
+  title: S.String,
+  slug: S.String,
+  excerpt: S.String,
+  statusId: S.String,
+  etaQuarter: S.NullOr(EtaQuarter),
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+  organizationId: S.String,
+  creatorMemberId: S.NullOr(S.String),
+  creatorId: S.NullOr(S.String),
+  /** UI hint; the backend remains authoritative for deletion. */
+  canDeleteAsCreator: S.optional(S.Boolean),
+  lockedAt: S.NullOr(S.DateFromString),
+  archivedAt: S.NullOr(S.DateFromString),
+  mergedIntoPostId: S.NullOr(S.String),
+  mergedAt: S.NullOr(S.DateFromString),
+  user: S.Struct({
+    name: S.NullOr(S.String),
+    image: S.NullOr(S.String),
+  }),
+});
+
+export type TPostListItem = S.Schema.Type<typeof PostListItem>;
+
 export const PostList = S.Struct({
   boardId: S.Union([S.String, S.Null, S.Undefined]),
   organizationId: S.String,

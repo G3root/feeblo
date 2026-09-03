@@ -1,5 +1,5 @@
 import type { TBoard } from "@feeblo/domain/board/schema";
-import type { TPost } from "@feeblo/domain/post/schema";
+import type { TPostListItem } from "@feeblo/domain/post/schema";
 import { createContext, type ReactNode, use } from "react";
 
 type TPageType = "Dashboard" | "PublicPage";
@@ -18,7 +18,13 @@ export interface PostCollectionState {
   isPublicBoard: boolean;
   organizationId: string;
   pageType: TPageType;
-  post: TPost;
+  /**
+   * List-or-detail row. List surfaces pass the slim `PostListItem`;
+   * detail routes merge the body over it, but `content` must be read
+   * through the detail collection (see `PostPage.Content`), never from
+   * this row.
+   */
+  post: TPostListItem;
 }
 
 export interface PostCollectionDataProviderProps {
@@ -26,7 +32,7 @@ export interface PostCollectionDataProviderProps {
   children?: ReactNode;
   organizationId: string;
   pageType: TPageType;
-  post: TPost;
+  post: TPostListItem;
 }
 
 const PostCollectionDataContext = createContext<PostCollectionState | null>(

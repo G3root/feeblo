@@ -1,3 +1,4 @@
+import { TTLCache } from "@isaacs/ttlcache";
 import type { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -15,7 +16,7 @@ import {
   type OgImageSiteNotFoundError,
 } from "./errors";
 import { generateOgImage } from "./og-image";
-import { OgImageRequest } from "./schema";
+import { OgImageRequest, type OgImageData } from "./schema";
 import { OgImageService } from "./service";
 
 const browserCacheDuration = Duration.hours(1);
@@ -33,6 +34,27 @@ const imageResponse = (image: Uint8Array) =>
       "Cache-Control": cacheControl,
     },
   });
+
+// Isolate-local memo for complete OG responses (DB lookups + render).
+// Satori+resvg renders dominate cost and link unfurlers request the same
+// URLs in bursts; browser/CDN `Cache-Control` remains the primary cache,
+// this absorbs repeats within an isolate. Keyed by request parameters (not
+// rendered data) so upvote-driven re-renders collapse into the TTL window
+// instead of key-missing on every count change. Post-detail images embed
+// live counts/titles, so they expire in minutes; site-main images only
+// change on rename and keep for an hour. `@isaacs/ttlcache` handles expiry
+// plus LRU eviction; only successful renders are stored, so 404s and rate
+// limits always revalidate. Buffers are read-only after render.
+// 50 entries: bursts hit the same few URLs, and values are 1200×630 PNGs
+// (hundreds of KB each), so the cap stays far below worker/server memory
+// pressure (~15MB worst case) while covering the hot set.
+const RENDER_CACHE_MAX_ENTRIES = 50;
+const MAIN_IMAGE_TTL_MS = 60 * 60 * 1_000;
+const POST_DETAIL_TTL_MS = 5 * 60 * 1_000;
+
+const ogImageCache = new TTLCache<string, Uint8Array>({
+  max: RENDER_CACHE_MAX_ENTRIES,
+});
 
 const decodeRequest = (
   request: HttpServerRequest.HttpServerRequest
@@ -67,8 +89,21 @@ const handleOgImageEffect = (
   Effect.gen(function* () {
     const service = yield* OgImageService;
     const input = yield* decodeRequest(request);
-    const imageData = yield* service.getData(input);
-    return imageResponse(yield* generateOgImage(imageData));
+    const cacheKey =
+      input.type === "post-detail"
+        ? `post-detail:${input.siteId}:${input.post}`
+        : `${input.type}:${input.siteId}`;
+    const cached = ogImageCache.get(cacheKey);
+    if (cached !== undefined) {
+      return imageResponse(cached);
+    }
+    const imageData: OgImageData = yield* service.getData(input);
+    const image = yield* generateOgImage(imageData);
+    ogImageCache.set(cacheKey, image, {
+      ttl:
+        input.type === "post-detail" ? POST_DETAIL_TTL_MS : MAIN_IMAGE_TTL_MS,
+    });
+    return imageResponse(image);
   });
 
 export const handleOgImage = (

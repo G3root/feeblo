@@ -7,6 +7,7 @@ import { hasWindow } from "@feeblo/utils/runtime-kind";
 import { getCachedAuthSession } from "@feeblo/web-shared/auth-session";
 import {
   createRpcCollectionHelpers,
+  eqFilterValue,
   postSlugFromPath,
 } from "@feeblo/web-shared/collections";
 import {
@@ -77,7 +78,7 @@ function getCurrentUserId() {
  * A restricted SSO session must never use a client-supplied entity organization
  * id to act on a different board.
  */
-function getMutationOrganizationId() {
+export function getMutationOrganizationId() {
   const organizationId = getCurrentOrganizationId();
 
   if (!organizationId) {
@@ -127,22 +128,10 @@ export const publicPostCollection = createCollection(
     },
     queryClient,
     getKey: (item) => item.id,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newPost } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.PostCreatePublic({
-          id: newPost.id,
-          boardId: newPost.boardId,
-          organizationId: getMutationOrganizationId(),
-          title: newPost.title,
-          content: newPost.content,
-          assetIds: newPost.assetIds ?? [],
-          statusId: newPost.statusId,
-        })
-      );
-    },
+    // No `onInsert`: creation persists through the surface's `persistPost`
+    // inside the shared form's optimistic action, so a bare insert fails
+    // fast with `MissingInsertHandlerError` instead of persisting without
+    // a body. Updates and deletes sync here as before.
     onUpdate: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: updatedPost } = mutation;
@@ -779,6 +768,39 @@ export const publicChangelogSubscriptionCollection = createCollection(
   })
 );
 
+export const publicPostDetailCollection = createCollection(
+  queryCollectionOptions({
+    // Keyed by the explicit `slug` filter with a fallback to the route
+    // slug, so detail subscribers (routes, content views) share one cache
+    // entry per post regardless of where they subscribe from.
+    queryKey: (opts) => {
+      const filters = parseLoadSubsetOptions(opts).filters;
+      const slug = eqFilterValue(filters, "slug") ?? resolvePostSlug(filters);
+      return organizationScopedQueryKey("public-post-detail", slug);
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+      const filters = parseLoadSubsetOptions(
+        ctx.meta?.loadSubsetOptions
+      ).filters;
+      const slug = eqFilterValue(filters, "slug") ?? resolvePostSlug(filters);
+
+      if (!(organizationId && slug)) {
+        return [];
+      }
+
+      const post = await fetchRpc(
+        (rpc) => rpc.PostGetPublic({ organizationId, slug }),
+        { signal: ctx.signal }
+      );
+      return [post];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
 export const publicCollections = {
   publicBoardCollection,
   publicChangelogCategoryCollection,
@@ -788,6 +810,7 @@ export const publicCollections = {
   publicCommentCollection,
   publicCommentReactionCollection,
   publicPostCollection,
+  publicPostDetailCollection,
   publicPostReactionCollection,
   publicPostStatusCollection,
   publicPostSubscriptionCollection,

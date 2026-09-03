@@ -152,6 +152,80 @@ describe("ChangelogRpcHandlers", () => {
         });
       })
     );
+    it.effect("returns a published entry by slug without listing", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const db = yield* currentDb;
+        const id = yield* ChangelogId.generate;
+        yield* db.insert(schema.siteTable).values({
+          id: `site_${id}`,
+          name: "Test site",
+          subdomain: `site-${id}`,
+          changelogVisibility: "PUBLIC",
+          organizationId: fixture.organizationId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        const create = (
+          entryId: typeof id,
+          title: string,
+          status: "draft" | "published"
+        ) =>
+          handlers
+            .ChangelogCreate({
+              assetIds: [],
+              coverImage: null,
+              id: entryId,
+              organizationId: fixture.organizationId,
+              title,
+              slug: "",
+              content: `${title} body`,
+              status,
+              scheduledAt: null,
+              publishedAt: status === "published" ? new Date() : null,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+        yield* create(id, "Shipped", "published");
+        const draftId = yield* ChangelogId.generate;
+        yield* create(draftId, "Unshipped", "draft");
+
+        const entry = yield* handlers
+          .ChangelogGetPublic({
+            organizationId: fixture.organizationId,
+            slug: "shipped",
+          })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+        expect(entry).toMatchObject({
+          id,
+          slug: "shipped",
+          title: "Shipped",
+        });
+        expect(entry.content).toContain("Shipped body");
+
+        // Drafts stay invisible to the public getter.
+        const draftError = yield* Effect.flip(
+          handlers
+            .ChangelogGetPublic({
+              organizationId: fixture.organizationId,
+              slug: "unshipped",
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+        );
+        expect(draftError._tag).toBe("ChangelogNotFoundError");
+
+        const missingError = yield* Effect.flip(
+          handlers
+            .ChangelogGetPublic({
+              organizationId: fixture.organizationId,
+              slug: "no-such-entry",
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+        );
+        expect(missingError._tag).toBe("ChangelogNotFoundError");
+      })
+    );
     it.effect(
       "promotes temporary media and stores its changelog reference",
       () =>
