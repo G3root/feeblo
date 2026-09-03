@@ -697,6 +697,101 @@ describe("PostRpcHandlers", () => {
       );
     });
 
+    describe("PostGetPublic", () => {
+      it.effect("returns a public post by slug", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Slugged feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const created = yield* handlers
+            .PostList({
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          const createdPost = created.find((post) => post.id === postId);
+
+          expect(createdPost).toBeDefined();
+
+          const post = yield* handlers
+            .PostGetPublic({
+              organizationId: fixture.organizationId,
+              // SAFETY: The existence check above guarantees the slug.
+              slug: createdPost!.slug,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+          expect(post.id).toBe(postId);
+          expect(post.title).toBe("Slugged feedback");
+        })
+      );
+
+      it.effect("does not expose posts from private boards", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const privateBoardId = yield* addBoard(fixture, "PRIVATE");
+          const privatePostId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate({
+              ...postCreateInput(fixture, privatePostId, "Private feedback"),
+              boardId: privateBoardId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const created = yield* handlers
+            .PostList({
+              organizationId: fixture.organizationId,
+              boardId: privateBoardId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          const privatePost = created.find((post) => post.id === privatePostId);
+
+          expect(privatePost).toBeDefined();
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostGetPublic({
+                organizationId: fixture.organizationId,
+                // SAFETY: The existence check above guarantees the slug.
+                slug: privatePost!.slug,
+              })
+              .pipe(
+                Effect.provideService(OptionalCurrentSession, Option.none())
+              )
+          );
+
+          expect(error._tag).toBe("PostNotFoundError");
+        })
+      );
+
+      it.effect("reports not found for unknown slugs", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostGetPublic({
+                organizationId: fixture.organizationId,
+                slug: "no-such-post-slug",
+              })
+              .pipe(
+                Effect.provideService(OptionalCurrentSession, Option.none())
+              )
+          );
+
+          expect(error._tag).toBe("PostNotFoundError");
+        })
+      );
+    });
+
     describe("PostListPublic", () => {
       it.effect("does not expose posts from private boards", () =>
         Effect.gen(function* () {

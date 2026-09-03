@@ -43,6 +43,12 @@ interface TPostFindMany {
   userId?: string | null | undefined;
 }
 
+interface TPostFindPublicBySlug {
+  organizationId: string;
+  slug: string;
+  userId?: string | null | undefined;
+}
+
 interface TPostDelete {
   boardId: string;
   creatorId: string;
@@ -390,6 +396,42 @@ const makePostRepository = Effect.gen(function* () {
           eq(schema.userTable.id, schema.postTable.creatorId)
         )
         .where(whereClause);
+    },
+
+    /**
+     * Single-post counterpart of `findManyPublic`: same visibility rules
+     * (public boards only, no archived or merged posts) keyed by slug.
+     * Resolves to `undefined` when no public post matches.
+     */
+    findPublicBySlug: ({
+      organizationId,
+      slug,
+      userId,
+    }: TPostFindPublicBySlug) => {
+      const whereClause = and(
+        eq(schema.postTable.organizationId, organizationId),
+        eq(schema.postTable.slug, slug),
+        // Same rule as `findManyPublic`: superseded content stays queryable
+        // internally but must not be publicly readable.
+        sql`${schema.postTable.archivedAt} is null`,
+        sql`${schema.postTable.mergedIntoPostId} is null`,
+        eq(schema.boardTable.visibility, "PUBLIC")
+      );
+
+      return db
+        .select(selectPostFields(userId))
+        .from(schema.postTable)
+        .innerJoin(
+          schema.boardTable,
+          eq(schema.boardTable.id, schema.postTable.boardId)
+        )
+        .leftJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.postTable.creatorId)
+        )
+        .where(whereClause)
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0]));
     },
 
     findSuggestionCandidates: ({

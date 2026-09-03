@@ -78,6 +78,14 @@
       "types": "./src/lib/collections.ts",
       "default": "./src/lib/collections.ts"
     },
+    "./sitemap": {
+      "types": "./src/lib/sitemap.ts",
+      "default": "./src/lib/sitemap.ts"
+    },
+    "./json-ld": {
+      "types": "./src/lib/json-ld.ts",
+      "default": "./src/lib/json-ld.ts"
+    },
     "./integrations/tanstack-query/root-provider": {
       "types": "./src/integrations/tanstack-query/root-provider.tsx",
       "default": "./src/integrations/tanstack-query/root-provider.tsx"

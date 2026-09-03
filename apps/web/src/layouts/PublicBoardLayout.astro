@@ -2,14 +2,18 @@
 import "../styles/global.css";
 
 import { getSecret } from "astro:env/server";
+import { serializeJsonLd, type JsonLdNode } from "@feeblo/web-shared/json-ld";
 import { getServerRuntimePublicEnv } from "../dashboard/lib/server-runtime-public-env";
 import CommonHead from "./CommonHead.astro";
 import EnvScript from "./EnvScript.astro";
 import ThemeScript from "./ThemeScript.astro";
 
 interface Props {
+  canonicalUrl?: string;
   changelogVisibility?: "PUBLIC" | "HIDDEN";
   description?: string;
+  /** JSON-LD nodes (schema.org) rendered as structured-data scripts in the head. */
+  jsonLd?: ReadonlyArray<JsonLdNode>;
   noIndex?: boolean;
   organizationId: string;
   siteName: string;
@@ -20,13 +24,20 @@ interface Props {
 const {
   changelogVisibility,
   description,
+  jsonLd,
   title = "feeblo",
   organizationId,
   siteName,
   subdomain,
 } = Astro.props;
 const noIndex = Boolean(getSecret("NO_INDEX")) || Boolean(Astro.props.noIndex);
-const canonicalUrl = new URL(Astro.url.pathname, Astro.url.origin).toString();
+// Public board requests are internally rewritten to `/s/...` by the
+// middleware; the canonical URL must stay on the original public path the
+// visitor (and every crawler) sees. The middleware stashes that path in
+// locals before rewriting (`Astro.url` reflects the rewrite target).
+const canonicalUrl =
+  Astro.props.canonicalUrl ??
+  new URL(Astro.locals.publicPath ?? Astro.url.pathname, Astro.url.origin).toString();
 const ogImageUrl = new URL("/og-image", getServerRuntimePublicEnv().apiUrl);
 ogImageUrl.searchParams.set("name", siteName);
 ogImageUrl.searchParams.set("site", subdomain);
@@ -41,6 +52,15 @@ ogImageUrl.searchParams.set("site", subdomain);
     noIndex={noIndex}
     ogImageUrl={ogImageUrl.toString()}
   />
+  {
+    jsonLd?.map((node) => (
+      <script
+        type="application/ld+json"
+        set:html={serializeJsonLd(node)}
+        is:inline
+      />
+    ))
+  }
   {
     changelogVisibility === "PUBLIC" && (
       <link

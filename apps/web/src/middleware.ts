@@ -75,6 +75,13 @@ function subdomainMiddleware(context: APIContext, next: MiddlewareNext) {
   context.locals.subdomain = subdomain;
   const targetPathPrefix = getTargetPathPrefix(subdomain);
   const pathname = normalizePathname(context.url.pathname);
+  // The path the visitor requested, before any rewrite. Pages (and the
+  // canonical URLs they render) must reflect this, not the internal rewrite
+  // target. First write wins: if the middleware sequence re-runs after a
+  // rewrite, the original path is already stashed.
+  if (context.locals.publicPath === undefined) {
+    context.locals.publicPath = pathname;
+  }
 
   if (isFeedbackWidgetPath(pathname)) {
     return next();

@@ -100,6 +100,22 @@ export async function createAuthenticatedWorkspace(
   return { ...user, organizationUrl: page.url() };
 }
 
+/**
+ * Creates a verified user and workspace through the sign-up flow and
+ * resolves once the dashboard is loaded and signed in.
+ */
+export async function createWorkspace(
+  page: Page,
+  user: TestUser = createTestUser()
+): Promise<AuthenticatedUser> {
+  const workspace = await createAuthenticatedWorkspace(page, user);
+
+  await expect(page).toHaveURL(workspace.organizationUrl);
+  await expect(page.getByRole("button", { name: user.email })).toBeVisible();
+
+  return workspace;
+}
+
 export async function logOut(page: Page, userEmail: string) {
   // Open the user menu in the sidebar and click log out.
   await page.getByRole("button", { name: userEmail }).click();

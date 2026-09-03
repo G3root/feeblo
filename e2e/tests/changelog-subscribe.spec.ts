@@ -1,25 +1,13 @@
 import { randomUUID } from "node:crypto";
 
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { createAuthenticatedWorkspace, logOut } from "../helpers/auth";
+import { openChangelogPage } from "../helpers/changelog";
 import { createTestUser } from "../helpers/test-users";
 
 const signInWithEmailButtonName = /^Sign in with email/;
 const authDialogName = "Sign in / Sign up";
-
-function publicBoardUrl(workspaceName: string) {
-  const subdomain = workspaceName.toLowerCase().replaceAll(" ", "-");
-  const baseURL = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3101");
-  return `${baseURL.protocol}//${subdomain}.${baseURL.hostname}${baseURL.port ? `:${baseURL.port}` : ""}`;
-}
-
-async function openChangelogPage(page: Page, workspaceName: string) {
-  await page.goto(`${publicBoardUrl(workspaceName)}/changelog`);
-  await expect(
-    page.getByRole("link", { name: "Subscribe to the changelog RSS feed" })
-  ).toBeVisible();
-}
 
 test.describe("changelog email subscription", () => {
   // Subscribing is available on every plan — only subscriber email delivery
