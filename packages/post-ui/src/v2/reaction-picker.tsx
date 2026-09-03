@@ -228,6 +228,25 @@ function ReactionPickerComponent(props: ReactionPickerRootProps) {
   );
 }
 
+// Single source of truth for the picker chrome (counts row + trigger + grid).
+// Post and comment pickers fetch different collections but render the same
+// layout, so they share this content to stay visually consistent.
+function ReactionPickerContent({ isLoading }: { isLoading: boolean }) {
+  return (
+    <>
+      <div className="flex items-center gap-1">
+        {isLoading ? (
+          <ReactionCountsSkeleton />
+        ) : (
+          <ReactionPickerDisplayRow />
+        )}
+        <ReactionPickerTrigger />
+      </div>
+      <ReactionPickerGrid />
+    </>
+  );
+}
+
 export function PostReactionPicker() {
   const { isLocked, post, organizationId } = usePostCollectionData();
 
@@ -372,15 +391,7 @@ export function PostReactionPicker() {
       onToggle={handleToggleReaction}
       reactionList={reactionList}
     >
-      <div className="flex items-center gap-1">
-        {isReactionCountsLoading ? (
-          <ReactionCountsSkeleton />
-        ) : (
-          <ReactionPickerDisplayRow />
-        )}
-        <ReactionPickerTrigger />
-      </div>
-      <ReactionPickerGrid />
+      <ReactionPickerContent isLoading={isReactionCountsLoading} />
     </ReactionPickerProvider>
   );
 }
@@ -538,15 +549,7 @@ export function CommentReactionPicker({
       onToggle={handleToggleReaction}
       reactionList={reactionList}
     >
-      <div className="flex items-center gap-1">
-        {isReactionCountsLoading ? (
-          <ReactionCountsSkeleton />
-        ) : (
-          <ReactionPickerDisplayRow />
-        )}
-        <ReactionPickerTrigger />
-      </div>
-      <ReactionPickerGrid />
+      <ReactionPickerContent isLoading={isReactionCountsLoading} />
     </ReactionPickerProvider>
   );
 }
