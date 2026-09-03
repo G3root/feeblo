@@ -90,12 +90,19 @@ function CommentComposerController(props: CommentComposerProviderProps) {
     submitLabel,
   } = props;
 
-  // SAFETY: only read at event time. The ref lets the memoized actions and
-  // the effects below stay referentially stable while the host re-renders
-  // with fresh (inline) callbacks — otherwise every host render would
-  // re-render the whole composer through context.
+  // SAFETY: only read at event time or in effects below. The ref lets the
+  // memoized actions and the effects below stay referentially stable while
+  // the host re-renders with fresh (inline) callbacks — otherwise every host
+  // render would re-render the whole composer through context.
   const latest = useRef(props);
-  latest.current = props;
+  // Keep render pure: React can replay or discard render work, so writing
+  // the ref during render could leak values from UI that never commits.
+  // A layout effect runs after commit but before paint, and it is declared
+  // before the store-sync effects below, so event handlers and those
+  // effects always see the committed props.
+  useIsomorphicLayoutEffect(() => {
+    latest.current = props;
+  });
 
   // Mirror controlled values into the store. Guarded so a render that didn't
   // change a value never dispatches; running in a layout effect keeps the

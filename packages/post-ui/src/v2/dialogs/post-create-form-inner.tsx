@@ -12,7 +12,13 @@ import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useState,
+} from "react";
 
 import { usePostCreateDialogContext } from "../dialog-stores/post";
 import {
@@ -39,9 +45,13 @@ function SimilarPosts({
   const { getPostHref, suggestPosts } = usePostCollections();
   const [posts, setPosts] = useState<readonly TPost[]>([]);
   const [loading, setLoading] = useState(false);
+  // Defer the expensive inputs off the urgent typing path: the editor stays
+  // responsive while suggestions settle a beat behind.
+  const deferredTitle = useDeferredValue(title);
+  const deferredContent = useDeferredValue(content);
 
   useEffect(() => {
-    const normalizedTitle = title.trim();
+    const normalizedTitle = deferredTitle.trim();
     if (!suggestPosts || normalizedTitle.length < 3) {
       setPosts([]);
       setLoading(false);
@@ -56,7 +66,7 @@ function SimilarPosts({
     const timer = window.setTimeout(() => {
       suggestPosts({
         ...(boardId && { boardId }),
-        content,
+        content: deferredContent,
         signal: controller.signal,
         title: normalizedTitle,
       })
@@ -81,7 +91,7 @@ function SimilarPosts({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [boardId, content, suggestPosts, title]);
+  }, [boardId, deferredContent, suggestPosts, deferredTitle]);
 
   // Do not render an empty/loading panel. If the request returns no matches,
   // the suggestions area should stay absent instead of flashing briefly.

@@ -1,5 +1,5 @@
 import { useDebouncedCallback } from "@tanstack/react-pacer";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Input, type InputProps } from "./input";
 import { InputGroupInput } from "./input-group";
@@ -20,12 +20,26 @@ const useDebounce = ({
   wait: number;
 }) => {
   const [localValue, setLocalValue] = useState(value);
+  const [prevValue, setPrevValue] = useState(value);
 
-  useEffect(() => {
+  // Sync external value changes during render, not in an effect: avoids an
+  // extra commit per parent update and never clobbers in-flight typing with
+  // a stale parent value arriving mid-debounce.
+  if (prevValue !== value) {
+    setPrevValue(value);
     setLocalValue(value ?? "");
-  }, [value]);
+  }
 
-  const emitDebounced = useDebouncedCallback(onChange, { wait });
+  // Ref seam: the debounced fn outlives the render that created it, so it
+  // must invoke the latest `onChange` without resubscribing every render.
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  const emitDebounced = useDebouncedCallback(
+    (next: string) => onChangeRef.current(next),
+    { wait }
+  );
 
   return { emitDebounced, setLocalValue, localValue };
 };

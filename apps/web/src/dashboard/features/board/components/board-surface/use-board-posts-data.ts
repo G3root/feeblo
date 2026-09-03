@@ -49,28 +49,9 @@ type UseBoardPostsDataOptions = {
   tagOperator: BoardTagOperator;
 };
 
-export function useBoardPostsData({
-  boardId,
-  organizationId,
-  postStatusFilter,
-  search,
-  statusOperator,
-  statuses,
-  tagIds,
-  tagOperator,
-}: UseBoardPostsDataOptions) {
-  const {
-    boardCollection,
-    postCollection,
-    postStatusCollection,
-    postTagCollection,
-    upvoteCollection,
-  } = useDashboardCollections();
-  const normalizedSearch = search.trim();
-  const statusesKey = statuses.join(",");
-  const tagIdsKey = tagIds.join(",");
-
-  const postStatusesQuery = useLiveQuery(
+function useBoardPostStatuses(organizationId: string) {
+  const { postStatusCollection } = useDashboardCollections();
+  return useLiveQuery(
     (q) => {
       if (!organizationId) {
         return undefined;
@@ -89,8 +70,11 @@ export function useBoardPostsData({
     },
     [organizationId]
   );
+}
 
-  const boardsQuery = useLiveQuery(
+function useBoardList(organizationId: string) {
+  const { boardCollection } = useDashboardCollections();
+  return useLiveQuery(
     (q) => {
       if (!organizationId) {
         return undefined;
@@ -107,8 +91,16 @@ export function useBoardPostsData({
     },
     [organizationId]
   );
+}
 
-  const matchingTagPostsQuery = useLiveQuery(
+function useMatchingTagPostIds(
+  organizationId: string,
+  tagIds: string[],
+  tagIdsKey: string,
+  tagOperator: BoardTagOperator
+) {
+  const { postTagCollection } = useDashboardCollections();
+  const query = useLiveQuery(
     (q) => {
       if (!(organizationId && tagIds.length > 0)) {
         return undefined;
@@ -142,11 +134,41 @@ export function useBoardPostsData({
     [organizationId, tagIdsKey, tagOperator]
   );
 
-  const matchingTagPostIds =
-    matchingTagPostsQuery.data?.map((entry) => entry.postId) ?? [];
-  const matchingTagPostIdsKey = matchingTagPostIds.join(",");
+  const ids = query.data?.map((entry) => entry.postId) ?? [];
+  return { ids, idsKey: ids.join(","), query };
+}
 
-  const postsQuery = useLiveQuery(
+type FilteredBoardPostsArgs = {
+  boardId?: string;
+  organizationId: string;
+  postStatusFilter: BoardPostStatusFilter;
+  normalizedSearch: string;
+  statuses: BoardPostStatus[];
+  statusesKey: string;
+  statusOperator: BoardStatusOperator;
+  tagIds: string[];
+  tagIdsKey: string;
+  tagOperator: BoardTagOperator;
+  matchingTagPostIds: string[];
+  matchingTagPostIdsKey: string;
+};
+
+function useFilteredBoardPosts({
+  boardId,
+  organizationId,
+  postStatusFilter,
+  normalizedSearch,
+  statuses,
+  statusesKey,
+  statusOperator,
+  tagIds,
+  tagIdsKey,
+  tagOperator,
+  matchingTagPostIds,
+  matchingTagPostIdsKey,
+}: FilteredBoardPostsArgs) {
+  const { postCollection, postStatusCollection } = useDashboardCollections();
+  return useLiveQuery(
     (q) => {
       if (!organizationId) {
         return undefined;
@@ -235,8 +257,11 @@ export function useBoardPostsData({
       matchingTagPostIdsKey,
     ]
   );
+}
 
-  const upvotesQuery = useLiveQuery(
+function usePostUpvoteCounts(organizationId: string) {
+  const { upvoteCollection } = useDashboardCollections();
+  return useLiveQuery(
     (q) => {
       if (!organizationId) {
         return undefined;
@@ -249,33 +274,88 @@ export function useBoardPostsData({
     },
     [organizationId]
   );
+}
 
-  const boardById = new Map(
-    (boardsQuery.data ?? []).map((board) => [board.id, board])
-  );
+function buildBoardById(
+  boards: ReadonlyArray<{ id: string; name: string; slug: string }>
+) {
+  return new Map(boards.map((board) => [board.id, board]));
+}
 
-  const upvoteCountByPostId = new Map<string, number>();
-
-  for (const upvote of upvotesQuery.data ?? []) {
-    upvoteCountByPostId.set(
-      upvote.postId,
-      (upvoteCountByPostId.get(upvote.postId) ?? 0) + 1
-    );
+function buildUpvoteCountByPostId(upvotes: ReadonlyArray<{ postId: string }>) {
+  const counts = new Map<string, number>();
+  for (const upvote of upvotes) {
+    counts.set(upvote.postId, (counts.get(upvote.postId) ?? 0) + 1);
   }
+  return counts;
+}
 
-  const posts: BoardPostRow[] = (postsQuery.data ?? []).map((post) => ({
+function buildBoardPostRows(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  posts: ReadonlyArray<any>,
+  boardById: Map<string, { name: string; slug: string }>,
+  upvoteCountByPostId: Map<string, number>
+): BoardPostRow[] {
+  return posts.map((post) => ({
     ...post,
     boardName: boardById.get(post.boardId)?.name ?? "",
     boardSlug: boardById.get(post.boardId)?.slug ?? "",
     upvoteCount: upvoteCountByPostId.get(post.id) ?? 0,
     user: post.user,
   }));
+}
+
+export function useBoardPostsData({
+  boardId,
+  organizationId,
+  postStatusFilter,
+  search,
+  statusOperator,
+  statuses,
+  tagIds,
+  tagOperator,
+}: UseBoardPostsDataOptions) {
+  const normalizedSearch = search.trim();
+  const statusesKey = statuses.join(",");
+  const tagIdsKey = tagIds.join(",");
+
+  const postStatusesQuery = useBoardPostStatuses(organizationId);
+  const boardsQuery = useBoardList(organizationId);
+  const matchingTags = useMatchingTagPostIds(
+    organizationId,
+    tagIds,
+    tagIdsKey,
+    tagOperator
+  );
+  const postsQuery = useFilteredBoardPosts({
+    boardId,
+    organizationId,
+    postStatusFilter,
+    normalizedSearch,
+    statuses,
+    statusesKey,
+    statusOperator,
+    tagIds,
+    tagIdsKey,
+    tagOperator,
+    matchingTagPostIds: matchingTags.ids,
+    matchingTagPostIdsKey: matchingTags.idsKey,
+  });
+  const upvotesQuery = usePostUpvoteCounts(organizationId);
+
+  const boardById = buildBoardById(boardsQuery.data ?? []);
+  const upvoteCountByPostId = buildUpvoteCountByPostId(upvotesQuery.data ?? []);
+  const posts = buildBoardPostRows(
+    postsQuery.data ?? [],
+    boardById,
+    upvoteCountByPostId
+  );
 
   return {
     hasError:
       postStatusesQuery.isError ||
       boardsQuery.isError ||
-      matchingTagPostsQuery.isError ||
+      matchingTags.query.isError ||
       postsQuery.isError ||
       upvotesQuery.isError,
     isLoading:
@@ -283,7 +363,7 @@ export function useBoardPostsData({
       boardsQuery.isLoading ||
       postsQuery.isLoading ||
       upvotesQuery.isLoading ||
-      (tagIds.length > 0 && matchingTagPostsQuery.isLoading),
+      (tagIds.length > 0 && matchingTags.query.isLoading),
     postStatuses: filterPostStatusesByPreset(
       postStatusesQuery.data ?? [],
       postStatusFilter

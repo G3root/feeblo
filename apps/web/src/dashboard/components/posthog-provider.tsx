@@ -69,12 +69,25 @@ export function groupPostHogOrganization(organizationId: string) {
  */
 export function PostHogIdentify() {
   const state = useResolvedAuth();
+  const status = state.status;
+  // Primitive deps: `state` is a fresh object per atom evaluation, so
+  // depending on it would re-fire identify on every render.
+  const userEmail = status === "authenticated" ? state.user.email : null;
+  const userName = status === "authenticated" ? state.user.name : null;
 
   useEffect(() => {
-    if (state.status !== "loading") {
-      identifyPostHog(state);
+    if (status === "loading") {
+      return;
     }
-  }, [state]);
+    if (status === "authenticated" && userEmail) {
+      identifyPostHog({
+        status,
+        user: { email: userEmail, name: userName ?? "" },
+      });
+    } else if (status === "unauthenticated") {
+      identifyPostHog({ status });
+    }
+  }, [status, userEmail, userName]);
 
   return null;
 }

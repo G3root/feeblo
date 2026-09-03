@@ -107,6 +107,24 @@ function UpgradePlanDialogPopup() {
   );
 }
 
+function UpgradePlanDialogHeader() {
+  return (
+    <DialogHeader className="gap-4 px-6 pt-6 pb-5">
+      <div className="flex items-center gap-3">
+        <div className="bg-primary/15 text-primary flex h-9 w-9 items-center justify-center rounded-xl">
+          <HugeiconsIcon className="h-4 w-4" icon={SparklesIcon} />
+        </div>
+        <div>
+          <DialogTitle>Upgrade Plan</DialogTitle>
+          <DialogDescription className="mt-1">
+            Select the plan that fits this workspace.
+          </DialogDescription>
+        </div>
+      </div>
+    </DialogHeader>
+  );
+}
+
 function UpgradePlanDialogContent({
   organizationId,
   catalog,
@@ -153,19 +171,7 @@ function UpgradePlanDialogContent({
       <DialogPanel scrollFade={false}>
         <div className="grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
           <div className="border-border flex flex-col lg:border-r">
-            <DialogHeader className="gap-4 px-6 pt-6 pb-5">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary/15 text-primary flex h-9 w-9 items-center justify-center rounded-xl">
-                  <HugeiconsIcon className="h-4 w-4" icon={SparklesIcon} />
-                </div>
-                <div>
-                  <DialogTitle>Upgrade Plan</DialogTitle>
-                  <DialogDescription className="mt-1">
-                    Select the plan that fits this workspace.
-                  </DialogDescription>
-                </div>
-              </div>
-            </DialogHeader>
+            <UpgradePlanDialogHeader />
 
             <div className="flex flex-1 flex-col px-6 pb-6">
               <div className="mb-4 flex items-center justify-between gap-4">
@@ -293,19 +299,7 @@ function UpgradePlanDialogSkeleton() {
       <DialogPanel scrollFade={false}>
         <div className="grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
           <div className="border-border flex flex-col lg:border-r">
-            <DialogHeader className="gap-4 px-6 pt-6 pb-5">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary/15 text-primary flex h-9 w-9 items-center justify-center rounded-xl">
-                  <HugeiconsIcon className="h-4 w-4" icon={SparklesIcon} />
-                </div>
-                <div>
-                  <DialogTitle>Upgrade Plan</DialogTitle>
-                  <DialogDescription className="mt-1">
-                    Select the plan that fits this workspace.
-                  </DialogDescription>
-                </div>
-              </div>
-            </DialogHeader>
+            <UpgradePlanDialogHeader />
             <div className="flex flex-1 flex-col px-6 pb-6">
               <div className="mb-4 flex items-center justify-between gap-4">
                 <div className="text-sm font-medium">Select plan:</div>
