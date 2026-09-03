@@ -5,9 +5,8 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Redacted from "effect/Redacted";
+import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
-import * as HttpApiSecurity from "effect/unstable/httpapi/HttpApiSecurity";
 import * as RpcMiddleware from "effect/unstable/rpc/RpcMiddleware";
 
 import { UnauthorizedError } from "./rpc-errors";
@@ -102,13 +101,15 @@ export class PublicAuthMiddleware extends RpcMiddleware.Service<
 
 function getValidatedSessionFromToken(
   auth: AuthHandler,
-  token: string
+  token: string,
+  // Defaults to the environment-resolved name for the RPC middlewares; the
+  // HTTP API middleware passes its composition-local name instead.
+  sessionCookie: string = getSessionCookie()
 ): Effect.Effect<Session, UnauthorizedError> {
   return Effect.gen(function* () {
     if (!token) {
       return yield* new UnauthorizedError({ message: "Not authenticated" });
     }
-    const sessionCookie = getSessionCookie();
     const session = yield* Effect.tryPromise({
       try: () =>
         auth.api.getSession({
@@ -212,54 +213,61 @@ export const PublicAuthMiddlewareLive = Layer.effect(
   })
 );
 
+// No `security` declaration here on purpose: `HttpApiBuilder` derives
+// credential decoders from the class-level declaration, which is shared by
+// every composition, while the session cookie name is resolved per
+// composition (see `makeHttpApiAuthMiddlewareLive`). The middleware therefore
+// extracts the session cookie itself from the incoming request.
 export class HttpApiAuthMiddleware extends HttpApiMiddleware.Service<
   HttpApiAuthMiddleware,
   { provides: CurrentSession }
 >()("@feeblo/domain/HttpApiAuthMiddleware", {
   error: UnauthorizedError,
-  security: {
-    cookie: HttpApiSecurity.apiKey({
-      in: "cookie",
-      // Placeholder only: the real cookie name is resolved from the
-      // environment at composition time by `HttpApiAuthMiddlewareLive` (see
-      // the patch below). It must NOT be resolved here — `getSessionCookieName()`
-      // reads process.env, which may not be populated at module load.
-      key: getSessionCookieNameForUrl(undefined),
-    }),
-  },
 }) {}
 
-export const HttpApiAuthMiddlewareLive = Layer.effect(
-  HttpApiAuthMiddleware,
-  Effect.gen(function* () {
-    const auth = yield* Auth;
+/**
+ * Builds the HTTP API auth middleware for one server composition.
+ *
+ * `resolveCookieName` runs once at layer build (the environment is loaded by
+ * then) and the resolved name is captured by this composition's middleware
+ * instance. No shared declaration is mutated, so compositions using different
+ * cookie names each authenticate against their own cookie.
+ */
+export const makeHttpApiAuthMiddlewareLive = (
+  resolveCookieName: () => string
+): Layer.Layer<HttpApiAuthMiddleware, never, Auth> =>
+  Layer.effect(
+    HttpApiAuthMiddleware,
+    Effect.gen(function* () {
+      const auth = yield* Auth;
+      const cookieName = resolveCookieName();
 
-    // Resolve and patch the session cookie name at composition time (env is
-    // loaded by then) instead of at module load. The HttpApi security scheme
-    // is consumed lazily by `HttpApiBuilder` when the router is assembled —
-    // after this layer has run — so the patch is guaranteed to be in effect
-    // before any credential is decoded.
-    const cookieName = getSessionCookieName();
-    // SAFETY: `ApiKey.key` is typed readonly but is a plain mutable field on a
-    // runtime object; patching it here is the intended use of the placeholder.
-    (HttpApiAuthMiddleware.security.cookie as { key: string }).key = cookieName;
+      return HttpApiAuthMiddleware.of((effect) =>
+        Effect.flatMap(HttpServerRequest.HttpServerRequest, (request) => {
+          const token = request.cookies[cookieName];
 
-    return {
-      cookie: (effect, { credential }) =>
-        getValidatedSessionFromToken(auth, Redacted.value(credential)).pipe(
-          Effect.flatMap((session) =>
-            Effect.gen(function* () {
-              if (session.user.restrictedToOrganizationId) {
-                return yield* new UnauthorizedError({
-                  message: "SSO sessions cannot access dashboard endpoints",
-                });
-              }
-              return yield* effect.pipe(
-                Effect.provideService(CurrentSession, session)
-              );
-            })
-          )
-        ),
-    };
-  })
-);
+          return getValidatedSessionFromToken(
+            auth,
+            token ?? "",
+            cookieName
+          ).pipe(
+            Effect.flatMap((session) =>
+              Effect.gen(function* () {
+                if (session.user.restrictedToOrganizationId) {
+                  return yield* new UnauthorizedError({
+                    message: "SSO sessions cannot access dashboard endpoints",
+                  });
+                }
+                return yield* effect.pipe(
+                  Effect.provideService(CurrentSession, session)
+                );
+              })
+            )
+          );
+        })
+      );
+    })
+  );
+
+export const HttpApiAuthMiddlewareLive =
+  makeHttpApiAuthMiddlewareLive(getSessionCookieName);
