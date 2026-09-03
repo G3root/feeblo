@@ -282,9 +282,7 @@ function buildBoardById(
   return new Map(boards.map((board) => [board.id, board]));
 }
 
-function buildUpvoteCountByPostId(
-  upvotes: ReadonlyArray<{ postId: string }>
-) {
+function buildUpvoteCountByPostId(upvotes: ReadonlyArray<{ postId: string }>) {
   const counts = new Map<string, number>();
   for (const upvote of upvotes) {
     counts.set(upvote.postId, (counts.get(upvote.postId) ?? 0) + 1);

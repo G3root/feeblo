@@ -235,11 +235,7 @@ function ReactionPickerContent({ isLoading }: { isLoading: boolean }) {
   return (
     <>
       <div className="flex items-center gap-1">
-        {isLoading ? (
-          <ReactionCountsSkeleton />
-        ) : (
-          <ReactionPickerDisplayRow />
-        )}
+        {isLoading ? <ReactionCountsSkeleton /> : <ReactionPickerDisplayRow />}
         <ReactionPickerTrigger />
       </div>
       <ReactionPickerGrid />
