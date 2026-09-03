@@ -1,7 +1,14 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { NotificationId, type LegidOf, WorkspaceId } from "@feeblo/id";
-import { eq } from "drizzle-orm";
+import {
+  BoardId,
+  NotificationId,
+  PostId,
+  PostStatusId,
+  type LegidOf,
+  WorkspaceId,
+} from "@feeblo/id";
+import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -503,6 +510,161 @@ describe("NotificationRpcHandlers", () => {
               recipientUserId: reader.userId,
             });
           })
+        );
+      }
+    );
+
+    layer(Layer.merge(TestLayer, Database.PgliteDatabaseLive))(
+      "comment notifications",
+      (it) => {
+        it.effect(
+          "excludes non-members from INTERNAL comment notifications",
+          () =>
+            Effect.gen(function* () {
+              const db = yield* currentDb;
+              const service = yield* NotificationService;
+              const organizationId = yield* WorkspaceId.generate;
+              const boardId = yield* BoardId.generate;
+              const statusId = yield* PostStatusId.generate;
+              const postId = yield* PostId.generate;
+              const now = new Date();
+              const memberSubscriberId = `user_${organizationId}_member_sub`;
+              const memberSubscriberMemberId = `member_${organizationId}_member_sub`;
+              const visitorCreatorId = `user_${organizationId}_visitor_creator`;
+              const visitorSubscriberId = `user_${organizationId}_visitor_sub`;
+              const actorUserId = `user_${organizationId}_actor`;
+              const actorMemberId = `member_${organizationId}_actor`;
+              const internalCommentId = `cmt_${organizationId}_internal`;
+              const publicCommentId = `cmt_${organizationId}_public`;
+
+              yield* db.insert(schema.organizationTable).values({
+                id: organizationId,
+                name: "Comment notifications org",
+                slug: organizationId,
+                createdAt: now,
+              });
+              for (const userId of [
+                memberSubscriberId,
+                visitorCreatorId,
+                visitorSubscriberId,
+                actorUserId,
+              ]) {
+                yield* db.insert(schema.userTable).values({
+                  id: userId,
+                  email: `${userId}@example.com`,
+                  name: userId,
+                });
+              }
+              yield* db.insert(schema.memberTable).values({
+                id: memberSubscriberMemberId,
+                organizationId,
+                userId: memberSubscriberId,
+                role: "manager",
+                createdAt: now,
+              });
+              yield* db.insert(schema.memberTable).values({
+                id: actorMemberId,
+                organizationId,
+                userId: actorUserId,
+                role: "manager",
+                createdAt: now,
+              });
+              yield* db.insert(schema.boardTable).values({
+                id: boardId,
+                name: "Test board",
+                slug: boardId,
+                visibility: "PUBLIC",
+                organizationId,
+                creatorId: memberSubscriberId,
+                creatorMemberId: memberSubscriberMemberId,
+                createdAt: now,
+                updatedAt: now,
+              });
+              yield* db.insert(schema.postStatusTable).values({
+                id: statusId,
+                type: "PENDING",
+                orderIndex: 0,
+                organizationId,
+              });
+              yield* db.insert(schema.postTable).values({
+                id: postId,
+                title: "Test post",
+                content: "Test content",
+                boardId,
+                organizationId,
+                statusId,
+                creatorId: visitorCreatorId,
+                creatorMemberId: null,
+                slug: postId,
+                excerpt: "Test excerpt",
+                createdAt: now,
+                updatedAt: now,
+              });
+              yield* db.insert(schema.postSubscriptionTable).values({
+                id: `psub_${organizationId}_member`,
+                postId,
+                userId: memberSubscriberId,
+                organizationId,
+                memberId: memberSubscriberMemberId,
+              });
+              yield* db.insert(schema.postSubscriptionTable).values({
+                id: `psub_${organizationId}_visitor`,
+                postId,
+                userId: visitorSubscriberId,
+                organizationId,
+                memberId: null,
+              });
+
+              yield* service.notifyComment({
+                actorUserId,
+                organizationId,
+                postId,
+                commentId: internalCommentId,
+                visibility: "INTERNAL",
+              });
+              const internalRows = yield* db
+                .select()
+                .from(schema.notificationTable)
+                .where(
+                  and(
+                    eq(schema.notificationTable.organizationId, organizationId),
+                    eq(schema.notificationTable.resourceId, internalCommentId)
+                  )
+                );
+              // The non-member post creator and the non-member subscriber
+              // cannot see INTERNAL comments, so only the member subscriber
+              // is notified.
+              expect(
+                internalRows.map((row) => row.recipientUserId).sort()
+              ).toEqual([memberSubscriberId]);
+
+              yield* service.notifyComment({
+                actorUserId,
+                organizationId,
+                postId,
+                commentId: publicCommentId,
+                visibility: "PUBLIC",
+              });
+              const publicRows = yield* db
+                .select()
+                .from(schema.notificationTable)
+                .where(
+                  and(
+                    eq(schema.notificationTable.organizationId, organizationId),
+                    eq(schema.notificationTable.resourceId, publicCommentId)
+                  )
+                );
+              // PUBLIC comments keep the existing fan-out to everyone.
+              expect(
+                publicRows.map((row) => row.recipientUserId).sort()
+              ).toEqual(
+                [
+                  visitorCreatorId,
+                  memberSubscriberId,
+                  visitorSubscriberId,
+                ].sort()
+              );
+            })
         );
       }
     );

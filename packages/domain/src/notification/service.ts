@@ -250,38 +250,52 @@ const makeNotificationService = Effect.gen(function* () {
                     eq(schema.commentTable.postId, postId)
                   )
                 );
-        // An INTERNAL reply is visible to members only, so a parent author
-        // who cannot see it (a non-member commenter) must not be notified;
-        // member parent authors still are.
+        // An INTERNAL comment is visible to members only, so non-members
+        // (post creator, parent author, or subscribers who never joined)
+        // must not be notified; PUBLIC comments keep the existing fan-out.
         const parentAuthorUserIds = parentAuthors.map(
           (parent) => parent.userId
         );
-        let replyRecipientUserIds = parentAuthorUserIds;
-        if (visibility === "INTERNAL" && parentAuthorUserIds.length > 0) {
-          const memberParentAuthors = yield* db
-            .select({ userId: schema.memberTable.userId })
-            .from(schema.memberTable)
-            .where(
-              and(
-                eq(schema.memberTable.organizationId, organizationId),
-                inArray(schema.memberTable.userId, parentAuthorUserIds)
+        const subscriberUserIds = subscribers.map(
+          (subscriber) => subscriber.userId
+        );
+        let recipientUserIds: ReadonlyArray<string | null | undefined> = [
+          context.creatorId,
+          ...parentAuthorUserIds,
+          ...subscriberUserIds,
+        ];
+        if (visibility === "INTERNAL") {
+          const candidateUserIds = [
+            ...new Set(
+              recipientUserIds.filter(
+                (userId): userId is string => isString(userId)
               )
+            ),
+          ];
+          if (candidateUserIds.length > 0) {
+            const memberRecipients = yield* db
+              .select({ userId: schema.memberTable.userId })
+              .from(schema.memberTable)
+              .where(
+                and(
+                  eq(schema.memberTable.organizationId, organizationId),
+                  inArray(schema.memberTable.userId, candidateUserIds)
+                )
+              );
+            const memberUserIds = new Set(
+              memberRecipients.map((member) => member.userId)
             );
-          const memberUserIds = new Set(
-            memberParentAuthors.map((member) => member.userId)
-          );
-          replyRecipientUserIds = parentAuthorUserIds.filter((userId) =>
-            memberUserIds.has(userId)
-          );
+            recipientUserIds = candidateUserIds.filter((userId) =>
+              memberUserIds.has(userId)
+            );
+          } else {
+            recipientUserIds = [];
+          }
         }
         yield* create({
           ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
-          recipientUserIds: [
-            context.creatorId,
-            ...replyRecipientUserIds,
-            ...subscribers.map((subscriber) => subscriber.userId),
-          ],
+          recipientUserIds,
           kind: "feedback.commented",
           resourceType: "comment",
           resourceId: commentId,

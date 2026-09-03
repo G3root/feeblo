@@ -105,11 +105,22 @@ function CommentThreadRow({
   replies,
   currentUserId,
 }: CommentThread & { currentUserId?: string }) {
-  const [isExpanded, setIsExpanded] = useState(
-    // A pinned reply is the post-wide highlighted comment: start its thread
-    // expanded so the pin is not hidden behind the collapsed accordion.
-    () => replies.some((reply) => reply.pinnedAt != null)
-  );
+  // A pinned reply is the post-wide highlighted comment: its thread reads
+  // expanded so the pin is not hidden behind the collapsed accordion.
+  const hasPinnedReply = replies.some((reply) => reply.pinnedAt != null);
+  const [isExpanded, setIsExpanded] = useState(hasPinnedReply);
+  const [prevHasPinnedReply, setPrevHasPinnedReply] =
+    useState(hasPinnedReply);
+  // Latch open on the false -> true transition (e.g. a reply is pinned
+  // after mount). Derived during render instead of an effect: other replies
+  // updates keep the current state, manual collapses stick, and an unpin
+  // never auto-collapses an expanded thread.
+  if (prevHasPinnedReply !== hasPinnedReply) {
+    setPrevHasPinnedReply(hasPinnedReply);
+    if (hasPinnedReply) {
+      setIsExpanded(true);
+    }
+  }
   const expandReplies = useCallback(() => setIsExpanded(true), []);
 
   return (
