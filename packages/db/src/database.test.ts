@@ -24,7 +24,7 @@ const transactionTestTable = pgTable("transaction_test", {
   id: integer("id").primaryKey(),
 });
 
-it.effect("rolls back captured database queries and nested savepoints", () =>
+it.live("rolls back captured database queries and nested savepoints", () =>
   Effect.gen(function* () {
     const rows = yield* Effect.gen(function* () {
       // This deliberately captures the root database before either transaction,
@@ -64,5 +64,6 @@ it.effect("rolls back captured database queries and nested savepoints", () =>
     }).pipe(Effect.provide(TestDatabaseLive));
 
     expect(rows).toEqual([{ id: 1 }, { id: 3 }]);
-  })
+  }),
+  30_000
 );

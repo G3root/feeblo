@@ -11,7 +11,7 @@ export function CommentComposerSubmit() {
   return (
     <div
       className={cn(
-        "flex items-center pt-2",
+        "flex items-center pt-3",
         state.showVisibilityToggle ? "justify-between" : "justify-end"
       )}
     >

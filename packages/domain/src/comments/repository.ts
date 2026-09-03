@@ -79,6 +79,10 @@ const makeCommentRepository = Effect.gen(function* () {
             userId: schema.commentTable.userId,
             visibility: schema.commentTable.visibility,
             parentCommentId: schema.commentTable.parentCommentId,
+            // Callers of this endpoint are members who see every comment, so
+            // nothing is hidden from them and the resolved parent is the
+            // actual parent.
+            resolvedParentCommentId: schema.commentTable.parentCommentId,
             memberId: schema.commentTable.memberId,
             statusUpdateId: schema.commentTable.statusUpdateId,
             pinnedAt: schema.commentTable.pinnedAt,
@@ -142,15 +146,49 @@ const makeCommentRepository = Effect.gen(function* () {
           and(
             eq(schema.commentTable.organizationId, organizationId),
             eq(schema.postTable.slug, slug),
-            ...(includeInternal
-              ? []
-              : [eq(schema.commentTable.visibility, "PUBLIC")]),
             eq(schema.boardTable.visibility, "PUBLIC")
           )
         )
         .orderBy(
           sql`${schema.commentTable.pinnedAt} DESC NULLS LAST`,
           desc(schema.commentTable.createdAt)
+        )
+        .pipe(
+          Effect.map((rows) => {
+            if (includeInternal) {
+              // Members see every comment, so nothing is hidden from them and
+              // the resolved parent is the actual parent.
+              return rows.map((row) => ({
+                ...row,
+                resolvedParentCommentId: row.parentCommentId,
+              }));
+            }
+            // Guests never see INTERNAL rows, but a hidden intermediary (a
+            // comment later toggled INTERNAL) must not orphan its public
+            // descendants: each public reply is re-anchored beneath its
+            // nearest visible ancestor.
+            const hiddenIds = new Set(
+              rows
+                .filter((row) => row.visibility === "INTERNAL")
+                .map((row) => row.id)
+            );
+            const parentIdByCommentId = new Map(
+              rows.map((row) => [row.id, row.parentCommentId])
+            );
+            return rows
+              .filter((row) => row.visibility === "PUBLIC")
+              .map((row) => {
+                let resolvedParentId: string | null = row.parentCommentId;
+                while (
+                  resolvedParentId !== null &&
+                  hiddenIds.has(resolvedParentId)
+                ) {
+                  resolvedParentId =
+                    parentIdByCommentId.get(resolvedParentId) ?? null;
+                }
+                return { ...row, resolvedParentCommentId: resolvedParentId };
+              });
+          })
         ),
     create: (args: InsertComment) =>
       Effect.gen(function* () {

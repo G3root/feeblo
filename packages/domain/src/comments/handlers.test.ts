@@ -17,6 +17,7 @@ import * as Option from "effect/Option";
 
 import { BoardRepository } from "../board/repository";
 import { EmailOutboxConfig } from "../email-outbox/config";
+import { NotificationService } from "../notification/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { PostPolicy } from "../post/policies";
@@ -325,6 +326,83 @@ describe("CommentRpcHandlers", () => {
           expect(comments).toHaveLength(0);
         })
       );
+
+      it.effect(
+        "re-anchors a public reply beneath its nearest visible ancestor when an intermediary is internal",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* CommentRpcHandlersEffect;
+            const fixture = yield* makeFixture("PUBLIC");
+            const rootId = yield* CommentId.generate;
+            const intermediaryId = yield* CommentId.generate;
+            const childId = yield* CommentId.generate;
+
+            yield* handlers
+              .CommentCreate(
+                commentCreateInput(fixture, rootId, "Root comment")
+              )
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            yield* handlers
+              .CommentCreate({
+                ...commentCreateInput(fixture, intermediaryId, "Intermediary"),
+                parentCommentId: rootId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            yield* handlers
+              .CommentCreate({
+                ...commentCreateInput(fixture, childId, "Child reply"),
+                parentCommentId: intermediaryId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            // A member toggles the intermediary internal: public guests then
+            // see only root + child, and the child must stay nested beneath
+            // its nearest visible ancestor (the root) instead of surfacing
+            // as an unrelated top-level thread.
+            yield* handlers
+              .CommentUpdate({
+                id: intermediaryId,
+                organizationId: fixture.organizationId,
+                postId: fixture.postId,
+                content: "Intermediary",
+                visibility: "INTERNAL" as const,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const comments = yield* handlers
+              .CommentListPublic({
+                organizationId: fixture.organizationId,
+                slug: fixture.postSlug,
+              })
+              .pipe(
+                Effect.provideService(OptionalCurrentSession, Option.none())
+              );
+
+            expect(comments.map((comment) => comment.id).sort()).toEqual(
+              [rootId, childId].sort()
+            );
+            expect(
+              comments.find((comment) => comment.id === rootId)
+            ).toMatchObject({
+              parentCommentId: null,
+              resolvedParentCommentId: null,
+            });
+            expect(
+              comments.find((comment) => comment.id === childId)
+            ).toMatchObject({
+              parentCommentId: intermediaryId,
+              resolvedParentCommentId: rootId,
+            });
+          })
+      );
     });
 
     describe("CommentCreate", () => {
@@ -457,6 +535,56 @@ describe("CommentRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
+          expect(result.message).toBe("Comment created successfully");
+        })
+      );
+
+      it.effect("only allows internal replies to an internal comment", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const internalCommentId = yield* CommentId.generate;
+          const publicReplyId = yield* CommentId.generate;
+          const internalReplyId = yield* CommentId.generate;
+
+          yield* handlers
+            .CommentCreate(
+              commentCreateInput(
+                fixture,
+                internalCommentId,
+                "Internal parent",
+                "INTERNAL"
+              )
+            )
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          // A PUBLIC reply under an INTERNAL parent would leak member-only
+          // context to public visitors, so it is denied.
+          const error = yield* Effect.flip(
+            handlers
+              .CommentCreate({
+                id: publicReplyId,
+                organizationId: fixture.organizationId,
+                postId: fixture.postId,
+                content: "Public reply to internal",
+                visibility: "PUBLIC" as const,
+                parentCommentId: internalCommentId,
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+          expect(error._tag).toBe("PolicyDenied");
+
+          // An INTERNAL reply to the same parent is allowed.
+          const result = yield* handlers
+            .CommentCreate({
+              id: internalReplyId,
+              organizationId: fixture.organizationId,
+              postId: fixture.postId,
+              content: "Internal reply to internal",
+              visibility: "INTERNAL" as const,
+              parentCommentId: internalCommentId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           expect(result.message).toBe("Comment created successfully");
         })
       );
@@ -917,6 +1045,163 @@ describe("CommentRpcHandlers", () => {
           );
 
           expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+    });
+
+    describe("reply notifications", () => {
+      // CommentRpcHandlersEffect resolves the notification service via
+      // serviceOption at build time, so handlers for these tests must be
+      // built with the layer supplied (the suite-level layer omits it).
+      const WithNotificationsLayer = NotificationService.layer.pipe(
+        Layer.provide(Database.PgliteDatabaseLive)
+      );
+
+      it.effect(
+        "does not notify a non-member parent author of an internal reply",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* CommentRpcHandlersEffect.pipe(
+              Effect.provide(WithNotificationsLayer)
+            );
+            const fixture = yield* makeFixture("PUBLIC");
+            const parentCommentId = yield* CommentId.generate;
+            const replyId = yield* CommentId.generate;
+            const db = yield* currentDb;
+            const guestUserId = `guest_${fixture.organizationId}`;
+            yield* db.insert(schema.userTable).values({
+              id: guestUserId,
+              email: `${guestUserId}@example.com`,
+              name: "Guest User",
+            });
+            const guestSession: Session = {
+              user: {
+                id: guestUserId,
+                email: `${guestUserId}@example.com`,
+                name: "Guest User",
+                restrictedToOrganizationId: null,
+              },
+              session: { userId: guestUserId, token: "guest-token" },
+              organizations: [{ id: fixture.organizationId }],
+              memberships: [],
+            };
+
+            // A non-member posts a public comment on the public board.
+            yield* handlers
+              .CommentCreatePublic(
+                commentCreateInput(fixture, parentCommentId, "Public question")
+              )
+              .pipe(Effect.provideService(CurrentSession, guestSession));
+
+            // A member replies internally; the non-member parent author
+            // cannot see the reply, so they must not be notified.
+            yield* handlers
+              .CommentCreate({
+                ...commentCreateInput(
+                  fixture,
+                  replyId,
+                  "Internal answer",
+                  "INTERNAL"
+                ),
+                parentCommentId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const rows = yield* db
+              .select()
+              .from(schema.notificationTable)
+              .where(
+                and(
+                  eq(
+                    schema.notificationTable.organizationId,
+                    fixture.organizationId
+                  ),
+                  eq(schema.notificationTable.resourceId, replyId)
+                )
+              );
+            expect(rows).toEqual([]);
+          })
+      );
+
+      it.effect("notifies a member parent author of an internal reply", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect.pipe(
+            Effect.provide(WithNotificationsLayer)
+          );
+          const fixture = yield* makeFixture("PUBLIC");
+          const parentCommentId = yield* CommentId.generate;
+          const replyId = yield* CommentId.generate;
+          const db = yield* currentDb;
+
+          const otherUserId = `other_member_${fixture.organizationId}`;
+          const otherMembershipId = `other_membership_${fixture.organizationId}`;
+          yield* db.insert(schema.userTable).values({
+            id: otherUserId,
+            email: `${otherUserId}@example.com`,
+            name: "Other Member",
+          });
+          yield* db.insert(schema.memberTable).values({
+            id: otherMembershipId,
+            organizationId: fixture.organizationId,
+            userId: otherUserId,
+            role: "manager",
+            createdAt: new Date(),
+          });
+          const otherMemberSession: Session = {
+            user: {
+              id: otherUserId,
+              email: `${otherUserId}@example.com`,
+              name: "Other Member",
+              restrictedToOrganizationId: null,
+            },
+            session: { userId: otherUserId, token: "other-member-token" },
+            organizations: [{ id: fixture.organizationId }],
+            memberships: [
+              {
+                membershipId: otherMembershipId,
+                organizationId: fixture.organizationId,
+                role: "manager",
+              },
+            ],
+          };
+
+          // A member posts a public comment.
+          yield* handlers
+            .CommentCreate(
+              commentCreateInput(fixture, parentCommentId, "Member question")
+            )
+            .pipe(Effect.provideService(CurrentSession, otherMemberSession));
+
+          // Another member replies internally; the member parent author can
+          // see the reply and is still notified.
+          yield* handlers
+            .CommentCreate({
+              ...commentCreateInput(
+                fixture,
+                replyId,
+                "Internal answer",
+                "INTERNAL"
+              ),
+              parentCommentId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const rows = yield* db
+            .select()
+            .from(schema.notificationTable)
+            .where(
+              and(
+                eq(
+                  schema.notificationTable.organizationId,
+                  fixture.organizationId
+                ),
+                eq(schema.notificationTable.resourceId, replyId)
+              )
+            );
+          expect(rows).toHaveLength(1);
+          expect(rows[0]?.recipientUserId).toBe(otherUserId);
         })
       );
     });

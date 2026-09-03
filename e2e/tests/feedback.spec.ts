@@ -75,9 +75,11 @@ test.describe("feedback workflow", () => {
       const commentBody = page.getByText(comment).last();
       await expect(commentBody).toBeVisible();
 
-      const commentCard = commentBody.locator(
-        "xpath=ancestor::div[contains(@class, 'rounded-2xl')][1]"
-      );
+      // The v2 comment display renders each comment as a dense row
+      // (`data-slot="comment"`), not a rounded card.
+      const commentCard = page
+        .locator('[data-slot="comment"]')
+        .filter({ hasText: comment });
       await commentCard.getByRole("button", { name: "Add reaction" }).click();
       await page
         .locator('[role="dialog"]:visible')

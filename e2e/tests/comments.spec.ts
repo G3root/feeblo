@@ -65,10 +65,10 @@ async function addComment(
   await expect(editor).toHaveText("");
 }
 
-/** The v2 comment display renders each comment inside a Card (`data-slot="card"`). */
+/** The v2 comment display renders each comment as a dense row (`data-slot="comment"`). */
 function commentCard(page: Page, commentText: string) {
   return page
-    .locator('[data-slot="card"]')
+    .locator('[data-slot="comment"]')
     .filter({ hasText: commentText })
     .first();
 }
@@ -352,7 +352,7 @@ test.describe("comment management", () => {
       // content lands asynchronously; keep the editor reference stable while
       // typing (the card's text changes, so a hasText-filtered locator would
       // stop matching) and wait for the prefilled text before editing.
-      const editCard = page.locator('[data-slot="card"]').first();
+      const editCard = page.locator('[data-slot="comment"]').first();
       const secondEditEditor = editCard.locator(".ProseMirror");
       await expect(secondEditEditor).toContainText(original);
       await replaceCommentContent(page, secondEditEditor, edited);
@@ -473,6 +473,90 @@ test.describe("comment management", () => {
       // The visibility survived the round-trip: still internal after reload.
       await page.reload();
       await expect(card.getByText("Internal", { exact: true })).toBeVisible();
+    }
+  );
+});
+
+test.describe("comment replies", () => {
+  /**
+   * Opens the reply composer on a comment card and submits a reply. The
+   * reply editor is the third ProseMirror on the page (post content,
+   * top-level composer, reply composer). The "Reply" accessible name is
+   * unambiguous at every step: while the composer is closed only the card's
+   * Reply toggle matches, and once it is open the toggle reads
+   * "Hide reply" while the composer's submit button reads "Reply".
+   */
+  async function addReply(
+    page: Page,
+    card: ReturnType<typeof commentCard>,
+    content: string
+  ) {
+    await card.getByRole("button", { name: "Reply", exact: true }).click();
+    await fillEditor(page, content, { index: 2 });
+
+    const create = waitForRpc(page, "CommentCreate");
+    await card.getByRole("button", { name: "Reply", exact: true }).click();
+    await create;
+
+    // The composer closes after the reply persists.
+    await expect(
+      card.getByRole("button", { name: "Hide reply", exact: true })
+    ).toHaveCount(0);
+  }
+
+  test(
+    "nests a reply under its parent and flattens reply-to-reply threads",
+    { tag: "@critical" },
+    async ({ page }) => {
+      await createWorkspace(page);
+      const title = `Reply post ${randomUUID().slice(0, 8)}`;
+      const parentText = `Parent comment ${randomUUID().slice(0, 8)}`;
+      const replyText = `Nested reply ${randomUUID().slice(0, 8)}`;
+      const nestedReplyText = `Reply to reply ${randomUUID().slice(0, 8)}`;
+
+      await createPost(page, title, "Post to exercise comment replies.");
+      await openPost(page, title);
+
+      await addComment(page, parentText);
+      const parentCard = commentCard(page, parentText);
+      await expect(parentCard).toBeVisible();
+
+      // Reply to the top-level comment. Opening the composer expands the
+      // replies accordion, so the reply is visible right after submitting.
+      await addReply(page, parentCard, replyText);
+      const replyCard = commentCard(page, replyText);
+      await expect(replyCard).toBeVisible();
+
+      // A reply is newer than its parent, so if threading broke it would
+      // sort ABOVE the parent (top-level comments are newest-first). It
+      // rendering BELOW the parent proves it is nested in the thread.
+      await expectToBeAbove(parentCard, replyCard);
+
+      // Reply to the reply: flattened under the same root thread.
+      await addReply(page, replyCard, nestedReplyText);
+      const nestedReplyCard = commentCard(page, nestedReplyText);
+      await expect(nestedReplyCard).toBeVisible();
+      await expectToBeAbove(replyCard, nestedReplyCard);
+      await expectToBeAbove(parentCard, nestedReplyCard);
+
+      // The thread structure survives a reload. Threads collapse back to
+      // the accordion on reload, so expand the parent's replies first.
+      await page.reload();
+      const parentThread = page
+        .locator('[data-slot="comment-thread"]')
+        .filter({ hasText: parentText });
+      await parentThread
+        .getByRole("button", { name: /^Show \d+ repl(y|ies)$/ })
+        .click();
+      await expect(parentCard).toBeVisible();
+      await expect(replyCard).toBeVisible();
+      await expect(nestedReplyCard).toBeVisible();
+      await expectToBeAbove(parentCard, replyCard);
+      await expectToBeAbove(parentCard, nestedReplyCard);
+
+      // Both replies are plain comment activity (no status changes).
+      await page.getByRole("tab", { name: "Activity" }).click();
+      await expect(activityItem(page, /added a comment/)).toHaveCount(3);
     }
   );
 });

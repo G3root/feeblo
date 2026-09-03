@@ -120,7 +120,7 @@ function ReactionPickerTrigger() {
           aria-label={meta.label}
           className="rounded-full"
           disabled={state.disabled}
-          size="icon-sm"
+          size="icon-xs"
           variant="ghost"
         >
           <HugeiconsIcon icon={SmileIcon} />
@@ -134,7 +134,7 @@ function ReactionPickerGrid() {
   const { actions, state } = useReactionPicker();
 
   return (
-    <PopoverPopup className="w-auto" sideOffset={4}>
+    <PopoverPopup className="w-auto" sideOffset={4} tooltipStyle>
       <div className="grid grid-cols-4 gap-1">
         {REACTION_EMOJIS.map((emoji) => {
           const isSelected = state.selectedReactions.has(emoji);
@@ -205,7 +205,7 @@ function ReactionPickerDisplayRow() {
             onClick={() => {
               actions.onToggle(emoji);
             }}
-            size="sm"
+            size="xs"
             type="button"
             variant={isSelected ? "secondary" : "ghost"}
           >
