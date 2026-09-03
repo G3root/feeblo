@@ -75,7 +75,8 @@ describe("makeId", () => {
     it.effect("rejects a tampered id", () =>
       Effect.gen(function* () {
         const id = yield* factory.generate;
-        const tampered = `${id.slice(0, -1)}0`;
+        const replacement = id.endsWith("0") ? "1" : "0";
+        const tampered = `${id.slice(0, -1)}${replacement}`;
         const isValid = yield* factory.verify(tampered);
 
         expect(isValid).toBe(false);
@@ -134,7 +135,8 @@ describe("makeId", () => {
     it.effect("fails with LegidError on tampered id body", () =>
       Effect.gen(function* () {
         const id = yield* factory.generate;
-        const tampered = `${id.slice(0, -1)}0`;
+        const replacement = id.endsWith("0") ? "1" : "0";
+        const tampered = `${id.slice(0, -1)}${replacement}`;
         const result = yield* factory
           .parse(tampered)
           .pipe(
