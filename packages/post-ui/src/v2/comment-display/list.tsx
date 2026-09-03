@@ -119,7 +119,7 @@ function CommentThreadRow({
       </CommentThreadContext>
       {replies.length > 0 && (
         <Collapsible
-          className="mt-0.5 ml-8"
+          className="mt-1.5 ml-8"
           onOpenChange={setIsExpanded}
           open={isExpanded}
         >
@@ -137,7 +137,7 @@ function CommentThreadRow({
               : `Show ${replies.length} ${replies.length === 1 ? "reply" : "replies"}`}
           </CollapsibleTrigger>
           <CollapsiblePanel>
-            <div className="border-border/70 mt-1 flex flex-col gap-0.5 border-l py-1 pl-4">
+            <div className="border-border/70 mt-1.5 flex flex-col gap-1 border-l py-1 pl-4">
               {replies.map((reply) => (
                 <CommentDisplayItem
                   currentUserId={currentUserId}

@@ -29,7 +29,7 @@ export function SubmitButton() {
         disabled={isDisabled}
         size="sm"
         type={actions.onSubmit ? "button" : "submit"}
-        // variant={isPrivate ? "default" : "outline"}
+        variant="brand"
         {...(actions?.onSubmit
           ? {
               onClick: actions.onSubmit,
@@ -43,7 +43,7 @@ export function SubmitButton() {
       </Button>
       {hasStatusOptions ? (
         <>
-          <GroupSeparator className="bg-primary/72" />
+          <GroupSeparator className="bg-brand-ring/72" />
           <StatusUpdateMenu />
         </>
       ) : null}
@@ -76,6 +76,7 @@ function StatusUpdateMenu() {
             }
             disabled={isDisabled}
             size="icon-sm"
+            variant="brand"
           />
         }
       >

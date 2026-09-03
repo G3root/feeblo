@@ -16,6 +16,7 @@ import z from "zod";
 
 import {
   CommentComposer,
+  commentComposerBoxClassName,
   type CommentComposerProviderProps,
   type TPostStatusOption,
 } from "../comment-composer";
@@ -243,7 +244,7 @@ export const CommentComposerField = withForm({
                             statusUpdateId={statusUpdate.state.value}
                             {...rest}
                           >
-                            <div className="border-border rounded-md border p-3">
+                            <div className={commentComposerBoxClassName}>
                               <CommentComposer.Editor />
                               <CommentComposer.Submit />
                             </div>

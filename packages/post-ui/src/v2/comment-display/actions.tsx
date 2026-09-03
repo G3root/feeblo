@@ -55,7 +55,7 @@ export function CommentDisplayActions() {
       </div>
 
       {isReplying && (
-        <div className="pt-1">
+        <div className="pt-2">
           <CommentComposer
             onSubmit={async (value) => {
               // Close the composer only when the reply actually persisted;

@@ -29,7 +29,7 @@ export function CommentDisplayComponent(props: CommentDisplayRootProps) {
       onCancelEdit={() => setIsEditing(false)}
       onStartEdit={() => setIsEditing(true)}
     >
-      <div className="group flex items-start gap-2 py-1" data-slot="comment">
+      <div className="group flex items-start gap-2 py-1.5" data-slot="comment">
         <CommentDisplayAvatar />
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
