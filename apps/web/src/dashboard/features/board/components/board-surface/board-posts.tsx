@@ -1,14 +1,24 @@
+import { Suspense, lazy, useMemo } from "react";
+
 import {
   useActiveBoardView,
   useBoardDisplayMode,
 } from "../../state/board-store-context";
-import { BoardGridView } from "./board-grid-view";
 import { BoardListView } from "./board-list-view";
 import { BoardPostBulkActions } from "./board-post-bulk-actions";
 import { BoardPostsEmpty } from "./board-posts-empty";
 import { BoardPostsLoading } from "./board-posts-loading";
 import { useBoardPostsData } from "./use-board-posts-data";
 import { groupPostsByStatus } from "./utils";
+
+// The grid view pulls in @dnd-kit (drag-and-drop) plus its lane/card
+// modules. List is the default mode, so split the grid off the initial
+// chunk and load it only when actually rendered.
+const BoardGridView = lazy(() =>
+  import("./board-grid-view").then((module) => ({
+    default: module.BoardGridView,
+  }))
+);
 
 export function BoardPosts({
   boardId,
@@ -38,6 +48,22 @@ export function BoardPosts({
     tagOperator,
   });
 
+  // `posts`/`postStatuses` are referentially stable (memoized in the hook),
+  // so grouping here preserves lane identity across unrelated renders and
+  // the memoized lane components below actually skip work.
+  const lanes = useMemo(
+    () =>
+      groupPostsByStatus(
+        posts,
+        postStatuses.map((postStatus) => ({
+          id: postStatus.id,
+          type: postStatus.type,
+          label: postStatus.label,
+        }))
+      ),
+    [posts, postStatuses]
+  );
+
   if (hasError) {
     throw new Error("Failed to load board posts");
   }
@@ -45,15 +71,6 @@ export function BoardPosts({
   if (isLoading) {
     return <BoardPostsLoading />;
   }
-
-  const groupedPosts = groupPostsByStatus(
-    posts,
-    postStatuses.map((postStatus) => ({
-      id: postStatus.id,
-      type: postStatus.type,
-      label: postStatus.label,
-    }))
-  );
 
   if (posts.length === 0) {
     return (
@@ -70,15 +87,17 @@ export function BoardPosts({
   return (
     <>
       {mode === "grid" ? (
-        <BoardGridView
-          boardId={boardId}
-          groupedPosts={groupedPosts}
-          organizationId={organizationId}
-        />
+        <Suspense fallback={<BoardPostsLoading />}>
+          <BoardGridView
+            boardId={boardId}
+            groupedPosts={lanes}
+            organizationId={organizationId}
+          />
+        </Suspense>
       ) : (
         <BoardListView
           boardId={boardId}
-          groupedPosts={groupedPosts}
+          groupedPosts={lanes}
           organizationId={organizationId}
         />
       )}
