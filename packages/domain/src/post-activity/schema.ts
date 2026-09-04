@@ -26,6 +26,17 @@ export const PostActivity = S.Struct({
   previousValue: S.NullOr(S.String),
   nextValue: S.NullOr(S.String),
   commentId: S.NullOr(S.String),
+  /** On-behalf provenance; see docs/on-behalf.md. */
+  metadata: S.optional(
+    S.NullOr(
+      S.Struct({
+        onBehalfOf: S.Struct({
+          contactId: S.optional(S.NullOr(S.String)),
+          userId: S.optional(S.NullOr(S.String)),
+        }),
+      })
+    )
+  ),
   createdAt: S.DateFromString,
 });
 

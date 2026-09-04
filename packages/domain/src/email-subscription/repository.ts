@@ -37,6 +37,13 @@ export type RequestEmailSubscriptionInput = {
   readonly alreadyVerifiedUser?: {
     readonly userId: string;
   };
+  /**
+   * The subject has no verified account yet (e.g. a customer attributed on
+   * behalf by a staff member), so the subscription is created in the
+   * `deferred_no_access` state: never emailed, activated later by identity
+   * linking. Ignored when `alreadyVerifiedUser` is set.
+   */
+  readonly deferredNoAccess?: boolean;
   readonly now: Contact["updatedAt"];
   readonly topic: EmailSubscriptionTopicInput;
   readonly verificationExpiresAt: Subscription["verificationExpiresAt"];
@@ -102,7 +109,8 @@ const topicCondition = (
 
 const verifiedStateFor = (
   subscription: Subscription | undefined,
-  alreadyVerified: boolean
+  alreadyVerified: boolean,
+  deferredNoAccess: boolean
 ): Subscription["state"] => {
   if (alreadyVerified) {
     return "active";
@@ -113,8 +121,12 @@ const verifiedStateFor = (
   ) {
     return subscription.state;
   }
-  if (alreadyVerified || subscription?.state === "active") {
+  // Established consent is never downgraded by a deferred request.
+  if (subscription?.state === "active") {
     return "active";
+  }
+  if (deferredNoAccess) {
+    return "deferred_no_access";
   }
   return "pending_verification";
 };
@@ -166,6 +178,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     const email = yield* parseEmailAddress(input.email, "requestSubscription");
     const userId = input.alreadyVerifiedUser?.userId;
     const alreadyVerified = userId !== undefined;
+    const deferredNoAccess = input.deferredNoAccess === true;
 
     const contactId = yield* EmailContactId.generate;
     const [createdContact] = yield* db
@@ -248,7 +261,11 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         verificationToken: Option.none<EmailSubscriptionToken>(),
       };
     }
-    const state = verifiedStateFor(priorSubscription, alreadyVerified);
+    const state = verifiedStateFor(
+      priorSubscription,
+      alreadyVerified,
+      deferredNoAccess
+    );
     const subscriptionId =
       priorSubscription?.id ?? (yield* EmailSubscriptionId.generate);
     const unsubscribeToken =

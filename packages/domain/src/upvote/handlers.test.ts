@@ -11,6 +11,10 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
+import { ResolvePrincipalService } from "../identity/service";
+import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { PostRepository } from "../post/repository";
 import {
@@ -18,6 +22,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { UserRepository } from "../user/repository";
 import { UpvoteRpcHandlersEffect } from "./handlers";
 import { UpvotePolicy } from "./policies";
 import { UpvoteRepository } from "./repository";
@@ -153,7 +158,17 @@ describe("UpvoteRpcHandlers", () => {
   const RepositoriesTest = Layer.mergeAll(
     PostRepository.layer,
     UpvoteRepository.layer,
-    PostSubscriptionRepository.layer
+    PostSubscriptionRepository.layer,
+    PostActivityRepository.layer,
+    EmailSubscriptionRepository.layerWithoutDependencies.pipe(
+      Layer.provide(
+        EmailSubscriptionTokenService.layerTest(
+          "upvote-handlers-test-signing-secret"
+        )
+      )
+    ),
+    ResolvePrincipalService.layer,
+    UserRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
   const HandlerTest = UpvotePolicy.layer.pipe(

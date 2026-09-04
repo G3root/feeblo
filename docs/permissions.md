@@ -52,6 +52,7 @@ Admin and owner are intentionally equivalent for authorization. `owner` is kept 
 | Boards | Create or delete boards | No | No | Yes |
 | Boards | Manage board privacy | No | No | Yes |
 | Posts | Create a post | Yes | Yes | Yes |
+| Posts | Create a post on behalf of a customer (`posts.createOnBehalf`) | No | Yes | Yes |
 | Posts | Delete a newly-created own post | Yes | Yes | Yes |
 | Posts | Change post tags | Yes | Yes | Yes |
 | Posts | Move posts between boards | Yes | Yes | Yes |
@@ -61,8 +62,9 @@ Admin and owner are intentionally equivalent for authorization. `owner` is kept 
 | Posts | Merge or unmerge posts | No | Yes | Yes |
 | Posts | Delete another user's post | No | Yes | Yes |
 | Posts | Manage post fields | No | Yes | Yes |
-| Votes | Vote for self or on behalf of another user | Yes | Yes | Yes |
+| Votes | Vote for self or on behalf of another user (`votes.onBehalf`) | Yes | Yes | Yes |
 | Comments | Create public or internal comments | Yes | Yes | Yes |
+| Comments | Create a comment on behalf of a customer (`comments.createOnBehalf`) | No | Yes | Yes |
 | Comments | Delete own comments | Yes | Yes | Yes |
 | Comments | Delete another user's comments | No | Yes | Yes |
 | Users | Delete users | No | Yes | Yes |
@@ -141,8 +143,8 @@ The former `member` role was renamed to `manager` (same permissions) and a new l
 
 | Role | Grants (beyond inheritance) |
 | --- | --- |
-| `contributor` | + `posts.move`; other contribution actions use membership/resource policies |
-| `manager` | + `members.remove`, `posts.*`, `changelog.*`, `tags.*`, `roadmap.*`, `comments.*`, CRM create/update |
+| `contributor` | + `posts.move`, `votes.onBehalf`; other contribution actions use membership/resource policies |
+| `manager` | + `members.remove`, `posts.*` (includes `posts.createOnBehalf`), `changelog.*`, `tags.*`, `roadmap.*`, `comments.*` (includes `comments.createOnBehalf`), CRM create/update |
 | `admin` | + `workspace.*`, `members.*`, `billing.*`, `site.*`, `boards.*`, `contacts.*`, `companies.*` |
 | `owner` | No additional grants; retained as a legacy alias of admin |
 

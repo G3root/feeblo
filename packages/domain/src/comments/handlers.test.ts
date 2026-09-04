@@ -17,6 +17,7 @@ import * as Option from "effect/Option";
 
 import { BoardRepository } from "../board/repository";
 import { EmailOutboxConfig } from "../email-outbox/config";
+import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
@@ -27,6 +28,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { UserRepository } from "../user/repository";
 import { CommentRpcHandlersEffect } from "./handlers";
 import { CommentPolicy } from "./policies";
 import { CommentRepository } from "./repository";
@@ -188,7 +190,9 @@ describe("CommentRpcHandlers", () => {
     CommentRepository.layer,
     PostActivityRepository.layer,
     PostRepository.layer,
-    PostSubscriptionRepository.layer
+    PostSubscriptionRepository.layer,
+    ResolvePrincipalService.layer,
+    UserRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
   const HandlerTest = Layer.mergeAll(

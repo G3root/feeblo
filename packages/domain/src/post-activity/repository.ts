@@ -6,6 +6,20 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+/**
+ * Structured provenance stored beside an activity. On-behalf actions record
+ * the customer subject distinct from the staff actor, e.g.
+ * `{ onBehalfOf: { contactId, userId? } }`. A field is omitted when the
+ * action cannot know it — e.g. removing a voter by userId may have no
+ * contact for them.
+ */
+export interface PostActivityMetadata {
+  readonly onBehalfOf: {
+    readonly contactId?: string | undefined;
+    readonly userId?: string | undefined;
+  };
+}
+
 /** Actor facts shared by every recorded activity. */
 export interface PostActivityActor {
   readonly actorId: string | null;
@@ -14,6 +28,8 @@ export interface PostActivityActor {
   readonly id?: LegidOf<"PostActivityId">;
   readonly organizationId: string;
   readonly postId: string;
+  /** Optional structured provenance (see `PostActivityMetadata`). */
+  readonly metadata?: PostActivityMetadata;
 }
 
 /**
@@ -64,6 +80,8 @@ export type PostActivityInput = PostActivityActor &
         readonly visibility: string | null;
       }
     | { readonly kind: "COMMENT_DELETED"; readonly commentId: string }
+    | { readonly kind: "VOTE_ADDED" }
+    | { readonly kind: "VOTE_REMOVED" }
     | { readonly kind: "COMMENT_PINNED"; readonly commentId: string }
     | { readonly kind: "COMMENT_UNPINNED"; readonly commentId: string }
   );
@@ -89,6 +107,8 @@ const toRow = (input: PostActivityInput): PostActivityRow => {
     case "POST_UNLOCKED":
     case "POST_ARCHIVED":
     case "POST_UNARCHIVED":
+    case "VOTE_ADDED":
+    case "VOTE_REMOVED":
       return {
         kind: input.kind,
         previousValue: null,
@@ -182,6 +202,7 @@ const makePostActivityRepository = Effect.gen(function* () {
         postId: input.postId,
         actorId: input.actorId,
         actorMemberId: input.actorMemberId,
+        metadata: input.metadata ?? null,
         ...toRow(input),
       };
     });
@@ -226,6 +247,7 @@ const makePostActivityRepository = Effect.gen(function* () {
           previousValue: schema.postActivityTable.previousValue,
           nextValue: schema.postActivityTable.nextValue,
           commentId: schema.postActivityTable.commentId,
+          metadata: schema.postActivityTable.metadata,
           createdAt: schema.postActivityTable.createdAt,
         })
         .from(schema.postActivityTable)
@@ -246,8 +268,12 @@ const makePostActivityRepository = Effect.gen(function* () {
         )
         .pipe(
           Effect.map((rows) =>
-            rows.map(({ actorName, actorImage, ...activity }) => ({
+            rows.map(({ actorName, actorImage, metadata, ...activity }) => ({
               ...activity,
+              // SAFETY: jsonb contents are written only through
+              // PostActivityMetadata constructors in this repository, so the
+              // runtime shape matches the interface exactly.
+              metadata: (metadata ?? null) as PostActivityMetadata | null,
               actor: {
                 name: actorName,
                 image: actorImage,

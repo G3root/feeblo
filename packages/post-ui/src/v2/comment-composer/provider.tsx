@@ -23,6 +23,10 @@ export type CommentComposerSubmitValue = {
 
 export type CommentComposerProviderProps = {
   children?: ReactNode;
+  /** Display label of the picked on-behalf subject; null = session user. */
+  authorDisplay?: string | null;
+  /** Picker UI shown while `isAuthorMode` is on. */
+  authorPicker?: ReactNode;
   cancelLabel?: string;
   /**
    * Controlled comment text. When omitted the composer keeps its own copy in
@@ -30,9 +34,11 @@ export type CommentComposerProviderProps = {
    */
   content?: string;
   disabled?: boolean;
+  isAuthorMode?: boolean;
   /** Controlled visibility; when omitted the composer keeps its own copy. */
   isPrivate?: boolean;
   onCancel?: () => void;
+  onAuthorToggle?: (pressed: boolean) => void;
   onContentChange?: (content: string) => void;
   onSubmit?: (value: CommentComposerSubmitValue) => void | Promise<void>;
   onStatusUpdateIdChange?: (id: string | null) => void;
@@ -45,6 +51,8 @@ export type CommentComposerProviderProps = {
    * composer bumps its own counter after a successful submit.
    */
   resetKey?: number;
+  /** Whether the "comment as customer" toggle is rendered at all. */
+  showAuthorToggle?: boolean;
   showVisibilityToggle?: boolean;
   statusUpdateLabel?: string;
   /** Controlled status update; when omitted the composer keeps its own copy. */
@@ -74,15 +82,19 @@ export function CommentComposerProvider(props: CommentComposerProviderProps) {
 function CommentComposerController(props: CommentComposerProviderProps) {
   const store = useCommentComposerStore();
   const {
+    authorDisplay = null,
+    authorPicker = null,
     cancelLabel = "Cancel",
     children,
     content,
     disabled = false,
+    isAuthorMode = false,
     isPrivate,
     placeholder,
     privateLabel = "Internal",
     publicLabel = "Public",
     resetKey,
+    showAuthorToggle = false,
     showVisibilityToggle = true,
     statusUpdateLabel = "Comment as status update",
     statusUpdateId,
@@ -173,6 +185,8 @@ function CommentComposerController(props: CommentComposerProviderProps) {
 
   const actions = useMemo<CommentComposerActions>(() => {
     const composed: CommentComposerActions = {
+      onAuthorToggle: (pressed: boolean) =>
+        latest.current.onAuthorToggle?.(pressed),
       onContentChange: (doc: string) => {
         // The store owns the text only when the host doesn't pass `content`.
         if (latest.current.content === undefined) {
@@ -218,15 +232,28 @@ function CommentComposerController(props: CommentComposerProviderProps) {
         statusUpdateLabel,
         submitLabel,
       },
-      state: { disabled, placeholder, showVisibilityToggle, statusOptions },
+      state: {
+        authorDisplay,
+        authorPicker,
+        disabled,
+        isAuthorMode,
+        placeholder,
+        showAuthorToggle,
+        showVisibilityToggle,
+        statusOptions,
+      },
     }),
     [
       actions,
+      authorDisplay,
+      authorPicker,
       cancelLabel,
       disabled,
+      isAuthorMode,
       placeholder,
       privateLabel,
       publicLabel,
+      showAuthorToggle,
       showVisibilityToggle,
       statusOptions,
       statusUpdateLabel,

@@ -28,8 +28,27 @@ const PERMISSION_ACTIONS = {
   billing: ["update"],
   site: ["update"],
   boards: ["create", "update", "delete"],
-  posts: ["update", "delete", "move", "lock", "archive", "status", "merge"],
-  comments: ["delete"],
+  posts: [
+    "update",
+    "delete",
+    "move",
+    "lock",
+    "archive",
+    "status",
+    "merge",
+    // Create a post attributed to a customer (on-behalf), manager and above.
+    "createOnBehalf",
+  ],
+  comments: [
+    "delete",
+    // Create a comment attributed to a customer (on-behalf), manager and
+    // above.
+    "createOnBehalf",
+  ],
+  // Add or remove a voter on behalf of a customer (on-behalf), contributor
+  // and above — the documented all-role "vote for self or on behalf of
+  // another user" matrix row.
+  votes: ["onBehalf"],
   changelog: ["create", "update", "publish", "delete"],
   "changelog-categories": ["create", "update", "delete"],
   roadmap: ["create", "update", "delete"],
@@ -58,6 +77,7 @@ export const PERMISSIONS = [
   ...createPermissions("boards", PERMISSION_ACTIONS.boards),
   ...createPermissions("posts", PERMISSION_ACTIONS.posts),
   ...createPermissions("comments", PERMISSION_ACTIONS.comments),
+  ...createPermissions("votes", PERMISSION_ACTIONS.votes),
   ...createPermissions("changelog", PERMISSION_ACTIONS.changelog),
   ...createPermissions(
     "changelog-categories",

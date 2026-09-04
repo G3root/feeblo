@@ -154,6 +154,9 @@
     "./http/router": {
       "default": "./src/http/router.ts"
     },
+    "./identity/linking": {
+      "default": "./src/identity/linking.ts"
+    },
     "./import-export/schema": {
       "default": "./src/import-export/schema.ts"
     },

@@ -49,6 +49,52 @@ const runMigrate = async () => {
     ON "post" USING hnsw ("embedding" vector_cosine_ops)
     WHERE "embedding" IS NOT NULL
   `);
+  // Trigram support for the on-behalf people picker (docs/on-behalf.md).
+  // Built outside the transactional migration pass so large contact tables
+  // are never write-locked by index creation.
+  await connection.unsafe(`
+    CREATE EXTENSION IF NOT EXISTS pg_trgm
+  `);
+  // A failed CONCURRENTLY build leaves an INVALID index behind, which
+  // `IF NOT EXISTS` would then skip forever while the planner ignores it.
+  // Drop such corpses so the creations below rebuild them concurrently.
+  const trigramIndexes = [
+    "contact_email_trgm_idx",
+    "contact_name_trgm_idx",
+    "company_name_trgm_idx",
+  ] as const;
+  for (const indexName of trigramIndexes) {
+    const invalid = await connection.unsafe<
+      Array<{ indisvalid: boolean; indisready: boolean }>
+    >(
+      `SELECT i.indisvalid, i.indisready
+       FROM pg_index i
+       JOIN pg_class c ON c.oid = i.indexrelid
+       WHERE c.relname = $1`,
+      [indexName]
+    );
+    if (
+      invalid[0] !== undefined &&
+      (!invalid[0].indisvalid || !invalid[0].indisready)
+    ) {
+      console.warn(`Dropping invalid index ${indexName} for rebuild`);
+      await connection.unsafe(
+        `DROP INDEX CONCURRENTLY IF EXISTS "${indexName}"`
+      );
+    }
+  }
+  await connection.unsafe(`
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS "contact_email_trgm_idx"
+    ON "contact" USING gin ("email" gin_trgm_ops)
+  `);
+  await connection.unsafe(`
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS "contact_name_trgm_idx"
+    ON "contact" USING gin ("name" gin_trgm_ops)
+  `);
+  await connection.unsafe(`
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS "company_name_trgm_idx"
+    ON "company" USING gin ("name" gin_trgm_ops)
+  `);
   await connection.unsafe(`
     ALTER TABLE "post"
     VALIDATE CONSTRAINT "post_embedding_metadata_chk"

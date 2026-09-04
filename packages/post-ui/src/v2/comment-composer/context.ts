@@ -1,4 +1,5 @@
 import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
+import type { ReactNode } from "react";
 import { createContext, use } from "react";
 
 import { useCommentComposerState } from "./store";
@@ -22,8 +23,14 @@ export type TPostStatusOption = {
  * the slices they use actually change.
  */
 export type CommentComposerState = {
+  /** Picked subject display label; null means the session user authors. */
+  authorDisplay: string | null;
+  /** Picker UI rendered while `isAuthorMode` is on (see Provider props). */
+  authorPicker: ReactNode | null;
   disabled: boolean;
+  isAuthorMode: boolean;
   placeholder: string | undefined;
+  showAuthorToggle: boolean;
   showVisibilityToggle: boolean;
   /** Options rendered in the "comment as status update" picker. */
   statusOptions: readonly TPostStatusOption[];
@@ -31,6 +38,7 @@ export type CommentComposerState = {
 
 export type CommentComposerActions = {
   onCancel?: () => void;
+  onAuthorToggle?: (pressed: boolean) => void;
   onContentChange: (content: string) => void;
   onSubmit?: () => void;
   onVisibilityChange: (isPrivate: boolean) => void;

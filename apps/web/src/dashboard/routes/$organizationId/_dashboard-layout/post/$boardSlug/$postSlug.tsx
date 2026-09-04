@@ -324,6 +324,14 @@ function RouteComponent() {
               <Separator />
             </div>
 
+            {/* Voter management: add/remove on behalf of customers.
+                Controls self-gate with `votes.onBehalf` (contributor+). */}
+            <PostPage.Voters />
+
+            <div>
+              <Separator />
+            </div>
+
             <PostPage.Subscribe />
           </div>
         </aside>

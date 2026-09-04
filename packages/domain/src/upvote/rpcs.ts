@@ -5,7 +5,13 @@ import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { AuthMiddleware, OptionalAuthMiddleware } from "../session-middleware";
 import { UpvoteServiceErrors } from "./errors";
-import { Upvote, UpvoteList, UpvoteToggle } from "./schema";
+import {
+  Upvote,
+  UpvoteAddOnBehalf,
+  UpvoteList,
+  UpvoteRemoveOnBehalf,
+  UpvoteToggle,
+} from "./schema";
 
 export class UpvoteRpcs extends RpcGroup.make(
   Rpc.make("UpvoteList", {
@@ -17,6 +23,24 @@ export class UpvoteRpcs extends RpcGroup.make(
     payload: UpvoteToggle,
     success: Schema.Struct({
       upvoted: Schema.Boolean,
+    }),
+    error: UpvoteServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  // On-behalf voter management is dashboard-only (AuthMiddleware): there is
+  // deliberately no public variant. Add and remove are separate RPCs so an
+  // admin can never remove someone else's vote by accident.
+  Rpc.make("UpvoteAddOnBehalf", {
+    payload: UpvoteAddOnBehalf,
+    success: Schema.Struct({
+      added: Schema.Boolean,
+    }),
+    error: UpvoteServiceErrors,
+  }).middleware(AuthMiddleware),
+  Rpc.make("UpvoteRemoveOnBehalf", {
+    payload: UpvoteRemoveOnBehalf,
+    success: Schema.Struct({
+      removed: Schema.Boolean,
     }),
     error: UpvoteServiceErrors,
   }).middleware(AuthMiddleware),

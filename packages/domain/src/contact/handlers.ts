@@ -12,12 +12,13 @@ import { withRemapDbErrors } from "../rpc-errors";
 import { WorkspaceRepository } from "../workspace/repository";
 import { ContactNotFoundError, FailedToCreateContactError } from "./errors";
 import { ContactPolicy } from "./policies";
-import { ContactRepository } from "./repository";
+import { type ContactSearchArgs, ContactRepository } from "./repository";
 import { ContactRpcs } from "./rpcs";
 import type {
   TContactCreate,
   TContactDelete,
   TContactList,
+  TContactSearch,
   TContactUpdate,
 } from "./schema";
 
@@ -34,6 +35,31 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Contact", "select")
         ),
+
+    ContactSearch: (args: TContactSearch) => {
+      const searchArgs: ContactSearchArgs = {
+        organizationId: args.organizationId,
+        query: args.query.trim(),
+      };
+      if (args.postId !== undefined) {
+        searchArgs.postId = args.postId;
+      }
+      if (args.limit !== undefined) {
+        searchArgs.limit = args.limit;
+      }
+
+      return Effect.gen(function* () {
+        // The combobox debounces client-side; the server enforces a minimum
+        // useful query length so stray keystrokes cost nothing.
+        if (searchArgs.query.length < 2) {
+          return [];
+        }
+        return yield* repository.search(searchArgs);
+      }).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Contact", "select")
+      );
+    },
 
     ContactCreate: (args: TContactCreate) =>
       transaction(

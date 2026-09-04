@@ -1,7 +1,12 @@
 import * as Schema from "effect/Schema";
 
+import { InvalidSubjectError, SubjectNotFoundError } from "../identity/errors";
 import { PolicyDeniedError } from "../policy";
-import { InternalServerError, UnauthorizedError } from "../rpc-errors";
+import {
+  BadRequestError,
+  InternalServerError,
+  UnauthorizedError,
+} from "../rpc-errors";
 
 export class FailedToDeleteCommentError extends Schema.TaggedError<FailedToDeleteCommentError>()(
   "FailedToDeleteCommentError",
@@ -44,12 +49,17 @@ export class FailedToUnpinCommentError extends Schema.TaggedError<FailedToUnpinC
 ) {}
 
 export const CommentServiceErrors = Schema.Union([
+  BadRequestError,
   UnauthorizedError,
   InternalServerError,
   PolicyDeniedError,
   FailedToDeleteCommentError,
   FailedToUpdateCommentError,
   FailedToCreateCommentError,
+  // On-behalf creation resolves an author subject and can reject invalid
+  // identifiers with the shared identity failures.
+  SubjectNotFoundError,
+  InvalidSubjectError,
   FailedToPinCommentError,
   FailedToUnpinCommentError,
 ]);

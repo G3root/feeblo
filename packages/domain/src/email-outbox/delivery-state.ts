@@ -5,12 +5,27 @@ const EMPTY_STATES: readonly TEmailDeliveryState[] = [];
 const transitionTargets = {
   accepted: ["delivered", "deferred", "bounced", "failed"],
   bounced: EMPTY_STATES,
-  deferred: ["sending", "expired", "failed", "paused_by_plan", "suppressed"],
+  deferred: [
+    "sending",
+    "expired",
+    "failed",
+    "paused_by_plan",
+    "suppressed",
+    "no_organization_access",
+  ],
   delivered: EMPTY_STATES,
   expired: EMPTY_STATES,
   failed: EMPTY_STATES,
+  no_organization_access: EMPTY_STATES,
   paused_by_plan: ["queued", "expired"],
-  queued: ["sending", "expired", "failed", "paused_by_plan", "suppressed"],
+  queued: [
+    "sending",
+    "expired",
+    "failed",
+    "paused_by_plan",
+    "suppressed",
+    "no_organization_access",
+  ],
   sending: [
     "accepted",
     "delivered",
@@ -20,6 +35,7 @@ const transitionTargets = {
     "expired",
     "paused_by_plan",
     "suppressed",
+    "no_organization_access",
   ],
   suppressed: EMPTY_STATES,
 } satisfies Readonly<

@@ -41,6 +41,7 @@ const emptyDeliveryStates = () =>
     suppressed: 0,
     paused_by_plan: 0,
     expired: 0,
+    no_organization_access: 0,
   }) satisfies Record<TEmailDeliveryState, number>;
 
 const makeEmailOutboxOperations = Effect.gen(function* () {

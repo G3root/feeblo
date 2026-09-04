@@ -1,13 +1,17 @@
 import { COMMENT_CONTENT_MAX_LENGTH } from "@feeblo/domain/content-limits";
 import { CommentId } from "@feeblo/id";
 import { useAppForm, withForm } from "@feeblo/ui/hooks/form";
+import { toastManager } from "@feeblo/ui/toast";
 import { formatPostStatus } from "@feeblo/web-shared/board/constants";
+import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { formOptions } from "@tanstack/react-form";
 import {
   useCallback,
   useMemo,
+  useState,
   type Dispatch,
   type ReactNode,
   type SetStateAction,
@@ -20,6 +24,14 @@ import {
   type CommentComposerProviderProps,
   type TPostStatusOption,
 } from "../comment-composer";
+import {
+  ContactCombobox,
+  describeContactSelection,
+  emptyOnBehalfAuthor,
+  hasOnBehalfAuthorValue,
+  OnBehalfAuthorSchema,
+  toOnBehalfAuthor,
+} from "../contact-combobox/contact-combobox";
 import { usePostCollectionData } from "../post-page-context";
 import { usePostCollections } from "../providers/post-collections-provider";
 
@@ -27,14 +39,21 @@ const CommentVisibilitySchema = z.enum(["PUBLIC", "INTERNAL"]);
 
 type TVisibilitySchema = z.infer<typeof CommentVisibilitySchema>;
 
+const CommentContentField = z
+  .string()
+  .min(1, "this field is required")
+  .max(
+    COMMENT_CONTENT_MAX_LENGTH,
+    `Comments must be at most ${COMMENT_CONTENT_MAX_LENGTH} characters`
+  );
+
 const Schema = z.object({
-  content: z
-    .string()
-    .min(1, "this field is required")
-    .max(
-      COMMENT_CONTENT_MAX_LENGTH,
-      `Comments must be at most ${COMMENT_CONTENT_MAX_LENGTH} characters`
-    ),
+  // The author key uses `.default` so the validator's OUTPUT shape carries a
+  // required `author` matching the form values under
+  // exactOptionalPropertyTypes (zod `.optional()` would produce an optional
+  // modifier instead).
+  author: OnBehalfAuthorSchema.default(emptyOnBehalfAuthor),
+  content: CommentContentField,
   visibility: CommentVisibilitySchema,
   statusUpdateId: z.string().nullable(),
 });
@@ -45,6 +64,7 @@ const defaultVisibility: TVisibilitySchema = "PUBLIC";
 
 export const commentCreateFormOpts = formOptions({
   defaultValues: {
+    author: emptyOnBehalfAuthor,
     content: "",
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     visibility: defaultVisibility as TVisibilitySchema,
@@ -52,7 +72,24 @@ export const commentCreateFormOpts = formOptions({
     statusUpdateId: null as string | null,
   },
   validators: {
-    onChange: Schema,
+    // A function validator (not a zod schema) because TanStack requires the
+    // validator's input AND output types to equal the form values exactly;
+    // the author key is server-validated.
+    onChange: ({ value }) => {
+      const contentParsed = CommentContentField.safeParse(value.content);
+      if (!contentParsed.success) {
+        // Field-scoped errors must ride under `fields`
+        // (GlobalFormValidationError); a flat record would surface as a
+        // single global form error.
+        return {
+          fields: {
+            content:
+              contentParsed.error.issues[0]?.message ?? "Invalid comment",
+          },
+        };
+      }
+      return undefined;
+    },
   },
 });
 
@@ -91,6 +128,8 @@ type TCreateCommentInput = {
   /** Set for replies; omitted/null for top-level comments. */
   parentCommentId?: string | null;
   statusUpdateId?: string | null;
+  /** Present ⇒ the comment is created on behalf of the resolved customer. */
+  author?: import("../contact-combobox/contact-combobox").OnBehalfAuthor;
 };
 
 /**
@@ -115,6 +154,7 @@ export function useCreateCommentAction() {
       visibility,
       parentCommentId = null,
       statusUpdateId = null,
+      author,
     }: TCreateCommentInput) => {
       if (!session) {
         onAuthRequired?.();
@@ -126,6 +166,17 @@ export function useCreateCommentAction() {
           membership.organizationId === organizationId &&
           membership.userId === session.user.id
       );
+
+      // Optimistic attribution must mirror the server's resolved identity:
+      // an on-behalf comment is authored by the picked customer, never by
+      // the acting member.
+      const onBehalf = author !== undefined && hasOnBehalfAuthorValue(author);
+      const optimisticUserId = onBehalf
+        ? (author?.userId ?? null)
+        : session.user.id;
+      const optimisticAuthorName = onBehalf
+        ? (author?.name ?? author?.email ?? session.user.name)
+        : session.user.name;
 
       const tx = commentCollection.insert({
         id: await CommentId.unsafeGenerate(),
@@ -139,17 +190,29 @@ export function useCreateCommentAction() {
         // creation time); the server re-resolves it for restricted lists.
         resolvedParentCommentId: null,
         organizationId,
-        memberId: membership?.membershipId ?? null,
+        // On-behalf comments keep staff attribution out of the author fields.
+        memberId: onBehalf ? null : (membership?.membershipId ?? null),
         postId,
         postSlug,
-        userId: session.user.id,
+        userId: optimisticUserId ?? session.user.id,
         pinnedAt: null,
         user: {
-          name: session.user.name,
+          name: optimisticAuthorName,
         },
+        ...(author !== undefined && hasOnBehalfAuthorValue(author)
+          ? { author: toOnBehalfAuthor(author) }
+          : undefined),
       });
 
-      await tx.isPersisted.promise;
+      try {
+        await tx.isPersisted.promise;
+      } catch (error) {
+        toastManager.add({
+          title: parseRpcError(error).message,
+          type: "error",
+        });
+        return false;
+      }
 
       return true;
     },
@@ -179,6 +242,7 @@ export const useCommentForm = ({
   return useAppForm({
     ...commentCreateFormOpts,
     defaultValues: {
+      author: emptyOnBehalfAuthor,
       content: "",
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       visibility: defaultVisibility as TVisibilitySchema,
@@ -190,6 +254,7 @@ export const useCommentForm = ({
         content: value.content,
         visibility: value.visibility,
         statusUpdateId: value.statusUpdateId,
+        author: value.author,
       });
 
       if (!created) {
@@ -200,7 +265,9 @@ export const useCommentForm = ({
       // from a clean slate: a stale `content` value here would otherwise be
       // re-submitted with the following comment once the editor re-mounts
       // without emitting a change. Resetting also clears the chosen status
-      // update, which is one-shot and must never be re-applied.
+      // update (one-shot, must never be re-applied) and drops the picked
+      // on-behalf subject so the next comment is authored by the session
+      // user again.
       formApi.reset();
       setEditorKey((val) => val + 1);
     },
@@ -213,6 +280,13 @@ export const CommentComposerField = withForm({
   // SAFETY: Empty-state placeholder for the generic container until real data is set.
   props: {} as CommentComposerProviderProps & { showStatusUpdate?: boolean },
   render: ({ form, disabled, ...rest }) => {
+    const { organizationId } = usePostCollections();
+    // Mirrors the backend's CommentPolicy gate for CommentCreate.author.
+    const commentOnBehalfPolicy = usePolicy(
+      hasPermission(organizationId, "comments.createOnBehalf")
+    );
+    const [isAuthorMode, setIsAuthorMode] = useState(false);
+
     // Keep the composer inert while the comment persists server-side: the
     // editor is only cleared after the CommentCreate RPC settles, so text
     // typed in that window would otherwise be wiped by the reset — and could
@@ -224,33 +298,71 @@ export const CommentComposerField = withForm({
             {(field) => (
               <form.AppField name="visibility">
                 {(visibility) => (
-                  <form.AppField name="statusUpdateId">
-                    {(statusUpdate) => (
-                      <CommentComposerStatusOptions
-                        enabled={rest.showStatusUpdate ?? false}
-                      >
-                        {(statusOptions) => (
-                          <CommentComposer.Provider
-                            disabled={disabled || isSubmitting}
-                            isPrivate={visibility.state.value === "INTERNAL"}
-                            onContentChange={field.handleChange}
-                            onStatusUpdateIdChange={statusUpdate.handleChange}
-                            onVisibilityChange={(isPrivate) =>
-                              visibility.handleChange(
-                                isPrivate ? "INTERNAL" : "PUBLIC"
-                              )
-                            }
-                            statusOptions={statusOptions}
-                            statusUpdateId={statusUpdate.state.value}
-                            {...rest}
+                  <form.AppField name="author">
+                    {(author) => (
+                      <form.AppField name="statusUpdateId">
+                        {(statusUpdate) => (
+                          <CommentComposerStatusOptions
+                            enabled={rest.showStatusUpdate ?? false}
                           >
-                            <div className={commentComposerBoxClassName}>
-                              <CommentComposer.Editor />
-                              <CommentComposer.Submit />
-                            </div>
-                          </CommentComposer.Provider>
+                            {(statusOptions) => (
+                              <CommentComposer.Provider
+                                authorDisplay={describeContactSelection(
+                                  author.state.value ?? null
+                                )}
+                                authorPicker={
+                                  <ContactCombobox
+                                    label="Comment as customer"
+                                    onSelect={(next) =>
+                                      author.handleChange(
+                                        next ?? emptyOnBehalfAuthor
+                                      )
+                                    }
+                                    organizationId={organizationId}
+                                    placeholder="Search customers by name or email..."
+                                    value={
+                                      hasOnBehalfAuthorValue(author.state.value)
+                                        ? author.state.value
+                                        : null
+                                    }
+                                  />
+                                }
+                                disabled={disabled || isSubmitting}
+                                isAuthorMode={
+                                  isAuthorMode && commentOnBehalfPolicy.allowed
+                                }
+                                isPrivate={
+                                  visibility.state.value === "INTERNAL"
+                                }
+                                onAuthorToggle={(pressed) => {
+                                  setIsAuthorMode(pressed);
+                                  if (!pressed) {
+                                    author.handleChange(emptyOnBehalfAuthor);
+                                  }
+                                }}
+                                onContentChange={field.handleChange}
+                                onStatusUpdateIdChange={
+                                  statusUpdate.handleChange
+                                }
+                                onVisibilityChange={(isPrivate) =>
+                                  visibility.handleChange(
+                                    isPrivate ? "INTERNAL" : "PUBLIC"
+                                  )
+                                }
+                                showAuthorToggle={commentOnBehalfPolicy.allowed}
+                                statusOptions={statusOptions}
+                                statusUpdateId={statusUpdate.state.value}
+                                {...rest}
+                              >
+                                <div className={commentComposerBoxClassName}>
+                                  <CommentComposer.Editor />
+                                  <CommentComposer.Submit />
+                                </div>
+                              </CommentComposer.Provider>
+                            )}
+                          </CommentComposerStatusOptions>
                         )}
-                      </CommentComposerStatusOptions>
+                      </form.AppField>
                     )}
                   </form.AppField>
                 )}

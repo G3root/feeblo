@@ -18,6 +18,8 @@ type TIsCreator = {
 
 type TCanCreate = {
   organizationId: string;
+  /** True when the payload attributes the post to a resolved customer. */
+  onBehalf?: boolean;
   source: TSource;
 };
 
@@ -154,6 +156,14 @@ const makePostPolicy = Effect.gen(function* () {
   const canCreate = (args: TCanCreate) => {
     if (args.source === "public") {
       return Policy.hasRestrictedOrganizationScope(args.organizationId);
+    }
+    if (args.onBehalf === true) {
+      // Attributing a post to a customer is a curation capability reserved
+      // for managers and above (`posts.createOnBehalf`).
+      return Policy.all(
+        Policy.hasMembership(args.organizationId),
+        Policy.canPermission(args.organizationId, "posts.createOnBehalf")
+      );
     }
     return Policy.hasMembership(args.organizationId);
   };

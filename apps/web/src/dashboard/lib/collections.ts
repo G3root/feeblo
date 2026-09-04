@@ -2,7 +2,17 @@ import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
 import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { PostSubscription } from "@feeblo/domain/post-subscription/schema";
+import type { TPostCreateAuthor } from "@feeblo/domain/post/schema";
 import type { Upvote } from "@feeblo/domain/upvote/schema";
+
+/**
+ * post-ui attaches a transient `author` to post/comment insert payloads so
+ * on-behalf attribution rides the same onInsert path; it is not a persisted
+ * column (see docs/on-behalf.md).
+ */
+type PostWithTransientAuthor = {
+  author?: TPostCreateAuthor;
+};
 import { hasWindow } from "@feeblo/utils/runtime-kind";
 import {
   createRpcCollectionHelpers,
@@ -121,6 +131,10 @@ export const postCollection = createCollection(
       const mutation = transaction.mutations[0];
       const { modified: newPost } = mutation;
 
+      // SAFETY: post-ui attaches the transient author payload declared on
+      // PostWithTransientAuthor above.
+      const author = (newPost as PostWithTransientAuthor).author;
+
       await fetchRpc((rpc) =>
         rpc.PostCreate({
           id: newPost.id,
@@ -130,6 +144,7 @@ export const postCollection = createCollection(
           content: newPost.content,
           assetIds: newPost.assetIds ?? [],
           statusId: newPost.statusId,
+          ...(author ? { author } : undefined),
         })
       );
     },
@@ -686,6 +701,10 @@ export const commentCollection = createCollection(
       const mutation = transaction.mutations[0];
       const { modified: newComment } = mutation;
 
+      // SAFETY: post-ui attaches the transient author payload declared on
+      // PostWithTransientAuthor above.
+      const author = (newComment as PostWithTransientAuthor).author;
+
       await fetchRpc(
         (rpc) =>
           rpc.CommentCreate({
@@ -695,6 +714,7 @@ export const commentCollection = createCollection(
             postId: newComment.postId,
             parentCommentId: newComment.parentCommentId,
             id: newComment.id,
+            ...(author ? { author } : undefined),
             statusUpdateId: newComment.statusUpdateId ?? null,
           }),
         {}
@@ -859,7 +879,9 @@ export const commentReactionCollection = createCollection(
 
 export const upvoteCollection = createCollection(
   queryCollectionOptions({
-    queryKey: organizationScopedQueryKey("upvote"),
+    // Lazy key: resolved at query time so navigation between organizations
+    // never reuses another organization's cache entry (matches queryFn).
+    queryKey: () => organizationScopedQueryKey("upvote"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
 
