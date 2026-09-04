@@ -256,6 +256,56 @@ describe("UpvoteRpcHandlers on-behalf", () => {
           })
       );
 
+      it.effect(
+        "adds a member with no contact row as voter by userId (picker shape)",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* UpvoteRpcHandlersEffect;
+            const db = yield* currentDb;
+            const fixture = yield* makeFixture("manager");
+            const postId = yield* PostId.generate;
+            yield* createPost(fixture, postId);
+
+            // Second member with no contact row: exactly what the picker
+            // returns for member rows (contactId null, userId set).
+            const memberUserId = `voter_${fixture.organizationId}`;
+            yield* db.insert(schema.userTable).values({
+              id: memberUserId,
+              email: `voter@${fixture.organizationId}.example.com`,
+              name: "Member Voter",
+              emailVerified: true,
+            });
+            yield* db.insert(schema.memberTable).values({
+              id: `member_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              userId: memberUserId,
+              role: "contributor",
+              createdAt: new Date(),
+            });
+
+            const result = yield* handlers
+              .UpvoteAddOnBehalf({
+                organizationId: fixture.organizationId,
+                postId,
+                author: { userId: memberUserId },
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "manager")
+                )
+              );
+            expect(result.added).toBe(true);
+
+            const upvotes = yield* getUpvotes(postId);
+            expect(upvotes).toHaveLength(1);
+            expect(upvotes[0]).toMatchObject({
+              userId: memberUserId,
+              memberId: `member_${fixture.organizationId}`,
+            });
+          })
+      );
+
       it.effect("is idempotent for an existing vote", () =>
         Effect.gen(function* () {
           const handlers = yield* UpvoteRpcHandlersEffect;

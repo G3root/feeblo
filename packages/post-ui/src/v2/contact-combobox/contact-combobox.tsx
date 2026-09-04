@@ -253,10 +253,25 @@ export function ContactCombobox({
   const queryLooksLikeEmail =
     trimmedQuery.length >= MIN_QUERY_LENGTH &&
     EmailSchema.safeParse(trimmedQuery).success;
-  const options: ContactOption[] =
-    queryLooksLikeEmail && results.length === 0 && !searchFailed
+  // Quackback parity: the create-new entry is always offered for email-like
+  // queries, not just on empty results — otherwise a substring hit hides the
+  // only path to attribute to someone new. Suppressed only for an exact
+  // email hit (submit would resolve to them anyway) and on transport errors
+  // (empty results prove nothing after a failure). Selecting it votes for
+  // the email via the resolver's find-or-create, same as before.
+  const exactEmailHit = results.some(
+    (contact) =>
+      contact.email !== null &&
+      contact.email.toLowerCase() === trimmedQuery.toLowerCase()
+  );
+  const createOption: ContactOption[] =
+    queryLooksLikeEmail && !searchFailed && !exactEmailHit
       ? [{ kind: "create", email: trimmedQuery }]
-      : results.map((contact) => ({ kind: "contact", contact }));
+      : [];
+  const options: ContactOption[] = [
+    ...results.map((contact): ContactOption => ({ kind: "contact", contact })),
+    ...createOption,
+  ];
 
   const handleSelect = (option: ContactOption | null) => {
     if (!option) {
@@ -413,7 +428,7 @@ export function ContactCombobox({
                       strokeWidth={2}
                     />
                     <span>
-                      No match — add{" "}
+                      {results.length === 0 ? "No match — add" : "Add"}{" "}
                       <span className="font-medium">{option.email}</span> as new
                       customer
                     </span>

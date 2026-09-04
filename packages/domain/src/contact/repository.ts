@@ -456,11 +456,13 @@ const makeContactRepository = Effect.gen(function* () {
           (name ?? email ?? "").toLowerCase();
 
         return [...customers, ...members]
-          .sort(
-            (a, b) =>
-              rankOf(a.name, a.email) - rankOf(b.name, b.email) ||
-              (labelOf(a.name, a.email) < labelOf(b.name, b.email) ? -1 : 1)
-          )
+          .sort((a, b) => {
+            const byRank = rankOf(a.name, a.email) - rankOf(b.name, b.email);
+            if (byRank !== 0) return byRank;
+            const aLabel = labelOf(a.name, a.email);
+            const bLabel = labelOf(b.name, b.email);
+            return aLabel < bLabel ? -1 : aLabel > bLabel ? 1 : 0;
+          })
           .slice(0, limit);
       });
     },

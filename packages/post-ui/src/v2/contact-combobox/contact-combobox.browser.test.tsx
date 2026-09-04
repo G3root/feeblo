@@ -176,6 +176,35 @@ describe("ContactCombobox", () => {
     expect(onSelect).toHaveBeenCalledWith({ email: "nobody@example.com" });
   });
 
+  it("offers to create alongside results, except on an exact email hit", async () => {
+    const onSearch = vi.fn().mockResolvedValue([member]);
+    const onSelect = vi.fn();
+    const screen = await render(
+      <Harness onSearch={onSearch} onSelect={onSelect} />
+    );
+
+    // A near-miss email matches the member row without being their exact
+    // email: both the row and the create-new entry are offered.
+    await typeQuery(screen, "sarah@feeblo.co");
+    await expect.element(screen.getByText("Sarah Chen")).toBeVisible();
+    const createRow = screen.getByText(/as new customer/);
+    await expect.element(createRow).toBeVisible();
+    await createRow.click();
+    expect(onSelect).toHaveBeenCalledWith({ email: "sarah@feeblo.co" });
+  });
+
+  it("hides the create entry on an exact email hit", async () => {
+    const onSearch = vi.fn().mockResolvedValue([member]);
+    const onSelect = vi.fn();
+    const screen = await render(
+      <Harness onSearch={onSearch} onSelect={onSelect} />
+    );
+
+    await typeQuery(screen, "sarah@feeblo.com");
+    await expect.element(screen.getByText("Sarah Chen")).toBeVisible();
+    await expect.element(screen.getByText(/as new customer/)).not.toBeVisible();
+  });
+
   it("selects a visible result and clears the selection", async () => {
     const onSearch = vi.fn().mockResolvedValue([member]);
     let selection: ContactComboboxSelection | null = null;
