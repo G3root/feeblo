@@ -237,13 +237,17 @@ export function PostCreateForm() {
       });
       // The RPC returns the collision-resolved slug actually persisted.
       // Reconcile the optimistic row before isPersisted settles so links
-      // and detail queries target the stored post even if the refetch below
-      // fails.
+      // and detail queries target the stored post.
       if (canonicalSlug !== row.slug) {
         postCollection.update(row.id, (draft) => {
           draft.slug = canonicalSlug;
         });
       }
+      // Sync server writes before returning: the optimistic state is
+      // dropped when the mutation settles, so refetch failures propagate
+      // to the submit handler instead of being suppressed.
+      await postCollection.utils.refetch();
+      return canonicalSlug;
     },
   });
 
@@ -317,7 +321,6 @@ export function PostCreateForm() {
 
         await tx.isPersisted.promise;
         finalized.commit();
-        await postCollection.utils.refetch().catch(() => undefined);
         trackEvent("post_created", { source, success: true });
         toastManager.add({
           title: "Post created successfully",
