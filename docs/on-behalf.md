@@ -82,7 +82,7 @@ Split identities therefore cannot persist: the first time the customer signs up 
 
 ## Picker search
 
-`ContactSearch` backs the author/voter/commenter comboboxes: org-scoped, single-round-trip SQL ranked exact email → email prefix → name prefix → substring over trigram indexes, returning `isMember`, `hasAccess`, and `alreadyVoted` badges so the UI can hint "will/won't be notified" before submitting. Without post context the board is unknown, so `hasAccess` for an unrestricted verified global user is provisional — eligibility cannot be determined until the post's board visibility is known (callers with a post pass `postId`). An empty result is the create-new-customer entry point.
+`ContactSearch` backs the author/voter/commenter comboboxes: org-scoped, two indexed queries (contacts over trigram indexes + members via `member⨝user`) merged in TS and ranked exact email → email prefix → name prefix → substring, returning `isMember`, `hasAccess`, and `alreadyVoted` badges so the UI can hint "will/won't be notified" before submitting. Member rows carry `contactId: null` — members are staff, never contacts; submit paths resolve via `userId`. A contact row already linked to a member is hidden in favor of the member row. Without post context the board is unknown, so `hasAccess` for an unrestricted verified global user is provisional — eligibility cannot be determined until the post's board visibility is known (callers with a post pass `postId`). An empty result is the create-new-customer entry point.
 
 ## Where things live
 

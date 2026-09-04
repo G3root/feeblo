@@ -150,7 +150,7 @@ export function EmptyQueryCreatesCustomer() {
 
 export function Selected() {
   const [selection, setSelection] = useState<ContactComboboxSelection | null>({
-    contactId: customer.contactId,
+    contactId: customer.contactId ?? undefined,
     email: customer.email ?? undefined,
     hasAccess: true,
     isMember: false,

@@ -422,7 +422,11 @@ export function ContactCombobox({
               ) : (
                 <ComboboxItem
                   disabled={option.contact.alreadyVoted}
-                  key={option.contact.contactId}
+                  key={
+                    option.contact.contactId ??
+                    option.contact.userId ??
+                    option.contact.email
+                  }
                   value={option}
                 >
                   <div className="flex w-full min-w-0 items-center gap-2">

@@ -339,49 +339,130 @@ const makeContactRepository = Effect.gen(function* () {
           )`
           : sql<boolean>`FALSE`;
 
-      return db
-        .select({
-          contactId: schema.contactTable.id,
-          userId: schema.contactTable.userId,
-          name: schema.contactTable.name,
-          email: schema.contactTable.email,
-          avatarUrl: schema.contactTable.avatar,
-          companyName: schema.companyTable.name,
-          isMember: sql<boolean>`${schema.memberTable.id} IS NOT NULL`,
-          hasAccess,
-          alreadyVoted,
-        })
-        .from(schema.contactTable)
-        .leftJoin(
-          schema.companyTable,
-          eq(schema.companyTable.id, schema.contactTable.companyId)
-        )
-        .leftJoin(
-          schema.memberTable,
-          and(
-            eq(
-              schema.memberTable.organizationId,
-              schema.contactTable.organizationId
-            ),
-            eq(schema.memberTable.userId, schema.contactTable.userId)
+      const memberRankCase = sql`CASE
+        WHEN lower(${schema.userTable.email}) = ${exactEmail} THEN 0
+        WHEN ${schema.userTable.email} ILIKE ${prefix} ESCAPE '\\' THEN 1
+        WHEN ${schema.userTable.name} ILIKE ${prefix} ESCAPE '\\' THEN 2
+        ELSE 3
+      END`;
+
+      const memberAlreadyVoted =
+        args.postId !== undefined
+          ? sql<boolean>`EXISTS (
+            SELECT 1 FROM "upvote" uv
+            WHERE uv.post_id = ${args.postId}
+              AND uv.organization_id = ${args.organizationId}
+              AND uv.user_id = ${schema.memberTable.userId}
+          )`
+          : sql<boolean>`FALSE`;
+
+      return Effect.gen(function* () {
+        const contacts = yield* db
+          .select({
+            contactId: schema.contactTable.id,
+            userId: schema.contactTable.userId,
+            name: schema.contactTable.name,
+            email: schema.contactTable.email,
+            avatarUrl: schema.contactTable.avatar,
+            companyName: schema.companyTable.name,
+            isMember: sql<boolean>`${schema.memberTable.id} IS NOT NULL`,
+            hasAccess,
+            alreadyVoted,
+          })
+          .from(schema.contactTable)
+          .leftJoin(
+            schema.companyTable,
+            eq(schema.companyTable.id, schema.contactTable.companyId)
           )
-        )
-        .leftJoin(
-          schema.userTable,
-          eq(schema.userTable.id, schema.contactTable.userId)
-        )
-        .where(
-          and(
-            eq(schema.contactTable.organizationId, args.organizationId),
-            sql`(
+          .leftJoin(
+            schema.memberTable,
+            and(
+              eq(
+                schema.memberTable.organizationId,
+                schema.contactTable.organizationId
+              ),
+              eq(schema.memberTable.userId, schema.contactTable.userId)
+            )
+          )
+          .leftJoin(
+            schema.userTable,
+            eq(schema.userTable.id, schema.contactTable.userId)
+          )
+          .where(
+            and(
+              eq(schema.contactTable.organizationId, args.organizationId),
+              sql`(
               ${schema.contactTable.email} ILIKE ${substring} ESCAPE '\\'
               OR ${schema.contactTable.name} ILIKE ${substring} ESCAPE '\\'
               OR COALESCE(${schema.companyTable.name}, '') ILIKE ${substring} ESCAPE '\\'
             )`
+            )
           )
-        )
-        .orderBy(rankCase, schema.contactTable.createdAt)
-        .limit(limit);
+          .orderBy(rankCase, schema.contactTable.createdAt)
+          .limit(limit);
+
+        // Members are staff, never contacts: a second leg surfaces org
+        // members with no contact row so the picker matches Quackback's
+        // people search. Two indexed queries merged in TS keeps ranking in
+        // one place and avoids UNION ordering pitfalls; both legs are
+        // already capped at `limit`, the merged list is sliced to it.
+        const members = yield* db
+          .select({
+            contactId: sql<string | null>`CAST(NULL AS TEXT)`,
+            userId: schema.memberTable.userId,
+            name: schema.userTable.name,
+            email: schema.userTable.email,
+            avatarUrl: schema.userTable.image,
+            companyName: sql<string | null>`CAST(NULL AS TEXT)`,
+            isMember: sql<boolean>`TRUE`,
+            hasAccess: sql<boolean>`${schema.userTable.emailVerified} IS TRUE`,
+            alreadyVoted: memberAlreadyVoted,
+          })
+          .from(schema.memberTable)
+          .innerJoin(
+            schema.userTable,
+            eq(schema.userTable.id, schema.memberTable.userId)
+          )
+          .where(
+            and(
+              eq(schema.memberTable.organizationId, args.organizationId),
+              sql`(
+                ${schema.userTable.email} ILIKE ${substring} ESCAPE '\\'
+                OR ${schema.userTable.name} ILIKE ${substring} ESCAPE '\\'
+              )`
+            )
+          )
+          .orderBy(memberRankCase, schema.memberTable.createdAt)
+          .limit(limit);
+
+        // A contact row already linked to a member is hidden in favor of
+        // the member row: no duplicate entries, and members never read as
+        // customers.
+        const memberUserIds = new Set(members.map((m) => m.userId));
+        const customers = contacts.filter(
+          (c) => c.userId == null || !memberUserIds.has(c.userId)
+        );
+
+        const query = trimmed.toLowerCase();
+        const rankOf = (name: string | null, email: string | null) => {
+          const e = (email ?? "").toLowerCase();
+          const n = (name ?? "").toLowerCase();
+          if (e !== "" && e === query) return 0;
+          if (e !== "" && e.startsWith(query)) return 1;
+          if (n !== "" && n.startsWith(query)) return 2;
+          return 3;
+        };
+        const labelOf = (name: string | null, email: string | null) =>
+          (name ?? email ?? "").toLowerCase();
+
+        return [...customers, ...members]
+          .sort(
+            (a, b) =>
+              rankOf(a.name, a.email) - rankOf(b.name, b.email) ||
+              (labelOf(a.name, a.email) < labelOf(b.name, b.email) ? -1 : 1)
+          )
+          .slice(0, limit);
+      });
     },
 
     countByOrganizationId: (organizationId: string) =>

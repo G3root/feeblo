@@ -86,7 +86,9 @@ export const ContactSearch = S.Struct({
 });
 
 export const ContactSearchResult = S.Struct({
-  contactId: S.String,
+  // Null for organization members surfaced without a contact row: members
+  // are staff, never contacts. Submit paths resolve via userId.
+  contactId: S.NullOr(S.String),
   userId: S.NullOr(S.String),
   name: S.NullOr(S.String),
   email: S.NullOr(S.String),

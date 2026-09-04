@@ -387,9 +387,11 @@ describe("ContactRepository.search", () => {
           query: "acme.com",
         });
         const byId = new Map(results.map((row) => [row.contactId, row]));
-
-        expect(byId.get("contact_staff")?.isMember).toBe(true);
-        expect(byId.get("contact_staff")?.hasAccess).toBe(true);
+        // Staff's contact row is hidden in favor of the member row.
+        const staff = results.find((row) => row.userId === "user_staff");
+        expect(staff?.contactId).toBeNull();
+        expect(staff?.isMember).toBe(true);
+        expect(staff?.hasAccess).toBe(true);
         expect(byId.get("contact_sso")?.isMember).toBe(false);
         expect(byId.get("contact_sso")?.hasAccess).toBe(true);
         expect(byId.get("contact_global")?.hasAccess).toBe(true);
@@ -418,7 +420,9 @@ describe("ContactRepository.search", () => {
           });
           const byId = new Map(results.map((row) => [row.contactId, row]));
 
-          expect(byId.get("contact_staff")?.hasAccess).toBe(true);
+          expect(
+            results.find((row) => row.userId === "user_staff")?.hasAccess
+          ).toBe(true);
           expect(byId.get("contact_sso")?.hasAccess).toBe(true);
           expect(byId.get("contact_global")?.hasAccess).toBe(false);
         })
@@ -451,8 +455,41 @@ describe("ContactRepository.search", () => {
 
           expect(byId.get("contact_global")?.hasAccess).toBe(true);
           expect(byId.get("contact_global")?.alreadyVoted).toBe(true);
-          expect(byId.get("contact_staff")?.alreadyVoted).toBe(false);
+          expect(
+            results.find((row) => row.userId === "user_staff")?.alreadyVoted
+          ).toBe(false);
         })
+    );
+
+    it.effect("returns organization members with no contact row", () =>
+      Effect.gen(function* () {
+        yield* getFixture();
+        const repository = yield* ContactRepository;
+        // Member with no contact row: visible without becoming a contact.
+        yield* insertUser({
+          id: "user_lonely_member",
+          email: "lonely.member@acme.com",
+          name: "Lonely Member",
+        });
+        yield* insertMember({
+          id: "member_lonely",
+          organizationId: "org_main",
+          userId: "user_lonely_member",
+        });
+
+        const results = yield* repository.search({
+          organizationId: "org_main",
+          query: "lonely.member@acme.com",
+        });
+
+        const match = results.find(
+          (row) => row.userId === "user_lonely_member"
+        );
+        expect(match).toBeDefined();
+        expect(match?.contactId).toBeNull();
+        expect(match?.isMember).toBe(true);
+        expect(match?.hasAccess).toBe(true);
+      })
     );
 
     it.effect("clamps limit and returns nothing for short queries", () =>
