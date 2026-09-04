@@ -9,6 +9,7 @@ import { EmailSchema } from "@feeblo/web-shared/user-validation";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 
+import { m } from "@/paraglide/messages";
 import { AuthShell } from "~/features/auth/components/auth-shell";
 
 const SearchSchema = z.object({
@@ -62,7 +63,7 @@ function RouteComponent() {
                 onSubmit: {
                   fields: {
                     email: {
-                      message: "Email is blocked.",
+                      message: m.dune_elm_jade(),
                     },
                   },
                 },
@@ -74,7 +75,7 @@ function RouteComponent() {
                 onSubmit: {
                   fields: {
                     email: {
-                      message: "Temporary email addresses are not allowed.",
+                      message: m.kelp_maple_nectar(),
                     },
                   },
                 },
@@ -96,9 +97,10 @@ function RouteComponent() {
               onSubmit: {
                 fields: {
                   email: {
-                    message: `Too many reset requests. Please try again in ${minutes} ${
-                      minutes === 1 ? "minute" : "minutes"
-                    }.`,
+                    message:
+                      minutes === 1
+                        ? m.cinder_drift_spruce({ minutes })
+                        : m.lunar_mellow_yucca({ minutes }),
                   },
                 },
               },
@@ -133,7 +135,7 @@ function RouteComponent() {
                 message:
                   error instanceof Error
                     ? error.message
-                    : "Something went wrong",
+                    : m.acorn_husk_zinnia(),
               },
             },
           },
@@ -144,16 +146,16 @@ function RouteComponent() {
 
   return (
     <AuthShell
-      description="Enter your account email and we'll send you a code to reset your password."
+      description={m.estuary_quarry_sage()}
       footer={
         <div className="text-center text-sm">
-          Remembered your password?{" "}
+          {m.glacier_mellow_prairie()}{" "}
           <Link className="underline underline-offset-4" to="/sign-in">
-            Sign in
+            {m.glade_marsh_moss()}
           </Link>
         </div>
       }
-      title="Forgot password"
+      title={m.lantern_quartz_river()}
     >
       <form
         onSubmit={(e) => {
@@ -164,13 +166,15 @@ function RouteComponent() {
       >
         <div className="flex flex-col gap-4">
           <form.AppField name="email">
-            {(field) => <field.TextField label="Email" type="email" />}
+            {(field) => (
+              <field.TextField label={m.boulder_glade_orbit()} type="email" />
+            )}
           </form.AppField>
 
           <form.AppForm>
             <form.SubscribeButton
               className="w-full"
-              label="Send reset code"
+              label={m.elm_fable_upland()}
               type="submit"
             />
           </form.AppForm>
