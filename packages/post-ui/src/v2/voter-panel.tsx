@@ -15,12 +15,7 @@ import {
   UserAdd01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  and,
-  createOptimisticAction,
-  eq,
-  useLiveQuery,
-} from "@tanstack/react-db";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useState } from "react";
 
 import {
@@ -73,41 +68,35 @@ export function VoterPanel() {
     [organizationId, post.id]
   );
 
-  const addVoter = createOptimisticAction<{ author: TPostCreateAuthor }>({
-    onMutate: () => {},
-    mutationFn: async ({ author }) => {
-      await fetchRpc((rpc) =>
-        rpc.UpvoteAddOnBehalf({
-          author,
-          organizationId,
-          postId: post.id,
-        })
-      );
-      // The RPC acknowledges with a payload ({added}); the refetches are the
-      // invalidation that brings the updated voter row, vote count and
-      // activity back.
-      await upvoteCollection.utils.refetch();
-      await postCollection.utils.refetch();
-    },
-  });
+  // Plain async functions, deliberately NOT createOptimisticAction: that API
+  // skips mutationFn entirely when onMutate stages zero collection
+  // operations (commit early-returns on an empty mutation list), which made
+  // add/remove silently no-op. The explicit refetches below are the
+  // invalidation that brings the updated voter row, vote count and
+  // activity back.
+  const addVoter = async ({ author }: { author: TPostCreateAuthor }) => {
+    await fetchRpc((rpc) =>
+      rpc.UpvoteAddOnBehalf({
+        author,
+        organizationId,
+        postId: post.id,
+      })
+    );
+    await upvoteCollection.utils.refetch();
+    await postCollection.utils.refetch();
+  };
 
-  const removeVoter = createOptimisticAction<{ userId: string }>({
-    onMutate: () => {},
-    mutationFn: async ({ userId }) => {
-      await fetchRpc((rpc) =>
-        rpc.UpvoteRemoveOnBehalf({
-          organizationId,
-          postId: post.id,
-          userId,
-        })
-      );
-      // The RPC acknowledges with a payload ({removed}); the refetches are
-      // the invalidation that brings the updated voter row, vote count and
-      // activity back.
-      await upvoteCollection.utils.refetch();
-      await postCollection.utils.refetch();
-    },
-  });
+  const removeVoter = async ({ userId }: { userId: string }) => {
+    await fetchRpc((rpc) =>
+      rpc.UpvoteRemoveOnBehalf({
+        organizationId,
+        postId: post.id,
+        userId,
+      })
+    );
+    await upvoteCollection.utils.refetch();
+    await postCollection.utils.refetch();
+  };
 
   const handleAdd = async (selection: ContactComboboxSelection | null) => {
     if (!selection) {
