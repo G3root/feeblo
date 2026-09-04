@@ -321,9 +321,7 @@ export const CommentComposerField = withForm({
                                     organizationId={organizationId}
                                     placeholder="Search customers by name or email..."
                                     value={
-                                      hasOnBehalfAuthorValue(
-                                        author.state.value
-                                      )
+                                      hasOnBehalfAuthorValue(author.state.value)
                                         ? author.state.value
                                         : null
                                     }
@@ -331,8 +329,7 @@ export const CommentComposerField = withForm({
                                 }
                                 disabled={disabled || isSubmitting}
                                 isAuthorMode={
-                                  isAuthorMode &&
-                                  commentOnBehalfPolicy.allowed
+                                  isAuthorMode && commentOnBehalfPolicy.allowed
                                 }
                                 isPrivate={
                                   visibility.state.value === "INTERNAL"
@@ -352,9 +349,7 @@ export const CommentComposerField = withForm({
                                     isPrivate ? "INTERNAL" : "PUBLIC"
                                   )
                                 }
-                                showAuthorToggle={
-                                  commentOnBehalfPolicy.allowed
-                                }
+                                showAuthorToggle={commentOnBehalfPolicy.allowed}
                                 statusOptions={statusOptions}
                                 statusUpdateId={statusUpdate.state.value}
                                 {...rest}
