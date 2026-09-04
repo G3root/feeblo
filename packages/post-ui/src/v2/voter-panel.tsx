@@ -47,7 +47,7 @@ function VoterAvatar({ upvote }: { upvote: TUpvote }) {
 export function VoterPanel() {
   const { post, organizationId } = usePostCollectionData();
   const {
-    collections: { postCollection, upvoteCollection },
+    collections: { upvoteCollection },
   } = usePostCollections();
   const { data: session } = useAuthState();
   const votesOnBehalfPolicy = usePolicy(
@@ -71,9 +71,9 @@ export function VoterPanel() {
   // Plain async functions, deliberately NOT createOptimisticAction: that API
   // skips mutationFn entirely when onMutate stages zero collection
   // operations (commit early-returns on an empty mutation list), which made
-  // add/remove silently no-op. The explicit refetches below are the
-  // invalidation that brings the updated voter row, vote count and
-  // activity back.
+  // add/remove silently no-op. Every vote count in the UI derives from the
+  // upvote collection client-side (post rows carry no vote count), so
+  // refetching it alone is the full invalidation.
   const addVoter = async ({ author }: { author: TPostCreateAuthor }) => {
     await fetchRpc((rpc) =>
       rpc.UpvoteAddOnBehalf({
@@ -83,7 +83,6 @@ export function VoterPanel() {
       })
     );
     await upvoteCollection.utils.refetch();
-    await postCollection.utils.refetch();
   };
 
   const removeVoter = async ({ userId }: { userId: string }) => {
@@ -95,7 +94,6 @@ export function VoterPanel() {
       })
     );
     await upvoteCollection.utils.refetch();
-    await postCollection.utils.refetch();
   };
 
   const handleAdd = async (selection: ContactComboboxSelection | null) => {
