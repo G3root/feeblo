@@ -24,7 +24,7 @@ import {
   ArrowUp01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 
 import {
   useBoardStore,
@@ -207,11 +207,20 @@ function LaneUnselectMenuItem({ posts }: { posts: BoardPostRow[] }) {
 
 function useLaneSelectedCount(posts: BoardPostRow[]) {
   const selectedPosts = useSelectedPosts();
-  const selectedIds = new Set(selectedPosts.map((entry) => entry.postId));
+  // One Set per selection change, shared by every lane on the board —
+  // previously each lane rebuilt it on every render (lanes × selection).
+  const selectedIds = useMemo(
+    () => new Set(selectedPosts.map((entry) => entry.postId)),
+    [selectedPosts]
+  );
 
-  return posts.reduce(
-    (count, post) => count + (selectedIds.has(post.id) ? 1 : 0),
-    0
+  return useMemo(
+    () =>
+      posts.reduce(
+        (count, post) => count + (selectedIds.has(post.id) ? 1 : 0),
+        0
+      ),
+    [posts, selectedIds]
   );
 }
 

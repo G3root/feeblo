@@ -791,6 +791,26 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       );
     },
 
+    PostGet: (args: TPostGet) => {
+      return Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const post = yield* repository.findBySlug({
+          organizationId: args.organizationId,
+          slug: args.slug,
+          userId: session.session.userId,
+        });
+        if (post === undefined) {
+          return yield* new PostNotFoundError({
+            message: "Post not found",
+          });
+        }
+        return post;
+      }).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Post", "select")
+      );
+    },
+
     PostGetPublic: (args: TPostGet) => {
       return Effect.gen(function* () {
         const sessionOption = yield* OptionalCurrentSession;

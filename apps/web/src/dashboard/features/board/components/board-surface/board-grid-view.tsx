@@ -97,7 +97,7 @@ export function BoardGridView({
     setItems(groupedPosts);
   }
 
-  const [initialSnapshot] = useState(() => structuredClone(items));
+  const [initialSnapshot] = useState(() => items);
   const snapshot = useRef(initialSnapshot);
   const activeDrag = useRef<{
     sourceId: string;
@@ -107,7 +107,9 @@ export function BoardGridView({
 
   const handleDragStart = useCallback<DragDropEventHandlers["onDragStart"]>(
     (event) => {
-      snapshot.current = structuredClone(items);
+      // No deep clone: lane moves below are immutable (new arrays/rows),
+      // so the previous state reference stays intact for cancel-rollback.
+      snapshot.current = items;
       const { source } = event.operation;
 
       if (source?.type !== "item") {
@@ -240,7 +242,7 @@ export function BoardGridView({
                     column={column}
                     id={post.id}
                     index={postIndex}
-                    key={post.slug}
+                    key={post.id}
                     organizationId={organizationId}
                     post={post}
                     statusId={post.statusId}

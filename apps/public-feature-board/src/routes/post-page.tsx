@@ -107,9 +107,12 @@ export function PostPage() {
     },
     [site.organizationId, slug]
   );
-  const post = postRow?.post;
+  const listPost = postRow?.post;
   const postStatus = postRow?.postStatus;
   const board = postRow?.board;
+  // The list row carries every display field; the body streams in through
+  // the detail collection inside the composed content view.
+  const post = listPost;
   const postId = post?.id ?? "";
   const postTagsQuery = useLiveQuery(
     (q) =>

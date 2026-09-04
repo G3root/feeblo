@@ -1,3 +1,4 @@
+import { TTLCache } from "@isaacs/ttlcache";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -23,6 +24,16 @@ const plansCacheControl = [
   `max-age=${Duration.toSeconds(browserCacheDuration)}`,
   `stale-while-revalidate=${Duration.toSeconds(staleCacheDuration)}`,
 ].join(", ");
+
+const PLANS_CACHE_KEY = "plans-catalog";
+const PLANS_CACHE_TTL_MS = 60_000;
+const plansResponseCache = new TTLCache<string, TPlansResponse>({ max: 1 });
+
+const withPlansHeaders = (body: TPlansResponse) =>
+  HttpApiSchema.withHeaders({
+    body,
+    headers: { "cache-control": plansCacheControl },
+  });
 
 /** The product columns the pricing catalog needs, as synced from Polar. */
 type PricingProduct = {
@@ -138,14 +149,24 @@ export const PricingHandlersEffect = Effect.gen(function* () {
 
   return {
     listPlans: () =>
-      workspaceRepository.findProducts().pipe(
-        withRemapDbErrors("Product", "select"),
-        Effect.map((products) =>
-          HttpApiSchema.withHeaders({
-            body: buildPlansResponse(products),
-            headers: { "cache-control": plansCacheControl },
-          })
-        )
-      ),
+      Effect.gen(function* () {
+        // The catalog is global (no per-org filter) and products change
+        // only via Polar webhooks, so memoize the built response. 60s is
+        // strictly fresher than the 1h browser max-age below; it absorbs
+        // origin traffic (marketing spikes, billing pages) that CDN
+        // stale-while-revalidate never sees.
+        const cached = plansResponseCache.get(PLANS_CACHE_KEY);
+        if (cached !== undefined) {
+          return withPlansHeaders(cached);
+        }
+        const products = yield* workspaceRepository
+          .findProducts()
+          .pipe(withRemapDbErrors("Product", "select"));
+        const body = buildPlansResponse(products);
+        plansResponseCache.set(PLANS_CACHE_KEY, body, {
+          ttl: PLANS_CACHE_TTL_MS,
+        });
+        return withPlansHeaders(body);
+      }),
   };
 });

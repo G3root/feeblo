@@ -18,10 +18,12 @@ import {
   publicCommentCollection,
   publicCommentReactionCollection,
   publicPostCollection,
+  publicPostDetailCollection,
   publicPostReactionCollection,
   publicPostStatusCollection,
   publicPostSubscriptionCollection,
   publicUpvoteCollection,
+  getMutationOrganizationId,
 } from "../../lib/collections";
 import { useSite } from "../../providers/site-provider";
 import { Navbar } from "../common/navbar";
@@ -30,6 +32,7 @@ import { PoweredByTag } from "./powered-by-tag";
 const collections: PostCollections = {
   boardCollection: publicBoardCollection,
   postCollection: publicPostCollection,
+  postDetailCollection: publicPostDetailCollection,
   postStatusCollection: publicPostStatusCollection,
   upvoteCollection: publicUpvoteCollection,
   commentCollection: publicCommentCollection,
@@ -71,12 +74,27 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
     [site.organizationId]
   );
 
+  // The shared create form persists through this surface RPC (public
+  // visibility rules, restricted-session scoping) inside its optimistic
+  // action; the list row itself carries no body.
+  const persistPost = useCallback<PostCollectionsValue["persistPost"]>(
+    async (input) =>
+      fetchRpc((rpc) =>
+        rpc.PostCreatePublic({
+          ...input,
+          organizationId: getMutationOrganizationId(),
+        })
+      ),
+    []
+  );
+
   return (
     <PostCollectionsProvider
       collections={collections}
       getPostHref={getPostHref}
       onAuthRequired={handleAuthRequired}
       organizationId={site.organizationId}
+      persistPost={persistPost}
       suggestPosts={suggestPosts}
     >
       <PostCreateDialogProvider>

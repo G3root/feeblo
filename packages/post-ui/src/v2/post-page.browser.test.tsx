@@ -71,6 +71,18 @@ vi.mock("./subscribe-toggle", () => {
   };
 });
 
+// The body resolves through the detail collection at runtime; fix it here
+// so composition tests stay focused on layout, not data fetching.
+// eslint-disable-next-line anti-slop/no-module-mocking
+vi.mock("./use-post-detail", () => ({
+  usePostDetail: () => ({
+    assetIds: [],
+    content: "Plain post content",
+    isError: false,
+    isLoading: false,
+  }),
+}));
+
 // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 const board = { visibility: "PUBLIC" } as TBoard;
 

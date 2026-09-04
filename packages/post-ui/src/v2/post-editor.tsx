@@ -15,8 +15,10 @@ import {
   useState,
 } from "react";
 
+import { ContentSkeleton } from "./content-skeleton";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
+import { usePostDetail } from "./use-post-detail";
 
 type PostEditorState = {
   disabled: boolean;
@@ -349,10 +351,13 @@ export const PostEditor = Object.assign(PostEditorComponent, {
 
 export function PostContentUpdateInput() {
   const {
-    collections: { postCollection },
+    collections: { postCollection, postDetailCollection },
     organizationId,
   } = usePostCollections();
   const { canManagePost, isLocked, post, pageType } = usePostCollectionData();
+  // Initial body + attachments resolve through the detail collection (the
+  // context row is a slim list item without `content`).
+  const detail = usePostDetail();
 
   const disabled = isLocked || !canManagePost;
 
@@ -361,7 +366,9 @@ export function PostContentUpdateInput() {
     content: string;
   }>({
     onMutate: ({ assetIds, content }) => {
-      postCollection.update(post.id, (draft) => {
+      // The body lives on the detail collection now (list rows are slim
+      // `PostListItem`s without `content`).
+      postDetailCollection.update(post.id, (draft) => {
         draft.content = content;
         draft.assetIds = assetIds;
       });
@@ -384,15 +391,28 @@ export function PostContentUpdateInput() {
               assetIds,
             })
       );
+      await postDetailCollection.utils.refetch();
       await postCollection.utils.refetch();
     },
   });
 
+  if (detail.isError) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        Post content could not be loaded.
+      </p>
+    );
+  }
+
+  if (detail.isLoading || detail.content === undefined) {
+    return <ContentSkeleton />;
+  }
+
   return (
     <PostEditor
-      content={post.content}
+      content={detail.content}
       disabled={disabled}
-      existingAssetIds={post.assetIds}
+      existingAssetIds={detail.assetIds ?? post.assetIds}
       onSubmit={async ({ assetIds, content }) => {
         try {
           const tx = updatePostContent({

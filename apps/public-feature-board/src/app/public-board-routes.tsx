@@ -18,6 +18,7 @@ import {
   publicCommentCollection,
   publicCommentReactionCollection,
   publicPostCollection,
+  publicPostDetailCollection,
   publicPostReactionCollection,
   publicPostStatusCollection,
   publicPostTagCollection,
@@ -70,6 +71,17 @@ function createPublicPostSubsetQueries(slug: string) {
             eq(postReaction.organizationId, organizationId),
             eq(postReaction.postSlug, slug)
           )
+        )
+    ),
+    // Full-post body for the detail view. The org-scoped list collection
+    // carries slim rows (no `content`); this slug-scoped query resolves the
+    // body through `PostGetPublic` alongside the other subsets so it
+    // arrives before the pending loader clears.
+    postDetail: createLiveQueryCollection((query) =>
+      query
+        .from({ post: publicPostDetailCollection })
+        .where(({ post }) =>
+          and(eq(post.organizationId, organizationId), eq(post.slug, slug))
         )
     ),
     // PostSubscription has no `postSlug` column; its query key falls back to
@@ -220,6 +232,7 @@ const postRoute = createRoute({
       publicPostStatusCollection.preload(),
       publicPostTagCollection.preload(),
       publicTagCollection.preload(),
+      subsetQueries.postDetail.preload(),
       subsetQueries.comments.preload(),
       subsetQueries.commentReactions.preload(),
       subsetQueries.postReactions.preload(),

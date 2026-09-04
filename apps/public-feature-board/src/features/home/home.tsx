@@ -123,7 +123,8 @@ function HomeList() {
                 post={post}
               >
                 {/* Reuses feedback-page PostCard composably — checkbox omitted via composition, no boolean prop */}
-                <PostCard.Root>
+                {/* Long feeds render every card: skip off-screen rows' rendering (see dashboard `BoardPostRowItem`). */}
+                <PostCard.Root className="[contain-intrinsic-size:auto_72px] [content-visibility:auto]">
                   <PostCard.Link />
                   <PostCard.Upvote />
                   <PostCard.Body>

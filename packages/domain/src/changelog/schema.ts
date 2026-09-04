@@ -34,6 +34,13 @@ export const ChangelogList = S.Struct({
 
 export type TChangelogList = S.Schema.Type<typeof ChangelogList>;
 
+export const ChangelogGet = S.Struct({
+  organizationId: S.String,
+  slug: S.String,
+});
+
+export type TChangelogGet = S.Schema.Type<typeof ChangelogGet>;
+
 const COVER_IMAGE_URL_PATTERN = /^https?:\/\/[^\s]+$/i;
 const COVER_IMAGE_URL_MAX_LENGTH = 2048;
 

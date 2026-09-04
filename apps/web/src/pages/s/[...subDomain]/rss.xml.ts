@@ -62,11 +62,15 @@ export const GET: APIRoute = async ({ locals, url }) => {
 
   // Lazy-load the markdown pipeline (unified/remark/rehype) with the request
   // so it stays out of the worker's startup module graph (same pattern as the
-  // RPC runtime import above).
-  const { markdownToHtml } = await import("@feeblo/utils/markdown");
+  // RPC runtime import above). Rendering itself is cached per entry version
+  // in `@feeblo/utils/markdown`.
+  const { markdownToHtmlCached } = await import("@feeblo/utils/markdown");
 
   const items: RSSFeedItem[] = changelogs.map((changelog, index) => {
-    const content = markdownToHtml(changelog.content).trim();
+    const content = markdownToHtmlCached(
+      `${changelog.id}:${String(changelog.updatedAt)}`,
+      changelog.content
+    ).trim();
     const item: RSSFeedItem = {
       title: changelog.title,
       link: `${changelogUrl}/${changelog.slug}`,

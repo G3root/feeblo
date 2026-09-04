@@ -3,19 +3,9 @@ import { randomUUID } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 
 import { createWorkspace } from "../helpers/auth";
+import { assertNoPageErrors, trackPageErrors } from "../helpers/page-errors";
 import { createPost, fillEditor, openPost } from "../helpers/posts";
-
-/** Resolves when the given subscription RPC completes on the wire. */
-function waitForSubscriptionRpc(
-  page: Page,
-  method: "PostSubscriptionCreate" | "PostSubscriptionDelete"
-) {
-  return page.waitForResponse(
-    (response) =>
-      response.url().includes("/rpc") &&
-      Boolean(response.request().postData()?.includes(method))
-  );
-}
+import { waitForRpc } from "../helpers/rpc";
 
 async function chooseFirstReaction(page: Page) {
   await page.getByRole("button", { name: "Add reaction" }).first().click();
@@ -27,14 +17,13 @@ async function chooseFirstReaction(page: Page) {
 
 test.describe("feedback workflow", () => {
   test.beforeEach(({ page }) => {
-    page.on("console", (message) => {
-      if (message.type() === "error") {
-        console.error(`[browser console] ${message.text()}`);
-      }
-    });
-    page.on("pageerror", (error) => {
-      console.error(`[browser pageerror] ${error.message}`);
-    });
+    // Fail on unexpected client failures (see comments.spec.ts): log-only
+    // hooks let uncaught render exceptions pass silently.
+    trackPageErrors(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await assertNoPageErrors(page);
   });
 
   test("user can create an organization", async ({ page }) => {
@@ -152,7 +141,7 @@ test.describe("feedback workflow", () => {
     await expect(unsubscribeButton).toBeVisible();
 
     // Unsubscribe, then re-subscribe.
-    const deleteRpc = waitForSubscriptionRpc(page, "PostSubscriptionDelete");
+    const deleteRpc = waitForRpc(page, "PostSubscriptionDelete");
     await unsubscribeButton.click();
     const subscribeButton = page.getByRole("button", {
       name: "Subscribe",
@@ -166,7 +155,7 @@ test.describe("feedback workflow", () => {
     await page.reload();
     await expect(subscribeButton).toBeVisible();
 
-    const createRpc = waitForSubscriptionRpc(page, "PostSubscriptionCreate");
+    const createRpc = waitForRpc(page, "PostSubscriptionCreate");
     await subscribeButton.click();
     await expect(unsubscribeButton).toBeVisible();
     await createRpc;

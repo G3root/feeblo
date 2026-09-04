@@ -9,6 +9,7 @@ import {
   Changelog,
   ChangelogCreate,
   ChangelogDelete,
+  ChangelogGet,
   ChangelogList,
   ChangelogSendUpdate,
   ChangelogUpdate,
@@ -24,6 +25,17 @@ export class ChangelogRpcs extends RpcGroup.make(
   Rpc.make("ChangelogListPublic", {
     payload: ChangelogList,
     success: Schema.Array(Changelog),
+    error: Schema.Union([ChangelogServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+
+  // Single-entry fetch for detail pages (SEO metadata). Lists return up to
+  // `PUBLIC_CHANGELOG_LIMIT` full bodies; resolving one entry through the
+  // list wastes that entire payload per request.
+  Rpc.make("ChangelogGetPublic", {
+    payload: ChangelogGet,
+    success: Changelog,
     error: Schema.Union([ChangelogServiceErrors, RateLimitErrors]),
   })
     .middleware(OptionalAuthMiddleware)

@@ -27,7 +27,10 @@ export const commentComposerBoxClassName =
 function CommentComposerComponent(props: CommentComposerProviderProps) {
   return (
     <CommentComposerProvider {...props}>
-      <div className={commentComposerBoxClassName}>
+      {/* `data-slot` is the stable test hook (same convention as
+      `data-slot="comment"`): the post page mounts two ProseMirror
+      editors, so tests scope to the composer instead of indexing. */}
+      <div className={commentComposerBoxClassName} data-slot="comment-composer">
         <CommentComposerEditor />
         <CommentComposerSubmit />
       </div>

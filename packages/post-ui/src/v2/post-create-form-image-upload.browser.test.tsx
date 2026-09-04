@@ -30,6 +30,7 @@ vi.mock("@feeblo/web-shared/use-auth-state", () => ({
   }),
 }));
 
+import { PostId } from "@feeblo/id";
 import { useEffect, useState } from "react";
 
 /** Member row the live-query stub exposes as the current member. */
@@ -58,7 +59,22 @@ type MockLiveResult = {
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@tanstack/react-db", () => ({
   and: (...args: unknown[]) => args,
-  createOptimisticAction: vi.fn(),
+  // Faithful seam for the form's optimistic create action: run the
+  // optimistic insert, then the persistence function, surfacing failures
+  // through `isPersisted` exactly like a real transaction.
+  createOptimisticAction: vi.fn(
+    (options: {
+      onMutate: (variables: PostCreateActionInput) => void;
+      mutationFn: (variables: PostCreateActionInput) => Promise<void>;
+    }) =>
+      (variables: PostCreateActionInput) => {
+        const promise = (async () => {
+          options.onMutate(variables);
+          await options.mutationFn(variables);
+        })();
+        return { isPersisted: { promise } };
+      }
+  ),
   eq: () => ({ __eq: true }),
   queryOnce: vi.fn(),
   useLiveQuery: vi.fn((query: (q: never) => MockLiveResult) => {
@@ -94,10 +110,10 @@ vi.mock("@feeblo/id", () => ({
   PostId: { unsafeGenerate: vi.fn().mockResolvedValue("post-1") },
 }));
 
-import { PostId } from "@feeblo/id";
-
 import { PostCreateDialogProvider } from "./dialog-stores/post";
+import type { PostCreateActionInput } from "./dialogs/post-create-form-inner";
 import { PostCreateForm } from "./dialogs/post-create-form-inner";
+import type { PersistPostInput } from "./providers/post-collections-provider";
 import { PostCollectionsProvider } from "./providers/post-collections-provider";
 
 class MockXMLHttpRequest {
@@ -168,6 +184,13 @@ const insertSpy = vi.fn().mockReturnValue({
   isPersisted: { promise: Promise.resolve() },
 });
 
+// Captures the surface persistence input the form's optimistic action
+// passes (row fields plus finalized body); the RPC transport itself stays
+// mocked (see the `@feeblo/web-shared/runtime` mock above).
+const persistSpy = vi
+  .fn<(input: PersistPostInput) => Promise<string>>()
+  .mockResolvedValue("my-great-idea");
+
 function FormHarness() {
   const [, forceRender] = useState(0);
   useEffect(() => {
@@ -197,6 +220,7 @@ function FormHarness() {
           } as never
         }
         organizationId="organization-id"
+        persistPost={persistSpy}
       >
         <PostCreateForm />
       </PostCollectionsProvider>
@@ -216,7 +240,22 @@ async function fillForm(screen: RenderScreen) {
 }
 
 async function pasteImage(screen: RenderScreen, text: string) {
+  // The rich-text editor lazy-loads inside the form (see PostContentField),
+  // so its textbox may not exist yet when the dialog opens. Wait for it
+  // instead of assuming synchronous mount — otherwise this flakes wherever
+  // the editor chunk resolves slowly.
+  await vi.waitFor(
+    () => {
+      expect(
+        screen.getByRole("textbox", { name: "" }).all().length
+      ).toBeGreaterThanOrEqual(2);
+    },
+    { timeout: 10_000 }
+  );
   const editor = screen.getByRole("textbox", { name: "" }).all()[1];
+  if (!editor) {
+    throw new Error("expected the post content editor to be mounted");
+  }
   await editor.click();
   await editor.fill(text);
 
@@ -237,8 +276,11 @@ async function submit(screen: RenderScreen): Promise<string> {
   await screen.getByRole("button", { name: "Create Post" }).click();
   // SAFETY: The upstream contract guarantees a string here.
   await waitForInsertCount(1);
-  // SAFETY: The upstream contract guarantees a string here.
-  return insertSpy.mock.calls[0]?.[0]?.content as string;
+  // The body travels as optimistic-action input to `persistPost`, not on
+  // the slim list row.
+  // SAFETY: The harness's persistPost receives the form's persistence input.
+  const persisted = persistSpy.mock.calls[0]?.[0] as { content: string };
+  return persisted.content;
 }
 
 async function waitForInsertCount(expectedCount: number): Promise<void> {
@@ -250,6 +292,7 @@ async function waitForInsertCount(expectedCount: number): Promise<void> {
 beforeEach(() => {
   MockXMLHttpRequest.sendCount = 0;
   insertSpy.mockClear();
+  persistSpy.mockClear();
   vi.mocked(PostId.unsafeGenerate).mockClear();
   vi.stubGlobal("XMLHttpRequest", MockXMLHttpRequest);
 });
@@ -327,11 +370,9 @@ describe("PostCreateForm image upload", () => {
 
   it("reuploads for the organization when ownership changes after a failed save", async () => {
     setMemberData(undefined);
-    insertSpy
-      .mockImplementationOnce(() => ({
-        isPersisted: { promise: Promise.reject(new Error("Save failed")) },
-      }))
-      .mockReturnValue({ isPersisted: { promise: Promise.resolve() } });
+    // The first persistence attempt fails; the optimistic row rolls back
+    // and the retry uploads under the resolved member.
+    persistSpy.mockRejectedValueOnce(new Error("Save failed"));
     const screen = await render(<FormHarness />);
 
     await fillForm(screen);
@@ -350,6 +391,9 @@ describe("PostCreateForm image upload", () => {
     await waitForInsertCount(2);
 
     expect(MockXMLHttpRequest.sendCount).toBe(2);
-    expect(insertSpy.mock.calls[1]?.[0]?.content).not.toContain("blob:");
+    // See `submit`: the body travels as action input, not on the slim row.
+    // SAFETY: The retry persists through the same harness spy.
+    const repersisted = persistSpy.mock.calls[1]?.[0] as { content: string };
+    expect(repersisted.content).not.toContain("blob:");
   });
 });

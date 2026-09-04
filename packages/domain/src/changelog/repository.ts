@@ -10,6 +10,7 @@ import * as Layer from "effect/Layer";
 import type {
   TChangelogCreate,
   TChangelogDelete,
+  TChangelogGet,
   TChangelogList,
   TChangelogUpdate,
 } from "./schema";
@@ -177,6 +178,48 @@ const makeChangelogRepository = Effect.gen(function* () {
         )
         .orderBy(desc(effectivePublishedAt))
         .limit(PUBLIC_CHANGELOG_LIMIT),
+
+    /**
+     * Published single-entry counterpart of `findManyPublished`, keyed by
+     * slug. Resolves to `undefined` when no published entry matches, so
+     * detail pages (SEO metadata, feeds) never pull the whole list.
+     */
+    findPublishedBySlug: ({ organizationId, slug }: TChangelogGet) =>
+      db
+        .select({
+          id: schema.changelogTable.id,
+          title: schema.changelogTable.title,
+          slug: schema.changelogTable.slug,
+          content: schema.changelogTable.content,
+          excerpt: schema.changelogTable.excerpt,
+          status: schema.changelogTable.status,
+          scheduledAt: schema.changelogTable.scheduledAt,
+          publishedAt: schema.changelogTable.publishedAt,
+          organizationId: schema.changelogTable.organizationId,
+          creatorMemberId: schema.changelogTable.creatorMemberId,
+          coverImage: schema.changelogTable.coverImage,
+          creatorId: schema.changelogTable.creatorId,
+          createdAt: schema.changelogTable.createdAt,
+          updatedAt: schema.changelogTable.updatedAt,
+          user: {
+            name: sql<string | null>`${schema.userTable.name}`,
+            image: sql<string | null>`${schema.userTable.image}`,
+          },
+        })
+        .from(schema.changelogTable)
+        .leftJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.changelogTable.creatorId)
+        )
+        .where(
+          and(
+            eq(schema.changelogTable.organizationId, organizationId),
+            eq(schema.changelogTable.slug, slug),
+            eq(schema.changelogTable.status, "published")
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0])),
 
     create: ({
       id,

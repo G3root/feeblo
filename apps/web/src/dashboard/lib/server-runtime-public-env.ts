@@ -42,3 +42,21 @@ export function getServerRuntimePublicEnv() {
     posthogHost: env.POSTHOG_HOST,
   };
 }
+
+/**
+ * Absolute API origin for `<link rel="preconnect">`, or empty when the
+ * browser talks to the API same-origin (dev proxy rewrites API_URL to
+ * `/api`) — same-origin needs no preconnect. Guards against relative and
+ * malformed values instead of throwing during render.
+ */
+export function apiPreconnectOrigins(): string[] {
+  const apiUrl = getServerRuntimePublicEnv().apiUrl;
+  if (!apiUrl.startsWith("http://") && !apiUrl.startsWith("https://")) {
+    return [];
+  }
+  try {
+    return [new URL(apiUrl).origin];
+  } catch {
+    return [];
+  }
+}

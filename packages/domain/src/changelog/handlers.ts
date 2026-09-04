@@ -25,12 +25,14 @@ import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
+import { ChangelogNotFoundError } from "./errors";
 import { ChangelogPolicy } from "./policies";
 import { ChangelogRepository } from "./repository";
 import { ChangelogRpcs } from "./rpcs";
 import type {
   TChangelogCreate,
   TChangelogDelete,
+  TChangelogGet,
   TChangelogList,
   TChangelogSendUpdate,
   TChangelogUpdate,
@@ -121,6 +123,26 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
       repository.findManyPublished(args).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "ChangelogListPublic",
+          level: "read",
+        }),
+        Policy.withPublicPolicy(
+          sitePolicy.canViewChangelog(args.organizationId)
+        ),
+        withRemapDbErrors("Changelog", "select")
+      ),
+
+    ChangelogGetPublic: (args: TChangelogGet) =>
+      Effect.gen(function* () {
+        const entry = yield* repository.findPublishedBySlug(args);
+        if (entry === undefined) {
+          return yield* new ChangelogNotFoundError({
+            message: "Changelog entry not found",
+          });
+        }
+        return entry;
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "ChangelogGetPublic",
           level: "read",
         }),
         Policy.withPublicPolicy(

@@ -3,7 +3,10 @@ import "../styles/global.css";
 
 import { getSecret } from "astro:env/server";
 import { serializeJsonLd, type JsonLdNode } from "@feeblo/web-shared/json-ld";
-import { getServerRuntimePublicEnv } from "../dashboard/lib/server-runtime-public-env";
+import {
+  apiPreconnectOrigins,
+  getServerRuntimePublicEnv,
+} from "../dashboard/lib/server-runtime-public-env";
 import CommonHead from "./CommonHead.astro";
 import EnvScript from "./EnvScript.astro";
 import ThemeScript from "./ThemeScript.astro";
@@ -51,6 +54,7 @@ ogImageUrl.searchParams.set("site", subdomain);
     title={title}
     noIndex={noIndex}
     ogImageUrl={ogImageUrl.toString()}
+    preconnectOrigins={apiPreconnectOrigins()}
   />
   {
     jsonLd?.map((node) => (
