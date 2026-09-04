@@ -42,6 +42,7 @@ import {
   commentCollection,
   commentReactionCollection,
   postCollection,
+  postDetailCollection,
   postReactionCollection,
   postStatusCollection,
   postSubscriptionCollection,
@@ -63,6 +64,17 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
  */
 function createPostSubsetQueries(organizationId: string, postSlug: string) {
   return {
+    // Full-post body for the detail view. The org-scoped list collection
+    // carries slim rows (no `content`); this slug-scoped query resolves the
+    // body through `PostGet` alongside the other subsets so it arrives
+    // before the pending shell clears.
+    postDetail: createLiveQueryCollection((query) =>
+      query
+        .from({ post: postDetailCollection })
+        .where(({ post }) =>
+          and(eq(post.organizationId, organizationId), eq(post.slug, postSlug))
+        )
+    ),
     commentReactions: createLiveQueryCollection((query) =>
       query
         .from({ commentReaction: commentReactionCollection })
@@ -123,6 +135,7 @@ export const Route = createFileRoute(
       postTagCollection.preload(),
       tagCollection.preload(),
       upvoteCollection.preload(),
+      subsetQueries.postDetail.preload(),
       subsetQueries.comments.preload(),
       subsetQueries.commentReactions.preload(),
       subsetQueries.postReactions.preload(),
@@ -179,6 +192,8 @@ function RouteComponent() {
   // Rendering the "Post not found" empty state then would flash the wrong
   // page (title, content and the reaction row unmount and remount), so show
   // a skeleton with the same layout while it resolves.
+  // (The body itself streams in through the detail collection inside
+  // `PostPage.Content`, so it never blocks this shell.)
   if (isPostLoading) {
     return <PostPageSkeleton />;
   }

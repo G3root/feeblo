@@ -167,10 +167,41 @@ const selectPostFields = (userId?: string | null) => ({
   mergedAt: schema.postTable.mergedAt,
 });
 
+const selectPostListFields = (userId?: string | null) => {
+  // Lists never render the full body (cards show `excerpt`; detail pages
+  // resolve `content` through `PostGet`/`PostGetPublic`), so drop the
+  // heaviest column while keeping every other list field identical.
+  const { content: _content, ...listFields } = selectPostFields(userId);
+  return listFields;
+};
+
 const makePostRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   return {
+    /**
+     * Authenticated single-post fetch backing the `PostGet` RPC. Scoped to
+     * the organization (membership is enforced by the handler's policy);
+     * unlike `findPublicBySlug` it does not gate on board visibility, so
+     * members can open posts on private boards and moderators can review
+     * archived content.
+     */
+    findBySlug: ({ organizationId, slug, userId }: TPostFindPublicBySlug) =>
+      db
+        .select(selectPostFields(userId))
+        .from(schema.postTable)
+        .leftJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.postTable.creatorId)
+        )
+        .where(
+          and(
+            eq(schema.postTable.organizationId, organizationId),
+            eq(schema.postTable.slug, slug)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0])),
     findActivityState: ({ id, organizationId }: TPostById) =>
       db
         .select({
@@ -360,7 +391,7 @@ const makePostRepository = Effect.gen(function* () {
       const whereClause = getWhereClause(where);
 
       return db
-        .select(selectPostFields(userId))
+        .select(selectPostListFields(userId))
         .from(schema.postTable)
         .leftJoin(
           schema.userTable,
@@ -385,7 +416,7 @@ const makePostRepository = Effect.gen(function* () {
       const whereClause = and(...where);
 
       return db
-        .select(selectPostFields(userId))
+        .select(selectPostListFields(userId))
         .from(schema.postTable)
         .innerJoin(
           schema.boardTable,

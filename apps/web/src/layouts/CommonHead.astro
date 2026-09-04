@@ -5,6 +5,10 @@ interface Props {
   description?: string;
   noIndex?: boolean;
   ogImageUrl?: string;
+  /** Cross-origin API hosts the page's client JS calls (RPC, uploads).
+   * Early connection setup saves ~1 RTT on the first call. Same-origin
+   * entries are skipped by callers. */
+  preconnectOrigins?: ReadonlyArray<string>;
   title?: string;
 }
 
@@ -14,6 +18,7 @@ const {
   description,
   noIndex,
   ogImageUrl,
+  preconnectOrigins = [],
   title = "feeblo",
 } = Astro.props;
 
@@ -30,6 +35,9 @@ import { SEO } from "astro-seo";
   }
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  {preconnectOrigins.map((origin) => (
+    <link rel="preconnect" href={origin} />
+  ))}
   <meta name="generator" content={Astro.generator} />
   <SEO
     title={title}
@@ -65,5 +73,9 @@ import { SEO } from "astro-seo";
     }}
   />
   <Font cssVariable="--font-inter" preload />
-  <Font cssVariable="--font-geist-mono" preload />
+  {/* Geist Mono backs `--font-mono` (code blocks) only: load it on demand
+  instead of preloading on every page. Inter is the body font and stays
+  preloaded. Fonts are bundled locally (`/_astro/fonts/`), so no
+  third-party preconnect is needed. */}
+  <Font cssVariable="--font-geist-mono" />
 </head>

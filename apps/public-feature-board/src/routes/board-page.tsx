@@ -201,10 +201,12 @@ export function BoardPage() {
               pageType="PublicPage"
               post={post}
             >
-              <FeedbackCard
-                color={postStatus.color ?? undefined}
-                label={postStatus.label || formatPostStatus(postStatus.type)}
-              />
+              <div className="[contain-intrinsic-size:auto_72px] [content-visibility:auto]">
+                <FeedbackCard
+                  color={postStatus.color ?? undefined}
+                  label={postStatus.label || formatPostStatus(postStatus.type)}
+                />
+              </div>
             </PostCollectionDataProvider>
           ))}
         </div>

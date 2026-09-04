@@ -30,7 +30,7 @@ type DetailContent =
 
 async function resolvePageContent(
   publicPath: string,
-  site: TSite
+  site: TSite,
 ): Promise<DetailContent> {
   const postMatch = /^\/p\/([^/]+)$/.exec(publicPath);
   const changelogMatch = /^\/changelog\/([^/]+)$/.exec(publicPath);
@@ -50,13 +50,15 @@ async function resolvePageContent(
       // the typed PostNotFoundError; translate that one tag into an explicit
       // not-found instead of swallowing it into the default metadata.
       const post = await fetchRpcServer((rpc) =>
-        rpc.PostGetPublic({
-          organizationId: site.organizationId,
-          // SAFETY: The capture group matched, so the index is present.
-          slug: postMatch[1]!,
-        }).pipe(
-          Effect.catchTag("PostNotFoundError", () => Effect.succeed(null))
-        )
+        rpc
+          .PostGetPublic({
+            organizationId: site.organizationId,
+            // SAFETY: The capture group matched, so the index is present.
+            slug: postMatch[1]!,
+          })
+          .pipe(
+            Effect.catchTag("PostNotFoundError", () => Effect.succeed(null)),
+          ),
       );
       return post === null
         ? { kind: "not-found" }
@@ -70,13 +72,19 @@ async function resolvePageContent(
 
     // SAFETY: `postMatch` is null here, so `changelogMatch` matched.
     const changelogSlug = changelogMatch![1]!;
-    // Changelog lists are bounded (published entries only), so resolving a
-    // single entry through the list is acceptable per request.
-    const entries = await fetchRpcServer((rpc) =>
-      rpc.ChangelogListPublic({ organizationId: site.organizationId })
+    // Resolve the single entry directly: pulling the whole published list
+    // (up to `PUBLIC_CHANGELOG_LIMIT` full bodies) per detail hit wastes
+    // that entire payload for one row.
+    const changelog = await fetchRpcServer((rpc) =>
+      rpc
+        .ChangelogGetPublic({
+          organizationId: site.organizationId,
+          slug: changelogSlug,
+        })
+        .pipe(
+          Effect.catchTag("ChangelogNotFoundError", () => Effect.succeed(null)),
+        ),
     );
-    const changelog =
-      entries.find((entry) => entry.slug === changelogSlug) ?? null;
     return changelog === null
       ? { kind: "not-found" }
       : { kind: "found", post: null, changelog };
@@ -103,9 +111,7 @@ if (publicPath === undefined) {
 
 const siteUrl = new URL("/", Astro.url.origin).toString();
 const pageUrl = new URL(publicPath, Astro.url.origin).toString();
-const jsonLd: JsonLdNode[] = [
-  websiteJsonLd({ name: site.name, url: siteUrl }),
-];
+const jsonLd: JsonLdNode[] = [websiteJsonLd({ name: site.name, url: siteUrl })];
 let pageTitle = `${site.name} — Feedback and roadmap`;
 let pageDescription = `Share feedback, follow the roadmap, and read product updates from ${site.name}.`;
 
@@ -139,7 +145,7 @@ if (post) {
       datePublished: post.createdAt,
       dateModified: post.updatedAt,
       authorName: post.user.name,
-    })
+    }),
   );
 } else if (changelog) {
   pageTitle = `${changelog.title} — ${site.name} changelog`;
@@ -152,7 +158,7 @@ if (post) {
       datePublished: changelog.publishedAt ?? changelog.createdAt,
       dateModified: changelog.updatedAt,
       authorName: changelog.user.name,
-    })
+    }),
   );
 }
 ---

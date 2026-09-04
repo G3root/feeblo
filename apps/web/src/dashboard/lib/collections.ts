@@ -6,9 +6,10 @@ import type { TPostCreateAuthor } from "@feeblo/domain/post/schema";
 import type { Upvote } from "@feeblo/domain/upvote/schema";
 
 /**
- * post-ui attaches a transient `author` to post/comment insert payloads so
+ * post-ui attaches a transient `author` to comment insert payloads so
  * on-behalf attribution rides the same onInsert path; it is not a persisted
- * column (see docs/on-behalf.md).
+ * column (see docs/on-behalf.md). Post on-behalf attribution flows via the
+ * surface's `persistPost` input instead (slim list rows carry no body).
  */
 type PostWithTransientAuthor = {
   author?: TPostCreateAuthor;
@@ -100,6 +101,10 @@ export const postCollection = createCollection(
     },
     queryClient,
     getKey: (item) => item.id,
+    // No `onInsert`: creation persists through the surface's `persistPost`
+    // inside the shared form's optimistic action, so a bare insert fails
+    // fast with `MissingInsertHandlerError` instead of persisting without
+    // a body. Updates and deletes sync here as before.
     onUpdate: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: updatedPost } = mutation;
@@ -127,27 +132,48 @@ export const postCollection = createCollection(
         })
       );
     },
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newPost } = mutation;
+  })
+);
 
-      // SAFETY: post-ui attaches the transient author payload declared on
-      // PostWithTransientAuthor above.
-      const author = (newPost as PostWithTransientAuthor).author;
-
-      await fetchRpc((rpc) =>
-        rpc.PostCreate({
-          id: newPost.id,
-          boardId: newPost.boardId,
-          organizationId: newPost.organizationId,
-          title: newPost.title,
-          content: newPost.content,
-          assetIds: newPost.assetIds ?? [],
-          statusId: newPost.statusId,
-          ...(author ? { author } : undefined),
-        })
-      );
+/**
+ * Full-post detail collection backing post detail routes. The org-scoped
+ * `postCollection` carries slim `PostListItem` rows (no `content`); this
+ * slug-scoped, on-demand collection resolves the body through `PostGet`.
+ * Detail routes preload + subscribe it and merge `content` over the list
+ * row. Content edits apply here through `createOptimisticAction` (ambient
+ * transaction, so no sync handlers by design); all other mutations stay on
+ * the list collection.
+ */
+export const postDetailCollection = createCollection(
+  queryCollectionOptions({
+    // Keyed by the explicit `slug` filter with a fallback to the route
+    // slug, so detail subscribers (routes, content views) share one cache
+    // entry per post regardless of where they subscribe from.
+    queryKey: (opts) => {
+      const filters = parseLoadSubsetOptions(opts).filters;
+      const slug = eqFilterValue(filters, "slug") ?? resolvePostSlug(filters);
+      return organizationScopedQueryKey("post-detail", slug);
     },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+      const filters = parseLoadSubsetOptions(
+        ctx.meta?.loadSubsetOptions
+      ).filters;
+      const slug = eqFilterValue(filters, "slug") ?? resolvePostSlug(filters);
+
+      if (!(organizationId && slug)) {
+        return [];
+      }
+
+      const post = await fetchRpc(
+        (rpc) => rpc.PostGet({ organizationId, slug }),
+        { signal: ctx.signal }
+      );
+      return [post];
+    },
+    queryClient,
+    getKey: (item) => item.id,
   })
 );
 
@@ -1593,6 +1619,7 @@ export const dashboardCollections = {
   membershipCollection,
   organizationCollection,
   postCollection,
+  postDetailCollection,
   postActivityCollection,
   postReactionCollection,
   postStatusCollection,

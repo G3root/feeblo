@@ -4,6 +4,7 @@ import "@feeblo/feedback-widget/styles";
 import { getSecret } from "astro:env/server";
 import type { WidgetConfig } from "@feeblo/feedback-widget";
 import spriteSvgRaw from "@feeblo/feedback-widget/icons/sprite.svg?raw";
+import { apiPreconnectOrigins } from "../dashboard/lib/server-runtime-public-env";
 import CommonHead from "./CommonHead.astro";
 import EnvScript from "./EnvScript.astro";
 
@@ -30,7 +31,11 @@ const spriteSvg = spriteSvgRaw.slice(spriteSvgRaw.indexOf("<svg"));
 
 <!doctype html>
 <html lang={locale} data-theme={theme} class={isDark ? "dark" : ""}>
-  <CommonHead title={title} noIndex={noIndex} />
+  <CommonHead
+    title={title}
+    noIndex={noIndex}
+    preconnectOrigins={apiPreconnectOrigins()}
+  />
   <EnvScript organizationId={organizationId} widgetConfig={widgetConfig} />
   <style is:inline>
     html,

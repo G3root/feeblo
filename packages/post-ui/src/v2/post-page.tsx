@@ -1,8 +1,8 @@
-import { Skeleton } from "@feeblo/ui/skeleton";
 import { lazy, type ReactNode, Suspense } from "react";
 
 import { PostCommentComposer } from "../post/post-comment-composer";
 import { CommentsList } from "./comment-display/list";
+import { ContentSkeleton } from "./content-skeleton";
 import { CommentDeleteDialogProvider } from "./dialog-stores/comment";
 import { CommentVisibilityDialogProvider } from "./dialog-stores/comment-visibility";
 import { PostDeleteDialogProvider } from "./dialog-stores/post";
@@ -18,6 +18,7 @@ import { PostTitleUpdateInput } from "./post-title-input";
 import { PostReactionPicker } from "./reaction-picker";
 import { SubscribeCard } from "./subscribe-toggle";
 import { UpvoteButton } from "./upvote-toggle";
+import { usePostDetail } from "./use-post-detail";
 
 // Voter management pulls in the picker and its search transport; lazy-load it
 // alongside the other below-the-fold surfaces so display mode stays
@@ -89,7 +90,7 @@ function Title() {
 }
 
 function Content() {
-  const { canManagePost, isLocked, post } = usePostCollectionData();
+  const { canManagePost, isLocked } = usePostCollectionData();
 
   // Post authors get the rich-text editor; everyone else (readers, locked
   // posts) sees the rendered Markdown.
@@ -103,19 +104,30 @@ function Content() {
 
   return (
     <Suspense fallback={<ContentSkeleton />}>
-      <MarkdownContent content={post.content} />
+      <DetailMarkdown />
     </Suspense>
   );
 }
 
-function ContentSkeleton() {
-  return (
-    <div className="space-y-2">
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-4 w-11/12" />
-      <Skeleton className="h-4 w-3/4" />
-    </div>
-  );
+function DetailMarkdown() {
+  const { content, isError, isLoading } = usePostDetail();
+
+  // The body streams in separately from the list row (see `usePostDetail`);
+  // keep the rest of the page interactive while it resolves, and degrade to
+  // an inline error instead of unmounting the page when it fails.
+  if (isError) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        Post content could not be loaded.
+      </p>
+    );
+  }
+
+  if (isLoading || content === undefined) {
+    return <ContentSkeleton />;
+  }
+
+  return <MarkdownContent content={content} />;
 }
 
 function Reactions() {

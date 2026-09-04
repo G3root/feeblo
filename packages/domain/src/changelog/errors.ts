@@ -21,10 +21,18 @@ export class FailedToUpdateChangelogError extends Schema.TaggedError<FailedToUpd
   { httpApiStatus: 500, identifier: "FailedToUpdateChangelogError" }
 ) {}
 
+/** No published changelog matched the given slug/organization. */
+export class ChangelogNotFoundError extends Schema.TaggedError<ChangelogNotFoundError>()(
+  "ChangelogNotFoundError",
+  { message: Schema.optional(Schema.String) },
+  { httpApiStatus: 404, identifier: "ChangelogNotFoundError" }
+) {}
+
 export const ChangelogServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
   PolicyDeniedError,
+  ChangelogNotFoundError,
   FailedToCreateChangelogError,
   FailedToDeleteChangelogError,
   FailedToUpdateChangelogError,

@@ -25,6 +25,11 @@ export function BoardPostRowItem({
   );
 
   return (
+    // NOTE: no `content-visibility: auto` here. The lane accordion animates
+    // a measured panel height (`--accordion-panel-height`); skipped rows
+    // report estimated sizes during measurement, which jumps the animation
+    // endpoint once real sizes resolve. (Reverted after causing exactly
+    // that open/close jump.)
     <div className="group hover:bg-muted/50 mt-1 flex items-center gap-2 rounded-xl px-4 py-3 transition-colors">
       <Checkbox
         aria-label={`Select ${post.title}`}

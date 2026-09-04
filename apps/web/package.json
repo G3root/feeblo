@@ -41,7 +41,6 @@
     "@hugeicons/core-free-icons": "^4.2.3",
     "@hugeicons/react": "^1.1.9",
     "@marsidev/react-turnstile": "^1.5.4",
-    "@posthog/react": "^1.10.3",
     "@tanstack/query-db-collection": "catalog:",
     "@tanstack/react-db": "catalog:",
     "@tanstack/react-form": "catalog:",

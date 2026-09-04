@@ -13,6 +13,7 @@ import {
   PostDeletePublic,
   PostGet,
   PostList,
+  PostListItem,
   PostMerge,
   PostOfficialUpdatePublish,
   PostSuggestions,
@@ -30,17 +31,26 @@ export class PostRpcs extends RpcGroup.make(
   // callers — do not do that without adding an explicit anonymous-identity path.
   Rpc.make("PostList", {
     payload: PostList,
-    success: Schema.Array(Post),
+    success: Schema.Array(PostListItem),
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
   Rpc.make("PostListPublic", {
     payload: PostList,
-    success: Schema.Array(Post),
+    success: Schema.Array(PostListItem),
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   })
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
+
+  // Authenticated detail fetch (full `Post` including `content`) for the
+  // dashboard. Lists return the slim `PostListItem`; detail routes resolve
+  // the body through this RPC instead of over-fetching it for every row.
+  Rpc.make("PostGet", {
+    payload: PostGet,
+    success: Post,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
 
   Rpc.make("PostGetPublic", {
     payload: PostGet,

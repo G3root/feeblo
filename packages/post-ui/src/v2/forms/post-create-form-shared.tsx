@@ -9,10 +9,10 @@ import { withForm } from "@feeblo/ui/hooks/form";
 import { Label } from "@feeblo/ui/label";
 import { Switch } from "@feeblo/ui/switch";
 import { formOptions } from "@tanstack/react-form";
+import { lazy, Suspense } from "react";
 import { z } from "zod";
 
 import { emptyOnBehalfAuthor } from "../contact-combobox/contact-combobox";
-import { PostEditor } from "../post-editor";
 import { PostBoardSelect, StatusField } from "../post-field";
 import { PostTitleInput } from "../post-title-input";
 import { usePostCollections } from "../providers/post-collections-provider";
@@ -39,6 +39,15 @@ const TitleField = z
 
 // The composed object schema was dropped: the function validator below checks
 // each field against its own schema, and `author` is server-validated.
+
+// The rich-text editor (prosekit + friends) is the heaviest module in the
+// create flow. The dialog opens first with fields + skeleton; the editor
+// streams in, so opening never waits on it.
+const PostEditor = lazy(() =>
+  import("../post-editor").then((module) => ({
+    default: module.PostEditor,
+  }))
+);
 
 export const postCreateFormOpts = formOptions({
   defaultValues: {
@@ -133,12 +142,18 @@ export const PostContentField = withForm({
             name={field.name}
             touched={field.state.meta.isTouched}
           >
-            <PostEditor
-              content={field.state.value}
-              onContentChange={field.handleChange}
-              {...(assetOwner === "organization" ? { organizationId } : {})}
-              {...rest}
-            />
+            <Suspense
+              fallback={
+                <div className="bg-muted h-36 animate-pulse rounded-xl" />
+              }
+            >
+              <PostEditor
+                content={field.state.value}
+                onContentChange={field.handleChange}
+                {...(assetOwner === "organization" ? { organizationId } : {})}
+                {...rest}
+              />
+            </Suspense>
             <FieldError
               errors={field.state.meta.errors}
               match={field.state.meta.isTouched && !field.state.meta.isValid}

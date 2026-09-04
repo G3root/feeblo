@@ -522,6 +522,11 @@ export const postTable = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date()),
   },
   (table) => [
+    index("post_organizationId_boardId_createdAt_idx").on(
+      table.organizationId,
+      table.boardId,
+      table.createdAt
+    ),
     index("post_statusId_idx").on(table.statusId),
     index("post_archivedAt_idx").on(table.archivedAt),
     index("post_mergedIntoPostId_idx").on(table.mergedIntoPostId),
@@ -589,6 +594,10 @@ export const upvoteTable = pgTable(
       .notNull(),
   },
   (table) => [
+    index("upvote_organizationId_postId_idx").on(
+      table.organizationId,
+      table.postId
+    ),
     index("upvote_postId_idx").on(table.postId),
     uniqueIndex("upvote_userId_postId_uidx").on(table.userId, table.postId),
   ]
@@ -617,6 +626,7 @@ export const postReactionTable = pgTable(
       .notNull(),
   },
   (table) => [
+    index("postReaction_postId_idx").on(table.postId),
     uniqueIndex("postReaction_userId_postId_emoji_uidx").on(
       table.userId,
       table.postId,
@@ -765,6 +775,7 @@ export const commentReactionTable = pgTable(
       .notNull(),
   },
   (table) => [
+    index("commentReaction_commentId_idx").on(table.commentId),
     uniqueIndex("commentReaction_userId_commentId_emoji_uidx").on(
       table.userId,
       table.commentId,
