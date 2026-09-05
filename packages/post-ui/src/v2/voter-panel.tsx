@@ -14,6 +14,7 @@ import {
   DialogPopup,
   DialogTitle,
 } from "@feeblo/ui/dialog";
+import { Popover, PopoverPopup, PopoverTrigger } from "@feeblo/ui/popover";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
@@ -21,6 +22,7 @@ import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
+import { EmailSchema } from "@feeblo/web-shared/user-validation";
 import {
   Cancel01Icon,
   ThumbsUpIcon,
@@ -71,8 +73,13 @@ export function VoterPanel() {
   const votesOnBehalfPolicy = usePolicy(
     hasPermission(organizationId, "votes.onBehalf")
   );
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   const { data: upvotes = [], isLoading } = useLiveQuery(
     (q) =>
@@ -121,12 +128,48 @@ export function VoterPanel() {
     }
     try {
       await addVoter({ author: toOnBehalfAuthor(selection) });
-      setIsPickerOpen(false);
+      setIsAddOpen(false);
     } catch (error) {
       toastManager.add({
         title: parseRpcError(error).message,
         type: "error",
       });
+    }
+  };
+
+  const resetCreateForm = () => {
+    setNewName("");
+    setNewEmail("");
+    setCreateError(null);
+    setIsCreating(false);
+  };
+
+  // Explicit new-user path (Quackback's "Create new user" parity): an
+  // admin names someone not yet in the system and their vote is recorded
+  // via the resolver's find-or-create. An email that turns out to belong
+  // to an existing contact or member resolves to them instead of
+  // duplicating — the RPC is idempotent either way.
+  const handleCreateAndVote = async () => {
+    const name = newName.trim();
+    const email = newEmail.trim();
+    if (!name) {
+      setCreateError("Name is required");
+      return;
+    }
+    if (!EmailSchema.safeParse(email).success) {
+      setCreateError("Enter a valid email address");
+      return;
+    }
+    setCreateError(null);
+    setIsCreating(true);
+    try {
+      await addVoter({ author: { email, name } });
+      setIsCreateOpen(false);
+      setIsAddOpen(false);
+      resetCreateForm();
+    } catch (error) {
+      setCreateError(parseRpcError(error).message);
+      setIsCreating(false);
     }
   };
 
@@ -153,29 +196,103 @@ export function VoterPanel() {
           Voters ({upvotes.length})
         </h2>
         {session && votesOnBehalfPolicy.allowed ? (
-          <Button
-            aria-expanded={isPickerOpen}
-            onClick={() => setIsPickerOpen((open) => !open)}
-            size="sm"
-            type="button"
-            variant="ghost"
-          >
-            <HugeiconsIcon icon={UserAdd01Icon} strokeWidth={2} />
-            Add voter
-          </Button>
+          <Popover onOpenChange={setIsAddOpen} open={isAddOpen}>
+            <PopoverTrigger
+              render={
+                <Button size="sm" type="button" variant="ghost">
+                  <HugeiconsIcon icon={UserAdd01Icon} strokeWidth={2} />
+                  Add voter
+                </Button>
+              }
+            />
+            <PopoverPopup align="end" className="w-64 p-1">
+              <ContactCombobox
+                label="Add voter"
+                onSelect={handleAdd}
+                organizationId={organizationId}
+                placeholder="Search customers by name or email..."
+                postId={post.id}
+                value={null}
+              />
+              <div className="border-border/30 border-t p-1">
+                <button
+                  className="text-muted-foreground hover:bg-muted/60 hover:text-foreground flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors"
+                  onClick={() => {
+                    resetCreateForm();
+                    setIsCreateOpen(true);
+                  }}
+                  type="button"
+                >
+                  <HugeiconsIcon
+                    className="size-4"
+                    icon={UserAdd01Icon}
+                    strokeWidth={2}
+                  />
+                  New user
+                </button>
+              </div>
+            </PopoverPopup>
+          </Popover>
         ) : null}
       </div>
 
-      {isPickerOpen && votesOnBehalfPolicy.allowed ? (
-        <ContactCombobox
-          label="Add voter"
-          onSelect={handleAdd}
-          organizationId={organizationId}
-          placeholder="Search customers by name or email..."
-          postId={post.id}
-          value={null}
-        />
-      ) : null}
+      <Dialog
+        onOpenChange={(open) => {
+          setIsCreateOpen(open);
+          if (!open) {
+            resetCreateForm();
+          }
+        }}
+        open={isCreateOpen}
+      >
+        <DialogPopup>
+          <DialogHeader>
+            <DialogTitle>New user</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 px-6 pb-6">
+            <input
+              aria-label="Name"
+              className="border-border/50 placeholder:text-muted-foreground/50 focus:border-border w-full rounded-md border bg-transparent px-2.5 py-1.5 text-xs outline-none"
+              onChange={(event) => setNewName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void handleCreateAndVote();
+                }
+              }}
+              placeholder="Name"
+              type="text"
+              value={newName}
+            />
+            <input
+              aria-label="Email"
+              className="border-border/50 placeholder:text-muted-foreground/50 focus:border-border w-full rounded-md border bg-transparent px-2.5 py-1.5 text-xs outline-none"
+              onChange={(event) => setNewEmail(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void handleCreateAndVote();
+                }
+              }}
+              placeholder="Email"
+              type="email"
+              value={newEmail}
+            />
+            {createError ? (
+              <p className="text-destructive text-[11px]">{createError}</p>
+            ) : null}
+            <Button
+              className="w-full"
+              disabled={!newName.trim() || !newEmail.trim() || isCreating}
+              onClick={() => void handleCreateAndVote()}
+              size="sm"
+              type="button"
+            >
+              {isCreating ? "Adding..." : "Create & add vote"}
+            </Button>
+          </div>
+        </DialogPopup>
+      </Dialog>
 
       {isLoading ? (
         <Skeleton className="h-8 w-full" />
