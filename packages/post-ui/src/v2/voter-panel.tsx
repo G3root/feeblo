@@ -1,7 +1,19 @@
 import type { TPostCreateAuthor } from "@feeblo/domain/post/schema";
 import type { TUpvote } from "@feeblo/domain/upvote/schema";
-import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarGroup,
+  AvatarGroupCount,
+  AvatarImage,
+} from "@feeblo/ui/avatar";
 import { Button } from "@feeblo/ui/button";
+import {
+  Dialog,
+  DialogHeader,
+  DialogPopup,
+  DialogTitle,
+} from "@feeblo/ui/dialog";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
@@ -26,9 +38,15 @@ import {
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
-function VoterAvatar({ upvote }: { upvote: TUpvote }) {
+function VoterAvatar({
+  className,
+  upvote,
+}: {
+  className?: string;
+  upvote: TUpvote;
+}) {
   return (
-    <Avatar className="shrink-0" size="sm">
+    <Avatar className={cn("shrink-0", className)} size="sm">
       {upvote.user.image ? <AvatarImage src={upvote.user.image} /> : null}
       <AvatarFallback>
         {(upvote.user.name ?? "?").slice(0, 1).toUpperCase()}
@@ -54,6 +72,7 @@ export function VoterPanel() {
     hasPermission(organizationId, "votes.onBehalf")
   );
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const { data: upvotes = [], isLoading } = useLiveQuery(
     (q) =>
@@ -163,46 +182,72 @@ export function VoterPanel() {
       ) : upvotes.length === 0 ? (
         <p className="text-muted-foreground text-xs">No voters yet.</p>
       ) : (
-        <ul className="space-y-1">
-          {upvotes.map((upvote) => {
-            const canRemove = Boolean(
-              session && votesOnBehalfPolicy.allowed && upvote.userId
-            );
-            return (
-              <li
-                className="group flex items-center gap-2 rounded-md px-1 py-1"
-                key={upvote.id}
-              >
-                <VoterAvatar upvote={upvote} />
-                <span
-                  className={cn(
-                    "min-w-0 flex-1 truncate text-sm",
-                    !upvote.user.name && "text-muted-foreground"
-                  )}
-                >
-                  {upvote.user.name ?? "Customer"}
-                </span>
-                {canRemove ? (
-                  <Button
-                    aria-label={`Remove voter ${upvote.user.name ?? "customer"}`}
-                    className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
-                    onClick={() => {
-                      if (!upvote.userId) {
-                        return;
-                      }
-                      handleRemove(upvote.userId);
-                    }}
-                    size="icon-xs"
-                    type="button"
-                    variant="ghost"
+        <Dialog onOpenChange={setIsDialogOpen} open={isDialogOpen}>
+          <button
+            aria-label={`Show all ${upvotes.length} voters`}
+            className="flex items-center transition-opacity hover:opacity-80"
+            onClick={() => setIsDialogOpen(true)}
+            type="button"
+          >
+            <AvatarGroup>
+              {upvotes.slice(0, 5).map((upvote) => (
+                <VoterAvatar
+                  className="ring-background ring-2"
+                  key={upvote.id}
+                  upvote={upvote}
+                />
+              ))}
+              {upvotes.length > 5 ? (
+                <AvatarGroupCount>+{upvotes.length - 5}</AvatarGroupCount>
+              ) : null}
+            </AvatarGroup>
+          </button>
+          <DialogPopup>
+            <DialogHeader>
+              <DialogTitle>Voters ({upvotes.length})</DialogTitle>
+            </DialogHeader>
+            <ul className="max-h-80 space-y-1 overflow-y-auto px-6 pb-6">
+              {upvotes.map((upvote) => {
+                const canRemove = Boolean(
+                  session && votesOnBehalfPolicy.allowed && upvote.userId
+                );
+                return (
+                  <li
+                    className="group flex items-center gap-2 rounded-md px-1 py-1"
+                    key={upvote.id}
                   >
-                    <HugeiconsIcon icon={Cancel01Icon} />
-                  </Button>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+                    <VoterAvatar upvote={upvote} />
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 truncate text-sm",
+                        !upvote.user.name && "text-muted-foreground"
+                      )}
+                    >
+                      {upvote.user.name ?? "Customer"}
+                    </span>
+                    {canRemove ? (
+                      <Button
+                        aria-label={`Remove voter ${upvote.user.name ?? "customer"}`}
+                        className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+                        onClick={() => {
+                          if (!upvote.userId) {
+                            return;
+                          }
+                          handleRemove(upvote.userId);
+                        }}
+                        size="icon-xs"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <HugeiconsIcon icon={Cancel01Icon} />
+                      </Button>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </DialogPopup>
+        </Dialog>
       )}
     </section>
   );
