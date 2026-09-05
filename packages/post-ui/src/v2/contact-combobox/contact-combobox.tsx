@@ -253,7 +253,7 @@ export function ContactCombobox({
   const queryLooksLikeEmail =
     trimmedQuery.length >= MIN_QUERY_LENGTH &&
     EmailSchema.safeParse(trimmedQuery).success;
-  // Quackback parity: the create-new entry is always offered for email-like
+  // The create-new entry is always offered for email-like
   // queries, not just on empty results — otherwise a substring hit hides the
   // only path to attribute to someone new. Suppressed only for an exact
   // email hit (submit would resolve to them anyway) and on transport errors

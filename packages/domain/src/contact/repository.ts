@@ -402,8 +402,8 @@ const makeContactRepository = Effect.gen(function* () {
           .limit(limit);
 
         // Members are staff, never contacts: a second leg surfaces org
-        // members with no contact row so the picker matches Quackback's
-        // people search. Two indexed queries merged in TS keeps ranking in
+        // members with no contact row alongside customers. Two indexed
+        // queries merged in TS keeps ranking in
         // one place and avoids UNION ordering pitfalls; both legs are
         // already capped at `limit`, the merged list is sliced to it.
         const members = yield* db

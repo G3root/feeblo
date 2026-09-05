@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@feeblo/ui/dialog";
 import { Popover, PopoverPopup, PopoverTrigger } from "@feeblo/ui/popover";
+import { Separator } from "@feeblo/ui/separator";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
@@ -144,11 +145,10 @@ export function VoterPanel() {
     setIsCreating(false);
   };
 
-  // Explicit new-user path (Quackback's "Create new user" parity): an
-  // admin names someone not yet in the system and their vote is recorded
-  // via the resolver's find-or-create. An email that turns out to belong
-  // to an existing contact or member resolves to them instead of
-  // duplicating — the RPC is idempotent either way.
+  // Explicit new-user path: an admin names someone not yet in the system
+  // and their vote is recorded via the resolver's find-or-create. An email
+  // that turns out to belong to an existing contact or member resolves to
+  // them instead of duplicating — the RPC is idempotent either way.
   const handleCreateAndVote = async () => {
     const name = newName.trim();
     const email = newEmail.trim();
@@ -214,22 +214,21 @@ export function VoterPanel() {
                 postId={post.id}
                 value={null}
               />
-              <div className="border-border/30 border-t p-1">
-                <button
-                  className="text-muted-foreground hover:bg-muted/60 hover:text-foreground flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors"
+              <div className="px-1 pt-2 pb-1">
+                <Separator className="mb-2" />
+                <Button
+                  className="w-full justify-start"
                   onClick={() => {
                     resetCreateForm();
                     setIsCreateOpen(true);
                   }}
+                  size="sm"
                   type="button"
+                  variant="ghost"
                 >
-                  <HugeiconsIcon
-                    className="size-4"
-                    icon={UserAdd01Icon}
-                    strokeWidth={2}
-                  />
+                  <HugeiconsIcon icon={UserAdd01Icon} strokeWidth={2} />
                   New user
-                </button>
+                </Button>
               </div>
             </PopoverPopup>
           </Popover>
