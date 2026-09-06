@@ -264,9 +264,10 @@ const makeContactRepository = Effect.gen(function* () {
      *
      * Matching runs over contact email/name and company name with prefix +
      * substring ILIKE patterns supported by the pg_trgm GIN indexes
-     * (migration 20260821021207_pretty_morbius). Ranking is computed in SQL so
-     * the whole search is one round trip: exact email hit first, then email
-     * prefix, then name prefix, then any substring match.
+     * (migration 20260821021207_pretty_morbius). Each leg selects its rank
+     * (exact email hit first, then email prefix, then name prefix, then any
+     * substring match) so the TS merge below sorts by the rank the database
+     * computed instead of reimplementing the tiers.
      *
      * `hasAccess` mirrors the notification eligibility rule in
      * plan-on-behalf.md: a linked, email-verified account that is either an
@@ -287,7 +288,7 @@ const makeContactRepository = Effect.gen(function* () {
       const prefix = `${escaped}%`;
       const substring = `%${escaped}%`;
 
-      const rankCase = sql`CASE
+      const contactRank = sql<number>`CASE
         WHEN lower(${schema.contactTable.email}) = ${exactEmail} THEN 0
         WHEN ${schema.contactTable.email} ILIKE ${prefix} ESCAPE '\\' THEN 1
         WHEN ${schema.contactTable.name} ILIKE ${prefix} ESCAPE '\\' THEN 2
@@ -341,7 +342,7 @@ const makeContactRepository = Effect.gen(function* () {
           )`
           : sql<boolean>`FALSE`;
 
-      const memberRankCase = sql`CASE
+      const memberRank = sql<number>`CASE
         WHEN lower(${schema.userTable.email}) = ${exactEmail} THEN 0
         WHEN ${schema.userTable.email} ILIKE ${prefix} ESCAPE '\\' THEN 1
         WHEN ${schema.userTable.name} ILIKE ${prefix} ESCAPE '\\' THEN 2
@@ -372,6 +373,7 @@ const makeContactRepository = Effect.gen(function* () {
             isMember: sql<boolean>`${schema.memberTable.id} IS NOT NULL`,
             hasAccess,
             alreadyVoted,
+            rank: contactRank,
           })
           .from(schema.contactTable)
           .leftJoin(
@@ -402,13 +404,12 @@ const makeContactRepository = Effect.gen(function* () {
             )`
             )
           )
-          .orderBy(rankCase, contactLabel, schema.contactTable.createdAt)
+          .orderBy(contactRank, contactLabel, schema.contactTable.createdAt)
           .limit(limit);
 
         // Members are staff, never contacts: a second leg surfaces org
         // members with no contact row alongside customers. Two indexed
-        // queries merged in TS keeps ranking in
-        // one place and avoids UNION ordering pitfalls; both legs are
+        // queries merged in TS avoids UNION ordering pitfalls; both legs are
         // already capped at `limit`, the merged list is sliced to it.
         const members = yield* db
           .select({
@@ -421,6 +422,7 @@ const makeContactRepository = Effect.gen(function* () {
             isMember: sql<boolean>`TRUE`,
             hasAccess: sql<boolean>`${schema.userTable.emailVerified} IS TRUE`,
             alreadyVoted: memberAlreadyVoted,
+            rank: memberRank,
           })
           .from(schema.memberTable)
           .innerJoin(
@@ -436,7 +438,7 @@ const makeContactRepository = Effect.gen(function* () {
               )`
             )
           )
-          .orderBy(memberRankCase, memberLabel, schema.memberTable.createdAt)
+          .orderBy(memberRank, memberLabel, schema.memberTable.createdAt)
           .limit(limit);
 
         // A contact row already linked to a member is hidden in favor of
@@ -447,26 +449,20 @@ const makeContactRepository = Effect.gen(function* () {
           (c) => c.userId == null || !memberUserIds.has(c.userId)
         );
 
-        const query = trimmed.toLowerCase();
-        const rankOf = (name: string | null, email: string | null) => {
-          const e = (email ?? "").toLowerCase();
-          const n = (name ?? "").toLowerCase();
-          if (e !== "" && e === query) return 0;
-          if (e !== "" && e.startsWith(query)) return 1;
-          if (n !== "" && n.startsWith(query)) return 2;
-          return 3;
-        };
         const labelOf = (name: string | null, email: string | null) =>
           (name ?? email ?? "").toLowerCase();
 
+        // Sort by the database-computed rank (selected above on both legs),
+        // then by display label; the rank column is stripped before return
+        // so the RPC shape is unchanged.
         return [...customers, ...members]
           .sort((a, b) => {
-            const byRank = rankOf(a.name, a.email) - rankOf(b.name, b.email);
-            if (byRank !== 0) return byRank;
+            if (a.rank !== b.rank) return a.rank - b.rank;
             const aLabel = labelOf(a.name, a.email);
             const bLabel = labelOf(b.name, b.email);
             return aLabel < bLabel ? -1 : aLabel > bLabel ? 1 : 0;
           })
+          .map(({ rank: _rank, ...result }) => result)
           .slice(0, limit);
       });
     },

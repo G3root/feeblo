@@ -8,23 +8,20 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { EmailOutboxConfig } from "../email-outbox/config";
-import { InvalidSubjectError, SubjectNotFoundError } from "../identity/errors";
+import { InvalidSubjectError } from "../identity/errors";
+import {
+  resolveOnBehalfSubject,
+  toOnBehalfMetadata,
+} from "../identity/on-behalf";
 import { ResolvePrincipalService } from "../identity/service";
 import { recordPostIntegrationEvent as recordPostIntegrationEventShared } from "../integration/post-event-recording";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
-import {
-  type PostActivityMetadata,
-  PostActivityRepository,
-} from "../post-activity/repository";
+import { PostActivityRepository } from "../post-activity/repository";
 import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
-import {
-  BadRequestError,
-  InternalServerError,
-  withRemapDbErrors,
-} from "../rpc-errors";
+import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import {
   FailedToCreateCommentError,
@@ -49,7 +46,6 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CommentRepository;
   const activityRepository = yield* PostActivityRepository;
   const commentPolicy = yield* CommentPolicy;
-  const resolvePrincipal = yield* ResolvePrincipalService;
   // const sitePolicy = yield* SitePolicy;
 
   const notifications = yield* Effect.serviceOption(NotificationService);
@@ -188,6 +184,14 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     return Effect.gen(function* () {
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
+      if (args.author !== undefined) {
+        // Per-member abuse bound for on-behalf creations (see
+        // plan-on-behalf.md); self-service comments are unaffected.
+        yield* RateLimit.consumeDashboardRateLimit({
+          key: `on-behalf-create:${args.organizationId}:${session.session.userId}`,
+          name: "on-behalf-create",
+        });
+      }
 
       yield* transaction(
         Effect.gen(function* () {
@@ -195,34 +199,16 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
           // transaction as the mutation (see plan-on-behalf.md). Absent
           // `author`, everything below behaves exactly as before. Comments
           // need a user row, so shadow users are provisioned here for
-          // email-only subjects. Identity failures surface as themselves;
-          // infrastructure failures are normalized like every other
-          // persistence error here.
+          // email-only subjects.
           const subject =
             args.author === undefined
               ? undefined
-              : yield* resolvePrincipal
-                  .resolve({
-                    organizationId: args.organizationId,
-                    needsUser: true,
-                    subject: args.author,
-                  })
-                  .pipe(
-                    Effect.mapError(
-                      (
-                        error
-                      ):
-                        | SubjectNotFoundError
-                        | InvalidSubjectError
-                        | InternalServerError =>
-                        error instanceof SubjectNotFoundError ||
-                        error instanceof InvalidSubjectError
-                          ? error
-                          : new InternalServerError({
-                              message: "Could not resolve the comment author.",
-                            })
-                    )
-                  );
+              : yield* resolveOnBehalfSubject({
+                  organizationId: args.organizationId,
+                  needsUser: true,
+                  subject: args.author,
+                  action: "comment author",
+                });
           // Comments need a user row: resolution with needsUser:true
           // guarantees one, provisioning a shadow account when necessary.
           if (subject !== undefined && subject.userId === null) {
@@ -249,13 +235,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
               !subject && { memberId: membership.membershipId }),
           });
 
-          const onBehalfMetadata: PostActivityMetadata | undefined =
-            subject && {
-              onBehalfOf: {
-                contactId: subject.contactId,
-                ...(subject.userId !== null && { userId: subject.userId }),
-              },
-            };
+          const onBehalfMetadata = toOnBehalfMetadata(subject);
 
           yield* activityRepository.create({
             organizationId: args.organizationId,

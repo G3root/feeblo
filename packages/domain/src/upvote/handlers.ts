@@ -1,19 +1,23 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
-import { InvalidSubjectError, SubjectNotFoundError } from "../identity/errors";
-import { isSyntheticEmail, ResolvePrincipalService } from "../identity/service";
+import { InvalidSubjectError } from "../identity/errors";
+import {
+  resolveOnBehalfSubject,
+  subscribeOnBehalfSubject,
+  toOnBehalfMetadata,
+} from "../identity/on-behalf";
+import { ResolvePrincipalService } from "../identity/service";
 import * as Policy from "../policy";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
-import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
+import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import { UserRepository } from "../user/repository";
 import { UpvotePolicy } from "./policies";
@@ -26,16 +30,10 @@ import type {
   TUpvoteToggle,
 } from "./schema";
 
-/** Verification links for admin-added voter subscriptions stay valid one day. */
-const VERIFICATION_WINDOW_MS = 86_400_000;
-
 export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* UpvoteRepository;
   const upvotePolicy = yield* UpvotePolicy;
   const activityRepository = yield* PostActivityRepository;
-  const emailSubscriptions = yield* EmailSubscriptionRepository;
-  const resolvePrincipal = yield* ResolvePrincipalService;
-  const userRepository = yield* UserRepository;
   const db = yield* currentDb;
 
   return {
@@ -79,36 +77,24 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
+        // Per-member abuse bound for on-behalf voter management (see
+        // plan-on-behalf.md).
+        yield* RateLimit.consumeDashboardRateLimit({
+          key: `on-behalf-create:${args.organizationId}:${session.session.userId}`,
+          name: "on-behalf-create",
+        });
 
         const result = yield* transaction(
           Effect.gen(function* () {
             // The customer is resolved inside the same transaction as the
             // mutation (see plan-on-behalf.md). Votes need a user row, so
             // shadow users are provisioned here for email-only subjects.
-            // Identity failures surface as themselves; infrastructure
-            // failures are normalized like every other persistence error.
-            const subject = yield* resolvePrincipal
-              .resolve({
-                organizationId: args.organizationId,
-                needsUser: true,
-                subject: args.author,
-              })
-              .pipe(
-                Effect.mapError(
-                  (
-                    error
-                  ):
-                    | SubjectNotFoundError
-                    | InvalidSubjectError
-                    | InternalServerError =>
-                    error instanceof SubjectNotFoundError ||
-                    error instanceof InvalidSubjectError
-                      ? error
-                      : new InternalServerError({
-                          message: "Could not resolve the voter.",
-                        })
-                )
-              );
+            const subject = yield* resolveOnBehalfSubject({
+              organizationId: args.organizationId,
+              needsUser: true,
+              subject: args.author,
+              action: "voter",
+            });
             if (subject.userId === null) {
               return yield* new InvalidSubjectError({
                 message: "The resolved customer has no account to vote as",
@@ -126,85 +112,29 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
               return added;
             }
 
+            const onBehalfMetadata = toOnBehalfMetadata(subject);
             yield* activityRepository.create({
               organizationId: args.organizationId,
               postId: args.postId,
               actorId: session.session.userId,
               actorMemberId: membership?.membershipId ?? null,
               kind: "VOTE_ADDED",
-              metadata: {
-                onBehalfOf: {
-                  contactId: subject.contactId,
-                  userId: subject.userId,
-                },
-              },
+              ...(onBehalfMetadata && { metadata: onBehalfMetadata }),
             });
 
             // Adding a voter is an explicit admin statement that this person
-            // cares about the post, so they get a post email subscription:
-            // trusted/active when their linked account is email-verified,
-            // deferred otherwise — nothing is emailed until identity linking
-            // grants them access. Self-service voting still subscribes
-            // nobody, and in-app notifications stay member-only.
+            // cares about the post, so they get a post email subscription.
+            // Self-service voting still subscribes nobody, and in-app
+            // notifications stay member-only.
             const subscriptionNow = yield* DateTime.nowAsDate;
-            const subjectUser = yield* userRepository.getById(subject.userId);
-            if (Option.isSome(subjectUser) && subjectUser.value.emailVerified) {
-              yield* emailSubscriptions
-                .requestSubscription({
-                  alreadyVerifiedUser: { userId: subject.userId },
-                  email: subjectUser.value.email,
-                  now: subscriptionNow,
-                  organizationId: args.organizationId,
-                  source: "admin_added_voter",
-                  topic: { topicId: args.postId, topicType: "post" },
-                  verificationExpiresAt: new Date(
-                    subscriptionNow.getTime() + VERIFICATION_WINDOW_MS
-                  ),
-                })
-                .pipe(
-                  Effect.mapError(
-                    () =>
-                      new InternalServerError({
-                        message:
-                          "Could not record the voter email subscription.",
-                      })
-                  )
-                );
-            } else {
-              const [contact] = yield* db
-                .select({ email: schema.contactTable.email })
-                .from(schema.contactTable)
-                .where(eq(schema.contactTable.id, subject.contactId))
-                .limit(1);
-              const contactEmail = contact?.email;
-              if (
-                contactEmail !== null &&
-                contactEmail !== undefined &&
-                !isSyntheticEmail(contactEmail)
-              ) {
-                yield* emailSubscriptions
-                  .requestSubscription({
-                    deferredNoAccess: true,
-                    email: contactEmail,
-                    now: subscriptionNow,
-                    organizationId: args.organizationId,
-                    source: "admin_added_voter",
-                    topic: { topicId: args.postId, topicType: "post" },
-                    verificationExpiresAt: new Date(
-                      subscriptionNow.getTime() + VERIFICATION_WINDOW_MS
-                    ),
-                  })
-                  .pipe(
-                    Effect.mapError(
-                      () =>
-                        new InternalServerError({
-                          message:
-                            "Could not record the deferred voter email subscription.",
-                        })
-                    )
-                  );
-              }
-            }
+            yield* subscribeOnBehalfSubject({
+              organizationId: args.organizationId,
+              topicId: args.postId,
+              subject,
+              source: "admin_added_voter",
+              subjectKind: "voter",
+              now: subscriptionNow,
+            });
 
             return added;
           })
@@ -224,6 +154,11 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
+        // Same per-member bound as the add path (see plan-on-behalf.md).
+        yield* RateLimit.consumeDashboardRateLimit({
+          key: `on-behalf-create:${args.organizationId}:${session.session.userId}`,
+          name: "on-behalf-create",
+        });
 
         const result = yield* transaction(
           Effect.gen(function* () {
@@ -237,6 +172,21 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
               return removed;
             }
 
+            // The remove payload carries only a userId; resolve the contact
+            // when one exists so provenance keeps its documented
+            // `{ contactId, userId }` shape. Pre-existing voters may have
+            // no contact — then only the userId is recorded and nothing
+            // is invented.
+            const [voterContact] = yield* db
+              .select({ contactId: schema.contactTable.id })
+              .from(schema.contactTable)
+              .where(
+                and(
+                  eq(schema.contactTable.organizationId, args.organizationId),
+                  eq(schema.contactTable.userId, args.userId)
+                )
+              )
+              .limit(1);
             yield* activityRepository.create({
               organizationId: args.organizationId,
               postId: args.postId,
@@ -245,9 +195,9 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
               kind: "VOTE_REMOVED",
               metadata: {
                 onBehalfOf: {
-                  // The remove payload carries only a userId; there may be
-                  // no contact for pre-existing voters, so no contactId is
-                  // invented here.
+                  ...(voterContact && {
+                    contactId: voterContact.contactId,
+                  }),
                   userId: args.userId,
                 },
               },

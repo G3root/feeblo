@@ -8,7 +8,9 @@ import { validateAttributeValueEffect } from "../attribute-definition/validation
 import { CompanyRepository } from "../company/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
+import { consumeDashboardRateLimit } from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
+import { CurrentSession } from "../session-middleware";
 import { WorkspaceRepository } from "../workspace/repository";
 import { ContactNotFoundError, FailedToCreateContactError } from "./errors";
 import { ContactPolicy } from "./policies";
@@ -54,6 +56,13 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         if (searchArgs.query.length < 2) {
           return [];
         }
+        const session = yield* CurrentSession;
+        // Dashboard read-level rate limit for the picker (see
+        // plan-on-behalf.md); keyed by the searching member.
+        yield* consumeDashboardRateLimit({
+          key: `contact-search:${args.organizationId}:${session.session.userId}`,
+          name: "contact-search",
+        });
         return yield* repository.search(searchArgs);
       }).pipe(
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),

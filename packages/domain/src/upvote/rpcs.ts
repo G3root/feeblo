@@ -35,14 +35,16 @@ export class UpvoteRpcs extends RpcGroup.make(
     success: Schema.Struct({
       added: Schema.Boolean,
     }),
-    error: UpvoteServiceErrors,
+    // On-behalf voter management consumes the per-member dashboard rate limit.
+    error: Schema.Union([UpvoteServiceErrors, RateLimitErrors]),
   }).middleware(AuthMiddleware),
   Rpc.make("UpvoteRemoveOnBehalf", {
     payload: UpvoteRemoveOnBehalf,
     success: Schema.Struct({
       removed: Schema.Boolean,
     }),
-    error: UpvoteServiceErrors,
+    // Same per-member bound as the add path.
+    error: Schema.Union([UpvoteServiceErrors, RateLimitErrors]),
   }).middleware(AuthMiddleware),
 
   Rpc.make("UpvoteListPublic", {

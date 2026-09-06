@@ -55,9 +55,9 @@ type NameLookup = ReadonlyMap<string, string>;
 /**
  * Provenance payload recorded by on-behalf actions
  * (`packages/domain/src/post-activity/repository.ts#PostActivityMetadata`).
- * `PostActivityList` does not return `metadata` yet, so this stays inert
- * until the RPC exposes it; the renderer is written against the documented
- * shape so provenance lights up without further UI changes.
+ * `PostActivityList` returns `metadata` (nullable; null for every
+ * pre-on-behalf row), so on-behalf rows render "on behalf of {subject}"
+ * once the subject's contact is in the local collection.
  */
 type OnBehalfMetadata = {
   onBehalfOf?: {

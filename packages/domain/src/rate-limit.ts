@@ -124,6 +124,63 @@ export const withPublicRpcRateLimit =
   <A, E, R>(self: Effect.Effect<A, E, R>) =>
     Effect.andThen(publicRpc(options), self);
 
+/**
+ * Per-member rate limits for authenticated dashboard RPCs (see
+ * plan-on-behalf.md, "Abuse and Cost Controls"). Unlike the public
+ * helpers above these are keyed by the calling member, not the client IP:
+ * dashboard RPCs always run under `AuthMiddleware`, so the member is the
+ * stable abuse identity.
+ *
+ * - `contact-search`: the combobox debounces client-side (~200ms, so
+ *   sustained typing peaks near 300 requests/minute); the cap sits above
+ *   that with headroom for a cheap indexed query.
+ * - `on-behalf-create`: deliberate admin writes (posts, voters, comments
+ *   attributed to a customer); 60/minute is generous for bulk capture
+ *   while bounding contact/shadow-user provisioning.
+ */
+const dashboardRateLimits = {
+  "contact-search": { limit: 300, window: "1 minute" },
+  "on-behalf-create": { limit: 60, window: "1 minute" },
+} as const satisfies Record<
+  string,
+  { readonly limit: number; readonly window: Duration.Input }
+>;
+
+export type DashboardRateLimitName = keyof typeof dashboardRateLimits;
+
+export const consumeDashboardRateLimit = (args: {
+  /** Fully-qualified key including the member scope, e.g. `contact-search:{org}:{userId}`. */
+  readonly key: string;
+  readonly name: DashboardRateLimitName;
+  /** Override for tests; production call sites always use the preset. */
+  readonly limit?: number;
+}): Effect.Effect<void, RateLimitError> =>
+  Effect.gen(function* () {
+    const rateLimitService = yield* Effect.serviceOption(RateLimitService);
+    if (Option.isNone(rateLimitService)) {
+      // Handler unit tests run without the rate-limit layer (same rationale
+      // as `PublicRpcRateLimiter`'s defaultValue above): skip rather than
+      // fail closed, so pure behavior tests need no limiter wiring.
+      return;
+    }
+    const preset = dashboardRateLimits[args.name];
+    return yield* rateLimitService.value
+      .consume({
+        key: args.key,
+        limit: args.limit ?? preset.limit,
+        window: preset.window,
+      })
+      .pipe(
+        Effect.catchTag("RateLimiterError", (error) =>
+          Effect.fail<RateLimitError>(
+            error.reason._tag === "RateLimitExceeded"
+              ? new RateLimitExceededError()
+              : new RateLimitUnavailableError()
+          )
+        )
+      );
+  });
+
 export class PublicRpcRateLimitMiddleware extends RpcMiddleware.Service<PublicRpcRateLimitMiddleware>()(
   "@feeblo/api/PublicRpcRateLimitMiddleware",
   {

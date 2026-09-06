@@ -192,8 +192,8 @@ When a shadow user's human eventually shows up with a real account, the split mu
 
 ## Abuse and Cost Controls
 
-- `ContactSearch` behind the dashboard read rate limiter.
-- Per-member rate limits on on-behalf creations (posts, voters, comments).
+- `ContactSearch` behind a per-member dashboard read rate limit (300/minute).
+- Per-member rate limits on on-behalf writes (posts, voter add/remove, comments; 60/minute).
 - Contact find-or-create cannot overwrite an existing contact's identity fields except empty name/avatar enrichment.
 - Staff-attribution badge prevents silent impersonation of members.
 

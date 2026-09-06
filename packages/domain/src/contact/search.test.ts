@@ -9,8 +9,9 @@ import { ContactRepository } from "./repository";
 
 /**
  * Repository-level coverage for the on-behalf people-picker query. The
- * handler adds only membership policy and the short-query guard; everything
- * under test here (ranking, scoping, badges) lives in the repository.
+ * handler adds only membership policy, the short-query guard, and the
+ * per-member read rate limit; everything under test here (ranking, scoping,
+ * badges) lives in the repository.
  */
 describe("ContactRepository.search", () => {
   const TestLayer = Layer.mergeAll(

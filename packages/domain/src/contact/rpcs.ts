@@ -2,6 +2,7 @@ import * as Schema from "effect/Schema";
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 
+import { RateLimitErrors } from "../rate-limit";
 import { AuthMiddleware } from "../session-middleware";
 import { ContactServiceErrors } from "./errors";
 import {
@@ -24,7 +25,8 @@ export class ContactRpcs extends RpcGroup.make(
   Rpc.make("ContactSearch", {
     success: Schema.Array(ContactSearchResult),
     payload: ContactSearch,
-    error: ContactServiceErrors,
+    // The picker consumes the per-member dashboard read rate limit.
+    error: Schema.Union([ContactServiceErrors, RateLimitErrors]),
   }).middleware(AuthMiddleware),
 
   Rpc.make("ContactCreate", {

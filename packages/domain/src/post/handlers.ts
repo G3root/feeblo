@@ -23,14 +23,17 @@ import { EmailOutboxRepository } from "../email-outbox/repository";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
-import { InvalidSubjectError, SubjectNotFoundError } from "../identity/errors";
-import { isSyntheticEmail, ResolvePrincipalService } from "../identity/service";
+import {
+  resolveOnBehalfSubject,
+  subscribeOnBehalfSubject,
+  toOnBehalfMetadata,
+} from "../identity/on-behalf";
+import { ResolvePrincipalService } from "../identity/service";
 import { recordPostIntegrationEvent as recordPostIntegrationEventShared } from "../integration/post-event-recording";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import {
   type PostActivityInput,
-  type PostActivityMetadata,
   PostActivityRepository,
 } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
@@ -84,8 +87,6 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   const entitlementPolicy = yield* EntitlementPolicy;
   const activityRepository = yield* PostActivityRepository;
   const postPolicy = yield* PostPolicy;
-  const resolvePrincipal = yield* ResolvePrincipalService;
-  const userRepository = yield* UserRepository;
   const notifications = yield* Effect.serviceOption(NotificationService);
   const embeddingService = yield* Effect.serviceOption(PostEmbeddingService);
   // const sitePolicy = yield* SitePolicy;
@@ -600,6 +601,15 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     Effect.gen(function* () {
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
+      if (args.author !== undefined) {
+        // Per-member abuse bound for on-behalf creations (see
+        // plan-on-behalf.md); self-service creates are unaffected. Runs
+        // before asset prep so a limited request does no work.
+        yield* RateLimit.consumeDashboardRateLimit({
+          key: `on-behalf-create:${args.organizationId}:${session.session.userId}`,
+          name: "on-behalf-create",
+        });
+      }
       const subscriptionRepository = yield* PostSubscriptionRepository;
       const board = yield* boardRepository.getById({
         id: args.boardId,
@@ -632,41 +642,17 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         Effect.gen(function* () {
           // On-behalf attribution resolves the customer inside the same
           // transaction as the mutation (see plan-on-behalf.md). Absent
-          // `author`, everything below behaves exactly as before. Identity
-          // failures surface as themselves; infrastructure failures are
-          // normalized like every other subscription/persistence error here.
+          // `author`, everything below behaves exactly as before.
           const subject =
             args.author === undefined
               ? undefined
-              : yield* resolvePrincipal
-                  .resolve({
-                    organizationId: args.organizationId,
-                    needsUser: false,
-                    subject: args.author,
-                  })
-                  .pipe(
-                    Effect.mapError(
-                      (
-                        error
-                      ):
-                        | SubjectNotFoundError
-                        | InvalidSubjectError
-                        | InternalServerError =>
-                        error instanceof SubjectNotFoundError ||
-                        error instanceof InvalidSubjectError
-                          ? error
-                          : new InternalServerError({
-                              message: "Could not resolve the post author.",
-                            })
-                    )
-                  );
-          const onBehalfMetadata: PostActivityMetadata | undefined =
-            subject && {
-              onBehalfOf: {
-                contactId: subject.contactId,
-                ...(subject.userId !== null && { userId: subject.userId }),
-              },
-            };
+              : yield* resolveOnBehalfSubject({
+                  organizationId: args.organizationId,
+                  needsUser: false,
+                  subject: args.author,
+                  action: "post author",
+                });
+          const onBehalfMetadata = toOnBehalfMetadata(subject);
           const persistedSlug = yield* repository.create({
             ...args,
             content: prepared.content,
@@ -743,21 +729,6 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                 )
               );
           } else {
-            const subjectUser =
-              subject.userId === null
-                ? Option.none()
-                : yield* userRepository.getById(subject.userId);
-            // A verified SSO account carries a synthetic sso-* inbox that can
-            // never receive mail, so it must not enter the trusted
-            // subscription path; it defers like any other unresolvable
-            // address.
-            const verifiedEmail =
-              Option.isSome(subjectUser) &&
-              subjectUser.value.emailVerified &&
-              !isSyntheticEmail(subjectUser.value.email)
-                ? subjectUser.value.email
-                : undefined;
-
             // In-app watch-list parity for the attributed author.
             if (subject.userId !== null) {
               yield* subscriptionRepository.subscribe({
@@ -766,67 +737,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                 userId: subject.userId,
               });
             }
-
-            if (verifiedEmail !== undefined && subject.userId !== null) {
-              yield* emailSubscriptions
-                .requestSubscription({
-                  alreadyVerifiedUser: { userId: subject.userId },
-                  email: verifiedEmail,
-                  now: subscriptionNow,
-                  organizationId: args.organizationId,
-                  source: "post_creator",
-                  topic: { topicId: args.id, topicType: "post" },
-                  verificationExpiresAt: new Date(
-                    subscriptionNow.getTime() + 86_400_000
-                  ),
-                })
-                .pipe(
-                  Effect.mapError(
-                    () =>
-                      new InternalServerError({
-                        message:
-                          "Could not record the post author email subscription.",
-                      })
-                  )
-                );
-            } else {
-              // Deferred: the subject has no verified account, so nothing is
-              // emailed — not even a verification request — until identity
-              // linking activates the subscription.
-              const [contact] = yield* db
-                .select({ email: schema.contactTable.email })
-                .from(schema.contactTable)
-                .where(eq(schema.contactTable.id, subject.contactId))
-                .limit(1);
-              const contactEmail = contact?.email;
-              if (
-                contactEmail !== null &&
-                contactEmail !== undefined &&
-                !isSyntheticEmail(contactEmail)
-              ) {
-                yield* emailSubscriptions
-                  .requestSubscription({
-                    deferredNoAccess: true,
-                    email: contactEmail,
-                    now: subscriptionNow,
-                    organizationId: args.organizationId,
-                    source: "post_creator",
-                    topic: { topicId: args.id, topicType: "post" },
-                    verificationExpiresAt: new Date(
-                      subscriptionNow.getTime() + 86_400_000
-                    ),
-                  })
-                  .pipe(
-                    Effect.mapError(
-                      () =>
-                        new InternalServerError({
-                          message:
-                            "Could not record the deferred post author email subscription.",
-                        })
-                    )
-                  );
-              }
-            }
+            yield* subscribeOnBehalfSubject({
+              organizationId: args.organizationId,
+              topicId: args.id,
+              subject,
+              source: "post_creator",
+              subjectKind: "post author",
+              now: subscriptionNow,
+            });
           }
 
           const intent = yield* emailOutbox

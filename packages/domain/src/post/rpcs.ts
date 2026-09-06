@@ -79,7 +79,8 @@ export class PostRpcs extends RpcGroup.make(
     // collision suffix) so callers can reference the stored post.
     success: Schema.String,
     payload: PostCreate,
-    error: PostServiceErrors,
+    // On-behalf creates consume the per-member dashboard rate limit.
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   }).middleware(AuthMiddleware),
 
   Rpc.make("PostCreatePublic", {

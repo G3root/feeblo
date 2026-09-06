@@ -430,6 +430,52 @@ describe("UpvoteRpcHandlers on-behalf", () => {
         })
       );
 
+      it.effect("defers the subscription for a verified SSO portal user", () =>
+        Effect.gen(function* () {
+          const handlers = yield* UpvoteRpcHandlersEffect;
+          const emailSubscriptions = yield* EmailSubscriptionRepository;
+          const fixture = yield* makeFixture("manager");
+          const postId = yield* PostId.generate;
+          yield* createPost(fixture, postId);
+
+          // A portal identity proven by the customer's IdP: verified, but
+          // its synthetic sso-* inbox can never receive mail, so it must
+          // defer like any other unresolvable address.
+          const db = yield* currentDb;
+          yield* db.insert(schema.userTable).values({
+            id: "user_portal_voter",
+            name: "Portal Customer",
+            email: "sso-abc123@feeblo.com",
+            emailHash: hashEmail("portal@example.com"),
+            emailVerified: true,
+            restrictedToOrganizationId: fixture.organizationId,
+          });
+
+          yield* handlers
+            .UpvoteAddOnBehalf({
+              organizationId: fixture.organizationId,
+              postId,
+              author: { email: "portal@example.com" },
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
+
+          const subscription = yield* emailSubscriptions.findSubscription({
+            email: "portal@example.com",
+            organizationId: fixture.organizationId,
+            topic: { topicId: postId, topicType: "post" },
+          });
+          expect(Option.getOrUndefined(subscription)).toMatchObject({
+            source: "admin_added_voter",
+            state: "deferred_no_access",
+          });
+        })
+      );
+
       it.effect("records provenance activity with the staff actor", () =>
         Effect.gen(function* () {
           const handlers = yield* UpvoteRpcHandlersEffect;
@@ -625,9 +671,24 @@ describe("UpvoteRpcHandlers on-behalf", () => {
             actorId: fixture.userId,
             actorMemberId: fixture.membershipId,
           });
-          // Remove-by-userId has no contact to attribute; none is invented.
+          // Remove-by-userId resolves the contact when one exists, so
+          // provenance keeps its documented `{ contactId, userId }` shape.
+          const db = yield* currentDb;
+          const [voterContact] = yield* db
+            .select({ contactId: schema.contactTable.id })
+            .from(schema.contactTable)
+            .where(
+              and(
+                eq(schema.contactTable.organizationId, fixture.organizationId),
+                eq(schema.contactTable.userId, shadowUserId)
+              )
+            )
+            .limit(1);
           expect(activities[0]?.metadata).toEqual({
-            onBehalfOf: { userId: shadowUserId },
+            onBehalfOf: {
+              contactId: voterContact?.contactId,
+              userId: shadowUserId,
+            },
           });
         })
       );
@@ -656,6 +717,45 @@ describe("UpvoteRpcHandlers on-behalf", () => {
           const activities = yield* getActivities(postId, "VOTE_REMOVED");
           expect(activities).toEqual([]);
         })
+      );
+
+      it.effect(
+        "records userId-only provenance when the voter has no contact",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* UpvoteRpcHandlersEffect;
+            const upvoteRepository = yield* UpvoteRepository;
+            const fixture = yield* makeFixture("manager");
+            const postId = yield* PostId.generate;
+            yield* createPost(fixture, postId);
+
+            // A self-service vote leaves no contact row behind.
+            yield* upvoteRepository.addAs({
+              organizationId: fixture.organizationId,
+              postId,
+              userId: fixture.userId,
+            });
+
+            const result = yield* handlers
+              .UpvoteRemoveOnBehalf({
+                organizationId: fixture.organizationId,
+                postId,
+                userId: fixture.userId,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "manager")
+                )
+              );
+            expect(result.removed).toBe(true);
+
+            const activities = yield* getActivities(postId, "VOTE_REMOVED");
+            expect(activities).toHaveLength(1);
+            expect(activities[0]?.metadata).toEqual({
+              onBehalfOf: { userId: fixture.userId },
+            });
+          })
       );
 
       it.effect("does not touch the email subscription", () =>
