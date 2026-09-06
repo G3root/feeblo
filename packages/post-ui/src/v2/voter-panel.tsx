@@ -15,7 +15,6 @@ import {
   DialogTitle,
 } from "@feeblo/ui/dialog";
 import { Popover, PopoverPopup, PopoverTrigger } from "@feeblo/ui/popover";
-import { Separator } from "@feeblo/ui/separator";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
@@ -23,7 +22,6 @@ import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
-import { EmailSchema } from "@feeblo/web-shared/user-validation";
 import {
   Cancel01Icon,
   ThumbsUpIcon,
@@ -38,6 +36,10 @@ import {
   type ContactComboboxSelection,
   toOnBehalfAuthor,
 } from "./contact-combobox/contact-combobox";
+import {
+  NewUserDialog,
+  NewUserFooter,
+} from "./contact-combobox/new-user-dialog";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
@@ -77,10 +79,6 @@ export function VoterPanel() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
 
   const { data: upvotes = [], isLoading } = useLiveQuery(
     (q) =>
@@ -138,39 +136,18 @@ export function VoterPanel() {
     }
   };
 
-  const resetCreateForm = () => {
-    setNewName("");
-    setNewEmail("");
-    setCreateError(null);
-    setIsCreating(false);
-  };
-
-  // Explicit new-user path: an admin names someone not yet in the system
-  // and their vote is recorded via the resolver's find-or-create. An email
-  // that turns out to belong to an existing contact or member resolves to
-  // them instead of duplicating — the RPC is idempotent either way.
-  const handleCreateAndVote = async () => {
-    const name = newName.trim();
-    const email = newEmail.trim();
-    if (!name) {
-      setCreateError("Name is required");
-      return;
-    }
-    if (!EmailSchema.safeParse(email).success) {
-      setCreateError("Enter a valid email address");
-      return;
-    }
-    setCreateError(null);
-    setIsCreating(true);
-    try {
-      await addVoter({ author: { email, name } });
-      setIsCreateOpen(false);
-      setIsAddOpen(false);
-      resetCreateForm();
-    } catch (error) {
-      setCreateError(parseRpcError(error).message);
-      setIsCreating(false);
-    }
+  // The shared dialog collects the name/email; an address that turns out
+  // to belong to an existing contact or member resolves to them instead
+  // of duplicating — the RPC is idempotent either way.
+  const handleCreateAndVote = async ({
+    email,
+    name,
+  }: {
+    email: string;
+    name: string;
+  }) => {
+    await addVoter({ author: { email, name } });
+    setIsAddOpen(false);
   };
 
   const handleRemove = async (userId: string) => {
@@ -214,84 +191,20 @@ export function VoterPanel() {
                 postId={post.id}
                 value={null}
               />
-              <div className="px-1 pt-10 pb-1">
-                <Separator className="mb-2" />
-                <Button
-                  className="w-full justify-start"
-                  onClick={() => {
-                    resetCreateForm();
-                    setIsCreateOpen(true);
-                  }}
-                  size="sm"
-                  type="button"
-                  variant="brand"
-                >
-                  <HugeiconsIcon icon={UserAdd01Icon} strokeWidth={2} />
-                  Add new upvoter
-                </Button>
-              </div>
+              <NewUserFooter onNewUser={() => setIsCreateOpen(true)}>
+                Add new upvoter
+              </NewUserFooter>
             </PopoverPopup>
           </Popover>
         ) : null}
       </div>
 
-      <Dialog
-        onOpenChange={(open) => {
-          setIsCreateOpen(open);
-          if (!open) {
-            resetCreateForm();
-          }
-        }}
+      <NewUserDialog
+        onOpenChange={setIsCreateOpen}
+        onSubmit={handleCreateAndVote}
         open={isCreateOpen}
-      >
-        <DialogPopup>
-          <DialogHeader>
-            <DialogTitle>New user</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2 px-6 pb-6">
-            <input
-              aria-label="Name"
-              className="border-border/50 placeholder:text-muted-foreground/50 focus:border-border w-full rounded-md border bg-transparent px-2.5 py-1.5 text-xs outline-none"
-              onChange={(event) => setNewName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  void handleCreateAndVote();
-                }
-              }}
-              placeholder="Name"
-              type="text"
-              value={newName}
-            />
-            <input
-              aria-label="Email"
-              className="border-border/50 placeholder:text-muted-foreground/50 focus:border-border w-full rounded-md border bg-transparent px-2.5 py-1.5 text-xs outline-none"
-              onChange={(event) => setNewEmail(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  void handleCreateAndVote();
-                }
-              }}
-              placeholder="Email"
-              type="email"
-              value={newEmail}
-            />
-            {createError ? (
-              <p className="text-destructive text-[11px]">{createError}</p>
-            ) : null}
-            <Button
-              className="w-full"
-              disabled={!newName.trim() || !newEmail.trim() || isCreating}
-              onClick={() => void handleCreateAndVote()}
-              size="sm"
-              type="button"
-            >
-              {isCreating ? "Adding..." : "Create & add vote"}
-            </Button>
-          </div>
-        </DialogPopup>
-      </Dialog>
+        submitLabel="Create & add vote"
+      />
 
       {isLoading ? (
         <Skeleton className="h-8 w-full" />

@@ -427,13 +427,13 @@ export function ContactCombobox({
             {(option) =>
               option.kind === "create" ? (
                 <ComboboxItem key={`create:${option.email}`} value={option}>
-                  <span className="flex items-center gap-2">
+                  <span className="flex w-full min-w-0 items-center gap-2">
                     <HugeiconsIcon
-                      className="text-muted-foreground"
+                      className="text-muted-foreground shrink-0"
                       icon={UserAdd01Icon}
                       strokeWidth={2}
                     />
-                    <span>
+                    <span className="min-w-0 flex-1 truncate">
                       {results.length === 0 ? "No match — add" : "Add"}{" "}
                       <span className="font-medium">{option.email}</span> as new
                       customer

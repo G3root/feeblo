@@ -34,6 +34,8 @@ export type CommentComposerProviderProps = {
    */
   content?: string;
   disabled?: boolean;
+  /** Stages a freshly named subject as the on-behalf author. */
+  onAuthorCreate?: (values: { email: string; name: string }) => void;
   /** Controlled visibility; when omitted the composer keeps its own copy. */
   isPrivate?: boolean;
   onCancel?: () => void;
@@ -182,6 +184,14 @@ function CommentComposerController(props: CommentComposerProviderProps) {
 
   const actions = useMemo<CommentComposerActions>(() => {
     const composed: CommentComposerActions = {
+      // Like onCancel below: present only when the host opted in, so the
+      // menu can detect it and show its create entry accordingly.
+      ...(latest.current.onAuthorCreate
+        ? {
+            onAuthorCreate: (values: { email: string; name: string }) =>
+              latest.current.onAuthorCreate?.(values),
+          }
+        : undefined),
       onContentChange: (doc: string) => {
         // The store owns the text only when the host doesn't pass `content`.
         if (latest.current.content === undefined) {

@@ -36,6 +36,8 @@ export type CommentComposerState = {
 };
 
 export type CommentComposerActions = {
+  /** Stages a freshly named subject as the on-behalf author. */
+  onAuthorCreate?: (values: { email: string; name: string }) => void;
   onCancel?: () => void;
   onContentChange: (content: string) => void;
   onSubmit?: () => void;

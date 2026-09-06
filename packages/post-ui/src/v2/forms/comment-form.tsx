@@ -308,6 +308,9 @@ export const CommentComposerField = withForm({
                                 authorDisplay={describeContactSelection(
                                   author.state.value ?? null
                                 )}
+                                onAuthorCreate={({ email, name }) =>
+                                  author.handleChange({ email, name })
+                                }
                                 authorPicker={
                                   <ContactCombobox
                                     // Mutually exclusive with status updates:
