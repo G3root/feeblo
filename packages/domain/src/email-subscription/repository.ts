@@ -125,6 +125,11 @@ const verifiedStateFor = (
   if (subscription?.state === "active") {
     return "active";
   }
+  // A pending verification keeps its token/expiry; a deferred request must
+  // not clear them by flipping the state to deferred_no_access.
+  if (subscription?.state === "pending_verification") {
+    return "pending_verification";
+  }
   if (deferredNoAccess) {
     return "deferred_no_access";
   }
