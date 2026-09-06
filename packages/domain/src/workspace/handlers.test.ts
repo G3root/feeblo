@@ -6,6 +6,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import { CurrentSession, type Session } from "../session-middleware";
+import { EntitlementPolicy } from "../entitlement/policies";
+import { MembershipRepository } from "../membership/repository";
 import { ReservedSubdomainError } from "../site/subdomain/errors";
 import { SubdomainValidationService } from "../site/subdomain/service";
 import { WorkspaceRpcHandlersEffect } from "./handlers";
@@ -93,6 +95,15 @@ describe("WorkspaceRpcHandlers", () => {
     Layer.provide(Database.PgliteDatabaseLive)
   );
 
+  const MembershipTest = MembershipRepository.layer.pipe(
+    Layer.provide(Database.PgliteDatabaseLive)
+  );
+
+  const EntitlementsTest = EntitlementPolicy.layer.pipe(
+    Layer.provide(WorkspaceRepository.layer),
+    Layer.provide(Database.PgliteDatabaseLive)
+  );
+
   const MockSubdomainValidationLayer = Layer.effect(
     SubdomainValidationService,
     Effect.succeed({
@@ -114,6 +125,8 @@ describe("WorkspaceRpcHandlers", () => {
 
   const TestLayer = Layer.mergeAll(
     RepositoryTest,
+    MembershipTest,
+    EntitlementsTest,
     Database.PgliteDatabaseLive,
     MockSubdomainValidationLayer
   );
@@ -292,6 +305,7 @@ describe("WorkspaceRpcHandlers", () => {
       it.effect("rejects when the subdomain is already taken", () =>
         Effect.gen(function* () {
           const handlers = yield* WorkspaceRpcHandlersEffect;
+          const db = yield* currentDb;
           const fixture = yield* makeFixture();
 
           // Create a site that claims the subdomain first
@@ -300,14 +314,165 @@ describe("WorkspaceRpcHandlers", () => {
             fixture.organizationId
           );
 
+          // Use a fresh user with no workspaces so the workspace-limit
+          // policy does not mask the subdomain-taken error.
+          const userId = `user_taken_${fixture.organizationId.slice(0, 8)}`;
+          yield* db.insert(schema.userTable).values({
+            id: userId,
+            email: `${userId}@example.com`,
+            name: "Taken Subdomain User",
+          });
+          const session: Session = {
+            user: {
+              id: userId,
+              email: `${userId}@example.com`,
+              name: "Taken Subdomain User",
+              restrictedToOrganizationId: null,
+            },
+            session: { userId, token: "test-token" },
+            organizations: [],
+            memberships: [],
+          };
+
           const error = yield* Effect.flip(
             handlers
               .WorkspaceCreate({ workspaceName: "Existing Workspace" })
-              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+              .pipe(Effect.provideService(CurrentSession, session))
           );
 
           expect(error._tag).toBe("BadRequestError");
           expect(error.message).toBe("This workspace name is already taken");
+        })
+      );
+
+      it.effect("allows up to three workspaces for free users, denies the fourth", () =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const session = makeSession(fixture);
+
+          // Fixture user already owns one free workspace: second and third
+          // creations succeed.
+          for (const name of ["Second Workspace", "Third Workspace"]) {
+            const result = yield* handlers
+              .WorkspaceCreate({ workspaceName: name })
+              .pipe(Effect.provideService(CurrentSession, session));
+            expect(result.organizationId).toBeDefined();
+          }
+
+          // Fourth owned workspace exceeds the free limit of 3.
+          const error = yield* Effect.flip(
+            handlers
+              .WorkspaceCreate({ workspaceName: "Fourth Workspace" })
+              .pipe(Effect.provideService(CurrentSession, session))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+          if (error._tag === "PolicyDenied") {
+            expect(error.reason).toContain("3 workspaces");
+          }
+        })
+      );
+
+      it.effect("allows a second workspace when the user owns a paid workspace", () =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+
+          yield* db.insert(schema.productTable).values({
+            id: `prod_paid_${fixture.organizationId}`,
+            name: "Starter Plan",
+            isRecurring: true,
+            isArchived: false,
+            externalOrganizationId: "ext_paid",
+            visibility: "PUBLIC",
+            metadata: { plan: "starter", variant: "monthly" },
+          });
+          yield* db.insert(schema.subscriptionTable).values({
+            id: `sub_paid_${fixture.organizationId}`,
+            externalId: `sub_ext_${fixture.organizationId}`,
+            organizationId: fixture.organizationId,
+            amount: 2900,
+            cancelAtPeriodEnd: false,
+            currency: "usd",
+            recurringInterval: "month",
+            recurringIntervalCount: 1,
+            status: "active",
+            currentPeriodStart: new Date(),
+            currentPeriodEnd: new Date(Date.now() + 30 * 86_400_000),
+            customerId: `cus_${fixture.organizationId}`,
+            productId: `prod_paid_${fixture.organizationId}`,
+          });
+
+          const result = yield* handlers
+            .WorkspaceCreate({ workspaceName: "Second Paid Workspace" })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          expect(result.organizationId).toBeDefined();
+
+          // Clean up so later ProductList tests see an isolated catalog.
+          yield* db
+            .delete(schema.subscriptionTable)
+            .where(eq(schema.subscriptionTable.id, `sub_paid_${fixture.organizationId}`));
+          yield* db
+            .delete(schema.productTable)
+            .where(eq(schema.productTable.id, `prod_paid_${fixture.organizationId}`));
+        })
+      );
+
+      it.effect("ignores member-role workspaces when counting the limit", () =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const db = yield* currentDb;
+          const now = new Date();
+
+          const memberOrgId = yield* WorkspaceId.generate;
+          const userId = `user_member_limit_${memberOrgId.slice(0, 8)}`;
+
+          yield* db.insert(schema.userTable).values({
+            id: userId,
+            email: `${userId}@example.com`,
+            name: "Member Limit User",
+          });
+          yield* db.insert(schema.organizationTable).values({
+            id: memberOrgId,
+            name: `Org ${memberOrgId.slice(0, 8)}`,
+            slug: memberOrgId,
+            createdAt: now,
+          });
+          yield* db.insert(schema.memberTable).values({
+            id: `m_member_${memberOrgId.slice(0, 8)}`,
+            organizationId: memberOrgId,
+            userId,
+            role: "contributor",
+            createdAt: now,
+          });
+
+          const session: Session = {
+            user: {
+              id: userId,
+              email: `${userId}@example.com`,
+              name: "Member Limit User",
+              restrictedToOrganizationId: null,
+            },
+            session: { userId, token: "test-token" },
+            organizations: [{ id: memberOrgId }],
+            memberships: [
+              {
+                membershipId: `m_member_${memberOrgId.slice(0, 8)}`,
+                organizationId: memberOrgId,
+                role: "contributor",
+              },
+            ],
+          };
+
+          // Being a member (not owner) of another workspace must not
+          // consume the free workspace allowance.
+          const result = yield* handlers
+            .WorkspaceCreate({ workspaceName: "First Owned Workspace" })
+            .pipe(Effect.provideService(CurrentSession, session));
+          expect(result.organizationId).toBeDefined();
         })
       );
     });

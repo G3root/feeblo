@@ -10,6 +10,7 @@ export const PlanKey = S.Literals(["free", "starter", "professional"]);
 export type TPlanKey = S.Schema.Type<typeof PlanKey>;
 
 const PlanLimits = S.Struct({
+  workspaces: S.NullOr(S.Number),
   feedbackBoards: S.NullOr(S.Number),
   privilegedMembers: S.NullOr(S.Number),
   changelogCategories: S.NullOr(S.Number),

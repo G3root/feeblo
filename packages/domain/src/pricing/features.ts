@@ -15,6 +15,7 @@ export type PricingFeatureRow = {
  */
 export const PLAN_PRICING_FEATURES = {
   free: [
+    { key: "workspaces", label: "3 Workspaces" },
     { key: "feedbackBoards", label: "2 Feedback Boards" },
     { key: "privilegedMembers", label: "2 Admin Roles" },
     { key: "changelogCategories", label: "3 Changelog Categories" },
@@ -29,6 +30,7 @@ export const PLAN_PRICING_FEATURES = {
     { key: "unlimitedPosts", label: "Unlimited Posts" },
   ],
   starter: [
+    { key: "workspaces", label: "Unlimited Workspaces" },
     { key: "feedbackBoards", label: "5 Feedback Boards" },
     { key: "privilegedMembers", label: "5 Admin Roles" },
     { key: "changelogCategories", label: "Unlimited Changelog Categories" },

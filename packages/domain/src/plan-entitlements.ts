@@ -1,6 +1,7 @@
 export type OrganizationPlan = "free" | "starter" | "professional";
 
 export type LimitFeatureKey =
+  | "workspaces"
   | "feedbackBoards"
   | "privilegedMembers"
   | "changelogCategories"
@@ -43,6 +44,11 @@ type PlanFeatureDefinition =
   | CapabilityFeatureDefinition;
 
 export const PLAN_FEATURE_CATALOG = {
+  workspaces: {
+    kind: "limit",
+    singularLabel: "Workspace",
+    pluralLabel: "Workspaces",
+  },
   feedbackBoards: {
     kind: "limit",
     singularLabel: "Feedback Board",
@@ -100,6 +106,7 @@ const defineFeatureOrder =
     order;
 
 const LIMIT_FEATURE_ORDER = defineFeatureOrder<LimitFeatureKey>()([
+  "workspaces",
   "feedbackBoards",
   "privilegedMembers",
   "changelogCategories",
@@ -123,6 +130,7 @@ const CAPABILITY_FEATURE_ORDER = defineFeatureOrder<CapabilityFeatureKey>()([
 export const PLAN_ENTITLEMENTS = {
   free: {
     limits: {
+      workspaces: 3,
       feedbackBoards: 2,
       privilegedMembers: 2,
       changelogCategories: 3,
@@ -144,6 +152,7 @@ export const PLAN_ENTITLEMENTS = {
   },
   starter: {
     limits: {
+      workspaces: null,
       feedbackBoards: 5,
       privilegedMembers: 5,
       changelogCategories: null,
@@ -165,6 +174,7 @@ export const PLAN_ENTITLEMENTS = {
   },
   professional: {
     limits: {
+      workspaces: null,
       feedbackBoards: null,
       privilegedMembers: null,
       changelogCategories: null,

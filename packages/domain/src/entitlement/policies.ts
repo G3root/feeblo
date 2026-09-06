@@ -42,6 +42,11 @@ type TCanCreateCrmEntry = {
   organizationId: string;
 };
 
+type TCanCreateWorkspace = {
+  /** Organization ids the requesting user already owns. */
+  ownedOrganizationIds: readonly string[];
+};
+
 const makeEntitlementPolicy = Effect.gen(function* () {
   const workspaceRepository = yield* WorkspaceRepository;
 
@@ -252,8 +257,44 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     return entitlements.limits.submissionNotificationRecipients;
   });
 
+  /**
+   * Whether the user may create another workspace, driven by
+   * `PLAN_ENTITLEMENTS.*.limits.workspaces`.
+   *
+   * The effective limit is the most permissive finite limit across the
+   * workspaces the user already owns; any owned paid workspace with a
+   * `null` (unlimited) limit lifts the cap entirely. Only owned workspaces
+   * count, so being a member of someone else's workspace never blocks
+   * creating your own.
+   */
+  const canCreateWorkspace = (args: TCanCreateWorkspace) =>
+    Effect.gen(function* () {
+      const ownedCount = args.ownedOrganizationIds.length;
+      if (ownedCount === 0) {
+        return;
+      }
+
+      let maxAllowed: number | null = null;
+      for (const organizationId of args.ownedOrganizationIds) {
+        const { entitlements } = yield* findEntitlements(organizationId);
+        const limit = entitlements.limits.workspaces;
+        if (limit === null) {
+          return;
+        }
+        maxAllowed = maxAllowed === null ? limit : Math.max(maxAllowed, limit);
+      }
+
+      const allowed = maxAllowed ?? PLAN_ENTITLEMENTS.free.limits.workspaces;
+      if (allowed !== null && ownedCount >= allowed) {
+        return yield* new Policy.PolicyDeniedError({
+          reason: `The free plan allows up to ${allowed} workspace${allowed === 1 ? "" : "s"}. Upgrade to a paid plan to create more workspaces.`,
+        });
+      }
+    });
+
   return {
     canCreateBoard,
+    canCreateWorkspace,
     canUpdateBoardVisibility,
     canHidePoweredByBranding,
     canUseWidgetSso,
