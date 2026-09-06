@@ -182,7 +182,7 @@ export function VoterPanel() {
                 </Button>
               }
             />
-            <PopoverPopup align="end" className="w-64 p-1">
+            <PopoverPopup align="end" className="w-64 p-1" initialFocus={false}>
               <ContactCombobox
                 label="Add voter"
                 onSelect={handleAdd}

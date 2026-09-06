@@ -364,7 +364,17 @@ export function ContactCombobox({
       filter={null}
       inputValue={query}
       items={options}
-      onInputValueChange={(nextQuery) => setQuery(nextQuery)}
+      onInputValueChange={(nextQuery, eventDetails) => {
+        // Filter-style combobox: only keystrokes drive the query. Base UI
+        // also syncs the pressed item into the input on select
+        // ('item-press') and on close ('none'), which would flash the raw
+        // option object in the input. Selection clears the query
+        // explicitly in handleSelect instead.
+        if (eventDetails.reason !== "input-change") {
+          return;
+        }
+        setQuery(nextQuery);
+      }}
       onOpenChange={setOpen}
       onValueChange={handleSelect}
       open={open}
@@ -427,13 +437,13 @@ export function ContactCombobox({
             {(option) =>
               option.kind === "create" ? (
                 <ComboboxItem key={`create:${option.email}`} value={option}>
-                  <span className="flex w-full min-w-0 items-center gap-2">
+                  <span className="flex items-center gap-2">
                     <HugeiconsIcon
-                      className="text-muted-foreground shrink-0"
+                      className="text-muted-foreground"
                       icon={UserAdd01Icon}
                       strokeWidth={2}
                     />
-                    <span className="min-w-0 flex-1 truncate">
+                    <span>
                       {results.length === 0 ? "No match — add" : "Add"}{" "}
                       <span className="font-medium">{option.email}</span> as new
                       customer
