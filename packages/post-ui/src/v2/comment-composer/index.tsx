@@ -1,4 +1,3 @@
-import { AuthorToggle } from "./author-toggle";
 import { CommentComposerEditor } from "./editor";
 import {
   CommentComposerProvider,
@@ -40,7 +39,6 @@ function CommentComposerComponent(props: CommentComposerProviderProps) {
 }
 
 export const CommentComposer = Object.assign(CommentComposerComponent, {
-  AuthorToggle,
   Editor: CommentComposerEditor,
   Provider: CommentComposerProvider,
   Submit: CommentComposerSubmit,

@@ -42,36 +42,40 @@ export function StatusField({
   statuses,
   onValueChange,
   disabled = false,
+  placeholder = "Select status",
 }: {
-  currentStatusId: string;
-  statuses: Pick<TPostStatus, "id" | "label" | "type">[];
+  /** Null renders the placeholder: the field supports "nothing selected". */
+  currentStatusId: string | null;
+  statuses: readonly Pick<TPostStatus, "id" | "label" | "type">[];
   onValueChange: (
     status: Pick<TPostStatus, "id" | "label" | "type"> | null
   ) => void;
   disabled?: boolean;
+  placeholder?: string;
 }) {
   const items = statuses.map((postStatus) => ({
     label: postStatus.label || formatPostStatus(postStatus.type),
     type: postStatus.type,
     value: postStatus.id,
   }));
-  const currentStatus = statuses.find(
-    (postStatus) => postStatus.id === currentStatusId
-  );
-  const defaultValue = {
-    value: currentStatusId,
-    label: currentStatus
-      ? currentStatus.label || formatPostStatus(currentStatus.type)
-      : "",
-    type: currentStatus?.type ?? "PLANNED",
-  };
+  const currentStatus =
+    currentStatusId === null
+      ? undefined
+      : statuses.find((postStatus) => postStatus.id === currentStatusId);
+  const defaultValue = currentStatus
+    ? {
+        value: currentStatus.id,
+        label: currentStatus.label || formatPostStatus(currentStatus.type),
+        type: currentStatus.type,
+      }
+    : null;
 
   return (
     <Combobox
       defaultValue={defaultValue}
       disabled={disabled}
       items={items}
-      key={currentStatusId}
+      key={currentStatusId ?? "none"}
       onValueChange={(value) =>
         onValueChange(
           value
@@ -86,7 +90,7 @@ export function StatusField({
       }
     >
       <ComboboxTrigger render={<SelectButton size="sm" />}>
-        <ComboboxValue>
+        <ComboboxValue placeholder={placeholder}>
           {(value) => (
             <span className="flex items-center gap-2">
               {value ? (

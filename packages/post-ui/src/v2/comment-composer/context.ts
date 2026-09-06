@@ -25,10 +25,9 @@ export type TPostStatusOption = {
 export type CommentComposerState = {
   /** Picked subject display label; null means the session user authors. */
   authorDisplay: string | null;
-  /** Picker UI rendered while `isAuthorMode` is on (see Provider props). */
+  /** Picker UI rendered in the options popover's author section. */
   authorPicker: ReactNode | null;
   disabled: boolean;
-  isAuthorMode: boolean;
   placeholder: string | undefined;
   showAuthorToggle: boolean;
   showVisibilityToggle: boolean;
@@ -38,7 +37,6 @@ export type CommentComposerState = {
 
 export type CommentComposerActions = {
   onCancel?: () => void;
-  onAuthorToggle?: (pressed: boolean) => void;
   onContentChange: (content: string) => void;
   onSubmit?: () => void;
   onVisibilityChange: (isPrivate: boolean) => void;

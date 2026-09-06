@@ -156,6 +156,9 @@ function ContactAvatar({
 }
 
 export interface ContactComboboxProps {
+  /** Disables the search input and selection; the selected summary's
+  dismiss control stays available so a picked subject can be cleared. */
+  disabled?: boolean;
   /** Accessible name for the search input. */
   label?: string;
   organizationId: string;
@@ -172,6 +175,7 @@ export interface ContactComboboxProps {
 }
 
 export function ContactCombobox({
+  disabled = false,
   label = "Search customers",
   organizationId,
   onSelect,
@@ -274,7 +278,7 @@ export function ContactCombobox({
   ];
 
   const handleSelect = (option: ContactOption | null) => {
-    if (!option) {
+    if (disabled || !option) {
       return;
     }
 
@@ -356,6 +360,7 @@ export function ContactCombobox({
   return (
     <Combobox
       autoHighlight
+      disabled={disabled}
       filter={null}
       inputValue={query}
       items={options}
@@ -366,6 +371,7 @@ export function ContactCombobox({
     >
       <ComboboxInput
         aria-label={label}
+        disabled={disabled}
         onBlur={() => {
           if (trimmedQuery.length === 0) {
             setOpen(false);

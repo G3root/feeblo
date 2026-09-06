@@ -25,7 +25,7 @@ export type CommentComposerProviderProps = {
   children?: ReactNode;
   /** Display label of the picked on-behalf subject; null = session user. */
   authorDisplay?: string | null;
-  /** Picker UI shown while `isAuthorMode` is on. */
+  /** Picker UI rendered in the options popover's author section. */
   authorPicker?: ReactNode;
   cancelLabel?: string;
   /**
@@ -34,11 +34,9 @@ export type CommentComposerProviderProps = {
    */
   content?: string;
   disabled?: boolean;
-  isAuthorMode?: boolean;
   /** Controlled visibility; when omitted the composer keeps its own copy. */
   isPrivate?: boolean;
   onCancel?: () => void;
-  onAuthorToggle?: (pressed: boolean) => void;
   onContentChange?: (content: string) => void;
   onSubmit?: (value: CommentComposerSubmitValue) => void | Promise<void>;
   onStatusUpdateIdChange?: (id: string | null) => void;
@@ -88,7 +86,6 @@ function CommentComposerController(props: CommentComposerProviderProps) {
     children,
     content,
     disabled = false,
-    isAuthorMode = false,
     isPrivate,
     placeholder,
     privateLabel = "Internal",
@@ -185,8 +182,6 @@ function CommentComposerController(props: CommentComposerProviderProps) {
 
   const actions = useMemo<CommentComposerActions>(() => {
     const composed: CommentComposerActions = {
-      onAuthorToggle: (pressed: boolean) =>
-        latest.current.onAuthorToggle?.(pressed),
       onContentChange: (doc: string) => {
         // The store owns the text only when the host doesn't pass `content`.
         if (latest.current.content === undefined) {
@@ -236,7 +231,6 @@ function CommentComposerController(props: CommentComposerProviderProps) {
         authorDisplay,
         authorPicker,
         disabled,
-        isAuthorMode,
         placeholder,
         showAuthorToggle,
         showVisibilityToggle,
@@ -249,7 +243,6 @@ function CommentComposerController(props: CommentComposerProviderProps) {
       authorPicker,
       cancelLabel,
       disabled,
-      isAuthorMode,
       placeholder,
       privateLabel,
       publicLabel,

@@ -11,7 +11,6 @@ import { formOptions } from "@tanstack/react-form";
 import {
   useCallback,
   useMemo,
-  useState,
   type Dispatch,
   type ReactNode,
   type SetStateAction,
@@ -285,7 +284,6 @@ export const CommentComposerField = withForm({
     const commentOnBehalfPolicy = usePolicy(
       hasPermission(organizationId, "comments.createOnBehalf")
     );
-    const [isAuthorMode, setIsAuthorMode] = useState(false);
 
     // Keep the composer inert while the comment persists server-side: the
     // editor is only cleared after the CommentCreate RPC settles, so text
@@ -312,6 +310,11 @@ export const CommentComposerField = withForm({
                                 )}
                                 authorPicker={
                                   <ContactCombobox
+                                    // Mutually exclusive with status updates:
+                                    // a chosen status disables authorship
+                                    // picking (and the status input disables
+                                    // itself while an author is picked).
+                                    disabled={statusUpdate.state.value !== null}
                                     label="Comment as customer"
                                     onSelect={(next) =>
                                       author.handleChange(
@@ -321,28 +324,16 @@ export const CommentComposerField = withForm({
                                     organizationId={organizationId}
                                     placeholder="Search customers by name or email..."
                                     value={
-                                      hasOnBehalfAuthorValue(
-                                        author.state.value
-                                      )
+                                      hasOnBehalfAuthorValue(author.state.value)
                                         ? author.state.value
                                         : null
                                     }
                                   />
                                 }
                                 disabled={disabled || isSubmitting}
-                                isAuthorMode={
-                                  isAuthorMode &&
-                                  commentOnBehalfPolicy.allowed
-                                }
                                 isPrivate={
                                   visibility.state.value === "INTERNAL"
                                 }
-                                onAuthorToggle={(pressed) => {
-                                  setIsAuthorMode(pressed);
-                                  if (!pressed) {
-                                    author.handleChange(emptyOnBehalfAuthor);
-                                  }
-                                }}
                                 onContentChange={field.handleChange}
                                 onStatusUpdateIdChange={
                                   statusUpdate.handleChange
@@ -352,9 +343,7 @@ export const CommentComposerField = withForm({
                                     isPrivate ? "INTERNAL" : "PUBLIC"
                                   )
                                 }
-                                showAuthorToggle={
-                                  commentOnBehalfPolicy.allowed
-                                }
+                                showAuthorToggle={commentOnBehalfPolicy.allowed}
                                 statusOptions={statusOptions}
                                 statusUpdateId={statusUpdate.state.value}
                                 {...rest}
