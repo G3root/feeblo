@@ -32,8 +32,7 @@ export const Route = createFileRoute("/register")({
 function RegisterRoute() {
   const navigate = Route.useNavigate();
   const { data: session, refetch } = useAuthState();
-  const existingOrganizationId =
-    session?.organizations?.[0]?.id ?? null;
+  const existingOrganizationId = session?.organizations?.[0]?.id ?? null;
 
   const form = useAppForm({
     ...registerFormOpts,
@@ -60,10 +59,7 @@ function RegisterRoute() {
         }
       } catch (error) {
         trackEvent("org_created", { success: false });
-        const { message } = parseRpcError(
-          error,
-          "Failed to create workspace"
-        );
+        const { message } = parseRpcError(error, "Failed to create workspace");
         toastManager.add({
           title: message,
           type: "error",

@@ -25,7 +25,6 @@ import { useNavigate } from "@tanstack/react-router";
 
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import { useEntitlements } from "~/hooks/use-entitlements";
-
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -47,9 +46,7 @@ export function WorkspaceSwitcher() {
 
   const workspaceLimit = entitlements.limits.workspaces;
   const atWorkspaceLimit =
-    !isPlanLoading &&
-    workspaceLimit !== null &&
-    data.length >= workspaceLimit;
+    !isPlanLoading && workspaceLimit !== null && data.length >= workspaceLimit;
 
   const selectedOrganization =
     data.find((organization) => organization.id === organizationId) ??
