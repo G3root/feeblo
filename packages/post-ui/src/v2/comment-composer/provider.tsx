@@ -181,12 +181,13 @@ function CommentComposerController(props: CommentComposerProviderProps) {
 
   const hasSubmit = props.onSubmit !== undefined;
   const hasCancel = props.onCancel !== undefined;
+  const hasAuthorCreate = props.onAuthorCreate !== undefined;
 
   const actions = useMemo<CommentComposerActions>(() => {
     const composed: CommentComposerActions = {
       // Like onCancel below: present only when the host opted in, so the
       // menu can detect it and show its create entry accordingly.
-      ...(latest.current.onAuthorCreate
+      ...(hasAuthorCreate
         ? {
             onAuthorCreate: (values: { email: string; name: string }) =>
               latest.current.onAuthorCreate?.(values),
@@ -225,7 +226,7 @@ function CommentComposerController(props: CommentComposerProviderProps) {
     }
 
     return composed;
-  }, [handleSubmit, hasCancel, hasSubmit, store]);
+  }, [handleSubmit, hasAuthorCreate, hasCancel, hasSubmit, store]);
 
   const contextValue = useMemo<CommentComposerContextValue>(
     () => ({

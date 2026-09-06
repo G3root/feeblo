@@ -67,7 +67,8 @@ const addCounts = (a: HealedIdentityCounts, b: HealedIdentityCounts) => ({
  * 6. `email_contact.user_id` moves unconditionally; `deferred_no_access`
  *    email subscriptions for each healed contact activate only when the
  *    surviving account satisfies notification eligibility (verified email
- *    AND member ∨ SSO-bound-to-org ∨ unrestricted global).
+ *    AND member ∨ SSO-bound-to-org ∨ unrestricted global on a PUBLIC board,
+ *    mirroring the delivery gate in `email-outbox/access.ts`).
  * 7. The shadow user row is deleted last, so every cascade sees healed data.
  */
 export const linkShadowUser = ({
@@ -199,13 +200,17 @@ export const linkShadowUser = ({
           // The activation must only ever verify an address the surviving
           // account actually proved; callers may link identities whose emails
           // differ in case, never in substance.
-          const eligible =
+          const addressProved =
             contact.email !== null &&
             realUser.emailVerified &&
-            realUser.email.toLowerCase() === contact.email.toLowerCase() &&
-            (isMember ||
-              realUser.restrictedToOrganizationId === contact.organizationId ||
-              realUser.restrictedToOrganizationId === null);
+            realUser.email.toLowerCase() === contact.email.toLowerCase();
+          const isSsoBound =
+            realUser.restrictedToOrganizationId === contact.organizationId;
+          const isUnrestrictedGlobal =
+            realUser.restrictedToOrganizationId === null;
+          const eligibleDirect = addressProved && (isMember || isSsoBound);
+          const eligibleGlobalDeferred =
+            addressProved && !isMember && !isSsoBound && isUnrestrictedGlobal;
 
           const emailContacts = yield* db
             .select({ id: schema.emailContactTable.id })
@@ -225,7 +230,7 @@ export const linkShadowUser = ({
             continue;
           }
 
-          if (eligible) {
+          if (eligibleDirect) {
             const activated = yield* db
               .update(schema.emailSubscriptionTable)
               .set({ state: "active", updatedAt: now, verifiedAt: now })
@@ -254,6 +259,85 @@ export const linkShadowUser = ({
                 updatedAt: now,
               })
               .where(eq(schema.emailContactTable.id, emailContact.id));
+          } else if (eligibleGlobalDeferred) {
+            // Unrestricted globals pass the delivery gate only on PUBLIC
+            // boards: activate deferred post subscriptions per-post instead
+            // of bulk-activating private-board rows that could never deliver.
+            const deferred = yield* db
+              .select({
+                id: schema.emailSubscriptionTable.id,
+                topicId: schema.emailSubscriptionTable.topicId,
+                topicType: schema.emailSubscriptionTable.topicType,
+              })
+              .from(schema.emailSubscriptionTable)
+              .where(
+                and(
+                  eq(schema.emailSubscriptionTable.contactId, emailContact.id),
+                  eq(
+                    schema.emailSubscriptionTable.organizationId,
+                    contact.organizationId
+                  ),
+                  eq(schema.emailSubscriptionTable.state, "deferred_no_access")
+                )
+              );
+            const postIds = deferred.flatMap((row) =>
+              row.topicType === "post" && row.topicId !== null
+                ? [row.topicId]
+                : []
+            );
+            if (postIds.length === 0) {
+              continue;
+            }
+            const publicPosts = yield* db
+              .select({ id: schema.postTable.id })
+              .from(schema.postTable)
+              .innerJoin(
+                schema.boardTable,
+                eq(schema.boardTable.id, schema.postTable.boardId)
+              )
+              .where(
+                and(
+                  eq(schema.postTable.organizationId, contact.organizationId),
+                  inArray(schema.postTable.id, postIds),
+                  eq(schema.boardTable.visibility, "PUBLIC")
+                )
+              );
+            const publicIds = new Set(publicPosts.map((row) => row.id));
+            const activatable = deferred
+              .filter(
+                (row) => row.topicId !== null && publicIds.has(row.topicId)
+              )
+              .map((row) => row.id);
+            if (activatable.length === 0) {
+              continue;
+            }
+            const activated = yield* db
+              .update(schema.emailSubscriptionTable)
+              .set({ state: "active", updatedAt: now, verifiedAt: now })
+              .where(
+                and(
+                  eq(schema.emailSubscriptionTable.contactId, emailContact.id),
+                  eq(
+                    schema.emailSubscriptionTable.organizationId,
+                    contact.organizationId
+                  ),
+                  eq(schema.emailSubscriptionTable.state, "deferred_no_access"),
+                  inArray(schema.emailSubscriptionTable.id, activatable)
+                )
+              )
+              .returning({ id: schema.emailSubscriptionTable.id });
+            subscriptionsActivated += activated.length;
+            if (activated.length > 0) {
+              yield* db
+                .update(schema.emailContactTable)
+                .set({
+                  userId: realUserId,
+                  verificationState: "verified",
+                  verifiedAt: now,
+                  updatedAt: now,
+                })
+                .where(eq(schema.emailContactTable.id, emailContact.id));
+            }
           }
         }
 

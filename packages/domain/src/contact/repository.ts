@@ -294,6 +294,8 @@ const makeContactRepository = Effect.gen(function* () {
         ELSE 3
       END`;
 
+      const contactLabel = sql`lower(COALESCE(${schema.contactTable.name}, ${schema.contactTable.email}, ''))`;
+
       // SAFETY: literal table names in the EXISTS probes are the stable
       // snake_case names of post/board/upvote; ids are bound parameters.
       const publicBoardProbe = sql`EXISTS (
@@ -345,6 +347,8 @@ const makeContactRepository = Effect.gen(function* () {
         WHEN ${schema.userTable.name} ILIKE ${prefix} ESCAPE '\\' THEN 2
         ELSE 3
       END`;
+
+      const memberLabel = sql`lower(COALESCE(${schema.userTable.name}, ${schema.userTable.email}))`;
 
       const memberAlreadyVoted =
         args.postId !== undefined
@@ -398,7 +402,7 @@ const makeContactRepository = Effect.gen(function* () {
             )`
             )
           )
-          .orderBy(rankCase, schema.contactTable.createdAt)
+          .orderBy(rankCase, contactLabel, schema.contactTable.createdAt)
           .limit(limit);
 
         // Members are staff, never contacts: a second leg surfaces org
@@ -432,7 +436,7 @@ const makeContactRepository = Effect.gen(function* () {
               )`
             )
           )
-          .orderBy(memberRankCase, schema.memberTable.createdAt)
+          .orderBy(memberRankCase, memberLabel, schema.memberTable.createdAt)
           .limit(limit);
 
         // A contact row already linked to a member is hidden in favor of

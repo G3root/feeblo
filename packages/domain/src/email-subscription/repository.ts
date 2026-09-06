@@ -397,6 +397,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
               "active",
               "pending_verification",
               "paused_by_plan",
+              "deferred_no_access",
             ])
           )
         );
@@ -521,7 +522,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     readonly topic: EmailSubscriptionTopicInput;
     readonly userId: string;
   }) {
-    const [row] = yield* db
+    const rows = yield* db
       .select({ state: schema.emailSubscriptionTable.state })
       .from(schema.emailSubscriptionTable)
       .innerJoin(
@@ -535,9 +536,35 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           eq(schema.emailContactTable.organizationId, organizationId),
           eq(schema.emailContactTable.userId, userId)
         )
-      )
-      .limit(1);
-    return row ?? null;
+      );
+    if (rows.length === 0) {
+      return null;
+    }
+    // One user can own several email contacts (several addresses) with
+    // diverging states for the same topic; an unordered `limit(1)` would
+    // return an arbitrary row. Aggregate to a deterministic user-level
+    // result so the toggle reflects the most-subscribed state.
+    const rank = (state: string): number => {
+      switch (state) {
+        case "active":
+          return 0;
+        case "pending_verification":
+          return 1;
+        case "paused_by_plan":
+          return 2;
+        case "deferred_no_access":
+          return 3;
+        default:
+          return 4;
+      }
+    };
+    let best = rows[0]!;
+    for (const candidate of rows) {
+      if (rank(candidate.state) < rank(best.state)) {
+        best = candidate;
+      }
+    }
+    return best;
   });
 
   /** Authenticated topic unsubscribe; it never accepts a bearer token. */

@@ -202,7 +202,9 @@ describe("ContactCombobox", () => {
 
     await typeQuery(screen, "sarah@feeblo.com");
     await expect.element(screen.getByText("Sarah Chen")).toBeVisible();
-    await expect.element(screen.getByText(/as new customer/)).not.toBeVisible();
+    await expect
+      .element(screen.getByText(/as new customer/))
+      .not.toBeInTheDocument();
   });
 
   it("selects a visible result and clears the selection", async () => {

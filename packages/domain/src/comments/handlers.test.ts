@@ -1794,6 +1794,8 @@ describe("CommentRpcHandlers", () => {
               1
             );
 
+            const before = recordedIntegrationEvents.length;
+
             yield* handlers
               .CommentCreate({
                 ...commentCreateInput(fixture, commentId, "Shipped it"),
@@ -1803,7 +1805,7 @@ describe("CommentRpcHandlers", () => {
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
 
-            const event = recordedIntegrationEvents.find(
+            const event = recordedIntegrationEvents.slice(before).find(
               (candidate) =>
                 // SAFETY: The recorded envelope exposes `type` for the event.
                 (candidate as { type?: string }).type ===
