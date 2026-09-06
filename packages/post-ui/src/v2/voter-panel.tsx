@@ -214,7 +214,7 @@ export function VoterPanel() {
                 postId={post.id}
                 value={null}
               />
-              <div className="px-1 pt-2 pb-1">
+              <div className="px-1 pt-10 pb-1">
                 <Separator className="mb-2" />
                 <Button
                   className="w-full justify-start"
@@ -224,10 +224,10 @@ export function VoterPanel() {
                   }}
                   size="sm"
                   type="button"
-                  variant="ghost"
+                  variant="brand"
                 >
                   <HugeiconsIcon icon={UserAdd01Icon} strokeWidth={2} />
-                  New user
+                  Add new upvoter
                 </Button>
               </div>
             </PopoverPopup>
