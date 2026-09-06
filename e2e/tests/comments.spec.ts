@@ -52,14 +52,25 @@ async function addComment(
 
   if (options.status) {
     await page.getByRole("button", { name: "Comment options" }).click();
+    // The options popover hosts a status combobox (role combobox, empty name
+    // until a status is chosen) inside the status section — not menu radios.
+    const statusTrigger = page
+      .locator('section[aria-label="Comment as status update"]')
+      .getByRole("combobox")
+      .first();
+    await expect(statusTrigger).toBeVisible();
+    await statusTrigger.click();
     await page
-      .getByRole("menuitemradio", { name: options.status, exact: true })
+      .getByRole("option", { name: options.status, exact: true })
       .click();
-    // Selecting a status closes the menu (closeOnClick), so the submit
-    // button next to it is never blocked by the menu's modal inert overlay.
+    // The popover stays open after picking (unlike the old menu), so close
+    // it before submitting — otherwise it can overlap the submit button.
+    await page.keyboard.press("Escape");
     await expect(
-      page.getByRole("menuitemradio", { name: options.status, exact: true })
-    ).toHaveCount(0);
+      page.getByRole("button", {
+        name: `Status update: ${options.status}`,
+      })
+    ).toBeVisible();
   }
 
   const create = waitForRpc(page, "CommentCreate");

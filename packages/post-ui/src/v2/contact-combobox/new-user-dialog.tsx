@@ -33,7 +33,7 @@ export function NewUserFooter({
   onNewUser: () => void;
 }) {
   return (
-    <div className="px-1 pt-10 pb-1">
+    <div className="px-1 pt-2 pb-1">
       <Separator className="mb-2" />
       <Button
         className="w-full justify-start"

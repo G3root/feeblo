@@ -145,19 +145,22 @@ const selectPostFields = (userId?: string | null) => ({
   creatorMemberId: schema.postTable.creatorMemberId,
   creatorId: schema.postTable.creatorId,
   canDeleteAsCreator: userId
-    ? sql<boolean>`(
-        ${schema.postTable.creatorId} = ${userId}
-        AND NOT EXISTS (
-          SELECT 1
-          FROM ${schema.commentTable}
-          WHERE ${schema.commentTable.postId} = ${schema.postTable.id}
-        )
-        AND NOT EXISTS (
-          SELECT 1
-          FROM ${schema.upvoteTable}
-          WHERE ${schema.upvoteTable.postId} = ${schema.postTable.id}
-            AND ${schema.upvoteTable.userId} <> ${userId}
-        )
+    ? sql<boolean>`COALESCE(
+        (
+          ${schema.postTable.creatorId} = ${userId}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM ${schema.commentTable}
+            WHERE ${schema.commentTable.postId} = ${schema.postTable.id}
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM ${schema.upvoteTable}
+            WHERE ${schema.upvoteTable.postId} = ${schema.postTable.id}
+              AND ${schema.upvoteTable.userId} <> ${userId}
+          )
+        ),
+        false
       )`
     : sql<boolean>`false`,
   metadata: schema.postTable.metadata,
