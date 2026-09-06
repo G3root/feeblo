@@ -32,8 +32,8 @@
   "dependencies": {
     "@effect/sql-pg": "catalog:",
     "@effect/sql-pglite": "catalog:",
-    "@electric-sql/pglite": "^0.5.4",
-    "@electric-sql/pglite-pgvector": "^0.0.5",
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-pgvector": "^0.0.9",
     "@feeblo/domain-contracts": "workspace:*",
     "@feeblo/permissions": "workspace:*",
     "dotenv": "catalog:",
@@ -49,6 +49,7 @@
     "@feeblo/id": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "@types/pg": "^8.16.0",
+    "better-auth": "catalog:",
     "drizzle-kit": "catalog:",
     "drizzle-seed": "catalog:",
     "tsx": "catalog:",
