@@ -7,4 +7,5 @@ export {
   DEFAULT_POST_EMBEDDING_DIMENSIONS,
   ROADMAP_PRIMARY_ORGANIZATION_ID_UIDX,
 } from "./schema/feedback";
+export { USER_EMAIL_HASH_ORG_UIDX } from "./schema/auth";
 export { gitHubIssueSafeMetadataConditions } from "./schema/integration";

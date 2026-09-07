@@ -16,8 +16,13 @@ import {
 // backend. These are the module boundaries the page reads directly, so
 // interception is the only seam available here.
 // eslint-disable-next-line anti-slop/no-module-mocking
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/use-auth-state", () => ({
   useAuthState: () => ({ data: null }),
+}));
+// eslint-disable-next-line anti-slop/no-module-mocking
+vi.mock("@feeblo/web-shared/runtime", () => ({
+  fetchRpc: () => Promise.resolve([]),
 }));
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/use-policy", () => ({

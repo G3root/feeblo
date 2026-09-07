@@ -99,8 +99,11 @@ describe("role permissions", () => {
     ).toBe(true);
   });
 
-  it("only grants contributors the cross-post move permission", () => {
-    expect([...permissionsForRole("contributor")]).toEqual(["posts.move"]);
+  it("only grants contributors the cross-post move and on-behalf vote permissions", () => {
+    expect([...permissionsForRole("contributor")]).toEqual([
+      "posts.move",
+      "votes.onBehalf",
+    ]);
     expect(roleGrants("contributor", "posts.move")).toBe(true);
     expect(roleGrants("contributor", "posts.status")).toBe(false);
   });
@@ -202,10 +205,13 @@ describe("can()", () => {
     }
   });
 
-  it("recognizes contributors as members with their limited move permission", () => {
+  it("recognizes contributors as members with their limited grants", () => {
     const session = ctx([[org, "contributor"]]);
     expect(isMember(session, org)).toBe(true);
-    expect([...permissionsForRole("contributor")]).toEqual(["posts.move"]);
+    expect([...permissionsForRole("contributor")]).toEqual([
+      "posts.move",
+      "votes.onBehalf",
+    ]);
   });
 
   it("allows managers to run content operations contributors cannot", () => {

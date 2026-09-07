@@ -1,5 +1,8 @@
 import type { TPost } from "@feeblo/domain/post/schema";
-import type { TPostListItem } from "@feeblo/domain/post/schema";
+import type {
+  TPostCreateAuthor,
+  TPostListItem,
+} from "@feeblo/domain/post/schema";
 import { PostId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
 import { DialogFooter, DialogPanel } from "@feeblo/ui/dialog";
@@ -11,6 +14,7 @@ import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
   and,
   createOptimisticAction,
@@ -19,6 +23,12 @@ import {
 } from "@tanstack/react-db";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
+import { AuthorPicker } from "../author-picker/author-picker";
+import {
+  emptyOnBehalfAuthor,
+  hasOnBehalfAuthorValue,
+  toOnBehalfAuthor,
+} from "../contact-combobox/contact-combobox";
 import { usePostCreateDialogContext } from "../dialog-stores/post";
 import {
   PostBoardField,
@@ -140,6 +150,7 @@ function SimilarPosts({
 }
 
 export interface PostCreateActionInput {
+  readonly author?: TPostCreateAuthor;
   readonly content: string;
   readonly row: TPostListItem;
 }
@@ -155,6 +166,12 @@ export function PostCreateForm() {
     postStatusCollection,
   } = collections;
   const { data: session } = useAuthState();
+
+  // Mirrors the backend's PostPolicy gate for PostCreate.author; hidden
+  // entirely from roles below manager.
+  const createOnBehalfPolicy = usePolicy(
+    hasPermission(organizationId, "posts.createOnBehalf")
+  );
 
   const { data: member } = useLiveQuery(
     (q) => {
@@ -225,7 +242,7 @@ export function PostCreateForm() {
     onMutate: ({ row }) => {
       postCollection.insert(row);
     },
-    mutationFn: async ({ content, row }) => {
+    mutationFn: async ({ author, content, row }) => {
       const canonicalSlug = await persistPost({
         assetIds: [...(row.assetIds ?? [])],
         boardId: row.boardId,
@@ -234,6 +251,7 @@ export function PostCreateForm() {
         organizationId: row.organizationId,
         statusId: row.statusId,
         title: row.title,
+        ...(author ? { author } : undefined),
       });
       // The RPC returns the collision-resolved slug actually persisted.
       // Reconcile the optimistic row before isPersisted settles so links
@@ -254,6 +272,7 @@ export function PostCreateForm() {
   const form = useAppForm({
     ...postCreateFormOpts,
     defaultValues: {
+      author: emptyOnBehalfAuthor,
       boardId: initialBoardId,
       content: "",
       createMore: false,
@@ -290,8 +309,15 @@ export function PostCreateForm() {
         if (!selectedPostStatus) {
           throw new Error("Post status not found");
         }
+        // Attribution only rides along when a subject is actually picked;
+        // otherwise the session user authors.
+        const authorSelection = createOnBehalfPolicy.allowed
+          ? value.author
+          : undefined;
+
         // The list row carries no body; it travels as action input to the
-        // surface's `persistPost` RPC instead.
+        // surface's `persistPost` RPC instead. On-behalf attribution rides
+        // the same action input so `persistPost` can forward it to PostCreate.
         const tx = createPost({
           content,
           row: {
@@ -317,6 +343,9 @@ export function PostCreateForm() {
               image: session?.user?.image ?? null,
             },
           },
+          ...(hasOnBehalfAuthorValue(authorSelection)
+            ? { author: toOnBehalfAuthor(authorSelection) }
+            : undefined),
         });
 
         await tx.isPersisted.promise;
@@ -330,6 +359,7 @@ export function PostCreateForm() {
         if (value.createMore) {
           form.resetField("title");
           form.resetField("content");
+          form.resetField("author");
           setContentEditorKey((current) => current + 1);
           return;
         }
@@ -392,9 +422,37 @@ export function PostCreateForm() {
 
       <DialogFooter className="grid grid-cols-2 items-center">
         <div className="flex justify-start">
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <PostBoardField boards={boards} form={form} />
             <PostStatusField form={form} statuses={postStatuses} />
+            {createOnBehalfPolicy.allowed ? (
+              <form.AppField name="author">
+                {(field) => {
+                  const selection = hasOnBehalfAuthorValue(field.state.value)
+                    ? field.state.value
+                    : null;
+                  return (
+                    <AuthorPicker
+                      display={
+                        selection ?? {
+                          name: session?.user?.name ?? "You",
+                          avatarUrl: session?.user?.image ?? null,
+                        }
+                      }
+                      label="Post author"
+                      onSelect={(next) =>
+                        field.handleChange(next ?? emptyOnBehalfAuthor)
+                      }
+                      organizationId={organizationId}
+                      placeholder="Select a customer"
+                      searchPlaceholder="Search customers by name or email..."
+                      submitLabel="Create & add author"
+                      value={selection}
+                    />
+                  );
+                }}
+              </form.AppField>
+            ) : null}
           </div>
         </div>
         <div className="flex items-center justify-end gap-3">

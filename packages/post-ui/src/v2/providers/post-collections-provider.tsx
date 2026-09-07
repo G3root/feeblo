@@ -6,7 +6,10 @@ import type { TPostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import type { TPostSubscription } from "@feeblo/domain/post-subscription/schema";
 import type { TPost } from "@feeblo/domain/post/schema";
-import type { TPostListItem } from "@feeblo/domain/post/schema";
+import type {
+  TPostCreateAuthor,
+  TPostListItem,
+} from "@feeblo/domain/post/schema";
 import type { TUpvote } from "@feeblo/domain/upvote/schema";
 import type { Collection } from "@tanstack/react-db";
 import { createContext, useContext, useMemo } from "react";
@@ -36,9 +39,12 @@ export interface PostCollections {
 /**
  * Input the shared create form passes to the surface's `persistPost`:
  * the slim list row's key fields plus the full body the list row omits.
+ * `author` carries on-behalf attribution (see docs/on-behalf.md) when a
+ * manager posts as a customer; otherwise the session user authors.
  */
 export interface PersistPostInput {
   readonly assetIds: Array<string>;
+  readonly author?: TPostCreateAuthor;
   readonly boardId: string;
   readonly content: string;
   readonly id: string;

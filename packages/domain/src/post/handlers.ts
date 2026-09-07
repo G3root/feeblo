@@ -23,6 +23,12 @@ import { EmailOutboxRepository } from "../email-outbox/repository";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
+import {
+  resolveOnBehalfSubject,
+  subscribeOnBehalfSubject,
+  toOnBehalfMetadata,
+} from "../identity/on-behalf";
+import { ResolvePrincipalService } from "../identity/service";
 import { recordPostIntegrationEvent as recordPostIntegrationEventShared } from "../integration/post-event-recording";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
@@ -39,6 +45,7 @@ import {
   withRemapDbErrors,
 } from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
+import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import {
   PostEmbeddingService,
@@ -63,6 +70,7 @@ import type {
   TPostOfficialUpdatePublish,
   TPostSuggestions,
   TPostUpdate,
+  TPostUpdateAuthor,
   TPostUpdateContent,
   TPostUpdateEta,
   TPostUpdateTitle,
@@ -460,6 +468,118 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       );
     });
 
+  const updatePostAuthorEffect = (args: TPostUpdateAuthor) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, args.organizationId);
+      const subscriptionRepository = yield* PostSubscriptionRepository;
+      // Reassignment find-or-creates contacts like on-behalf creation, so
+      // it shares the same per-member abuse bound (see plan-on-behalf.md).
+      yield* RateLimit.consumeOnBehalfWriteLimit({
+        organizationId: args.organizationId,
+        userId: session.session.userId,
+      });
+      yield* transaction(
+        Effect.gen(function* () {
+          const previous = yield* repository.findActivityState({
+            id: args.id,
+            organizationId: args.organizationId,
+          });
+          if (!previous) {
+            return yield* new FailedToUpdatePostError();
+          }
+          // Attribution resolves inside the same transaction as the
+          // mutation, exactly like on-behalf creation. Posts carry no
+          // user-keyed rows of their own, so no shadow user is needed.
+          const subject = yield* resolveOnBehalfSubject({
+            organizationId: args.organizationId,
+            needsUser: false,
+            subject: args.author,
+            action: "post author",
+          });
+          if (
+            previous.contactId === subject.contactId &&
+            previous.creatorId === subject.userId
+          ) {
+            return;
+          }
+          const onBehalfMetadata = toOnBehalfMetadata(subject);
+          yield* repository.updateAuthor({
+            id: args.id,
+            organizationId: args.organizationId,
+            creatorId: subject.userId,
+            // On-behalf posts keep staff attribution out of the author
+            // fields, matching the create path.
+            creatorMemberId: null,
+            contactId: subject.contactId,
+          });
+          yield* activityRepository.create({
+            actorId: session.session.userId,
+            actorMemberId: membership?.membershipId ?? null,
+            organizationId: args.organizationId,
+            postId: args.id,
+            kind: "AUTHOR_CHANGED",
+            ...(onBehalfMetadata && { metadata: onBehalfMetadata }),
+          });
+          // The new author inherits the creator subscription exactly as if
+          // the post had been created on their behalf: a verified account
+          // is trusted, everyone else defers until identity linking grants
+          // them access. The previous author is unsubscribed first —
+          // otherwise they keep receiving status mail for a post no longer
+          // attributed to them. Only identifiers that differ from the new
+          // subject's are retired, so a shared address survives for the
+          // fresh subscribe below.
+          const subscriptionNow = yield* DateTime.nowAsDate;
+          const retiredUserId =
+            previous.creatorId !== null && previous.creatorId !== subject.userId
+              ? previous.creatorId
+              : null;
+          if (retiredUserId !== null) {
+            yield* subscriptionRepository.unsubscribe({
+              postId: args.id,
+              userId: retiredUserId,
+            });
+          }
+          let retiredContactEmail: string | null = null;
+          if (
+            previous.contactId !== null &&
+            previous.contactId !== subject.contactId
+          ) {
+            const [previousContact] = yield* db
+              .select({ email: schema.contactTable.email })
+              .from(schema.contactTable)
+              .where(eq(schema.contactTable.id, previous.contactId))
+              .limit(1);
+            retiredContactEmail = previousContact?.email ?? null;
+          }
+          if (retiredUserId !== null || retiredContactEmail !== null) {
+            yield* emailSubscriptions.unsubscribePreviousAuthorTopic({
+              contactEmail: retiredContactEmail,
+              now: subscriptionNow,
+              organizationId: args.organizationId,
+              topic: { topicId: args.id, topicType: "post" },
+              userId: retiredUserId,
+            });
+          }
+          if (subject.userId !== null) {
+            yield* subscriptionRepository.subscribe({
+              organizationId: args.organizationId,
+              postId: args.id,
+              userId: subject.userId,
+            });
+          }
+          yield* subscribeOnBehalfSubject({
+            organizationId: args.organizationId,
+            topicId: args.id,
+            subject,
+            source: "post_creator",
+            subjectKind: "post author",
+            now: subscriptionNow,
+          });
+        })
+      );
+    });
+
   const updatePostContentEffect = (args: TPostUpdateContent) =>
     Effect.gen(function* () {
       const session = yield* CurrentSession;
@@ -594,6 +714,15 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     Effect.gen(function* () {
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
+      if (args.author !== undefined) {
+        // Per-member abuse bound for on-behalf creations (see
+        // plan-on-behalf.md); self-service creates are unaffected. Runs
+        // before asset prep so a limited request does no work.
+        yield* RateLimit.consumeOnBehalfWriteLimit({
+          organizationId: args.organizationId,
+          userId: session.session.userId,
+        });
+      }
       const subscriptionRepository = yield* PostSubscriptionRepository;
       const board = yield* boardRepository.getById({
         id: args.boardId,
@@ -624,15 +753,29 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
       const persisted = yield* transaction(
         Effect.gen(function* () {
+          // On-behalf attribution resolves the customer inside the same
+          // transaction as the mutation (see plan-on-behalf.md). Absent
+          // `author`, everything below behaves exactly as before.
+          const subject =
+            args.author === undefined
+              ? undefined
+              : yield* resolveOnBehalfSubject({
+                  organizationId: args.organizationId,
+                  needsUser: false,
+                  subject: args.author,
+                  action: "post author",
+                });
+          const onBehalfMetadata = toOnBehalfMetadata(subject);
           const persistedSlug = yield* repository.create({
             ...args,
             content: prepared.content,
             excerpt: htmlToExcerpt(sanitizedHtml),
-            creatorId: session.session.userId,
+            creatorId: subject ? subject.userId : session.session.userId,
             ...(opts.source && { source: opts.source }),
-            ...(membership && {
-              creatorMemberId: membership.membershipId,
-            }),
+            // On-behalf posts keep staff attribution out of the author fields.
+            ...(membership &&
+              !subject && { creatorMemberId: membership.membershipId }),
+            ...(subject && { contactId: subject.contactId }),
           });
           yield* commitPreparedEditorAssets(prepared.promotions);
           yield* syncPostAssetReferences({
@@ -649,6 +792,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             actorId: session.session.userId,
             actorMemberId: membership?.membershipId ?? null,
             kind: "POST_CREATED",
+            ...(onBehalfMetadata && { metadata: onBehalfMetadata }),
           });
           yield* recordPostIntegrationEvent({
             actorMemberId: membership?.membershipId ?? null,
@@ -664,34 +808,57 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           });
 
           // The creator of a post is automatically subscribed to it.
-          yield* subscriptionRepository.subscribe({
-            organizationId: args.organizationId,
-            postId: args.id,
-            userId: session.session.userId,
-            ...(membership && { memberId: membership.membershipId }),
-          });
+          // On-behalf posts subscribe the resolved customer instead of the
+          // staff actor, following the same notification-eligibility rules:
+          // a verified account is trusted, everyone else is deferred until
+          // identity linking grants them access.
           const subscriptionNow = yield* DateTime.nowAsDate;
-          yield* emailSubscriptions
-            .requestSubscription({
-              alreadyVerifiedUser: { userId: session.session.userId },
-              email: session.user.email,
-              now: subscriptionNow,
+          if (subject === undefined) {
+            yield* subscriptionRepository.subscribe({
               organizationId: args.organizationId,
+              postId: args.id,
+              userId: session.session.userId,
+              ...(membership && { memberId: membership.membershipId }),
+            });
+            yield* emailSubscriptions
+              .requestSubscription({
+                alreadyVerifiedUser: { userId: session.session.userId },
+                email: session.user.email,
+                now: subscriptionNow,
+                organizationId: args.organizationId,
+                source: "post_creator",
+                topic: { topicId: args.id, topicType: "post" },
+                verificationExpiresAt: new Date(
+                  subscriptionNow.getTime() + 86_400_000
+                ),
+              })
+              .pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message:
+                        "Could not record the post creator email subscription.",
+                    })
+                )
+              );
+          } else {
+            // In-app watch-list parity for the attributed author.
+            if (subject.userId !== null) {
+              yield* subscriptionRepository.subscribe({
+                organizationId: args.organizationId,
+                postId: args.id,
+                userId: subject.userId,
+              });
+            }
+            yield* subscribeOnBehalfSubject({
+              organizationId: args.organizationId,
+              topicId: args.id,
+              subject,
               source: "post_creator",
-              topic: { topicId: args.id, topicType: "post" },
-              verificationExpiresAt: new Date(
-                subscriptionNow.getTime() + 86_400_000
-              ),
-            })
-            .pipe(
-              Effect.mapError(
-                () =>
-                  new InternalServerError({
-                    message:
-                      "Could not record the post creator email subscription.",
-                  })
-              )
-            );
+              subjectKind: "post author",
+              now: subscriptionNow,
+            });
+          }
 
           const intent = yield* emailOutbox
             .recordIntent({
@@ -1010,6 +1177,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         Policy.withPolicy(
           postPolicy.canCreate({
             organizationId: args.organizationId,
+            onBehalf: args.author !== undefined,
             source: "dashboard",
           })
         ),
@@ -1024,7 +1192,15 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     PostCreatePublic: (args: TPostCreate) =>
-      createPostEffect(args, { source: "PUBLIC_BOARD" }).pipe(
+      Effect.gen(function* () {
+        if (args.author !== undefined) {
+          return yield* new BadRequestError({
+            message:
+              "Posts cannot be created on behalf of another author from public boards",
+          });
+        }
+        return yield* createPostEffect(args, { source: "PUBLIC_BOARD" });
+      }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "PostCreatePublic",
           level: "expensive",
@@ -1048,6 +1224,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     PostUpdateEta: (args: TPostUpdateEta) =>
       updatePostEtaEffect(args).pipe(
         Policy.withPolicy(postPolicy.canUpdateEta(args.organizationId)),
+        withRemapDbErrors("Post", "update")
+      ),
+
+    PostUpdateAuthor: (args: TPostUpdateAuthor) =>
+      updatePostAuthorEffect(args).pipe(
+        Policy.withPolicy(postPolicy.canUpdateAuthor(args.organizationId)),
         withRemapDbErrors("Post", "update")
       ),
 
@@ -1227,6 +1409,8 @@ export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   Layer.provide(EmailOutboxRepository.layer),
   Layer.provide(EmailSubscriptionRepository.layer),
   Layer.provide(EmailOutboxConfig.layer),
+  Layer.provide(ResolvePrincipalService.layer),
+  Layer.provide(UserRepository.layer),
   Layer.provide(
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   ),

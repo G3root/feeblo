@@ -8,16 +8,19 @@ import { validateAttributeValueEffect } from "../attribute-definition/validation
 import { CompanyRepository } from "../company/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
+import { consumeDashboardRateLimit } from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
+import { CurrentSession } from "../session-middleware";
 import { WorkspaceRepository } from "../workspace/repository";
 import { ContactNotFoundError, FailedToCreateContactError } from "./errors";
 import { ContactPolicy } from "./policies";
-import { ContactRepository } from "./repository";
+import { type ContactSearchArgs, ContactRepository } from "./repository";
 import { ContactRpcs } from "./rpcs";
 import type {
   TContactCreate,
   TContactDelete,
   TContactList,
+  TContactSearch,
   TContactUpdate,
 } from "./schema";
 
@@ -34,6 +37,38 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Contact", "select")
         ),
+
+    ContactSearch: (args: TContactSearch) => {
+      const searchArgs: ContactSearchArgs = {
+        organizationId: args.organizationId,
+        query: args.query.trim(),
+      };
+      if (args.postId !== undefined) {
+        searchArgs.postId = args.postId;
+      }
+      if (args.limit !== undefined) {
+        searchArgs.limit = args.limit;
+      }
+
+      return Effect.gen(function* () {
+        // The combobox debounces client-side; the server enforces a minimum
+        // useful query length so stray keystrokes cost nothing.
+        if (searchArgs.query.length < 2) {
+          return [];
+        }
+        const session = yield* CurrentSession;
+        // Dashboard read-level rate limit for the picker (see
+        // plan-on-behalf.md); keyed by the searching member.
+        yield* consumeDashboardRateLimit({
+          key: `contact-search:${args.organizationId}:${session.session.userId}`,
+          name: "contact-search",
+        });
+        return yield* repository.search(searchArgs);
+      }).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Contact", "select")
+      );
+    },
 
     ContactCreate: (args: TContactCreate) =>
       transaction(

@@ -1,5 +1,4 @@
 import { Button } from "@feeblo/ui/button";
-import { cn } from "@feeblo/ui/utils";
 
 import { useCommentComposer } from "./context";
 import { SubmitButton } from "./submit-button";
@@ -10,12 +9,17 @@ export function CommentComposerSubmit() {
 
   return (
     <div
-      className={cn(
-        "flex items-center pt-3",
-        state.showVisibilityToggle ? "justify-between" : "justify-end"
-      )}
+      className={
+        state.showVisibilityToggle
+          ? "flex items-center justify-between pt-3"
+          : "flex items-center justify-end pt-3"
+      }
     >
-      {state.showVisibilityToggle ? <VisibilityToggle /> : null}
+      {state.showVisibilityToggle ? (
+        <div className="flex items-center gap-1">
+          <VisibilityToggle />
+        </div>
+      ) : null}
       <div className="flex items-center gap-2">
         {actions.onCancel ? (
           <Button onClick={actions.onCancel} size="sm" variant="ghost">

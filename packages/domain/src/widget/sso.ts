@@ -5,7 +5,6 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { eq } from "drizzle-orm";
-import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -22,6 +21,7 @@ import { ContactRepository } from "../contact/repository";
 import type { ParsedPersonAttributes } from "../contact/utils";
 import { parsePersonAttributes } from "../contact/utils";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { linkShadowUser } from "../identity/linking";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import {
   maxTokenLifetimeFromMinutes,
@@ -351,10 +351,12 @@ export const createSsoSession = ({
   );
 
 /**
- * Re-assigns widget portal data (contacts and authored posts) from the
- * restricted SSO user to the real user created during a global sign-in. Runs
- * before the restricted user is deleted so contact ownership survives the
- * cascade (`contact.userId` is `ON DELETE SET NULL`).
+ * Re-assigns widget portal data from the restricted SSO user to the real user
+ * created during a global sign-in. Delegates to the shared identity-linking
+ * program (see {@link linkShadowUser}) for the comprehensive healing
+ * (contacts, posts, upvotes, comments, subscriptions) so contact ownership
+ * survives the cascade (`contact.userId` is `ON DELETE SET NULL`); the caller
+ * deletes the restricted user afterwards.
  *
  * The function is defense-in-depth hardened against misuse: it must never
  * reassign another user's data, so both ids are verified against the user
@@ -381,63 +383,63 @@ export const linkAnonymousAccount = ({
       return;
     }
 
-    yield* transaction(
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        const now = yield* DateTime.nowAsDate;
+    const db = yield* currentDb;
+    const [anonymousUser, newUser] = yield* Effect.all([
+      db
+        .select({
+          restrictedToOrganizationId:
+            schema.userTable.restrictedToOrganizationId,
+        })
+        .from(schema.userTable)
+        .where(eq(schema.userTable.id, anonymousUserId))
+        .limit(1),
+      db
+        .select({
+          restrictedToOrganizationId:
+            schema.userTable.restrictedToOrganizationId,
+        })
+        .from(schema.userTable)
+        .where(eq(schema.userTable.id, newUserId))
+        .limit(1),
+    ]);
+    const anonymous = anonymousUser[0];
+    const target = newUser[0];
 
-        const [anonymousUser, newUser] = yield* Effect.all([
-          db
-            .select({
-              restrictedToOrganizationId:
-                schema.userTable.restrictedToOrganizationId,
+    if (!anonymous) {
+      return yield* new LinkAnonymousAccountError({
+        code: "ANONYMOUS_USER_NOT_FOUND",
+      });
+    }
+    if (!anonymous.restrictedToOrganizationId) {
+      return yield* new LinkAnonymousAccountError({
+        code: "ANONYMOUS_USER_NOT_RESTRICTED",
+      });
+    }
+    if (!target) {
+      return yield* new LinkAnonymousAccountError({
+        code: "NEW_USER_NOT_FOUND",
+      });
+    }
+    if (target.restrictedToOrganizationId) {
+      return yield* new LinkAnonymousAccountError({
+        code: "NEW_USER_IS_ANONYMOUS",
+      });
+    }
+
+    yield* linkShadowUser({
+      shadowUserId: anonymousUserId,
+      realUserId: newUserId,
+      deleteShadowUser: false,
+    }).pipe(
+      Effect.mapError((error) =>
+        error instanceof LinkAnonymousAccountError
+          ? error
+          : new LinkAnonymousAccountError({
+              code: "LINK_FAILED",
+              message:
+                "Failed to transfer widget portal data to the real account",
             })
-            .from(schema.userTable)
-            .where(eq(schema.userTable.id, anonymousUserId))
-            .limit(1),
-          db
-            .select({
-              restrictedToOrganizationId:
-                schema.userTable.restrictedToOrganizationId,
-            })
-            .from(schema.userTable)
-            .where(eq(schema.userTable.id, newUserId))
-            .limit(1),
-        ]);
-        const anonymous = anonymousUser[0];
-        const target = newUser[0];
-
-        if (!anonymous) {
-          return yield* new LinkAnonymousAccountError({
-            code: "ANONYMOUS_USER_NOT_FOUND",
-          });
-        }
-        if (!anonymous.restrictedToOrganizationId) {
-          return yield* new LinkAnonymousAccountError({
-            code: "ANONYMOUS_USER_NOT_RESTRICTED",
-          });
-        }
-        if (!target) {
-          return yield* new LinkAnonymousAccountError({
-            code: "NEW_USER_NOT_FOUND",
-          });
-        }
-        if (target.restrictedToOrganizationId) {
-          return yield* new LinkAnonymousAccountError({
-            code: "NEW_USER_IS_ANONYMOUS",
-          });
-        }
-
-        yield* db
-          .update(schema.contactTable)
-          .set({ userId: newUserId, updatedAt: now })
-          .where(eq(schema.contactTable.userId, anonymousUserId));
-
-        yield* db
-          .update(schema.postTable)
-          .set({ creatorId: newUserId, updatedAt: now })
-          .where(eq(schema.postTable.creatorId, anonymousUserId));
-      })
+      )
     );
   }).pipe(
     // Normalize transport failures (unexpected database/SQL errors) into the

@@ -333,7 +333,15 @@ function RouteComponent() {
               <Separator />
             </div>
 
-            <PostDetails author={post.user?.name} createdAt={post.createdAt} />
+            <PostDetails createdAt={post.createdAt} />
+
+            <div>
+              <Separator />
+            </div>
+
+            {/* Voter management: add/remove on behalf of customers.
+                Controls self-gate with `votes.onBehalf` (contributor+). */}
+            <PostPage.Voters />
 
             <div>
               <Separator />

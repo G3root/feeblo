@@ -21,6 +21,8 @@ type TCanCreate = {
   postId: string;
   source: TSource;
   parentCommentId?: string | null;
+  /** True when the payload attributes the comment to a resolved customer. */
+  onBehalf?: boolean;
   /** Post status (org-scoped FK) this comment moves the post to. */
   statusUpdateId?: string | null | undefined;
 };
@@ -104,6 +106,29 @@ const makeCommentPolicy = Effect.gen(function* () {
         canReplyToParent(args),
         // Moving the post from the public page is a manager+ privilege: the
         // same permission the post editor enforces for status transitions.
+        args.statusUpdateId != null
+          ? Policy.canPermission(args.organizationId, "posts.status")
+          : Policy.policy(() => Effect.succeed(true))
+      );
+    }
+
+    if (args.onBehalf === true) {
+      // Attributing a comment to a customer is a curation capability
+      // reserved for managers and above (`comments.createOnBehalf`).
+      // INTERNAL-visibility comments may also be authored on behalf — same
+      // permission, same resolution.
+      return Policy.all(
+        Policy.hasMembership(args.organizationId),
+        Policy.canPermission(args.organizationId, "comments.createOnBehalf"),
+        Policy.policy(() =>
+          postRepository.isUnlocked({
+            id: args.postId,
+            organizationId: args.organizationId,
+          })
+        ),
+        canReplyToParent(args),
+        // Moving the post via a comment is a manager+ privilege everywhere,
+        // matching the post editor's status transition gate.
         args.statusUpdateId != null
           ? Policy.canPermission(args.organizationId, "posts.status")
           : Policy.policy(() => Effect.succeed(true))

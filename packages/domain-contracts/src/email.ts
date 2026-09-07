@@ -49,6 +49,13 @@ export const EmailDeliveryState = S.Literals([
   "suppressed",
   "paused_by_plan",
   "expired",
+  /**
+   * Terminal skip recorded by the dispatcher's organization-access gate: the
+   * recipient had no verified account with organization access when the
+   * delivery was attempted. Re-evaluated per attempt, so a recipient who
+   * gains access later receives subsequent deliveries without backfill.
+   */
+  "no_organization_access",
 ]);
 
 export type TEmailDeliveryState = S.Schema.Type<typeof EmailDeliveryState>;
@@ -75,7 +82,12 @@ export type TEmailSubscriptionTopicType = S.Schema.Type<
 >;
 
 /** Canonical `email_subscription.source` vocabulary. */
-export const EmailSubscriptionSource = S.Literals(["explicit", "post_creator"]);
+export const EmailSubscriptionSource = S.Literals([
+  "explicit",
+  "post_creator",
+  // A voter added on behalf of a customer by a staff member.
+  "admin_added_voter",
+]);
 
 export type TEmailSubscriptionSource = S.Schema.Type<
   typeof EmailSubscriptionSource
@@ -87,6 +99,13 @@ export const EmailSubscriptionState = S.Literals([
   "active",
   "paused_by_plan",
   "unsubscribed",
+  /**
+   * The subject has no verified account yet (e.g. a contact created from a
+   * bare email by a staff member), so they cannot receive anything. The
+   * dispatcher skips these; identity linking activates them once the subject
+   * gains organization access.
+   */
+  "deferred_no_access",
 ]);
 
 export type TEmailSubscriptionState = S.Schema.Type<

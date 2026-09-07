@@ -6,6 +6,8 @@ import type {
 import * as Effect from "effect/Effect";
 import * as Metric from "effect/Metric";
 
+import type { EmailRecipientAccessClass } from "./access";
+
 type EmailDeliveryTransitionLabel = TEmailDeliveryState | "complained";
 
 const emailIntentTransitions = Metric.counter(
@@ -39,6 +41,14 @@ const emailDeliveryRetries = Metric.counter(
 const emailDeliveryThrottles = Metric.counter(
   "feeblo_email_delivery_throttles_total",
   { description: "Email delivery work delayed by an internal safety control" }
+);
+
+const emailDeliveryAccessSkips = Metric.counter(
+  "feeblo_email_delivery_access_skips_total",
+  {
+    description:
+      "Email deliveries skipped because the recipient lacks organization access",
+  }
 );
 
 const emailProviderSubmissions = Metric.counter(
@@ -90,6 +100,15 @@ export const recordEmailDeliveryRetry = (errorTag: string) =>
 /** Records an internal circuit-breaker or volume throttle decision. */
 export const recordEmailDeliveryThrottle = (reason: string) =>
   Metric.update(Metric.withAttributes(emailDeliveryThrottles, { reason }), 1);
+
+/** Records a terminal organization-access skip classified by recipient class. */
+export const recordEmailDeliveryAccessSkip = (
+  recipientClass: EmailRecipientAccessClass
+) =>
+  Metric.update(
+    Metric.withAttributes(emailDeliveryAccessSkips, { recipientClass }),
+    1
+  );
 
 /** Records one accepted provider submission and its configured cost estimate. */
 export const recordEmailProviderSubmission = (
