@@ -1,1 +1,0 @@
-ALTER TABLE "post_activity" ADD COLUMN "metadata" jsonb;
