@@ -23,6 +23,10 @@ export type CommentComposerSubmitValue = {
 
 export type CommentComposerProviderProps = {
   children?: ReactNode;
+  /** Display label of the picked on-behalf subject; null = session user. */
+  authorDisplay?: string | null;
+  /** Picker UI rendered in the options popover's author section. */
+  authorPicker?: ReactNode;
   cancelLabel?: string;
   /**
    * Controlled comment text. When omitted the composer keeps its own copy in
@@ -30,6 +34,8 @@ export type CommentComposerProviderProps = {
    */
   content?: string;
   disabled?: boolean;
+  /** Stages a freshly named subject as the on-behalf author. */
+  onAuthorCreate?: (values: { email: string; name: string }) => void;
   /** Controlled visibility; when omitted the composer keeps its own copy. */
   isPrivate?: boolean;
   onCancel?: () => void;
@@ -45,6 +51,8 @@ export type CommentComposerProviderProps = {
    * composer bumps its own counter after a successful submit.
    */
   resetKey?: number;
+  /** Whether the "comment as customer" toggle is rendered at all. */
+  showAuthorToggle?: boolean;
   showVisibilityToggle?: boolean;
   statusUpdateLabel?: string;
   /** Controlled status update; when omitted the composer keeps its own copy. */
@@ -74,6 +82,8 @@ export function CommentComposerProvider(props: CommentComposerProviderProps) {
 function CommentComposerController(props: CommentComposerProviderProps) {
   const store = useCommentComposerStore();
   const {
+    authorDisplay = null,
+    authorPicker = null,
     cancelLabel = "Cancel",
     children,
     content,
@@ -83,6 +93,7 @@ function CommentComposerController(props: CommentComposerProviderProps) {
     privateLabel = "Internal",
     publicLabel = "Public",
     resetKey,
+    showAuthorToggle = false,
     showVisibilityToggle = true,
     statusUpdateLabel = "Comment as status update",
     statusUpdateId,
@@ -177,9 +188,18 @@ function CommentComposerController(props: CommentComposerProviderProps) {
 
   const hasSubmit = props.onSubmit !== undefined;
   const hasCancel = props.onCancel !== undefined;
+  const hasAuthorCreate = props.onAuthorCreate !== undefined;
 
   const actions = useMemo<CommentComposerActions>(() => {
     const composed: CommentComposerActions = {
+      // Like onCancel below: present only when the host opted in, so the
+      // menu can detect it and show its create entry accordingly.
+      ...(hasAuthorCreate
+        ? {
+            onAuthorCreate: (values: { email: string; name: string }) =>
+              latest.current.onAuthorCreate?.(values),
+          }
+        : undefined),
       onContentChange: (doc: string) => {
         // The store owns the text only when the host doesn't pass `content`.
         if (latest.current.content === undefined) {
@@ -213,7 +233,7 @@ function CommentComposerController(props: CommentComposerProviderProps) {
     }
 
     return composed;
-  }, [handleSubmit, hasCancel, hasSubmit, store]);
+  }, [handleSubmit, hasAuthorCreate, hasCancel, hasSubmit, store]);
 
   const contextValue = useMemo<CommentComposerContextValue>(
     () => ({
@@ -225,15 +245,26 @@ function CommentComposerController(props: CommentComposerProviderProps) {
         statusUpdateLabel,
         submitLabel,
       },
-      state: { disabled, placeholder, showVisibilityToggle, statusOptions },
+      state: {
+        authorDisplay,
+        authorPicker,
+        disabled,
+        placeholder,
+        showAuthorToggle,
+        showVisibilityToggle,
+        statusOptions,
+      },
     }),
     [
       actions,
+      authorDisplay,
+      authorPicker,
       cancelLabel,
       disabled,
       placeholder,
       privateLabel,
       publicLabel,
+      showAuthorToggle,
       showVisibilityToggle,
       statusOptions,
       statusUpdateLabel,

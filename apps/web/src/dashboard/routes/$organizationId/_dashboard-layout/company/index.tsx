@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@feeblo/ui/table";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
 import {
   anyPolicy,
   hasPermission,
@@ -155,15 +156,28 @@ function CompanyPage() {
               policy={hasPermission(organizationId, "companies.create")}
             >
               {({ allowed }) => (
-                <Button
-                  disabled={!allowed}
-                  onClick={openCreateDialog}
-                  type="button"
-                  variant="brand"
-                >
-                  <HugeiconsIcon icon={Building02Icon} />
-                  Create company
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={(props) => (
+                      <Button
+                        {...props}
+                        disabled={!allowed}
+                        onClick={openCreateDialog}
+                        type="button"
+                        variant="brand"
+                      >
+                        <HugeiconsIcon icon={Building02Icon} />
+                        Create company
+                      </Button>
+                    )}
+                  />
+                  {hasReachedCrmLimit ? (
+                    <TooltipPopup>
+                      CRM entry limit reached ({totalCrmEntries} of {crmLimit}
+                      used) — upgrade to add more companies.
+                    </TooltipPopup>
+                  ) : null}
+                </Tooltip>
               )}
             </PolicyGuard>
           </EmptyContent>
@@ -183,15 +197,28 @@ function CompanyPage() {
         </div>
         <PolicyGuard policy={hasPermission(organizationId, "companies.create")}>
           {({ allowed }) => (
-            <Button
-              disabled={!allowed}
-              onClick={openCreateDialog}
-              type="button"
-              variant="brand"
-            >
-              <HugeiconsIcon icon={Building02Icon} />
-              Create company
-            </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={(props) => (
+                  <Button
+                    {...props}
+                    disabled={!allowed}
+                    onClick={openCreateDialog}
+                    type="button"
+                    variant="brand"
+                  >
+                    <HugeiconsIcon icon={Building02Icon} />
+                    Create company
+                  </Button>
+                )}
+              />
+              {hasReachedCrmLimit ? (
+                <TooltipPopup>
+                  CRM entry limit reached ({totalCrmEntries} of {crmLimit}
+                  used) — upgrade to add more companies.
+                </TooltipPopup>
+              ) : null}
+            </Tooltip>
           )}
         </PolicyGuard>
       </div>

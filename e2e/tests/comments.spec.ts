@@ -3,7 +3,9 @@ import { randomUUID } from "node:crypto";
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import { createWorkspace } from "../helpers/auth";
+import { assertNoPageErrors, trackPageErrors } from "../helpers/page-errors";
 import { createPost, fillEditor, openPost } from "../helpers/posts";
+import { waitForRpc } from "../helpers/rpc";
 
 /**
  * E2E coverage for the two comment features added on the comment-features
@@ -31,27 +33,44 @@ import { createPost, fillEditor, openPost } from "../helpers/posts";
  */
 
 /**
- * The post page mounts two rich-text editors: the post content editor
- * (index 0) and the comment composer (index 1). This targets the composer.
+ * Targets the comment composer through its stable hook. The post page
+ * mounts two rich-text editors (post content + composer), so positional
+ * indexing would break the moment editor order or count changes.
  */
+function composerScope(page: Page) {
+  return page.locator('[data-slot="comment-composer"]');
+}
+
 async function addComment(
   page: Page,
   content: string,
   options: { status?: string } = {}
 ) {
-  const editor = page.locator(".ProseMirror").nth(1);
-  await fillEditor(page, content, { index: 1 });
+  const composer = composerScope(page);
+  const editor = composer.locator(".ProseMirror");
+  await fillEditor(page, content, { scope: composer });
 
   if (options.status) {
     await page.getByRole("button", { name: "Comment options" }).click();
+    // The options popover hosts a status combobox (role combobox, empty name
+    // until a status is chosen) inside the status section — not menu radios.
+    const statusTrigger = page
+      .locator('section[aria-label="Comment as status update"]')
+      .getByRole("combobox")
+      .first();
+    await expect(statusTrigger).toBeVisible();
+    await statusTrigger.click();
     await page
-      .getByRole("menuitemradio", { name: options.status, exact: true })
+      .getByRole("option", { name: options.status, exact: true })
       .click();
-    // Selecting a status closes the menu (closeOnClick), so the submit
-    // button next to it is never blocked by the menu's modal inert overlay.
+    // The popover stays open after picking (unlike the old menu), so close
+    // it before submitting — otherwise it can overlap the submit button.
+    await page.keyboard.press("Escape");
     await expect(
-      page.getByRole("menuitemradio", { name: options.status, exact: true })
-    ).toHaveCount(0);
+      page.getByRole("button", {
+        name: `Status update: ${options.status}`,
+      })
+    ).toBeVisible();
   }
 
   const create = waitForRpc(page, "CommentCreate");
@@ -65,10 +84,10 @@ async function addComment(
   await expect(editor).toHaveText("");
 }
 
-/** The v2 comment display renders each comment inside a Card (`data-slot="card"`). */
+/** The v2 comment display renders each comment as a dense row (`data-slot="comment"`). */
 function commentCard(page: Page, commentText: string) {
   return page
-    .locator('[data-slot="card"]')
+    .locator('[data-slot="comment"]')
     .filter({ hasText: commentText })
     .first();
 }
@@ -101,14 +120,6 @@ function activityItem(page: Page, text: string | RegExp) {
     .filter({ hasText: text });
 }
 
-function waitForRpc(page: Page, method: string) {
-  return page.waitForResponse(
-    (response) =>
-      response.url().includes("/rpc") &&
-      Boolean(response.request().postData()?.includes(method))
-  );
-}
-
 /**
  * Retrying assertion for vertical order in the comment list: `above` must
  * render above `below` (the list reorders when a comment is pinned). Missing
@@ -126,14 +137,14 @@ async function expectToBeAbove(above: Locator, below: Locator) {
 }
 
 test.beforeEach(({ page }) => {
-  page.on("console", (message) => {
-    if (message.type() === "error") {
-      console.error(`[browser console] ${message.text()}`);
-    }
-  });
-  page.on("pageerror", (error) => {
-    console.error(`[browser pageerror] ${error.message}`);
-  });
+  // Fail on unexpected client failures instead of only logging them: an
+  // uncaught render exception passes silently whenever the asserted
+  // elements still resolve.
+  trackPageErrors(page);
+});
+
+test.afterEach(async ({ page }) => {
+  await assertNoPageErrors(page);
 });
 
 test.describe("comment pinning", () => {
@@ -352,7 +363,7 @@ test.describe("comment management", () => {
       // content lands asynchronously; keep the editor reference stable while
       // typing (the card's text changes, so a hasText-filtered locator would
       // stop matching) and wait for the prefilled text before editing.
-      const editCard = page.locator('[data-slot="card"]').first();
+      const editCard = page.locator('[data-slot="comment"]').first();
       const secondEditEditor = editCard.locator(".ProseMirror");
       await expect(secondEditEditor).toContainText(original);
       await replaceCommentContent(page, secondEditEditor, edited);
@@ -473,6 +484,93 @@ test.describe("comment management", () => {
       // The visibility survived the round-trip: still internal after reload.
       await page.reload();
       await expect(card.getByText("Internal", { exact: true })).toBeVisible();
+    }
+  );
+});
+
+test.describe("comment replies", () => {
+  /**
+   * Opens the reply composer on a comment card and submits a reply. Scoped
+   * to the card's composer slot: the page can hold several editors (post
+   * content, top-level composer, reply composers), so positional indexing
+   * would break as threads nest. The "Reply" accessible name is
+   * unambiguous at every step: while the composer is closed only the card's
+   * Reply toggle matches, and once it is open the toggle reads
+   * "Hide reply" while the composer's submit button reads "Reply".
+   */
+  async function addReply(
+    page: Page,
+    card: ReturnType<typeof commentCard>,
+    content: string
+  ) {
+    await card.getByRole("button", { name: "Reply", exact: true }).click();
+    await fillEditor(page, content, {
+      scope: card.locator('[data-slot="comment-composer"]'),
+    });
+
+    const create = waitForRpc(page, "CommentCreate");
+    await card.getByRole("button", { name: "Reply", exact: true }).click();
+    await create;
+
+    // The composer closes after the reply persists.
+    await expect(
+      card.getByRole("button", { name: "Hide reply", exact: true })
+    ).toHaveCount(0);
+  }
+
+  test(
+    "nests a reply under its parent and flattens reply-to-reply threads",
+    { tag: "@critical" },
+    async ({ page }) => {
+      await createWorkspace(page);
+      const title = `Reply post ${randomUUID().slice(0, 8)}`;
+      const parentText = `Parent comment ${randomUUID().slice(0, 8)}`;
+      const replyText = `Nested reply ${randomUUID().slice(0, 8)}`;
+      const nestedReplyText = `Reply to reply ${randomUUID().slice(0, 8)}`;
+
+      await createPost(page, title, "Post to exercise comment replies.");
+      await openPost(page, title);
+
+      await addComment(page, parentText);
+      const parentCard = commentCard(page, parentText);
+      await expect(parentCard).toBeVisible();
+
+      // Reply to the top-level comment. Opening the composer expands the
+      // replies accordion, so the reply is visible right after submitting.
+      await addReply(page, parentCard, replyText);
+      const replyCard = commentCard(page, replyText);
+      await expect(replyCard).toBeVisible();
+
+      // A reply is newer than its parent, so if threading broke it would
+      // sort ABOVE the parent (top-level comments are newest-first). It
+      // rendering BELOW the parent proves it is nested in the thread.
+      await expectToBeAbove(parentCard, replyCard);
+
+      // Reply to the reply: flattened under the same root thread.
+      await addReply(page, replyCard, nestedReplyText);
+      const nestedReplyCard = commentCard(page, nestedReplyText);
+      await expect(nestedReplyCard).toBeVisible();
+      await expectToBeAbove(replyCard, nestedReplyCard);
+      await expectToBeAbove(parentCard, nestedReplyCard);
+
+      // The thread structure survives a reload. Threads collapse back to
+      // the accordion on reload, so expand the parent's replies first.
+      await page.reload();
+      const parentThread = page
+        .locator('[data-slot="comment-thread"]')
+        .filter({ hasText: parentText });
+      await parentThread
+        .getByRole("button", { name: /^Show \d+ repl(y|ies)$/ })
+        .click();
+      await expect(parentCard).toBeVisible();
+      await expect(replyCard).toBeVisible();
+      await expect(nestedReplyCard).toBeVisible();
+      await expectToBeAbove(parentCard, replyCard);
+      await expectToBeAbove(parentCard, nestedReplyCard);
+
+      // Both replies are plain comment activity (no status changes).
+      await page.getByRole("tab", { name: "Activity" }).click();
+      await expect(activityItem(page, /added a comment/)).toHaveCount(3);
     }
   );
 });

@@ -32,7 +32,8 @@ export class CommentRpcs extends RpcGroup.make(
     success: Schema.Struct({
       message: Schema.String,
     }),
-    error: CommentServiceErrors,
+    // On-behalf creates consume the per-member dashboard rate limit.
+    error: Schema.Union([CommentServiceErrors, RateLimitErrors]),
     payload: CommentCreate,
   }).middleware(AuthMiddleware),
   Rpc.make("CommentCreatePublic", {

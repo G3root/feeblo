@@ -16,8 +16,13 @@ import {
 // backend. These are the module boundaries the page reads directly, so
 // interception is the only seam available here.
 // eslint-disable-next-line anti-slop/no-module-mocking
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/use-auth-state", () => ({
   useAuthState: () => ({ data: null }),
+}));
+// eslint-disable-next-line anti-slop/no-module-mocking
+vi.mock("@feeblo/web-shared/runtime", () => ({
+  fetchRpc: () => Promise.resolve([]),
 }));
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/use-policy", () => ({
@@ -70,6 +75,18 @@ vi.mock("./subscribe-toggle", () => {
     ),
   };
 });
+
+// The body resolves through the detail collection at runtime; fix it here
+// so composition tests stay focused on layout, not data fetching.
+// eslint-disable-next-line anti-slop/no-module-mocking
+vi.mock("./use-post-detail", () => ({
+  usePostDetail: () => ({
+    assetIds: [],
+    content: "Plain post content",
+    isError: false,
+    isLoading: false,
+  }),
+}));
 
 // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 const board = { visibility: "PUBLIC" } as TBoard;

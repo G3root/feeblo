@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { EmailContactId, EmailSubscriptionId } from "@feeblo/id";
-import { and, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -37,6 +37,13 @@ export type RequestEmailSubscriptionInput = {
   readonly alreadyVerifiedUser?: {
     readonly userId: string;
   };
+  /**
+   * The subject has no verified account yet (e.g. a customer attributed on
+   * behalf by a staff member), so the subscription is created in the
+   * `deferred_no_access` state: never emailed, activated later by identity
+   * linking. Ignored when `alreadyVerifiedUser` is set.
+   */
+  readonly deferredNoAccess?: boolean;
   readonly now: Contact["updatedAt"];
   readonly topic: EmailSubscriptionTopicInput;
   readonly verificationExpiresAt: Subscription["verificationExpiresAt"];
@@ -102,7 +109,8 @@ const topicCondition = (
 
 const verifiedStateFor = (
   subscription: Subscription | undefined,
-  alreadyVerified: boolean
+  alreadyVerified: boolean,
+  deferredNoAccess: boolean
 ): Subscription["state"] => {
   if (alreadyVerified) {
     return "active";
@@ -113,8 +121,17 @@ const verifiedStateFor = (
   ) {
     return subscription.state;
   }
-  if (alreadyVerified || subscription?.state === "active") {
+  // Established consent is never downgraded by a deferred request.
+  if (subscription?.state === "active") {
     return "active";
+  }
+  // A pending verification keeps its token/expiry; a deferred request must
+  // not clear them by flipping the state to deferred_no_access.
+  if (subscription?.state === "pending_verification") {
+    return "pending_verification";
+  }
+  if (deferredNoAccess) {
+    return "deferred_no_access";
   }
   return "pending_verification";
 };
@@ -166,6 +183,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     const email = yield* parseEmailAddress(input.email, "requestSubscription");
     const userId = input.alreadyVerifiedUser?.userId;
     const alreadyVerified = userId !== undefined;
+    const deferredNoAccess = input.deferredNoAccess === true;
 
     const contactId = yield* EmailContactId.generate;
     const [createdContact] = yield* db
@@ -248,7 +266,11 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         verificationToken: Option.none<EmailSubscriptionToken>(),
       };
     }
-    const state = verifiedStateFor(priorSubscription, alreadyVerified);
+    const state = verifiedStateFor(
+      priorSubscription,
+      alreadyVerified,
+      deferredNoAccess
+    );
     const subscriptionId =
       priorSubscription?.id ?? (yield* EmailSubscriptionId.generate);
     const unsubscribeToken =
@@ -380,6 +402,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
               "active",
               "pending_verification",
               "paused_by_plan",
+              "deferred_no_access",
             ])
           )
         );
@@ -504,7 +527,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     readonly topic: EmailSubscriptionTopicInput;
     readonly userId: string;
   }) {
-    const [row] = yield* db
+    const rows = yield* db
       .select({ state: schema.emailSubscriptionTable.state })
       .from(schema.emailSubscriptionTable)
       .innerJoin(
@@ -518,9 +541,35 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           eq(schema.emailContactTable.organizationId, organizationId),
           eq(schema.emailContactTable.userId, userId)
         )
-      )
-      .limit(1);
-    return row ?? null;
+      );
+    if (rows.length === 0) {
+      return null;
+    }
+    // One user can own several email contacts (several addresses) with
+    // diverging states for the same topic; an unordered `limit(1)` would
+    // return an arbitrary row. Aggregate to a deterministic user-level
+    // result so the toggle reflects the most-subscribed state.
+    const rank = (state: string): number => {
+      switch (state) {
+        case "active":
+          return 0;
+        case "pending_verification":
+          return 1;
+        case "paused_by_plan":
+          return 2;
+        case "deferred_no_access":
+          return 3;
+        default:
+          return 4;
+      }
+    };
+    let best = rows[0]!;
+    for (const candidate of rows) {
+      if (rank(candidate.state) < rank(best.state)) {
+        best = candidate;
+      }
+    }
+    return best;
   });
 
   /** Authenticated topic unsubscribe; it never accepts a bearer token. */
@@ -585,6 +634,79 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     return updated.length === 0
       ? { _tag: "AlreadyUnsubscribed" as const }
       : { _tag: "Unsubscribed" as const };
+  });
+
+  /**
+   * Author-reassignment cleanup: retires every email subscription the
+   * previous author holds for one topic. Unlike
+   * `unsubscribeAuthenticatedSubscription` this includes
+   * `deferred_no_access` rows — a deferred row for a removed contact-only
+   * author must not activate on later identity linking and start notifying
+   * them about a post they no longer author. No-op when neither identifier
+   * is provided or nothing matches. Callers pass only identifiers that
+   * differ from the new subject's, so a shared address is never retired
+   * before the fresh subscribe below re-establishes it.
+   */
+  const unsubscribePreviousAuthorTopic = Effect.fn(
+    "EmailSubscriptionRepository.unsubscribePreviousAuthorTopic"
+  )(function* ({
+    contactEmail,
+    now,
+    organizationId,
+    topic,
+    userId,
+  }: {
+    /** Previous contact's email; matched case-insensitively. */
+    readonly contactEmail: string | null;
+    readonly now: Date;
+    readonly organizationId: string;
+    readonly topic: EmailSubscriptionTopicInput;
+    /** Previous author's user row; null for contact-only authors. */
+    readonly userId: string | null;
+  }) {
+    const contactClauses = [
+      ...(userId !== null ? [eq(schema.emailContactTable.userId, userId)] : []),
+      ...(contactEmail !== null
+        ? [
+            sql`lower(${schema.emailContactTable.email}) = lower(${contactEmail})`,
+          ]
+        : []),
+    ];
+    if (contactClauses.length === 0) {
+      return { unsubscribed: 0 };
+    }
+    const contacts = yield* db
+      .select({ id: schema.emailContactTable.id })
+      .from(schema.emailContactTable)
+      .where(
+        and(
+          eq(schema.emailContactTable.organizationId, organizationId),
+          or(...contactClauses)
+        )
+      );
+    if (contacts.length === 0) {
+      return { unsubscribed: 0 };
+    }
+    const updated = yield* db
+      .update(schema.emailSubscriptionTable)
+      .set({
+        state: "unsubscribed",
+        unsubscribedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(schema.emailSubscriptionTable.organizationId, organizationId),
+          topicCondition(schema.emailSubscriptionTable, topic),
+          inArray(
+            schema.emailSubscriptionTable.contactId,
+            contacts.map((contact) => contact.id)
+          ),
+          ne(schema.emailSubscriptionTable.state, "unsubscribed")
+        )
+      )
+      .returning({ id: schema.emailSubscriptionTable.id });
+    return { unsubscribed: updated.length };
   });
 
   /** Synchronizes only reversible consent states with the workspace email plan. */
@@ -707,6 +829,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     requestSubscription,
     unsubscribe,
     unsubscribeAuthenticatedSubscription,
+    unsubscribePreviousAuthorTopic,
     reconcileSubscriptionPlanStates,
     findPlanStateOrganizationIds,
     upsertSuppression,

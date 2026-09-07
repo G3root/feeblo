@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@feeblo/ui/table";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
 import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import { UserAdd01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -158,15 +159,28 @@ function ContactPage() {
               policy={hasPermission(organizationId, "contacts.create")}
             >
               {({ allowed }) => (
-                <Button
-                  disabled={!allowed}
-                  onClick={openCreateDialog}
-                  type="button"
-                  variant="brand"
-                >
-                  <HugeiconsIcon icon={UserAdd01Icon} />
-                  Create contact
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={(props) => (
+                      <Button
+                        {...props}
+                        disabled={!allowed}
+                        onClick={openCreateDialog}
+                        type="button"
+                        variant="brand"
+                      >
+                        <HugeiconsIcon icon={UserAdd01Icon} />
+                        Create contact
+                      </Button>
+                    )}
+                  />
+                  {hasReachedCrmLimit ? (
+                    <TooltipPopup>
+                      CRM entry limit reached ({totalCrmEntries} of {crmLimit}
+                      used) — upgrade to add more contacts.
+                    </TooltipPopup>
+                  ) : null}
+                </Tooltip>
               )}
             </PolicyGuard>
           </EmptyContent>
@@ -186,15 +200,28 @@ function ContactPage() {
         </div>
         <PolicyGuard policy={hasPermission(organizationId, "contacts.create")}>
           {({ allowed }) => (
-            <Button
-              disabled={!allowed}
-              onClick={openCreateDialog}
-              type="button"
-              variant="brand"
-            >
-              <HugeiconsIcon icon={UserAdd01Icon} />
-              Create contact
-            </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={(props) => (
+                  <Button
+                    {...props}
+                    disabled={!allowed}
+                    onClick={openCreateDialog}
+                    type="button"
+                    variant="brand"
+                  >
+                    <HugeiconsIcon icon={UserAdd01Icon} />
+                    Create contact
+                  </Button>
+                )}
+              />
+              {hasReachedCrmLimit ? (
+                <TooltipPopup>
+                  CRM entry limit reached ({totalCrmEntries} of {crmLimit}
+                  used) — upgrade to add more contacts.
+                </TooltipPopup>
+              ) : null}
+            </Tooltip>
           )}
         </PolicyGuard>
       </div>

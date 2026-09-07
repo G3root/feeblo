@@ -10,5 +10,5 @@ export function CommentDisplayBody() {
     return <CommentDisplayEditForm />;
   }
 
-  return <MarkdownContent className="mt-1 text-sm" content={state.content} />;
+  return <MarkdownContent className="mt-0.5 text-sm" content={state.content} />;
 }

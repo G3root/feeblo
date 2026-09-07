@@ -777,7 +777,12 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     lastError,
   }: {
     readonly id: string;
-    readonly state: "failed" | "suppressed" | "expired" | "paused_by_plan";
+    readonly state:
+      | "failed"
+      | "suppressed"
+      | "expired"
+      | "paused_by_plan"
+      | "no_organization_access";
     readonly lastError?: unknown;
   }) {
     const updatedAt = yield* DateTime.nowAsDate;

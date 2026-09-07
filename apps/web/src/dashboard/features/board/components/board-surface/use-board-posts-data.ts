@@ -8,7 +8,16 @@ import {
   not,
   useLiveQuery,
 } from "@tanstack/react-db";
+import { useMemo } from "react";
 
+import {
+  boardCollection,
+  postCollection,
+  postStatusCollection,
+  postTagCollection,
+  tagCollection,
+  upvoteCollection,
+} from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import type {
@@ -17,6 +26,23 @@ import type {
   BoardTagOperator,
 } from "../../state/board-store-context";
 import type { BoardPostRow } from "./types";
+
+/**
+ * Warms exactly the collections `useBoardPostsData` subscribes to. Board
+ * and feedback routes call this in `beforeLoad` so lane data arrives with
+ * the route instead of after mount; the layout only preloads shell-level
+ * collections (organization, board, plan).
+ */
+export async function preloadBoardPostsDataCollections(): Promise<void> {
+  await Promise.all([
+    boardCollection.preload(),
+    postCollection.preload(),
+    postStatusCollection.preload(),
+    tagCollection.preload(),
+    postTagCollection.preload(),
+    upvoteCollection.preload(),
+  ]);
+}
 
 const STATUSES_BY_PRESET = {
   active: ["PLANNED", "IN_PROGRESS"],
@@ -276,35 +302,6 @@ function usePostUpvoteCounts(organizationId: string) {
   );
 }
 
-function buildBoardById(
-  boards: ReadonlyArray<{ id: string; name: string; slug: string }>
-) {
-  return new Map(boards.map((board) => [board.id, board]));
-}
-
-function buildUpvoteCountByPostId(upvotes: ReadonlyArray<{ postId: string }>) {
-  const counts = new Map<string, number>();
-  for (const upvote of upvotes) {
-    counts.set(upvote.postId, (counts.get(upvote.postId) ?? 0) + 1);
-  }
-  return counts;
-}
-
-function buildBoardPostRows(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  posts: ReadonlyArray<any>,
-  boardById: Map<string, { name: string; slug: string }>,
-  upvoteCountByPostId: Map<string, number>
-): BoardPostRow[] {
-  return posts.map((post) => ({
-    ...post,
-    boardName: boardById.get(post.boardId)?.name ?? "",
-    boardSlug: boardById.get(post.boardId)?.slug ?? "",
-    upvoteCount: upvoteCountByPostId.get(post.id) ?? 0,
-    user: post.user,
-  }));
-}
-
 export function useBoardPostsData({
   boardId,
   organizationId,
@@ -343,12 +340,41 @@ export function useBoardPostsData({
   });
   const upvotesQuery = usePostUpvoteCounts(organizationId);
 
-  const boardById = buildBoardById(boardsQuery.data ?? []);
-  const upvoteCountByPostId = buildUpvoteCountByPostId(upvotesQuery.data ?? []);
-  const posts = buildBoardPostRows(
-    postsQuery.data ?? [],
-    boardById,
-    upvoteCountByPostId
+  const boardsData = boardsQuery.data;
+  const upvotesData = upvotesQuery.data;
+  const postsData = postsQuery.data;
+  const postStatusesData = postStatusesQuery.data;
+
+  // Derived maps and rows are rebuilt only when their source query data
+  // changes. Without this every render allocates new arrays/objects, which
+  // defeats the `memo` on lane/row components below and re-renders the
+  // whole board on unrelated store updates (selection, dialogs).
+  const posts: BoardPostRow[] = useMemo(() => {
+    const boardById = new Map(
+      (boardsData ?? []).map((board) => [board.id, board])
+    );
+
+    const upvoteCountByPostId = new Map<string, number>();
+
+    for (const upvote of upvotesData ?? []) {
+      upvoteCountByPostId.set(
+        upvote.postId,
+        (upvoteCountByPostId.get(upvote.postId) ?? 0) + 1
+      );
+    }
+
+    return (postsData ?? []).map((post) => ({
+      ...post,
+      boardName: boardById.get(post.boardId)?.name ?? "",
+      boardSlug: boardById.get(post.boardId)?.slug ?? "",
+      upvoteCount: upvoteCountByPostId.get(post.id) ?? 0,
+      user: post.user,
+    }));
+  }, [boardsData, upvotesData, postsData]);
+
+  const postStatuses = useMemo(
+    () => filterPostStatusesByPreset(postStatusesData ?? [], postStatusFilter),
+    [postStatusesData, postStatusFilter]
   );
 
   return {
@@ -364,10 +390,7 @@ export function useBoardPostsData({
       postsQuery.isLoading ||
       upvotesQuery.isLoading ||
       (tagIds.length > 0 && matchingTags.query.isLoading),
-    postStatuses: filterPostStatusesByPreset(
-      postStatusesQuery.data ?? [],
-      postStatusFilter
-    ),
+    postStatuses,
     posts,
   };
 }

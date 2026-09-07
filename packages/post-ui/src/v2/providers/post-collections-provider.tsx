@@ -6,6 +6,10 @@ import type { TPostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import type { TPostSubscription } from "@feeblo/domain/post-subscription/schema";
 import type { TPost } from "@feeblo/domain/post/schema";
+import type {
+  TPostCreateAuthor,
+  TPostListItem,
+} from "@feeblo/domain/post/schema";
 import type { TUpvote } from "@feeblo/domain/upvote/schema";
 import type { Collection } from "@tanstack/react-db";
 import { createContext, useContext, useMemo } from "react";
@@ -15,18 +19,53 @@ export interface PostCollections {
   commentCollection: Collection<TComment, string, any, any>;
   commentReactionCollection: Collection<TCommentReaction, string, any, any>;
   membersCollection?: Collection<TOrganizationMember, string, any, any>;
-  postCollection: Collection<TPost, string, any, any>;
+  /**
+   * Slim list rows (`PostListItem`, no `content`). Detail bodies resolve
+   * through {@link PostCollections.postDetailCollection}.
+   */
+  postCollection: Collection<TPostListItem, string, any, any>;
+  /**
+   * Full posts (`Post`, including `content`) keyed by detail slug.
+   * Content edits apply here; every other mutation stays on the list
+   * collection.
+   */
+  postDetailCollection: Collection<TPost, string, any, any>;
   postReactionCollection: Collection<TPostReaction, string, any, any>;
   postStatusCollection: Collection<TPostStatus, string, any, any>;
   postSubscriptionCollection: Collection<TPostSubscription, string, any, any>;
   upvoteCollection: Collection<TUpvote, string, any, any>;
 }
 
+/**
+ * Input the shared create form passes to the surface's `persistPost`:
+ * the slim list row's key fields plus the full body the list row omits.
+ * `author` carries on-behalf attribution (see docs/on-behalf.md) when a
+ * manager posts as a customer; otherwise the session user authors.
+ */
+export interface PersistPostInput {
+  readonly assetIds: Array<string>;
+  readonly author?: TPostCreateAuthor;
+  readonly boardId: string;
+  readonly content: string;
+  readonly id: string;
+  readonly organizationId: string;
+  readonly statusId: string;
+  readonly title: string;
+}
+
 export interface PostCollectionsValue {
   collections: PostCollections;
-  getPostHref?: (post: TPost) => string;
+  getPostHref?: (post: TPostListItem) => string;
   onAuthRequired?: () => void;
   organizationId: string;
+  /**
+   * Persists a new post through the surface's create RPC (dashboard
+   * `PostCreate`, public board `PostCreatePublic`). The shared create form
+   * calls this inside its optimistic action; the slim list row is inserted
+   * into `collections.postCollection` by the action itself, so the full
+   * body travels as action input rather than through the list row.
+   */
+  persistPost: (input: PersistPostInput) => Promise<string>;
   suggestPosts?: (input: {
     boardId?: string;
     content: string;
@@ -53,13 +92,15 @@ export function PostCollectionsProvider({
   getPostHref,
   onAuthRequired,
   organizationId,
+  persistPost,
   suggestPosts,
 }: {
   children: React.ReactNode;
   collections: PostCollections;
-  getPostHref?: (post: TPost) => string;
+  getPostHref?: (post: TPostListItem) => string;
   onAuthRequired?: () => void;
   organizationId: string;
+  persistPost: PostCollectionsValue["persistPost"];
   suggestPosts?: PostCollectionsValue["suggestPosts"];
 }) {
   const contextValue = useMemo<PostCollectionsValue>(
@@ -68,9 +109,17 @@ export function PostCollectionsProvider({
       getPostHref,
       onAuthRequired,
       organizationId,
+      persistPost,
       suggestPosts,
     }),
-    [collections, getPostHref, onAuthRequired, organizationId, suggestPosts]
+    [
+      collections,
+      getPostHref,
+      onAuthRequired,
+      organizationId,
+      persistPost,
+      suggestPosts,
+    ]
   );
 
   return (

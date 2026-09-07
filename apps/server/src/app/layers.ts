@@ -51,6 +51,7 @@ import * as Redacted from "effect/Redacted";
 import type * as Ref from "effect/Ref";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import * as RateLimiter from "effect/unstable/persistence/RateLimiter";
+import type * as Redis from "effect/unstable/persistence/Redis";
 
 import type { ServerConfigValue } from "../config";
 import { redisOptions } from "../infra/redis";
@@ -162,10 +163,13 @@ export const makeWebhookIntegrationConfig = (config: ServerConfigValue) => {
 export const makeRateLimitLayer = (
   config: ServerConfigValue,
   useTestMailer: boolean
-): Layer.Layer<RateLimitService> => {
+): Layer.Layer<RateLimitService, Redis.RedisError> => {
   const memoryStore = RateLimiter.layerStoreMemory;
 
-  const RateLimitStoreLayer: Layer.Layer<RateLimiter.RateLimiterStore> =
+  const RateLimitStoreLayer: Layer.Layer<
+    RateLimiter.RateLimiterStore,
+    Redis.RedisError
+  > =
     useTestMailer || config.nodeEnv === "test"
       ? memoryStore
       : config.redisUrl !== undefined
@@ -205,7 +209,7 @@ export const makeWorkflowLayer = (
 
 export const makeAuthLayer = (
   makeMailerLayer: () => Layer.Layer<Mailer, Layer.Error<typeof Mailer.layer>>,
-  rateLimitLayer: Layer.Layer<RateLimitService>
+  rateLimitLayer: Layer.Layer<RateLimitService, Redis.RedisError>
 ) => Layer.effect(Auth, initAuthHandler(makeMailerLayer, rateLimitLayer));
 
 export const makeServiceLayers = ({

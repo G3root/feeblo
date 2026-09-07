@@ -1,8 +1,11 @@
 import type { TPost } from "@feeblo/domain/post/schema";
+import type {
+  TPostCreateAuthor,
+  TPostListItem,
+} from "@feeblo/domain/post/schema";
 import { PostId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
 import { DialogFooter, DialogPanel } from "@feeblo/ui/dialog";
-import { finalizeEditorContent } from "@feeblo/ui/editor";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import { htmlToExcerpt } from "@feeblo/utils/html";
@@ -11,7 +14,13 @@ import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
+import {
+  and,
+  createOptimisticAction,
+  eq,
+  useLiveQuery,
+} from "@tanstack/react-db";
 import {
   type FormEvent,
   useCallback,
@@ -20,6 +29,12 @@ import {
   useState,
 } from "react";
 
+import { AuthorPicker } from "../author-picker/author-picker";
+import {
+  emptyOnBehalfAuthor,
+  hasOnBehalfAuthorValue,
+  toOnBehalfAuthor,
+} from "../contact-combobox/contact-combobox";
 import { usePostCreateDialogContext } from "../dialog-stores/post";
 import {
   PostBoardField,
@@ -144,9 +159,16 @@ function SimilarPosts({
   );
 }
 
+export interface PostCreateActionInput {
+  readonly author?: TPostCreateAuthor;
+  readonly content: string;
+  readonly row: TPostListItem;
+}
+
 export function PostCreateForm() {
   const store = usePostCreateDialogContext();
-  const { collections, onAuthRequired, organizationId } = usePostCollections();
+  const { collections, onAuthRequired, organizationId, persistPost } =
+    usePostCollections();
   const {
     boardCollection,
     membersCollection,
@@ -154,6 +176,12 @@ export function PostCreateForm() {
     postStatusCollection,
   } = collections;
   const { data: session } = useAuthState();
+
+  // Mirrors the backend's PostPolicy gate for PostCreate.author; hidden
+  // entirely from roles below manager.
+  const createOnBehalfPolicy = usePolicy(
+    hasPermission(organizationId, "posts.createOnBehalf")
+  );
 
   const { data: member } = useLiveQuery(
     (q) => {
@@ -216,9 +244,45 @@ export function PostCreateForm() {
   const [contentEditorKey, setContentEditorKey] = useState(0);
   const [editorScope] = useState(() => crypto.randomUUID());
 
+  // Creation persists through the surface's `persistPost` RPC while the
+  // slim list row (no `content`) inserts optimistically in the same
+  // transaction. The body travels as action input — never through the
+  // list row or a side channel — and a failed RPC rolls the row back.
+  const createPost = createOptimisticAction<PostCreateActionInput>({
+    onMutate: ({ row }) => {
+      postCollection.insert(row);
+    },
+    mutationFn: async ({ author, content, row }) => {
+      const canonicalSlug = await persistPost({
+        assetIds: [...(row.assetIds ?? [])],
+        boardId: row.boardId,
+        content,
+        id: row.id,
+        organizationId: row.organizationId,
+        statusId: row.statusId,
+        title: row.title,
+        ...(author ? { author } : undefined),
+      });
+      // The RPC returns the collision-resolved slug actually persisted.
+      // Reconcile the optimistic row before isPersisted settles so links
+      // and detail queries target the stored post.
+      if (canonicalSlug !== row.slug) {
+        postCollection.update(row.id, (draft) => {
+          draft.slug = canonicalSlug;
+        });
+      }
+      // Sync server writes before returning: the optimistic state is
+      // dropped when the mutation settles, so refetch failures propagate
+      // to the submit handler instead of being suppressed.
+      await postCollection.utils.refetch();
+      return canonicalSlug;
+    },
+  });
+
   const form = useAppForm({
     ...postCreateFormOpts,
     defaultValues: {
+      author: emptyOnBehalfAuthor,
       boardId: initialBoardId,
       content: "",
       createMore: false,
@@ -238,6 +302,10 @@ export function PostCreateForm() {
         const postId = await PostId.unsafeGenerate();
         const title = value.title.trim();
         const assetOrganizationId = member ? organizationId : undefined;
+        // Imported on submit rather than with the dialog chunk: asset
+        // finalization rides the editor chunk, already warm from the open
+        // editor, so submit pays no extra load.
+        const { finalizeEditorContent } = await import("@feeblo/ui/editor");
         const finalized = await finalizeEditorContent(
           value.content,
           assetOrganizationId,
@@ -251,34 +319,47 @@ export function PostCreateForm() {
         if (!selectedPostStatus) {
           throw new Error("Post status not found");
         }
-        const tx = postCollection.insert({
-          id: postId,
-          assetIds,
-          archivedAt: null,
-          boardId: value.boardId,
-          title,
-          slug: slugify(title) || "untitled",
+        // Attribution only rides along when a subject is actually picked;
+        // otherwise the session user authors.
+        const authorSelection = createOnBehalfPolicy.allowed
+          ? value.author
+          : undefined;
+
+        // The list row carries no body; it travels as action input to the
+        // surface's `persistPost` RPC instead. On-behalf attribution rides
+        // the same action input so `persistPost` can forward it to PostCreate.
+        const tx = createPost({
           content,
-          excerpt: htmlToExcerpt(content),
-          lockedAt: null,
-          mergedAt: null,
-          mergedIntoPostId: null,
-          etaQuarter: null,
-          statusId: selectedPostStatus.id,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          organizationId,
-          creatorId: session?.user?.id ?? null,
-          creatorMemberId: member?.id ?? null,
-          user: {
-            name: session?.user?.name ?? null,
-            image: session?.user?.image ?? null,
+          row: {
+            id: postId,
+            assetIds,
+            archivedAt: null,
+            boardId: value.boardId,
+            title,
+            slug: slugify(title) || "untitled",
+            excerpt: htmlToExcerpt(content),
+            lockedAt: null,
+            mergedAt: null,
+            mergedIntoPostId: null,
+            etaQuarter: null,
+            statusId: selectedPostStatus.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            organizationId,
+            creatorId: session?.user?.id ?? null,
+            creatorMemberId: member?.id ?? null,
+            user: {
+              name: session?.user?.name ?? null,
+              image: session?.user?.image ?? null,
+            },
           },
+          ...(hasOnBehalfAuthorValue(authorSelection)
+            ? { author: toOnBehalfAuthor(authorSelection) }
+            : undefined),
         });
 
         await tx.isPersisted.promise;
         finalized.commit();
-        await postCollection.utils.refetch().catch(() => undefined);
         trackEvent("post_created", { source, success: true });
         toastManager.add({
           title: "Post created successfully",
@@ -288,6 +369,7 @@ export function PostCreateForm() {
         if (value.createMore) {
           form.resetField("title");
           form.resetField("content");
+          form.resetField("author");
           setContentEditorKey((current) => current + 1);
           return;
         }
@@ -350,9 +432,37 @@ export function PostCreateForm() {
 
       <DialogFooter className="grid grid-cols-2 items-center">
         <div className="flex justify-start">
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <PostBoardField boards={boards} form={form} />
             <PostStatusField form={form} statuses={postStatuses} />
+            {createOnBehalfPolicy.allowed ? (
+              <form.AppField name="author">
+                {(field) => {
+                  const selection = hasOnBehalfAuthorValue(field.state.value)
+                    ? field.state.value
+                    : null;
+                  return (
+                    <AuthorPicker
+                      display={
+                        selection ?? {
+                          name: session?.user?.name ?? "You",
+                          avatarUrl: session?.user?.image ?? null,
+                        }
+                      }
+                      label="Post author"
+                      onSelect={(next) =>
+                        field.handleChange(next ?? emptyOnBehalfAuthor)
+                      }
+                      organizationId={organizationId}
+                      placeholder="Select a customer"
+                      searchPlaceholder="Search customers by name or email..."
+                      submitLabel="Create & add author"
+                      value={selection}
+                    />
+                  );
+                }}
+              </form.AppField>
+            ) : null}
           </div>
         </div>
         <div className="flex items-center justify-end gap-3">

@@ -2,7 +2,7 @@ import { currentDb, schema } from "@feeblo/db";
 import type { TNotificationEventType } from "@feeblo/db/validation-schema/notification-kind";
 import { NotificationId } from "@feeblo/id";
 import { isString } from "@feeblo/utils/runtime-kind";
-import { and, count, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -213,7 +213,14 @@ const makeNotificationService = Effect.gen(function* () {
       organizationId,
       postId,
       commentId,
-    }: PostNotificationInput & { commentId: string }) =>
+      parentCommentId = null,
+      visibility,
+    }: PostNotificationInput & {
+      commentId: string;
+      /** Set when the comment is a reply; the parent's author is notified. */
+      parentCommentId?: string | null;
+      visibility: "PUBLIC" | "INTERNAL";
+    }) =>
       Effect.gen(function* () {
         const context = yield* getPostContext({ organizationId, postId });
         if (!context) {
@@ -228,13 +235,67 @@ const makeNotificationService = Effect.gen(function* () {
               eq(schema.postSubscriptionTable.postId, postId)
             )
           );
+        // A reply also notifies the author of the comment being replied to;
+        // create() drops the actor and dedupes, so self-replies stay silent.
+        const parentAuthors =
+          parentCommentId == null
+            ? []
+            : yield* db
+                .select({ userId: schema.commentTable.userId })
+                .from(schema.commentTable)
+                .where(
+                  and(
+                    eq(schema.commentTable.id, parentCommentId),
+                    eq(schema.commentTable.organizationId, organizationId),
+                    eq(schema.commentTable.postId, postId)
+                  )
+                );
+        // An INTERNAL comment is visible to members only, so non-members
+        // (post creator, parent author, or subscribers who never joined)
+        // must not be notified; PUBLIC comments keep the existing fan-out.
+        const parentAuthorUserIds = parentAuthors.map(
+          (parent) => parent.userId
+        );
+        const subscriberUserIds = subscribers.map(
+          (subscriber) => subscriber.userId
+        );
+        let recipientUserIds: ReadonlyArray<string | null | undefined> = [
+          context.creatorId,
+          ...parentAuthorUserIds,
+          ...subscriberUserIds,
+        ];
+        if (visibility === "INTERNAL") {
+          const candidateUserIds = [
+            ...new Set(
+              recipientUserIds.filter((userId): userId is string =>
+                isString(userId)
+              )
+            ),
+          ];
+          if (candidateUserIds.length > 0) {
+            const memberRecipients = yield* db
+              .select({ userId: schema.memberTable.userId })
+              .from(schema.memberTable)
+              .where(
+                and(
+                  eq(schema.memberTable.organizationId, organizationId),
+                  inArray(schema.memberTable.userId, candidateUserIds)
+                )
+              );
+            const memberUserIds = new Set(
+              memberRecipients.map((member) => member.userId)
+            );
+            recipientUserIds = candidateUserIds.filter((userId) =>
+              memberUserIds.has(userId)
+            );
+          } else {
+            recipientUserIds = [];
+          }
+        }
         yield* create({
           ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
-          recipientUserIds: [
-            context.creatorId,
-            ...subscribers.map((subscriber) => subscriber.userId),
-          ],
+          recipientUserIds,
           kind: "feedback.commented",
           resourceType: "comment",
           resourceId: commentId,

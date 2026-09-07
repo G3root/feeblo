@@ -1,5 +1,6 @@
+import { randomBytes } from "node:crypto";
+
 import { faker } from "@faker-js/faker";
-import { initAuthHandler } from "@feeblo/auth/server";
 import {
   BoardId,
   ChangelogCategoryId,
@@ -23,9 +24,13 @@ import { isObject } from "@feeblo/utils/runtime-kind";
 import { and, eq, inArray } from "drizzle-orm";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
 
+import {
+  createSeedAuth,
+  parseSeedAuthOptions,
+  SeedConfigError,
+} from "./seed-auth";
+import type { SeedAuth } from "./seed-auth";
 import { Database } from "./src";
 import { nukeDatabase } from "./src/nuke";
 import {
@@ -382,18 +387,20 @@ const addDays = (date: Date, days: number) => {
 const formatPlan = (scenario: SubscriptionScenario | undefined) =>
   scenario ? `${scenario.productPlan} · ${scenario.status}` : "free";
 
-const ensureUser = ({
-  email,
-  name,
-  password,
-}: {
-  email: string;
-  name: string;
-  password: string;
-}) =>
+const ensureUser = (
+  {
+    email,
+    name,
+    password,
+  }: {
+    email: string;
+    name: string;
+    password: string;
+  },
+  auth: SeedAuth
+) =>
   Effect.gen(function* () {
     const db = yield* Database.Database;
-    const auth = yield* initAuthHandler();
 
     let [existingUser] = yield* db
       .select({
@@ -1233,203 +1240,223 @@ const seedChangelogs = ({
     console.log(`   Seeded ${CHANGELOG_SEEDS.length} changelogs`);
   });
 
-const seed = Effect.gen(function* () {
-  console.log("Starting database seed...\n");
+const seed = (auth: SeedAuth) =>
+  Effect.gen(function* () {
+    console.log("Starting database seed...\n");
 
-  yield* nukeDatabase();
-  console.log("Database reset complete.\n");
+    yield* nukeDatabase();
+    console.log("Database reset complete.\n");
 
-  console.log("0) Seeding billing products");
-  const products = yield* ensureProducts();
-  console.log(
-    `   Products: ${products.length} (starter/professional × monthly/yearly)`
-  );
+    console.log("0) Seeding billing products");
+    const products = yield* ensureProducts();
+    console.log(
+      `   Products: ${products.length} (starter/professional × monthly/yearly)`
+    );
 
-  console.log("1) Creating test user and organization");
-  const primaryUser = yield* ensureUser(TEST_USER);
-  const primaryOrg = yield* ensureOrganization(primaryUser.id);
-  const primaryMember = yield* ensureMember({
-    organizationId: primaryOrg.id,
-    userId: primaryUser.id,
-    role: "owner",
-  });
-
-  if (!primaryMember) {
-    return yield* new SeedDataError({
-      message: "Failed to ensure primary member",
-    });
-  }
-
-  const primaryScenario = ORGANIZATION_PLANS[TEST_USER.email];
-  if (primaryScenario) {
-    yield* ensureSubscription({
+    console.log("1) Creating test user and organization");
+    const primaryUser = yield* ensureUser(TEST_USER, auth);
+    const primaryOrg = yield* ensureOrganization(primaryUser.id);
+    const primaryMember = yield* ensureMember({
       organizationId: primaryOrg.id,
-      products,
-      scenario: primaryScenario,
-    });
-  }
-
-  const mainBoards = yield* ensureBoards({
-    organizationId: primaryOrg.id,
-    names: ["Bugs", "Features"],
-  });
-
-  const mainPosts = yield* ensurePosts({
-    organizationId: primaryOrg.id,
-    boardIds: mainBoards.map((item) => item.id),
-    count: MAIN_POST_COUNT,
-    creatorId: primaryUser.id,
-    ...(primaryMember && { creatorMemberId: primaryMember.id }),
-  });
-
-  const primarySite = yield* ensureSite({
-    organizationId: primaryOrg.id,
-    name: primaryOrg.name,
-    subdomain: `${faker.word.adjective()}-${faker.word.noun()}`,
-  });
-
-  console.log(`   Main org: ${primaryOrg.name}`);
-  console.log(`   Plan: ${formatPlan(primaryScenario)}`);
-  console.log(`   Site subdomain: ${primarySite.subdomain}`);
-  console.log(`   Boards: ${mainBoards.map((item) => item.name).join(", ")}`);
-  console.log(`   Posts: ${mainPosts.length}`);
-
-  console.log("2) Creating additional users");
-
-  const extraUsers: Array<{ id: string; email: string; joinMainOrg: boolean }> =
-    [];
-
-  for (const candidate of TEAM_USERS) {
-    const userRecord = yield* ensureUser({
-      email: candidate.email,
-      name: candidate.name,
-      password: TEST_USER.password,
+      userId: primaryUser.id,
+      role: "owner",
     });
 
-    extraUsers.push({
-      id: userRecord.id,
-      email: userRecord.email,
-      joinMainOrg: candidate.joinMainOrg,
-    });
+    if (!primaryMember) {
+      return yield* new SeedDataError({
+        message: "Failed to ensure primary member",
+      });
+    }
 
-    if (candidate.joinMainOrg) {
-      yield* ensureMember({
+    const primaryScenario = ORGANIZATION_PLANS[TEST_USER.email];
+    if (primaryScenario) {
+      yield* ensureSubscription({
         organizationId: primaryOrg.id,
-        userId: userRecord.id,
-        role: candidate.mainOrgRole ?? "manager",
+        products,
+        scenario: primaryScenario,
+      });
+    }
+
+    const mainBoards = yield* ensureBoards({
+      organizationId: primaryOrg.id,
+      names: ["Bugs", "Features"],
+    });
+
+    const mainPosts = yield* ensurePosts({
+      organizationId: primaryOrg.id,
+      boardIds: mainBoards.map((item) => item.id),
+      count: MAIN_POST_COUNT,
+      creatorId: primaryUser.id,
+      ...(primaryMember && { creatorMemberId: primaryMember.id }),
+    });
+
+    const primarySite = yield* ensureSite({
+      organizationId: primaryOrg.id,
+      name: primaryOrg.name,
+      subdomain: `${faker.word.adjective()}-${faker.word.noun()}`,
+    });
+
+    console.log(`   Main org: ${primaryOrg.name}`);
+    console.log(`   Plan: ${formatPlan(primaryScenario)}`);
+    console.log(`   Site subdomain: ${primarySite.subdomain}`);
+    console.log(`   Boards: ${mainBoards.map((item) => item.name).join(", ")}`);
+    console.log(`   Posts: ${mainPosts.length}`);
+
+    console.log("2) Creating additional users");
+
+    const extraUsers: Array<{
+      id: string;
+      email: string;
+      joinMainOrg: boolean;
+    }> = [];
+
+    for (const candidate of TEAM_USERS) {
+      const userRecord = yield* ensureUser(
+        {
+          email: candidate.email,
+          name: candidate.name,
+          password: TEST_USER.password,
+        },
+        auth
+      );
+
+      extraUsers.push({
+        id: userRecord.id,
+        email: userRecord.email,
+        joinMainOrg: candidate.joinMainOrg,
       });
 
-      const personalOrg = yield* ensureOrganization(userRecord.id);
+      if (candidate.joinMainOrg) {
+        yield* ensureMember({
+          organizationId: primaryOrg.id,
+          userId: userRecord.id,
+          role: candidate.mainOrgRole ?? "manager",
+        });
 
-      const planScenario = ORGANIZATION_PLANS[candidate.email];
+        const personalOrg = yield* ensureOrganization(userRecord.id);
+
+        const planScenario = ORGANIZATION_PLANS[candidate.email];
+        if (planScenario) {
+          yield* ensureSubscription({
+            organizationId: personalOrg.id,
+            products,
+            scenario: planScenario,
+          });
+        }
+
+        yield* ensureSite({
+          organizationId: personalOrg.id,
+          name: personalOrg.name,
+          subdomain: `${faker.word.adjective()}-${faker.word.noun()}`,
+        });
+      }
+    }
+
+    console.log(
+      `   Team members in main org: ${extraUsers.filter((item) => item.joinMainOrg).length}`
+    );
+    console.log(
+      `   External users with separate orgs: ${extraUsers.filter((item) => !item.joinMainOrg).length}`
+    );
+
+    console.log("3) Seeding additional organizations");
+
+    const externalUsers = extraUsers.filter((item) => !item.joinMainOrg);
+
+    for (const externalUser of externalUsers) {
+      const externalOrg = yield* ensureOrganization(
+        externalUser.id,
+        faker.company.name()
+      );
+      const externalMember = yield* ensureMember({
+        organizationId: externalOrg.id,
+        userId: externalUser.id,
+        role: "owner",
+      });
+
+      const planScenario = ORGANIZATION_PLANS[externalUser.email];
       if (planScenario) {
         yield* ensureSubscription({
-          organizationId: personalOrg.id,
+          organizationId: externalOrg.id,
           products,
           scenario: planScenario,
         });
       }
 
-      yield* ensureSite({
-        organizationId: personalOrg.id,
-        name: personalOrg.name,
+      const externalBoards = yield* ensureBoards({
+        organizationId: externalOrg.id,
+        names: ["Roadmap", "Requests"],
+      });
+
+      const externalPosts = yield* ensurePosts({
+        organizationId: externalOrg.id,
+        boardIds: externalBoards.map((item) => item.id),
+        count: EXTERNAL_POST_COUNT,
+        creatorId: externalUser.id,
+        ...(externalMember && { creatorMemberId: externalMember.id }),
+      });
+
+      const externalSite = yield* ensureSite({
+        organizationId: externalOrg.id,
+        name: externalOrg.name,
         subdomain: `${faker.word.adjective()}-${faker.word.noun()}`,
       });
-    }
-  }
 
-  console.log(
-    `   Team members in main org: ${extraUsers.filter((item) => item.joinMainOrg).length}`
-  );
-  console.log(
-    `   External users with separate orgs: ${extraUsers.filter((item) => !item.joinMainOrg).length}`
-  );
-
-  console.log("3) Seeding additional organizations");
-
-  const externalUsers = extraUsers.filter((item) => !item.joinMainOrg);
-
-  for (const externalUser of externalUsers) {
-    const externalOrg = yield* ensureOrganization(
-      externalUser.id,
-      faker.company.name()
-    );
-    const externalMember = yield* ensureMember({
-      organizationId: externalOrg.id,
-      userId: externalUser.id,
-      role: "owner",
-    });
-
-    const planScenario = ORGANIZATION_PLANS[externalUser.email];
-    if (planScenario) {
-      yield* ensureSubscription({
-        organizationId: externalOrg.id,
-        products,
-        scenario: planScenario,
-      });
+      console.log(
+        `   Org for ${externalUser.email}: ${externalOrg.name} (${externalPosts.length} posts, plan: ${formatPlan(planScenario)}, subdomain: ${externalSite.subdomain})`
+      );
     }
 
-    const externalBoards = yield* ensureBoards({
-      organizationId: externalOrg.id,
-      names: ["Roadmap", "Requests"],
+    console.log("4) Seeding comments, likes, and reactions in main org");
+
+    const actorIds = [
+      primaryUser.id,
+      ...extraUsers.filter((item) => item.joinMainOrg).map((item) => item.id),
+      ...extraUsers
+        .filter((item) => !item.joinMainOrg)
+        .slice(0, 2)
+        .map((item) => item.id),
+    ];
+
+    yield* seedEngagement({
+      organizationId: primaryOrg.id,
+      actorIds,
+      posts: mainPosts,
     });
 
-    const externalPosts = yield* ensurePosts({
-      organizationId: externalOrg.id,
-      boardIds: externalBoards.map((item) => item.id),
-      count: EXTERNAL_POST_COUNT,
-      creatorId: externalUser.id,
-      ...(externalMember && { creatorMemberId: externalMember.id }),
+    console.log("5) Seeding changelogs in main org");
+
+    yield* seedChangelogs({
+      organizationId: primaryOrg.id,
+      creatorId: primaryUser.id,
+      creatorMemberId: primaryMember.id,
+      posts: mainPosts,
     });
 
-    const externalSite = yield* ensureSite({
-      organizationId: externalOrg.id,
-      name: externalOrg.name,
-      subdomain: `${faker.word.adjective()}-${faker.word.noun()}`,
-    });
-
-    console.log(
-      `   Org for ${externalUser.email}: ${externalOrg.name} (${externalPosts.length} posts, plan: ${formatPlan(planScenario)}, subdomain: ${externalSite.subdomain})`
-    );
-  }
-
-  console.log("4) Seeding comments, likes, and reactions in main org");
-
-  const actorIds = [
-    primaryUser.id,
-    ...extraUsers.filter((item) => item.joinMainOrg).map((item) => item.id),
-    ...extraUsers
-      .filter((item) => !item.joinMainOrg)
-      .slice(0, 2)
-      .map((item) => item.id),
-  ];
-
-  yield* seedEngagement({
-    organizationId: primaryOrg.id,
-    actorIds,
-    posts: mainPosts,
+    console.log("\nSeed completed successfully.");
+    console.log(`Primary user email: ${TEST_USER.email}`);
+    console.log(`Primary user password: ${TEST_USER.password}`);
   });
 
-  console.log("5) Seeding changelogs in main org");
+const SeedLayer = Database.DatabaseContextLive;
 
-  yield* seedChangelogs({
-    organizationId: primaryOrg.id,
-    creatorId: primaryUser.id,
-    creatorMemberId: primaryMember.id,
-    posts: mainPosts,
-  });
+const seedEnv = parseSeedAuthOptions(process.env);
+if (seedEnv instanceof SeedConfigError) {
+  console.error(`Seed failed: ${seedEnv.message}`);
+  process.exit(1);
+}
 
-  console.log("\nSeed completed successfully.");
-  console.log(`Primary user email: ${TEST_USER.email}`);
-  console.log(`Primary user password: ${TEST_USER.password}`);
+const seedHandle = createSeedAuth({
+  ...seedEnv,
+  secret: randomBytes(32).toString("base64"),
 });
 
-const SeedLayer = Layer.merge(
-  Database.DatabaseContextLive,
-  WorkflowEngine.layerMemory
-);
-
-Effect.runPromise(seed.pipe(Effect.provide(SeedLayer))).catch((error) => {
+Effect.runPromise(
+  seed(seedHandle.auth).pipe(
+    Effect.ensuring(Effect.tryPromise(seedHandle.close).pipe(Effect.ignore)),
+    Effect.provide(SeedLayer)
+  )
+).catch((error) => {
   console.error("Seed failed:", error);
   process.exit(1);
 });

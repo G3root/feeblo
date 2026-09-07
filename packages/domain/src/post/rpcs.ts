@@ -13,10 +13,12 @@ import {
   PostDeletePublic,
   PostGet,
   PostList,
+  PostListItem,
   PostMerge,
   PostOfficialUpdatePublish,
   PostSuggestions,
   PostUpdate,
+  PostUpdateAuthor,
   PostUpdateContent,
   PostUpdateEta,
   PostUpdateTitle,
@@ -30,17 +32,26 @@ export class PostRpcs extends RpcGroup.make(
   // callers — do not do that without adding an explicit anonymous-identity path.
   Rpc.make("PostList", {
     payload: PostList,
-    success: Schema.Array(Post),
+    success: Schema.Array(PostListItem),
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
   Rpc.make("PostListPublic", {
     payload: PostList,
-    success: Schema.Array(Post),
+    success: Schema.Array(PostListItem),
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   })
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
+
+  // Authenticated detail fetch (full `Post` including `content`) for the
+  // dashboard. Lists return the slim `PostListItem`; detail routes resolve
+  // the body through this RPC instead of over-fetching it for every row.
+  Rpc.make("PostGet", {
+    payload: PostGet,
+    success: Post,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
 
   Rpc.make("PostGetPublic", {
     payload: PostGet,
@@ -69,7 +80,8 @@ export class PostRpcs extends RpcGroup.make(
     // collision suffix) so callers can reference the stored post.
     success: Schema.String,
     payload: PostCreate,
-    error: PostServiceErrors,
+    // On-behalf creates consume the per-member dashboard rate limit.
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   }).middleware(AuthMiddleware),
 
   Rpc.make("PostCreatePublic", {
@@ -106,6 +118,13 @@ export class PostRpcs extends RpcGroup.make(
     success: Schema.Void,
     payload: PostUpdateEta,
     error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostUpdateAuthor", {
+    success: Schema.Void,
+    payload: PostUpdateAuthor,
+    // Reassignment shares the on-behalf write rate limit with creation.
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   }).middleware(AuthMiddleware),
 
   Rpc.make("PostUpdatePublic", {

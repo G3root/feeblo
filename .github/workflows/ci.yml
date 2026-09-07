@@ -190,6 +190,7 @@ jobs:
           IMAGE_TAG: test
           APP_RELEASE: ${{ github.sha }}
           DATABASE_URL: postgres://feeblo:password@pg:5432/feeblo
+          REDIS_URL: redis://redis:6379/0
           APP_URL: http://localhost:3001
           API_URL: http://localhost:3000
           APP_ROOT_DOMAIN: localhost

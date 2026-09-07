@@ -21,6 +21,8 @@ type TCanCreate = {
   postId: string;
   source: TSource;
   parentCommentId?: string | null;
+  /** True when the payload attributes the comment to a resolved customer. */
+  onBehalf?: boolean;
   /** Post status (org-scoped FK) this comment moves the post to. */
   statusUpdateId?: string | null | undefined;
 };
@@ -52,15 +54,17 @@ const makeCommentPolicy = Effect.gen(function* () {
 
   /**
    * Guards against cross-tenant/cross-post parent references: a reply must
-   * point at a comment on the same organization + post. On the public path
-   * the parent must additionally be a PUBLIC comment, so anonymous users
-   * cannot anchor a reply under an INTERNAL (member-only) comment.
+   * point at a comment on the same organization + post. A reply under an
+   * INTERNAL parent continues member-only context, so it must be INTERNAL
+   * itself; PUBLIC replies are only allowed under a PUBLIC parent. That also
+   * keeps anonymous users from anchoring a reply under an INTERNAL
+   * (member-only) comment, since they can only create PUBLIC replies.
    */
   const canReplyToParent = (args: {
     organizationId: string;
     postId: string;
     parentCommentId?: string | null;
-    publicOnly: boolean;
+    visibility: "PUBLIC" | "INTERNAL";
   }) =>
     Policy.policy(() => {
       if (!args.parentCommentId) {
@@ -77,7 +81,8 @@ const makeCommentPolicy = Effect.gen(function* () {
             Option.match(parent, {
               onNone: () => false,
               onSome: (comment) =>
-                args.publicOnly ? comment.visibility === "PUBLIC" : true,
+                comment.visibility === "PUBLIC" ||
+                args.visibility === "INTERNAL",
             })
           )
         );
@@ -98,9 +103,32 @@ const makeCommentPolicy = Effect.gen(function* () {
           Policy.hasMembership(args.organizationId),
           Policy.policy(() => Effect.succeed(args.visibility === "PUBLIC"))
         ),
-        canReplyToParent({ ...args, publicOnly: true }),
+        canReplyToParent(args),
         // Moving the post from the public page is a manager+ privilege: the
         // same permission the post editor enforces for status transitions.
+        args.statusUpdateId != null
+          ? Policy.canPermission(args.organizationId, "posts.status")
+          : Policy.policy(() => Effect.succeed(true))
+      );
+    }
+
+    if (args.onBehalf === true) {
+      // Attributing a comment to a customer is a curation capability
+      // reserved for managers and above (`comments.createOnBehalf`).
+      // INTERNAL-visibility comments may also be authored on behalf — same
+      // permission, same resolution.
+      return Policy.all(
+        Policy.hasMembership(args.organizationId),
+        Policy.canPermission(args.organizationId, "comments.createOnBehalf"),
+        Policy.policy(() =>
+          postRepository.isUnlocked({
+            id: args.postId,
+            organizationId: args.organizationId,
+          })
+        ),
+        canReplyToParent(args),
+        // Moving the post via a comment is a manager+ privilege everywhere,
+        // matching the post editor's status transition gate.
         args.statusUpdateId != null
           ? Policy.canPermission(args.organizationId, "posts.status")
           : Policy.policy(() => Effect.succeed(true))
@@ -115,7 +143,7 @@ const makeCommentPolicy = Effect.gen(function* () {
           organizationId: args.organizationId,
         })
       ),
-      canReplyToParent({ ...args, publicOnly: false }),
+      canReplyToParent(args),
       // Moving the post via a comment is a manager+ privilege everywhere,
       // matching the post editor's status transition gate.
       args.statusUpdateId != null

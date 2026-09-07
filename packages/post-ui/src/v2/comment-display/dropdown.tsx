@@ -22,7 +22,12 @@ export function CommentDisplayDropdown() {
     <Menu>
       <MenuTrigger
         render={
-          <Button size="icon-sm" variant="ghost">
+          <Button
+            aria-label="Comment menu"
+            className="transition-opacity data-popup-open:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
+            size="icon-sm"
+            variant="ghost"
+          >
             <HugeiconsIcon icon={Ellipsis} />
           </Button>
         }

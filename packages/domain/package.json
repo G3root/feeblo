@@ -154,6 +154,9 @@
     "./http/router": {
       "default": "./src/http/router.ts"
     },
+    "./identity/linking": {
+      "default": "./src/identity/linking.ts"
+    },
     "./import-export/schema": {
       "default": "./src/import-export/schema.ts"
     },
@@ -447,6 +450,7 @@
     "@feeblo/permissions": "workspace:*",
     "@feeblo/transactional": "workspace:*",
     "@feeblo/utils": "workspace:*",
+    "@isaacs/ttlcache": "catalog:",
     "@polar-sh/sdk": "catalog:",
     "better-auth": "catalog:",
     "cookie-es": "^3.1.1",
@@ -456,7 +460,8 @@
     "jose": "catalog:",
     "leo-profanity": "^1.9.0",
     "react": "catalog:",
-    "takumi-js": "^2.4.0"
+    "takumi-js": "^2.4.0",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",

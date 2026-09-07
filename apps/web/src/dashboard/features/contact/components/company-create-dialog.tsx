@@ -39,6 +39,7 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { useCompanyCreateDialogContext } from "../dialog-stores";
+import { CrmLimitInfoPopover } from "./crm-entries-usage";
 
 export function CompanyCreateDialog() {
   const store = useCompanyCreateDialogContext();
@@ -171,7 +172,8 @@ function CompanyCreateForm() {
             <EmptyDescription>
               The {crmLimit} CRM entry limit for your plan has been reached (
               {totalCrmEntries} of {crmLimit} used). Upgrade to create more
-              companies and contacts.
+              companies and contacts, or delete unused entries to free up space.{" "}
+              <CrmLimitInfoPopover crmLimit={crmLimit} />
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>

@@ -124,6 +124,12 @@ export const finalizeEditorContent = async (
     previewUrl: string;
   }> = [];
 
+  // Eligibility filtering stays synchronous; only the network uploads below
+  // run concurrently.
+  const eligible: Array<{
+    pending: PendingEditorUpload;
+    previewUrl: string;
+  }> = [];
   for (const [previewUrl, pending] of pendingEditorUploads) {
     // Asset ownership is decided at finalize time, not at insert time. The
     // editor may be mounted before the member/organization check resolves
@@ -148,17 +154,41 @@ export const finalizeEditorContent = async (
       continue;
     }
 
-    const uploaded =
-      pending.uploaded !== undefined &&
-      pending.uploaded.organizationId === organizationId
-        ? pending.uploaded
-        : {
-            ...(await uploadEditorMediaFile({
-              file: pending.file,
-              options: organizationId ? { organizationId } : {},
-            })),
-            ...(organizationId && { organizationId }),
-          };
+    eligible.push({ pending, previewUrl });
+  }
+
+  // Uploads are independent XHRs: run them together so N pasted images
+  // cost one upload latency instead of N. Replacement application stays
+  // sequential below (string read-modify-write would race otherwise) in
+  // the original paste order, preserving today's result exactly.
+  // allSettled (not all) so one rejection still records its successful
+  // siblings in pendingEditorUploads; the retry then reuses them instead of
+  // re-uploading (which would orphan the first asset).
+  const settledEntries = await Promise.allSettled(
+    eligible.map(async ({ pending, previewUrl }) => ({
+      pending,
+      previewUrl,
+      uploaded:
+        pending.uploaded !== undefined &&
+        pending.uploaded.organizationId === organizationId
+          ? pending.uploaded
+          : {
+              ...(await uploadEditorMediaFile({
+                file: pending.file,
+                options: organizationId ? { organizationId } : {},
+              })),
+              ...(organizationId && { organizationId }),
+            },
+    }))
+  );
+
+  let firstError: unknown;
+  for (const settled of settledEntries) {
+    if (settled.status === "rejected") {
+      firstError ??= settled.reason;
+      continue;
+    }
+    const { pending, previewUrl, uploaded } = settled.value;
     const uploadedPending = { ...pending, uploaded };
     pendingEditorUploads.set(previewUrl, uploadedPending);
     finalizedContent = finalizedContent.split(previewUrl).join(uploaded.url);
@@ -166,6 +196,10 @@ export const finalizeEditorContent = async (
       assetIds.push(uploaded.assetId);
     }
     finalizedUploads.push({ pending: uploadedPending, previewUrl });
+  }
+
+  if (firstError !== undefined) {
+    throw firstError;
   }
 
   return {

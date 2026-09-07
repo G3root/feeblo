@@ -50,7 +50,7 @@ export function PostCommentComposer({
   );
 
   return (
-    <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
+    <form className="flex flex-col gap-2" onSubmit={handleSubmit}>
       <CommentComposerField
         disabled={disabled}
         form={form}

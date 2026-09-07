@@ -29,7 +29,7 @@ export type CommentDisplayProviderProps = {
   onReply: (value: {
     content: string;
     isPrivate: boolean;
-  }) => void | Promise<void>;
+  }) => boolean | Promise<boolean>;
   onStartEdit?: () => void;
   onToggleVisibility?: () => void;
   onTogglePin?: () => void;

@@ -6,6 +6,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import * as S from "effect/Schema";
+import { regexes } from "zod/v4/core";
 
 import {
   POST_CONTENT_MAX_LENGTH,
@@ -48,6 +49,43 @@ export const Post = S.Struct({
 });
 
 export type TPost = S.Schema.Type<typeof Post>;
+
+/**
+ * Slim list projection of {@link Post} for `PostList`/`PostListPublic`.
+ *
+ * `content` (full Markdown/HTML bodies) dominates list payloads but no list
+ * UI renders it — cards, boards, and roadmaps show `excerpt`, and detail
+ * pages resolve the body through `PostGet`/`PostGetPublic` instead. Keep in
+ * sync with {@link Post} minus `content`; the compiler enforces the shape
+ * at each RPC boundary, not the field-by-field correspondence.
+ */
+export const PostListItem = S.Struct({
+  assetIds: S.optional(S.Array(S.String)),
+  id: S.String,
+  boardId: S.String,
+  title: S.String,
+  slug: S.String,
+  excerpt: S.String,
+  statusId: S.String,
+  etaQuarter: S.NullOr(EtaQuarter),
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+  organizationId: S.String,
+  creatorMemberId: S.NullOr(S.String),
+  creatorId: S.NullOr(S.String),
+  /** UI hint; the backend remains authoritative for deletion. */
+  canDeleteAsCreator: S.optional(S.Boolean),
+  lockedAt: S.NullOr(S.DateFromString),
+  archivedAt: S.NullOr(S.DateFromString),
+  mergedIntoPostId: S.NullOr(S.String),
+  mergedAt: S.NullOr(S.DateFromString),
+  user: S.Struct({
+    name: S.NullOr(S.String),
+    image: S.NullOr(S.String),
+  }),
+});
+
+export type TPostListItem = S.Schema.Type<typeof PostListItem>;
 
 export const PostList = S.Struct({
   boardId: S.Union([S.String, S.Null, S.Undefined]),
@@ -171,6 +209,46 @@ export const PostMerge = S.Struct({
 
 export type TPostMerge = S.Schema.Type<typeof PostMerge>;
 
+/**
+ * Minimal deliverability shape for author input. Synthetic inboxes are
+ * generated internally and never pass through this input; without the
+ * shape check, a direct RPC caller could persist junk contact emails that
+ * can never heal or receive notifications.
+ *
+ * The rule is Zod core's practical email pattern (`regexes.email`): it
+ * already rejects repeated or misplaced dots (`a..b@example.com`,
+ * `.a@example.com`, `a.@example.com`, `a@.example.com`) that a naive
+ * `local@domain.tld` check accepts. Importing it (instead of hand-rolling
+ * a regex) keeps the server filter and the client's `z.email()` on one
+ * shared pattern by construction — see `isDeliverableAuthorEmail` in
+ * `@feeblo/web-shared/user-validation` for the client-side gate.
+ */
+export const isValidOnBehalfAuthorEmail = (email: string): boolean =>
+  regexes.email.test(email);
+
+const AuthorEmail = S.String.check(
+  S.makeFilter(isValidOnBehalfAuthorEmail, {
+    message: "author.email must be a valid email address",
+  })
+);
+
+/**
+ * The customer a dashboard post is attributed to when created on behalf of
+ * them (see plan-on-behalf.md). Identifiers are consulted in strict priority
+ * order by `ResolvePrincipalService`: `userId` > `contactId` > `externalId` >
+ * `email`; `name`/`avatarUrl` only enrich the resolved contact.
+ */
+export const PostCreateAuthor = S.Struct({
+  userId: S.optional(S.String),
+  contactId: S.optional(S.String),
+  externalId: S.optional(S.String),
+  email: S.optional(AuthorEmail),
+  name: S.optional(S.String),
+  avatarUrl: S.optional(S.String),
+});
+
+export type TPostCreateAuthor = S.Schema.Type<typeof PostCreateAuthor>;
+
 export const PostCreate = S.Struct({
   assetIds: S.Array(S.String),
   id: PostId.schema,
@@ -185,6 +263,23 @@ export const PostCreate = S.Struct({
   statusId: PostStatusId.schema,
   organizationId: WorkspaceId.schema,
   etaQuarter: S.optional(S.NullOr(EtaQuarter)),
+  /** Present ⇒ the post is created on behalf of the resolved customer. */
+  author: S.optional(PostCreateAuthor),
 });
 
 export type TPostCreate = S.Schema.Type<typeof PostCreate>;
+
+/**
+ * Dashboard author reassignment: attributes an existing post to a resolved
+ * customer, reusing the on-behalf resolution rules (`userId` > `contactId` >
+ * `externalId` > `email`). An absent subject is not representable here —
+ * clearing back to the staff actor is not supported; the resolver rejects
+ * an identifier-less payload with `InvalidSubjectError`.
+ */
+export const PostUpdateAuthor = S.Struct({
+  id: PostId.schema,
+  organizationId: WorkspaceId.schema,
+  author: PostCreateAuthor,
+});
+
+export type TPostUpdateAuthor = S.Schema.Type<typeof PostUpdateAuthor>;

@@ -10,6 +10,7 @@ import {
   useLiveQuery,
 } from "@tanstack/react-db";
 
+import { useCreateCommentAction } from "../forms/comment-form";
 import { usePostCollections } from "../providers/post-collections-provider";
 import { CommentDisplayComponent } from "./component";
 
@@ -25,6 +26,7 @@ export function CommentDisplayItem({
   const {
     collections: { commentCollection, postStatusCollection },
   } = usePostCollections();
+  const createComment = useCreateCommentAction();
 
   // Derive the status-update type by joining the comment's FK onto the
   // org-scoped post status collection (labels/colors live client-side).
@@ -109,7 +111,13 @@ export function CommentDisplayItem({
       statusUpdateLabel={statusUpdateLabel}
       statusUpdateColor={statusUpdateColor}
       onDelete={() => {}}
-      onReply={() => {}}
+      onReply={({ content, isPrivate }) =>
+        createComment({
+          content,
+          visibility: isPrivate ? "INTERNAL" : "PUBLIC",
+          parentCommentId: data.id,
+        })
+      }
       onTogglePin={async () => {
         const tx = togglePinAction({});
         await tx.isPersisted.promise;

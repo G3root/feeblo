@@ -126,7 +126,16 @@ const getWhereClause = (where: SQL[]) =>
         onSome: (clause) => clause,
       });
 
-const selectPostFields = (userId?: string | null) => ({
+/**
+ * Contact columns backing the dashboard author-display fallback (see
+ * `contactFallback` below). Public selects must never join the contact
+ * table: contact names are workspace-internal and must not leak onto
+ * public boards.
+ */
+const selectPostFields = (
+  userId?: string | null,
+  opts?: { contactFallback?: boolean }
+) => ({
   id: schema.postTable.id,
   title: schema.postTable.title,
   boardId: schema.postTable.boardId,
@@ -139,25 +148,41 @@ const selectPostFields = (userId?: string | null) => ({
   updatedAt: schema.postTable.updatedAt,
   organizationId: schema.postTable.organizationId,
   user: {
-    name: sql<string | null>`${schema.userTable.name}`,
-    image: sql<string | null>`${schema.userTable.image}`,
+    // Dashboard rows attribute contact-only authors (bare/new emails with
+    // no user row, e.g. from on-behalf creation or PostUpdateAuthor) to
+    // their contact name instead of rendering "Unknown author". The
+    // fallback is dashboard-only: public selects keep the user join alone
+    // so customer names never leak onto public boards.
+    name: opts?.contactFallback
+      ? sql<
+          string | null
+        >`COALESCE(${schema.userTable.name}, ${schema.contactTable.name})`
+      : sql<string | null>`${schema.userTable.name}`,
+    image: opts?.contactFallback
+      ? sql<
+          string | null
+        >`COALESCE(${schema.userTable.image}, ${schema.contactTable.avatar})`
+      : sql<string | null>`${schema.userTable.image}`,
   },
   creatorMemberId: schema.postTable.creatorMemberId,
   creatorId: schema.postTable.creatorId,
   canDeleteAsCreator: userId
-    ? sql<boolean>`(
-        ${schema.postTable.creatorId} = ${userId}
-        AND NOT EXISTS (
-          SELECT 1
-          FROM ${schema.commentTable}
-          WHERE ${schema.commentTable.postId} = ${schema.postTable.id}
-        )
-        AND NOT EXISTS (
-          SELECT 1
-          FROM ${schema.upvoteTable}
-          WHERE ${schema.upvoteTable.postId} = ${schema.postTable.id}
-            AND ${schema.upvoteTable.userId} <> ${userId}
-        )
+    ? sql<boolean>`COALESCE(
+        (
+          ${schema.postTable.creatorId} = ${userId}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM ${schema.commentTable}
+            WHERE ${schema.commentTable.postId} = ${schema.postTable.id}
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM ${schema.upvoteTable}
+            WHERE ${schema.upvoteTable.postId} = ${schema.postTable.id}
+              AND ${schema.upvoteTable.userId} <> ${userId}
+          )
+        ),
+        false
       )`
     : sql<boolean>`false`,
   metadata: schema.postTable.metadata,
@@ -167,16 +192,57 @@ const selectPostFields = (userId?: string | null) => ({
   mergedAt: schema.postTable.mergedAt,
 });
 
+const selectPostListFields = (
+  userId?: string | null,
+  opts?: { contactFallback?: boolean }
+) => {
+  // Lists never render the full body (cards show `excerpt`; detail pages
+  // resolve `content` through `PostGet`/`PostGetPublic`), so drop the
+  // heaviest column while keeping every other list field identical.
+  const { content: _content, ...listFields } = selectPostFields(userId, opts);
+  return listFields;
+};
+
 const makePostRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   return {
+    /**
+     * Authenticated single-post fetch backing the `PostGet` RPC. Scoped to
+     * the organization (membership is enforced by the handler's policy);
+     * unlike `findPublicBySlug` it does not gate on board visibility, so
+     * members can open posts on private boards and moderators can review
+     * archived content.
+     */
+    findBySlug: ({ organizationId, slug, userId }: TPostFindPublicBySlug) =>
+      db
+        .select(selectPostFields(userId, { contactFallback: true }))
+        .from(schema.postTable)
+        .leftJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.postTable.creatorId)
+        )
+        .leftJoin(
+          schema.contactTable,
+          eq(schema.contactTable.id, schema.postTable.contactId)
+        )
+        .where(
+          and(
+            eq(schema.postTable.organizationId, organizationId),
+            eq(schema.postTable.slug, slug)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0])),
     findActivityState: ({ id, organizationId }: TPostById) =>
       db
         .select({
           archivedAt: schema.postTable.archivedAt,
           boardId: schema.postTable.boardId,
+          contactId: schema.postTable.contactId,
           content: schema.postTable.content,
+          creatorId: schema.postTable.creatorId,
+          creatorMemberId: schema.postTable.creatorMemberId,
           etaQuarter: schema.postTable.etaQuarter,
           lockedAt: schema.postTable.lockedAt,
           statusId: schema.postTable.statusId,
@@ -360,11 +426,15 @@ const makePostRepository = Effect.gen(function* () {
       const whereClause = getWhereClause(where);
 
       return db
-        .select(selectPostFields(userId))
+        .select(selectPostListFields(userId, { contactFallback: true }))
         .from(schema.postTable)
         .leftJoin(
           schema.userTable,
           eq(schema.userTable.id, schema.postTable.creatorId)
+        )
+        .leftJoin(
+          schema.contactTable,
+          eq(schema.contactTable.id, schema.postTable.contactId)
         )
         .where(whereClause);
     },
@@ -385,7 +455,7 @@ const makePostRepository = Effect.gen(function* () {
       const whereClause = and(...where);
 
       return db
-        .select(selectPostFields(userId))
+        .select(selectPostListFields(userId))
         .from(schema.postTable)
         .innerJoin(
           schema.boardTable,
@@ -586,6 +656,35 @@ const makePostRepository = Effect.gen(function* () {
       db
         .update(schema.postTable)
         .set({ etaQuarter })
+        .where(
+          and(
+            eq(schema.postTable.id, id),
+            eq(schema.postTable.organizationId, organizationId)
+          )
+        )
+        .pipe(Effect.asVoid),
+
+    /**
+     * Re-attributes a post to a resolved on-behalf subject. Mirrors the
+     * create path: staff attribution stays out of the author fields, so
+     * `creatorMemberId` is always cleared and `contactId` always set.
+     */
+    updateAuthor: ({
+      id,
+      organizationId,
+      creatorId,
+      creatorMemberId,
+      contactId,
+    }: {
+      id: string;
+      organizationId: string;
+      creatorId: string | null;
+      creatorMemberId: string | null;
+      contactId: string;
+    }) =>
+      db
+        .update(schema.postTable)
+        .set({ creatorId, creatorMemberId, contactId })
         .where(
           and(
             eq(schema.postTable.id, id),

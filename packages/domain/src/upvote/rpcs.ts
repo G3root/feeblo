@@ -5,7 +5,13 @@ import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { AuthMiddleware, OptionalAuthMiddleware } from "../session-middleware";
 import { UpvoteServiceErrors } from "./errors";
-import { Upvote, UpvoteList, UpvoteToggle } from "./schema";
+import {
+  Upvote,
+  UpvoteAddOnBehalf,
+  UpvoteList,
+  UpvoteRemoveOnBehalf,
+  UpvoteToggle,
+} from "./schema";
 
 export class UpvoteRpcs extends RpcGroup.make(
   Rpc.make("UpvoteList", {
@@ -19,6 +25,26 @@ export class UpvoteRpcs extends RpcGroup.make(
       upvoted: Schema.Boolean,
     }),
     error: UpvoteServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  // On-behalf voter management is dashboard-only (AuthMiddleware): there is
+  // deliberately no public variant. Add and remove are separate RPCs so an
+  // admin can never remove someone else's vote by accident.
+  Rpc.make("UpvoteAddOnBehalf", {
+    payload: UpvoteAddOnBehalf,
+    success: Schema.Struct({
+      added: Schema.Boolean,
+    }),
+    // On-behalf voter management consumes the per-member dashboard rate limit.
+    error: Schema.Union([UpvoteServiceErrors, RateLimitErrors]),
+  }).middleware(AuthMiddleware),
+  Rpc.make("UpvoteRemoveOnBehalf", {
+    payload: UpvoteRemoveOnBehalf,
+    success: Schema.Struct({
+      removed: Schema.Boolean,
+    }),
+    // Same per-member bound as the add path.
+    error: Schema.Union([UpvoteServiceErrors, RateLimitErrors]),
   }).middleware(AuthMiddleware),
 
   Rpc.make("UpvoteListPublic", {

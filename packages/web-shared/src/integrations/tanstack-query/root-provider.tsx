@@ -5,7 +5,22 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 let clientQueryClient: QueryClient | null = null;
 
 function makeQueryClient() {
-  return new QueryClient();
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        // Collections without an explicit `staleTime` (most of them) would
+        // otherwise refetch on every mount and window focus, fanning out
+        // into an RPC storm across the ~11 preloaded collections. A minute
+        // of freshness, no focus refetch, and a single retry keeps
+        // navigation cheap; collections with fresher needs set their own
+        // `staleTime`/`refetchInterval` per query.
+        staleTime: 60_000,
+        gcTime: 10 * 60_000,
+        refetchOnWindowFocus: false,
+        retry: 1,
+      },
+    },
+  });
 }
 
 export function getContext() {

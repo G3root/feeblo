@@ -2,6 +2,7 @@ import { CommentId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
 import { COMMENT_CONTENT_MAX_LENGTH } from "../content-limits";
+import { PostCreateAuthor } from "../post/schema";
 
 export const Comment = S.Struct({
   id: S.String,
@@ -16,6 +17,13 @@ export const Comment = S.Struct({
   userId: S.NullOr(S.String),
   visibility: S.Literals(["PUBLIC", "INTERNAL"]),
   parentCommentId: S.Union([S.String, S.Null]),
+  /**
+   * Parent re-resolved to the nearest ancestor the caller can see; equal to
+   * parentCommentId when no ancestor is hidden from them. Public lists
+   * rewrite it past INTERNAL (member-only) intermediaries so a public reply
+   * still nests beneath its nearest visible ancestor.
+   */
+  resolvedParentCommentId: S.Union([S.String, S.Null]),
   memberId: S.Union([S.String, S.Null]),
   /** Post status (org-scoped FK) this comment moved the post to, when posted as a status update. */
   statusUpdateId: S.NullOr(S.String),
@@ -41,6 +49,8 @@ export const CommentCreate = S.Struct({
   content: S.String.check(S.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)),
   visibility: S.Literals(["PUBLIC", "INTERNAL"]),
   parentCommentId: S.Union([CommentId.schema, S.Null]),
+  /** Present ⇒ the comment is created on behalf of the resolved customer. */
+  author: S.optional(PostCreateAuthor),
   /** Optional post status (org-scoped FK) this comment moves the post to. */
   statusUpdateId: S.optional(S.NullOr(PostStatusId.schema)),
 });
