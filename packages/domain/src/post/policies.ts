@@ -237,6 +237,18 @@ const makePostPolicy = Effect.gen(function* () {
       )
     );
 
+  /**
+   * Re-attributing a post to another customer reuses the on-behalf creation
+   * capability (`posts.createOnBehalf`, managers and above): the same
+   * attribution boundary applies whether the customer is named at creation
+   * or reassigned later.
+   */
+  const canUpdateAuthor = (organizationId: string) =>
+    Policy.all(
+      Policy.hasMembership(organizationId),
+      Policy.canPermission(organizationId, "posts.createOnBehalf")
+    );
+
   /** ETA is a post property reserved for managers and above (`posts.status`). */
   const canUpdateEta = (organizationId: string) =>
     Policy.all(
@@ -257,6 +269,7 @@ const makePostPolicy = Effect.gen(function* () {
     canDelete,
     canUpdate,
     canUpdateProperties,
+    canUpdateAuthor,
     canUpdateEta,
     canAdminUpdate,
     canMerge,

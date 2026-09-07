@@ -82,6 +82,9 @@ export type PostActivityInput = PostActivityActor &
     | { readonly kind: "COMMENT_DELETED"; readonly commentId: string }
     | { readonly kind: "VOTE_ADDED" }
     | { readonly kind: "VOTE_REMOVED" }
+    // Dashboard author reassignment: the new author travels in `metadata`
+    // (`toOnBehalfMetadata`), like the voter subject on VOTE_ADDED.
+    | { readonly kind: "AUTHOR_CHANGED" }
     | { readonly kind: "COMMENT_PINNED"; readonly commentId: string }
     | { readonly kind: "COMMENT_UNPINNED"; readonly commentId: string }
   );
@@ -109,6 +112,7 @@ const toRow = (input: PostActivityInput): PostActivityRow => {
     case "POST_UNARCHIVED":
     case "VOTE_ADDED":
     case "VOTE_REMOVED":
+    case "AUTHOR_CHANGED":
       return {
         kind: input.kind,
         previousValue: null,

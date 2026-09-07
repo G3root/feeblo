@@ -15,8 +15,6 @@ import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
-import { UserAdd01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
   and,
   createOptimisticAction,
@@ -25,8 +23,8 @@ import {
 } from "@tanstack/react-db";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
+import { AuthorPicker } from "../author-picker/author-picker";
 import {
-  ContactCombobox,
   emptyOnBehalfAuthor,
   hasOnBehalfAuthorValue,
   toOnBehalfAuthor,
@@ -174,7 +172,6 @@ export function PostCreateForm() {
   const createOnBehalfPolicy = usePolicy(
     hasPermission(organizationId, "posts.createOnBehalf")
   );
-  const [isOnBehalfOpen, setIsOnBehalfOpen] = useState(false);
 
   const { data: member } = useLiveQuery(
     (q) => {
@@ -312,12 +309,11 @@ export function PostCreateForm() {
         if (!selectedPostStatus) {
           throw new Error("Post status not found");
         }
-        // Attribution only rides along when the section is expanded and a
-        // subject is actually picked; otherwise the session user authors.
-        const authorSelection =
-          createOnBehalfPolicy.allowed && isOnBehalfOpen
-            ? value.author
-            : undefined;
+        // Attribution only rides along when a subject is actually picked;
+        // otherwise the session user authors.
+        const authorSelection = createOnBehalfPolicy.allowed
+          ? value.author
+          : undefined;
 
         // The list row carries no body; it travels as action input to the
         // surface's `persistPost` RPC instead. On-behalf attribution rides
@@ -369,7 +365,6 @@ export function PostCreateForm() {
         }
 
         form.reset();
-        setIsOnBehalfOpen(false);
         setContentEditorKey((current) => current + 1);
         store.send({ type: "toggle" });
       } catch (error) {
@@ -425,60 +420,39 @@ export function PostCreateForm() {
         </div>
       </DialogPanel>
 
-      {createOnBehalfPolicy.allowed ? (
-        <div className="border-border border-t px-1 pt-3">
-          <button
-            aria-controls="post-on-behalf-field"
-            aria-expanded={isOnBehalfOpen}
-            className="text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-1.5 text-sm transition-colors"
-            onClick={() => {
-              if (isOnBehalfOpen) {
-                form.resetField("author");
-              }
-              setIsOnBehalfOpen((open) => !open);
-            }}
-            type="button"
-          >
-            <HugeiconsIcon
-              className="size-4"
-              icon={UserAdd01Icon}
-              strokeWidth={2}
-            />
-            Post on behalf of a customer
-          </button>
-          {isOnBehalfOpen ? (
-            <form.AppField name="author">
-              {(field) => (
-                <div className="pt-2" id="post-on-behalf-field">
-                  <ContactCombobox
-                    label="Post on behalf of"
-                    onSelect={(next) =>
-                      field.handleChange(next ?? emptyOnBehalfAuthor)
-                    }
-                    organizationId={organizationId}
-                    placeholder="Search customers by name or email..."
-                    value={
-                      hasOnBehalfAuthorValue(field.state.value)
-                        ? field.state.value
-                        : null
-                    }
-                  />
-                  <p className="text-muted-foreground pt-1 text-xs">
-                    The post is attributed to this customer; you stay recorded
-                    as the actor.
-                  </p>
-                </div>
-              )}
-            </form.AppField>
-          ) : null}
-        </div>
-      ) : null}
-
       <DialogFooter className="grid grid-cols-2 items-center">
         <div className="flex justify-start">
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <PostBoardField boards={boards} form={form} />
             <PostStatusField form={form} statuses={postStatuses} />
+            {createOnBehalfPolicy.allowed ? (
+              <form.AppField name="author">
+                {(field) => {
+                  const selection = hasOnBehalfAuthorValue(field.state.value)
+                    ? field.state.value
+                    : null;
+                  return (
+                    <AuthorPicker
+                      display={
+                        selection ?? {
+                          name: session?.user?.name ?? "You",
+                          avatarUrl: session?.user?.image ?? null,
+                        }
+                      }
+                      label="Post author"
+                      onSelect={(next) =>
+                        field.handleChange(next ?? emptyOnBehalfAuthor)
+                      }
+                      organizationId={organizationId}
+                      placeholder="Select a customer"
+                      searchPlaceholder="Search customers by name or email..."
+                      submitLabel="Create & add author"
+                      value={selection}
+                    />
+                  );
+                }}
+              </form.AppField>
+            ) : null}
           </div>
         </div>
         <div className="flex items-center justify-end gap-3">

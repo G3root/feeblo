@@ -18,6 +18,7 @@ import {
   PostOfficialUpdatePublish,
   PostSuggestions,
   PostUpdate,
+  PostUpdateAuthor,
   PostUpdateContent,
   PostUpdateEta,
   PostUpdateTitle,
@@ -117,6 +118,13 @@ export class PostRpcs extends RpcGroup.make(
     success: Schema.Void,
     payload: PostUpdateEta,
     error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostUpdateAuthor", {
+    success: Schema.Void,
+    payload: PostUpdateAuthor,
+    // Reassignment shares the on-behalf write rate limit with creation.
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   }).middleware(AuthMiddleware),
 
   Rpc.make("PostUpdatePublic", {

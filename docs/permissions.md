@@ -52,7 +52,7 @@ Admin and owner are intentionally equivalent for authorization. `owner` is kept 
 | Boards | Create or delete boards | No | No | Yes |
 | Boards | Manage board privacy | No | No | Yes |
 | Posts | Create a post | Yes | Yes | Yes |
-| Posts | Create a post on behalf of a customer (`posts.createOnBehalf`) | No | Yes | Yes |
+| Posts | Create a post on behalf of a customer, or reassign a post's author (`posts.createOnBehalf`) | No | Yes | Yes |
 | Posts | Delete a newly-created own post | Yes | Yes | Yes |
 | Posts | Change post tags | Yes | Yes | Yes |
 | Posts | Move posts between boards | Yes | Yes | Yes |

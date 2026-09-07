@@ -70,6 +70,7 @@ import type {
   TPostOfficialUpdatePublish,
   TPostSuggestions,
   TPostUpdate,
+  TPostUpdateAuthor,
   TPostUpdateContent,
   TPostUpdateEta,
   TPostUpdateTitle,
@@ -462,6 +463,84 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             kind: "ETA_CHANGED",
             previousEta: previous.etaQuarter,
             nextEta: args.etaQuarter,
+          });
+        })
+      );
+    });
+
+  const updatePostAuthorEffect = (args: TPostUpdateAuthor) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, args.organizationId);
+      const subscriptionRepository = yield* PostSubscriptionRepository;
+      // Reassignment find-or-creates contacts like on-behalf creation, so
+      // it shares the same per-member abuse bound (see plan-on-behalf.md).
+      yield* RateLimit.consumeDashboardRateLimit({
+        key: `on-behalf-create:${args.organizationId}:${session.session.userId}`,
+        name: "on-behalf-create",
+      });
+      yield* transaction(
+        Effect.gen(function* () {
+          const previous = yield* repository.findActivityState({
+            id: args.id,
+            organizationId: args.organizationId,
+          });
+          if (!previous) {
+            return yield* new FailedToUpdatePostError();
+          }
+          // Attribution resolves inside the same transaction as the
+          // mutation, exactly like on-behalf creation. Posts carry no
+          // user-keyed rows of their own, so no shadow user is needed.
+          const subject = yield* resolveOnBehalfSubject({
+            organizationId: args.organizationId,
+            needsUser: false,
+            subject: args.author,
+            action: "post author",
+          });
+          if (
+            previous.contactId === subject.contactId &&
+            previous.creatorId === subject.userId
+          ) {
+            return;
+          }
+          const onBehalfMetadata = toOnBehalfMetadata(subject);
+          yield* repository.updateAuthor({
+            id: args.id,
+            organizationId: args.organizationId,
+            creatorId: subject.userId,
+            // On-behalf posts keep staff attribution out of the author
+            // fields, matching the create path.
+            creatorMemberId: null,
+            contactId: subject.contactId,
+          });
+          yield* activityRepository.create({
+            actorId: session.session.userId,
+            actorMemberId: membership?.membershipId ?? null,
+            organizationId: args.organizationId,
+            postId: args.id,
+            kind: "AUTHOR_CHANGED",
+            ...(onBehalfMetadata && { metadata: onBehalfMetadata }),
+          });
+          // The new author inherits the creator subscription exactly as if
+          // the post had been created on their behalf: a verified account
+          // is trusted, everyone else defers until identity linking grants
+          // them access. The previous author's subscriptions are left
+          // alone — silently unsubscribing them would be a worse surprise.
+          const subscriptionNow = yield* DateTime.nowAsDate;
+          if (subject.userId !== null) {
+            yield* subscriptionRepository.subscribe({
+              organizationId: args.organizationId,
+              postId: args.id,
+              userId: subject.userId,
+            });
+          }
+          yield* subscribeOnBehalfSubject({
+            organizationId: args.organizationId,
+            topicId: args.id,
+            subject,
+            source: "post_creator",
+            subjectKind: "post author",
+            now: subscriptionNow,
           });
         })
       );
@@ -1111,6 +1190,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     PostUpdateEta: (args: TPostUpdateEta) =>
       updatePostEtaEffect(args).pipe(
         Policy.withPolicy(postPolicy.canUpdateEta(args.organizationId)),
+        withRemapDbErrors("Post", "update")
+      ),
+
+    PostUpdateAuthor: (args: TPostUpdateAuthor) =>
+      updatePostAuthorEffect(args).pipe(
+        Policy.withPolicy(postPolicy.canUpdateAuthor(args.organizationId)),
         withRemapDbErrors("Post", "update")
       ),
 

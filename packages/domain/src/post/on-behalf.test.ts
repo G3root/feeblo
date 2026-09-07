@@ -26,7 +26,11 @@ import { ResolvePrincipalService } from "../identity/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { S3Test } from "../services/s3-test";
-import { CurrentSession, type Session } from "../session-middleware";
+import {
+  CurrentSession,
+  OptionalCurrentSession,
+  type Session,
+} from "../session-middleware";
 import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { PostRpcHandlersEffect } from "./handlers";
@@ -569,6 +573,396 @@ describe("PostRpcHandlers on-behalf", () => {
               .limit(1);
             expect(activity?.metadata).toBeNull();
           }
+        })
+      );
+    });
+
+    describe("PostUpdateAuthor", () => {
+      it.effect("reattributes a self-authored post to a new customer", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const repository = yield* EmailSubscriptionRepository;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture("manager");
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Self post"))
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
+
+          yield* handlers
+            .PostUpdateAuthor({
+              id: postId,
+              organizationId: fixture.organizationId,
+              author: {
+                email: "author-jane@example.com",
+                name: "Jane Doe",
+              },
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
+
+          const post = yield* getPost(postId);
+          expect(post).toMatchObject({
+            creatorId: null,
+            creatorMemberId: null,
+          });
+          expect(post?.contactId).not.toBeNull();
+
+          const [storedContact] = yield* db
+            .select()
+            .from(schema.contactTable)
+            .where(eq(schema.contactTable.id, post!.contactId!))
+            .limit(1);
+          expect(storedContact).toMatchObject({
+            email: "author-jane@example.com",
+            name: "Jane Doe",
+          });
+
+          const [activity] = yield* db
+            .select()
+            .from(schema.postActivityTable)
+            .where(
+              and(
+                eq(schema.postActivityTable.postId, postId),
+                eq(schema.postActivityTable.kind, "AUTHOR_CHANGED")
+              )
+            )
+            .limit(1);
+          expect(activity).toMatchObject({
+            actorId: fixture.userId,
+            actorMemberId: fixture.membershipId,
+            metadata: { onBehalfOf: { contactId: post?.contactId } },
+          });
+
+          // A contact-only subject with no account defers like a
+          // bare-email create: attribution without notification.
+          const subscription = yield* repository.findSubscription({
+            email: "author-jane@example.com",
+            organizationId: fixture.organizationId,
+            topic: { topicId: postId, topicType: "post" },
+          });
+          expect(Option.getOrUndefined(subscription)).toMatchObject({
+            source: "post_creator",
+            state: "deferred_no_access",
+          });
+        })
+      );
+
+      it.effect("adopts a verified account by email", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const repository = yield* EmailSubscriptionRepository;
+          const fixture = yield* makeFixture("manager");
+          yield* insertVerifiedUser({
+            id: "user_author_kate",
+            email: "author-kate@example.com",
+          });
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Self post"))
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
+
+          yield* handlers
+            .PostUpdateAuthor({
+              id: postId,
+              organizationId: fixture.organizationId,
+              author: { email: "author-kate@example.com" },
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
+
+          const post = yield* getPost(postId);
+          expect(post?.creatorId).toBe("user_author_kate");
+          expect(post?.creatorMemberId).toBeNull();
+          expect(post?.contactId).not.toBeNull();
+
+          const subscription = yield* repository.findSubscription({
+            email: "author-kate@example.com",
+            organizationId: fixture.organizationId,
+            topic: { topicId: postId, topicType: "post" },
+          });
+          expect(Option.getOrUndefined(subscription)).toMatchObject({
+            source: "post_creator",
+            state: "active",
+          });
+        })
+      );
+
+      it.effect("is a no-op when attribution already matches", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture("manager");
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Self post"))
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
+
+          const session = makeSession(fixture, "manager");
+          const author = {
+            email: "author-sam@example.com",
+            name: "Sam Shadow",
+          };
+          for (let index = 0; index < 2; index++) {
+            yield* handlers
+              .PostUpdateAuthor({
+                id: postId,
+                organizationId: fixture.organizationId,
+                author,
+              })
+              .pipe(Effect.provideService(CurrentSession, session));
+          }
+
+          const activities = yield* db
+            .select({ id: schema.postActivityTable.id })
+            .from(schema.postActivityTable)
+            .where(
+              and(
+                eq(schema.postActivityTable.postId, postId),
+                eq(schema.postActivityTable.kind, "AUTHOR_CHANGED")
+              )
+            );
+          expect(activities).toHaveLength(1);
+        })
+      );
+
+      it.effect("denies contributors and non-members", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("manager");
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Self post"))
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
+
+          for (const role of ["contributor", null] as const) {
+            const error = yield* Effect.flip(
+              handlers
+                .PostUpdateAuthor({
+                  id: postId,
+                  organizationId: fixture.organizationId,
+                  author: { email: "author-jane@example.com" },
+                })
+                .pipe(
+                  Effect.provideService(
+                    CurrentSession,
+                    makeSession(fixture, role)
+                  )
+                )
+            );
+            expect(error._tag).toBe("PolicyDenied");
+          }
+
+          const post = yield* getPost(postId);
+          expect(post).toMatchObject({
+            creatorId: fixture.userId,
+            creatorMemberId: fixture.membershipId,
+            contactId: null,
+          });
+        })
+      );
+
+      it.effect("fails for unknown posts", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("manager");
+          const postId = yield* PostId.generate;
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostUpdateAuthor({
+                id: postId,
+                organizationId: fixture.organizationId,
+                author: { email: "author-jane@example.com" },
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "manager")
+                )
+              )
+          );
+          expect(error._tag).toBe("FailedToUpdatePostError");
+        })
+      );
+    });
+
+    describe("Author display fallback", () => {
+      it.effect("shows the contact name for contact-only authors", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("manager");
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, "manager");
+
+          const slug = yield* handlers
+            .PostCreate({
+              ...postCreateInput(fixture, postId, "Bare email post"),
+              author: {
+                email: "author-display@example.com",
+                name: "Display Doe",
+              },
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const post = yield* getPost(postId);
+          expect(post?.creatorId).toBeNull();
+
+          const posts = yield* handlers
+            .PostList({
+              boardId: fixture.boardId,
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+          expect(posts.find((row) => row.id === postId)?.user).toEqual({
+            name: "Display Doe",
+            image: null,
+          });
+
+          const detail = yield* handlers
+            .PostGet({ organizationId: fixture.organizationId, slug })
+            .pipe(Effect.provideService(CurrentSession, session));
+          expect(detail.user).toEqual({
+            name: "Display Doe",
+            image: null,
+          });
+        })
+      );
+
+      it.effect("shows the contact name after author reassignment", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("manager");
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, "manager");
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Self post"))
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          yield* handlers
+            .PostUpdateAuthor({
+              id: postId,
+              organizationId: fixture.organizationId,
+              author: {
+                email: "author-reassigned@example.com",
+                name: "Reassigned Roe",
+              },
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const posts = yield* handlers
+            .PostList({
+              boardId: fixture.boardId,
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+          expect(posts.find((row) => row.id === postId)?.user).toEqual({
+            name: "Reassigned Roe",
+            image: null,
+          });
+        })
+      );
+
+      it.effect("prefers the user row when one is linked", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("manager");
+          yield* insertVerifiedUser({
+            id: "user_author_display",
+            email: "author-linked@example.com",
+          });
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, "manager");
+
+          yield* handlers
+            .PostCreate({
+              ...postCreateInput(fixture, postId, "Linked post"),
+              author: {
+                email: "author-linked@example.com",
+                name: "Stale Enrichment",
+              },
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          // The adopted account is "Jane Customer" (see
+          // insertVerifiedUser); the contact enrichment name must not win.
+          const posts = yield* handlers
+            .PostList({
+              boardId: fixture.boardId,
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+          expect(posts.find((row) => row.id === postId)?.user).toEqual({
+            name: "Jane Customer",
+            image: null,
+          });
+        })
+      );
+
+      it.effect("keeps contact names off public rows", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("manager");
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate({
+              ...postCreateInput(fixture, postId, "Public on behalf"),
+              author: {
+                email: "author-public@example.com",
+                name: "Public Doe",
+              },
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
+
+          const posts = yield* handlers
+            .PostListPublic({
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+          expect(posts.find((row) => row.id === postId)?.user).toEqual({
+            name: null,
+            image: null,
+          });
         })
       );
     });

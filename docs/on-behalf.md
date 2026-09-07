@@ -36,7 +36,7 @@ Named permissions follow the two-layer model in `docs/permissions.md`:
 
 | Permission | Minimum role | RPCs |
 | --- | --- | --- |
-| `posts.createOnBehalf` | manager | `PostCreate` with `author` |
+| `posts.createOnBehalf` | manager | `PostCreate` with `author`, `PostUpdateAuthor` |
 | `comments.createOnBehalf` | manager | `CommentCreate` with `author` |
 | `votes.onBehalf` | contributor | `UpvoteAddOnBehalf`, `UpvoteRemoveOnBehalf` |
 
@@ -46,7 +46,7 @@ Voter management is deliberately **not** a toggle: `UpvoteAddOnBehalf` is idempo
 
 ## Provenance
 
-`post.source` stays `DASHBOARD`; on-behalf facts live in `post_activity.metadata` as `{ onBehalfOf: { contactId, userId? } }` with the admin recorded as the actor. Activity kinds `VOTE_ADDED` / `VOTE_REMOVED` record voter management. Timelines render "created by Sarah on behalf of john@acme.com".
+`post.source` stays `DASHBOARD`; on-behalf facts live in `post_activity.metadata` as `{ onBehalfOf: { contactId, userId? } }` with the admin recorded as the actor. Activity kinds `VOTE_ADDED` / `VOTE_REMOVED` record voter management and `AUTHOR_CHANGED` records dashboard author reassignment (`PostUpdateAuthor`), which reuses the creation-time resolution rules and subscribes the new author as `post_creator`. Dashboard post rows display contact-only authors (no linked user row) under their contact name; public rows never fall back, so customer names stay off public boards. Timelines render "created by Sarah on behalf of john@acme.com".
 
 ## Notifications
 

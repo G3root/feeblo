@@ -9,6 +9,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
+import { PostAuthorField } from "./post-author-field";
+
 export function PostPageSkeleton() {
   return (
     <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_280px]">
@@ -39,54 +41,37 @@ export function PostPageSkeleton() {
     </div>
   );
 }
-export function PostDetails({
-  author,
-  createdAt,
-}: {
-  author: string | null | undefined;
-  createdAt: Date | string;
-}) {
-  const details = [
-    {
-      icon: UserIcon,
-      label: "Author",
-      value: author ?? "Unknown author",
-    },
-    {
-      icon: Calendar03Icon,
-      label: "Created",
-      value: dayjs.default(createdAt).fromNow(),
-    },
-    // {
-    //   icon: Time02Icon,
-    //   label: "Updated",
-    //   value: formatPostDate(updatedAt),
-    // },
-  ];
-
+export function PostDetails({ createdAt }: { createdAt: Date | string }) {
   return (
     <section aria-labelledby="post-details-heading" className="space-y-2.5">
       <h2 className="sr-only" id="post-details-heading">
         Details
       </h2>
       <dl className="space-y-2">
-        {details.map((detail) => (
-          <div
-            className="grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-2 text-xs"
-            key={detail.label}
-          >
-            <HugeiconsIcon
-              aria-hidden="true"
-              className="text-muted-foreground/72 size-4"
-              icon={detail.icon}
-              strokeWidth={1.75}
-            />
-            <dt className="text-muted-foreground">{detail.label}</dt>
-            <dd className="text-foreground max-w-32 truncate font-medium">
-              {detail.value}
-            </dd>
-          </div>
-        ))}
+        <div className="grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-2 text-xs">
+          <HugeiconsIcon
+            aria-hidden="true"
+            className="text-muted-foreground/72 size-4"
+            icon={UserIcon}
+            strokeWidth={1.75}
+          />
+          <dt className="text-muted-foreground">Author</dt>
+          <dd className="text-foreground max-w-32 font-medium">
+            <PostAuthorField />
+          </dd>
+        </div>
+        <div className="grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-2 text-xs">
+          <HugeiconsIcon
+            aria-hidden="true"
+            className="text-muted-foreground/72 size-4"
+            icon={Calendar03Icon}
+            strokeWidth={1.75}
+          />
+          <dt className="text-muted-foreground">Created</dt>
+          <dd className="text-foreground max-w-32 truncate font-medium">
+            {dayjs.default(createdAt).fromNow()}
+          </dd>
+        </div>
       </dl>
     </section>
   );

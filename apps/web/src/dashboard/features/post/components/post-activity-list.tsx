@@ -31,6 +31,7 @@ import {
   Tag01Icon,
   Tag02Icon,
   ThumbsUpIcon,
+  UserAdd01Icon,
   UserMinus01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -110,6 +111,7 @@ const activityIconMap = {
   COMMENT_DELETED: CommentRemove01Icon,
   VOTE_ADDED: ThumbsUpIcon,
   VOTE_REMOVED: UserMinus01Icon,
+  AUTHOR_CHANGED: UserAdd01Icon,
   COMMENT_PINNED: PinIcon,
   COMMENT_UNPINNED: PinOffIcon,
 } satisfies Record<TPostActivityKind, typeof FileAddIcon>;
@@ -160,6 +162,9 @@ function getActivityDescription({
     COMMENT_DELETED: "deleted a comment",
     VOTE_ADDED: "added a voter",
     VOTE_REMOVED: "removed a voter",
+    // The new author renders through the shared on-behalf suffix
+    // ("on behalf of {subject}") from the activity metadata.
+    AUTHOR_CHANGED: "changed the author",
     COMMENT_PINNED: "pinned a comment",
     COMMENT_UNPINNED: "unpinned a comment",
   } satisfies Record<TPostActivityKind, string>;

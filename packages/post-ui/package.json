@@ -32,6 +32,14 @@
       "types": "./src/v2/contact-combobox/contact-combobox.tsx",
       "default": "./src/v2/contact-combobox/contact-combobox.tsx"
     },
+    "./contact-combobox/new-user-dialog": {
+      "types": "./src/v2/contact-combobox/new-user-dialog.tsx",
+      "default": "./src/v2/contact-combobox/new-user-dialog.tsx"
+    },
+    "./author-picker": {
+      "types": "./src/v2/author-picker/author-picker.tsx",
+      "default": "./src/v2/author-picker/author-picker.tsx"
+    },
     "./dialogs": {
       "types": "./src/v2/dialogs/index.ts",
       "default": "./src/v2/dialogs/index.ts"

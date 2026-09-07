@@ -280,3 +280,18 @@ export const PostCreate = S.Struct({
 });
 
 export type TPostCreate = S.Schema.Type<typeof PostCreate>;
+
+/**
+ * Dashboard author reassignment: attributes an existing post to a resolved
+ * customer, reusing the on-behalf resolution rules (`userId` > `contactId` >
+ * `externalId` > `email`). An absent subject is not representable here —
+ * clearing back to the staff actor is not supported; the resolver rejects
+ * an identifier-less payload with `InvalidSubjectError`.
+ */
+export const PostUpdateAuthor = S.Struct({
+  id: PostId.schema,
+  organizationId: WorkspaceId.schema,
+  author: PostCreateAuthor,
+});
+
+export type TPostUpdateAuthor = S.Schema.Type<typeof PostUpdateAuthor>;

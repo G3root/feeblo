@@ -333,7 +333,7 @@ function RouteComponent() {
               <Separator />
             </div>
 
-            <PostDetails author={post.user?.name} createdAt={post.createdAt} />
+            <PostDetails createdAt={post.createdAt} />
 
             <div>
               <Separator />
