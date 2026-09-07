@@ -161,6 +161,39 @@ describe("ContactCombobox", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it("allows picking voted contacts when disableAlreadyVoted is false", async () => {
+    const onSearch = vi.fn().mockResolvedValue([voter]);
+    const onSelect = vi.fn();
+    const screen = await render(
+      <ContactCombobox
+        disableAlreadyVoted={false}
+        label="Search customers"
+        onSelect={onSelect}
+        organizationId="organization-id"
+        postId="post-1"
+        search={(input) => {
+          onSearch(input);
+          return Promise.resolve([voter]);
+        }}
+        value={null}
+      />
+    );
+
+    // Author pickers reuse the combobox with voting state ignored: no
+    // badge, and the row stays selectable so a voter can be reattributed
+    // as the author.
+    await typeQuery(screen, "voter@acme.com");
+    await expect.element(screen.getByText("Al Ready")).toBeVisible();
+    await expect
+      .element(screen.getByText("Already voted"))
+      .not.toBeInTheDocument();
+
+    await screen.getByText("Al Ready").click();
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ contactId: voter.contactId })
+    );
+  });
+
   it("offers to create a new customer when nothing matches", async () => {
     const onSearch = vi.fn().mockResolvedValue([]);
     const onSelect = vi.fn();

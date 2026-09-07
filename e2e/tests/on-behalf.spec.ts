@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 
-import { expect, type Browser, type Page, test } from "@playwright/test";
+import {
+  expect,
+  type Browser,
+  type Locator,
+  type Page,
+  test,
+} from "@playwright/test";
 
 import {
   createAuthenticatedWorkspace,
@@ -30,18 +36,26 @@ import { publicBoardUrl } from "../helpers/urls";
  * 1. Post on behalf of a new customer (create-new entry) + provenance + no
  *    email to the deferred subject.
  * 2. Post on behalf of an existing contact picked from search.
- * 3. Voter add via the picker, Already-voted guard, add via the new-user
+ * 3. Clearing the picked post author returns the dialog to self-authorship.
+ * 4. Dashboard author reassignment (`PostUpdateAuthor`) via search and via
+ *    the new-user dialog, with activity provenance and permission gating.
+ * 5. Voter add via the picker, Already-voted guard, add via the new-user
  *    dialog (with validation), and removal — each with activity provenance.
- * 4. Comment as a customer via the options popover, author reset after
+ * 6. Comment as a customer via the options popover, author reset after
  *    submit, and activity provenance.
- * 5. Mutual exclusivity of status updates and comment-as-customer.
- * 6. Role gating: contributor keeps `votes.onBehalf` but sees no post or
- *    comment on-behalf controls.
- * 7. Picker guidance states (min length, empty, create-new, exact-email).
- * 8. Public-board rendering of on-behalf attribution.
+ * 7. Mutual exclusivity of status updates and comment-as-customer.
+ * 8. Role gating: contributor keeps `votes.onBehalf` but sees no post or
+ *    comment on-behalf controls (no `Post author` picker, no
+ *    `Change author` field, no comment options).
+ * 9. Picker guidance states (min length, empty, create-new, exact-email).
+ * 10. Public-board rendering of on-behalf attribution.
  *
  * The workspace creator is the owner, so all three on-behalf permissions are
  * granted unless a test explicitly invites a contributor.
+ *
+ * Post-create attribution uses the shared `AuthorPicker` (`Post author`
+ * trigger in the dialog footer, search input portalled to `document.body`),
+ * while voters/comments use `ContactCombobox` inline in their popovers.
  */
 
 function composerScope(page: Page) {
@@ -82,30 +96,13 @@ function newCustomerName() {
 }
 
 /**
- * Types `email` into the combobox labelled `label` and picks the synthetic
- * "as new customer" entry. Resolves once the picked summary replaces the
- * input, which proves the selection landed in form state.
- */
-async function pickNewCustomer(page: Page, label: string, email: string) {
-  const input = page.getByRole("combobox", { name: label });
-  await expect(input).toBeVisible();
-  await input.click();
-  await input.fill(email);
-
-  const createOption = page
-    .getByRole("option")
-    .filter({ hasText: email })
-    .filter({ hasText: /as new customer/ });
-  await expect(createOption).toBeVisible();
-  await createOption.click();
-
-  // The combobox is replaced by a summary row once a subject is picked.
-  await expect(page.getByRole("combobox", { name: label })).toHaveCount(0);
-}
-
-/**
  * Searches the combobox labelled `label` for `query` and picks the result
  * row containing `rowText` (a contact name or email).
+ *
+ * Used for the inline `ContactCombobox` surfaces (voters, comments) whose
+ * input lives in place. The `AuthorPicker` surfaces (post create,
+ * dashboard reassignment) portal their input to `document.body` — use
+ * `pickPostAuthor*` / `reassignAuthor*` below for those.
  */
 async function pickExistingContact(
   page: Page,
@@ -123,6 +120,126 @@ async function pickExistingContact(
   await row.click();
 
   await expect(page.getByRole("combobox", { name: label })).toHaveCount(0);
+}
+
+/**
+ * Opens the post-create `AuthorPicker` (`Post author` trigger in the dialog
+ * footer). The search input portals to `document.body`, so it is queried
+ * on `page` while the trigger stays scoped to `dialog`.
+ */
+async function openPostAuthorPicker(page: Page, dialog: Locator) {
+  const trigger = dialog.getByRole("button", { name: /Post author/ });
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+  await expect(
+    page.getByRole("combobox", { name: "Post author" })
+  ).toBeVisible();
+}
+
+/**
+ * Picks a brand-new customer in the post-create picker via the synthetic
+ * "as new customer" entry. Resolves once the popover closes and the dialog
+ * trigger shows the picked email, proving the selection landed in form state.
+ */
+async function pickPostAuthorNewCustomer(
+  page: Page,
+  dialog: Locator,
+  email: string
+) {
+  await openPostAuthorPicker(page, dialog);
+  const input = page.getByRole("combobox", { name: "Post author" });
+  await input.click();
+  await input.fill(email);
+
+  const createOption = page
+    .getByRole("option")
+    .filter({ hasText: email })
+    .filter({ hasText: /as new customer/ });
+  await expect(createOption).toBeVisible();
+  await createOption.click();
+
+  // Picking closes the popover; the trigger now displays the picked email.
+  await expect(page.getByRole("combobox", { name: "Post author" })).toHaveCount(
+    0
+  );
+  await expect(dialog.getByText(email).first()).toBeVisible();
+}
+
+/**
+ * Picks an existing contact in the post-create picker by searching `query`
+ * and choosing the row containing `rowText` (contact name or email).
+ */
+async function pickPostAuthorExisting(
+  page: Page,
+  dialog: Locator,
+  query: string,
+  rowText: string
+) {
+  await openPostAuthorPicker(page, dialog);
+  const input = page.getByRole("combobox", { name: "Post author" });
+  await input.click();
+  await input.fill(query);
+
+  const row = page.getByRole("option").filter({ hasText: rowText }).first();
+  await expect(row).toBeVisible();
+  await row.click();
+
+  await expect(page.getByRole("combobox", { name: "Post author" })).toHaveCount(
+    0
+  );
+  await expect(dialog.getByText(rowText).first()).toBeVisible();
+}
+
+/**
+ * Reassigns a post's author through the dashboard `Change author` field via
+ * the "Add a brand new user" dialog. Resolves once the success toast
+ * appears and the trigger shows the new name.
+ */
+async function reassignAuthorThroughDialog(
+  page: Page,
+  name: string,
+  email: string
+) {
+  await page.getByRole("button", { name: /Change author/ }).click();
+  await expect(
+    page.getByRole("combobox", { name: "Change author" })
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Add a brand new user" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "New user" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Name").fill(name);
+  await dialog.getByLabel("Email").fill(email);
+
+  const updated = waitForRpc(page, "PostUpdateAuthor");
+  // Dashboard reassignment uses the shared picker's default submit label.
+  await dialog.getByRole("button", { name: "Create & set author" }).click();
+  await updated;
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText("Author updated", { exact: true })).toBeVisible();
+}
+
+/**
+ * Reassigns a post's author through the dashboard `Change author` field by
+ * searching `query` and picking the row containing `rowText`.
+ */
+async function reassignAuthorThroughSearch(
+  page: Page,
+  query: string,
+  rowText: string
+) {
+  await page.getByRole("button", { name: /Change author/ }).click();
+  const input = page.getByRole("combobox", { name: "Change author" });
+  await expect(input).toBeVisible();
+  await input.click();
+  await input.fill(query);
+
+  const row = page.getByRole("option").filter({ hasText: rowText }).first();
+  await expect(row).toBeVisible();
+  const updated = waitForRpc(page, "PostUpdateAuthor");
+  await row.click();
+  await updated;
+  await expect(page.getByText("Author updated", { exact: true })).toBeVisible();
 }
 
 /**
@@ -145,35 +262,10 @@ async function createPostOnBehalfOfNewCustomer(
   await dialog.getByRole("combobox").first().click();
   await page.getByRole("option", { name: "Features 💡" }).click();
 
-  await dialog
-    .getByRole("button", { name: "Post on behalf of a customer" })
-    .click();
-  const pickerLabel = "Post on behalf of";
-  await expect(
-    dialog.getByRole("combobox", { name: pickerLabel })
-  ).toBeVisible();
-
-  // Scope the picker interaction to the dialog: the board/status comboboxes
-  // share the page, so the global option list could match the wrong popup.
-  const input = dialog.getByRole("combobox", { name: pickerLabel });
-  await input.click();
-  await input.fill(customerEmail);
-  const createOption = page
-    .getByRole("option")
-    .filter({ hasText: customerEmail })
-    .filter({ hasText: /as new customer/ });
-  await expect(createOption).toBeVisible();
-  await createOption.click();
-  await expect(dialog.getByRole("combobox", { name: pickerLabel })).toHaveCount(
-    0
-  );
-
-  // A create-new pick replaces the input with a summary row (dismissable
-  // via its remove control). Access is unknown until submit, so no
-  // notification hint renders yet.
-  await expect(
-    dialog.getByRole("button", { name: "Remove selected person" })
-  ).toBeVisible();
+  // The shared AuthorPicker lives in the dialog footer; its search input
+  // portals to document.body. Picking closes the popover and the trigger
+  // shows the picked email, proving the selection landed in form state.
+  await pickPostAuthorNewCustomer(page, dialog, customerEmail);
   await expect(dialog.getByText(customerEmail).first()).toBeVisible();
 
   const created = waitForRpc(page, "PostCreate");
@@ -397,27 +489,15 @@ test.describe("posts on behalf", () => {
       });
       await dialog.getByRole("combobox").first().click();
       await page.getByRole("option", { name: "Features 💡" }).click();
-      await dialog
-        .getByRole("button", { name: "Post on behalf of a customer" })
-        .click();
 
-      // Searching the contact's name surfaces their row; picking it shows
-      // the name/email summary instead of the raw email entry.
-      const input = dialog.getByRole("combobox", {
-        name: "Post on behalf of",
-      });
-      await input.click();
-      await input.fill(customerName.slice(0, 12));
-      const row = page
-        .getByRole("option")
-        .filter({ hasText: customerName })
-        .first();
-      await expect(row).toBeVisible();
-      await row.click();
-      await expect(
-        dialog.getByRole("combobox", { name: "Post on behalf of" })
-      ).toHaveCount(0);
-      await expect(dialog.getByText(customerName).first()).toBeVisible();
+      // Searching the contact's name surfaces their row; picking it closes
+      // the popover and shows the name in the dialog trigger.
+      await pickPostAuthorExisting(
+        page,
+        dialog,
+        customerName.slice(0, 12),
+        customerName
+      );
 
       const created = waitForRpc(page, "PostCreate");
       await dialog.getByRole("button", { name: "Create Post" }).click();
@@ -436,10 +516,10 @@ test.describe("posts on behalf", () => {
     }
   );
 
-  test("collapsing the on-behalf section clears the picked subject", async ({
+  test("removing the picked post author restores self-authorship", async ({
     page,
   }) => {
-    await createWorkspace(page);
+    const workspace = await createWorkspace(page);
     const title = `Cleared author ${randomUUID().slice(0, 8)}`;
     const customerEmail = newCustomerEmail();
 
@@ -447,35 +527,38 @@ test.describe("posts on behalf", () => {
     const dialog = page.getByRole("dialog", { name: "Create Post" });
     await expect(dialog).toBeVisible();
     await dialog.getByLabel("Post Title").fill(title);
-    await fillEditor(page, "The author toggle is one-shot.", {
+    await fillEditor(page, "The author pick is one-shot.", {
       scope: dialog,
     });
     await dialog.getByRole("combobox").first().click();
     await page.getByRole("option", { name: "Features 💡" }).click();
 
-    const toggle = dialog.getByRole("button", {
-      name: "Post on behalf of a customer",
-    });
-    await toggle.click();
-    await pickNewCustomer(page, "Post on behalf of", customerEmail);
-    // The picked summary offers its own dismiss control; collapsing the
-    // section hides the picker and resets the form value instead so nothing
-    // rides along on submit.
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    // Pick a new customer: the popover closes and the trigger shows the
+    // picked email.
+    await pickPostAuthorNewCustomer(page, dialog, customerEmail);
+
+    // Reopening the picker surfaces the picked summary with its dismiss
+    // control; clearing it returns the combobox to search mode so nothing
+    // rides along on submit. The popover stays open after a clear so
+    // another person can be picked without reopening it.
+    await dialog.getByRole("button", { name: /Post author/ }).click();
     await expect(
-      dialog.getByRole("combobox", { name: "Post on behalf of" })
+      page.getByRole("combobox", { name: "Post author" })
     ).toHaveCount(0);
-    // Reopening proves the reset: a fresh search input with no staged
-    // summary, not the previous subject.
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await page.getByRole("button", { name: "Remove selected person" }).click();
     await expect(
-      dialog.getByRole("combobox", { name: "Post on behalf of" })
+      page.getByRole("combobox", { name: "Post author" })
     ).toBeVisible();
+    await page.keyboard.press("Escape");
+    // The trigger falls back to the session user once the pick is cleared.
     await expect(dialog.getByText(customerEmail)).toHaveCount(0);
-    // Collapse again so the submit is self-authored.
-    await toggle.click();
+    await expect(
+      dialog.getByRole("button", { name: /Post author/ })
+    ).toBeVisible();
+    // The session fallback displays the workspace owner's name.
+    await expect(
+      dialog.getByRole("button", { name: new RegExp(workspace.name) })
+    ).toBeVisible();
 
     const created = waitForRpc(page, "PostCreate");
     await dialog.getByRole("button", { name: "Create Post" }).click();
@@ -797,16 +880,15 @@ test.describe("permissions", () => {
       );
 
       try {
-        // Post creation: the on-behalf toggle is manager+ only.
+        // Post creation: the author picker is manager+ only, so the
+        // contributor dialog has no `Post author` trigger at all.
         await contributorPage.getByRole("button", { name: "New post" }).click();
         const contributorDialog = contributorPage.getByRole("dialog", {
           name: "Create Post",
         });
         await expect(contributorDialog).toBeVisible();
         await expect(
-          contributorDialog.getByRole("button", {
-            name: "Post on behalf of a customer",
-          })
+          contributorDialog.getByRole("button", { name: /Post author/ })
         ).toHaveCount(0);
         await contributorPage.keyboard.press("Escape");
 
@@ -823,6 +905,11 @@ test.describe("permissions", () => {
         await expect(
           contributorPage.getByRole("button", { name: "Add voter" })
         ).toBeVisible();
+        // Dashboard author reassignment is manager+ only: the contributor
+        // sees the author as static text, never a `Change author` trigger.
+        await expect(
+          contributorPage.getByRole("button", { name: /Change author/ })
+        ).toHaveCount(0);
 
         // Comment composer: neither a status picker nor an author picker —
         // the options trigger renders only when at least one section does.
@@ -837,14 +924,15 @@ test.describe("permissions", () => {
           name: "Create Post",
         });
         await expect(
-          ownerDialog.getByRole("button", {
-            name: "Post on behalf of a customer",
-          })
+          ownerDialog.getByRole("button", { name: /Post author/ })
         ).toBeVisible();
         await page.keyboard.press("Escape");
         await openPost(page, title);
         await expect(
           page.getByRole("button", { name: "Comment options" })
+        ).toBeVisible();
+        await expect(
+          page.getByRole("button", { name: /Change author/ })
         ).toBeVisible();
 
         await assertNoPageErrors(contributorPage);
@@ -853,6 +941,137 @@ test.describe("permissions", () => {
       }
     }
   );
+});
+
+test.describe("post author reassignment", () => {
+  test(
+    "reassigns a post author to a new customer and records provenance",
+    { tag: "@critical" },
+    async ({ page }) => {
+      await createWorkspace(page);
+      const title = `Reassign post ${randomUUID().slice(0, 8)}`;
+      const customerName = newCustomerName();
+      const customerEmail = newCustomerEmail();
+
+      await createPost(page, title, "Post to exercise reassignment.");
+      await dismissToast(page, "Post created successfully");
+      await openPost(page, title);
+
+      // The details sidebar offers the shared picker under `Change author`.
+      await expect(
+        page.getByRole("button", { name: /Change author/ })
+      ).toBeVisible();
+      await reassignAuthorThroughDialog(page, customerName, customerEmail);
+      await dismissToast(page, "Author updated");
+
+      // The trigger now displays the new author once collections refetch.
+      await expect(
+        page.getByRole("button", { name: new RegExp(customerName) })
+      ).toBeVisible();
+
+      await openActivityTab(page);
+      await expect(
+        activityItem(page, /changed the author/).filter({
+          hasText: customerName,
+        })
+      ).toBeVisible();
+      await expect(
+        activityItem(page, /on behalf of/).filter({ hasText: customerName })
+      ).toBeVisible();
+
+      // Contact-only subjects are attribution-only: no email leaves.
+      const emails = await getTestEmails(page.request);
+      expect(
+        emails.filter((email) => email.to.toLowerCase() === customerEmail)
+      ).toHaveLength(0);
+    }
+  );
+
+  test("reassigns a post author to an existing contact from search", async ({
+    page,
+  }) => {
+    await createWorkspace(page);
+    const customerName = newCustomerName();
+    const customerEmail = newCustomerEmail();
+    const title = `Reassign search ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, title, "Post to exercise search reassignment.");
+    await dismissToast(page, "Post created successfully");
+    await openPost(page, title);
+    // Seed the contact so the reassignment picker has a result row.
+    await addVoterThroughDialog(page, customerName, customerEmail);
+    await expect(page.getByText("Voters (1)")).toBeVisible();
+
+    await reassignAuthorThroughSearch(page, customerEmail, customerName);
+    await dismissToast(page, "Author updated");
+    await expect(
+      page.getByRole("button", { name: new RegExp(customerName) })
+    ).toBeVisible();
+
+    await openActivityTab(page);
+    await expect(
+      activityItem(page, /changed the author/).filter({
+        hasText: customerName,
+      })
+    ).toBeVisible();
+  });
+
+  test("dashboard shows the contact name while the public board hides it", async ({
+    browser,
+    page,
+  }) => {
+    const owner = await createAuthenticatedWorkspace(page);
+    const title = `Author display ${randomUUID().slice(0, 8)}`;
+    const customerName = newCustomerName();
+    const customerEmail = newCustomerEmail();
+
+    await createPostOnBehalfOfNewCustomer(
+      page,
+      title,
+      "Contact-only author display.",
+      customerEmail
+    );
+    await dismissToast(page, "Post created successfully");
+
+    // Reassign the bare-email contact to a named customer (same email
+    // enriches the existing contact) so the leak assertion targets a real
+    // display name rather than a bare email.
+    await openPost(page, title);
+    await reassignAuthorThroughDialog(page, customerName, customerEmail);
+    await dismissToast(page, "Author updated");
+    await page.goto(owner.organizationUrl);
+    // Dashboard rows fall back to the contact name when no user row is
+    // linked, so the renamed author is visible on the dashboard card.
+    // The card renders the name twice (mobile + desktop meta); target the
+    // desktop slot, which is the visible one on the e2e viewport.
+    const renamedCard = page
+      .locator('[data-slot="post-card"]')
+      .filter({ hasText: title });
+    await expect(
+      renamedCard.locator('[data-slot="post-card-author-name"]', {
+        hasText: customerName,
+      })
+    ).toBeVisible();
+
+    // Public rows never join the contact table: the customer name stays
+    // off public boards even though the dashboard shows it.
+    const visitorContext = await browser.newContext();
+    const visitorPage = await visitorContext.newPage();
+    trackPageErrors(visitorPage);
+    try {
+      await visitorPage.goto(publicBoardUrl(owner.workspaceName));
+      await expect(
+        visitorPage.getByRole("link", { name: title })
+      ).toBeVisible();
+      await expect(visitorPage.getByText(customerName)).toHaveCount(0);
+      await visitorPage.getByRole("link", { name: title }).click();
+      await expect(visitorPage.getByText(title)).toBeVisible();
+      await expect(visitorPage.getByText(customerName)).toHaveCount(0);
+      await assertNoPageErrors(visitorPage);
+    } finally {
+      await visitorContext.close();
+    }
+  });
 });
 
 test.describe("picker guidance", () => {

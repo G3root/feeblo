@@ -125,6 +125,45 @@ describe("AuthorPicker", () => {
     });
   });
 
+  it("picks a contact who already voted (voting never blocks authorship)", async () => {
+    const votedCustomer: TContactSearchResult = {
+      ...customer,
+      alreadyVoted: true,
+    };
+    const onSelect = vi.fn();
+    const screen = await render(
+      <AuthorPicker
+        display={{ name: "John Doe", avatarUrl: null }}
+        label="Change author"
+        onSelect={onSelect}
+        organizationId="organization-id"
+        postId="post-1"
+        search={() => Promise.resolve([votedCustomer])}
+        value={null}
+      />
+    );
+
+    await screen.getByRole("button", { name: /Change author/ }).click();
+    await expectComboboxOpen(screen, true);
+
+    const input = screen.getByRole("combobox");
+    await input.click();
+    await input.fill("john");
+    const row = screen.getByText("John Doe").nth(1);
+    await expect.element(row).toBeVisible();
+    // No Already-voted badge in author context, and the row is enabled.
+    await expect
+      .poll(() => screen.getByText("Already voted").query() !== null, {
+        timeout: 1_000,
+      })
+      .toBe(false);
+
+    await row.click();
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ contactId: customer.contactId })
+    );
+  });
+
   it("renders static text when disabled", async () => {
     const onSelect = vi.fn();
     const screen = await render(

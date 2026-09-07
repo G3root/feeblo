@@ -159,6 +159,13 @@ export interface ContactComboboxProps {
   /** Disables the search input and selection; the selected summary's
   dismiss control stays available so a picked subject can be cleared. */
   disabled?: boolean;
+  /**
+   * Whether an `alreadyVoted` contact is unselectable. Voter pickers keep
+   * the default (`true`) so the same person cannot be added twice;
+   * author pickers pass `false` — voting history must not block
+   * attribution, and the badge is hidden there as noise.
+   */
+  disableAlreadyVoted?: boolean;
   /** Accessible name for the search input. */
   label?: string;
   organizationId: string;
@@ -176,6 +183,7 @@ export interface ContactComboboxProps {
 
 export function ContactCombobox({
   disabled = false,
+  disableAlreadyVoted = true,
   label = "Search customers",
   organizationId,
   onSelect,
@@ -452,7 +460,7 @@ export function ContactCombobox({
                 </ComboboxItem>
               ) : (
                 <ComboboxItem
-                  disabled={option.contact.alreadyVoted}
+                  disabled={disableAlreadyVoted && option.contact.alreadyVoted}
                   key={
                     option.contact.contactId ??
                     option.contact.userId ??
@@ -489,7 +497,7 @@ export function ContactCombobox({
                     {option.contact.isMember ? (
                       <Badge variant="outline">Workspace member</Badge>
                     ) : null}
-                    {option.contact.alreadyVoted ? (
+                    {option.contact.alreadyVoted && disableAlreadyVoted ? (
                       <Badge variant="outline">Already voted</Badge>
                     ) : null}
                   </div>

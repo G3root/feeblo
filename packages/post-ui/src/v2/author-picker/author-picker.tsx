@@ -56,8 +56,10 @@ export interface AuthorPickerProps {
   /** Trigger text when no author is displayed. */
   placeholder?: string;
   /**
-   * Post-scoped search: enables the `alreadyVoted` badge. Omit when no
-   * post exists yet (create flows).
+   * Post-scoped search for API compatibility. Author picking ignores
+   * voting state (`alreadyVoted` neither disables rows nor shows a badge):
+   * voting history must not block attribution. Omit when no post exists
+   * yet (create flows).
    */
   postId?: string;
   /** Replace the ContactSearch transport (stories/tests). */
@@ -188,6 +190,7 @@ export function AuthorPicker({
         </PopoverTrigger>
         <PopoverPopup align="end" className="w-60 p-1" initialFocus={false}>
           <ContactCombobox
+            disableAlreadyVoted={false}
             label={label}
             onSelect={handleSelect}
             organizationId={organizationId}
