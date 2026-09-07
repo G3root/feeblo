@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "user_emailHash_restrictedToOrganizationId_uidx" ON "user" ("email_hash","restricted_to_organization_id");

@@ -52,16 +52,6 @@ const makeUserRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   return {
-    findByEmailHash: (email: string) =>
-      Effect.gen(function* () {
-        const rows = yield* db
-          .select({ id: schema.userTable.id })
-          .from(schema.userTable)
-          .where(eq(schema.userTable.emailHash, hashEmail(email)))
-          .limit(1);
-        return rows[0] ? Option.some(rows[0]) : Option.none();
-      }),
-
     getById: (id: string) =>
       Effect.gen(function* () {
         const rows = yield* db
@@ -159,7 +149,12 @@ const makeUserRepository = Effect.gen(function* () {
           return updated;
         }
 
-        // Create a new SSO-only user with a random email address.
+        // Create a new SSO-only user with a random email address. The
+        // (emailHash, restrictedToOrganizationId) unique index closes the
+        // select-then-insert race: a targeted ON CONFLICT turns a lost race
+        // into an empty returning set instead of a duplicate row, and the
+        // winner is re-read and updated through the same promotion path as
+        // an existing row.
         const id = yield* UserId.generate;
         const now = yield* DateTime.nowAsDate;
         const [created = null] = yield* db
@@ -175,13 +170,56 @@ const makeUserRepository = Effect.gen(function* () {
             createdAt: now,
             updatedAt: now,
           })
+          .onConflictDoNothing({
+            target: [
+              schema.userTable.emailHash,
+              schema.userTable.restrictedToOrganizationId,
+            ],
+          })
           .returning();
-        if (!created) {
+        if (created) {
+          return created;
+        }
+        const [winner] = yield* db
+          .select()
+          .from(schema.userTable)
+          .where(
+            and(
+              eq(schema.userTable.emailHash, emailHash),
+              eq(
+                schema.userTable.restrictedToOrganizationId,
+                restrictedToOrganizationId
+              )
+            )
+          )
+          .limit(1);
+        if (!winner) {
           return yield* new UserPersistenceError({
             message: "SSO user insert did not return a row",
           });
         }
-        return created;
+        const winnerUpdatedAt = yield* DateTime.nowAsDate;
+        const promotedFromShadow = isShadowUserEmail(winner.email);
+        const [winnerUpdated = null] = yield* db
+          .update(schema.userTable)
+          .set({
+            name: args.name,
+            ...(promotedFromShadow && {
+              email: yield* generateRandomEmail("sso"),
+              emailVerified: true,
+            }),
+            restrictedToOrganizationId,
+            jwtAutoLoginAt: winnerUpdatedAt,
+            updatedAt: winnerUpdatedAt,
+          })
+          .where(eq(schema.userTable.id, winner.id))
+          .returning();
+        if (!winnerUpdated) {
+          return yield* new UserPersistenceError({
+            message: "SSO user update did not return a row",
+          });
+        }
+        return winnerUpdated;
       }),
 
     /**
@@ -238,6 +276,8 @@ const makeUserRepository = Effect.gen(function* () {
         }
 
         // Create a new shadow user with a random, never-mailable address.
+        // Same targeted ON CONFLICT race handling as upsertSsoUser: a lost
+        // race re-reads the winner and applies the standard name update.
         const id = yield* UserId.generate;
         const now = yield* DateTime.nowAsDate;
         const [created = null] = yield* db
@@ -252,13 +292,46 @@ const makeUserRepository = Effect.gen(function* () {
             createdAt: now,
             updatedAt: now,
           })
+          .onConflictDoNothing({
+            target: [
+              schema.userTable.emailHash,
+              schema.userTable.restrictedToOrganizationId,
+            ],
+          })
           .returning();
-        if (!created) {
+        if (created) {
+          return created;
+        }
+        const [winner] = yield* db
+          .select()
+          .from(schema.userTable)
+          .where(
+            and(
+              eq(schema.userTable.emailHash, emailHash),
+              eq(
+                schema.userTable.restrictedToOrganizationId,
+                restrictedToOrganizationId
+              )
+            )
+          )
+          .limit(1);
+        if (!winner) {
           return yield* new UserPersistenceError({
             message: "Shadow user insert did not return a row",
           });
         }
-        return created;
+        const winnerUpdatedAt = yield* DateTime.nowAsDate;
+        const [winnerUpdated = null] = yield* db
+          .update(schema.userTable)
+          .set({ name: args.name, updatedAt: winnerUpdatedAt })
+          .where(eq(schema.userTable.id, winner.id))
+          .returning();
+        if (!winnerUpdated) {
+          return yield* new UserPersistenceError({
+            message: "Shadow user update did not return a row",
+          });
+        }
+        return winnerUpdated;
       }),
   };
 });

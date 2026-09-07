@@ -283,8 +283,12 @@ const makeContactRepository = Effect.gen(function* () {
 
       const limit = Math.min(Math.max(args.limit ?? 10, 1), 25);
       // Escape LIKE metacharacters so user input can't inject wildcards.
+      // exactEmail uses the raw normalized query: it backs an equality check
+      // (lower(email) = ...), not ILIKE, so LIKE escaping would break exact
+      // matches for emails containing %, _ or \. escaped stays scoped to
+      // the ILIKE prefix/substring patterns below.
       const escaped = trimmed.replace(/[\\%_]/g, "\\$&");
-      const exactEmail = escaped.toLowerCase();
+      const exactEmail = trimmed.toLowerCase();
       const prefix = `${escaped}%`;
       const substring = `%${escaped}%`;
 

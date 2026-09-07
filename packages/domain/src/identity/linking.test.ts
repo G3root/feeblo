@@ -585,9 +585,14 @@ describe("identity linking", () => {
             email: `jane.${n}@example.com`,
             restrictedToOrganizationId: organizationId,
           });
+          // The shadow carries a distinct identity hash: the
+          // (emailHash, restrictedToOrganizationId) unique index forbids two
+          // org-scoped users sharing one hash, so the legacy duplicate is
+          // represented via the contact link (which is what linkShadowUser
+          // heals) rather than a colliding hash.
           yield* insertShadowUser({
             id: shadow,
-            email: `jane.${n}@example.com`,
+            email: `shadow.${n}@example.com`,
             organizationId,
           });
           yield* insertContact({

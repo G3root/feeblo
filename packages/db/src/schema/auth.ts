@@ -13,6 +13,15 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+/**
+ * Name of the composite unique index enforcing at most one org-scoped
+ * identity per (email hash, organization). Shared with the user
+ * repository's unique-violation fallback so renames stay synchronized with
+ * generated migrations.
+ */
+export const USER_EMAIL_HASH_ORG_UIDX =
+  "user_emailHash_restrictedToOrganizationId_uidx";
+
 export const userTable = pgTable(
   "user",
   {
@@ -42,6 +51,15 @@ export const userTable = pgTable(
   (table) => [
     index("user_emailHash_idx").on(table.emailHash),
     index("user_restricted_to_organization_id_idx").on(
+      table.restrictedToOrganizationId
+    ),
+    // Enforces at most one org-scoped identity per (email hash, organization).
+    // NULLs stay distinct (Postgres default), so globally-registered accounts
+    // (NULL restrictedToOrganizationId) and hash-less rows never conflict;
+    // only non-null pairs are deduplicated, closing the
+    // provisionShadowUser/upsertSsoUser select-then-insert race.
+    uniqueIndex(USER_EMAIL_HASH_ORG_UIDX).on(
+      table.emailHash,
       table.restrictedToOrganizationId
     ),
   ]
