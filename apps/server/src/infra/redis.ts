@@ -18,7 +18,6 @@ export const redisOptions = (redisUrl: string) => {
     },
     ...(url.username && { username: decodeURIComponent(url.username) }),
     ...(url.password && { password: decodeURIComponent(url.password) }),
-    ...(Number.isInteger(database) &&
-      database >= 0 && { database }),
+    ...(Number.isInteger(database) && database >= 0 && { database }),
   };
 };
