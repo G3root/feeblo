@@ -181,6 +181,44 @@ describe("ResolvePrincipalService", () => {
     );
 
     it.effect(
+      "prefers organization-scoped identity when both global and org-scoped match",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const service = yield* ResolvePrincipalService;
+          const organizationId = yield* makeOrganization();
+          const email = "both-adopt@example.com";
+          yield* insertGlobalUser({
+            id: "user_both_global_resolve",
+            email,
+          });
+          // Org-scoped portal identity for the same human: synthetic inbox,
+          // same email hash, verified, bound to this workspace.
+          yield* db.insert(schema.userTable).values({
+            id: "user_both_org_resolve",
+            name: "Portal",
+            email: `sso-both-adopt-${organizationId.slice(0, 8)}@feeblo.com`,
+            emailHash: hashEmail(email),
+            emailVerified: true,
+            restrictedToOrganizationId: organizationId,
+          });
+
+          const resolved = yield* service.resolve({
+            organizationId,
+            needsUser: true,
+            subject: { email, name: "Both" },
+          });
+
+          // Attribution must match `findAdoptableByIdentityHash` precedence
+          // (org-scoped wins) so it stays consistent with the SSO session
+          // identity and the `sso` notification-access class.
+          expect(resolved.userId).toBe("user_both_org_resolve");
+          const contact = yield* getContactById(resolved.contactId);
+          expect(contact?.userId).toBe("user_both_org_resolve");
+        })
+    );
+
+    it.effect(
       "does not adopt an account restricted to another organization",
       () =>
         Effect.gen(function* () {

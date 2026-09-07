@@ -68,6 +68,15 @@ const makeUserRepository = Effect.gen(function* () {
      * exactly this organization. Users restricted to other organizations are
      * deliberately invisible so one workspace cannot adopt another
      * workspace's portal identities.
+     *
+     * Precedence: when both a global account and an organization-scoped
+     * (shadow/SSO portal) account share the same email hash, the
+     * organization-scoped row wins. It is the workspace's own view of that
+     * human and matches the session identity returned by `upsertSsoUser`
+     * (which never returns a global account), so on-behalf attribution and
+     * the organization-access notification gate (`evaluateOrganizationAccess`,
+     * `sso` class) consistently use the same user ID instead of splitting
+     * history across two IDs.
      */
     findAdoptableByIdentityHash: (args: {
       email: string;
@@ -82,6 +91,10 @@ const makeUserRepository = Effect.gen(function* () {
               eq(schema.userTable.emailHash, hashEmail(args.email)),
               sql`(${schema.userTable.restrictedToOrganizationId} IS NULL OR ${schema.userTable.restrictedToOrganizationId} = ${args.organizationId})`
             )
+          )
+          .orderBy(
+            sql`CASE WHEN ${schema.userTable.restrictedToOrganizationId} IS NULL THEN 1 ELSE 0 END`,
+            schema.userTable.id
           )
           .limit(1);
         return rows[0] ? Option.some(rows[0]) : Option.none();
