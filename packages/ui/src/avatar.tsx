@@ -60,6 +60,10 @@ export function AvatarImage({
     <AvatarPrimitive.Image
       className={cn("size-full object-cover", className)}
       data-slot="avatar-image"
+      // Board lanes render one avatar per row; keep offscreen images from
+      // competing with lane content on initial load. Callers can override.
+      loading="lazy"
+      decoding="async"
       {...props}
     />
   );
