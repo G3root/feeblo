@@ -185,6 +185,16 @@ postCollection.createIndex((row) => row.statusId, {
   indexType: BasicIndex,
 });
 
+// Board queries filter by organization (and board) on every navigation;
+// without these the live query scans the full overfetched collection.
+postCollection.createIndex((row) => row.organizationId, {
+  indexType: BasicIndex,
+});
+
+postCollection.createIndex((row) => row.boardId, {
+  indexType: BasicIndex,
+});
+
 export const postStatusCollection = createCollection(
   queryCollectionOptions({
     queryKey: () => organizationScopedQueryKey("post-status"),
@@ -208,6 +218,10 @@ export const postStatusCollection = createCollection(
     getKey: (item) => item.id,
   })
 );
+
+postStatusCollection.createIndex((row) => row.organizationId, {
+  indexType: BasicIndex,
+});
 
 export const changelogCollection = createCollection(
   queryCollectionOptions({
@@ -496,6 +510,10 @@ export const boardCollection = createCollection(
   })
 );
 
+boardCollection.createIndex((row) => row.organizationId, {
+  indexType: BasicIndex,
+});
+
 export const tagCollection = createCollection(
   queryCollectionOptions({
     queryKey: () => organizationScopedQueryKey("tag"),
@@ -553,6 +571,10 @@ export const tagCollection = createCollection(
   })
 );
 
+tagCollection.createIndex((row) => row.organizationId, {
+  indexType: BasicIndex,
+});
+
 export const postTagCollection = createCollection(
   queryCollectionOptions({
     queryKey: () => organizationScopedQueryKey("post-tag"),
@@ -577,6 +599,19 @@ export const postTagCollection = createCollection(
     getKey: (item) => item.id,
   })
 );
+
+// Tag-filter queries hit all three axes (org scope, post join, tag match).
+postTagCollection.createIndex((row) => row.organizationId, {
+  indexType: BasicIndex,
+});
+
+postTagCollection.createIndex((row) => row.postId, {
+  indexType: BasicIndex,
+});
+
+postTagCollection.createIndex((row) => row.tagId, {
+  indexType: BasicIndex,
+});
 
 export const membershipCollection = createCollection(
   queryCollectionOptions({
@@ -950,6 +985,16 @@ export const upvoteCollection = createCollection(
     },
   })
 );
+
+// Upvote counts are derived per post on every board render; index both the
+// org-scoped subscription filter and the per-post aggregation key.
+upvoteCollection.createIndex((row) => row.organizationId, {
+  indexType: BasicIndex,
+});
+
+upvoteCollection.createIndex((row) => row.postId, {
+  indexType: BasicIndex,
+});
 
 export const postReactionCollection = createCollection(
   queryCollectionOptions({
