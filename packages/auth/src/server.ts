@@ -48,6 +48,7 @@ import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
+import type * as Redis from "effect/unstable/persistence/Redis";
 import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 
 import { drizzleAdapter } from "./adapter/drizzle-adapter";
@@ -81,7 +82,10 @@ export const initAuthHandler = (
     Mailer,
     Layer.Error<typeof Mailer.layer>
   > = () => Mailer.layer,
-  rateLimitLayer: Layer.Layer<RateLimitService> = RateLimitService.layerMemory
+  rateLimitLayer: Layer.Layer<
+    RateLimitService,
+    Redis.RedisError
+  > = RateLimitService.layerMemory
 ) =>
   Effect.gen(function* () {
     const {
