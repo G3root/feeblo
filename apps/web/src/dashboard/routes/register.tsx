@@ -9,8 +9,9 @@ import {
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
 
 import { RegisterShell } from "~/features/register/components/register-shell";
@@ -30,7 +31,8 @@ export const Route = createFileRoute("/register")({
 
 function RegisterRoute() {
   const navigate = Route.useNavigate();
-  const { refetch } = useAuthState();
+  const { data: session, refetch } = useAuthState();
+  const existingOrganizationId = session?.organizations?.[0]?.id ?? null;
 
   const form = useAppForm({
     ...registerFormOpts,
@@ -55,12 +57,24 @@ function RegisterRoute() {
           });
           return;
         }
-      } catch {
+      } catch (error) {
         trackEvent("org_created", { success: false });
+        const { message } = parseRpcError(error, "Failed to create workspace");
         toastManager.add({
-          title: "Failed to create workspace",
+          title: message,
           type: "error",
         });
+        // The free plan includes one workspace: send users at the limit
+        // to billing so they can upgrade instead of retrying the form.
+        if (
+          existingOrganizationId &&
+          message.toLowerCase().includes("workspace")
+        ) {
+          navigate({
+            to: "/$organizationId/settings/billing",
+            params: { organizationId: existingOrganizationId },
+          });
+        }
         return;
       }
     },
@@ -72,7 +86,20 @@ function RegisterRoute() {
         <CardHeader>
           <CardTitle>Create a new Workspace</CardTitle>
           <CardDescription>
-            create a new workspace to get started
+            {existingOrganizationId ? (
+              <>
+                The free plan includes 3 workspaces.{" "}
+                <Link
+                  params={{ organizationId: existingOrganizationId }}
+                  to="/$organizationId/settings/billing"
+                >
+                  Upgrade
+                </Link>{" "}
+                to create more.
+              </>
+            ) : (
+              "create a new workspace to get started"
+            )}
           </CardDescription>
         </CardHeader>
 

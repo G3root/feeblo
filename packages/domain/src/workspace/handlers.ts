@@ -4,6 +4,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { EntitlementPolicy } from "../entitlement/policies";
+import { MembershipRepository } from "../membership/repository";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
@@ -18,6 +20,8 @@ import type {
 
 export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* WorkspaceRepository;
+  const membershipRepository = yield* MembershipRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
   const { validate: validateSubdomain } = yield* SubdomainValidationService;
 
   return {
@@ -38,6 +42,18 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
 
         const organizationId = yield* transaction(
           Effect.gen(function* () {
+            const memberships =
+              yield* membershipRepository.findMembershipsByUserId({
+                userId: session.session.userId,
+              });
+            const ownedOrganizationIds = memberships
+              .filter((membership) => membership.role === "owner")
+              .map((membership) => membership.organizationId);
+
+            yield* entitlementPolicy.canCreateWorkspace({
+              ownedOrganizationIds,
+            });
+
             const isSubdomainTaken =
               yield* repository.isSubdomainTaken(subdomain);
 
@@ -106,6 +122,8 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
 export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
   WorkspaceRpcHandlersEffect
 ).pipe(
+  Layer.provide(MembershipRepository.layer),
+  Layer.provide(EntitlementPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(SubdomainValidationService.layerEnv)
 );

@@ -36,6 +36,7 @@ describe("plan feature catalog", () => {
   it("projects starter enforcement values into customer-facing feature rows", () => {
     expect(PLAN_ENTITLEMENTS.starter).toEqual({
       limits: {
+        workspaces: null,
         feedbackBoards: 5,
         privilegedMembers: 5,
         changelogCategories: null,
@@ -57,6 +58,7 @@ describe("plan feature catalog", () => {
     });
 
     expect(getPlanFeatureRows("starter")).toEqual([
+      { key: "workspaces", label: "Unlimited Workspaces" },
       { key: "feedbackBoards", label: "5 Feedback Boards" },
       { key: "privilegedMembers", label: "5 Admin Roles" },
       { key: "changelogCategories", label: "Unlimited Changelog Categories" },
@@ -82,9 +84,20 @@ describe("plan feature catalog", () => {
   });
 
   it("formats unlimited professional limits from the same entitlement values", () => {
-    expect(getPlanFeatureRows("professional").slice(0, 2)).toEqual([
+    expect(getPlanFeatureRows("professional").slice(0, 3)).toEqual([
+      { key: "workspaces", label: "Unlimited Workspaces" },
       { key: "feedbackBoards", label: "Unlimited Feedback Boards" },
       { key: "privilegedMembers", label: "Unlimited Admin Roles" },
     ]);
+  });
+
+  it("limits free workspaces to three", () => {
+    expect(PLAN_ENTITLEMENTS.free.limits.workspaces).toBe(3);
+    expect(PLAN_ENTITLEMENTS.starter.limits.workspaces).toBeNull();
+    expect(PLAN_ENTITLEMENTS.professional.limits.workspaces).toBeNull();
+    expect(getPlanFeatureRows("free")).toContainEqual({
+      key: "workspaces",
+      label: "3 Workspaces",
+    });
   });
 });

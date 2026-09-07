@@ -13,11 +13,18 @@ import {
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
-import { Plus, Tick02Icon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
+import {
+  Plus,
+  SparklesIcon,
+  Tick02Icon,
+  UnfoldMoreIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 
+import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
+import { useEntitlements } from "~/hooks/use-entitlements";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -34,6 +41,12 @@ export function WorkspaceSwitcher() {
   );
 
   const data = organizationsQuery.data ?? [];
+  const { entitlements, isLoading: isPlanLoading } = useEntitlements();
+  const upgradePlanStore = useUpgradePlanDialogContext();
+
+  const workspaceLimit = entitlements.limits.workspaces;
+  const atWorkspaceLimit =
+    !isPlanLoading && workspaceLimit !== null && data.length >= workspaceLimit;
 
   const selectedOrganization =
     data.find((organization) => organization.id === organizationId) ??
@@ -75,17 +88,35 @@ export function WorkspaceSwitcher() {
               />
               <MenuSeparator />
 
-              <MenuItem
-                className="justify-center"
-                onClick={() =>
-                  navigate({
-                    to: "/register",
-                  })
-                }
-              >
-                <HugeiconsIcon className="text-muted-foreground" icon={Plus} />
-                <span>Create workspace</span>
-              </MenuItem>
+              {atWorkspaceLimit ? (
+                <MenuItem
+                  className="justify-center"
+                  onClick={() => {
+                    upgradePlanStore.send({ type: "toggle" });
+                  }}
+                >
+                  <HugeiconsIcon
+                    className="text-muted-foreground"
+                    icon={SparklesIcon}
+                  />
+                  <span>Upgrade for more workspaces</span>
+                </MenuItem>
+              ) : (
+                <MenuItem
+                  className="justify-center"
+                  onClick={() =>
+                    navigate({
+                      to: "/register",
+                    })
+                  }
+                >
+                  <HugeiconsIcon
+                    className="text-muted-foreground"
+                    icon={Plus}
+                  />
+                  <span>Create workspace</span>
+                </MenuItem>
+              )}
             </MenuPopup>
           </Menu>
         </SidebarMenuItem>
