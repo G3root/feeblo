@@ -79,9 +79,9 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         const membership = Policy.getMembership(session, args.organizationId);
         // Per-member abuse bound for on-behalf voter management (see
         // plan-on-behalf.md).
-        yield* RateLimit.consumeDashboardRateLimit({
-          key: `on-behalf-create:${args.organizationId}:${session.session.userId}`,
-          name: "on-behalf-create",
+        yield* RateLimit.consumeOnBehalfWriteLimit({
+          organizationId: args.organizationId,
+          userId: session.session.userId,
         });
 
         const result = yield* transaction(
@@ -155,9 +155,9 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
         // Same per-member bound as the add path (see plan-on-behalf.md).
-        yield* RateLimit.consumeDashboardRateLimit({
-          key: `on-behalf-create:${args.organizationId}:${session.session.userId}`,
-          name: "on-behalf-create",
+        yield* RateLimit.consumeOnBehalfWriteLimit({
+          organizationId: args.organizationId,
+          userId: session.session.userId,
         });
 
         const result = yield* transaction(

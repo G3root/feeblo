@@ -708,6 +708,125 @@ describe("PostRpcHandlers on-behalf", () => {
         })
       );
 
+      it.effect("unsubscribes the previous author on reassignment", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const emailSubscriptions = yield* EmailSubscriptionRepository;
+          const postSubscriptions = yield* PostSubscriptionRepository;
+          const fixture = yield* makeFixture("manager");
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, "manager");
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Self post"))
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          // Sanity: the self-service creator starts subscribed everywhere.
+          expect(
+            yield* postSubscriptions.isSubscribed({
+              organizationId: fixture.organizationId,
+              postId,
+              userId: fixture.userId,
+            })
+          ).toBe(true);
+
+          yield* handlers
+            .PostUpdateAuthor({
+              id: postId,
+              organizationId: fixture.organizationId,
+              author: {
+                email: "author-jane@example.com",
+                name: "Jane Doe",
+              },
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          // The previous author keeps no subscription: otherwise they
+          // would keep receiving status mail for a post that is no longer
+          // attributed to them.
+          expect(
+            yield* postSubscriptions.isSubscribed({
+              organizationId: fixture.organizationId,
+              postId,
+              userId: fixture.userId,
+            })
+          ).toBe(false);
+          const retired = yield* emailSubscriptions.findSubscription({
+            email: fixture.userEmail,
+            organizationId: fixture.organizationId,
+            topic: { topicId: postId, topicType: "post" },
+          });
+          expect(Option.getOrUndefined(retired)).toMatchObject({
+            state: "unsubscribed",
+          });
+
+          // The new author still inherits the creator subscription.
+          const incoming = yield* emailSubscriptions.findSubscription({
+            email: "author-jane@example.com",
+            organizationId: fixture.organizationId,
+            topic: { topicId: postId, topicType: "post" },
+          });
+          expect(Option.getOrUndefined(incoming)).toMatchObject({
+            source: "post_creator",
+            state: "deferred_no_access",
+          });
+        })
+      );
+
+      it.effect(
+        "retires the deferred row of a removed contact-only author",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const emailSubscriptions = yield* EmailSubscriptionRepository;
+            const fixture = yield* makeFixture("manager");
+            const postId = yield* PostId.generate;
+            const session = makeSession(fixture, "manager");
+
+            yield* handlers
+              .PostCreate({
+                ...postCreateInput(fixture, postId, "On behalf feedback"),
+                author: {
+                  email: "author-jane@example.com",
+                  name: "Jane Doe",
+                },
+              })
+              .pipe(Effect.provideService(CurrentSession, session));
+
+            yield* handlers
+              .PostUpdateAuthor({
+                id: postId,
+                organizationId: fixture.organizationId,
+                author: {
+                  email: "author-sam@example.com",
+                  name: "Sam Shadow",
+                },
+              })
+              .pipe(Effect.provideService(CurrentSession, session));
+
+            // A deferred row must not survive reassignment: it would
+            // otherwise activate on later identity linking and notify the
+            // removed author about a post they no longer author.
+            const retired = yield* emailSubscriptions.findSubscription({
+              email: "author-jane@example.com",
+              organizationId: fixture.organizationId,
+              topic: { topicId: postId, topicType: "post" },
+            });
+            expect(Option.getOrUndefined(retired)).toMatchObject({
+              state: "unsubscribed",
+            });
+            const incoming = yield* emailSubscriptions.findSubscription({
+              email: "author-sam@example.com",
+              organizationId: fixture.organizationId,
+              topic: { topicId: postId, topicType: "post" },
+            });
+            expect(Option.getOrUndefined(incoming)).toMatchObject({
+              source: "post_creator",
+              state: "deferred_no_access",
+            });
+          })
+      );
+
       it.effect("is a no-op when attribution already matches", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;

@@ -990,6 +990,9 @@ importers:
       takumi-js:
         specifier: ^2.4.0
         version: 2.7.2(csstype@3.2.3)(preact@10.29.8)(react@19.2.8)
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@effect/vitest':
         specifier: 'catalog:'

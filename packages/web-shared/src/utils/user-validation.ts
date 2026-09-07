@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { regexes } from "zod/v4/core";
 
 export const EmailSchema = z
   .email({ error: "Email is required" })
@@ -6,6 +7,17 @@ export const EmailSchema = z
   .max(100, { message: "Email is too long" })
   // users can type the email in any case, but we store it in lowercase
   .transform((value) => value.toLowerCase());
+
+/**
+ * Server-acceptability check for on-behalf author/voter emails. Uses Zod
+ * core's practical email pattern — the same pattern `z.email()` (and the
+ * server's `AuthorEmail` filter via `isValidOnBehalfAuthorEmail` in
+ * `packages/domain/src/post/schema.ts`) validates against — so the picker
+ * never offers a create-new path the RPC would reject. One shared pattern
+ * by construction; no hand-rolled regex to keep in sync.
+ */
+export const isDeliverableAuthorEmail = (value: string): boolean =>
+  regexes.email.test(value);
 
 export const PasswordSchema = z
   .string({ error: "Password is required" })

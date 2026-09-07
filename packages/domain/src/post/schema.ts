@@ -6,6 +6,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import * as S from "effect/Schema";
+import { regexes } from "zod/v4/core";
 
 import {
   POST_CONTENT_MAX_LENGTH,
@@ -209,39 +210,26 @@ export const PostMerge = S.Struct({
 export type TPostMerge = S.Schema.Type<typeof PostMerge>;
 
 /**
- * Minimal deliverability shape for author input: `local@domain.tld`, no
- * whitespace, and dots only as single label separators (no leading,
- * trailing, or consecutive dots). Synthetic inboxes are generated
- * internally and never pass through this input; without the shape check,
- * a direct RPC caller could persist junk contact emails that can never
- * heal or receive notifications.
+ * Minimal deliverability shape for author input. Synthetic inboxes are
+ * generated internally and never pass through this input; without the
+ * shape check, a direct RPC caller could persist junk contact emails that
+ * can never heal or receive notifications.
+ *
+ * The rule is Zod core's practical email pattern (`regexes.email`): it
+ * already rejects repeated or misplaced dots (`a..b@example.com`,
+ * `.a@example.com`, `a.@example.com`, `a@.example.com`) that a naive
+ * `local@domain.tld` check accepts. Importing it (instead of hand-rolling
+ * a regex) keeps the server filter and the client's `z.email()` on one
+ * shared pattern by construction — see `isDeliverableAuthorEmail` in
+ * `@feeblo/web-shared/user-validation` for the client-side gate.
  */
+export const isValidOnBehalfAuthorEmail = (email: string): boolean =>
+  regexes.email.test(email);
+
 const AuthorEmail = S.String.check(
-  S.makeFilter(
-    (email) => {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return false;
-      }
-      // Dots must separate labels: reject repeated or misplaced dots that
-      // the base shape above still accepts (e.g. "a..b@example.com",
-      // ".a@example.com", "a.@example.com", "a@.example.com").
-      if (email.includes("..")) {
-        return false;
-      }
-      const at = email.indexOf("@");
-      const local = email.slice(0, at);
-      const domain = email.slice(at + 1);
-      return (
-        !local.startsWith(".") &&
-        !local.endsWith(".") &&
-        !domain.startsWith(".") &&
-        !domain.endsWith(".")
-      );
-    },
-    {
-      message: "author.email must be a valid email address",
-    }
-  )
+  S.makeFilter(isValidOnBehalfAuthorEmail, {
+    message: "author.email must be a valid email address",
+  })
 );
 
 /**

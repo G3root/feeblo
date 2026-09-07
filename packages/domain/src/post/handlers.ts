@@ -475,9 +475,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       const subscriptionRepository = yield* PostSubscriptionRepository;
       // Reassignment find-or-creates contacts like on-behalf creation, so
       // it shares the same per-member abuse bound (see plan-on-behalf.md).
-      yield* RateLimit.consumeDashboardRateLimit({
-        key: `on-behalf-create:${args.organizationId}:${session.session.userId}`,
-        name: "on-behalf-create",
+      yield* RateLimit.consumeOnBehalfWriteLimit({
+        organizationId: args.organizationId,
+        userId: session.session.userId,
       });
       yield* transaction(
         Effect.gen(function* () {
@@ -524,9 +524,43 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           // The new author inherits the creator subscription exactly as if
           // the post had been created on their behalf: a verified account
           // is trusted, everyone else defers until identity linking grants
-          // them access. The previous author's subscriptions are left
-          // alone — silently unsubscribing them would be a worse surprise.
+          // them access. The previous author is unsubscribed first —
+          // otherwise they keep receiving status mail for a post no longer
+          // attributed to them. Only identifiers that differ from the new
+          // subject's are retired, so a shared address survives for the
+          // fresh subscribe below.
           const subscriptionNow = yield* DateTime.nowAsDate;
+          const retiredUserId =
+            previous.creatorId !== null && previous.creatorId !== subject.userId
+              ? previous.creatorId
+              : null;
+          if (retiredUserId !== null) {
+            yield* subscriptionRepository.unsubscribe({
+              postId: args.id,
+              userId: retiredUserId,
+            });
+          }
+          let retiredContactEmail: string | null = null;
+          if (
+            previous.contactId !== null &&
+            previous.contactId !== subject.contactId
+          ) {
+            const [previousContact] = yield* db
+              .select({ email: schema.contactTable.email })
+              .from(schema.contactTable)
+              .where(eq(schema.contactTable.id, previous.contactId))
+              .limit(1);
+            retiredContactEmail = previousContact?.email ?? null;
+          }
+          if (retiredUserId !== null || retiredContactEmail !== null) {
+            yield* emailSubscriptions.unsubscribePreviousAuthorTopic({
+              contactEmail: retiredContactEmail,
+              now: subscriptionNow,
+              organizationId: args.organizationId,
+              topic: { topicId: args.id, topicType: "post" },
+              userId: retiredUserId,
+            });
+          }
           if (subject.userId !== null) {
             yield* subscriptionRepository.subscribe({
               organizationId: args.organizationId,
@@ -684,9 +718,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         // Per-member abuse bound for on-behalf creations (see
         // plan-on-behalf.md); self-service creates are unaffected. Runs
         // before asset prep so a limited request does no work.
-        yield* RateLimit.consumeDashboardRateLimit({
-          key: `on-behalf-create:${args.organizationId}:${session.session.userId}`,
-          name: "on-behalf-create",
+        yield* RateLimit.consumeOnBehalfWriteLimit({
+          organizationId: args.organizationId,
+          userId: session.session.userId,
         });
       }
       const subscriptionRepository = yield* PostSubscriptionRepository;

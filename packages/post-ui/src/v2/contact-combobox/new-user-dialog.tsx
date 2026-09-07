@@ -7,7 +7,10 @@ import {
 } from "@feeblo/ui/dialog";
 import { Separator } from "@feeblo/ui/separator";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
-import { EmailSchema } from "@feeblo/web-shared/user-validation";
+import {
+  EmailSchema,
+  isDeliverableAuthorEmail,
+} from "@feeblo/web-shared/user-validation";
 import { UserAdd01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactNode } from "react";
@@ -88,7 +91,13 @@ export function NewUserDialog({
       setError("Name is required");
       return;
     }
-    if (!EmailSchema.safeParse(nextEmail).success) {
+    // The deliverability check mirrors the server's `AuthorEmail` filter
+    // (`PostCreateAuthor.email`): without it, dotted junk passes the dialog
+    // and fails on submit with a raw RPC error.
+    if (
+      !EmailSchema.safeParse(nextEmail).success ||
+      !isDeliverableAuthorEmail(nextEmail)
+    ) {
       setError("Enter a valid email address");
       return;
     }

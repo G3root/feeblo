@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { ContactId } from "@feeblo/id";
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq, getTableName, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -297,11 +297,15 @@ const makeContactRepository = Effect.gen(function* () {
 
       const contactLabel = sql`lower(COALESCE(${schema.contactTable.name}, ${schema.contactTable.email}, ''))`;
 
-      // SAFETY: literal table names in the EXISTS probes are the stable
-      // snake_case names of post/board/upvote; ids are bound parameters.
+      // Table names come from the Drizzle schema (not string literals) so a
+      // rename is caught by the typechecker; ids stay bound parameters.
+      // `sql.identifier` quotes each name exactly like the query builder.
+      const postTableName = getTableName(schema.postTable);
+      const boardTableName = getTableName(schema.boardTable);
+      const upvoteTableName = getTableName(schema.upvoteTable);
       const publicBoardProbe = sql`EXISTS (
-        SELECT 1 FROM "post" p
-        JOIN "board" b ON b.id = p.board_id
+        SELECT 1 FROM ${sql.identifier(postTableName)} p
+        JOIN ${sql.identifier(boardTableName)} b ON b.id = p.board_id
         WHERE p.id = ${args.postId}
           AND p.organization_id = ${args.organizationId}
           AND b.visibility = 'PUBLIC'
@@ -335,7 +339,7 @@ const makeContactRepository = Effect.gen(function* () {
       const alreadyVoted =
         args.postId !== undefined
           ? sql<boolean>`EXISTS (
-            SELECT 1 FROM "upvote" uv
+            SELECT 1 FROM ${sql.identifier(upvoteTableName)} uv
             WHERE uv.post_id = ${args.postId}
               AND uv.organization_id = ${args.organizationId}
               AND uv.user_id = ${schema.contactTable.userId}
@@ -354,7 +358,7 @@ const makeContactRepository = Effect.gen(function* () {
       const memberAlreadyVoted =
         args.postId !== undefined
           ? sql<boolean>`EXISTS (
-            SELECT 1 FROM "upvote" uv
+            SELECT 1 FROM ${sql.identifier(upvoteTableName)} uv
             WHERE uv.post_id = ${args.postId}
               AND uv.organization_id = ${args.organizationId}
               AND uv.user_id = ${schema.memberTable.userId}

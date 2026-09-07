@@ -181,6 +181,25 @@ export const consumeDashboardRateLimit = (args: {
       );
   });
 
+/**
+ * Per-member abuse bound for on-behalf writes (posts, voter add/remove,
+ * comments attributed to a customer; see plan-on-behalf.md, "Abuse and
+ * Cost Controls"). Centralizes the `on-behalf-create:{org}:{userId}` key
+ * so the five call sites cannot drift (wrong key or bucket name on the
+ * next copy). Self-service paths never call this.
+ */
+export const consumeOnBehalfWriteLimit = (args: {
+  readonly organizationId: string;
+  readonly userId: string;
+  /** Override for tests; production call sites always use the preset. */
+  readonly limit?: number;
+}): Effect.Effect<void, RateLimitError> =>
+  consumeDashboardRateLimit({
+    key: `on-behalf-create:${args.organizationId}:${args.userId}`,
+    name: "on-behalf-create",
+    ...(args.limit === undefined ? undefined : { limit: args.limit }),
+  });
+
 export class PublicRpcRateLimitMiddleware extends RpcMiddleware.Service<PublicRpcRateLimitMiddleware>()(
   "@feeblo/api/PublicRpcRateLimitMiddleware",
   {

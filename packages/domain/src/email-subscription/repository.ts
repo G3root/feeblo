@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { EmailContactId, EmailSubscriptionId } from "@feeblo/id";
-import { and, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -636,6 +636,79 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       : { _tag: "Unsubscribed" as const };
   });
 
+  /**
+   * Author-reassignment cleanup: retires every email subscription the
+   * previous author holds for one topic. Unlike
+   * `unsubscribeAuthenticatedSubscription` this includes
+   * `deferred_no_access` rows — a deferred row for a removed contact-only
+   * author must not activate on later identity linking and start notifying
+   * them about a post they no longer author. No-op when neither identifier
+   * is provided or nothing matches. Callers pass only identifiers that
+   * differ from the new subject's, so a shared address is never retired
+   * before the fresh subscribe below re-establishes it.
+   */
+  const unsubscribePreviousAuthorTopic = Effect.fn(
+    "EmailSubscriptionRepository.unsubscribePreviousAuthorTopic"
+  )(function* ({
+    contactEmail,
+    now,
+    organizationId,
+    topic,
+    userId,
+  }: {
+    /** Previous contact's email; matched case-insensitively. */
+    readonly contactEmail: string | null;
+    readonly now: Date;
+    readonly organizationId: string;
+    readonly topic: EmailSubscriptionTopicInput;
+    /** Previous author's user row; null for contact-only authors. */
+    readonly userId: string | null;
+  }) {
+    const contactClauses = [
+      ...(userId !== null ? [eq(schema.emailContactTable.userId, userId)] : []),
+      ...(contactEmail !== null
+        ? [
+            sql`lower(${schema.emailContactTable.email}) = lower(${contactEmail})`,
+          ]
+        : []),
+    ];
+    if (contactClauses.length === 0) {
+      return { unsubscribed: 0 };
+    }
+    const contacts = yield* db
+      .select({ id: schema.emailContactTable.id })
+      .from(schema.emailContactTable)
+      .where(
+        and(
+          eq(schema.emailContactTable.organizationId, organizationId),
+          or(...contactClauses)
+        )
+      );
+    if (contacts.length === 0) {
+      return { unsubscribed: 0 };
+    }
+    const updated = yield* db
+      .update(schema.emailSubscriptionTable)
+      .set({
+        state: "unsubscribed",
+        unsubscribedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(schema.emailSubscriptionTable.organizationId, organizationId),
+          topicCondition(schema.emailSubscriptionTable, topic),
+          inArray(
+            schema.emailSubscriptionTable.contactId,
+            contacts.map((contact) => contact.id)
+          ),
+          ne(schema.emailSubscriptionTable.state, "unsubscribed")
+        )
+      )
+      .returning({ id: schema.emailSubscriptionTable.id });
+    return { unsubscribed: updated.length };
+  });
+
   /** Synchronizes only reversible consent states with the workspace email plan. */
   const reconcileSubscriptionPlanStates = Effect.fn(
     "EmailSubscriptionRepository.reconcileSubscriptionPlanStates"
@@ -756,6 +829,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     requestSubscription,
     unsubscribe,
     unsubscribeAuthenticatedSubscription,
+    unsubscribePreviousAuthorTopic,
     reconcileSubscriptionPlanStates,
     findPlanStateOrganizationIds,
     upsertSuppression,

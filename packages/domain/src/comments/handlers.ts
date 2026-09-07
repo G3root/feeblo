@@ -187,9 +187,9 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       if (args.author !== undefined) {
         // Per-member abuse bound for on-behalf creations (see
         // plan-on-behalf.md); self-service comments are unaffected.
-        yield* RateLimit.consumeDashboardRateLimit({
-          key: `on-behalf-create:${args.organizationId}:${session.session.userId}`,
-          name: "on-behalf-create",
+        yield* RateLimit.consumeOnBehalfWriteLimit({
+          organizationId: args.organizationId,
+          userId: session.session.userId,
         });
       }
 

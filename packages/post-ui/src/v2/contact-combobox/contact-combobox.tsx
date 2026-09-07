@@ -12,7 +12,10 @@ import {
   ComboboxPopup,
 } from "@feeblo/ui/combobox";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
-import { EmailSchema } from "@feeblo/web-shared/user-validation";
+import {
+  EmailSchema,
+  isDeliverableAuthorEmail,
+} from "@feeblo/web-shared/user-validation";
 import {
   Cancel01Icon,
   Search01Icon,
@@ -261,10 +264,13 @@ export function ContactCombobox({
 
   const trimmedQuery = query.trim();
   // The create-new path feeds the raw query to find-or-create as an EMAIL;
-  // non-email queries (names) only ever surface real search results.
+  // non-email queries (names) only ever surface real search results. The
+  // deliverability check mirrors the server's `AuthorEmail` filter so the
+  // entry point is only offered for addresses the RPC will accept.
   const queryLooksLikeEmail =
     trimmedQuery.length >= MIN_QUERY_LENGTH &&
-    EmailSchema.safeParse(trimmedQuery).success;
+    EmailSchema.safeParse(trimmedQuery).success &&
+    isDeliverableAuthorEmail(trimmedQuery);
   // The create-new entry is always offered for email-like
   // queries, not just on empty results — otherwise a substring hit hides the
   // only path to attribute to someone new. Suppressed only for an exact
