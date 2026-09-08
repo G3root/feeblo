@@ -713,6 +713,97 @@ describe("PostRpcHandlers", () => {
       );
     });
 
+    describe("PostDeleteEligibilityList", () => {
+      it.effect("returns only the caller's untouched posts", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const untouchedPostId = yield* PostId.generate;
+          const engagedPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [untouchedPostId, "Untouched feedback"],
+            [engagedPostId, "Engaged feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          const commentId = yield* CommentId.generate;
+          yield* db.insert(schema.commentTable).values({
+            id: commentId,
+            content: "Engaging comment",
+            organizationId: fixture.organizationId,
+            postId: engagedPostId,
+            userId: fixture.userId,
+          });
+
+          const result = yield* handlers
+            .PostDeleteEligibilityList({
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          expect(result.eligibleIds).toEqual([untouchedPostId]);
+        })
+      );
+    });
+
+    describe("PostDeleteEligibilityListPublic", () => {
+      it.effect("returns an empty set for anonymous callers", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+
+          const result = yield* handlers
+            .PostDeleteEligibilityListPublic({
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+          expect(result).toEqual({ eligibleIds: [] });
+        })
+      );
+
+      it.effect("reflects engagement for the creator's posts", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Own feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const session = Option.some(makeSession(fixture));
+          const check = () =>
+            handlers
+              .PostDeleteEligibilityListPublic({
+                organizationId: fixture.organizationId,
+              })
+              .pipe(Effect.provideService(OptionalCurrentSession, session));
+
+          expect(yield* check()).toEqual({ eligibleIds: [postId] });
+
+          const commentId = yield* CommentId.generate;
+          yield* db.insert(schema.commentTable).values({
+            id: commentId,
+            content: "Engaging comment",
+            organizationId: fixture.organizationId,
+            postId,
+            userId: fixture.userId,
+          });
+
+          expect(yield* check()).toEqual({ eligibleIds: [] });
+        })
+      );
+    });
+
     describe("PostGetPublic", () => {
       it.effect("returns a public post by slug", () =>
         Effect.gen(function* () {
@@ -2163,6 +2254,196 @@ describe("PostRpcHandlers", () => {
           expect(sourcePost).toMatchObject({ mergedIntoPostId: targetPostId });
           expect(sourcePost?.archivedAt).toBeInstanceOf(Date);
           expect(sourcePost?.mergedAt).toBeInstanceOf(Date);
+        })
+      );
+
+      it.effect("moves engagement set-based and drops duplicate twins", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [sourcePostId, "Source feedback"],
+            [targetPostId, "Target feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          const sharedVoterId = `user_shared_${fixture.organizationId}`;
+          const sourceOnlyVoterId = `user_source_only_${fixture.organizationId}`;
+          for (const [id, email] of [
+            [sharedVoterId, `shared_${fixture.organizationId}@example.com`],
+            [
+              sourceOnlyVoterId,
+              `source_only_${fixture.organizationId}@example.com`,
+            ],
+          ] as const) {
+            yield* db.insert(schema.userTable).values({
+              id,
+              email,
+              name: "Voter",
+            });
+          }
+
+          yield* db.insert(schema.upvoteTable).values([
+            {
+              id: `upvote_shared_source_${fixture.organizationId}`,
+              userId: sharedVoterId,
+              postId: sourcePostId,
+              organizationId: fixture.organizationId,
+            },
+            {
+              id: `upvote_shared_target_${fixture.organizationId}`,
+              userId: sharedVoterId,
+              postId: targetPostId,
+              organizationId: fixture.organizationId,
+            },
+            {
+              id: `upvote_source_only_${fixture.organizationId}`,
+              userId: sourceOnlyVoterId,
+              postId: sourcePostId,
+              organizationId: fixture.organizationId,
+            },
+          ]);
+
+          const commentId = yield* CommentId.generate;
+          yield* db.insert(schema.commentTable).values({
+            id: commentId,
+            content: "Source comment",
+            organizationId: fixture.organizationId,
+            postId: sourcePostId,
+            userId: fixture.userId,
+          });
+
+          yield* db.insert(schema.tagTable).values([
+            {
+              id: `tag_shared_${fixture.organizationId}`,
+              name: "Shared",
+              slug: `shared-${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+            },
+            {
+              id: `tag_source_${fixture.organizationId}`,
+              name: "Source only",
+              slug: `source-${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+            },
+          ]);
+          yield* db.insert(schema.postTagTable).values([
+            {
+              id: `post_tag_shared_source_${fixture.organizationId}`,
+              postId: sourcePostId,
+              tagId: `tag_shared_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+            },
+            {
+              id: `post_tag_shared_target_${fixture.organizationId}`,
+              postId: targetPostId,
+              tagId: `tag_shared_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+            },
+            {
+              id: `post_tag_source_only_${fixture.organizationId}`,
+              postId: sourcePostId,
+              tagId: `tag_source_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+            },
+          ]);
+
+          yield* db.insert(schema.postReactionTable).values([
+            {
+              id: `reaction_shared_source_${fixture.organizationId}`,
+              userId: sharedVoterId,
+              postId: sourcePostId,
+              emoji: "👍",
+            },
+            {
+              id: `reaction_shared_target_${fixture.organizationId}`,
+              userId: sharedVoterId,
+              postId: targetPostId,
+              emoji: "👍",
+            },
+            {
+              id: `reaction_source_only_${fixture.organizationId}`,
+              userId: sourceOnlyVoterId,
+              postId: sourcePostId,
+              emoji: "🎉",
+            },
+          ]);
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          // Shared twins collapse to the target row; unique source rows move.
+          const targetUpvotes = yield* db
+            .select({ userId: schema.upvoteTable.userId })
+            .from(schema.upvoteTable)
+            .where(eq(schema.upvoteTable.postId, targetPostId));
+          expect(targetUpvotes.map((upvote) => upvote.userId).sort()).toEqual(
+            [sharedVoterId, sourceOnlyVoterId].sort()
+          );
+
+          const targetReactions = yield* db
+            .select({
+              userId: schema.postReactionTable.userId,
+              emoji: schema.postReactionTable.emoji,
+            })
+            .from(schema.postReactionTable)
+            .where(eq(schema.postReactionTable.postId, targetPostId));
+          expect(targetReactions).toHaveLength(2);
+          expect(targetReactions).toContainEqual({
+            userId: sharedVoterId,
+            emoji: "👍",
+          });
+          expect(targetReactions).toContainEqual({
+            userId: sourceOnlyVoterId,
+            emoji: "🎉",
+          });
+
+          const targetTags = yield* db
+            .select({ tagId: schema.postTagTable.tagId })
+            .from(schema.postTagTable)
+            .where(eq(schema.postTagTable.postId, targetPostId));
+          expect(targetTags.map((postTag) => postTag.tagId).sort()).toEqual(
+            [
+              `tag_shared_${fixture.organizationId}`,
+              `tag_source_${fixture.organizationId}`,
+            ].sort()
+          );
+
+          const targetComments = yield* db
+            .select({ id: schema.commentTable.id })
+            .from(schema.commentTable)
+            .where(eq(schema.commentTable.postId, targetPostId));
+          expect(targetComments.map((comment) => comment.id)).toEqual([
+            commentId,
+          ]);
+
+          // Nothing engagement-related may remain on the archived source.
+          for (const table of [
+            schema.upvoteTable,
+            schema.postReactionTable,
+            schema.postTagTable,
+            schema.commentTable,
+          ] as const) {
+            const leftovers = yield* db
+              .select({ id: table.id })
+              .from(table)
+              .where(eq(table.postId, sourcePostId));
+            expect(leftovers).toEqual([]);
+          }
         })
       );
     });

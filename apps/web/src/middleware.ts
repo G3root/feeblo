@@ -66,10 +66,6 @@ function hasPathPrefix(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
-function isPublicBoardSubdomain(subdomain: string | null): subdomain is string {
-  return Boolean(subdomain && subdomain.toLowerCase() !== DASHBOARD_SUBDOMAIN);
-}
-
 function subdomainMiddleware(context: APIContext, next: MiddlewareNext) {
   const subdomain = resolveSubdomain(context);
   context.locals.subdomain = subdomain;
@@ -103,42 +99,10 @@ function subdomainMiddleware(context: APIContext, next: MiddlewareNext) {
   return next();
 }
 
-async function siteMiddleware(context: APIContext, next: MiddlewareNext) {
-  const pathname = normalizePathname(context.url.pathname);
-  if (isFeedbackWidgetPath(pathname)) {
-    return next();
-  }
-
-  const { subdomain } = context.locals;
-  if (isPublicBoardSubdomain(subdomain)) {
-    try {
-      // The Effect RPC runtime (~150 kB) is only needed to resolve the site
-      // for public board subdomains. Load it lazily so dashboard/app requests
-      // never evaluate it, keeping it out of the worker's startup module graph.
-      const { fetchRpcServer } = await import("~/lib/runtime-server");
-      const sites = await fetchRpcServer((rpc) =>
-        rpc.SiteListBySubdomain({ subdomain })
-      );
-      context.locals.site = sites[0] ?? null;
-    } catch (error) {
-      console.error("Failed to fetch site for subdomain", subdomain, error);
-      context.locals.site = null;
-    }
-  } else {
-    context.locals.site = null;
-  }
-
-  return next();
-}
-
 // Session resolution and the session-aware redirects (sign-in bounce,
 // register bounce, default-organization canonicalization) moved to the client:
 // see `~/lib/auth-redirects` in the dashboard app. Documents no longer embed a
 // server-resolved auth hint, so they are user-independent and need no
 // `private, no-store` cache treatment.
 
-export const onRequest = sequence(
-  localeMiddleware,
-  subdomainMiddleware,
-  siteMiddleware
-);
+export const onRequest = sequence(localeMiddleware, subdomainMiddleware);

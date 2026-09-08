@@ -10,6 +10,9 @@ import {
   PostAdminUpdate,
   PostCreate,
   PostDelete,
+  PostDeleteEligibilityList,
+  PostDeleteEligibilityListPublic,
+  PostDeleteEligibilityListResult,
   PostDeletePublic,
   PostGet,
   PostList,
@@ -106,6 +109,23 @@ export class PostRpcs extends RpcGroup.make(
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   })
     .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+
+  // Delete affordance sync (see `PostDeleteEligibilityList` schema): the
+  // caller's whole eligible set in one lookup, overfetched client-side,
+  // instead of per-row probes on every list fetch.
+  Rpc.make("PostDeleteEligibilityList", {
+    success: PostDeleteEligibilityListResult,
+    payload: PostDeleteEligibilityList,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostDeleteEligibilityListPublic", {
+    success: PostDeleteEligibilityListResult,
+    payload: PostDeleteEligibilityListPublic,
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
 
   Rpc.make("PostUpdate", {

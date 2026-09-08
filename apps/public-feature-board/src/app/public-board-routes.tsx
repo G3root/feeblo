@@ -17,6 +17,7 @@ import {
   publicChangelogCollection,
   publicCommentCollection,
   publicCommentReactionCollection,
+  publicDeleteEligibilityCollection,
   publicPostCollection,
   publicPostDetailCollection,
   publicPostReactionCollection,
@@ -236,6 +237,9 @@ const postRoute = createRoute({
       subsetQueries.comments.preload(),
       subsetQueries.commentReactions.preload(),
       subsetQueries.postReactions.preload(),
+      // Delete hints are per-user private state; skip the RPC for
+      // anonymous visitors (the queryFn resolves [] without a session).
+      ...(session ? [publicDeleteEligibilityCollection.preload()] : []),
       // Subscription is per-user private state. Skip the RPC for anonymous
       // visitors to avoid `RpcError: RPC request failed` /
       // `[QueryCollection] Error observing query public-post-subscription`—

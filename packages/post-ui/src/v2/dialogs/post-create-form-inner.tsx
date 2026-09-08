@@ -171,6 +171,7 @@ export function PostCreateForm() {
     usePostCollections();
   const {
     boardCollection,
+    deleteEligibilityCollection,
     membersCollection,
     postCollection,
     postStatusCollection,
@@ -275,6 +276,9 @@ export function PostCreateForm() {
       // dropped when the mutation settles, so refetch failures propagate
       // to the submit handler instead of being suppressed.
       await postCollection.utils.refetch();
+      // A new own post is immediately deletable: refresh the hint set so
+      // its detail affordance doesn't wait for the next sync.
+      await deleteEligibilityCollection?.utils.refetch();
       return canonicalSlug;
     },
   });

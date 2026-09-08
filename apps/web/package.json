@@ -40,6 +40,7 @@
     "@feeblo/web-shared": "workspace:*",
     "@hugeicons/core-free-icons": "^4.2.3",
     "@hugeicons/react": "^1.1.9",
+    "@isaacs/ttlcache": "catalog:",
     "@marsidev/react-turnstile": "^1.5.4",
     "@tanstack/query-db-collection": "catalog:",
     "@tanstack/react-db": "catalog:",

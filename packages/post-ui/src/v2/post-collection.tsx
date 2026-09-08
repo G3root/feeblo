@@ -7,12 +7,14 @@ import {
   isUser,
   usePolicy,
 } from "@feeblo/web-shared/use-policy";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
 
 import {
   createPostCollectionState as buildPostCollectionState,
   type PostCollectionDataProviderProps,
   PostCollectionStateProvider as StateProvider,
 } from "./post-page-context";
+import { usePostCollections } from "./providers/post-collections-provider";
 
 export function PostCollectionDataProvider({
   board,
@@ -39,8 +41,34 @@ export function PostCollectionDataProvider({
       allPolicy(hasMembership(organizationId), isUser(post?.creatorId ?? ""))
     )
   );
+  // List rows carry no delete hint; contributor affordances subscribe to
+  // the injected eligibility collection for the viewed post instead. The
+  // query stays undefined (no sync) unless a non-privileged creator views
+  // their own post, so card lists never fetch per-card eligibility.
+  const {
+    collections: { deleteEligibilityCollection },
+  } = usePostCollections();
+  const contributorCase = isPostCreator && !canManageAllPosts;
+  const eligibilityQuery = useLiveQuery(
+    (q) => {
+      if (!contributorCase || !deleteEligibilityCollection || !post?.id) {
+        return undefined;
+      }
+      return q
+        .from({ eligibility: deleteEligibilityCollection })
+        .where(({ eligibility }) =>
+          and(
+            eq(eligibility.organizationId, organizationId),
+            eq(eligibility.postId, post.id)
+          )
+        )
+        .select(({ eligibility }) => ({ postId: eligibility.postId }))
+        .findOne();
+    },
+    [contributorCase, deleteEligibilityCollection, organizationId, post?.id]
+  );
   const canDeletePost =
-    canManageAllPosts || (isPostCreator && post?.canDeleteAsCreator === true);
+    canManageAllPosts || (isPostCreator && eligibilityQuery.data != null);
 
   const isMember =
     session?.memberships?.some((m) => m.organizationId === organizationId) ??

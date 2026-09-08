@@ -10,7 +10,6 @@ declare namespace App {
     };
     /** The request path before any rewrite; undefined before the middleware sets it. */
     publicPath?: string;
-    site: import("@feeblo/domain/site/schema").TSite | null;
     subdomain: string | null;
   }
 }

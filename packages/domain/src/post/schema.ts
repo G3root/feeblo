@@ -36,8 +36,6 @@ export const Post = S.Struct({
   organizationId: S.String,
   creatorMemberId: S.NullOr(S.String),
   creatorId: S.NullOr(S.String),
-  /** UI hint; the backend remains authoritative for deletion. */
-  canDeleteAsCreator: S.optional(S.Boolean),
   lockedAt: S.NullOr(S.DateFromString),
   archivedAt: S.NullOr(S.DateFromString),
   mergedIntoPostId: S.NullOr(S.String),
@@ -73,8 +71,6 @@ export const PostListItem = S.Struct({
   organizationId: S.String,
   creatorMemberId: S.NullOr(S.String),
   creatorId: S.NullOr(S.String),
-  /** UI hint; the backend remains authoritative for deletion. */
-  canDeleteAsCreator: S.optional(S.Boolean),
   lockedAt: S.NullOr(S.DateFromString),
   archivedAt: S.NullOr(S.DateFromString),
   mergedIntoPostId: S.NullOr(S.String),
@@ -135,6 +131,37 @@ export const PostDeletePublic = S.Struct({
 export type TPostDelete = S.Schema.Type<typeof PostDelete>;
 
 export type TPostDeletePublic = S.Schema.Type<typeof PostDeletePublic>;
+
+/**
+ * Replacement for the retired per-row `canDeleteAsCreator` list probes:
+ * the caller's whole eligible set (own untouched posts) in one set-based
+ * lookup. Clients overfetch it into a collection once per organization and
+ * derive every affordance client-side; the backend delete path
+ * re-validates, so this stays a UI hint.
+ */
+export const PostDeleteEligibilityList = S.Struct({
+  organizationId: WorkspaceId.schema,
+});
+
+export type TPostDeleteEligibilityList = S.Schema.Type<
+  typeof PostDeleteEligibilityList
+>;
+
+export const PostDeleteEligibilityListResult = S.Struct({
+  eligibleIds: S.Array(S.String),
+});
+
+export type TPostDeleteEligibilityListResult = S.Schema.Type<
+  typeof PostDeleteEligibilityListResult
+>;
+
+export const PostDeleteEligibilityListPublic = S.Struct({
+  organizationId: WorkspaceId.schema,
+});
+
+export type TPostDeleteEligibilityListPublic = S.Schema.Type<
+  typeof PostDeleteEligibilityListPublic
+>;
 
 export const PostUpdate = S.Struct({
   id: PostId.schema,

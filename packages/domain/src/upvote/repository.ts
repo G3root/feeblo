@@ -71,57 +71,57 @@ const makeUpvoteRepository = Effect.gen(function* () {
 
     toggle: ({ organizationId, postId, userId, visibility }: TUpvoteToggle) =>
       Effect.gen(function* () {
-        const operators = [
-          eq(schema.postTable.id, postId),
-          eq(schema.postTable.organizationId, organizationId),
-          ...(visibility ? [eq(schema.boardTable.visibility, visibility)] : []),
-        ];
-        const post = yield* db
-          .select({ id: schema.postTable.id })
+        // Single probe for the post gate, the existing vote, and the member
+        // row (needed only for inserts): previously three sequential
+        // SELECTs. At most one row: votes are unique per user+post and
+        // memberships unique per org+user.
+        const [probe] = yield* db
+          .select({
+            memberId: schema.memberTable.id,
+            postId: schema.postTable.id,
+            upvoteId: schema.upvoteTable.id,
+          })
           .from(schema.postTable)
           .innerJoin(
             schema.boardTable,
             eq(schema.boardTable.id, schema.postTable.boardId)
           )
-          .where(and(...operators))
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        if (Option.isNone(post)) {
-          return { upvoted: false };
-        }
-
-        const existingUpvote = yield* db
-          .select({ id: schema.upvoteTable.id })
-          .from(schema.upvoteTable)
-          .where(
+          .leftJoin(
+            schema.upvoteTable,
             and(
-              eq(schema.upvoteTable.postId, postId),
+              eq(schema.upvoteTable.postId, schema.postTable.id),
               eq(schema.upvoteTable.userId, userId)
             )
           )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        if (Option.isSome(existingUpvote)) {
-          yield* db
-            .delete(schema.upvoteTable)
-            .where(eq(schema.upvoteTable.id, existingUpvote.value.id));
-
-          return { upvoted: false };
-        }
-
-        const member = yield* db
-          .select({ id: schema.memberTable.id })
-          .from(schema.memberTable)
-          .where(
+          .leftJoin(
+            schema.memberTable,
             and(
               eq(schema.memberTable.organizationId, organizationId),
               eq(schema.memberTable.userId, userId)
             )
           )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
+          .where(
+            and(
+              eq(schema.postTable.id, postId),
+              eq(schema.postTable.organizationId, organizationId),
+              ...(visibility
+                ? [eq(schema.boardTable.visibility, visibility)]
+                : [])
+            )
+          )
+          .limit(1);
+
+        if (!probe) {
+          return { upvoted: false };
+        }
+
+        if (probe.upvoteId) {
+          yield* db
+            .delete(schema.upvoteTable)
+            .where(eq(schema.upvoteTable.id, probe.upvoteId));
+
+          return { upvoted: false };
+        }
 
         const upvoteId = yield* UpvoteId.generate;
         yield* db
@@ -131,7 +131,7 @@ const makeUpvoteRepository = Effect.gen(function* () {
             postId,
             userId,
             organizationId,
-            memberId: Option.getOrNull(member)?.id ?? null,
+            memberId: probe.memberId,
           })
           .onConflictDoNothing();
 

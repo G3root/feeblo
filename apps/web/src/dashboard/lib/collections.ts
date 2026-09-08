@@ -131,6 +131,7 @@ export const postCollection = createCollection(
           organizationId: deletedPost.organizationId,
         })
       );
+      await deleteEligibilityCollection.utils.refetch();
     },
   })
 );
@@ -783,6 +784,7 @@ export const commentCollection = createCollection(
 
       await postActivityCollection.utils.refetch();
       await postCollection.utils.refetch();
+      await deleteEligibilityCollection.utils.refetch();
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -800,6 +802,7 @@ export const commentCollection = createCollection(
 
       await postActivityCollection.utils.refetch();
       await postCollection.utils.refetch();
+      await deleteEligibilityCollection.utils.refetch();
     },
     onUpdate: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -821,6 +824,9 @@ export const commentCollection = createCollection(
     },
   })
 );
+
+/** Cap for the per-post activity cache entry (see the merge below). */
+const MAX_POST_ACTIVITIES = 500;
 
 export const postActivityCollection = createCollection(
   queryCollectionOptions({
@@ -870,7 +876,15 @@ export const postActivityCollection = createCollection(
       for (const activity of changes) {
         merged.set(activity.id, activity);
       }
-      return [...merged.values()];
+      // Bound per-post growth: long-lived posts would otherwise accumulate
+      // an unbounded cache entry across every sync. Oldest-first is
+      // preserved; the timeline paginates forward from here.
+      const ordered = [...merged.values()].sort(
+        (left, right) => +left.createdAt - +right.createdAt
+      );
+      return ordered.length > MAX_POST_ACTIVITIES
+        ? ordered.slice(ordered.length - MAX_POST_ACTIVITIES)
+        : ordered;
     },
     queryClient,
     getKey: (item) => item.id,
@@ -970,6 +984,7 @@ export const upvoteCollection = createCollection(
         })
       );
       await postCollection.utils.refetch();
+      await deleteEligibilityCollection.utils.refetch();
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -982,6 +997,7 @@ export const upvoteCollection = createCollection(
         })
       );
       await postCollection.utils.refetch();
+      await deleteEligibilityCollection.utils.refetch();
     },
   })
 );
@@ -993,6 +1009,41 @@ upvoteCollection.createIndex((row) => row.organizationId, {
 });
 
 upvoteCollection.createIndex((row) => row.postId, {
+  indexType: BasicIndex,
+});
+
+/**
+ * Creator delete hints for the whole organization, synced once. List rows
+ * carry no delete hint (per-row probes on every list fetch); contributor
+ * affordances derive from this small set client-side instead, and the
+ * backend delete path re-validates. Presence of a row means eligible.
+ * Refetch after engagement mutations (see the call sites below).
+ */
+export const deleteEligibilityCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () => organizationScopedQueryKey("delete-eligibility"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const result = await fetchRpc(
+        (rpc) => rpc.PostDeleteEligibilityList({ organizationId }),
+        { signal: ctx.signal }
+      );
+      return result.eligibleIds.map((postId) => ({
+        organizationId,
+        postId,
+      }));
+    },
+    queryClient,
+    getKey: (item) => item.postId,
+  })
+);
+
+deleteEligibilityCollection.createIndex((row) => row.postId, {
   indexType: BasicIndex,
 });
 
@@ -1653,6 +1704,7 @@ export const dashboardCollections = {
   commentCollection,
   commentReactionCollection,
   companyCollection,
+  deleteEligibilityCollection,
   companyAttributeDefinitionCollection,
   companyAttributeValueCollection,
   contactAttributeDefinitionCollection,

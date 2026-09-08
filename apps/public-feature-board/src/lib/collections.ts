@@ -19,7 +19,11 @@ import {
 } from "@feeblo/web-shared/reaction-keys";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
-import { createCollection, parseLoadSubsetOptions } from "@tanstack/react-db";
+import {
+  BasicIndex,
+  createCollection,
+  parseLoadSubsetOptions,
+} from "@tanstack/react-db";
 import * as Duration from "effect/Duration";
 import type * as Schema from "effect/Schema";
 
@@ -156,6 +160,7 @@ export const publicPostCollection = createCollection(
           id: deletedPost.id,
         })
       );
+      await publicDeleteEligibilityCollection.utils.refetch();
     },
   })
 );
@@ -458,6 +463,7 @@ export const publicCommentCollection = createCollection(
         })
       );
       await publicPostCollection.utils.refetch();
+      await publicDeleteEligibilityCollection.utils.refetch();
     },
     onUpdate: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -485,6 +491,7 @@ export const publicCommentCollection = createCollection(
         })
       );
       await publicPostCollection.utils.refetch();
+      await publicDeleteEligibilityCollection.utils.refetch();
     },
   })
 );
@@ -588,6 +595,7 @@ export const publicUpvoteCollection = createCollection(
           postId: newUpvote.postId,
         })
       );
+      await publicDeleteEligibilityCollection.utils.refetch();
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -599,6 +607,7 @@ export const publicUpvoteCollection = createCollection(
           postId: deletedUpvote.postId,
         })
       );
+      await publicDeleteEligibilityCollection.utils.refetch();
     },
   })
 );
@@ -801,6 +810,40 @@ export const publicPostDetailCollection = createCollection(
   })
 );
 
+/**
+ * Creator delete hints for the whole organization, synced once. Public
+ * list rows carry no delete hint; the public detail affordance derives
+ * from this small set client-side instead. Presence means eligible.
+ * Refetch after engagement mutations (see the call sites below).
+ */
+export const publicDeleteEligibilityCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () => organizationScopedQueryKey("public-delete-eligibility"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const result = await fetchRpc(
+        (rpc) => rpc.PostDeleteEligibilityListPublic({ organizationId }),
+        { signal: ctx.signal }
+      );
+      return result.eligibleIds.map((postId) => ({
+        organizationId,
+        postId,
+      }));
+    },
+    queryClient,
+    getKey: (item) => item.postId,
+  })
+);
+
+publicDeleteEligibilityCollection.createIndex((row) => row.postId, {
+  indexType: BasicIndex,
+});
+
 export const publicCollections = {
   publicBoardCollection,
   publicChangelogCategoryCollection,
@@ -809,6 +852,7 @@ export const publicCollections = {
   publicChangelogPostCollection,
   publicCommentCollection,
   publicCommentReactionCollection,
+  publicDeleteEligibilityCollection,
   publicPostCollection,
   publicPostDetailCollection,
   publicPostReactionCollection,

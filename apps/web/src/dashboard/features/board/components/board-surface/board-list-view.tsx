@@ -17,7 +17,7 @@ import {
   type BoardPostStatus,
   formatPostStatus,
 } from "@feeblo/web-shared/board/constants";
-import { hasMembership, PolicyGuard } from "@feeblo/web-shared/use-policy";
+import { hasMembership, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
   Add01Icon,
   ArrowDown01Icon,
@@ -45,6 +45,9 @@ export function BoardListView({
   boardId?: string;
   groupedPosts: BoardPostLane[];
 }) {
+  // One membership subscription per board instead of one per lane: every
+  // lane header only needs this boolean for its add-post button.
+  const { allowed: canAddPost } = usePolicy(hasMembership(organizationId));
   return (
     <section>
       <Accordion
@@ -55,6 +58,7 @@ export function BoardListView({
         {groupedPosts.map((lane) => (
           <BoardListLane
             boardId={boardId}
+            canAddPost={canAddPost}
             key={lane.statusId}
             lane={lane}
             organizationId={organizationId}
@@ -67,10 +71,12 @@ export function BoardListView({
 
 const BoardListLane = memo(function BoardListLane({
   boardId,
+  canAddPost,
   lane,
   organizationId,
 }: {
   boardId?: string;
+  canAddPost: boolean;
   lane: BoardPostLane;
   organizationId: string;
 }) {
@@ -78,8 +84,8 @@ const BoardListLane = memo(function BoardListLane({
     <AccordionPrimitive.Item value={lane.statusId}>
       <BoardListLaneHeader
         boardId={boardId}
+        canAddPost={canAddPost}
         lane={lane}
-        organizationId={organizationId}
       />
       <AccordionPanel className="h-auto px-0 pb-0">
         {lane.posts.map((post) => (
@@ -96,12 +102,12 @@ const BoardListLane = memo(function BoardListLane({
 
 function BoardListLaneHeader({
   boardId,
+  canAddPost,
   lane,
-  organizationId,
 }: {
   boardId?: string;
+  canAddPost: boolean;
   lane: BoardPostLane;
-  organizationId: string;
 }) {
   const store = useBoardStore();
 
@@ -132,17 +138,13 @@ function BoardListLaneHeader({
             </div>
           </AccordionTrigger>
 
-          <PolicyGuard policy={hasMembership(organizationId)}>
-            {({ allowed }) => (
-              <AddPostButton
-                boardId={boardId}
-                disabled={!allowed}
-                label={lane.label || formatPostStatus(lane.status)}
-                status={lane.status}
-                statusId={lane.statusId}
-              />
-            )}
-          </PolicyGuard>
+          <AddPostButton
+            boardId={boardId}
+            disabled={!canAddPost}
+            label={lane.label || formatPostStatus(lane.status)}
+            status={lane.status}
+            statusId={lane.statusId}
+          />
         </div>
       </ContextMenuTrigger>
 

@@ -1,17 +1,23 @@
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import {
   and,
+  coalesce,
   count,
   eq,
+  gte,
   ilike,
   inArray,
+  isNull,
+  isUndefined,
   not,
+  or,
   useLiveQuery,
 } from "@tanstack/react-db";
-import { useMemo } from "react";
+import { useDeferredValue, useMemo } from "react";
 
 import {
   boardCollection,
+  deleteEligibilityCollection,
   postCollection,
   postStatusCollection,
   postTagCollection,
@@ -32,10 +38,17 @@ import type { BoardPostRow } from "./types";
  * and feedback routes call this in `beforeLoad` so lane data arrives with
  * the route instead of after mount; the layout only preloads shell-level
  * collections (organization, board, plan).
+ *
+ * TanStack DB is deliberately overfetched here: full org collections sync
+ * once, then every filter/search/sort runs as an incremental live query
+ * (D2 differential dataflow) with no further network trips. Keep it that
+ * way — do not "optimize" this into paginated server queries without
+ * replacing the whole board data model.
  */
 export async function preloadBoardPostsDataCollections(): Promise<void> {
   await Promise.all([
     boardCollection.preload(),
+    deleteEligibilityCollection.preload(),
     postCollection.preload(),
     postStatusCollection.preload(),
     tagCollection.preload(),
@@ -98,107 +111,85 @@ function useBoardPostStatuses(organizationId: string) {
   );
 }
 
-function useBoardList(organizationId: string) {
-  const { boardCollection } = useDashboardCollections();
-  return useLiveQuery(
+export function useBoardPostsData({
+  boardId,
+  organizationId,
+  postStatusFilter,
+  search,
+  statusOperator,
+  statuses,
+  tagIds,
+  tagOperator,
+}: UseBoardPostsDataOptions) {
+  const {
+    boardCollection,
+    postCollection,
+    postStatusCollection,
+    postTagCollection,
+    upvoteCollection,
+  } = useDashboardCollections();
+  const normalizedSearch = search.trim();
+  // Defer the title filter off the urgent keystroke path (same pattern as
+  // the public board): the input stays responsive while the live query
+  // re-runs over the overfetched collection at lower priority.
+  const deferredSearch = useDeferredValue(normalizedSearch);
+  const statusesKey = statuses.join(",");
+  const tagIdsKey = tagIds.join(",");
+
+  const postStatusesQuery = useBoardPostStatuses(organizationId);
+
+  // One live query for everything the lanes render. The previous shape ran
+  // five separate queries and stitched them in JS (board Map, upvote-count
+  // Map, tag id-list bridged through a comma-joined dep key): every vote
+  // recounted all org upvotes from scratch and every tag change rebuilt an
+  // O(n) key that re-subscribed the posts query. Here D2 maintains each
+  // piece incrementally —
+  // - board name/slug resolve in a left join (a post never vanishes when
+  //   its board row arrives late),
+  // - upvote totals come from a groupBy subquery (one small row per post
+  //   instead of every upvote row materialized),
+  // - tag matching is a grouped subquery joined in place, so there is no
+  //   JS id-list bridge and no giant dep key.
+  const postsQuery = useLiveQuery(
     (q) => {
       if (!organizationId) {
         return undefined;
       }
 
-      return q
-        .from({ board: boardCollection })
-        .where(({ board }) => eq(board.organizationId, organizationId))
-        .select(({ board }) => ({
-          id: board.id,
-          name: board.name,
-          slug: board.slug,
+      const upvoteCounts = q
+        .from({ upvote: upvoteCollection })
+        .where(({ upvote }) => eq(upvote.organizationId, organizationId))
+        .groupBy(({ upvote }) => upvote.postId)
+        .select(({ upvote }) => ({
+          postId: upvote.postId,
+          upvoteCount: count(upvote.id),
         }));
-    },
-    [organizationId]
-  );
-}
 
-function useMatchingTagPostIds(
-  organizationId: string,
-  tagIds: string[],
-  tagIdsKey: string,
-  tagOperator: BoardTagOperator
-) {
-  const { postTagCollection } = useDashboardCollections();
-  const query = useLiveQuery(
-    (q) => {
-      if (!(organizationId && tagIds.length > 0)) {
-        return undefined;
-      }
-
-      const baseQuery = q
+      // Grouped per post so every tag operator shares one subquery shape:
+      // the `having` keeps only full matches for *AllOf modes (a tautology
+      // otherwise) and the join kind in `where` picks include vs exclude.
+      // `in` over an empty tag list matches nothing, so with no tags
+      // selected this join is an inert no-op rather than a branch.
+      const requireAllTags =
+        tagOperator === "includeAllOf" || tagOperator === "excludeIfAllOf";
+      const matchingTags = q
         .from({ postTag: postTagCollection })
         .where(({ postTag }) =>
           and(
             eq(postTag.organizationId, organizationId),
             inArray(postTag.tagId, tagIds)
           )
-        );
-
-      if (tagOperator === "includeAllOf" || tagOperator === "excludeIfAllOf") {
-        return baseQuery
-          .groupBy(({ postTag }) => postTag.postId)
-          .select(({ postTag }) => ({
-            matchedCount: count(postTag.postId),
-            postId: postTag.postId,
-          }))
-          .having(({ $selected }) => eq($selected.matchedCount, tagIds.length));
-      }
-
-      return baseQuery
+        )
+        .groupBy(({ postTag }) => postTag.postId)
         .select(({ postTag }) => ({
+          matchedCount: count(postTag.postId),
           postId: postTag.postId,
         }))
-        .distinct();
-    },
-    [organizationId, tagIdsKey, tagOperator]
-  );
-
-  const ids = query.data?.map((entry) => entry.postId) ?? [];
-  return { ids, idsKey: ids.join(","), query };
-}
-
-type FilteredBoardPostsArgs = {
-  boardId?: string;
-  organizationId: string;
-  postStatusFilter: BoardPostStatusFilter;
-  normalizedSearch: string;
-  statuses: BoardPostStatus[];
-  statusesKey: string;
-  statusOperator: BoardStatusOperator;
-  tagIds: string[];
-  tagIdsKey: string;
-  tagOperator: BoardTagOperator;
-  matchingTagPostIds: string[];
-  matchingTagPostIdsKey: string;
-};
-
-function useFilteredBoardPosts({
-  boardId,
-  organizationId,
-  postStatusFilter,
-  normalizedSearch,
-  statuses,
-  statusesKey,
-  statusOperator,
-  tagIds,
-  tagIdsKey,
-  tagOperator,
-  matchingTagPostIds,
-  matchingTagPostIdsKey,
-}: FilteredBoardPostsArgs) {
-  const { postCollection, postStatusCollection } = useDashboardCollections();
-  return useLiveQuery(
-    (q) => {
-      if (!organizationId) {
-        return undefined;
-      }
+        .having(({ $selected }) =>
+          requireAllTags
+            ? eq($selected.matchedCount, tagIds.length)
+            : gte($selected.matchedCount, 1)
+        );
 
       return q
         .from({ post: postCollection })
@@ -207,20 +198,16 @@ function useFilteredBoardPosts({
           ({ post, postStatus }) => eq(post.statusId, postStatus.id),
           "inner"
         )
-        .select(({ post, postStatus }) => ({
-          archivedAt: post.archivedAt,
-          boardId: post.boardId,
-          id: post.id,
-          mergedIntoPostId: post.mergedIntoPostId,
-          slug: post.slug,
-          statusId: post.statusId,
-          status: postStatus.type,
-          summary: post.excerpt,
-          title: post.title,
-          updatedAt: post.updatedAt,
-          user: post.user,
-        }))
-        .where(({ post, postStatus }) => {
+        .leftJoin({ board: boardCollection }, ({ post, board }) =>
+          eq(post.boardId, board.id)
+        )
+        .leftJoin({ upvoteCounts }, ({ post, upvoteCounts }) =>
+          eq(post.id, upvoteCounts.postId)
+        )
+        .leftJoin({ matchingTags }, ({ post, matchingTags }) =>
+          eq(post.id, matchingTags.postId)
+        )
+        .where(({ matchingTags, post, postStatus }) => {
           let condition = eq(post.organizationId, organizationId);
 
           if (boardId) {
@@ -241,10 +228,10 @@ function useFilteredBoardPosts({
             );
           }
 
-          if (normalizedSearch) {
+          if (deferredSearch) {
             condition = and(
               condition,
-              ilike(post.title, `%${normalizedSearch}%`)
+              ilike(post.title, `%${deferredSearch}%`)
             );
           }
 
@@ -258,138 +245,78 @@ function useFilteredBoardPosts({
           }
 
           if (tagIds.length > 0) {
-            condition = and(
-              condition,
-              tagOperator === "excludeIfAnyOf" ||
-                tagOperator === "excludeIfAllOf"
-                ? not(inArray(post.id, matchingTagPostIds))
-                : inArray(post.id, matchingTagPostIds)
+            // A missed left join reads as null/undefined (same guard as the
+            // changelog completed-posts query).
+            const unmatched = or(
+              isNull(matchingTags.postId),
+              isUndefined(matchingTags.postId)
             );
+            if (
+              tagOperator === "excludeIfAnyOf" ||
+              tagOperator === "excludeIfAllOf"
+            ) {
+              if (tagOperator === "excludeIfAllOf") {
+                condition = and(
+                  condition,
+                  or(
+                    unmatched,
+                    not(eq(matchingTags.matchedCount, tagIds.length))
+                  )
+                );
+              } else {
+                condition = and(condition, unmatched);
+              }
+            } else {
+              condition = and(condition, not(unmatched));
+            }
           }
 
           return condition;
         })
-        .orderBy((post) => post.post.createdAt, "desc");
+        .orderBy(({ post }) => post.createdAt, "desc")
+        .select(({ board, post, postStatus, upvoteCounts }) => ({
+          archivedAt: post.archivedAt,
+          boardId: post.boardId,
+          boardName: coalesce(board.name, ""),
+          boardSlug: coalesce(board.slug, ""),
+          id: post.id,
+          mergedIntoPostId: post.mergedIntoPostId,
+          slug: post.slug,
+          statusId: post.statusId,
+          status: postStatus.type,
+          summary: post.excerpt,
+          title: post.title,
+          updatedAt: post.updatedAt,
+          upvoteCount: coalesce(upvoteCounts.upvoteCount, 0),
+          user: post.user,
+        }));
     },
     [
       boardId,
       organizationId,
       postStatusFilter,
-      normalizedSearch,
+      deferredSearch,
       statusesKey,
       statusOperator,
       tagIdsKey,
       tagOperator,
-      matchingTagPostIdsKey,
     ]
   );
-}
 
-function usePostUpvoteCounts(organizationId: string) {
-  const { upvoteCollection } = useDashboardCollections();
-  return useLiveQuery(
-    (q) => {
-      if (!organizationId) {
-        return undefined;
-      }
-
-      return q
-        .from({ upvote: upvoteCollection })
-        .where(({ upvote }) => eq(upvote.organizationId, organizationId))
-        .select(({ upvote }) => ({ postId: upvote.postId }));
-    },
-    [organizationId]
-  );
-}
-
-export function useBoardPostsData({
-  boardId,
-  organizationId,
-  postStatusFilter,
-  search,
-  statusOperator,
-  statuses,
-  tagIds,
-  tagOperator,
-}: UseBoardPostsDataOptions) {
-  const normalizedSearch = search.trim();
-  const statusesKey = statuses.join(",");
-  const tagIdsKey = tagIds.join(",");
-
-  const postStatusesQuery = useBoardPostStatuses(organizationId);
-  const boardsQuery = useBoardList(organizationId);
-  const matchingTags = useMatchingTagPostIds(
-    organizationId,
-    tagIds,
-    tagIdsKey,
-    tagOperator
-  );
-  const postsQuery = useFilteredBoardPosts({
-    boardId,
-    organizationId,
-    postStatusFilter,
-    normalizedSearch,
-    statuses,
-    statusesKey,
-    statusOperator,
-    tagIds,
-    tagIdsKey,
-    tagOperator,
-    matchingTagPostIds: matchingTags.ids,
-    matchingTagPostIdsKey: matchingTags.idsKey,
-  });
-  const upvotesQuery = usePostUpvoteCounts(organizationId);
-
-  const boardsData = boardsQuery.data;
-  const upvotesData = upvotesQuery.data;
-  const postsData = postsQuery.data;
-  const postStatusesData = postStatusesQuery.data;
-
-  // Derived maps and rows are rebuilt only when their source query data
-  // changes. Without this every render allocates new arrays/objects, which
-  // defeats the `memo` on lane/row components below and re-renders the
-  // whole board on unrelated store updates (selection, dialogs).
-  const posts: BoardPostRow[] = useMemo(() => {
-    const boardById = new Map(
-      (boardsData ?? []).map((board) => [board.id, board])
-    );
-
-    const upvoteCountByPostId = new Map<string, number>();
-
-    for (const upvote of upvotesData ?? []) {
-      upvoteCountByPostId.set(
-        upvote.postId,
-        (upvoteCountByPostId.get(upvote.postId) ?? 0) + 1
-      );
-    }
-
-    return (postsData ?? []).map((post) => ({
-      ...post,
-      boardName: boardById.get(post.boardId)?.name ?? "",
-      boardSlug: boardById.get(post.boardId)?.slug ?? "",
-      upvoteCount: upvoteCountByPostId.get(post.id) ?? 0,
-      user: post.user,
-    }));
-  }, [boardsData, upvotesData, postsData]);
+  const posts: BoardPostRow[] = postsQuery.data ?? [];
 
   const postStatuses = useMemo(
-    () => filterPostStatusesByPreset(postStatusesData ?? [], postStatusFilter),
-    [postStatusesData, postStatusFilter]
+    () =>
+      filterPostStatusesByPreset(
+        postStatusesQuery.data ?? [],
+        postStatusFilter
+      ),
+    [postStatusesQuery.data, postStatusFilter]
   );
 
   return {
-    hasError:
-      postStatusesQuery.isError ||
-      boardsQuery.isError ||
-      matchingTags.query.isError ||
-      postsQuery.isError ||
-      upvotesQuery.isError,
-    isLoading:
-      postStatusesQuery.isLoading ||
-      boardsQuery.isLoading ||
-      postsQuery.isLoading ||
-      upvotesQuery.isLoading ||
-      (tagIds.length > 0 && matchingTags.query.isLoading),
+    hasError: postStatusesQuery.isError || postsQuery.isError,
+    isLoading: postStatusesQuery.isLoading || postsQuery.isLoading,
     postStatuses,
     posts,
   };
