@@ -110,6 +110,59 @@ describe("FeebloProvider", () => {
     await expect.element(screen.getByText("open:no")).toBeVisible();
   });
 
+  it("invokes replacement callbacks after rerender", async () => {
+    const onCloseFirst = vi.fn();
+    const onErrorFirst = vi.fn();
+    const onHeightFirst = vi.fn();
+    const screen = await render(
+      <TestProvider
+        onClose={onCloseFirst}
+        onError={onErrorFirst}
+        onHeightChange={onHeightFirst}
+        organizationId="org_callback_refresh"
+      >
+        <StateProbe />
+      </TestProvider>
+    );
+
+    const onCloseNext = vi.fn();
+    const onErrorNext = vi.fn();
+    const onHeightNext = vi.fn();
+    await screen.rerender(
+      <TestProvider
+        onClose={onCloseNext}
+        onError={onErrorNext}
+        onHeightChange={onHeightNext}
+        organizationId="org_callback_refresh"
+      >
+        <StateProbe />
+      </TestProvider>
+    );
+
+    postFromWidget({ data: { height: 123 }, event: "PAGE_HEIGHT" });
+    postFromWidget({
+      data: { code: "REFRESHED", message: "refreshed" },
+      event: "ERROR",
+    });
+
+    await vi.waitFor(() => {
+      expect(onHeightNext).toHaveBeenCalledWith(123);
+      expect(onErrorNext).toHaveBeenCalledTimes(1);
+    });
+
+    // CLOSE only fires onClose when the embed is open.
+    await screen.getByRole("button", { name: "open" }).click();
+    await expect.element(screen.getByText("open:yes")).toBeVisible();
+    postFromWidget({ event: "CLOSE" });
+
+    await vi.waitFor(() => {
+      expect(onCloseNext).toHaveBeenCalledTimes(1);
+    });
+    expect(onHeightFirst).not.toHaveBeenCalled();
+    expect(onErrorFirst).not.toHaveBeenCalled();
+    expect(onCloseFirst).not.toHaveBeenCalled();
+  });
+
   it("re-initializes the embed when config props change", async () => {
     const screen = await render(
       <TestProvider organizationId="org_reconfig" theme="dark">

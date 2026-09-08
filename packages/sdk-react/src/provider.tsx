@@ -80,7 +80,7 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
     closeRef.current = props.onClose;
     errorRef.current = props.onError;
     heightRef.current = props.onHeightChange;
-  }, []);
+  }, [props.onClose, props.onError, props.onHeightChange]);
 
   const handleSelfClose = useCallback(() => {
     closeRef.current?.();

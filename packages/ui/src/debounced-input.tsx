@@ -1,5 +1,5 @@
 import { useDebouncedCallback } from "@tanstack/react-pacer";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Input, type InputProps } from "./input";
 import { InputGroupInput } from "./input-group";
@@ -36,9 +36,32 @@ const useDebounce = ({
   useEffect(() => {
     onChangeRef.current = onChange;
   });
-  const emitDebounced = useDebouncedCallback(
-    (next: string) => onChangeRef.current(next),
+
+  // Generation invalidates pending debounced calls when the controlled
+  // value changes externally: typing "ab" then receiving value "reset"
+  // must not later emit stale "ab".
+  const generationRef = useRef(0);
+  const prevExternalRef = useRef(value);
+  useEffect(() => {
+    if (prevExternalRef.current !== value) {
+      prevExternalRef.current = value;
+      generationRef.current += 1;
+    }
+  }, [value]);
+
+  const emitDebouncedRaw = useDebouncedCallback(
+    (next: string, gen: number) => {
+      if (gen === generationRef.current) {
+        onChangeRef.current(next);
+      }
+    },
     { wait }
+  );
+  const emitDebounced = useCallback(
+    (next: string) => {
+      emitDebouncedRaw(next, generationRef.current);
+    },
+    [emitDebouncedRaw]
   );
 
   return { emitDebounced, setLocalValue, localValue };
