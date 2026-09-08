@@ -24,8 +24,8 @@ const robotsResponse = (lines: ReadonlyArray<string>) =>
  * robots.txt for public board hosts, served at
  * `https://<subdomain>.<root-domain>/robots.txt`.
  *
- * The site resolves from the request host (cached). Sites flagged
- * `noIndex` (or a deployment with the `NO_INDEX` env secret) get a
+ * The site resolves from the request host with a fresh lookup per request.
+ * Sites flagged `noIndex` (or a deployment with the `NO_INDEX` env secret) get a
  * blanket `Disallow` with no sitemap link: neither crawlable nor advertised.
  *
  * For indexable sites the disallowed paths are the ones that exist on public

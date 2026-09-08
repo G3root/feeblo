@@ -32,9 +32,9 @@ const escapeCdata = (value: string): string =>
  * RSS 2.0 feed for the public changelog, served at
  * `https://<subdomain>.<root-domain>/changelog/rss.xml`.
  *
- * The site resolves from the request host (cached); when the site does
- * not exist or its changelog is hidden, the feed is a 404 so hidden
- * changelogs are never exposed through RSS.
+ * The site resolves from the request host with a fresh lookup per request;
+ * when the site does not exist or its changelog is hidden, the feed is a
+ * 404 so hidden changelogs are never exposed through RSS.
  *
  * Descriptions contain rendered HTML in CDATA. This keeps the feed readable
  * in clients that support HTML while avoiding Markdown being shown literally.

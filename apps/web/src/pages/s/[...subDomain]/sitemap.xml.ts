@@ -26,7 +26,7 @@ const xmlResponse = (body: string) =>
  * Sitemap protocol feed for the public board, served at
  * `https://<subdomain>.<root-domain>/sitemap.xml`.
  *
- * The site resolves from the request host (cached); a request for
+ * The site resolves from the request host with a fresh lookup per request;
  * a host without a site is a 404. Sites flagged `noIndex` get an empty
  * urlset: robots.txt already tells crawlers to keep out, so no URLs are
  * advertised.
