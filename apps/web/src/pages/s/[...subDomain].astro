@@ -102,7 +102,12 @@ if (!subdomain) {
   throw new Error("Subdomain is required");
 }
 
-const site = await resolveSite(subdomain);
+let site: TSite | null;
+try {
+  site = await resolveSite(subdomain);
+} catch {
+  return new Response("Content unavailable", { status: 502 });
+}
 
 if (!site) {
   return new Response("Site not found", { status: 404 });

@@ -1,5 +1,6 @@
 import rss, { type RSSFeedItem } from "@astrojs/rss";
 import type { TChangelog } from "@feeblo/domain/changelog/schema";
+import type { TSite } from "@feeblo/domain/site/schema";
 import type { APIRoute } from "astro";
 
 import { resolveSite } from "~/lib/site";
@@ -40,7 +41,12 @@ const escapeCdata = (value: string): string =>
  */
 export const GET: APIRoute = async ({ locals, url }) => {
   const { subdomain } = locals;
-  const site = subdomain ? await resolveSite(subdomain) : null;
+  let site: TSite | null;
+  try {
+    site = subdomain ? await resolveSite(subdomain) : null;
+  } catch {
+    return new Response("Feed unavailable", { status: 502 });
+  }
 
   if (site === null || site.changelogVisibility !== "PUBLIC") {
     return new Response("Not found", { status: 404 });

@@ -61,12 +61,12 @@ function movePostToColumn(
       return {
         ...lane,
         posts: [
-          ...lane.posts,
           {
             ...movedPost,
             status: toLane.status,
             statusId: toLane.statusId,
           },
+          ...lane.posts,
         ],
       };
     }

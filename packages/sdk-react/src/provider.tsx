@@ -75,7 +75,8 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
   const identityRef = useRef<UserIdentity | undefined>(undefined);
 
   // Single pass: keep all SDK callback seams pointing at the latest props
-  // without re-creating the widget.
+  // without re-creating the widget. Synced in an effect (not during render)
+  // so render stays pure under replay/discard.
   useEffect(() => {
     closeRef.current = props.onClose;
     errorRef.current = props.onError;

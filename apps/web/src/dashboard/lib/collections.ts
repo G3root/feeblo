@@ -825,9 +825,6 @@ export const commentCollection = createCollection(
   })
 );
 
-/** Cap for the per-post activity cache entry (see the merge below). */
-const MAX_POST_ACTIVITIES = 500;
-
 export const postActivityCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
@@ -876,15 +873,14 @@ export const postActivityCollection = createCollection(
       for (const activity of changes) {
         merged.set(activity.id, activity);
       }
-      // Bound per-post growth: long-lived posts would otherwise accumulate
-      // an unbounded cache entry across every sync. Oldest-first is
-      // preserved; the timeline paginates forward from here.
+      // Preserve the full merged history: the timeline renders every activity
+      // and `since` only moves forward, so dropping entries would make that
+      // history permanently unreachable (the backend offers no backfill for
+      // older-than-window rows).
       const ordered = [...merged.values()].sort(
         (left, right) => +left.createdAt - +right.createdAt
       );
-      return ordered.length > MAX_POST_ACTIVITIES
-        ? ordered.slice(ordered.length - MAX_POST_ACTIVITIES)
-        : ordered;
+      return ordered;
     },
     queryClient,
     getKey: (item) => item.id,

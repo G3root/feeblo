@@ -16,26 +16,22 @@ const siteCache = new TTLCache<string, TSite | null>({
 /**
  * Resolves the public-board site for a subdomain, cached per isolate.
  * Negative results are cached too so random-subdomain probes don't hammer
- * the API; transport failures are NOT cached (they resolve to null and the
- * next request retries).
+ * the API; transport failures propagate (and are NOT cached) so callers can
+ * distinguish missing sites (null → 404) from downstream outages (throw →
+ * 502).
  */
 export async function resolveSite(subdomain: string): Promise<TSite | null> {
   const cached = siteCache.get(subdomain);
   if (cached !== undefined) {
     return cached;
   }
-  try {
-    // Lazy-load the Effect RPC runtime so it stays out of the worker's
-    // startup module graph (same pattern as the feed endpoints).
-    const { fetchRpcServer } = await import("./runtime-server");
-    const sites = await fetchRpcServer((rpc) =>
-      rpc.SiteListBySubdomain({ subdomain })
-    );
-    const site = sites[0] ?? null;
-    siteCache.set(subdomain, site);
-    return site;
-  } catch (error) {
-    console.error("Failed to fetch site for subdomain", subdomain, error);
-    return null;
-  }
+  // Lazy-load the Effect RPC runtime so it stays out of the worker's
+  // startup module graph (same pattern as the feed endpoints).
+  const { fetchRpcServer } = await import("./runtime-server");
+  const sites = await fetchRpcServer((rpc) =>
+    rpc.SiteListBySubdomain({ subdomain })
+  );
+  const site = sites[0] ?? null;
+  siteCache.set(subdomain, site);
+  return site;
 }

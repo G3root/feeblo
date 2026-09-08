@@ -46,8 +46,14 @@ export function useFeebloEvent(
       handlerRef.current(nativeEvent);
     };
     if (event === "*") {
-      return Feeblo.on("*", forward);
+      Feeblo.on("*", forward);
+      return () => {
+        Feeblo.off("*", forward);
+      };
     }
-    return Feeblo.on(event, forward);
+    Feeblo.on(event, forward);
+    return () => {
+      Feeblo.off(event, forward);
+    };
   }, [event]);
 }

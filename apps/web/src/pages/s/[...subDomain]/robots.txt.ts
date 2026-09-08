@@ -1,3 +1,4 @@
+import type { TSite } from "@feeblo/domain/site/schema";
 import type { APIRoute } from "astro";
 import { getSecret } from "astro:env/server";
 
@@ -35,7 +36,13 @@ const robotsResponse = (lines: ReadonlyArray<string>) =>
  */
 export const GET: APIRoute = async ({ locals, url }) => {
   const { subdomain } = locals;
-  const site = subdomain ? await resolveSite(subdomain) : null;
+  let site: TSite | null;
+  try {
+    site = subdomain ? await resolveSite(subdomain) : null;
+  } catch {
+    // Fail closed: an outage must not expose an indexable response.
+    return robotsResponse(["User-agent: *", "Disallow: /"]);
+  }
   const origin = url.origin;
 
   if (site === null || site.noIndex || Boolean(getSecret("NO_INDEX"))) {
