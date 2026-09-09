@@ -7,6 +7,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 
 import { m } from "../../paraglide/messages.js";
 import { useSite } from "../../providers/site-provider";
+import { LocaleSwitcher } from "./locale-switcher";
 import { UserMenu } from "./user-menu";
 
 export function Navbar() {
@@ -82,6 +83,7 @@ function UserActions() {
 
   return (
     <div className="flex items-center gap-2">
+      <LocaleSwitcher />
       {isAuthenticated ? (
         <>
           <NotificationsMenu organizationId={site.organizationId} />
