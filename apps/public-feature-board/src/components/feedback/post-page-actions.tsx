@@ -11,6 +11,8 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 
+import { m } from "../../paraglide/messages.js";
+
 export function PostPageActions() {
   const { canDeletePost, post } = usePostCollectionData();
   const postId = post.id;
@@ -20,7 +22,7 @@ export function PostPageActions() {
   return (
     <div className="mb-8 flex items-center justify-between gap-2">
       <Link
-        aria-label="Back"
+        aria-label={m.cuddly_left_hound()}
         className={cn(buttonVariants({ size: "icon-sm", variant: "outline" }))}
         search={{
           board: undefined,
@@ -38,7 +40,7 @@ export function PostPageActions() {
             render={(props) => (
               <Button
                 {...props}
-                aria-label="More actions"
+                aria-label={m.chunky_clear_scallop()}
                 size="icon-sm"
                 variant="outline"
               >
@@ -58,7 +60,7 @@ export function PostPageActions() {
               variant="destructive"
             >
               <HugeiconsIcon icon={Delete02Icon} />
-              <span>Delete</span>
+              <span>{m.key_smug_stingray()}</span>
             </MenuItem>
           </MenuPopup>
         </Menu>

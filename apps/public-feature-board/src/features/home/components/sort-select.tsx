@@ -7,15 +7,16 @@ import {
 } from "@feeblo/ui/select";
 
 import { useHome } from "../home-context";
-import { SORT_ITEMS } from "./sort-options";
+import { getSortItems } from "./sort-options";
 
 export function HomeSortSelect({ className }: { className?: string }) {
   const { state, actions } = useHome();
   const { sortBy } = state;
+  const sortItems = getSortItems();
 
   return (
     <Select
-      items={SORT_ITEMS}
+      items={sortItems}
       onValueChange={(nextValue) => {
         if (nextValue !== null) {
           actions.updateFilters({ sort: nextValue });
@@ -27,7 +28,7 @@ export function HomeSortSelect({ className }: { className?: string }) {
         <SelectValue />
       </SelectTrigger>
       <SelectPopup>
-        {SORT_ITEMS.map((item) => (
+        {sortItems.map((item) => (
           <SelectItem key={item.value} value={item.value}>
             {item.label}
           </SelectItem>

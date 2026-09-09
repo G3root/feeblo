@@ -13,6 +13,7 @@ import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useMemo } from "react";
 
+import { m } from "../../paraglide/messages.js";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
 
@@ -101,7 +102,7 @@ function PostVoterDialogTrigger() {
     <DialogTrigger
       render={(props) => (
         <Button size="xs" variant="ghost" {...props}>
-          See all
+          {m.dull_sea_bird()}
         </Button>
       )}
     />
@@ -133,10 +134,11 @@ function PostVoterDialogPopup() {
   return (
     <DialogPopup>
       <DialogHeader>
-        <DialogTitle>Voters</DialogTitle>
+        <DialogTitle>{m.alive_heroic_fish()}</DialogTitle>
         <DialogDescription>
-          {voterCount} {voterCount === 1 ? "person has" : "people have"} voted
-          on this post.
+          {voterCount === 1
+            ? m.fair_born_swallow({ count: voterCount })
+            : m.home_mushy_hawk({ count: voterCount })}
         </DialogDescription>
       </DialogHeader>
       <DialogPanel className="flex flex-col gap-1">

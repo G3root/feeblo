@@ -12,6 +12,8 @@ import { refreshAuthSession } from "@feeblo/web-shared/auth-session";
 import { LogoutSquare01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
+import { m } from "../../paraglide/messages.js";
+
 export function UserMenu() {
   const auth = useAuth();
   const user = auth.status === "authenticated" ? auth.user : null;
@@ -23,7 +25,7 @@ export function UserMenu() {
   return (
     <Menu>
       <MenuTrigger
-        aria-label="User menu"
+        aria-label={m.empty_extra_canary()}
         className="bg-background hover:bg-accent hover:text-accent-foreground flex items-center gap-2 rounded-full py-1 pr-2 pl-1 transition-colors"
       >
         <UserAvatar image={user.image} name={user.name ?? "CN"} />
@@ -43,7 +45,7 @@ export function UserMenu() {
           }}
         >
           <HugeiconsIcon icon={LogoutSquare01Icon} />
-          Log out
+          {m.flaky_mad_walrus()}
         </MenuItem>
       </MenuPopup>
     </Menu>

@@ -2,7 +2,6 @@
 import type { TChangelog } from "@feeblo/domain/changelog/schema";
 import type { TPost } from "@feeblo/domain/post/schema";
 import type { TSite } from "@feeblo/domain/site/schema";
-import { PublicBoardApp } from "@feeblo/public-feature-board";
 import {
   changelogJsonLd,
   postJsonLd,
@@ -10,6 +9,7 @@ import {
   type JsonLdNode,
 } from "@feeblo/web-shared/json-ld";
 import { resolveSite } from "~/lib/site";
+import { PublicBoardIsland } from "../../public-board/public-board-island";
 import PublicBoardLayout from "../../layouts/PublicBoardLayout.astro";
 
 export const prerender = false;
@@ -191,6 +191,6 @@ if (post) {
   title={pageTitle}
 >
   <main>
-    <PublicBoardApp client:only="react" site={site} />
+    <PublicBoardIsland client:only="react" site={site} />
   </main>
 </PublicBoardLayout>

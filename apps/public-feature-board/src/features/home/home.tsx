@@ -19,6 +19,7 @@ import {
   FeedbackBrowseLayoutMain,
 } from "../../components/layout/feedback-browse-layout";
 import { formatPostStatus } from "../../lib/utils";
+import { m } from "../../paraglide/messages.js";
 import { HomeBoardSelect } from "./components/board-select";
 import { HomeFilterList } from "./components/filter-list";
 import { HomeGiveFeedbackButton } from "./components/give-feedback-button";
@@ -51,7 +52,9 @@ function HomeTitle() {
 
   return (
     <CardTitle className="hidden px-1 sm:block">
-      {state.selectedBoard === "all" ? "All feedback" : state.activeBoardLabel}
+      {state.selectedBoard === "all"
+        ? m.muddy_bad_midge()
+        : state.activeBoardLabel}
     </CardTitle>
   );
 }
@@ -100,14 +103,12 @@ function HomeList() {
             <Empty>
               <EmptyHeader>
                 <EmptyTitle>
-                  {normalizedSearch
-                    ? "No feedback matches your search"
-                    : "No matching feedback"}
+                  {normalizedSearch ? m.salty_salty_coyote() : m.fair_mad_fox()}
                 </EmptyTitle>
                 <EmptyDescription>
                   {normalizedSearch
-                    ? "Try a different search term."
-                    : "Try another status or board to see more public posts."}
+                    ? m.yummy_mellow_quail()
+                    : m.fine_basic_parrot()}
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -158,7 +159,7 @@ function HomeStatusFilters() {
       items={state.statusItems}
       onSelect={(value) => actions.updateFilters({ status: value })}
       selectedValue={state.selectedStatus}
-      title="Status"
+      title={m.orange_ornate_spider()}
     />
   );
 }
@@ -171,7 +172,7 @@ function HomeBoardFilters() {
       items={state.boardItems}
       onSelect={(value) => actions.updateFilters({ board: value })}
       selectedValue={state.selectedBoard}
-      title="Boards"
+      title={m.weary_gray_oryx()}
     />
   );
 }
@@ -237,10 +238,8 @@ function HomeError() {
     <HomeLayout>
       <Empty className="border">
         <EmptyHeader>
-          <EmptyTitle>Feedback unavailable</EmptyTitle>
-          <EmptyDescription>
-            There was a problem loading feedback.
-          </EmptyDescription>
+          <EmptyTitle>{m.mean_flaky_guppy()}</EmptyTitle>
+          <EmptyDescription>{m.day_just_bobcat()}</EmptyDescription>
         </EmptyHeader>
       </Empty>
     </HomeLayout>

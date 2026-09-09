@@ -2,6 +2,7 @@ import { Button } from "@feeblo/ui/button";
 import { ChatFeedback01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
+import { m } from "../../../paraglide/messages.js";
 import { useHome } from "../home-context";
 
 export function HomeGiveFeedbackButton() {
@@ -14,7 +15,7 @@ export function HomeGiveFeedbackButton() {
       variant="brand"
     >
       <HugeiconsIcon icon={ChatFeedback01Icon} />
-      <span className="hidden sm:inline">Give Feedback</span>
+      <span className="hidden sm:inline">{m.proud_honest_flamingo()}</span>
     </Button>
   );
 }

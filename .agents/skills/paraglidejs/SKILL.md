@@ -169,8 +169,7 @@ export function SaveButton(props: { label: LocalizedString }) {
 
 ## This repo (Astro)
 
-- Config: `apps/web/astro.config.mjs` uses `paraglideVitePlugin({project:"./project.inlang", outdir:"./src/paraglide", strategy:["cookie","baseLocale"]})`. Middleware: `apps/web/src/middleware.ts` uses `paraglideMiddleware`.
-- Generated output `apps/web/src/paraglide/` is git-ignored build artifact. Never hand-edit. Edit `messages/*.json` then rebuild.
-- Check types runs `pnpm build:paraglide && astro check`.
-- Machine translate: `pnpm --filter web machine-translate` (inlang machine translate).
-- `apps/web` owns i18n: `project.inlang/`, `messages/`, `src/paraglide/`, strategy `["cookie","baseLocale"]`. `@feeblo/public-feature-board` is a shared UI package rendered inside Astro (`src/pages/s/[...subDomain].astro` via `<PublicBoardApp client:only="react" />`): give it no strategy, pass translated strings as props.
+- Dashboard (`apps/web`): `apps/web/astro.config.mjs` uses `paraglideVitePlugin({project:"./project.inlang", outdir:"./src/paraglide", strategy:["cookie","baseLocale"]})`. Middleware: `apps/web/src/middleware.ts` uses `paraglideMiddleware`. Generated output `apps/web/src/paraglide/` is a git-ignored build artifact — never hand-edit. Import via `@/paraglide/*`. Check types runs `pnpm build:paraglide && astro check`. Machine translate: `pnpm --filter web machine-translate`.
+- Public board (`apps/public-feature-board`): owns its own catalog (`project.inlang/`, `messages/`, git-ignored `src/paraglide/`) because it renders too much copy to thread through props. Compile with `--strategy baseLocale --emit-ts-declarations` (`pnpm --filter @feeblo/public-feature-board build:paraglide`; its `dev` watches). Import messages relatively (`../paraglide/messages.js`). The package must never read cookies/URL itself: the host injects its runtime via `initPublicBoardI18n({ getLocale, setLocale })` (`src/i18n.ts`) from `apps/web/src/public-board/public-board-island.tsx`, which wraps `<PublicBoardApp client:only="react" />` once before render. Locale changes flow through the host's cookie strategy.
+- Turbo: `build:paraglide` is a task with `outputs: ["src/paraglide/**"]`; `check-types` depends on `build:paraglide` + `^build:paraglide` so generated types exist before `tsc`/`astro check` and `apps/web` waits for the board's compile. `pnpm dev:web` runs both dev watchers.
+- New keys: generate with `@inlang/sdk`'s `humanId()` (slice to 3 words to match the existing catalog), never a hand-rolled word list. Brand names stay hardcoded.

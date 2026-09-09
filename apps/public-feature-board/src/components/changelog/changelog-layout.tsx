@@ -1,17 +1,30 @@
 import { cn } from "@feeblo/ui/utils";
 import type { HTMLAttributes, ReactNode } from "react";
 
+import { getLocale } from "../../paraglide/runtime.js";
 import {
   FeedbackBrowseLayout,
   FeedbackBrowseLayoutContent,
   FeedbackBrowseLayoutMain,
 } from "../layout/feedback-browse-layout";
 
-const changelogDateFormatter = new Intl.DateTimeFormat(undefined, {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
+const changelogDateFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function getChangelogDateFormatter() {
+  const locale = getLocale();
+  let formatter = changelogDateFormatters.get(locale);
+
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    changelogDateFormatters.set(locale, formatter);
+  }
+
+  return formatter;
+}
 
 export function ChangelogPageLayout({ children }: { children: ReactNode }) {
   return (
@@ -89,5 +102,5 @@ export function ChangelogTimelineBody({
 }
 
 export function formatChangelogDate(value: Date) {
-  return changelogDateFormatter.format(value);
+  return getChangelogDateFormatter().format(value);
 }

@@ -22,6 +22,7 @@ import {
 } from "../components/changelog/changelog-layout";
 import { ChangelogSubscribeButton } from "../components/changelog/changelog-subscribe-button";
 import { formatPostStatus } from "../lib/utils";
+import { m } from "../paraglide/messages.js";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
@@ -108,7 +109,7 @@ export function ChangeLogDetailPage() {
   );
 
   if (isLoading) {
-    return <ChangelogPageLayout>Loading changelog...</ChangelogPageLayout>;
+    return <ChangelogPageLayout>{m.quick_tidy_javelina()}</ChangelogPageLayout>;
   }
 
   if (isError) {
@@ -116,10 +117,8 @@ export function ChangeLogDetailPage() {
       <ChangelogPageLayout>
         <Empty>
           <EmptyHeader>
-            <EmptyTitle>Changelog unavailable</EmptyTitle>
-            <EmptyDescription>
-              There was a problem loading this published changelog.
-            </EmptyDescription>
+            <EmptyTitle>{m.cute_dull_panda()}</EmptyTitle>
+            <EmptyDescription>{m.mealy_steep_squid()}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       </ChangelogPageLayout>
@@ -131,10 +130,8 @@ export function ChangeLogDetailPage() {
       <ChangelogPageLayout>
         <Empty>
           <EmptyHeader>
-            <EmptyTitle>Changelog not found</EmptyTitle>
-            <EmptyDescription>
-              This published changelog entry does not exist anymore.
-            </EmptyDescription>
+            <EmptyTitle>{m.least_inclusive_kangaroo()}</EmptyTitle>
+            <EmptyDescription>{m.grand_grassy_anteater()}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       </ChangelogPageLayout>
@@ -153,7 +150,7 @@ export function ChangeLogDetailPage() {
             to="/changelog"
           >
             <HugeiconsIcon icon={ArrowLeft01Icon} />
-            Back
+            {m.polite_level_octopus()}
           </Link>
         </ChangelogStickyRail>
 
@@ -179,7 +176,9 @@ export function ChangeLogDetailPage() {
                 {changelog.title}
               </h1>
               <p className="text-muted-foreground text-sm">
-                Published by {changelog.user.name ?? "Anonymous"}
+                {m.crazy_gross_emu({
+                  name: changelog.user.name ?? m.even_giant_beaver(),
+                })}
               </p>
             </div>
           </header>
@@ -190,11 +189,11 @@ export function ChangeLogDetailPage() {
 
           {isLinkedPostsError ? (
             <p className="text-muted-foreground text-sm">
-              Linked posts are unavailable.
+              {m.sour_topical_niklas()}
             </p>
           ) : isLinkedPostsLoading ? (
             <p className="text-muted-foreground text-sm">
-              Loading linked posts...
+              {m.yummy_civil_kangaroo()}
             </p>
           ) : linkedPosts.length > 0 ? (
             <section
@@ -205,7 +204,7 @@ export function ChangeLogDetailPage() {
                 className="text-xl font-semibold tracking-tight"
                 id="linked-posts-heading"
               >
-                Linked posts
+                {m.away_blue_mink()}
               </h2>
               <div className="divide-y rounded-xl border">
                 {linkedPosts.map((post) => (

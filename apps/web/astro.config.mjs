@@ -27,6 +27,7 @@ const widgetIconsDir = fileURLToPath(
 
 const reactRoutes = [
   "**/dashboard/**",
+  "**/public-board/**",
   "**/public-feature-board/**",
   "**/@feeblo/public-feature-board/**",
 ];

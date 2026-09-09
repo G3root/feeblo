@@ -11,6 +11,7 @@ import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useRef } from "react";
 
 import { publicChangelogSubscriptionCollection } from "../../lib/collections";
+import { m } from "../../paraglide/messages.js";
 import { useSite } from "../../providers/site-provider";
 
 const ANCHORED_SUBSCRIBE_TOAST_ID = "changelog-subscribe";
@@ -119,14 +120,12 @@ export function ChangelogSubscribeButton() {
             sideOffset: 8,
           },
           timeout: 2000,
-          title: isSubscribed
-            ? "Unsubscribed from the changelog!"
-            : "Subscribed to the changelog!",
+          title: isSubscribed ? m.trick_teary_panther() : m.drab_teary_boar(),
         });
       }
     } catch {
       toastManager.add({
-        title: "Failed to update subscription",
+        title: m.slimy_main_crossbill(),
         type: "error",
       });
     } finally {
@@ -134,7 +133,7 @@ export function ChangelogSubscribeButton() {
     }
   };
 
-  const label = isSubscribed ? "Unsubscribe" : "Subscribe";
+  const label = isSubscribed ? m.only_basic_kangaroo() : m.alert_muddy_hawk();
 
   return (
     <Button

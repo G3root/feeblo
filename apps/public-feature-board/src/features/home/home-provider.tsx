@@ -22,6 +22,7 @@ import {
 
 import { useHomePageFilters } from "../../hooks/use-home-page-filters";
 import { formatPostStatus } from "../../lib/utils";
+import { m } from "../../paraglide/messages.js";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
 import {
@@ -235,7 +236,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     const totalPosts = statusCounts.reduce((sum, s) => sum + s.count, 0);
 
     return [
-      { count: totalPosts, label: "All statuses", value: "all" },
+      { count: totalPosts, label: m.curly_many_badger(), value: "all" },
       ...statuses.map((status) => ({
         count: countMap.get(status.id) ?? 0,
         label: status.label || formatPostStatus(status.type),
@@ -259,7 +260,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     const totalPosts = boardCounts.reduce((sum, b) => sum + b.count, 0);
 
     return [
-      { count: totalPosts, label: "All boards", value: "all" },
+      { count: totalPosts, label: m.spry_male_nils(), value: "all" },
       ...boards.map((board) => ({
         count: countMap.get(board.slug) ?? 0,
         label: board.name,
@@ -270,7 +271,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
 
   const activeBoardLabel =
     boardItems.find((item) => item.value === selectedBoard)?.label ??
-    "All boards";
+    m.spry_male_nils();
   const activeBoardId =
     selectedBoard === "all"
       ? ""

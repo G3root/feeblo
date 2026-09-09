@@ -1,10 +1,13 @@
 import type { HomePageSortOption } from "../../../hooks/use-home-page-filters";
+import { m } from "../../../paraglide/messages.js";
 
-export const SORT_ITEMS: Array<{
+export function getSortItems(): Array<{
   label: string;
   value: HomePageSortOption;
-}> = [
-  { label: "Most upvoted", value: "upvotes" },
-  { label: "Newest", value: "newest" },
-  { label: "Oldest", value: "oldest" },
-];
+}> {
+  return [
+    { label: m.just_frail_thrush(), value: "upvotes" },
+    { label: m.direct_heavy_cat(), value: "newest" },
+    { label: m.bright_quaint_cougar(), value: "oldest" },
+  ];
+}
