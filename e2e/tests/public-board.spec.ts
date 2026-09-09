@@ -372,3 +372,32 @@ test(
     }
   }
 );
+
+test("the board document language follows the locale cookie before hydration", async ({
+  browser,
+  page,
+}) => {
+  const user = createTestUser();
+  await createAuthenticatedWorkspace(page, user);
+
+  const boardUrl = publicBoardUrl(user.workspaceName);
+  const visitorContext = await browser.newContext();
+  await visitorContext.addCookies([
+    { name: "PARAGLIDE_LOCALE", value: "de", url: boardUrl },
+  ]);
+  const visitorPage = await visitorContext.newPage();
+
+  try {
+    // `<html lang dir>` is written both by the inline head script and, after
+    // hydration, by the island. Blocking the island's JS proves the inline
+    // script applied the cookie locale before first paint instead of flipping
+    // it once the SPA boots.
+    await visitorPage.route("**/*.js", (route) => route.abort());
+    await visitorPage.goto(boardUrl, { waitUntil: "domcontentloaded" });
+
+    await expect(visitorPage.locator("html")).toHaveAttribute("lang", "de");
+    await expect(visitorPage.locator("html")).toHaveAttribute("dir", "ltr");
+  } finally {
+    await visitorContext.close();
+  }
+});

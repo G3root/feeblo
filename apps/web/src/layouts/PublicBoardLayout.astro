@@ -9,6 +9,7 @@ import {
 } from "../dashboard/lib/server-runtime-public-env";
 import CommonHead from "./CommonHead.astro";
 import EnvScript from "./EnvScript.astro";
+import LocaleScript from "./LocaleScript.astro";
 import ThemeScript from "./ThemeScript.astro";
 
 interface Props {
@@ -44,6 +45,10 @@ const canonicalUrl =
 const ogImageUrl = new URL("/og-image", getServerRuntimePublicEnv().apiUrl);
 ogImageUrl.searchParams.set("name", siteName);
 ogImageUrl.searchParams.set("site", subdomain);
+
+// The SSR document is CDN-cached locale-agnostically (`s-maxage=60`), so it
+// ships the base locale. `LocaleScript` re-applies `<html lang dir>` from the
+// locale cookie before the body parses, so there is no post-hydration flip.
 ---
 
 <!doctype html>
@@ -77,6 +82,7 @@ ogImageUrl.searchParams.set("site", subdomain);
   }
   <EnvScript organizationId={organizationId} />
   <ThemeScript />
+  <LocaleScript />
   <body>
     <slot />
   </body>

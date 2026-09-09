@@ -28,7 +28,8 @@ const localeLabels = {
  * Locale picker for the public board. `setLocale` is the host runtime
  * injected by the island wrapper: it writes the locale cookie and reloads the
  * document, so the board and the shared post UI re-render in the new locale
- * together (and the island re-syncs `<html lang dir>`).
+ * together (and the inline locale script re-applies `<html lang dir>` before
+ * the new document paints).
  */
 export function LocaleSwitcher() {
   const currentLocale = getLocale();
