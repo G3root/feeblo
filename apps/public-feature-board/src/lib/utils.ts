@@ -15,7 +15,7 @@ const postStatusMessages = {
 } satisfies Record<TPostStatusType, () => string>;
 
 function isPostStatusType(value: string): value is TPostStatusType {
-  return value in postStatusMessages;
+  return Object.hasOwn(postStatusMessages, value);
 }
 
 export function formatPostStatus(status: string) {
