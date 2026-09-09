@@ -1,5 +1,5 @@
 import { useDebouncedCallback } from "@tanstack/react-pacer";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Input, type InputProps } from "./input";
 import { InputGroupInput } from "./input-group";
@@ -20,12 +20,49 @@ const useDebounce = ({
   wait: number;
 }) => {
   const [localValue, setLocalValue] = useState(value);
+  const [prevValue, setPrevValue] = useState(value);
 
-  useEffect(() => {
+  // Sync external value changes during render, not in an effect: avoids an
+  // extra commit per parent update and never clobbers in-flight typing with
+  // a stale parent value arriving mid-debounce.
+  if (prevValue !== value) {
+    setPrevValue(value);
     setLocalValue(value ?? "");
+  }
+
+  // Ref seam: the debounced fn outlives the render that created it, so it
+  // must invoke the latest `onChange` without resubscribing every render.
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+
+  // Generation invalidates pending debounced calls when the controlled
+  // value changes externally: typing "ab" then receiving value "reset"
+  // must not later emit stale "ab".
+  const generationRef = useRef(0);
+  const prevExternalRef = useRef(value);
+  useEffect(() => {
+    if (prevExternalRef.current !== value) {
+      prevExternalRef.current = value;
+      generationRef.current += 1;
+    }
   }, [value]);
 
-  const emitDebounced = useDebouncedCallback(onChange, { wait });
+  const emitDebouncedRaw = useDebouncedCallback(
+    (next: string, gen: number) => {
+      if (gen === generationRef.current) {
+        onChangeRef.current(next);
+      }
+    },
+    { wait }
+  );
+  const emitDebounced = useCallback(
+    (next: string) => {
+      emitDebouncedRaw(next, generationRef.current);
+    },
+    [emitDebouncedRaw]
+  );
 
   return { emitDebounced, setLocalValue, localValue };
 };

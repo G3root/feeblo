@@ -41,6 +41,7 @@ import {
   boardCollection,
   commentCollection,
   commentReactionCollection,
+  deleteEligibilityCollection,
   postCollection,
   postDetailCollection,
   postReactionCollection,
@@ -130,6 +131,7 @@ export const Route = createFileRoute(
 
     await Promise.all([
       boardCollection.preload(),
+      deleteEligibilityCollection.preload(),
       postCollection.preload(),
       postStatusCollection.preload(),
       postTagCollection.preload(),

@@ -1,5 +1,6 @@
 import { KeyboardSensor, PointerSensor } from "@dnd-kit/dom";
 import { type DragDropEventHandlers, DragDropProvider } from "@dnd-kit/react";
+import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
@@ -10,6 +11,8 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
 import { BoardGridLaneColumn } from "./board-grid-lane-column";
 import { BoardGridPostCard } from "./board-grid-post-card";
 import type { BoardPostLane } from "./types";
+
+const GRID_PAGE_SIZE = 100;
 
 const sensors = [
   PointerSensor.configure({
@@ -58,12 +61,12 @@ function movePostToColumn(
       return {
         ...lane,
         posts: [
-          ...lane.posts,
           {
             ...movedPost,
             status: toLane.status,
             statusId: toLane.statusId,
           },
+          ...lane.posts,
         ],
       };
     }
@@ -97,6 +100,12 @@ export function BoardGridView({
     setItems(groupedPosts);
   }
 
+  // Grid lanes paginate instead of virtualizing: cards are dnd-kit
+  // sortables, and unmounting drag sources mid-scroll needs a feel-check
+  // before windowing. Paging caps the DOM with zero drag interaction risk.
+  const [visibleCounts, setVisibleCounts] = useState<
+    Readonly<Record<string, number>>
+  >({});
   const [initialSnapshot] = useState(() => items);
   const snapshot = useRef(initialSnapshot);
   const activeDrag = useRef<{
@@ -226,6 +235,9 @@ export function BoardGridView({
             const column = lane.status;
             const rows = lane.posts;
             const laneId = `${boardId ?? organizationId}:${columnIndex}`;
+            const visibleCount = visibleCounts[lane.statusId] ?? GRID_PAGE_SIZE;
+            const visibleRows = rows.slice(0, visibleCount);
+            const remainingCount = rows.length - visibleRows.length;
             return (
               <BoardGridLaneColumn
                 boardId={boardId}
@@ -237,7 +249,7 @@ export function BoardGridView({
                 statusId={lane.statusId}
                 totalPosts={rows.length}
               >
-                {rows.map((post, postIndex) => (
+                {visibleRows.map((post, postIndex) => (
                   <BoardGridPostCard
                     column={column}
                     id={post.id}
@@ -248,6 +260,22 @@ export function BoardGridView({
                     statusId={post.statusId}
                   />
                 ))}
+                {remainingCount > 0 ? (
+                  <Button
+                    onClick={() =>
+                      setVisibleCounts((current) => ({
+                        ...current,
+                        [lane.statusId]:
+                          (current[lane.statusId] ?? GRID_PAGE_SIZE) +
+                          GRID_PAGE_SIZE,
+                      }))
+                    }
+                    size="sm"
+                    variant="ghost"
+                  >
+                    Show {Math.min(remainingCount, GRID_PAGE_SIZE)} more
+                  </Button>
+                ) : null}
               </BoardGridLaneColumn>
             );
           })}

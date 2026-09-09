@@ -1,4 +1,5 @@
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
+import { useCallback } from "react";
 
 export type HomePageSortOption = "upvotes" | "newest" | "oldest";
 type FilterValue = "all" | string;
@@ -45,35 +46,40 @@ export function useHomePageFilters({
       ? selectedBoardFromUrl
       : "all";
 
-  const updateFilters = ({
-    board = selectedBoard,
-    sort = sortBy,
-    status = selectedStatus,
-  }: {
-    board?: FilterValue;
-    sort?: HomePageSortOption;
-    status?: FilterValue;
-  }) => {
-    const nextSearch: Record<string, string | undefined> = {};
+  // Stable identity: `HomeProvider` memoizes its context value on this, so a
+  // new closure per render would re-render every consumer on each keystroke.
+  const updateFilters = useCallback(
+    ({
+      board = selectedBoard,
+      sort = sortBy,
+      status = selectedStatus,
+    }: {
+      board?: FilterValue;
+      sort?: HomePageSortOption;
+      status?: FilterValue;
+    }) => {
+      const nextSearch: Record<string, string | undefined> = {};
 
-    if (status !== "all") {
-      nextSearch.status = status;
-    }
+      if (status !== "all") {
+        nextSearch.status = status;
+      }
 
-    if (board !== "all") {
-      nextSearch.board = board;
-    }
+      if (board !== "all") {
+        nextSearch.board = board;
+      }
 
-    if (sort !== "newest") {
-      nextSearch.sort = sort;
-    }
+      if (sort !== "newest") {
+        nextSearch.sort = sort;
+      }
 
-    navigate({
-      to: "/",
-      search: nextSearch,
-      replace: true,
-    });
-  };
+      navigate({
+        to: "/",
+        search: nextSearch,
+        replace: true,
+      });
+    },
+    [navigate, selectedBoard, selectedStatus, sortBy]
+  );
 
   return {
     selectedBoard,

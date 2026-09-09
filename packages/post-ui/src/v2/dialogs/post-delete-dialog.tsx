@@ -10,6 +10,7 @@ import {
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { and, eq, queryOnce } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 
@@ -18,7 +19,7 @@ import { usePostCollections } from "../providers/post-collections-provider";
 
 export function PostDeleteDialog() {
   const store = usePostDeleteDialogContext();
-  const { collections } = usePostCollections();
+  const { collections, organizationId } = usePostCollections();
   const open = useSelector(store, (state) => state.context.open);
   const navigate = useNavigate();
   return (
@@ -41,6 +42,39 @@ export function PostDeleteDialog() {
                 const id = store.get().context.data.postId;
                 const redirectOptions =
                   store.get().context.data.redirectOptions;
+
+                // Revalidate at confirm time without subscribing: a post
+                // engaged after the affordance rendered must not be fired.
+                // Hosts without the collection skip the check; the backend
+                // remains authoritative either way.
+                if (collections.deleteEligibilityCollection) {
+                  const { deleteEligibilityCollection } = collections;
+                  const fresh = await queryOnce((q) =>
+                    q
+                      .from({ eligibility: deleteEligibilityCollection })
+                      .where(({ eligibility }) =>
+                        and(
+                          eq(eligibility.organizationId, organizationId),
+                          eq(eligibility.postId, id)
+                        )
+                      )
+                      .select(({ eligibility }) => ({
+                        postId: eligibility.postId,
+                      }))
+                  );
+                  if (fresh.length === 0) {
+                    trackEvent("post_deleted", {
+                      mode: "single",
+                      success: false,
+                    });
+                    toastManager.add({
+                      title: "This post can no longer be deleted.",
+                      type: "error",
+                    });
+                    store.send({ type: "toggle" });
+                    return;
+                  }
+                }
 
                 const tx = collections.postCollection.delete(id, {
                   optimistic: false,

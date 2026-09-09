@@ -45,6 +45,7 @@ import {
   boardCollection,
   commentCollection,
   commentReactionCollection,
+  deleteEligibilityCollection,
   membersCollection,
   postCollection,
   postDetailCollection,
@@ -92,6 +93,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         collections={{
           boardCollection,
           commentCollection,
+          deleteEligibilityCollection,
           membersCollection,
           postCollection,
           postDetailCollection,

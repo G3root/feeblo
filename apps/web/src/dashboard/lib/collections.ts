@@ -131,6 +131,7 @@ export const postCollection = createCollection(
           organizationId: deletedPost.organizationId,
         })
       );
+      await deleteEligibilityCollection.utils.refetch();
     },
   })
 );
@@ -185,6 +186,16 @@ postCollection.createIndex((row) => row.statusId, {
   indexType: BasicIndex,
 });
 
+// Board queries filter by organization (and board) on every navigation;
+// without these the live query scans the full overfetched collection.
+postCollection.createIndex((row) => row.organizationId, {
+  indexType: BasicIndex,
+});
+
+postCollection.createIndex((row) => row.boardId, {
+  indexType: BasicIndex,
+});
+
 export const postStatusCollection = createCollection(
   queryCollectionOptions({
     queryKey: () => organizationScopedQueryKey("post-status"),
@@ -208,6 +219,10 @@ export const postStatusCollection = createCollection(
     getKey: (item) => item.id,
   })
 );
+
+postStatusCollection.createIndex((row) => row.organizationId, {
+  indexType: BasicIndex,
+});
 
 export const changelogCollection = createCollection(
   queryCollectionOptions({
@@ -496,6 +511,10 @@ export const boardCollection = createCollection(
   })
 );
 
+boardCollection.createIndex((row) => row.organizationId, {
+  indexType: BasicIndex,
+});
+
 export const tagCollection = createCollection(
   queryCollectionOptions({
     queryKey: () => organizationScopedQueryKey("tag"),
@@ -553,6 +572,10 @@ export const tagCollection = createCollection(
   })
 );
 
+tagCollection.createIndex((row) => row.organizationId, {
+  indexType: BasicIndex,
+});
+
 export const postTagCollection = createCollection(
   queryCollectionOptions({
     queryKey: () => organizationScopedQueryKey("post-tag"),
@@ -577,6 +600,19 @@ export const postTagCollection = createCollection(
     getKey: (item) => item.id,
   })
 );
+
+// Tag-filter queries hit all three axes (org scope, post join, tag match).
+postTagCollection.createIndex((row) => row.organizationId, {
+  indexType: BasicIndex,
+});
+
+postTagCollection.createIndex((row) => row.postId, {
+  indexType: BasicIndex,
+});
+
+postTagCollection.createIndex((row) => row.tagId, {
+  indexType: BasicIndex,
+});
 
 export const membershipCollection = createCollection(
   queryCollectionOptions({
@@ -748,6 +784,7 @@ export const commentCollection = createCollection(
 
       await postActivityCollection.utils.refetch();
       await postCollection.utils.refetch();
+      await deleteEligibilityCollection.utils.refetch();
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -765,6 +802,7 @@ export const commentCollection = createCollection(
 
       await postActivityCollection.utils.refetch();
       await postCollection.utils.refetch();
+      await deleteEligibilityCollection.utils.refetch();
     },
     onUpdate: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -835,7 +873,14 @@ export const postActivityCollection = createCollection(
       for (const activity of changes) {
         merged.set(activity.id, activity);
       }
-      return [...merged.values()];
+      // Preserve the full merged history: the timeline renders every activity
+      // and `since` only moves forward, so dropping entries would make that
+      // history permanently unreachable (the backend offers no backfill for
+      // older-than-window rows).
+      const ordered = [...merged.values()].sort(
+        (left, right) => +left.createdAt - +right.createdAt
+      );
+      return ordered;
     },
     queryClient,
     getKey: (item) => item.id,
@@ -935,6 +980,7 @@ export const upvoteCollection = createCollection(
         })
       );
       await postCollection.utils.refetch();
+      await deleteEligibilityCollection.utils.refetch();
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -947,9 +993,55 @@ export const upvoteCollection = createCollection(
         })
       );
       await postCollection.utils.refetch();
+      await deleteEligibilityCollection.utils.refetch();
     },
   })
 );
+
+// Upvote counts are derived per post on every board render; index both the
+// org-scoped subscription filter and the per-post aggregation key.
+upvoteCollection.createIndex((row) => row.organizationId, {
+  indexType: BasicIndex,
+});
+
+upvoteCollection.createIndex((row) => row.postId, {
+  indexType: BasicIndex,
+});
+
+/**
+ * Creator delete hints for the whole organization, synced once. List rows
+ * carry no delete hint (per-row probes on every list fetch); contributor
+ * affordances derive from this small set client-side instead, and the
+ * backend delete path re-validates. Presence of a row means eligible.
+ * Refetch after engagement mutations (see the call sites below).
+ */
+export const deleteEligibilityCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () => organizationScopedQueryKey("delete-eligibility"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const result = await fetchRpc(
+        (rpc) => rpc.PostDeleteEligibilityList({ organizationId }),
+        { signal: ctx.signal }
+      );
+      return result.eligibleIds.map((postId) => ({
+        organizationId,
+        postId,
+      }));
+    },
+    queryClient,
+    getKey: (item) => item.postId,
+  })
+);
+
+deleteEligibilityCollection.createIndex((row) => row.postId, {
+  indexType: BasicIndex,
+});
 
 export const postReactionCollection = createCollection(
   queryCollectionOptions({
@@ -1608,6 +1700,7 @@ export const dashboardCollections = {
   commentCollection,
   commentReactionCollection,
   companyCollection,
+  deleteEligibilityCollection,
   companyAttributeDefinitionCollection,
   companyAttributeValueCollection,
   contactAttributeDefinitionCollection,

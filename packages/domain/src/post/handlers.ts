@@ -3,7 +3,7 @@ import { type LegidOf, PostStatusId } from "@feeblo/id";
 import * as Permissions from "@feeblo/permissions";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -64,6 +64,8 @@ import type {
   TPostAdminUpdate,
   TPostCreate,
   TPostDelete,
+  TPostDeleteEligibilityList,
+  TPostDeleteEligibilityListPublic,
   TPostGet,
   TPostList,
   TPostMerge,
@@ -326,20 +328,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           yield* activityRepository.createMany(activities);
           let createdOutboxId: string | undefined;
           if (previous.statusId !== args.statusId) {
-            const postRows = yield* db
-              .select({ slug: schema.postTable.slug })
-              .from(schema.postTable)
-              .where(
-                and(
-                  eq(schema.postTable.id, args.id),
-                  eq(schema.postTable.organizationId, args.organizationId)
-                )
-              )
-              .limit(1);
-            const postSlug = postRows[0]?.slug;
-            if (!postSlug) {
-              return yield* new FailedToUpdatePostError();
-            }
+            // `slug` rides on the locked `findActivityState` row above
+            // instead of a second SELECT inside the transaction.
+            const postSlug = previous.slug;
             yield* recordPostIntegrationEvent({
               actorMemberId: membership?.membershipId ?? null,
               actorName: membership ? session.user.name : undefined,
@@ -918,17 +909,18 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
   return {
     PostList: (args: TPostList) => {
-      return Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        return yield* repository.findMany({
+      // No per-row delete hints here: `canDeleteAsCreator` probes cost two
+      // anti-joins per list fetch while only the caller's own rows can be
+      // true. Affordances resolve it on demand via PostDeleteEligibility.
+      return repository
+        .findMany({
           organizationId: args.organizationId,
           boardId: args.boardId,
-          userId: session.session.userId,
-        });
-      }).pipe(
-        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-        withRemapDbErrors("Post", "select")
-      );
+        })
+        .pipe(
+          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          withRemapDbErrors("Post", "select")
+        );
     },
 
     PostListPublic: (args: TPostList) => {
@@ -944,7 +936,6 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         const posts = yield* repository.findManyPublic({
           organizationId: args.organizationId,
           boardId: args.boardId,
-          userId,
         });
         // Creator identifiers are PII (see `public-actor.ts`): keep them only
         // on the session user's own rows so "did I create this" still works.
@@ -960,11 +951,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
     PostGet: (args: TPostGet) => {
       return Effect.gen(function* () {
-        const session = yield* CurrentSession;
         const post = yield* repository.findBySlug({
           organizationId: args.organizationId,
           slug: args.slug,
-          userId: session.session.userId,
         });
         if (post === undefined) {
           return yield* new PostNotFoundError({
@@ -991,7 +980,6 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         const post = yield* repository.findPublicBySlug({
           organizationId: args.organizationId,
           slug: args.slug,
-          userId,
         });
         if (post === undefined) {
           return yield* new PostNotFoundError({
@@ -1068,6 +1056,38 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           })
         ),
         withRemapDbErrors("Post", "delete")
+      ),
+
+    PostDeleteEligibilityList: (args: TPostDeleteEligibilityList) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const rows = yield* repository.findDeletableIds({
+          organizationId: args.organizationId,
+          userId: session.session.userId,
+        });
+        return { eligibleIds: rows.map((row) => row.id) };
+      }).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Post", "select")
+      ),
+
+    PostDeleteEligibilityListPublic: (args: TPostDeleteEligibilityListPublic) =>
+      Effect.gen(function* () {
+        const sessionOption = yield* OptionalCurrentSession;
+        if (sessionOption._tag === "None") {
+          return { eligibleIds: [] };
+        }
+        const rows = yield* repository.findDeletableIds({
+          organizationId: args.organizationId,
+          userId: sessionOption.value.session.userId,
+        });
+        return { eligibleIds: rows.map((row) => row.id) };
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostDeleteEligibilityListPublic",
+          level: "read",
+        }),
+        withRemapDbErrors("Post", "select")
       ),
 
     PostUpdate: (args: TPostUpdate) =>

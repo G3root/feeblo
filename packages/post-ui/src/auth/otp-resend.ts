@@ -87,20 +87,36 @@ export function useOtpResend({
   onResend: () => Promise<ResendResult>;
   successMessage: string;
 }) {
+  const [expiresAt, setExpiresAt] = useState(
+    () => Date.now() + RESEND_COOLDOWN_SECONDS * 1000
+  );
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
   const [isResending, setIsResending] = useState(false);
 
+  // Single interval per cooldown cycle, derived from a wall-clock deadline:
+  // no chained re-subscribes, no drift under background throttling.
   useEffect(() => {
-    if (cooldown <= 0) {
+    if (expiresAt - Date.now() <= 0) {
+      setCooldown(0);
       return;
     }
-
-    const timer = window.setTimeout(() => {
-      setCooldown((current) => Math.max(0, current - 1));
+    const timer = window.setInterval(() => {
+      const remaining = Math.ceil((expiresAt - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setCooldown(0);
+        window.clearInterval(timer);
+      } else {
+        setCooldown(remaining);
+      }
     }, 1000);
 
-    return () => window.clearTimeout(timer);
-  }, [cooldown]);
+    return () => window.clearInterval(timer);
+  }, [expiresAt]);
+
+  const startCooldown = useCallback((seconds: number) => {
+    setExpiresAt(Date.now() + seconds * 1000);
+    setCooldown(seconds);
+  }, []);
 
   const resend = useCallback(async () => {
     setIsResending(true);
@@ -108,7 +124,7 @@ export function useOtpResend({
       const result = await onResend();
 
       if (result.success) {
-        setCooldown(RESEND_COOLDOWN_SECONDS);
+        startCooldown(RESEND_COOLDOWN_SECONDS);
         toastManager.add({
           title: successMessage,
           type: "success",
@@ -117,7 +133,7 @@ export function useOtpResend({
       }
 
       if (result.retryAfterSeconds !== undefined) {
-        setCooldown(result.retryAfterSeconds);
+        startCooldown(result.retryAfterSeconds);
       }
       toastManager.add({
         title: result.message ?? "Failed to send verification code",
@@ -134,7 +150,7 @@ export function useOtpResend({
     } finally {
       setIsResending(false);
     }
-  }, [onResend, successMessage]);
+  }, [onResend, startCooldown, successMessage]);
 
   return { cooldown, isResending, resend };
 }

@@ -21,7 +21,13 @@ import {
   eq,
   useLiveQuery,
 } from "@tanstack/react-db";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useState,
+} from "react";
 
 import { AuthorPicker } from "../author-picker/author-picker";
 import {
@@ -54,9 +60,13 @@ function SimilarPosts({
   const { getPostHref, suggestPosts } = usePostCollections();
   const [posts, setPosts] = useState<readonly TPost[]>([]);
   const [loading, setLoading] = useState(false);
+  // Defer the expensive inputs off the urgent typing path: the editor stays
+  // responsive while suggestions settle a beat behind.
+  const deferredTitle = useDeferredValue(title);
+  const deferredContent = useDeferredValue(content);
 
   useEffect(() => {
-    const normalizedTitle = title.trim();
+    const normalizedTitle = deferredTitle.trim();
     if (!suggestPosts || normalizedTitle.length < 3) {
       setPosts([]);
       setLoading(false);
@@ -71,7 +81,7 @@ function SimilarPosts({
     const timer = window.setTimeout(() => {
       suggestPosts({
         ...(boardId && { boardId }),
-        content,
+        content: deferredContent,
         signal: controller.signal,
         title: normalizedTitle,
       })
@@ -96,7 +106,7 @@ function SimilarPosts({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [boardId, content, suggestPosts, title]);
+  }, [boardId, deferredContent, suggestPosts, deferredTitle]);
 
   // Do not render an empty/loading panel. If the request returns no matches,
   // the suggestions area should stay absent instead of flashing briefly.
@@ -161,6 +171,7 @@ export function PostCreateForm() {
     usePostCollections();
   const {
     boardCollection,
+    deleteEligibilityCollection,
     membersCollection,
     postCollection,
     postStatusCollection,
@@ -265,6 +276,9 @@ export function PostCreateForm() {
       // dropped when the mutation settles, so refetch failures propagate
       // to the submit handler instead of being suppressed.
       await postCollection.utils.refetch();
+      // A new own post is immediately deletable: refresh the hint set so
+      // its detail affordance doesn't wait for the next sync.
+      await deleteEligibilityCollection?.utils.refetch();
       return canonicalSlug;
     },
   });

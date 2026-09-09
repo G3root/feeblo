@@ -7,6 +7,8 @@ import {
 import type { APIRoute } from "astro";
 import { getSecret } from "astro:env/server";
 
+import { resolveSite } from "~/lib/site";
+
 export const prerender = false;
 
 const xmlResponse = (body: string) =>
@@ -24,7 +26,7 @@ const xmlResponse = (body: string) =>
  * Sitemap protocol feed for the public board, served at
  * `https://<subdomain>.<root-domain>/sitemap.xml`.
  *
- * The middleware resolves `locals.site` from the request host; a request for
+ * The site resolves from the request host with a fresh lookup per request;
  * a host without a site is a 404. Sites flagged `noIndex` get an empty
  * urlset: robots.txt already tells crawlers to keep out, so no URLs are
  * advertised.
@@ -41,7 +43,13 @@ const xmlResponse = (body: string) =>
  * protocol's 50,000-URL cap.
  */
 export const GET: APIRoute = async ({ locals, url }) => {
-  const site = locals.site;
+  const { subdomain } = locals;
+  let site: TSite | null;
+  try {
+    site = subdomain ? await resolveSite(subdomain) : null;
+  } catch {
+    return new Response("Sitemap unavailable", { status: 502 });
+  }
 
   if (site === null) {
     return new Response("Not found", { status: 404 });
@@ -145,9 +153,11 @@ async function collectUrls(
   }
 
   // Deterministic order keeps `?page=N` slices stable across requests, so
-  // crawlers never see URLs migrate between sitemap pages.
+  // crawlers never see URLs migrate between sitemap pages. Code-unit
+  // comparison: slugs are ASCII, so `localeCompare`'s ICU collation only
+  // buys cost here (it dominates this endpoint's CPU on large boards).
   const sortedPosts = posts.toSorted((left, right) =>
-    left.slug.localeCompare(right.slug)
+    left.slug < right.slug ? -1 : left.slug > right.slug ? 1 : 0
   );
   for (const post of sortedPosts) {
     urls.push({

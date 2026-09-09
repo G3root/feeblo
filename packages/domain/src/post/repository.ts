@@ -15,6 +15,7 @@ import {
   type SQL,
   sql,
 } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -40,13 +41,16 @@ interface TPostUpdateInput {
 interface TPostFindMany {
   boardId?: string | null | undefined;
   organizationId: string;
-  userId?: string | null | undefined;
+}
+
+interface TPostFindDeletableIds {
+  organizationId: string;
+  userId: string;
 }
 
 interface TPostFindPublicBySlug {
   organizationId: string;
   slug: string;
-  userId?: string | null | undefined;
 }
 
 interface TPostDelete {
@@ -132,10 +136,7 @@ const getWhereClause = (where: SQL[]) =>
  * table: contact names are workspace-internal and must not leak onto
  * public boards.
  */
-const selectPostFields = (
-  userId?: string | null,
-  opts?: { contactFallback?: boolean }
-) => ({
+const selectPostFields = (opts?: { contactFallback?: boolean }) => ({
   id: schema.postTable.id,
   title: schema.postTable.title,
   boardId: schema.postTable.boardId,
@@ -166,25 +167,6 @@ const selectPostFields = (
   },
   creatorMemberId: schema.postTable.creatorMemberId,
   creatorId: schema.postTable.creatorId,
-  canDeleteAsCreator: userId
-    ? sql<boolean>`COALESCE(
-        (
-          ${schema.postTable.creatorId} = ${userId}
-          AND NOT EXISTS (
-            SELECT 1
-            FROM ${schema.commentTable}
-            WHERE ${schema.commentTable.postId} = ${schema.postTable.id}
-          )
-          AND NOT EXISTS (
-            SELECT 1
-            FROM ${schema.upvoteTable}
-            WHERE ${schema.upvoteTable.postId} = ${schema.postTable.id}
-              AND ${schema.upvoteTable.userId} <> ${userId}
-          )
-        ),
-        false
-      )`
-    : sql<boolean>`false`,
   metadata: schema.postTable.metadata,
   lockedAt: schema.postTable.lockedAt,
   archivedAt: schema.postTable.archivedAt,
@@ -192,14 +174,15 @@ const selectPostFields = (
   mergedAt: schema.postTable.mergedAt,
 });
 
-const selectPostListFields = (
-  userId?: string | null,
-  opts?: { contactFallback?: boolean }
-) => {
+const selectPostListFields = (opts?: { contactFallback?: boolean }) => {
   // Lists never render the full body (cards show `excerpt`; detail pages
   // resolve `content` through `PostGet`/`PostGetPublic`), so drop the
   // heaviest column while keeping every other list field identical.
-  const { content: _content, ...listFields } = selectPostFields(userId, opts);
+  // `canDeleteAsCreator` is dropped too: its two per-row NOT EXISTS probes
+  // ran on every list fetch for every row, yet only the session user's own
+  // rows can ever be true. Delete affordances resolve it on demand through
+  // `PostDeleteEligibility`/`PostDeleteEligibilityPublic` instead.
+  const { content: _content, ...listFields } = selectPostFields(opts);
   return listFields;
 };
 
@@ -214,9 +197,9 @@ const makePostRepository = Effect.gen(function* () {
      * members can open posts on private boards and moderators can review
      * archived content.
      */
-    findBySlug: ({ organizationId, slug, userId }: TPostFindPublicBySlug) =>
+    findBySlug: ({ organizationId, slug }: TPostFindPublicBySlug) =>
       db
-        .select(selectPostFields(userId, { contactFallback: true }))
+        .select(selectPostFields({ contactFallback: true }))
         .from(schema.postTable)
         .leftJoin(
           schema.userTable,
@@ -245,6 +228,7 @@ const makePostRepository = Effect.gen(function* () {
           creatorMemberId: schema.postTable.creatorMemberId,
           etaQuarter: schema.postTable.etaQuarter,
           lockedAt: schema.postTable.lockedAt,
+          slug: schema.postTable.slug,
           statusId: schema.postTable.statusId,
           title: schema.postTable.title,
         })
@@ -416,7 +400,42 @@ const makePostRepository = Effect.gen(function* () {
           )
         ),
 
-    findMany: ({ boardId, organizationId, userId }: TPostFindMany) => {
+    /**
+     * Creator-side delete hints for the whole organization: posts the user
+     * created that are still untouched (no comments, no foreign upvotes).
+     * One set-based lookup, overfetched client-side; the delete path
+     * re-validates per post with its board, so this stays a UI hint and
+     * skips board scoping.
+     */
+    findDeletableIds: ({ organizationId, userId }: TPostFindDeletableIds) =>
+      db
+        .select({ id: schema.postTable.id })
+        .from(schema.postTable)
+        .where(
+          and(
+            eq(schema.postTable.organizationId, organizationId),
+            eq(schema.postTable.creatorId, userId),
+            notExists(
+              db
+                .select({ id: schema.commentTable.id })
+                .from(schema.commentTable)
+                .where(eq(schema.commentTable.postId, schema.postTable.id))
+            ),
+            notExists(
+              db
+                .select({ id: schema.upvoteTable.id })
+                .from(schema.upvoteTable)
+                .where(
+                  and(
+                    eq(schema.upvoteTable.postId, schema.postTable.id),
+                    ne(schema.upvoteTable.userId, userId)
+                  )
+                )
+            )
+          )
+        ),
+
+    findMany: ({ boardId, organizationId }: TPostFindMany) => {
       const where: SQL[] = [];
       if (boardId) {
         where.push(eq(schema.postTable.boardId, boardId));
@@ -426,7 +445,7 @@ const makePostRepository = Effect.gen(function* () {
       const whereClause = getWhereClause(where);
 
       return db
-        .select(selectPostListFields(userId, { contactFallback: true }))
+        .select(selectPostListFields({ contactFallback: true }))
         .from(schema.postTable)
         .leftJoin(
           schema.userTable,
@@ -439,7 +458,7 @@ const makePostRepository = Effect.gen(function* () {
         .where(whereClause);
     },
 
-    findManyPublic: ({ boardId, organizationId, userId }: TPostFindMany) => {
+    findManyPublic: ({ boardId, organizationId }: TPostFindMany) => {
       const where: SQL[] = [
         eq(schema.postTable.organizationId, organizationId),
         // Superseded content stays queryable internally but must not remain
@@ -455,7 +474,7 @@ const makePostRepository = Effect.gen(function* () {
       const whereClause = and(...where);
 
       return db
-        .select(selectPostListFields(userId))
+        .select(selectPostListFields())
         .from(schema.postTable)
         .innerJoin(
           schema.boardTable,
@@ -473,11 +492,7 @@ const makePostRepository = Effect.gen(function* () {
      * (public boards only, no archived or merged posts) keyed by slug.
      * Resolves to `undefined` when no public post matches.
      */
-    findPublicBySlug: ({
-      organizationId,
-      slug,
-      userId,
-    }: TPostFindPublicBySlug) => {
+    findPublicBySlug: ({ organizationId, slug }: TPostFindPublicBySlug) => {
       const whereClause = and(
         eq(schema.postTable.organizationId, organizationId),
         eq(schema.postTable.slug, slug),
@@ -489,7 +504,7 @@ const makePostRepository = Effect.gen(function* () {
       );
 
       return db
-        .select(selectPostFields(userId))
+        .select(selectPostFields())
         .from(schema.postTable)
         .innerJoin(
           schema.boardTable,
@@ -968,109 +983,94 @@ const makePostRepository = Effect.gen(function* () {
             .set({ postId: targetPostId })
             .where(eq(schema.commentTable.postId, sourcePostId));
 
-          const upvotes = yield* tx
-            .select({
-              id: schema.upvoteTable.id,
-              userId: schema.upvoteTable.userId,
-            })
-            .from(schema.upvoteTable)
+          // Set-based reassignment: move every source row without a twin on
+          // the target, then drop the leftover twins. Previously one
+          // SELECT + UPDATE/DELETE per row (2n+1 round-trips holding the
+          // merge transaction open); now two statements per table.
+          // Twins are unique-keyed (upvote: user+post, reaction:
+          // user+post+emoji, tag: post+tag), so a moved row can never
+          // collide with a later one.
+          const targetUpvote = alias(schema.upvoteTable, "merge_target_upvote");
+          yield* tx
+            .update(schema.upvoteTable)
+            .set({ postId: targetPostId })
+            .where(
+              and(
+                eq(schema.upvoteTable.postId, sourcePostId),
+                notExists(
+                  tx
+                    .select({ id: targetUpvote.id })
+                    .from(targetUpvote)
+                    .where(
+                      and(
+                        eq(targetUpvote.postId, targetPostId),
+                        eq(targetUpvote.userId, schema.upvoteTable.userId)
+                      )
+                    )
+                )
+              )
+            );
+          yield* tx
+            .delete(schema.upvoteTable)
             .where(eq(schema.upvoteTable.postId, sourcePostId));
 
-          for (const upvote of upvotes) {
-            const existing = yield* tx
-              .select({ id: schema.upvoteTable.id })
-              .from(schema.upvoteTable)
-              .where(
-                and(
-                  eq(schema.upvoteTable.postId, targetPostId),
-                  eq(schema.upvoteTable.userId, upvote.userId)
+          const targetReaction = alias(
+            schema.postReactionTable,
+            "merge_target_reaction"
+          );
+          yield* tx
+            .update(schema.postReactionTable)
+            .set({ postId: targetPostId })
+            .where(
+              and(
+                eq(schema.postReactionTable.postId, sourcePostId),
+                notExists(
+                  tx
+                    .select({ id: targetReaction.id })
+                    .from(targetReaction)
+                    .where(
+                      and(
+                        eq(targetReaction.postId, targetPostId),
+                        eq(
+                          targetReaction.userId,
+                          schema.postReactionTable.userId
+                        ),
+                        eq(targetReaction.emoji, schema.postReactionTable.emoji)
+                      )
+                    )
                 )
               )
-              .limit(1)
-              .pipe(Effect.map(EffectArray.get(0)));
-
-            if (Option.isSome(existing)) {
-              yield* tx
-                .delete(schema.upvoteTable)
-                .where(eq(schema.upvoteTable.id, upvote.id));
-              continue;
-            }
-
-            yield* tx
-              .update(schema.upvoteTable)
-              .set({ postId: targetPostId })
-              .where(eq(schema.upvoteTable.id, upvote.id));
-          }
-
-          const reactions = yield* tx
-            .select({
-              emoji: schema.postReactionTable.emoji,
-              id: schema.postReactionTable.id,
-              userId: schema.postReactionTable.userId,
-            })
-            .from(schema.postReactionTable)
+            );
+          yield* tx
+            .delete(schema.postReactionTable)
             .where(eq(schema.postReactionTable.postId, sourcePostId));
 
-          for (const reaction of reactions) {
-            const existing = yield* tx
-              .select({ id: schema.postReactionTable.id })
-              .from(schema.postReactionTable)
-              .where(
-                and(
-                  eq(schema.postReactionTable.postId, targetPostId),
-                  eq(schema.postReactionTable.userId, reaction.userId),
-                  eq(schema.postReactionTable.emoji, reaction.emoji)
+          const targetPostTag = alias(
+            schema.postTagTable,
+            "merge_target_post_tag"
+          );
+          yield* tx
+            .update(schema.postTagTable)
+            .set({ postId: targetPostId })
+            .where(
+              and(
+                eq(schema.postTagTable.postId, sourcePostId),
+                notExists(
+                  tx
+                    .select({ id: targetPostTag.id })
+                    .from(targetPostTag)
+                    .where(
+                      and(
+                        eq(targetPostTag.postId, targetPostId),
+                        eq(targetPostTag.tagId, schema.postTagTable.tagId)
+                      )
+                    )
                 )
               )
-              .limit(1)
-              .pipe(Effect.map(EffectArray.get(0)));
-
-            if (Option.isSome(existing)) {
-              yield* tx
-                .delete(schema.postReactionTable)
-                .where(eq(schema.postReactionTable.id, reaction.id));
-              continue;
-            }
-
-            yield* tx
-              .update(schema.postReactionTable)
-              .set({ postId: targetPostId })
-              .where(eq(schema.postReactionTable.id, reaction.id));
-          }
-
-          const postTags = yield* tx
-            .select({
-              id: schema.postTagTable.id,
-              tagId: schema.postTagTable.tagId,
-            })
-            .from(schema.postTagTable)
+            );
+          yield* tx
+            .delete(schema.postTagTable)
             .where(eq(schema.postTagTable.postId, sourcePostId));
-
-          for (const postTag of postTags) {
-            const existing = yield* tx
-              .select({ id: schema.postTagTable.id })
-              .from(schema.postTagTable)
-              .where(
-                and(
-                  eq(schema.postTagTable.postId, targetPostId),
-                  eq(schema.postTagTable.tagId, postTag.tagId)
-                )
-              )
-              .limit(1)
-              .pipe(Effect.map(EffectArray.get(0)));
-
-            if (Option.isSome(existing)) {
-              yield* tx
-                .delete(schema.postTagTable)
-                .where(eq(schema.postTagTable.id, postTag.id));
-              continue;
-            }
-
-            yield* tx
-              .update(schema.postTagTable)
-              .set({ postId: targetPostId })
-              .where(eq(schema.postTagTable.id, postTag.id));
-          }
 
           yield* tx
             .update(schema.postTable)

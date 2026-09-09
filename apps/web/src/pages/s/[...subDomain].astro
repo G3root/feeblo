@@ -9,6 +9,7 @@ import {
   websiteJsonLd,
   type JsonLdNode,
 } from "@feeblo/web-shared/json-ld";
+import { resolveSite } from "~/lib/site";
 import PublicBoardLayout from "../../layouts/PublicBoardLayout.astro";
 
 export const prerender = false;
@@ -95,10 +96,17 @@ async function resolvePageContent(
   }
 }
 
-const { publicPath, subdomain, site } = Astro.locals;
+const { publicPath, subdomain } = Astro.locals;
 
 if (!subdomain) {
   throw new Error("Subdomain is required");
+}
+
+let site: TSite | null;
+try {
+  site = await resolveSite(subdomain);
+} catch {
+  return new Response("Content unavailable", { status: 502 });
 }
 
 if (!site) {
@@ -133,6 +141,15 @@ if (detail.kind === "rpc-unavailable") {
 }
 
 const { post, changelog } = detail;
+
+// Documents are user-independent (auth resolves client-side), so the CDN
+// may serve anonymous board HTML for a minute; crawlers and repeat
+// visitors skip SSR entirely. Visibility flips surface within the TTL,
+// matching the rss/sitemap endpoints' looser 5-minute convention.
+Astro.response.headers.set(
+  "Cache-Control",
+  "public, s-maxage=60, stale-while-revalidate=300"
+);
 
 if (post) {
   pageTitle = `${post.title} — ${site.name}`;

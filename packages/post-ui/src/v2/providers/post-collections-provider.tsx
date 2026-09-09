@@ -14,10 +14,26 @@ import type { TUpvote } from "@feeblo/domain/upvote/schema";
 import type { Collection } from "@tanstack/react-db";
 import { createContext, useContext, useMemo } from "react";
 
+/**
+ * Creator delete hint row: presence of a row for a post means the session
+ * user may delete it as its untouched creator. Resolved on demand per
+ * post through the eligibility RPCs; the backend delete path re-validates.
+ */
+export interface DeleteEligibilityRow {
+  organizationId: string;
+  postId: string;
+}
+
 export interface PostCollections {
   boardCollection: Collection<TBoard, string, any, any>;
   commentCollection: Collection<TComment, string, any, any>;
   commentReactionCollection: Collection<TCommentReaction, string, any, any>;
+  deleteEligibilityCollection?: Collection<
+    DeleteEligibilityRow,
+    string,
+    any,
+    any
+  >;
   membersCollection?: Collection<TOrganizationMember, string, any, any>;
   /**
    * Slim list rows (`PostListItem`, no `content`). Detail bodies resolve

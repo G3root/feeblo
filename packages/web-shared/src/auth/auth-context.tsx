@@ -39,7 +39,9 @@ export type AuthState =
       user: AuthUser;
     };
 
-const AuthContext = createContext<AuthState>({ status: "loading" });
+const loadingAuthState: AuthState = { status: "loading" };
+
+const AuthContext = createContext<AuthState>(loadingAuthState);
 
 export const useAuth = () => useContext(AuthContext);
 
@@ -117,7 +119,7 @@ export function AuthProvider({
 }) {
   if (!hasWindow()) {
     return (
-      <AuthContext.Provider value={{ status: "loading" }}>
+      <AuthContext.Provider value={loadingAuthState}>
         {children}
       </AuthContext.Provider>
     );

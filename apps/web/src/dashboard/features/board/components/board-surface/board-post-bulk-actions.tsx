@@ -16,7 +16,7 @@ import {
   hasPermission,
   usePolicy,
 } from "@feeblo/web-shared/use-policy";
-import { inArray, useLiveQuery } from "@tanstack/react-db";
+import { and, eq, inArray, queryOnce, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 
 import {
@@ -31,14 +31,13 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
 /**
  * Mirrors the backend `PostPolicy.canDelete` for the current selection:
  * `hasMembership AND (posts.* OR every selected post is an untouched post
- * created by the caller)`. `canDeleteAsCreator` is the server-computed
- * new-owner flag for the session user (creator + no comments + no other
- * users' votes), so a contributor may bulk-delete a selection consisting
- * only of their own untouched posts — exactly what PostDelete authorizes.
+ * created by the caller)`. Eligibility syncs once per organization into a
+ * collection; every selection check below is a client-side live query with
+ * no RPC, so a contributor may bulk-delete a selection consisting only of
+ * their own untouched posts — exactly what PostDelete authorizes.
  */
 function useCanBulkDeleteSelectedPosts(): boolean {
   const organizationId = useOrganizationId();
-  const { postCollection } = useDashboardCollections();
   const selectedPostIds = useSelectedPostIds();
   const selectionKey = selectedPostIds.join(",");
 
@@ -47,28 +46,41 @@ function useCanBulkDeleteSelectedPosts(): boolean {
   );
   const { allowed: isMember } = usePolicy(hasMembership(organizationId));
 
-  const { data: selectedRows } = useLiveQuery(
-    (q) =>
-      q
-        .from({ post: postCollection })
-        .where(({ post }) => inArray(post.id, selectedPostIds)),
-    // SAFETY: selectionKey encodes selectedPostIds as the query re-key.
-    [selectionKey]
+  // Eligibility only concerns contributors: managers bypass the check and
+  // non-members/empty selections can never delete. The eligible set syncs
+  // once per organization; this check is purely client-side.
+  const contributorCase =
+    !canManageAllPosts && isMember && selectedPostIds.length > 0;
+  const { deleteEligibilityCollection } = useDashboardCollections();
+  const { data: eligibleRows } = useLiveQuery(
+    (q) => {
+      if (!contributorCase || !deleteEligibilityCollection) {
+        return undefined;
+      }
+      return q
+        .from({ eligibility: deleteEligibilityCollection })
+        .where(({ eligibility }) =>
+          and(
+            eq(eligibility.organizationId, organizationId),
+            inArray(eligibility.postId, selectedPostIds)
+          )
+        )
+        .select(({ eligibility }) => ({ postId: eligibility.postId }));
+    },
+    // selectionKey encodes selectedPostIds as the query re-key.
+    [contributorCase, deleteEligibilityCollection, organizationId, selectionKey]
   );
 
   if (canManageAllPosts) {
     return true;
   }
-  if (!isMember || selectedPostIds.length === 0) {
+  if (!contributorCase || !eligibleRows) {
     return false;
   }
-  // Every selected post must still be present and flagged as deletable by
-  // its creator; a missing row (filtered out, stale selection) disables.
-  return (
-    selectedRows != null &&
-    selectedRows.length === selectedPostIds.length &&
-    selectedRows.every((post) => post.canDeleteAsCreator === true)
-  );
+  // Every selected post must resolve eligible; a missing row (filtered
+  // out, stale selection) simply isn't in the eligible set.
+  const eligibleIds = new Set(eligibleRows.map((row) => row.postId));
+  return selectedPostIds.every((postId) => eligibleIds.has(postId));
 }
 
 export function BoardPostBulkActions() {
@@ -115,7 +127,8 @@ export function BoardPostBulkActions() {
 
 function BulkDeleteAlert() {
   const store = useBoardStore();
-  const { postCollection } = useDashboardCollections();
+  const { deleteEligibilityCollection, postCollection } =
+    useDashboardCollections();
   const selectedPostIds = useSelectedPostIds();
   const selectedPosts = useSelectedPosts();
   const open = useSelector(store, (state) => state.context.bulkDeleteOpen);
@@ -150,9 +163,57 @@ function BulkDeleteAlert() {
               }
 
               try {
+                // Revalidate against the synced set at confirm time: a post
+                // engaged after the affordance rendered must not be fired.
+                // `queryOnce` evaluates without subscribing; the backend
+                // remains authoritative for anything that slips through.
+                const freshEligibility = deleteEligibilityCollection
+                  ? new Set(
+                      (
+                        await queryOnce((q) =>
+                          q
+                            .from({
+                              eligibility: deleteEligibilityCollection,
+                            })
+                            .where(({ eligibility }) =>
+                              and(
+                                eq(eligibility.organizationId, organizationId),
+                                inArray(eligibility.postId, selectedPostIds)
+                              )
+                            )
+                            .select(({ eligibility }) => ({
+                              postId: eligibility.postId,
+                            }))
+                        )
+                      ).map((row) => row.postId)
+                    )
+                  : null;
+                const deletablePosts =
+                  freshEligibility === null
+                    ? selectedPosts
+                    : selectedPosts.filter((selectedPost) =>
+                        freshEligibility.has(selectedPost.postId)
+                      );
+                const skippedCount =
+                  selectedPosts.length - deletablePosts.length;
+                if (deletablePosts.length === 0) {
+                  trackEvent("post_deleted", {
+                    mode: "bulk",
+                    success: false,
+                  });
+                  toastManager.add({
+                    title:
+                      "These posts can no longer be deleted. The selection was refreshed.",
+                    type: "error",
+                  });
+                  await deleteEligibilityCollection?.utils.refetch();
+                  store.send({ type: "setBulkDeleteOpen", open: false });
+                  return;
+                }
+
                 const postIdsByBoardId = new Map<string, string[]>();
 
-                for (const selectedPost of selectedPosts) {
+                for (const selectedPost of deletablePosts) {
                   const boardPostIds =
                     postIdsByBoardId.get(selectedPost.boardId) ?? [];
                   boardPostIds.push(selectedPost.postId);
@@ -177,9 +238,14 @@ function BulkDeleteAlert() {
                 store.send({ type: "clearSelection" });
                 store.send({ type: "setBulkDeleteOpen", open: false });
                 toastManager.add({
-                  title: `${selectedPostIds.length} post${
-                    selectedPostIds.length === 1 ? "" : "s"
-                  } deleted successfully`,
+                  title:
+                    skippedCount > 0
+                      ? `${deletablePosts.length} post${
+                          deletablePosts.length === 1 ? "" : "s"
+                        } deleted, ${skippedCount} skipped (no longer deletable)`
+                      : `${deletablePosts.length} post${
+                          deletablePosts.length === 1 ? "" : "s"
+                        } deleted successfully`,
                   type: "success",
                 });
               } catch (error) {

@@ -1,5 +1,8 @@
+import type { TSite } from "@feeblo/domain/site/schema";
 import type { APIRoute } from "astro";
 import { getSecret } from "astro:env/server";
+
+import { resolveSite } from "~/lib/site";
 
 export const prerender = false;
 
@@ -21,8 +24,8 @@ const robotsResponse = (lines: ReadonlyArray<string>) =>
  * robots.txt for public board hosts, served at
  * `https://<subdomain>.<root-domain>/robots.txt`.
  *
- * The middleware resolves `locals.site` from the request host. Sites flagged
- * `noIndex` (or a deployment with the `NO_INDEX` env secret) get a
+ * The site resolves from the request host with a fresh lookup per request.
+ * Sites flagged `noIndex` (or a deployment with the `NO_INDEX` env secret) get a
  * blanket `Disallow` with no sitemap link: neither crawlable nor advertised.
  *
  * For indexable sites the disallowed paths are the ones that exist on public
@@ -32,7 +35,14 @@ const robotsResponse = (lines: ReadonlyArray<string>) =>
  * pages duplicate the canonical public URLs.
  */
 export const GET: APIRoute = async ({ locals, url }) => {
-  const site = locals.site;
+  const { subdomain } = locals;
+  let site: TSite | null;
+  try {
+    site = subdomain ? await resolveSite(subdomain) : null;
+  } catch {
+    // Fail closed: an outage must not expose an indexable response.
+    return robotsResponse(["User-agent: *", "Disallow: /"]);
+  }
   const origin = url.origin;
 
   if (site === null || site.noIndex || Boolean(getSecret("NO_INDEX"))) {

@@ -1,16 +1,29 @@
 import rss, { type RSSFeedItem } from "@astrojs/rss";
 import type { TChangelog } from "@feeblo/domain/changelog/schema";
+import type { TSite } from "@feeblo/domain/site/schema";
 import type { APIRoute } from "astro";
+
+import { resolveSite } from "~/lib/site";
 
 export const prerender = false;
 
+// Single pass: the chained `replaceAll` version re-scanned the whole
+// string (including its own `&amp;` insertions) five times per value.
 const escapeXml = (value: string): string =>
-  value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
+  value.replace(/["&'<>]/g, (char) => {
+    switch (char) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&apos;";
+    }
+  });
 
 const escapeCdata = (value: string): string =>
   value.replaceAll("]]>", "]]]]><![CDATA[>");
@@ -19,15 +32,21 @@ const escapeCdata = (value: string): string =>
  * RSS 2.0 feed for the public changelog, served at
  * `https://<subdomain>.<root-domain>/changelog/rss.xml`.
  *
- * The middleware resolves `locals.site` from the request host; when the site
- * does not exist or its changelog is hidden, the feed is a 404 so hidden
- * changelogs are never exposed through RSS.
+ * The site resolves from the request host with a fresh lookup per request;
+ * when the site does not exist or its changelog is hidden, the feed is a
+ * 404 so hidden changelogs are never exposed through RSS.
  *
  * Descriptions contain rendered HTML in CDATA. This keeps the feed readable
  * in clients that support HTML while avoiding Markdown being shown literally.
  */
 export const GET: APIRoute = async ({ locals, url }) => {
-  const site = locals.site;
+  const { subdomain } = locals;
+  let site: TSite | null;
+  try {
+    site = subdomain ? await resolveSite(subdomain) : null;
+  } catch {
+    return new Response("Feed unavailable", { status: 502 });
+  }
 
   if (site === null || site.changelogVisibility !== "PUBLIC") {
     return new Response("Not found", { status: 404 });

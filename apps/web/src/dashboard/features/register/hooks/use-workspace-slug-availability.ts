@@ -22,13 +22,15 @@ export function useWorkspaceSlugAvailability(slug: string, enabled: boolean) {
     }
 
     let cancelled = false;
+    const controller = new AbortController();
 
     const timeoutId = window.setTimeout(async () => {
       setState({ status: "checking", suggestion: null });
 
       try {
-        const response = await fetchRpc((rpc) =>
-          rpc.WorkspaceSlugCheck({ slug })
+        const response = await fetchRpc(
+          (rpc) => rpc.WorkspaceSlugCheck({ slug }),
+          { signal: controller.signal }
         );
 
         if (cancelled) {
@@ -41,7 +43,9 @@ export function useWorkspaceSlugAvailability(slug: string, enabled: boolean) {
           setState({ status: "taken", suggestion: response.suggestion });
         }
       } catch {
-        if (!cancelled) {
+        // Aborted superseded checks stay silent; only genuine failures
+        // surface, and never after unmount.
+        if (!cancelled && !controller.signal.aborted) {
           setState({ status: "error", suggestion: null });
         }
       }
@@ -50,6 +54,7 @@ export function useWorkspaceSlugAvailability(slug: string, enabled: boolean) {
     return () => {
       cancelled = true;
       window.clearTimeout(timeoutId);
+      controller.abort();
     };
   }, [slug, enabled]);
 
