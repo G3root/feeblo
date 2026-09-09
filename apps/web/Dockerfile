@@ -25,6 +25,12 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 # Build the project and its dependencies
 COPY --from=prepare /app/out/full/ .
 
+# `turbo prune` only copies workspace packages into out/full, so the
+# root-level paraglide project and message catalogs have to be copied
+# explicitly or `build:paraglide` fails with ENOENT.
+COPY --from=prepare /app/project.inlang ./project.inlang
+COPY --from=prepare /app/messages ./messages
+
 ENV NODE_ENV=production
 
 RUN pnpm turbo build
