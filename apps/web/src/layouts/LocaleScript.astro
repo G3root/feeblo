@@ -16,19 +16,19 @@ const directions = Object.fromEntries(
 
 <script is:inline define:vars={{ baseLocale, cookieName, directions, locales }}>
   (function () {
+    // Mirror paraglide's `extractLocaleFromCookie`: one match, pattern built
+    // once. (`extractLocaleFromCookie` itself can't be imported here — this
+    // script is `is:inline` and must run before hydration.)
+    var match = document.cookie.match(
+      new RegExp("(?:^|;\\s*)" + cookieName + "=([^;]*)")
+    );
     var value = "";
-    var entries = document.cookie ? document.cookie.split(";") : [];
-    for (var i = 0; i < entries.length; i += 1) {
-      var entry = entries[i].trim();
-      if (entry.indexOf(cookieName + "=") === 0) {
-        value = entry.slice(cookieName.length + 1);
-        break;
+    if (match) {
+      try {
+        value = decodeURIComponent(match[1]);
+      } catch (error) {
+        value = "";
       }
-    }
-    try {
-      value = decodeURIComponent(value);
-    } catch (error) {
-      value = "";
     }
     var locale = locales.indexOf(value) === -1 ? baseLocale : value;
     document.documentElement.lang = locale;
