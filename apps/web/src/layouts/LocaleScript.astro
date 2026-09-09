@@ -1,0 +1,37 @@
+---
+import {
+  baseLocale,
+  cookieName,
+  getTextDirection,
+  locales,
+} from "../paraglide/runtime";
+
+// Resolve directions at build time so the inline script carries a lookup table
+// instead of a second copy of paraglide's RTL language list. `define:vars`
+// serializes these into the script, keeping the locale set in one place.
+const directions = Object.fromEntries(
+  locales.map((locale) => [locale, getTextDirection(locale)])
+);
+---
+
+<script is:inline define:vars={{ baseLocale, cookieName, directions, locales }}>
+  (function () {
+    // Mirror paraglide's `extractLocaleFromCookie`: one match, pattern built
+    // once. (`extractLocaleFromCookie` itself can't be imported here — this
+    // script is `is:inline` and must run before hydration.)
+    var match = document.cookie.match(
+      new RegExp("(?:^|;\\s*)" + cookieName + "=([^;]*)")
+    );
+    var value = "";
+    if (match) {
+      try {
+        value = decodeURIComponent(match[1]);
+      } catch (error) {
+        value = "";
+      }
+    }
+    var locale = locales.indexOf(value) === -1 ? baseLocale : value;
+    document.documentElement.lang = locale;
+    document.documentElement.dir = directions[locale] || "ltr";
+  })();
+</script>

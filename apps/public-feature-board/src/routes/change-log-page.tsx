@@ -41,6 +41,7 @@ import {
   ChangelogFilterProvider,
   useChangelogFilterStore,
 } from "../lib/changelog-filter-store";
+import { m } from "../paraglide/messages.js";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
@@ -135,7 +136,7 @@ export function ChangelogPage() {
   }
 
   if (isLoading) {
-    return <ChangelogPageLayout>Loading changelog...</ChangelogPageLayout>;
+    return <ChangelogPageLayout>{m.loud_patchy_liger()}</ChangelogPageLayout>;
   }
 
   if (isError) {
@@ -143,10 +144,8 @@ export function ChangelogPage() {
       <ChangelogPageLayout>
         <Empty className="border">
           <EmptyHeader>
-            <EmptyTitle>Changelog unavailable</EmptyTitle>
-            <EmptyDescription>
-              There was a problem loading published changelog entries.
-            </EmptyDescription>
+            <EmptyTitle>{m.fuzzy_smug_capybara()}</EmptyTitle>
+            <EmptyDescription>{m.merry_drab_tapir()}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       </ChangelogPageLayout>
@@ -157,17 +156,19 @@ export function ChangelogPage() {
     <ChangelogPageLayout>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-3">
-          <h2 className="text-base font-semibold tracking-tight">Changelogs</h2>
+          <h2 className="text-base font-semibold tracking-tight">
+            {m.yummy_silly_hedgehog()}
+          </h2>
           <div className="flex items-center gap-2">
             <ChangelogSubscribeButton />
             <a
-              aria-label="Subscribe to the changelog RSS feed"
+              aria-label={m.dry_weak_canary()}
               className={cn(
                 buttonVariants({ size: "icon-sm", variant: "ghost" }),
                 "text-muted-foreground hover:text-foreground"
               )}
               href="/changelog/rss.xml"
-              title="RSS feed"
+              title={m.solid_raw_hawk()}
             >
               <HugeiconsIcon icon={RssIcon} />
             </a>
@@ -182,13 +183,13 @@ export function ChangelogPage() {
           <EmptyHeader>
             <EmptyTitle>
               {normalizedSearch || hasActiveCategoryFilter
-                ? "No changelogs match your filters"
-                : "No published changelogs yet"}
+                ? m.fair_loved_penguin()
+                : m.flaky_honest_bumblebee()}
             </EmptyTitle>
             <EmptyDescription>
               {normalizedSearch || hasActiveCategoryFilter
-                ? "Try a different search or category filter."
-                : "Published changelog updates will appear here once they are released."}
+                ? m.east_odd_duck()
+                : m.gray_tiny_panda()}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -276,11 +277,11 @@ function ChangelogFilterToolbar({
             </InputGroupText>
           </InputGroupAddon>
           <DebouncedInputGroupInput
-            aria-label="Search changelog titles"
+            aria-label={m.long_mean_stingray()}
             onChange={(value) => {
               store.send({ type: "setSearch", value });
             }}
-            placeholder="Search changelog titles"
+            placeholder={m.long_mean_stingray()}
             value={search}
           />
         </InputGroup>

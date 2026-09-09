@@ -1,3 +1,5 @@
+import { m } from "../paraglide/messages.js";
+import { getLocale } from "../paraglide/runtime.js";
 import type {
   RoadmapColumnDefinition,
   RoadmapLane,
@@ -8,10 +10,10 @@ export function formatRoadmapPostDate(value: Date | string) {
   const date = value instanceof Date ? value : new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "Recently";
+    return m.mean_house_shrike();
   }
 
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString(getLocale(), {
     day: "numeric",
     month: "short",
   });

@@ -9,6 +9,7 @@ import {
 import { DashedLineCircleIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
+import { m } from "../../../paraglide/messages.js";
 import { useHome } from "../home-context";
 
 export function HomeStatusMenu({ className }: { className?: string }) {
@@ -21,7 +22,7 @@ export function HomeStatusMenu({ className }: { className?: string }) {
         render={(props) => (
           <Button
             {...props}
-            aria-label="Filter by status"
+            aria-label={m.spry_big_earthworm()}
             className={className}
             size="icon"
             variant="outline"

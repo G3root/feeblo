@@ -17,6 +17,8 @@ import { FilterIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, use, useMemo } from "react";
 
+import { m } from "../paraglide/messages.js";
+
 // ---------------------------------------------------------------------------
 // Shareable roadmap layout primitives — compound components with lifted state
 // Follows vercel-composition-patterns: avoid boolean props, use compound
@@ -203,7 +205,9 @@ function RoadmapSwitcherView({
           <MenuTrigger
             render={
               <Button
-                aria-label={`Switch roadmap, current ${options.find((o) => o.slug === value)?.name ?? value}`}
+                aria-label={m.cozy_weak_larva({
+                  name: options.find((o) => o.slug === value)?.name ?? value,
+                })}
                 size="icon-sm"
                 variant="outline"
               >
@@ -253,7 +257,7 @@ function RoadmapSwitcher() {
 export function RoadmapNoColumnsEmpty() {
   return (
     <div className="border-border/70 bg-muted/20 text-muted-foreground flex min-h-64 flex-1 items-center justify-center rounded-lg border border-dashed p-6 text-center text-sm">
-      This roadmap has no columns configured.
+      {m.many_calm_jaguar()}
     </div>
   );
 }

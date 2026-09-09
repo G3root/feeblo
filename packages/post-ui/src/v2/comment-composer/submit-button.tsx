@@ -1,6 +1,7 @@
 import { Button } from "@feeblo/ui/button";
 import { Group, GroupSeparator } from "@feeblo/ui/group";
 
+import { m } from "../../paraglide/messages.js";
 import { useCommentComposer, useCommentComposerIsDisabled } from "./context";
 import { CommentOptionsMenu } from "./options-menu";
 import { useCommentComposerState } from "./store";
@@ -27,9 +28,7 @@ export function SubmitButton() {
           : {})}
       >
         {meta.submitLabel ??
-          (isPrivate
-            ? `Comment ${meta.privateLabel}`
-            : `Comment ${meta.publicLabel}`)}
+          (isPrivate ? m.due_any_skunk() : m.aloof_dirty_goldfish())}
       </Button>
       {hasOptionsMenu ? (
         <>

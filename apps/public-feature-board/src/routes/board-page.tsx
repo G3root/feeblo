@@ -21,6 +21,7 @@ import {
   FeedbackBrowseLayoutSidebar,
 } from "../components/layout/feedback-browse-layout";
 import { formatPostStatus } from "../lib/utils";
+import { m } from "../paraglide/messages.js";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
@@ -43,7 +44,9 @@ function ListHeader({ count, title }: { count?: number; title: string }) {
       <h2 className="text-base font-semibold tracking-tight">{title}</h2>
       {count !== undefined && (
         <span className="text-muted-foreground text-xs tabular-nums">
-          {count} {count === 1 ? "post" : "posts"}
+          {count === 1
+            ? m.still_dry_jay({ count })
+            : m.front_frail_yak({ count })}
         </span>
       )}
     </div>
@@ -129,7 +132,7 @@ export function BoardPage() {
     return (
       <MainContent>
         <div className="min-w-0">
-          <ListHeader title="Loading..." />
+          <ListHeader title={m.salty_knotty_capybara()} />
           <div className="divide-border/40 border-border/60 w-full divide-y overflow-hidden rounded-lg border">
             {["a", "b", "c", "d", "e"].map((key) => (
               <FeedbackCardSkeleton key={key} />
@@ -145,10 +148,8 @@ export function BoardPage() {
       <MainContent>
         <Empty className="border">
           <EmptyHeader>
-            <EmptyTitle>Posts unavailable</EmptyTitle>
-            <EmptyDescription>
-              There was a problem loading this board.
-            </EmptyDescription>
+            <EmptyTitle>{m.sound_spicy_ray()}</EmptyTitle>
+            <EmptyDescription>{m.loose_silly_leopard()}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       </MainContent>
@@ -160,10 +161,8 @@ export function BoardPage() {
       <MainContent>
         <Empty className="border">
           <EmptyHeader>
-            <EmptyTitle>Board not found</EmptyTitle>
-            <EmptyDescription>
-              This public board does not exist anymore.
-            </EmptyDescription>
+            <EmptyTitle>{m.light_smart_mayfly()}</EmptyTitle>
+            <EmptyDescription>{m.wild_raw_goat()}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       </MainContent>
@@ -177,10 +176,8 @@ export function BoardPage() {
           <ListHeader count={0} title={board.name} />
           <Empty className="border">
             <EmptyHeader>
-              <EmptyTitle>No feedback yet</EmptyTitle>
-              <EmptyDescription>
-                Posts from this board will appear here once shared publicly.
-              </EmptyDescription>
+              <EmptyTitle>{m.plane_strong_crow()}</EmptyTitle>
+              <EmptyDescription>{m.yummy_antsy_clownfish()}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         </div>

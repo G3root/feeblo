@@ -6,6 +6,7 @@ import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { createOptimisticAction } from "@tanstack/react-db";
 import { useId, useRef } from "react";
 
+import { m } from "../paraglide/messages.js";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
@@ -23,7 +24,7 @@ export function PostTitleInput({ className, ...props }: PostTitleInputProps) {
   return (
     <>
       <label className="sr-only" htmlFor={id}>
-        Post Title
+        {m.ideal_empty_gorilla()}
       </label>
       <Input
         className={cn(
@@ -84,7 +85,7 @@ export function PostTitleUpdateInput() {
     }
 
     if (newValue.trim() === "") {
-      toastManager.add({ title: "Title is required", type: "error" });
+      toastManager.add({ title: m.ideal_spare_loris(), type: "error" });
       if (inputRef.current) {
         inputRef.current.value = defaultValue;
       }
@@ -98,12 +99,12 @@ export function PostTitleUpdateInput() {
       trackEvent("post_updated", { field: "title", success: true });
 
       toastManager.add({
-        title: "Title updated successfully",
+        title: m.slow_blue_dingo(),
         type: "success",
       });
     } catch {
       trackEvent("post_updated", { field: "title", success: false });
-      toastManager.add({ title: "Failed to update title", type: "error" });
+      toastManager.add({ title: m.zippy_ago_chicken(), type: "error" });
       if (inputRef.current) {
         inputRef.current.value = defaultValue;
       }

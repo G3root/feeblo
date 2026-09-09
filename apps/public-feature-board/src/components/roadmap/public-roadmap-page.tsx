@@ -18,6 +18,7 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { createContext, use, useCallback, useMemo } from "react";
 
+import { m } from "../../paraglide/messages.js";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
 
@@ -183,7 +184,7 @@ function PublicRoadmapBoardContent() {
 
           {lanes.length > 0 ? (
             <RoadmapGrid
-              emptyLaneMessage="No updates in this stage."
+              emptyLaneMessage={m.orange_factual_rat()}
               lanes={lanes}
               renderCard={({ post }) => (
                 <PublicRoadmapIssueCard
@@ -229,8 +230,8 @@ function PublicRoadmapIndexView() {
   if (isError) {
     return (
       <PublicRoadmapError
-        description="There was a problem loading the roadmap."
-        title="Roadmap unavailable"
+        description={m.bland_weary_vulture()}
+        title={m.main_dirty_maggot()}
       />
     );
   }
@@ -238,8 +239,8 @@ function PublicRoadmapIndexView() {
   if (!displayedRoadmap) {
     return (
       <PublicRoadmapError
-        description="This workspace does not have a public roadmap yet."
-        title="No roadmap yet"
+        description={m.clean_large_capybara()}
+        title={m.fair_clear_tiger()}
       />
     );
   }
@@ -262,8 +263,8 @@ function PublicRoadmapDetailView() {
   if (isError) {
     return (
       <PublicRoadmapError
-        description="There was a problem loading the roadmap."
-        title="Roadmap unavailable"
+        description={m.bland_weary_vulture()}
+        title={m.main_dirty_maggot()}
       />
     );
   }
@@ -271,8 +272,8 @@ function PublicRoadmapDetailView() {
   if (!displayedRoadmap) {
     return (
       <PublicRoadmapError
-        description="This roadmap does not exist or has been removed."
-        title="Roadmap not found"
+        description={m.sleek_good_ox()}
+        title={m.icy_giant_rat()}
       />
     );
   }

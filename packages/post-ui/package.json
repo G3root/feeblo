@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./i18n": {
+      "types": "./src/i18n.ts",
+      "default": "./src/i18n.ts"
+    },
     "./post-properties": {
       "types": "./src/v2/post-field.tsx",
       "default": "./src/v2/post-field.tsx"
@@ -174,11 +178,14 @@
     }
   },
   "scripts": {
+    "build:paraglide": "paraglide-js compile --project ../../project.inlang --outdir ./src/paraglide --strategy baseLocale --emit-ts-declarations",
     "check-types": "tsc --noEmit",
-    "test": "vitest run --config vitest.config.ts",
-    "test:watch": "vitest --config vitest.config.ts",
+    "dev": "paraglide-js compile --project ../../project.inlang --outdir ./src/paraglide --strategy baseLocale --emit-ts-declarations --watch",
     "ladle": "ladle serve",
-    "ladle:build": "ladle build"
+    "ladle:build": "ladle build",
+    "machine-translate": "inlang machine translate --project ../../project.inlang",
+    "test": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest --config vitest.config.ts"
   },
   "dependencies": {
     "@feeblo/domain": "workspace:*",
@@ -197,6 +204,8 @@
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
+    "@inlang/cli": "^3.3.0",
+    "@inlang/paraglide-js": "^2.23.1",
     "@ladle/react": "^5.1.1",
     "@tailwindcss/vite": "catalog:",
     "@tanstack/react-query": "catalog:",

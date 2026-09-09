@@ -3,16 +3,27 @@
   "ui": "tui",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "^build:paraglide"],
       "env": ["APP_ROOT_DOMAIN", "APP_URL", "API_URL", "CLOUDFLARE_ADAPTER"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**"]
     },
+    "build:paraglide": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/project.inlang/**",
+        "$TURBO_ROOT$/messages/**"
+      ],
+      "outputs": ["src/paraglide/**"]
+    },
     "test": {
+      "dependsOn": ["build:paraglide"],
       "outputs": [],
       "cache": false
     },
-    "check-types": {},
+    "check-types": {
+      "dependsOn": ["build:paraglide", "^build:paraglide"]
+    },
     "dev": {
       "cache": false,
       "persistent": true

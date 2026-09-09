@@ -18,6 +18,9 @@ const isCloudflareAdapter = process.env.CLOUDFLARE_ADAPTER === "true";
 const widgetDir = fileURLToPath(
   new URL("../../packages/feedback-widget", import.meta.url)
 );
+const paraglideProjectDir = fileURLToPath(
+  new URL("../../project.inlang", import.meta.url)
+);
 const widgetIconsSource = fileURLToPath(
   new URL("../../packages/feedback-widget/src/icons/source", import.meta.url)
 );
@@ -27,6 +30,7 @@ const widgetIconsDir = fileURLToPath(
 
 const reactRoutes = [
   "**/dashboard/**",
+  "**/public-board/**",
   "**/public-feature-board/**",
   "**/@feeblo/public-feature-board/**",
 ];
@@ -94,7 +98,7 @@ export default defineConfig({
     },
     plugins: [
       paraglideVitePlugin({
-        project: "./project.inlang",
+        project: paraglideProjectDir,
         outdir: "./src/paraglide",
         emitTsDeclarations: true,
         strategy: ["cookie", "baseLocale"],

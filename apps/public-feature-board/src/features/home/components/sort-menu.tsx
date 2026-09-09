@@ -9,12 +9,14 @@ import {
 import { Sorting01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
+import { m } from "../../../paraglide/messages.js";
 import { useHome } from "../home-context";
-import { SORT_ITEMS } from "./sort-options";
+import { getSortItems } from "./sort-options";
 
 export function HomeSortMenu({ className }: { className?: string }) {
   const { state, actions } = useHome();
   const { sortBy } = state;
+  const sortItems = getSortItems();
 
   return (
     <Menu>
@@ -22,7 +24,7 @@ export function HomeSortMenu({ className }: { className?: string }) {
         render={(props) => (
           <Button
             {...props}
-            aria-label="Sort feedback"
+            aria-label={m.fancy_solid_husky()}
             className={className}
             size="icon"
             variant="outline"
@@ -40,7 +42,7 @@ export function HomeSortMenu({ className }: { className?: string }) {
           }}
           value={sortBy}
         >
-          {SORT_ITEMS.map((item) => (
+          {sortItems.map((item) => (
             <MenuRadioItem closeOnClick key={item.value} value={item.value}>
               {item.label}
             </MenuRadioItem>

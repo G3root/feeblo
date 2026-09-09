@@ -25,6 +25,7 @@ import {
   useState,
 } from "react";
 
+import { m } from "../paraglide/messages.js";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
@@ -81,7 +82,7 @@ function ReactionPickerProvider({
   children,
   disabled = false,
   existingReactions,
-  label = "Add reaction",
+  label = m.loose_equal_hyena(),
   onToggle,
   reactionList,
 }: ReactionPickerProviderProps) {
@@ -317,7 +318,7 @@ export function PostReactionPicker() {
       if (onAuthRequired) {
         onAuthRequired();
       } else {
-        toastManager.add({ title: "Sign in to react", type: "error" });
+        toastManager.add({ title: m.zany_white_rat(), type: "error" });
       }
       return;
     }
@@ -474,7 +475,7 @@ export function CommentReactionPicker({
       if (onAuthRequired) {
         onAuthRequired();
       } else {
-        toastManager.add({ title: "Sign in to react", type: "error" });
+        toastManager.add({ title: m.zany_white_rat(), type: "error" });
       }
       return;
     }

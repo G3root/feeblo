@@ -12,6 +12,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { m } from "../paraglide/messages.js";
+
 const REFRESH_MS = 30_000;
 const LIST_LIMIT = 20;
 
@@ -127,7 +129,7 @@ export function NotificationsMenu({
       <MenuTrigger
         render={
           <Button
-            aria-label="Notifications"
+            aria-label={m.quaint_less_panther()}
             className="relative"
             size="icon-sm"
             variant="ghost"
@@ -143,21 +145,23 @@ export function NotificationsMenu({
       </MenuTrigger>
       <MenuPopup align="end" className="w-96 p-0" sideOffset={8}>
         <div className="flex items-center justify-between border-b px-4 py-3">
-          <span className="text-sm font-semibold">Notifications</span>
+          <span className="text-sm font-semibold">
+            {m.quaint_less_panther()}
+          </span>
           {unreadCount > 0 && (
             <Button
               onClick={() => markAllRead.mutate()}
               size="xs"
               variant="ghost"
             >
-              Mark all read
+              {m.tasty_loose_lizard()}
             </Button>
           )}
         </div>
         <div className="max-h-96 overflow-y-auto">
           {rows.length === 0 ? (
             <p className="text-muted-foreground px-4 py-8 text-center text-sm">
-              You&rsquo;re all caught up.
+              {m.neat_brief_hamster()}
             </p>
           ) : (
             rows.map((notification) => {

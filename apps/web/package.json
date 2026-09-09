@@ -6,7 +6,7 @@
   "scripts": {
     "build": "pnpm build:paraglide && pnpm build:app",
     "build:app": "dotenvx run -f ../../.env -- astro build",
-    "build:paraglide": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide",
+    "build:paraglide": "paraglide-js compile --project ../../project.inlang --outdir ./src/paraglide",
     "build:bare": "astro build",
     "preview": "astro preview",
     "astro": "astro",
@@ -14,7 +14,7 @@
     "dev:bare": "astro dev",
     "generate-types": "wrangler types",
     "check-types": "pnpm build:paraglide && pnpm astro check",
-    "machine-translate": "inlang machine translate --project project.inlang"
+    "machine-translate": "inlang machine translate --project ../../project.inlang"
   },
   "dependencies": {
     "@astrojs/node": "11.0.0",

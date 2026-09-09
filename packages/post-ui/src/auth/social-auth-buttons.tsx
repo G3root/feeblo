@@ -2,6 +2,7 @@ import { Button } from "@feeblo/ui/button";
 import { Field } from "@feeblo/ui/field";
 import { type ReactNode, useState } from "react";
 
+import { m } from "../paraglide/messages.js";
 import { type SocialProvider, signInWithSocialProvider } from "./auth-flows";
 
 type SocialAuthButtonsProps = {
@@ -63,7 +64,7 @@ export function SocialAuthButtons({ redirectTo }: SocialAuthButtonsProps) {
             variant="outline"
           >
             {provider.icon}
-            Continue with {provider.label}
+            {m.quiet_dull_turkey({ provider: provider.label })}
           </Button>
         </Field>
       ))}

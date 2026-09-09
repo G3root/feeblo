@@ -8,6 +8,7 @@ import { cn } from "@feeblo/ui/utils";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
+import { m } from "../../../paraglide/messages.js";
 import { useHome } from "../home-context";
 
 export function HomeSearchInput() {
@@ -28,11 +29,11 @@ export function HomeSearchInput() {
           </InputGroupText>
         </InputGroupAddon>
         <DebouncedInputGroupInput
-          aria-label="Search feedback"
+          aria-label={m.least_suave_wolf()}
           onBlur={() => actions.setSearchFocused(false)}
           onChange={actions.setSearch}
           onFocus={() => actions.setSearchFocused(true)}
-          placeholder="Search feedback"
+          placeholder={m.least_suave_wolf()}
           value={search}
         />
       </InputGroup>

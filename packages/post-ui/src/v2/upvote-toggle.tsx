@@ -12,6 +12,7 @@ import type { Collection } from "@tanstack/react-db";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useMemo } from "react";
 
+import { m } from "../paraglide/messages.js";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
@@ -133,7 +134,7 @@ function UpvoteTrigger({
   variant = "default",
   disabled = false,
   isUpvoted,
-  label = "Upvote",
+  label = m.mild_tidy_hare(),
   onToggle,
   upvoteCount,
 }: UpvoteTriggerProps) {
@@ -336,7 +337,7 @@ function UpvoteToggleProvider({
   children,
   disabled = false,
   isUpvoted,
-  label = "Upvote",
+  label = m.mild_tidy_hare(),
   onToggle,
   upvoteCount,
 }: UpvoteToggleProviderProps) {

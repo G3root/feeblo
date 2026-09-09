@@ -4,6 +4,7 @@ import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
 import type { ReactNode } from "react";
 
 import { truncate } from "../../lib/utils";
+import { m } from "../../paraglide/messages.js";
 
 // ---------------------------------------------------------------------------
 // Feedback-specific augmentations — context-aware wrappers around shared primitives.
@@ -26,7 +27,7 @@ function FeedbackPostCardLink({
   const { post } = usePostCollectionData();
   return (
     <SharedPostCard.Link
-      label={label ?? `View ${post.title}`}
+      label={label ?? m.pink_minor_felix({ title: post.title })}
       params={params ?? { slug: post.slug }}
       to={to ?? "/p/$slug"}
     />
@@ -40,7 +41,7 @@ function FeedbackPostCardTitle({ children }: { children?: ReactNode }) {
 
 function FeedbackPostCardDescription({ children }: { children?: ReactNode }) {
   const { post } = usePostCollectionData();
-  const description = truncate(post.excerpt, 100) || "No details yet.";
+  const description = truncate(post.excerpt, 100) || m.cuddly_grand_lemur();
   return (
     <SharedPostCard.Description>
       {children ?? description}

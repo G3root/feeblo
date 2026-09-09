@@ -20,6 +20,8 @@ import {
 import { DashedLine02Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
+import { m } from "../paraglide/messages.js";
+
 export function FieldRow({
   label,
   children,
@@ -42,7 +44,7 @@ export function StatusField({
   statuses,
   onValueChange,
   disabled = false,
-  placeholder = "Select status",
+  placeholder = m.safe_jolly_shell(),
 }: {
   /** Null renders the placeholder: the field supports "nothing selected". */
   currentStatusId: string | null;
@@ -112,16 +114,16 @@ export function StatusField({
           )}
         </ComboboxValue>
       </ComboboxTrigger>
-      <ComboboxPopup aria-label="Select status" className="w-full">
+      <ComboboxPopup aria-label={m.safe_jolly_shell()} className="w-full">
         <div className="border-b p-2">
           <ComboboxInput
             className="rounded-md before:rounded-[calc(var(--radius-md)-1px)]"
-            placeholder="Search statuses..."
+            placeholder={m.seemly_tasty_nuthatch()}
             showTrigger={false}
             startAddon={<HugeiconsIcon icon={Search01Icon} strokeWidth={2} />}
           />
         </div>
-        <ComboboxEmpty>No statuses found.</ComboboxEmpty>
+        <ComboboxEmpty>{m.key_super_antelope()}</ComboboxEmpty>
         <ComboboxList>
           {(item) => (
             <ComboboxItem key={item.value} value={item}>
@@ -179,7 +181,7 @@ export function PostBoardSelect({
       }
     >
       <ComboboxTrigger render={<SelectButton className="w-full" size="sm" />}>
-        <ComboboxValue placeholder="Select board">
+        <ComboboxValue placeholder={m.upper_tangy_monkey()}>
           {(value) => (
             <span className="flex items-center gap-2">
               {value ? (
@@ -192,22 +194,24 @@ export function PostBoardSelect({
                   {value.label}
                 </>
               ) : (
-                <span className="text-muted-foreground">Select board</span>
+                <span className="text-muted-foreground">
+                  {m.upper_tangy_monkey()}
+                </span>
               )}
             </span>
           )}
         </ComboboxValue>
       </ComboboxTrigger>
-      <ComboboxPopup aria-label="Select board" className="w-full">
+      <ComboboxPopup aria-label={m.upper_tangy_monkey()} className="w-full">
         <div className="border-b p-2">
           <ComboboxInput
             className="rounded-md before:rounded-[calc(var(--radius-md)-1px)]"
-            placeholder="Search boards..."
+            placeholder={m.aware_nimble_robin()}
             showTrigger={false}
             startAddon={<HugeiconsIcon icon={Search01Icon} strokeWidth={2} />}
           />
         </div>
-        <ComboboxEmpty>No boards found.</ComboboxEmpty>
+        <ComboboxEmpty>{m.basic_alert_boar()}</ComboboxEmpty>
         <ComboboxList>
           {(item) => (
             <ComboboxItem key={item.value} value={item}>

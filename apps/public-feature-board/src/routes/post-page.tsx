@@ -23,6 +23,8 @@ import { PostPageActions } from "../components/feedback/post-page-actions";
 import { PostVoterDialog } from "../components/feedback/post-voter-dialog";
 // import { useUpvote } from "../hooks/use-upvote";
 import { formatPostStatus } from "../lib/utils";
+import { m } from "../paraglide/messages.js";
+import { getLocale } from "../paraglide/runtime.js";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
@@ -50,16 +52,28 @@ function StatusPill({ postStatus }: { postStatus: TPostStatus }) {
   );
 }
 
-const publishedDateFormatter = new Intl.DateTimeFormat(undefined, {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
+const publishedDateFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function getPublishedDateFormatter() {
+  const locale = getLocale();
+  let formatter = publishedDateFormatters.get(locale);
+
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    publishedDateFormatters.set(locale, formatter);
+  }
+
+  return formatter;
+}
 
 function formatPublishedDate(value: Date | string) {
   const date = isString(value) ? new Date(value) : value;
 
-  return publishedDateFormatter.format(date);
+  return getPublishedDateFormatter().format(date);
 }
 
 export const Route = createLazyRoute("/p/$slug")({
@@ -138,7 +152,7 @@ export function PostPage() {
   );
 
   if (postLoading || postTagsQuery.isLoading) {
-    return <RootLayout>Loading post...</RootLayout>;
+    return <RootLayout>{m.good_extra_giraffe()}</RootLayout>;
   }
 
   if (postError || postTagsQuery.isError) {
@@ -146,10 +160,8 @@ export function PostPage() {
       <RootLayout>
         <Empty>
           <EmptyHeader>
-            <EmptyTitle>Post unavailable</EmptyTitle>
-            <EmptyDescription>
-              There was a problem loading this post.
-            </EmptyDescription>
+            <EmptyTitle>{m.plane_ideal_dolphin()}</EmptyTitle>
+            <EmptyDescription>{m.mild_green_jannes()}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       </RootLayout>
@@ -161,10 +173,8 @@ export function PostPage() {
       <RootLayout>
         <Empty>
           <EmptyHeader>
-            <EmptyTitle>Post not found</EmptyTitle>
-            <EmptyDescription>
-              This public post does not exist anymore.
-            </EmptyDescription>
+            <EmptyTitle>{m.fresh_stout_halibut()}</EmptyTitle>
+            <EmptyDescription>{m.basic_formal_samuel()}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       </RootLayout>
@@ -268,7 +278,7 @@ function PostMetaSidebarVoters() {
     <PostVoterDialog.Root postId={post.id}>
       <PostMetaSidebarSection
         actions={<PostVoterDialog.Trigger />}
-        title="Voters"
+        title={m.yummy_fair_bobcat()}
       >
         <PostVoterDialog.Items />
         <PostVoterDialog.Content />
@@ -280,7 +290,7 @@ function PostMetaSidebarVoters() {
 function PostMetaSidebarBoard() {
   const { board } = usePostCollectionData();
   return (
-    <PostMetaSidebarSection title="Board">
+    <PostMetaSidebarSection title={m.full_new_vulture()}>
       <BoardNavLink
         href={`/b/${board.slug ?? ""}`}
         label={board.name}
@@ -296,7 +306,7 @@ function PostMetaSidebarStatus({ postStatus }: { postStatus?: TPostStatus }) {
   }
 
   return (
-    <PostMetaSidebarSection title="Status">
+    <PostMetaSidebarSection title={m.odd_home_jaguar()}>
       <StatusPill postStatus={postStatus} />
     </PostMetaSidebarSection>
   );
@@ -312,7 +322,7 @@ function PostMetaSidebarTags({
   }
 
   return (
-    <PostMetaSidebarSection title="Tags">
+    <PostMetaSidebarSection title={m.wild_long_nils()}>
       <div className="flex flex-wrap gap-1.5">
         {tags.map((tag) => (
           <Badge
@@ -330,10 +340,10 @@ function PostMetaSidebarTags({
 
 function PostMetaSidebarAuthor() {
   const { post } = usePostCollectionData();
-  const authorName = post?.user?.name ?? "Anonymous";
+  const authorName = post?.user?.name ?? m.blue_clear_flea();
   const authorImage = post?.user?.image ?? undefined;
   return (
-    <PostMetaSidebarSection title="Posted by">
+    <PostMetaSidebarSection title={m.great_trick_jay()}>
       <div className="flex items-center gap-2.5">
         <UserAvatar className="size-8" image={authorImage} name={authorName} />
         <p className="text-foreground text-sm font-medium">{authorName}</p>
@@ -346,7 +356,7 @@ function PostMetaSidebarPublishedOn() {
   const { post } = usePostCollectionData();
   const publishedDate = formatPublishedDate(post.createdAt);
   return (
-    <PostMetaSidebarSection title="Posted on">
+    <PostMetaSidebarSection title={m.last_dry_sheep()}>
       <p className="text-foreground text-sm font-medium">{publishedDate}</p>
     </PostMetaSidebarSection>
   );
@@ -354,9 +364,9 @@ function PostMetaSidebarPublishedOn() {
 
 function ShareFeedBack() {
   return (
-    <PostMetaSidebarSection title="Share this feedback">
+    <PostMetaSidebarSection title={m.equal_quiet_buzzard()}>
       <Button className="-ml-2 w-full justify-start" size="sm" variant="ghost">
-        Copy Link
+        {m.fair_patient_earthworm()}
       </Button>
     </PostMetaSidebarSection>
   );

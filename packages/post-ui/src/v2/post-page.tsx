@@ -1,5 +1,6 @@
 import { lazy, type ReactNode, Suspense } from "react";
 
+import { m } from "../paraglide/messages.js";
 import { PostCommentComposer } from "../post/post-comment-composer";
 import { CommentsList } from "./comment-display/list";
 import { ContentSkeleton } from "./content-skeleton";
@@ -117,9 +118,7 @@ function DetailMarkdown() {
   // an inline error instead of unmounting the page when it fails.
   if (isError) {
     return (
-      <p className="text-muted-foreground text-sm">
-        Post content could not be loaded.
-      </p>
+      <p className="text-muted-foreground text-sm">{m.fun_proof_guppy()}</p>
     );
   }
 

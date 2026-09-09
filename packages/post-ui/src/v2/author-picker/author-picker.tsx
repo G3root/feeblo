@@ -9,6 +9,7 @@ import { UnfoldMoreIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 
+import { m } from "../../paraglide/messages.js";
 import {
   ContactCombobox,
   describeContactSelection,
@@ -83,14 +84,14 @@ export interface AuthorPickerProps {
 export function AuthorPicker({
   disabled = false,
   display,
-  label = "Select author",
+  label = m.smart_active_halibut(),
   onSelect,
   organizationId,
-  placeholder = "Select author",
+  placeholder = m.smart_active_halibut(),
   postId,
   search,
-  searchPlaceholder = "Search users...",
-  submitLabel = "Create & set author",
+  searchPlaceholder = m.patient_empty_tiger(),
+  submitLabel = m.short_proof_bat(),
   value,
 }: AuthorPickerProps) {
   const [open, setOpen] = useState(false);
@@ -200,7 +201,7 @@ export function AuthorPicker({
             value={value}
           />
           <NewUserFooter onNewUser={() => setCreateOpen(true)}>
-            Add a brand new user
+            {m.lazy_royal_squid()}
           </NewUserFooter>
         </PopoverPopup>
       </Popover>

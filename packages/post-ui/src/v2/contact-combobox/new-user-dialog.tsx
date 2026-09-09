@@ -16,6 +16,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
+import { m } from "../../paraglide/messages.js";
+
 export type NewUserValues = {
   email: string;
   name: string;
@@ -64,7 +66,7 @@ export function NewUserDialog({
   onSubmit,
   open,
   submitLabel,
-  title = "New user",
+  title = m.aloof_active_angelfish(),
 }: {
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: NewUserValues) => Promise<void>;
@@ -88,7 +90,7 @@ export function NewUserDialog({
     const nextName = name.trim();
     const nextEmail = email.trim();
     if (!nextName) {
-      setError("Name is required");
+      setError(m.keen_trite_gecko());
       return;
     }
     // The deliverability check mirrors the server's `AuthorEmail` filter
@@ -98,7 +100,7 @@ export function NewUserDialog({
       !EmailSchema.safeParse(nextEmail).success ||
       !isDeliverableAuthorEmail(nextEmail)
     ) {
-      setError("Enter a valid email address");
+      setError(m.tense_super_wallaby());
       return;
     }
     setError(null);
@@ -129,7 +131,7 @@ export function NewUserDialog({
         </DialogHeader>
         <div className="space-y-2 px-6 pb-6">
           <input
-            aria-label="Name"
+            aria-label={m.raw_cool_wolf()}
             className="border-border/50 placeholder:text-muted-foreground/50 focus:border-border w-full rounded-md border bg-transparent px-2.5 py-1.5 text-xs outline-none"
             onChange={(event) => setName(event.target.value)}
             onKeyDown={(event) => {
@@ -138,12 +140,12 @@ export function NewUserDialog({
                 void handleSubmit();
               }
             }}
-            placeholder="Name"
+            placeholder={m.raw_cool_wolf()}
             type="text"
             value={name}
           />
           <input
-            aria-label="Email"
+            aria-label={m.slimy_lofty_leopard()}
             className="border-border/50 placeholder:text-muted-foreground/50 focus:border-border w-full rounded-md border bg-transparent px-2.5 py-1.5 text-xs outline-none"
             onChange={(event) => setEmail(event.target.value)}
             onKeyDown={(event) => {
@@ -152,7 +154,7 @@ export function NewUserDialog({
                 void handleSubmit();
               }
             }}
-            placeholder="Email"
+            placeholder={m.slimy_lofty_leopard()}
             type="email"
             value={email}
           />
@@ -166,7 +168,7 @@ export function NewUserDialog({
             size="sm"
             type="button"
           >
-            {isSubmitting ? "Adding..." : submitLabel}
+            {isSubmitting ? m.tangy_frail_wren() : submitLabel}
           </Button>
         </div>
       </DialogPopup>

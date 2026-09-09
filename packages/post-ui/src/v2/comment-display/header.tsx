@@ -3,6 +3,7 @@ import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import { CircleLockIcon, Pin02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
+import { m } from "../../paraglide/messages.js";
 import { useCommentDisplay } from "./context";
 import { formatRelativeTime } from "./utils";
 
@@ -15,7 +16,7 @@ export function CommentDisplayHeader() {
 
       {state.statusUpdateType != null && (
         <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
-          changed status to{" "}
+          {m.gray_lower_tadpole()}{" "}
           {state.statusUpdateLabel || formatPostStatus(state.statusUpdateType)}
           <span
             aria-hidden="true"
@@ -33,7 +34,7 @@ export function CommentDisplayHeader() {
       </span>
       {state.isInternal && (
         <Badge variant="info">
-          <HugeiconsIcon icon={CircleLockIcon} /> Internal
+          <HugeiconsIcon icon={CircleLockIcon} /> {m.quaint_slimy_osprey()}
         </Badge>
       )}
       {state.pinnedAt != null && (
@@ -42,7 +43,7 @@ export function CommentDisplayHeader() {
           variant="default"
         >
           <HugeiconsIcon icon={Pin02Icon} />
-          Pinned
+          {m.main_drab_maggot()}
         </Badge>
       )}
     </div>

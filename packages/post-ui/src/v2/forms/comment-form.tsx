@@ -17,6 +17,7 @@ import {
 } from "react";
 import z from "zod";
 
+import { m } from "../../paraglide/messages.js";
 import {
   CommentComposer,
   commentComposerBoxClassName,
@@ -40,11 +41,10 @@ type TVisibilitySchema = z.infer<typeof CommentVisibilitySchema>;
 
 const CommentContentField = z
   .string()
-  .min(1, "this field is required")
-  .max(
-    COMMENT_CONTENT_MAX_LENGTH,
-    `Comments must be at most ${COMMENT_CONTENT_MAX_LENGTH} characters`
-  );
+  .min(1, { error: () => m.slow_muddy_cheetah() })
+  .max(COMMENT_CONTENT_MAX_LENGTH, {
+    error: () => m.bland_antsy_fireant({ count: COMMENT_CONTENT_MAX_LENGTH }),
+  });
 
 const Schema = z.object({
   // The author key uses `.default` so the validator's OUTPUT shape carries a
@@ -83,7 +83,7 @@ export const commentCreateFormOpts = formOptions({
         return {
           fields: {
             content:
-              contentParsed.error.issues[0]?.message ?? "Invalid comment",
+              contentParsed.error.issues[0]?.message ?? m.wild_fine_bison(),
           },
         };
       }
@@ -318,14 +318,14 @@ export const CommentComposerField = withForm({
                                     // picking (and the status input disables
                                     // itself while an author is picked).
                                     disabled={statusUpdate.state.value !== null}
-                                    label="Comment as customer"
+                                    label={m.solid_full_shrimp()}
                                     onSelect={(next) =>
                                       author.handleChange(
                                         next ?? emptyOnBehalfAuthor
                                       )
                                     }
                                     organizationId={organizationId}
-                                    placeholder="Search customers by name or email..."
+                                    placeholder={m.lime_jumpy_mouse()}
                                     value={
                                       hasOnBehalfAuthorValue(author.state.value)
                                         ? author.state.value

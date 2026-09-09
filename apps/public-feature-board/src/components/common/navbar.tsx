@@ -5,7 +5,9 @@ import { cn } from "@feeblo/ui/utils";
 import { useAuth } from "@feeblo/web-shared/auth-context";
 import { Link, useLocation } from "@tanstack/react-router";
 
+import { m } from "../../paraglide/messages.js";
 import { useSite } from "../../providers/site-provider";
+import { LocaleSwitcher } from "./locale-switcher";
 import { UserMenu } from "./user-menu";
 
 export function Navbar() {
@@ -24,12 +26,12 @@ export function Navbar() {
             </div>
 
             <nav className="text-muted-foreground hidden items-center gap-4 self-stretch text-sm sm:flex">
-              <NavTab href="/" label="Feedback" />
+              <NavTab href="/" label={m.caring_brave_orangutan()} />
               {site.roadmapVisibility === "PUBLIC" ? (
-                <NavTab href="/roadmap" label="Roadmap" />
+                <NavTab href="/roadmap" label={m.slimy_stale_blackbird()} />
               ) : null}
               {site.changelogVisibility === "PUBLIC" ? (
-                <NavTab href="/changelog" label="Changelog" />
+                <NavTab href="/changelog" label={m.strong_loved_flamingo()} />
               ) : null}
             </nav>
           </div>
@@ -40,12 +42,12 @@ export function Navbar() {
         </div>
 
         <nav className="text-muted-foreground flex items-center gap-4 pb-2 text-sm sm:hidden">
-          <NavTab href="/" label="Feedback" />
+          <NavTab href="/" label={m.caring_brave_orangutan()} />
           {site.roadmapVisibility === "PUBLIC" ? (
-            <NavTab href="/roadmap" label="Roadmap" />
+            <NavTab href="/roadmap" label={m.slimy_stale_blackbird()} />
           ) : null}
           {site.changelogVisibility === "PUBLIC" ? (
-            <NavTab href="/changelog" label="Changelog" />
+            <NavTab href="/changelog" label={m.strong_loved_flamingo()} />
           ) : null}
         </nav>
       </div>
@@ -81,6 +83,7 @@ function UserActions() {
 
   return (
     <div className="flex items-center gap-2">
+      <LocaleSwitcher />
       {isAuthenticated ? (
         <>
           <NotificationsMenu organizationId={site.organizationId} />

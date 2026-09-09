@@ -5,6 +5,7 @@ import { Cancel01Icon, MoreVerticalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 
+import { m } from "../../paraglide/messages.js";
 import {
   NewUserDialog,
   NewUserFooter,
@@ -50,8 +51,8 @@ export function CommentOptionsMenu() {
             <Button
               aria-label={
                 selectedStatus
-                  ? `Status update: ${selectedStatus.label}`
-                  : "Comment options"
+                  ? m.full_slow_goose({ status: selectedStatus.label })
+                  : m.simple_nimble_cowfish()
               }
               disabled={isDisabled}
               size="icon-sm"
@@ -90,13 +91,13 @@ export function CommentOptionsMenu() {
                       onValueChange={(status) =>
                         actions.onStatusUpdateIdChange(status?.id ?? null)
                       }
-                      placeholder="Select status..."
+                      placeholder={m.lower_new_florian()}
                       statuses={state.statusOptions}
                     />
                   </div>
                   {statusSelected ? (
                     <Button
-                      aria-label="Remove status update"
+                      aria-label={m.ago_away_crocodile()}
                       disabled={isDisabled}
                       onClick={() => actions.onStatusUpdateIdChange(null)}
                       size="icon-xs"
@@ -112,11 +113,11 @@ export function CommentOptionsMenu() {
             {showAuthor && showStatus ? <Separator /> : null}
             {showAuthor && state.authorPicker ? (
               <section
-                aria-label="Comment as customer"
+                aria-label={m.solid_full_shrimp()}
                 className="min-w-0 space-y-1.5"
               >
                 <p className="text-muted-foreground text-[11px] font-medium">
-                  Comment as customer
+                  {m.solid_full_shrimp()}
                 </p>
                 {state.authorPicker}
                 {canCreateAuthor ? (
@@ -124,7 +125,7 @@ export function CommentOptionsMenu() {
                     disabled={statusSelected || isDisabled}
                     onNewUser={() => setIsCreateOpen(true)}
                   >
-                    Add new author
+                    {m.fluffy_steep_squid()}
                   </NewUserFooter>
                 ) : null}
               </section>
@@ -139,7 +140,7 @@ export function CommentOptionsMenu() {
             await actions.onAuthorCreate?.(values);
           }}
           open={isCreateOpen}
-          submitLabel="Add author"
+          submitLabel={m.away_round_goldfish()}
         />
       ) : null}
     </>

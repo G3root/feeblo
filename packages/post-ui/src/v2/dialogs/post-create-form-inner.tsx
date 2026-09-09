@@ -29,6 +29,7 @@ import {
   useState,
 } from "react";
 
+import { m } from "../../paraglide/messages.js";
 import { AuthorPicker } from "../author-picker/author-picker";
 import {
   emptyOnBehalfAuthor,
@@ -117,15 +118,13 @@ function SimilarPosts({
   return (
     <section
       aria-busy={loading}
-      aria-label="Similar posts"
+      aria-label={m.fun_game_goose()}
       aria-live="polite"
       className="bg-muted/30 overflow-hidden rounded-lg border"
     >
       <div className="border-b px-3 py-2">
-        <p className="text-sm font-medium">Similar posts</p>
-        <p className="text-muted-foreground text-xs">
-          Check whether your idea already exists.
-        </p>
+        <p className="text-sm font-medium">{m.fun_game_goose()}</p>
+        <p className="text-muted-foreground text-xs">{m.bad_empty_polecat()}</p>
       </div>
       <div className="divide-y">
         {posts.map((post) => {
@@ -321,7 +320,7 @@ export function PostCreateForm() {
         );
 
         if (!selectedPostStatus) {
-          throw new Error("Post status not found");
+          throw new Error(m.knotty_actual_bumblebee());
         }
         // Attribution only rides along when a subject is actually picked;
         // otherwise the session user authors.
@@ -366,7 +365,7 @@ export function PostCreateForm() {
         finalized.commit();
         trackEvent("post_created", { source, success: true });
         toastManager.add({
-          title: "Post created successfully",
+          title: m.trite_lower_moose(),
           type: "success",
         });
 
@@ -449,18 +448,18 @@ export function PostCreateForm() {
                     <AuthorPicker
                       display={
                         selection ?? {
-                          name: session?.user?.name ?? "You",
+                          name: session?.user?.name ?? m.noble_merry_owl(),
                           avatarUrl: session?.user?.image ?? null,
                         }
                       }
-                      label="Post author"
+                      label={m.inner_glad_leopard()}
                       onSelect={(next) =>
                         field.handleChange(next ?? emptyOnBehalfAuthor)
                       }
                       organizationId={organizationId}
-                      placeholder="Select a customer"
-                      searchPlaceholder="Search customers by name or email..."
-                      submitLabel="Create & add author"
+                      placeholder={m.free_quiet_llama()}
+                      searchPlaceholder={m.lime_jumpy_mouse()}
+                      submitLabel={m.stout_cozy_finch()}
                       value={selection}
                     />
                   );
@@ -472,7 +471,7 @@ export function PostCreateForm() {
         <div className="flex items-center justify-end gap-3">
           <PostCreateMoreField form={form} />
           <Button type="submit" variant="brand">
-            Create Post
+            {m.lucky_game_cowfish()}
           </Button>
         </div>
       </DialogFooter>

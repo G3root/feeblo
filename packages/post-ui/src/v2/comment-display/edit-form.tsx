@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { m } from "../../paraglide/messages.js";
 import { CommentComposer } from "../comment-composer";
 import { useCommentDisplay } from "./context";
 
@@ -27,7 +28,7 @@ export function CommentDisplayEditForm() {
         }}
         onVisibilityChange={setIsPrivate}
         showVisibilityToggle={false}
-        submitLabel="Save"
+        submitLabel={m.weary_drab_falcon()}
       />
     </div>
   );

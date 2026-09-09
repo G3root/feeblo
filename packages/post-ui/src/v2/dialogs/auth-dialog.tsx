@@ -37,6 +37,7 @@ import {
   useSignUpEmail,
   useVerifyEmailOtp,
 } from "../../auth/use-auth-submission";
+import { m } from "../../paraglide/messages.js";
 import { useAuthDialogContext } from "../dialog-stores/auth";
 
 type EmailStep = "email-sign-in" | "email-sign-up";
@@ -57,7 +58,7 @@ export function AuthButton() {
       type="button"
       variant="secondary"
     >
-      Sign in / Sign up
+      {m.ok_jumpy_cobra()}
     </Button>
   );
 }
@@ -120,7 +121,7 @@ export function AuthDialogRoot() {
               variant="ghost"
             >
               <HugeiconsIcon icon={ArrowLeft01Icon} />
-              Back
+              {m.dizzy_lower_baboon()}
             </Button>
           ) : null}
           <DialogTitle>{title}</DialogTitle>
@@ -155,23 +156,22 @@ function getStepCopy(step: DialogStep) {
   switch (step.kind) {
     case "chooser":
       return {
-        title: "Sign in / Sign up",
+        title: m.ok_jumpy_cobra(),
       };
     case "email-sign-in":
       return {
-        title: "Sign in with email",
-        description: "Use your email and password to continue.",
+        title: m.stock_such_porpoise(),
+        description: m.awake_tidy_antelope(),
       };
     case "email-sign-up":
       return {
-        title: "Sign up with email",
-        description: "Create an account to start collecting feedback.",
+        title: m.extra_born_bear(),
+        description: m.agent_smart_cat(),
       };
     case "otp-verification":
       return {
-        title: "Verify your email",
-        description:
-          "Enter the 6-digit code we just emailed you to activate your account.",
+        title: m.still_white_dachshund(),
+        description: m.north_tiny_pelican(),
       };
   }
 }
@@ -184,14 +184,14 @@ function AuthMethodChooser({
   return (
     <div className="flex flex-col gap-3">
       <SocialAuthButtons />
-      <FieldSeparator>Or continue with email</FieldSeparator>
+      <FieldSeparator>{m.stout_teary_dove()}</FieldSeparator>
 
       <Button onClick={() => onSelectEmailStep("email-sign-in")}>
-        Sign in with email
+        {m.stock_such_porpoise()}
       </Button>
 
       <Button onClick={() => onSelectEmailStep("email-sign-up")}>
-        Sign up with email
+        {m.extra_born_bear()}
       </Button>
     </div>
   );
@@ -199,7 +199,7 @@ function AuthMethodChooser({
 
 function showAuthError(message?: string | null) {
   toastManager.add({
-    title: message ?? "Something went wrong",
+    title: message ?? m.every_salty_antelope(),
     type: "error",
   });
 }
@@ -233,14 +233,14 @@ function SignInForm({
 
   return (
     <AuthForm form={form}>
-      <SignInFields form={form} submitLabel="Sign in">
+      <SignInFields form={form} submitLabel={m.salty_few_seal()}>
         <a
           className="text-muted-foreground text-sm underline underline-offset-4"
           href={`${getRuntimePublicEnv().appUrl ?? ""}/forgot-password`}
           rel="noreferrer"
           target="_blank"
         >
-          Forgot password?
+          {m.fit_close_crossbill()}
         </a>
       </SignInFields>
     </AuthForm>
@@ -266,7 +266,7 @@ function SignUpForm({
     ...signUpFormOpts,
     onSubmit: async ({ value }) => {
       if (turnstile.isEnabled && !turnstile.token) {
-        showAuthError("Please complete the security verification");
+        showAuthError(m.small_round_lemming());
         return;
       }
 
@@ -289,7 +289,7 @@ function SignUpForm({
       <SignUpFields
         disabled={turnstile.isEnabled && !turnstile.token}
         form={form}
-        submitLabel="Sign up"
+        submitLabel={m.mealy_patchy_shrimp()}
       >
         <TurnstileField
           onError={turnstile.handleError}
@@ -340,8 +340,8 @@ function OtpVerificationForm({
 
   return (
     <AuthForm form={form}>
-      <OtpFormFields form={form} submitLabel="Verify">
-        <OtpResend onResend={resend} successMessage="Verification code sent" />
+      <OtpFormFields form={form} submitLabel={m.kind_less_vole()}>
+        <OtpResend onResend={resend} successMessage={m.honest_dry_skunk()} />
       </OtpFormFields>
     </AuthForm>
   );

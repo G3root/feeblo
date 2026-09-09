@@ -2,6 +2,7 @@ import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
 import type { ReactNode } from "react";
 import { createContext, use } from "react";
 
+import { m } from "../../paraglide/messages.js";
 import { useCommentComposerState } from "./store";
 
 /** One selectable post status in the "comment as status update" picker. */
@@ -92,6 +93,6 @@ export function useCommentComposerPlaceholder(): string {
 
   return (
     state.placeholder ??
-    (isPrivate ? "Add an internal note..." : "Add a comment...")
+    (isPrivate ? m.patient_active_mammoth() : m.actual_safe_impala())
   );
 }

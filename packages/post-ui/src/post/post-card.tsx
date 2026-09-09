@@ -3,6 +3,8 @@ import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { cn } from "@feeblo/ui/utils";
 import { Link } from "@tanstack/react-router";
 
+import { m } from "../paraglide/messages.js";
+
 // ---------------------------------------------------------------------------
 // Shared composable PostCard — coss-style primitives (no useRender, no mergeProps)
 // Composition over boolean props. Add a checkbox as child of Root; omit when not needed.
@@ -175,7 +177,7 @@ export function PostCardAuthor({
         className="text-muted-foreground truncate text-right text-xs"
         data-slot="post-card-author-name"
       >
-        {name ?? "Anonymous"}
+        {name ?? m.active_equal_hedgehog()}
       </span>
     </div>
   );
@@ -213,7 +215,7 @@ export function PostCardMobileMeta({
     >
       <UserAvatar image={image} name={name} />
       <span className="truncate" data-slot="post-card-mobile-author">
-        {name ?? "Anonymous"}
+        {name ?? m.active_equal_hedgehog()}
       </span>
       <span className="text-border" data-slot="post-card-mobile-separator">
         ·

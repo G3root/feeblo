@@ -16,6 +16,7 @@ import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 
 import { useChangelogFilterStore } from "../../lib/changelog-filter-store";
+import { m } from "../../paraglide/messages.js";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
 
@@ -59,7 +60,7 @@ export function ChangelogCategoryFilter() {
           <MenuSub>
             <MenuSubTrigger>
               <HugeiconsIcon icon={Tag01Icon} />
-              Categories
+              {m.gaudy_trite_mayfly()}
             </MenuSubTrigger>
             <MenuPortal>
               <MenuSubPopup>

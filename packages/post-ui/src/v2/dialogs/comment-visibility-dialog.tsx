@@ -11,6 +11,7 @@ import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { useSelector } from "@xstate/store-react";
 
+import { m } from "../../paraglide/messages.js";
 import { useCommentVisibilityDialogContext } from "../dialog-stores/comment-visibility";
 import { usePostCollections } from "../providers/post-collections-provider";
 
@@ -33,16 +34,14 @@ export function CommentVisibilityDialog() {
       <AlertDialogPopup>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {isInternal ? "Make comment public" : "Make comment internal"}
+            {isInternal ? m.male_civil_lionfish() : m.nice_super_octopus()}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {isInternal
-              ? "This comment will be visible to everyone. Are you sure you want to make it public?"
-              : "This comment will only be visible to members of your organization. Are you sure you want to make it internal?"}
+            {isInternal ? m.weary_free_jaguar() : m.orange_lime_jackal()}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{m.early_careful_coyote()}</AlertDialogCancel>
           <Button
             onClick={async () => {
               try {
@@ -53,21 +52,21 @@ export function CommentVisibilityDialog() {
                 await tx.isPersisted.promise;
                 toastManager.add({
                   title: isInternal
-                    ? "Comment is now public"
-                    : "Comment is now internal",
+                    ? m.moving_vivid_duck()
+                    : m.giant_factual_midge(),
                   type: "success",
                 });
                 store.send({ type: "toggle" });
               } catch {
                 toastManager.add({
-                  title: "Failed to update comment visibility",
+                  title: m.patient_dry_iguana(),
                   type: "error",
                 });
               }
             }}
             variant="destructive"
           >
-            Continue
+            {m.clean_aqua_lion()}
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
