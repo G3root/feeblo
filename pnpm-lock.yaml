@@ -1170,6 +1170,12 @@ importers:
       '@feeblo/config':
         specifier: workspace:*
         version: link:../config
+      '@inlang/cli':
+        specifier: ^3.3.0
+        version: 3.3.0
+      '@inlang/paraglide-js':
+        specifier: ^2.23.1
+        version: 2.23.2(typescript@6.0.3)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
       '@ladle/react':
         specifier: ^5.1.1
         version: 5.1.1(@types/node@26.2.0)(@types/react@19.2.18)(jiti@2.7.0)(lightningcss@1.33.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(tsx@4.23.12)(typescript@6.0.3)(yaml@2.9.0)

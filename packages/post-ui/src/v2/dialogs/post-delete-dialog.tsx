@@ -14,6 +14,7 @@ import { and, eq, queryOnce } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 
+import { m } from "../../paraglide/messages.js";
 import { usePostDeleteDialogContext } from "../dialog-stores/post";
 import { usePostCollections } from "../providers/post-collections-provider";
 
@@ -29,13 +30,13 @@ export function PostDeleteDialog() {
     >
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete Post</AlertDialogTitle>
+          <AlertDialogTitle>{m.wise_wild_poodle()}</AlertDialogTitle>
           <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete the post.
+            {m.brave_sunny_wasp()}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{m.early_careful_coyote()}</AlertDialogCancel>
           <Button
             onClick={async () => {
               try {
@@ -68,7 +69,7 @@ export function PostDeleteDialog() {
                       success: false,
                     });
                     toastManager.add({
-                      title: "This post can no longer be deleted.",
+                      title: m.cozy_safe_pug(),
                       type: "error",
                     });
                     store.send({ type: "toggle" });
@@ -83,7 +84,7 @@ export function PostDeleteDialog() {
                 trackEvent("post_deleted", { mode: "single", success: true });
                 store.send({ type: "toggle" });
                 toastManager.add({
-                  title: "Post deleted successfully",
+                  title: m.direct_true_fireant(),
                   type: "success",
                 });
                 if (redirectOptions) {
@@ -92,14 +93,14 @@ export function PostDeleteDialog() {
               } catch {
                 trackEvent("post_deleted", { mode: "single", success: false });
                 toastManager.add({
-                  title: "Failed to delete post",
+                  title: m.known_known_vole(),
                   type: "error",
                 });
               }
             }}
             variant="destructive"
           >
-            Continue
+            {m.clean_aqua_lion()}
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>

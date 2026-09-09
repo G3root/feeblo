@@ -8,6 +8,7 @@ import {
 import { CircleLockIcon, CircleUnlockIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
+import { m } from "../../paraglide/messages.js";
 import { useCommentComposer, useCommentComposerIsDisabled } from "./context";
 import { useCommentComposerState } from "./store";
 
@@ -28,7 +29,9 @@ export function VisibilityToggle() {
         <TooltipTrigger
           render={
             <Toggle
-              aria-label={isPrivate ? "Switch to public" : "Switch to internal"}
+              aria-label={
+                isPrivate ? m.great_crisp_crossbill() : m.tangy_bold_camel()
+              }
               disabled={isDisabled}
               onPressedChange={(pressed) => actions.onVisibilityChange(pressed)}
               pressed={isPrivate}

@@ -11,6 +11,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useCallback, useMemo, useState } from "react";
 
+import { m } from "../../paraglide/messages.js";
 import { usePostCollectionData } from "../post-page-context";
 import { usePostCollections } from "../providers/post-collections-provider";
 import { CommentDisplayItem } from "./list-item";
@@ -143,8 +144,10 @@ function CommentThreadRow({
               size={14}
             />
             {isExpanded
-              ? "Hide replies"
-              : `Show ${replies.length} ${replies.length === 1 ? "reply" : "replies"}`}
+              ? m.dull_close_thrush()
+              : replies.length === 1
+                ? m.fresh_smart_mare({ count: replies.length })
+                : m.fit_aqua_beetle({ count: replies.length })}
           </CollapsibleTrigger>
           <CollapsiblePanel>
             <div className="border-border/70 mt-1.5 flex flex-col gap-1 border-l py-1 pl-4">

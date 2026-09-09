@@ -25,6 +25,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 
+import { m } from "../../paraglide/messages.js";
+
 /** Debounce applied before each ContactSearch round-trip. */
 const SEARCH_DEBOUNCE_MS = 200;
 /** Minimum query length before the picker hits ContactSearch. */
@@ -187,10 +189,10 @@ export interface ContactComboboxProps {
 export function ContactCombobox({
   disabled = false,
   disableAlreadyVoted = true,
-  label = "Search customers",
+  label = m.best_mealy_lynx(),
   organizationId,
   onSelect,
-  placeholder = "Search by name or email...",
+  placeholder = m.happy_same_oryx(),
   postId,
   search = searchContacts,
   value,
@@ -331,7 +333,7 @@ export function ContactCombobox({
   // The empty-object default (no subject picked) must read as "nothing
   // selected" so the picker opens normally.
   if (value !== null && hasOnBehalfAuthorValue(value)) {
-    const displayName = value.name ?? value.email ?? "Customer";
+    const displayName = value.name ?? value.email ?? m.aqua_awake_meerkat();
 
     return (
       <div className="flex flex-col gap-1">
@@ -350,10 +352,10 @@ export function ContactCombobox({
             ) : null}
           </div>
           {value.isMember ? (
-            <Badge variant="outline">Workspace member</Badge>
+            <Badge variant="outline">{m.sad_soft_tadpole()}</Badge>
           ) : null}
           <Button
-            aria-label="Remove selected person"
+            aria-label={m.short_teary_seahorse()}
             onClick={() => onSelect(null)}
             size="icon-xs"
             type="button"
@@ -364,7 +366,7 @@ export function ContactCombobox({
         </div>
         {value.hasAccess === false ? (
           <p className="text-muted-foreground text-xs">
-            Won't be notified until they have access to this workspace.
+            {m.hour_smart_wombat()}
           </p>
         ) : null}
       </div>
@@ -417,14 +419,14 @@ export function ContactCombobox({
             aria-live="polite"
             className="text-muted-foreground px-3 py-2 text-xs"
           >
-            Searching…
+            {m.sunny_elegant_thrush()}
           </p>
         ) : null}
         {!isSearching &&
         trimmedQuery.length > 0 &&
         trimmedQuery.length < MIN_QUERY_LENGTH ? (
           <p className="text-muted-foreground px-3 py-2 text-xs">
-            Type at least {MIN_QUERY_LENGTH} characters to search.
+            {m.loud_giant_goat({ count: MIN_QUERY_LENGTH })}
           </p>
         ) : null}
         {!isSearching &&
@@ -432,7 +434,7 @@ export function ContactCombobox({
         trimmedQuery.length >= MIN_QUERY_LENGTH ? (
           <div className="flex items-center justify-between gap-2 px-3 py-2">
             <p className="text-muted-foreground text-xs">
-              Couldn't load results.
+              {m.smug_crisp_alpaca()}
             </p>
             <Button
               onClick={() => setRetryToken((token) => token + 1)}
@@ -440,7 +442,7 @@ export function ContactCombobox({
               type="button"
               variant="ghost"
             >
-              Retry
+              {m.even_seemly_bear()}
             </Button>
           </div>
         ) : null}
@@ -458,9 +460,9 @@ export function ContactCombobox({
                       strokeWidth={2}
                     />
                     <span>
-                      {results.length === 0 ? "No match — add" : "Add"}{" "}
-                      <span className="font-medium">{option.email}</span> as new
-                      customer
+                      {results.length === 0
+                        ? m.misty_red_vole({ email: option.email })
+                        : m.agent_gross_anteater({ email: option.email })}
                     </span>
                   </span>
                 </ComboboxItem>
@@ -491,7 +493,7 @@ export function ContactCombobox({
                       ) : null}
                       {option.contact.hasAccess === false ? (
                         <p className="text-muted-foreground truncate text-xs">
-                          Won't be notified until they have access
+                          {m.curly_watery_polecat()}
                         </p>
                       ) : null}
                     </div>
@@ -501,10 +503,12 @@ export function ContactCombobox({
                       </span>
                     ) : null}
                     {option.contact.isMember ? (
-                      <Badge variant="outline">Workspace member</Badge>
+                      <Badge variant="outline">{m.sad_soft_tadpole()}</Badge>
                     ) : null}
                     {option.contact.alreadyVoted && disableAlreadyVoted ? (
-                      <Badge variant="outline">Already voted</Badge>
+                      <Badge variant="outline">
+                        {m.even_fancy_crocodile()}
+                      </Badge>
                     ) : null}
                   </div>
                 </ComboboxItem>
@@ -513,7 +517,7 @@ export function ContactCombobox({
           </ComboboxList>
         ) : null}
         {!isSearching && trimmedQuery.length === 0 ? (
-          <ComboboxEmpty>Type a name or email to search.</ComboboxEmpty>
+          <ComboboxEmpty>{m.warm_steep_vole()}</ComboboxEmpty>
         ) : null}
       </ComboboxPopup>
     </Combobox>

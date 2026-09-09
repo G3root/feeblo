@@ -9,6 +9,7 @@ import {
 import { useSelector } from "@xstate/store-react";
 import { lazy, Suspense } from "react";
 
+import { m } from "../../paraglide/messages.js";
 import { usePostCreateDialogContext } from "../dialog-stores/post";
 
 const PostCreateForm = lazy(() =>
@@ -18,7 +19,7 @@ const PostCreateForm = lazy(() =>
 );
 
 function PostCreateFormFallback() {
-  return <DialogPanel>Loading post form…</DialogPanel>;
+  return <DialogPanel>{m.sleek_left_ray()}</DialogPanel>;
 }
 
 export function PostCreateDialog() {
@@ -28,10 +29,8 @@ export function PostCreateDialog() {
     <Dialog onOpenChange={() => store.send({ type: "toggle" })} open={open}>
       <DialogPopup className="w-full max-w-187.5 md:min-h-150">
         <DialogHeader>
-          <DialogTitle>Create Post</DialogTitle>
-          <DialogDescription>
-            Create a new post in the selected board.
-          </DialogDescription>
+          <DialogTitle>{m.lucky_game_cowfish()}</DialogTitle>
+          <DialogDescription>{m.wide_inner_jurgen()}</DialogDescription>
         </DialogHeader>
         {open ? (
           <Suspense fallback={<PostCreateFormFallback />}>

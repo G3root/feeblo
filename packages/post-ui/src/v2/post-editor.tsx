@@ -15,6 +15,7 @@ import {
   useState,
 } from "react";
 
+import { m } from "../paraglide/messages.js";
 import { ContentSkeleton } from "./content-skeleton";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
@@ -52,7 +53,6 @@ type PostEditorInitialContent = {
 const PostEditorInitialContentContext =
   createContext<PostEditorInitialContent | null>(null);
 
-const DEFAULT_PLACEHOLDER = "Type '/' for commands or start typing...";
 const noop = () => undefined;
 
 function usePostEditor() {
@@ -129,7 +129,7 @@ function PostEditorProvider({
   onSubmit = noop,
   placeholder,
   resetKey = 0,
-  submitLabel = "Publish",
+  submitLabel = m.whole_misty_marlin(),
 }: PostEditorProviderProps) {
   const onContentChangeRef = useRef(onContentChange);
   const onSubmitRef = useRef(onSubmit);
@@ -158,7 +158,7 @@ function PostEditorProvider({
       disabled,
       editorScope,
       organizationId,
-      placeholder: placeholder ?? DEFAULT_PLACEHOLDER,
+      placeholder: placeholder ?? m.big_muddy_jannes(),
       resetKey,
     }),
     [disabled, editorScope, organizationId, placeholder, resetKey]
@@ -210,7 +210,7 @@ const PostEditorSubmit = memo(function PostEditorSubmit() {
   return (
     <div className="flex items-center justify-end pt-2">
       <Button
-        aria-label="Save"
+        aria-label={m.ornate_bad_toad()}
         disabled={state.disabled}
         onClick={async () => {
           // Capture the anchor synchronously: awaiting the submit can unmount
@@ -234,7 +234,7 @@ const PostEditorSubmit = memo(function PostEditorSubmit() {
                 sideOffset: 8,
               },
               timeout: 2000,
-              title: `${meta.submitLabel} successful`,
+              title: m.front_sad_hare(),
             });
           } catch {
             // Failure feedback is surfaced by the onSubmit handler.
@@ -398,9 +398,7 @@ export function PostContentUpdateInput() {
 
   if (detail.isError) {
     return (
-      <p className="text-muted-foreground text-sm">
-        Post content could not be loaded.
-      </p>
+      <p className="text-muted-foreground text-sm">{m.fun_proof_guppy()}</p>
     );
   }
 
@@ -422,14 +420,14 @@ export function PostContentUpdateInput() {
           await tx.isPersisted.promise;
         } catch (error) {
           toastManager.add({
-            title: "Failed to update content",
+            title: m.tame_such_reindeer(),
             type: "error",
           });
           throw error;
         }
       }}
       organizationId={organizationId}
-      submitLabel="Update"
+      submitLabel={m.key_bald_mule()}
     >
       <PostEditor.Submit />
     </PostEditor>

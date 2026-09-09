@@ -11,6 +11,7 @@ import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { useSelector } from "@xstate/store-react";
 
+import { m } from "../../paraglide/messages.js";
 import { useCommentDeleteDialogContext } from "../dialog-stores/comment";
 import { usePostCollections } from "../providers/post-collections-provider";
 
@@ -27,14 +28,13 @@ export function CommentDeleteDialog() {
     >
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete Comment</AlertDialogTitle>
+          <AlertDialogTitle>{m.due_same_millipede()}</AlertDialogTitle>
           <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete the
-            comment.
+            {m.close_smart_wallaby()}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{m.early_careful_coyote()}</AlertDialogCancel>
           <Button
             onClick={async () => {
               try {
@@ -42,20 +42,20 @@ export function CommentDeleteDialog() {
                 const tx = commentCollection.delete(id);
                 await tx.isPersisted.promise;
                 toastManager.add({
-                  title: "Comment deleted successfully",
+                  title: m.mealy_soft_elk(),
                   type: "success",
                 });
                 store.send({ type: "toggle" });
               } catch {
                 toastManager.add({
-                  title: "Failed to delete comment",
+                  title: m.day_spare_herring(),
                   type: "error",
                 });
               }
             }}
             variant="destructive"
           >
-            Continue
+            {m.clean_aqua_lion()}
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>

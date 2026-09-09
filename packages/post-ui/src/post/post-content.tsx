@@ -2,6 +2,8 @@ import type { EditorProps } from "@feeblo/ui/editor";
 import { Editor } from "@feeblo/ui/editor";
 import { EditorProvider } from "@feeblo/ui/editor/editor-store";
 
+import { m } from "../paraglide/messages.js";
+
 interface PostContentEditorProps extends EditorProps {
   onChange: (value: string) => void;
   value: string;
@@ -32,7 +34,7 @@ export function PostContentEditor({
             onChange(doc);
           }}
           organizationId={organizationId}
-          placeholder="Add description..."
+          placeholder={m.glad_next_larva()}
           readOnly={readOnly}
           {...rest}
         />

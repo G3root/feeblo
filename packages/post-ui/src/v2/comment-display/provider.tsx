@@ -1,6 +1,7 @@
 import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
 import { type ReactNode, useMemo } from "react";
 
+import { m } from "../../paraglide/messages.js";
 import {
   CommentDisplayContext,
   type CommentDisplayContextValue,
@@ -62,9 +63,9 @@ export function CommentDisplayProvider({
   postSlug,
   content,
   createdAt,
-  deleteLabel = "Delete",
+  deleteLabel = m.grassy_least_wallaby(),
   disabled = false,
-  editLabel = "Edit",
+  editLabel = m.kind_wise_goat(),
   isAuthor = false,
   isEditing = false,
   isInternal = false,
@@ -79,11 +80,11 @@ export function CommentDisplayProvider({
   onToggleVisibility = defaultCallbacks.onToggleVisibility,
   onTogglePin = defaultCallbacks.onTogglePin,
   onUpdate = defaultCallbacks.onUpdate,
-  replyLabel = "Reply",
-  toggleToInternalLabel = "Make internal",
-  toggleToPublicLabel = "Make public",
-  pinLabel = "Pin comment",
-  unpinLabel = "Unpin comment",
+  replyLabel = m.male_home_guppy(),
+  toggleToInternalLabel = m.icy_lofty_fireant(),
+  toggleToPublicLabel = m.chunky_heroic_cowfish(),
+  pinLabel = m.inclusive_bold_eagle(),
+  unpinLabel = m.hour_same_warbler(),
 }: CommentDisplayProviderProps) {
   const contextValue = useMemo<CommentDisplayContextValue>(
     () => ({

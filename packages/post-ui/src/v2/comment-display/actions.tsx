@@ -1,6 +1,7 @@
 import { Button } from "@feeblo/ui/button";
 import { useState } from "react";
 
+import { m } from "../../paraglide/messages.js";
 import { CommentComposer } from "../comment-composer";
 import { usePostCollectionData } from "../post-page-context";
 import { usePostCollections } from "../providers/post-collections-provider";
@@ -44,7 +45,7 @@ export function CommentDisplayActions() {
           type="button"
           variant="ghost"
         >
-          {isReplying ? "Hide reply" : meta.replyLabel}
+          {isReplying ? m.fresh_curly_stork() : meta.replyLabel}
         </Button>
         <CommentReactionPicker
           commentId={state.commentId}
@@ -69,13 +70,13 @@ export function CommentDisplayActions() {
                 setIsReplying(false);
               }
             }}
-            placeholder={`Reply to ${state.authorName}...`}
+            placeholder={m.fuzzy_caring_mare({ name: state.authorName })}
             // A reply under an INTERNAL comment continues member-only
             // context: force it INTERNAL and hide the toggle (the policy
             // denies PUBLIC replies under an INTERNAL parent).
             isPrivate={state.isInternal ? true : undefined}
             showVisibilityToggle={isMember && !state.isInternal}
-            submitLabel="Reply"
+            submitLabel={m.male_home_guppy()}
           />
         </div>
       )}

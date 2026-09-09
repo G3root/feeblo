@@ -31,6 +31,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useState } from "react";
 
+import { m } from "../paraglide/messages.js";
 import {
   ContactCombobox,
   type ContactComboboxSelection,
@@ -162,7 +163,7 @@ export function VoterPanel() {
   };
 
   return (
-    <section aria-label="Voters" className="space-y-2">
+    <section aria-label={m.dizzy_livid_warbler()} className="space-y-2">
       <div className="flex items-center justify-between">
         <h2 className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
           <HugeiconsIcon
@@ -170,7 +171,7 @@ export function VoterPanel() {
             icon={ThumbsUpIcon}
             strokeWidth={2}
           />
-          Voters ({upvotes.length})
+          {m.safe_shy_firefox({ count: upvotes.length })}
         </h2>
         {session && votesOnBehalfPolicy.allowed ? (
           <Popover onOpenChange={setIsAddOpen} open={isAddOpen}>
@@ -178,21 +179,21 @@ export function VoterPanel() {
               render={
                 <Button size="sm" type="button" variant="ghost">
                   <HugeiconsIcon icon={UserAdd01Icon} strokeWidth={2} />
-                  Add voter
+                  {m.deft_strong_fox()}
                 </Button>
               }
             />
             <PopoverPopup align="end" className="w-64 p-1" initialFocus={false}>
               <ContactCombobox
-                label="Add voter"
+                label={m.deft_strong_fox()}
                 onSelect={handleAdd}
                 organizationId={organizationId}
-                placeholder="Search customers by name or email..."
+                placeholder={m.basic_main_tuna()}
                 postId={post.id}
                 value={null}
               />
               <NewUserFooter onNewUser={() => setIsCreateOpen(true)}>
-                Add new upvoter
+                {m.known_weird_platypus()}
               </NewUserFooter>
             </PopoverPopup>
           </Popover>
@@ -203,17 +204,19 @@ export function VoterPanel() {
         onOpenChange={setIsCreateOpen}
         onSubmit={handleCreateAndVote}
         open={isCreateOpen}
-        submitLabel="Create & add vote"
+        submitLabel={m.great_tangy_butterfly()}
       />
 
       {isLoading ? (
         <Skeleton className="h-8 w-full" />
       ) : upvotes.length === 0 ? (
-        <p className="text-muted-foreground text-xs">No voters yet.</p>
+        <p className="text-muted-foreground text-xs">
+          {m.pretty_misty_stingray()}
+        </p>
       ) : (
         <Dialog onOpenChange={setIsDialogOpen} open={isDialogOpen}>
           <button
-            aria-label={`Show all ${upvotes.length} voters`}
+            aria-label={m.home_late_grebe({ count: upvotes.length })}
             className="flex items-center transition-opacity hover:opacity-80"
             onClick={() => setIsDialogOpen(true)}
             type="button"
@@ -233,7 +236,9 @@ export function VoterPanel() {
           </button>
           <DialogPopup>
             <DialogHeader>
-              <DialogTitle>Voters ({upvotes.length})</DialogTitle>
+              <DialogTitle>
+                {m.safe_shy_firefox({ count: upvotes.length })}
+              </DialogTitle>
             </DialogHeader>
             <ul className="max-h-80 space-y-1 overflow-y-auto px-6 pb-6">
               {upvotes.map((upvote) => {
@@ -252,11 +257,13 @@ export function VoterPanel() {
                         !upvote.user.name && "text-muted-foreground"
                       )}
                     >
-                      {upvote.user.name ?? "Customer"}
+                      {upvote.user.name ?? m.teal_merry_bee()}
                     </span>
                     {canRemove ? (
                       <Button
-                        aria-label={`Remove voter ${upvote.user.name ?? "customer"}`}
+                        aria-label={m.calm_nice_marmot({
+                          name: upvote.user.name ?? m.teal_merry_bee(),
+                        })}
                         className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
                         onClick={() => {
                           if (!upvote.userId) {

@@ -3,6 +3,7 @@ import { Menu, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { Ellipsis } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
+import { m } from "../../paraglide/messages.js";
 import { usePostCollectionData } from "../post-page-context";
 import { useCommentDisplay } from "./context";
 import { DeleteButton } from "./delete-button";
@@ -23,7 +24,7 @@ export function CommentDisplayDropdown() {
       <MenuTrigger
         render={
           <Button
-            aria-label="Comment menu"
+            aria-label={m.equal_sound_lark()}
             className="transition-opacity data-popup-open:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
             size="icon-sm"
             variant="ghost"

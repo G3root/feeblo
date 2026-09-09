@@ -12,6 +12,7 @@ import { formOptions } from "@tanstack/react-form";
 import { lazy, Suspense } from "react";
 import { z } from "zod";
 
+import { m } from "../../paraglide/messages.js";
 import { emptyOnBehalfAuthor } from "../contact-combobox/contact-combobox";
 import { PostBoardSelect, StatusField } from "../post-field";
 import { PostTitleInput } from "../post-title-input";
@@ -19,23 +20,27 @@ import { usePostCollections } from "../providers/post-collections-provider";
 
 // Per-field schemas: reused by the form's function validator, which checks
 // each field independently (see postCreateFormOpts).
-const BoardIdField = z.string().trim().min(1, "Board is required");
+const BoardIdField = z
+  .string()
+  .trim()
+  .min(1, { error: () => m.agent_real_tuna() });
 const ContentField = z
   .string()
-  .min(1, "Content is required")
-  .max(
-    POST_CONTENT_MAX_LENGTH,
-    `Content must be at most ${POST_CONTENT_MAX_LENGTH} characters`
-  );
-const StatusIdField = z.string().trim().min(1, "Status is required");
+  .min(1, { error: () => m.flat_stout_thrush() })
+  .max(POST_CONTENT_MAX_LENGTH, {
+    error: () => m.upper_sea_thrush({ count: POST_CONTENT_MAX_LENGTH }),
+  });
+const StatusIdField = z
+  .string()
+  .trim()
+  .min(1, { error: () => m.slow_legal_kitten() });
 const TitleField = z
   .string()
   .trim()
-  .min(1, "Title is required")
-  .max(
-    POST_TITLE_MAX_LENGTH,
-    `Title must be at most ${POST_TITLE_MAX_LENGTH} characters`
-  );
+  .min(1, { error: () => m.mellow_fit_stork() })
+  .max(POST_TITLE_MAX_LENGTH, {
+    error: () => m.game_quiet_mule({ count: POST_TITLE_MAX_LENGTH }),
+  });
 
 // The composed object schema was dropped: the function validator below checks
 // each field against its own schema, and `author` is server-validated.
@@ -75,7 +80,8 @@ export const postCreateFormOpts = formOptions({
       for (const [key, fieldSchema, fieldValue] of fieldChecks) {
         const parsed = fieldSchema.safeParse(fieldValue);
         if (!parsed.success) {
-          fieldErrors[key] = parsed.error.issues[0]?.message ?? "Invalid value";
+          fieldErrors[key] =
+            parsed.error.issues[0]?.message ?? m.sweet_direct_buzzard();
         }
       }
       // Field-scoped errors must ride under `fields` (GlobalFormValidationError);
@@ -105,7 +111,7 @@ export const PostTitleField = withForm({
               name={field.name}
               onBlur={field.handleBlur}
               onChange={(e) => field.handleChange(e.target.value)}
-              placeholder="Enter post title..."
+              placeholder={m.spicy_plain_newt()}
               size="sm"
               value={field.state.value}
             />
@@ -247,7 +253,7 @@ export const PostCreateMoreField = withForm({
               id="create-more"
               onCheckedChange={field.handleChange}
             />
-            <Label htmlFor="create-more">Create more</Label>
+            <Label htmlFor="create-more">{m.house_busy_deer()}</Label>
           </div>
         )}
       </form.AppField>

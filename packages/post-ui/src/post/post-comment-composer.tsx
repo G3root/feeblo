@@ -5,6 +5,7 @@ import { MessageLock01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type FormEvent, type ReactNode, useCallback, useState } from "react";
 
+import { m } from "../paraglide/messages.js";
 import { CommentComposerField, useCommentForm } from "../v2/forms/comment-form";
 import { usePostCollectionData } from "../v2/post-page-context";
 
@@ -17,7 +18,7 @@ type PostCommentComposerProps = {
 };
 
 export function PostCommentComposer({
-  disabledReason = "Comments are locked for this post.",
+  disabledReason = m.elegant_low_mule(),
   defaultVisibility = "PUBLIC",
   showVisibilityPicker = false,
 }: PostCommentComposerProps) {
@@ -61,7 +62,7 @@ export function PostCommentComposer({
       {isLocked && (
         <Alert variant="info">
           <HugeiconsIcon icon={MessageLock01Icon} />
-          <AlertTitle>Comments locked</AlertTitle>
+          <AlertTitle>{m.heavy_early_bear()}</AlertTitle>
           <AlertDescription>{disabledReason}</AlertDescription>
         </Alert>
       )}
@@ -78,9 +79,9 @@ type PostCommentGuestPromptProps = {
 
 export function PostCommentGuestPrompt({
   action,
-  description = "Sign in to leave a comment or react to this post.",
+  description = m.warm_patient_crab(),
   isAuthenticated,
-  title = "Join the discussion",
+  title = m.top_bald_alpaca(),
 }: PostCommentGuestPromptProps) {
   if (isAuthenticated) {
     return null;

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { m } from "../paraglide/messages.js";
 import { RoadmapLaneColumn } from "./roadmap-lane-column";
 import type { RoadmapLane, RoadmapPost } from "./types";
 
@@ -15,7 +16,7 @@ interface RoadmapGridProps<TPost extends RoadmapPost> {
 }
 
 export function RoadmapGrid<TPost extends RoadmapPost>({
-  emptyLaneMessage = "No issues yet.",
+  emptyLaneMessage = m.alert_fresh_lamb(),
   lanes,
   renderCard,
 }: RoadmapGridProps<TPost>) {

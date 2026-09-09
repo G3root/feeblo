@@ -8,6 +8,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useRef } from "react";
 
+import { m } from "../paraglide/messages.js";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
@@ -124,14 +125,12 @@ export function SubscribeButton() {
             sideOffset: 8,
           },
           timeout: 2000,
-          title: isSubscribed
-            ? "Unsubscribed from the post!"
-            : "Subscribed to the post!",
+          title: isSubscribed ? m.merry_jolly_seal() : m.sour_light_trout(),
         });
       }
     } catch {
       toastManager.add({
-        title: "Failed to update subscription",
+        title: m.acidic_clear_warthog(),
         type: "error",
       });
     } finally {
@@ -139,7 +138,7 @@ export function SubscribeButton() {
     }
   };
 
-  const label = isSubscribed ? "Unsubscribe" : "Subscribe";
+  const label = isSubscribed ? m.stock_early_okapi() : m.quiet_good_bumblebee();
 
   return (
     <Button
@@ -165,9 +164,9 @@ export function SubscribeCard() {
   return (
     <>
       <div className="flex flex-col gap-1.5">
-        <h2 className="text-sm font-semibold">Subscribe to post</h2>
+        <h2 className="text-sm font-semibold">{m.any_chunky_guppy()}</h2>
         <p className="text-muted-foreground text-xs text-pretty">
-          Subscribe to receive future updates on the post by email
+          {m.simple_mild_marmot()}
         </p>
       </div>
 

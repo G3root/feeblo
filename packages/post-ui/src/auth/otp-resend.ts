@@ -3,6 +3,8 @@ import { verificationOtpEndpoint } from "@feeblo/web-shared/auth-client";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 
+import { m } from "../paraglide/messages.js";
+
 export const RESEND_COOLDOWN_SECONDS = 60;
 
 export const RateLimitErrorSchema = z.object({
@@ -24,12 +26,12 @@ export function getResendLabel({
   isResending: boolean;
 }) {
   if (isResending) {
-    return "Sending…";
+    return m.smart_shy_goldfish();
   }
   if (cooldown > 0) {
-    return `Resend in ${formatCountdown(cooldown)}`;
+    return m.bold_cozy_owl({ time: formatCountdown(cooldown) });
   }
-  return "Resend code";
+  return m.honest_ago_lemming();
 }
 
 export async function clearVerificationOtp(
@@ -136,7 +138,7 @@ export function useOtpResend({
         startCooldown(result.retryAfterSeconds);
       }
       toastManager.add({
-        title: result.message ?? "Failed to send verification code",
+        title: result.message ?? m.keen_top_panther(),
         type: "error",
       });
     } catch {
@@ -144,7 +146,7 @@ export function useOtpResend({
       // so the user can retry, but surface the error and resolve so click
       // handlers don't produce unhandled rejections.
       toastManager.add({
-        title: "Failed to send verification code",
+        title: m.keen_top_panther(),
         type: "error",
       });
     } finally {

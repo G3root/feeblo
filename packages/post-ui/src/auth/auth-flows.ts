@@ -6,6 +6,8 @@ import {
 } from "@feeblo/web-shared/auth-client";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 
+import { m } from "../paraglide/messages.js";
+
 export type SocialProvider = "github" | "google";
 
 export const getSafeCallbackURL = (redirectTo?: string) => {
@@ -44,7 +46,7 @@ export async function initializeEmailVerification(email: string) {
   }
 
   toastManager.add({
-    title: "Failed to initialize verification",
+    title: m.clean_sleek_racoon(),
     type: "error",
   });
   return false;
@@ -79,7 +81,7 @@ export async function initializePasswordReset(email: string) {
       .catch(() => undefined);
 
     toastManager.add({
-      title: serverMessage ?? "Failed to initialize password reset",
+      title: serverMessage ?? m.caring_best_alligator(),
       type: "error",
     });
     return false;

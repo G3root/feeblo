@@ -2,6 +2,7 @@ import { toastManager } from "@feeblo/ui/toast";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import { useCallback } from "react";
 
+import { m } from "../paraglide/messages.js";
 import { initializeEmailVerification } from "./auth-flows";
 import { clearVerificationOtp } from "./otp-resend";
 
@@ -60,7 +61,7 @@ export function useSignInEmail({
           type: "error",
           error: {
             message:
-              error instanceof Error ? error.message : "Something went wrong",
+              error instanceof Error ? error.message : m.every_salty_antelope(),
           },
         };
       }
@@ -133,7 +134,7 @@ export function useSignUpEmail({
           type: "error",
           error: {
             message:
-              error instanceof Error ? error.message : "Something went wrong",
+              error instanceof Error ? error.message : m.every_salty_antelope(),
           },
         };
       }
@@ -158,15 +159,15 @@ export function useVerifyEmailOtp({
           toastManager.add({
             title:
               response.error.code === "INVALID_OTP"
-                ? "Invalid verification code"
-                : (response.error.message ?? "Something went wrong"),
+                ? m.fresh_cozy_midge()
+                : (response.error.message ?? m.every_salty_antelope()),
             type: "error",
           });
           return false;
         }
 
         toastManager.add({
-          title: "Email verified",
+          title: m.novel_nice_panda(),
           type: "success",
         });
 
@@ -176,7 +177,7 @@ export function useVerifyEmailOtp({
       } catch (error) {
         toastManager.add({
           title:
-            error instanceof Error ? error.message : "Something went wrong",
+            error instanceof Error ? error.message : m.every_salty_antelope(),
           type: "error",
         });
         return false;
@@ -208,32 +209,32 @@ export function useCheckResetPasswordOtp({
           switch (response.error.code) {
             case "INVALID_OTP":
               toastManager.add({
-                title: "Invalid verification code",
+                title: m.fresh_cozy_midge(),
                 type: "error",
               });
               return false;
             case "OTP_EXPIRED":
               toastManager.add({
-                title: "This code has expired. Request a new one.",
+                title: m.frail_active_rat(),
                 type: "error",
               });
               return false;
             case "TOO_MANY_ATTEMPTS":
               toastManager.add({
-                title: "Too many attempts. Request a new code.",
+                title: m.fair_direct_goldfish(),
                 type: "error",
               });
               return false;
             case "USER_NOT_FOUND":
               toastManager.add({
-                title: "This account is no longer available. Please try again.",
+                title: m.that_gray_insect(),
                 type: "error",
               });
               await onUserNotFound?.();
               return false;
             default:
               toastManager.add({
-                title: response.error.message ?? "Something went wrong",
+                title: response.error.message ?? m.every_salty_antelope(),
                 type: "error",
               });
               return false;
@@ -245,7 +246,7 @@ export function useCheckResetPasswordOtp({
       } catch (error) {
         toastManager.add({
           title:
-            error instanceof Error ? error.message : "Something went wrong",
+            error instanceof Error ? error.message : m.every_salty_antelope(),
           type: "error",
         });
         return false;
@@ -263,13 +264,13 @@ export type SignInErrorField = {
 export function getSignInErrorField(error: AuthErrorLike): SignInErrorField {
   switch (error.code) {
     case "INVALID_EMAIL_OR_PASSWORD":
-      return { field: "password", message: "Invalid email or password" };
+      return { field: "password", message: m.brief_next_millipede() };
     case "EMAIL_BLOCKED":
-      return { field: "email", message: "Email is blocked." };
+      return { field: "email", message: m.good_topical_koala() };
     default:
       return {
         field: "email",
-        message: error.message ?? "Something went wrong",
+        message: error.message ?? m.every_salty_antelope(),
       };
   }
 }
@@ -284,19 +285,19 @@ export function getSignUpErrorField(error: AuthErrorLike): SignUpErrorField {
     case "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL":
       return {
         field: "email",
-        message: "A user with that email already exists",
+        message: m.any_tense_barbel(),
       };
     case "EMAIL_BLOCKED":
-      return { field: "email", message: "Email is blocked." };
+      return { field: "email", message: m.good_topical_koala() };
     case "TEMPORARY_EMAIL_NOT_ALLOWED":
       return {
         field: "email",
-        message: "Temporary email addresses are not allowed.",
+        message: m.crisp_such_jurgen(),
       };
     default:
       return {
         field: "email",
-        message: error.message ?? "Something went wrong",
+        message: error.message ?? m.every_salty_antelope(),
       };
   }
 }

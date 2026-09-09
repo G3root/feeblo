@@ -1,6 +1,7 @@
 import { useIsomorphicLayoutEffect } from "@feeblo/ui/hooks/use-isomorphic-layout-effect";
 import { useCallback, useMemo, useRef, type ReactNode } from "react";
 
+import { m } from "../../paraglide/messages.js";
 import {
   CommentComposerContext,
   type CommentComposerActions,
@@ -84,18 +85,18 @@ function CommentComposerController(props: CommentComposerProviderProps) {
   const {
     authorDisplay = null,
     authorPicker = null,
-    cancelLabel = "Cancel",
+    cancelLabel = m.early_careful_coyote(),
     children,
     content,
     disabled = false,
     isPrivate,
     placeholder,
-    privateLabel = "Internal",
-    publicLabel = "Public",
+    privateLabel = m.day_slow_sheep(),
+    publicLabel = m.whole_sleek_florian(),
     resetKey,
     showAuthorToggle = false,
     showVisibilityToggle = true,
-    statusUpdateLabel = "Comment as status update",
+    statusUpdateLabel = m.mad_shy_hound(),
     statusUpdateId,
     statusOptions = EMPTY_STATUS_OPTIONS,
     submitLabel,
