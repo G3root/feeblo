@@ -102,8 +102,12 @@ function PostMergeCommandDialog({
   readonly onOpenChange: (open: boolean) => void;
 }) {
   const { board, organizationId, post } = usePostCollectionData();
-  const { postActivityCollection, postCollection, upvoteCollection } =
-    useDashboardCollections();
+  const {
+    commentCollection,
+    postActivityCollection,
+    postCollection,
+    upvoteCollection,
+  } = useDashboardCollections();
   const navigate = useNavigate();
   const [isPending, setIsPending] = useState(false);
 
@@ -158,6 +162,7 @@ function PostMergeCommandDialog({
       );
 
       await Promise.all([
+        commentCollection.utils.refetch(),
         postCollection.utils.refetch(),
         postActivityCollection.utils.refetch(),
         upvoteCollection.utils.refetch(),

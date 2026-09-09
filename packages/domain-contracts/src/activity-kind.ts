@@ -35,6 +35,9 @@ export const PostActivityKind = S.Literals([
   "AUTHOR_CHANGED",
   "COMMENT_PINNED",
   "COMMENT_UNPINNED",
+  // A duplicate post was merged into this post; the merged-in post id is
+  // recorded in the activity's `nextValue`.
+  "POST_MERGED",
 ]);
 
 export type TPostActivityKind = S.Schema.Type<typeof PostActivityKind>;

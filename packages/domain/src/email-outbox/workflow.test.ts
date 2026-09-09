@@ -4,6 +4,7 @@ import {
   EmailContactId,
   EmailSubscriptionId,
   MemberId,
+  PostId,
   UserId,
   WorkspaceId,
 } from "@feeblo/id";
@@ -25,6 +26,10 @@ import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { WorkspaceRepository } from "../workspace/repository";
 import { EmailOutboxConfig } from "./config";
+import {
+  emailSubscriptionTopicForIntent,
+  resolveSubscriptionNotificationContent,
+} from "./content";
 import { EmailOutboxRepository } from "./repository";
 import {
   EmailDeliveryWorkflow,
@@ -1662,6 +1667,74 @@ describe("EmailOutbox workflows", () => {
             `external-${organizationId}@example.test`.toLowerCase(),
           ]);
         })
+    );
+
+    it.effect("points merged notifications at the surviving target", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const { organizationId } = yield* fixture;
+        const now = new Date("2026-08-11T00:00:00.000Z");
+        const sourcePostId = yield* PostId.generate;
+        const targetPostId = yield* PostId.generate;
+        yield* db.insert(schema.postTable).values([
+          {
+            id: sourcePostId,
+            organizationId,
+            boardId: `brd_${organizationId}`,
+            statusId: `pst_${organizationId}`,
+            title: "Duplicate feedback",
+            slug: "duplicate-feedback",
+            content: "x",
+            excerpt: "x",
+            mergedIntoPostId: targetPostId,
+            mergedAt: now,
+            archivedAt: now,
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: targetPostId,
+            organizationId,
+            boardId: `brd_${organizationId}`,
+            statusId: `pst_${organizationId}`,
+            title: "Canonical feedback",
+            slug: "canonical-feedback",
+            content: "x",
+            excerpt: "x",
+            createdAt: now,
+            updatedAt: now,
+          },
+        ]);
+
+        expect(
+          emailSubscriptionTopicForIntent({
+            kind: "post.merged",
+            postId: sourcePostId,
+            targetPostId,
+          })
+        ).toEqual({ topicId: targetPostId, topicType: "post" });
+
+        const content = yield* resolveSubscriptionNotificationContent(
+          "https://app.feeblo.example",
+          {
+            organizationId,
+            payload: {
+              kind: "post.merged",
+              postId: sourcePostId,
+              targetPostId,
+            },
+          }
+        );
+
+        expect(content?.topic).toEqual({
+          topicId: targetPostId,
+          topicType: "post",
+        });
+        expect(content?.templatePayload.actionUrl).toContain(
+          "/canonical-feedback"
+        );
+        expect(content?.templatePayload.body).toContain("Duplicate feedback");
+      })
     );
   });
 });

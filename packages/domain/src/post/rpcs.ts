@@ -64,6 +64,17 @@ export class PostRpcs extends RpcGroup.make(
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
 
+  // Resolves a merged source slug to its surviving target slug so public
+  // detail routes can 301 redirect instead of 404ing. Returns null when the
+  // source is not a publicly visible merged post.
+  Rpc.make("PostResolveMergedPublic", {
+    payload: PostGet,
+    success: Schema.NullOr(Schema.String),
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+
   Rpc.make("PostSuggestions", {
     payload: PostSuggestions,
     success: Schema.Array(Post),

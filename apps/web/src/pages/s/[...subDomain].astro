@@ -27,6 +27,7 @@ type DetailContent =
       readonly changelog: TChangelog | null;
     }
   | { readonly kind: "not-found" }
+  | { readonly kind: "redirect"; readonly to: string }
   | { readonly kind: "rpc-unavailable" };
 
 async function resolvePageContent(
@@ -61,9 +62,21 @@ async function resolvePageContent(
             Effect.catchTag("PostNotFoundError", () => Effect.succeed(null)),
           ),
       );
-      return post === null
-        ? { kind: "not-found" }
-        : { kind: "found", post, changelog: null };
+      if (post === null) {
+        // A merged source 404s publicly; resolve its survivor so inbound
+        // links (and merge emails) land on the canonical post.
+        const mergedTargetSlug = await fetchRpcServer((rpc) =>
+          rpc.PostResolveMergedPublic({
+            organizationId: site.organizationId,
+            // SAFETY: The capture group matched, so the index is present.
+            slug: postMatch[1]!,
+          }),
+        );
+        return mergedTargetSlug === null
+          ? { kind: "not-found" }
+          : { kind: "redirect", to: `/p/${mergedTargetSlug}` };
+      }
+      return { kind: "found", post, changelog: null };
     }
 
     if (site.changelogVisibility !== "PUBLIC") {
@@ -126,6 +139,12 @@ let pageDescription = `Share feedback, follow the roadmap, and read product upda
 // The board is a client-rendered SPA; this server-resolved metadata gives
 // crawlers per-page titles, descriptions, and structured data.
 const detail = await resolvePageContent(publicPath, site);
+
+if (detail.kind === "redirect") {
+  // A merged source permanently moved to its survivor: 301 preserves link
+  // equity and sends visitors straight to the canonical discussion.
+  return Astro.redirect(detail.to, 301);
+}
 
 if (detail.kind === "not-found") {
   // Missing or hidden detail content: a hard 404 keeps crawlers (and

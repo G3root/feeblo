@@ -10,6 +10,7 @@ import {
   eq,
   inArray,
   isNotNull,
+  isNull,
   ne,
   notExists,
   type SQL,
@@ -519,6 +520,43 @@ const makePostRepository = Effect.gen(function* () {
         .pipe(Effect.map((rows) => rows[0]));
     },
 
+    /**
+     * Resolves a publicly visible merged source slug to the slug of the
+     * surviving target, so public detail routes can redirect inbound links
+     * (and merge-notification emails) instead of 404ing. Returns undefined
+     * when the source is not merged, either board is private, or the target
+     * is itself archived/merged.
+     */
+    findMergedPublicTargetBySlug: ({
+      organizationId,
+      slug,
+    }: TPostFindPublicBySlug) => {
+      const sourcePost = alias(schema.postTable, "merged_source_post");
+      const sourceBoard = alias(schema.boardTable, "merged_source_board");
+      const targetPost = alias(schema.postTable, "merged_target_post");
+      const targetBoard = alias(schema.boardTable, "merged_target_board");
+
+      return db
+        .select({ slug: targetPost.slug })
+        .from(sourcePost)
+        .innerJoin(sourceBoard, eq(sourceBoard.id, sourcePost.boardId))
+        .innerJoin(targetPost, eq(targetPost.id, sourcePost.mergedIntoPostId))
+        .innerJoin(targetBoard, eq(targetBoard.id, targetPost.boardId))
+        .where(
+          and(
+            eq(sourcePost.organizationId, organizationId),
+            eq(sourcePost.slug, slug),
+            isNotNull(sourcePost.mergedIntoPostId),
+            eq(sourceBoard.visibility, "PUBLIC"),
+            isNull(targetPost.archivedAt),
+            isNull(targetPost.mergedIntoPostId),
+            eq(targetBoard.visibility, "PUBLIC")
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0]));
+    },
+
     findSuggestionCandidates: ({
       boardId,
       embedding,
@@ -978,6 +1016,32 @@ const makePostRepository = Effect.gen(function* () {
             });
           }
 
+          // The partial unique index `comment_post_pinned_uidx` allows at
+          // most one pinned comment per post. When the target already has a
+          // pinned comment, unpin the source's first so the bulk
+          // reassignment below cannot violate the index; otherwise the
+          // source's pinned comment becomes the target's.
+          const [targetPinnedComment] = yield* tx
+            .select({ id: schema.commentTable.id })
+            .from(schema.commentTable)
+            .where(
+              and(
+                eq(schema.commentTable.postId, targetPostId),
+                isNotNull(schema.commentTable.pinnedAt)
+              )
+            )
+            .limit(1);
+          if (targetPinnedComment) {
+            yield* tx
+              .update(schema.commentTable)
+              .set({ pinnedAt: null })
+              .where(
+                and(
+                  eq(schema.commentTable.postId, sourcePostId),
+                  isNotNull(schema.commentTable.pinnedAt)
+                )
+              );
+          }
           yield* tx
             .update(schema.commentTable)
             .set({ postId: targetPostId })
@@ -1071,6 +1135,80 @@ const makePostRepository = Effect.gen(function* () {
           yield* tx
             .delete(schema.postTagTable)
             .where(eq(schema.postTagTable.postId, sourcePostId));
+
+          // Followers move with the post so subscribers keep receiving
+          // updates. A user following both posts keeps the target
+          // subscription; the duplicate source row is dropped.
+          const targetSubscription = alias(
+            schema.postSubscriptionTable,
+            "merge_target_subscription"
+          );
+          yield* tx
+            .update(schema.postSubscriptionTable)
+            .set({ postId: targetPostId })
+            .where(
+              and(
+                eq(schema.postSubscriptionTable.postId, sourcePostId),
+                notExists(
+                  tx
+                    .select({ id: targetSubscription.id })
+                    .from(targetSubscription)
+                    .where(
+                      and(
+                        eq(targetSubscription.postId, targetPostId),
+                        eq(
+                          targetSubscription.userId,
+                          schema.postSubscriptionTable.userId
+                        )
+                      )
+                    )
+                )
+              )
+            );
+          yield* tx
+            .delete(schema.postSubscriptionTable)
+            .where(eq(schema.postSubscriptionTable.postId, sourcePostId));
+
+          // Email subscribers follow the surviving post too, so a merged-away
+          // post does not silently orphan their consent. A contact who
+          // already has a target-topic row keeps that row (and its explicit
+          // verified/unsubscribed state); the duplicate source row is dropped.
+          const targetEmailSubscription = alias(
+            schema.emailSubscriptionTable,
+            "merge_target_email_subscription"
+          );
+          yield* tx
+            .update(schema.emailSubscriptionTable)
+            .set({ topicId: targetPostId })
+            .where(
+              and(
+                eq(schema.emailSubscriptionTable.topicType, "post"),
+                eq(schema.emailSubscriptionTable.topicId, sourcePostId),
+                notExists(
+                  tx
+                    .select({ id: targetEmailSubscription.id })
+                    .from(targetEmailSubscription)
+                    .where(
+                      and(
+                        eq(
+                          targetEmailSubscription.contactId,
+                          schema.emailSubscriptionTable.contactId
+                        ),
+                        eq(targetEmailSubscription.topicType, "post"),
+                        eq(targetEmailSubscription.topicId, targetPostId)
+                      )
+                    )
+                )
+              )
+            );
+          yield* tx
+            .delete(schema.emailSubscriptionTable)
+            .where(
+              and(
+                eq(schema.emailSubscriptionTable.topicType, "post"),
+                eq(schema.emailSubscriptionTable.topicId, sourcePostId)
+              )
+            );
 
           yield* tx
             .update(schema.postTable)
