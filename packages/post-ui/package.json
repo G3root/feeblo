@@ -178,12 +178,12 @@
     }
   },
   "scripts": {
-    "build:paraglide": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy baseLocale --emit-ts-declarations",
+    "build:paraglide": "paraglide-js compile --project ../../project.inlang --outdir ./src/paraglide --strategy baseLocale --emit-ts-declarations",
     "check-types": "tsc --noEmit",
-    "dev": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy baseLocale --emit-ts-declarations --watch",
+    "dev": "paraglide-js compile --project ../../project.inlang --outdir ./src/paraglide --strategy baseLocale --emit-ts-declarations --watch",
     "ladle": "ladle serve",
     "ladle:build": "ladle build",
-    "machine-translate": "inlang machine translate --project project.inlang",
+    "machine-translate": "inlang machine translate --project ../../project.inlang",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts"
   },

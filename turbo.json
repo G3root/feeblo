@@ -9,6 +9,11 @@
       "outputs": ["dist/**"]
     },
     "build:paraglide": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/project.inlang/**",
+        "$TURBO_ROOT$/messages/**"
+      ],
       "outputs": ["src/paraglide/**"]
     },
     "test": {

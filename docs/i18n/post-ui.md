@@ -1,9 +1,9 @@
 # post-ui i18n
 
-`@feeblo/post-ui` is the shared post/comment/auth UI used by the dashboard and the public board. It owns its own Paraglide catalog, compiled with the `baseLocale` fallback strategy (Paraglide monorepo Pattern 1, shared UI package owns reusable messages).
+`@feeblo/post-ui` is the shared post/comment/auth UI used by the dashboard and the public board. It compiles from the shared root catalog with the `baseLocale` fallback strategy (Paraglide monorepo Pattern 1; see `docs/i18n/README.md`).
 
-- Catalog: `packages/post-ui/project.inlang/` + `messages/{en,de}.json`
-- Generated (git-ignored): `packages/post-ui/src/paraglide/`
+- Catalog: `project.inlang/` + `messages/{en,de}.json` at the repo root.
+- Generated (git-ignored): `packages/post-ui/src/paraglide/`.
 - Import messages relatively (`../paraglide/messages.js` from `src/v2/*`, `../../paraglide/messages.js` from `src/v2/*/*`).
 
 ## Host injection
@@ -18,7 +18,7 @@ Both use `apps/web`'s cookie strategy (`["cookie","baseLocale"]`) as the single 
 ## Adding a message
 
 1. Generate a flat random key with `@inlang/sdk`'s `humanId()` (three words).
-2. Add English to `messages/en.json` and German to `messages/de.json` (du-form, brand names stay hardcoded).
+2. Add English to the root `messages/en.json` and German to `messages/de.json` (du-form, brand names stay hardcoded).
 3. Call `m.<key>()`. Defaults in function parameters are evaluated per call, so `placeholder = m.<key>()` is safe; module-level default objects are not — use `prop ?? m.<key>()` in render instead.
 4. Recompile: `pnpm --filter @feeblo/post-ui build:paraglide` (or run the package `dev` watcher).
 
