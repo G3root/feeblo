@@ -8,3 +8,7 @@
 - **Delivery**: one durable attemptable execution of an event for one route; its ID is stable across retries.
 - **Inbox Event**: a future durable inbound provider event. It is not implemented for V1 webhooks.
 - **Binding**: a future durable local-to-remote entity relationship used by bidirectional sync. It is not implemented for V1; Slack and Discord identities currently resolve through the user table (email match where available, or stable synthetic email).
+
+# Conventions
+
+- **i18n**: user-facing strings in `apps/web` go through Paraglide (`m.*`) with random human-readable message keys (`penguin_purple_shoe`). See `.agents/skills/paraglide-i18n/SKILL.md` before adding or changing any UI copy.

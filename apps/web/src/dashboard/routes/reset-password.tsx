@@ -25,6 +25,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 
+import { m } from "@/paraglide/messages";
 import { AuthShell } from "~/features/auth/components/auth-shell";
 
 const SearchSchema = z.object({
@@ -132,7 +133,7 @@ function RouteComponent() {
                 message:
                   error instanceof Error
                     ? error.message
-                    : "Something went wrong",
+                    : m.fjord_grove_kindle(),
               },
             },
           },
@@ -147,7 +148,7 @@ function RouteComponent() {
           response.error.code === "TOO_MANY_ATTEMPTS"
         ) {
           toastManager.add({
-            title: "This reset code is no longer valid. Request a new one.",
+            title: m.kite_umbra_zephyr(),
             type: "error",
           });
           setStep("otp");
@@ -169,7 +170,7 @@ function RouteComponent() {
       await clearVerificationOtp(email, "reset-password");
 
       toastManager.add({
-        title: "Password reset. Please sign in with your new password.",
+        title: m.nectar_pine_wander(),
         type: "success",
       });
 
@@ -192,31 +193,31 @@ function RouteComponent() {
   if (step === "password") {
     return (
       <AuthShell
-        description={`Choose a new password for ${email}.`}
+        description={m.amber_flint_heath({ email })}
         footer={
           <div className="text-center text-sm">
-            Remembered your password?{" "}
+            {m.glacier_mellow_prairie()}{" "}
             <Link className="underline underline-offset-4" to="/sign-in">
-              Sign in
+              {m.glade_marsh_moss()}
             </Link>
           </div>
         }
-        title="Reset your password"
+        title={m.amber_juniper_quiet()}
         titleRef={passwordHeadingRef}
       >
         <AuthForm form={passwordForm}>
           <passwordForm.AppField name="password">
-            {(field) => <field.PasswordField label="New Password" />}
+            {(field) => <field.PasswordField label={m.coast_field_tulip()} />}
           </passwordForm.AppField>
 
           <passwordForm.AppField name="confirmPassword">
-            {(field) => <field.PasswordField label="Confirm Password" />}
+            {(field) => <field.PasswordField label={m.cinder_dune_north()} />}
           </passwordForm.AppField>
 
           <passwordForm.AppForm>
             <passwordForm.SubscribeButton
               className="w-full"
-              label="Update password"
+              label={m.nimbus_orchard_vine()}
               type="submit"
             />
           </passwordForm.AppForm>
@@ -227,22 +228,22 @@ function RouteComponent() {
 
   return (
     <AuthShell
-      description={`We sent a 6-digit code to ${email}.`}
+      description={m.gale_jolly_tulip({ email })}
       footer={
         <div className="text-center text-sm">
-          Remembered your password?{" "}
+          {m.glacier_mellow_prairie()}{" "}
           <Link className="underline underline-offset-4" to="/sign-in">
-            Sign in
+            {m.glade_marsh_moss()}
           </Link>
         </div>
       }
-      title="Enter verification code"
+      title={m.delta_inlet_nimbus()}
     >
       <AuthForm form={otpForm}>
-        <OtpFormFields form={otpForm} submitLabel="Continue">
+        <OtpFormFields form={otpForm} submitLabel={m.comet_drift_eager()}>
           <OtpResend
             onResend={resendResetCode}
-            successMessage="Reset code sent"
+            successMessage={m.gulf_oasis_vale()}
           />
         </OtpFormFields>
       </AuthForm>
