@@ -22,6 +22,12 @@ import {
 const localeLabels = {
   en: "English",
   de: "Deutsch",
+  zh: "中文",
+  es: "Español",
+  fr: "Français",
+  pt: "Português",
+  ru: "Русский",
+  ar: "العربية",
 } satisfies Record<Locale, string>;
 
 /**

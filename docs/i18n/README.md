@@ -5,9 +5,15 @@ Paraglide JS with a single shared catalog at the repo root, compiled per package
 ## Layout
 
 ```
-project.inlang/settings.json   # baseLocale en, locales en+de
+project.inlang/settings.json   # baseLocale en, locales en+de+zh+es+fr+pt+ru+ar
 messages/en.json               # all messages, shared by every package
 messages/de.json
+messages/zh.json
+messages/es.json
+messages/fr.json
+messages/pt.json
+messages/ru.json
+messages/ar.json
 apps/web/src/paraglide/        # generated, git-ignored
 apps/public-feature-board/src/paraglide/
 packages/post-ui/src/paraglide/
@@ -37,7 +43,7 @@ Every `build:paraglide` script points at `../../project.inlang`; Turbo lists the
 ## Adding a message
 
 1. Generate a flat random key with `@inlang/sdk`'s `humanId()` (three words). Never rename an existing key.
-2. Add the English copy to `messages/en.json` and the German copy to `messages/de.json` (du-form German, brand names stay hardcoded).
+2. Add the English copy to `messages/en.json` plus a translation for every other locale (`messages/{de,zh,es,fr,pt,ru,ar}.json`; German is du-form, brand names stay hardcoded).
 3. Call `m.<key>()` in the component; import `m` from the package's local `src/paraglide/messages.js`.
 4. Recompile the owning package (`build:paraglide`) or run its `dev` watcher.
 

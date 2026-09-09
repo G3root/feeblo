@@ -169,7 +169,7 @@ export function SaveButton(props: { label: LocalizedString }) {
 
 ## This repo (Astro)
 
-One shared catalog at the repo root (`project.inlang/` + `messages/{en,de}.json`), compiled per package (Pattern 1). Details: `docs/i18n/README.md`.
+One shared catalog at the repo root (`project.inlang/` + `messages/{en,de,zh,es,fr,pt,ru,ar}.json`), compiled per package (Pattern 1). Details: `docs/i18n/README.md`.
 
 - Dashboard (`apps/web`): `apps/web/astro.config.mjs` uses `paraglideVitePlugin({project: paraglideProjectDir, outdir: "./src/paraglide", strategy:["cookie","baseLocale"]})`, where `paraglideProjectDir` is the absolute repo-root `project.inlang` resolved via `fileURLToPath(new URL("../../project.inlang", import.meta.url))`. Middleware: `apps/web/src/middleware.ts` uses `paraglideMiddleware`. Generated output `apps/web/src/paraglide/` is a git-ignored build artifact — never hand-edit. Import via `@/paraglide/*`. Check types runs `pnpm build:paraglide && astro check`. Machine translate: `pnpm --filter web machine-translate`.
 - Public board (`apps/public-feature-board`): compiles from the shared root project with `--project ../../project.inlang --strategy baseLocale --emit-ts-declarations` (`pnpm --filter @feeblo/public-feature-board build:paraglide`; its `dev` watches). Import messages relatively (`../paraglide/messages.js`). The package must never read cookies/URL itself: the host injects its runtime via `initPublicBoardI18n({ getLocale, setLocale })` (`src/i18n.ts`) from `apps/web/src/public-board/public-board-island.tsx`, which wraps `<PublicBoardApp client:only="react" />` once before render. Locale changes flow through the host's cookie strategy.
