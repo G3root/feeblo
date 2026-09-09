@@ -6,6 +6,7 @@ import { createWorkspace } from "../helpers/auth";
 import { assertNoPageErrors, trackPageErrors } from "../helpers/page-errors";
 import { createPost, fillEditor, openPost } from "../helpers/posts";
 import { waitForRpc } from "../helpers/rpc";
+import { publicBoardUrl } from "../helpers/urls";
 
 async function chooseFirstReaction(page: Page) {
   await page.getByRole("button", { name: "Add reaction" }).first().click();
@@ -124,6 +125,122 @@ test.describe("feedback workflow", () => {
     await expect(
       page.getByRole("checkbox", { name: completedTitle })
     ).toHaveCount(0);
+  });
+
+  test("manager can merge a duplicate post into the current post", async ({
+    page,
+  }) => {
+    const workspace = await createWorkspace(page);
+    const targetTitle = `Merge target ${randomUUID().slice(0, 8)}`;
+    const sourceTitle = `Merge source ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, targetTitle, "Canonical feedback.");
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, sourceTitle, "Duplicate feedback.");
+    await openPost(page, targetTitle);
+
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await page.getByRole("menuitem", { name: "Merge others to this" }).click();
+
+    // The palette footer advertises the keyboard affordances.
+    await expect(page.getByText("Navigate", { exact: true })).toBeVisible();
+    await expect(page.getByText("Open", { exact: true })).toBeVisible();
+    await expect(page.getByText("Close", { exact: true })).toBeVisible();
+
+    const mergeRpc = waitForRpc(page, "PostMerge");
+    await page.getByRole("option", { name: sourceTitle, exact: true }).click();
+    await mergeRpc;
+
+    await expect(
+      page.getByText(`Merged "${sourceTitle}" into this post`)
+    ).toBeVisible();
+  });
+
+  test("manager can merge the current post into an existing post", async ({
+    page,
+  }) => {
+    const workspace = await createWorkspace(page);
+    const sourceTitle = `Merge source ${randomUUID().slice(0, 8)}`;
+    const targetTitle = `Merge target ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, sourceTitle, "Duplicate feedback.");
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, targetTitle, "Canonical feedback.");
+    await openPost(page, sourceTitle);
+
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await page.getByRole("menuitem", { name: "Merge to existing" }).click();
+
+    const mergeRpc = waitForRpc(page, "PostMerge");
+    await page.getByRole("option", { name: targetTitle, exact: true }).click();
+    await mergeRpc;
+
+    // The merged post redirects to the surviving target post.
+    await expect(page.getByLabel("Post Title")).toHaveValue(targetTitle);
+  });
+
+  test("merge carries comments over and records the merge activity", async ({
+    page,
+  }) => {
+    const workspace = await createWorkspace(page);
+    const targetTitle = `Merge target ${randomUUID().slice(0, 8)}`;
+    const sourceTitle = `Merge source ${randomUUID().slice(0, 8)}`;
+    const comment = `Carried comment ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, targetTitle, "Canonical feedback.");
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, sourceTitle, "Duplicate feedback.");
+    await openPost(page, sourceTitle);
+
+    // Comment on the source post before it is merged away.
+    await fillEditor(page, comment, { index: 1 });
+    await page.getByRole("button", { name: "Comment Public" }).click();
+    await expect(page.getByText(comment).last()).toBeVisible();
+
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await page.getByRole("menuitem", { name: "Merge to existing" }).click();
+
+    const mergeRpc = waitForRpc(page, "PostMerge");
+    await page.getByRole("option", { name: targetTitle, exact: true }).click();
+    await mergeRpc;
+
+    // Redirected to the target, where the source comment now lives.
+    await expect(page.getByLabel("Post Title")).toHaveValue(targetTitle);
+    await expect(page.getByText(comment).last()).toBeVisible();
+
+    // The merge is recorded on the target's activity timeline.
+    await page.getByRole("tab", { name: "Activity" }).click();
+    await expect(page.getByText(`merged in "${sourceTitle}"`)).toBeVisible();
+  });
+
+  test("public merged post URL redirects to the surviving target", async ({
+    page,
+  }) => {
+    const workspace = await createWorkspace(page);
+    const targetTitle = `Merge target ${randomUUID().slice(0, 8)}`;
+    const sourceTitle = `Merge source ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, targetTitle, "Canonical feedback.");
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, sourceTitle, "Duplicate feedback.");
+    await openPost(page, sourceTitle);
+    const sourceSlug = new URL(page.url()).pathname.split("/").pop();
+    expect(sourceSlug).toBeTruthy();
+
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await page.getByRole("menuitem", { name: "Merge to existing" }).click();
+
+    const mergeRpc = waitForRpc(page, "PostMerge");
+    await page.getByRole("option", { name: targetTitle, exact: true }).click();
+    await mergeRpc;
+    await expect(page.getByLabel("Post Title")).toHaveValue(targetTitle);
+    const targetSlug = new URL(page.url()).pathname.split("/").pop();
+    expect(targetSlug).toBeTruthy();
+
+    // The archived source 301s to the survivor instead of 404ing.
+    const boardUrl = publicBoardUrl(workspace.workspaceName);
+    await page.goto(`${boardUrl}/p/${sourceSlug}`);
+    await expect(page).toHaveURL(`${boardUrl}/p/${targetSlug}`);
   });
 
   test("post creator can toggle their subscription", async ({ page }) => {

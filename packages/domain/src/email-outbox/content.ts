@@ -68,9 +68,12 @@ export const emailSubscriptionTopicForIntent = (
       return { topicId: null, topicType: "changelog" };
     case "post.status_changed":
     case "post.official_update_published":
-    case "post.merged":
     case "post.closed":
       return { topicId: payload.postId, topicType: "post" };
+    // The merge reassigns subscriptions to the surviving post, so the
+    // notification is delivered on the target topic.
+    case "post.merged":
+      return { topicId: payload.targetPostId, topicType: "post" };
     default:
       return undefined;
   }
@@ -253,12 +256,18 @@ export const resolveSubscriptionNotificationContent = (
           intent.payload.kind === "post.official_update_published"
             ? intent.payload.body
             : undefined;
+        // A merge notification is about the source post but must land on the
+        // surviving target: the source is archived and its public URL 301s.
+        const urlPostId =
+          intent.payload.kind === "post.merged"
+            ? intent.payload.targetPostId
+            : postId;
         return yield* transaction(
           Effect.gen(function* () {
             const txDb = yield* Database.Database;
             const post = yield* txDb.query.postTable.findFirst({
               where: {
-                id: postId,
+                id: urlPostId,
                 organizationId: intent.organizationId,
               },
               columns: { slug: true, title: true },
@@ -270,6 +279,19 @@ export const resolveSubscriptionNotificationContent = (
             if (!post) {
               return undefined;
             }
+            // The subject of a merge email is the source post that was
+            // folded in, even though the link points at the target.
+            const source =
+              payloadKind === "post.merged"
+                ? yield* txDb.query.postTable.findFirst({
+                    where: {
+                      id: postId,
+                      organizationId: intent.organizationId,
+                    },
+                    columns: { title: true },
+                  })
+                : undefined;
+            const displayTitle = source?.title ?? post.title;
             const url = `${appUrl}/${intent.organizationId}/post/${post.board?.slug ?? ""}/${post.slug}`;
             let event = `moved to ${titleCase(post.postStatus?.type ?? "updated")}`;
             if (payloadKind === "post.official_update_published") {
@@ -283,7 +305,7 @@ export const resolveSubscriptionNotificationContent = (
               template: "subscription-notification" as const,
               topic: {
                 topicType: "post" as const,
-                topicId: postId,
+                topicId: urlPostId,
               },
               templatePayload: {
                 actionLabel: "View post",
@@ -292,10 +314,12 @@ export const resolveSubscriptionNotificationContent = (
                   payloadKind === "post.official_update_published" &&
                   payloadBody !== undefined
                     ? payloadBody
-                    : `A post you follow was ${event}.`,
+                    : payloadKind === "post.merged"
+                      ? `"${displayTitle}" was merged into this post.`
+                      : `A post you follow was ${event}.`,
                 eyebrow: "Feedback",
-                posts: [{ label: post.title, url }],
-                title: `Post ${event}: ${post.title}`,
+                posts: [{ label: displayTitle, url }],
+                title: `Post ${event}: ${displayTitle}`,
               },
             } satisfies PostNotificationContent;
           })

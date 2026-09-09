@@ -72,6 +72,7 @@ export interface AnalyticsEvents {
   post_created: { source: PostCreationSource; success: boolean };
   post_deleted: { mode: "single" | "bulk"; success: boolean };
   post_lock_changed: { locked: boolean; success: boolean };
+  post_merged: { direction: "into-existing" | "into-this"; success: boolean };
   post_updated: {
     field: "author" | "board" | "content" | "eta" | "status" | "title";
     success: boolean;

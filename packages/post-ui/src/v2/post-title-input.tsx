@@ -114,6 +114,10 @@ export function PostTitleUpdateInput() {
   return (
     <PostTitleInput
       defaultValue={defaultValue}
+      // Uncontrolled input: remount on post change so same-route navigation
+      // (e.g. redirecting after a merge) resets the visible value instead of
+      // leaving the previous post's title in the field.
+      key={postId}
       onBlur={canManagePost ? handleBlur : undefined}
       readOnly={!canManagePost}
       ref={inputRef}

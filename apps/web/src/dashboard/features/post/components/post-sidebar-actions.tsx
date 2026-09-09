@@ -28,6 +28,8 @@ import { usePublicSiteUrl } from "~/hooks/use-site";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
+import { PostMergeMenu } from "./post-merge-menu";
+
 type DialogAction = "lock" | null;
 type PostAdminAction = "lock";
 
@@ -124,6 +126,8 @@ function PostAdminActionButtons() {
 
   return (
     <>
+      <PostMergeMenu />
+
       <Tooltip>
         <TooltipTrigger
           render={(props) => (

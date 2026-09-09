@@ -899,6 +899,85 @@ describe("PostRpcHandlers", () => {
       );
     });
 
+    describe("PostResolveMergedPublic", () => {
+      it.effect("resolves a merged public source to the target slug", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [sourcePostId, "Duplicate feedback"],
+            [targetPostId, "Canonical feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          const posts = yield* handlers
+            .PostList({
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          const source = posts.find((post) => post.id === sourcePostId);
+          const target = posts.find((post) => post.id === targetPostId);
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const resolved = yield* handlers
+            .PostResolveMergedPublic({
+              organizationId: fixture.organizationId,
+              // SAFETY: The list lookup above guarantees the slug.
+              slug: source!.slug,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+          expect(resolved).toBe(target?.slug);
+        })
+      );
+
+      it.effect("returns null for a post that was not merged", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Live feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const posts = yield* handlers
+            .PostList({
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          const post = posts.find((row) => row.id === postId);
+
+          const resolved = yield* handlers
+            .PostResolveMergedPublic({
+              organizationId: fixture.organizationId,
+              // SAFETY: The list lookup above guarantees the slug.
+              slug: post!.slug,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+          expect(resolved).toBeNull();
+        })
+      );
+    });
+
     describe("PostGet", () => {
       it.effect("returns the full post including content for members", () =>
         Effect.gen(function* () {
@@ -2444,6 +2523,292 @@ describe("PostRpcHandlers", () => {
               .where(eq(table.postId, sourcePostId));
             expect(leftovers).toEqual([]);
           }
+        })
+      );
+
+      it.effect(
+        "unpins the source comment when the target already has one",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const sourcePostId = yield* PostId.generate;
+            const targetPostId = yield* PostId.generate;
+
+            for (const [id, title] of [
+              [sourcePostId, "Source feedback"],
+              [targetPostId, "Target feedback"],
+            ] as const) {
+              yield* handlers
+                .PostCreate(postCreateInput(fixture, id, title))
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                );
+            }
+
+            const sourceCommentId = yield* CommentId.generate;
+            const targetCommentId = yield* CommentId.generate;
+            const pinnedAt = new Date();
+            yield* db.insert(schema.commentTable).values([
+              {
+                id: sourceCommentId,
+                content: "Source pinned comment",
+                organizationId: fixture.organizationId,
+                pinnedAt,
+                postId: sourcePostId,
+                userId: fixture.userId,
+              },
+              {
+                id: targetCommentId,
+                content: "Target pinned comment",
+                organizationId: fixture.organizationId,
+                pinnedAt,
+                postId: targetPostId,
+                userId: fixture.userId,
+              },
+            ]);
+
+            yield* handlers
+              .PostMerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+                targetPostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const targetComments = yield* db
+              .select({
+                id: schema.commentTable.id,
+                pinnedAt: schema.commentTable.pinnedAt,
+              })
+              .from(schema.commentTable)
+              .where(eq(schema.commentTable.postId, targetPostId));
+
+            expect(targetComments).toHaveLength(2);
+            // The partial unique index allows one pinned comment per post; the
+            // target's pin wins and the moved source comment arrives unpinned.
+            expect(
+              targetComments
+                .filter((comment) => comment.pinnedAt !== null)
+                .map((comment) => comment.id)
+            ).toEqual([targetCommentId]);
+          })
+      );
+
+      it.effect("moves post and email subscriptions and dedupes twins", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [sourcePostId, "Source feedback"],
+            [targetPostId, "Target feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          const sharedUserId = `user_shared_sub_${fixture.organizationId}`;
+          const sourceOnlyUserId = `user_source_only_sub_${fixture.organizationId}`;
+          for (const [id, email] of [
+            [sharedUserId, `shared_sub_${fixture.organizationId}@example.com`],
+            [
+              sourceOnlyUserId,
+              `source_sub_${fixture.organizationId}@example.com`,
+            ],
+          ] as const) {
+            yield* db.insert(schema.userTable).values({
+              id,
+              email,
+              name: "Subscriber",
+            });
+          }
+
+          yield* db.insert(schema.postSubscriptionTable).values([
+            {
+              id: `post_sub_shared_source_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: sharedUserId,
+            },
+            {
+              id: `post_sub_shared_target_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              postId: targetPostId,
+              userId: sharedUserId,
+            },
+            {
+              id: `post_sub_source_only_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: sourceOnlyUserId,
+            },
+          ]);
+
+          const sharedContactId = `email_contact_shared_${fixture.organizationId}`;
+          const sourceOnlyContactId = `email_contact_source_${fixture.organizationId}`;
+          const now = new Date();
+          yield* db.insert(schema.emailContactTable).values([
+            {
+              id: sharedContactId,
+              organizationId: fixture.organizationId,
+              email: `shared_sub_${fixture.organizationId}@example.com`,
+              verificationState: "verified",
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              id: sourceOnlyContactId,
+              organizationId: fixture.organizationId,
+              email: `source_sub_${fixture.organizationId}@example.com`,
+              verificationState: "verified",
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]);
+          yield* db.insert(schema.emailSubscriptionTable).values([
+            {
+              id: `email_sub_shared_source_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              contactId: sharedContactId,
+              topicType: "post",
+              topicId: sourcePostId,
+              source: "explicit",
+              state: "active",
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              id: `email_sub_shared_target_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              contactId: sharedContactId,
+              topicType: "post",
+              topicId: targetPostId,
+              source: "explicit",
+              state: "active",
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              id: `email_sub_source_only_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              contactId: sourceOnlyContactId,
+              topicType: "post",
+              topicId: sourcePostId,
+              source: "explicit",
+              state: "active",
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]);
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const targetSubscriptions = yield* db
+            .select({ userId: schema.postSubscriptionTable.userId })
+            .from(schema.postSubscriptionTable)
+            .where(eq(schema.postSubscriptionTable.postId, targetPostId));
+          const targetSubscriberIds = targetSubscriptions.map(
+            (row) => row.userId
+          );
+          // The shared subscriber is deduped to a single target row; the
+          // source-only subscriber is carried over. (The fixture creator is
+          // auto-subscribed on create and is intentionally ignored here.)
+          expect(
+            targetSubscriberIds.filter((id) => id === sharedUserId)
+          ).toHaveLength(1);
+          expect(targetSubscriberIds).toContain(sourceOnlyUserId);
+
+          const targetEmailSubscriptions = yield* db
+            .select({ contactId: schema.emailSubscriptionTable.contactId })
+            .from(schema.emailSubscriptionTable)
+            .where(eq(schema.emailSubscriptionTable.topicId, targetPostId));
+          const targetEmailContactIds = targetEmailSubscriptions.map(
+            (row) => row.contactId
+          );
+          expect(
+            targetEmailContactIds.filter((id) => id === sharedContactId)
+          ).toHaveLength(1);
+          expect(targetEmailContactIds).toContain(sourceOnlyContactId);
+
+          // No subscription may remain pointed at the archived source.
+          const leftoverPostSubscriptions = yield* db
+            .select({ id: schema.postSubscriptionTable.id })
+            .from(schema.postSubscriptionTable)
+            .where(eq(schema.postSubscriptionTable.postId, sourcePostId));
+          expect(leftoverPostSubscriptions).toEqual([]);
+
+          const leftoverEmailSubscriptions = yield* db
+            .select({ id: schema.emailSubscriptionTable.id })
+            .from(schema.emailSubscriptionTable)
+            .where(eq(schema.emailSubscriptionTable.topicId, sourcePostId));
+          expect(leftoverEmailSubscriptions).toEqual([]);
+        })
+      );
+
+      it.effect("records a merge activity on the target", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [sourcePostId, "Source feedback"],
+            [targetPostId, "Target feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const [activity] = yield* db
+            .select({
+              actorId: schema.postActivityTable.actorId,
+              kind: schema.postActivityTable.kind,
+              nextValue: schema.postActivityTable.nextValue,
+              postId: schema.postActivityTable.postId,
+            })
+            .from(schema.postActivityTable)
+            .where(
+              and(
+                eq(schema.postActivityTable.postId, targetPostId),
+                eq(schema.postActivityTable.kind, "POST_MERGED")
+              )
+            );
+
+          expect(activity).toMatchObject({
+            actorId: fixture.userId,
+            kind: "POST_MERGED",
+            nextValue: sourcePostId,
+            postId: targetPostId,
+          });
         })
       );
     });

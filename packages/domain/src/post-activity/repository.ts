@@ -87,6 +87,9 @@ export type PostActivityInput = PostActivityActor &
     | { readonly kind: "AUTHOR_CHANGED" }
     | { readonly kind: "COMMENT_PINNED"; readonly commentId: string }
     | { readonly kind: "COMMENT_UNPINNED"; readonly commentId: string }
+    // Records that `mergedPostId` was merged into this post; the id travels
+    // in `nextValue` so the timeline can resolve the merged-in post.
+    | { readonly kind: "POST_MERGED"; readonly mergedPostId: string }
   );
 
 type PostActivityRow = {
@@ -178,6 +181,13 @@ const toRow = (input: PostActivityInput): PostActivityRow => {
         previousValue: null,
         nextValue: null,
         commentId: input.commentId,
+      };
+    case "POST_MERGED":
+      return {
+        kind: input.kind,
+        previousValue: null,
+        nextValue: input.mergedPostId,
+        commentId: null,
       };
     default: {
       // Every kind is handled above; the default arm only fires when a new

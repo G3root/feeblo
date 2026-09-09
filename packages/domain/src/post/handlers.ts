@@ -1004,6 +1004,21 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "select")
       ),
 
+    PostResolveMergedPublic: (args: TPostGet) =>
+      Effect.gen(function* () {
+        const target = yield* repository.findMergedPublicTargetBySlug({
+          organizationId: args.organizationId,
+          slug: args.slug,
+        });
+        return target?.slug ?? null;
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostResolveMergedPublic",
+          level: "read",
+        }),
+        withRemapDbErrors("Post", "select")
+      ),
+
     PostSuggestionsPublic: (args: TPostSuggestions) =>
       Effect.gen(function* () {
         const sessionOption = yield* OptionalCurrentSession;
@@ -1373,9 +1388,21 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             message: "Source and target posts must be different",
           });
         }
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
         const outboxId = yield* transaction(
           Effect.gen(function* () {
             yield* repository.merge(args);
+            // Record the merge on the surviving target so its timeline shows
+            // which duplicate was folded into it.
+            yield* activityRepository.create({
+              actorId: session.session.userId,
+              actorMemberId: membership?.membershipId ?? null,
+              kind: "POST_MERGED",
+              mergedPostId: args.sourcePostId,
+              organizationId: args.organizationId,
+              postId: args.targetPostId,
+            });
             if (
               !(yield* entitlementPolicy.mayMaterializeEmailIntent({
                 organizationId: args.organizationId,
