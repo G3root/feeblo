@@ -126,6 +126,58 @@ test.describe("feedback workflow", () => {
     ).toHaveCount(0);
   });
 
+  test("manager can merge a duplicate post into the current post", async ({
+    page,
+  }) => {
+    const workspace = await createWorkspace(page);
+    const targetTitle = `Merge target ${randomUUID().slice(0, 8)}`;
+    const sourceTitle = `Merge source ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, targetTitle, "Canonical feedback.");
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, sourceTitle, "Duplicate feedback.");
+    await openPost(page, targetTitle);
+
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await page.getByRole("menuitem", { name: "Merge others to this" }).click();
+
+    // The palette footer advertises the keyboard affordances.
+    await expect(page.getByText("Navigate", { exact: true })).toBeVisible();
+    await expect(page.getByText("Open", { exact: true })).toBeVisible();
+    await expect(page.getByText("Close", { exact: true })).toBeVisible();
+
+    const mergeRpc = waitForRpc(page, "PostMerge");
+    await page.getByRole("option", { name: sourceTitle, exact: true }).click();
+    await mergeRpc;
+
+    await expect(
+      page.getByText(`Merged "${sourceTitle}" into this post`)
+    ).toBeVisible();
+  });
+
+  test("manager can merge the current post into an existing post", async ({
+    page,
+  }) => {
+    const workspace = await createWorkspace(page);
+    const sourceTitle = `Merge source ${randomUUID().slice(0, 8)}`;
+    const targetTitle = `Merge target ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, sourceTitle, "Duplicate feedback.");
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, targetTitle, "Canonical feedback.");
+    await openPost(page, sourceTitle);
+
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await page.getByRole("menuitem", { name: "Merge to existing" }).click();
+
+    const mergeRpc = waitForRpc(page, "PostMerge");
+    await page.getByRole("option", { name: targetTitle, exact: true }).click();
+    await mergeRpc;
+
+    // The merged post redirects to the surviving target post.
+    await expect(page.getByLabel("Post Title")).toHaveValue(targetTitle);
+  });
+
   test("post creator can toggle their subscription", async ({ page }) => {
     const title = `Subscription post ${randomUUID().slice(0, 8)}`;
 
