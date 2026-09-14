@@ -13,13 +13,9 @@ export type MergedPostTargetArgs = {
  * runs for ordinary visits. One-shot point-in-time read: no SWR, the idle TTL
  * just dedups repeat visits to the same old slug.
  */
-export const mergedPostTargetAtom = Atom.family(
-  (args: MergedPostTargetArgs) =>
-    PublicClient.query(
-      "PostResolveMergedPublic",
-      {
-        organizationId: args.organizationId,
-        slug: args.slug,
-      }
-    ).pipe(Atom.setIdleTTL("5 minutes"))
+export const mergedPostTargetAtom = Atom.family((args: MergedPostTargetArgs) =>
+  PublicClient.query("PostResolveMergedPublic", {
+    organizationId: args.organizationId,
+    slug: args.slug,
+  }).pipe(Atom.setIdleTTL("5 minutes"))
 );

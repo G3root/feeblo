@@ -1,6 +1,7 @@
+import { useAtomValue } from "@effect/atom-react";
 import type { TBoard } from "@feeblo/domain/board/schema";
-import type { TPostListItem } from "@feeblo/domain/post/schema";
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
+import type { TPostListItem } from "@feeblo/domain/post/schema";
 import { AuthButton } from "@feeblo/post-ui/auth-dialog";
 import { PostCommentGuestPrompt } from "@feeblo/post-ui/post-comment-composer";
 import { PostPage as ComposedPostPage } from "@feeblo/post-ui/post-page";
@@ -15,7 +16,6 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
-import { useAtomValue } from "@effect/atom-react";
 import { isString } from "@feeblo/utils/runtime-kind";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import {
