@@ -249,13 +249,13 @@ function MergedPostResolver({
   // Derived during render: undefined while loading, string while
   // redirecting, null when the slug is genuinely unknown.
   const targetSlug = Result.builder(targetResult)
-    .onInitial(() => undefined as string | null | undefined)
-    .onFailure(() => null as string | null)
+    .onInitial(() => undefined)
+    .onFailure(() => null)
     .onSuccess((value) => value)
     .exhaustive();
 
   useEffect(() => {
-    if (typeof targetSlug === "string") {
+    if (isString(targetSlug)) {
       void navigate({
         params: { slug: targetSlug },
         replace: true,
