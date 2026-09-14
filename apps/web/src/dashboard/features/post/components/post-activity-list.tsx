@@ -32,6 +32,7 @@ import {
   Tag01Icon,
   Tag02Icon,
   ThumbsUpIcon,
+  Undo02Icon,
   UserAdd01Icon,
   UserMinus01Icon,
 } from "@hugeicons/core-free-icons";
@@ -117,6 +118,8 @@ const activityIconMap = {
   COMMENT_PINNED: PinIcon,
   COMMENT_UNPINNED: PinOffIcon,
   POST_MERGED: GitMergeIcon,
+  POST_MERGED_INTO: GitMergeIcon,
+  POST_UNMERGED: Undo02Icon,
 } satisfies Record<TPostActivityKind, typeof FileAddIcon>;
 
 const ETA_PATTERN = /^(\d{4})-Q([1-4])$/;
@@ -173,6 +176,8 @@ function getActivityDescription({
     COMMENT_PINNED: "pinned a comment",
     COMMENT_UNPINNED: "unpinned a comment",
     POST_MERGED: `merged in "${postNames.get(activity.nextValue ?? "") ?? "a post"}"`,
+    POST_MERGED_INTO: `merged into "${postNames.get(activity.nextValue ?? "") ?? "another post"}"`,
+    POST_UNMERGED: `unmerged the post from "${postNames.get(activity.nextValue ?? "") ?? "a post"}"`,
   } satisfies Record<TPostActivityKind, string>;
 
   return descriptions[activity.kind];

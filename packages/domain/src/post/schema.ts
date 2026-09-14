@@ -237,6 +237,19 @@ export const PostMerge = S.Struct({
 export type TPostMerge = S.Schema.Type<typeof PostMerge>;
 
 /**
+ * Reverts a merge: the archived source post is restored to the board. Rows
+ * moved into the survivor by `PostMerge` (comments, votes, reactions, tags,
+ * followers) stay with the survivor — the merge cannot reconstruct their
+ * original ownership.
+ */
+export const PostUnmerge = S.Struct({
+  organizationId: WorkspaceId.schema,
+  sourcePostId: PostId.schema,
+});
+
+export type TPostUnmerge = S.Schema.Type<typeof PostUnmerge>;
+
+/**
  * Minimal deliverability shape for author input. Synthetic inboxes are
  * generated internally and never pass through this input; without the
  * shape check, a direct RPC caller could persist junk contact emails that

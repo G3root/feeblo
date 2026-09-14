@@ -438,6 +438,72 @@ const makeNotificationService = Effect.gen(function* () {
         });
       }),
 
+    /**
+     * Tells everyone attached to a merged-away post where it went: its
+     * creator, the creator and followers of the survivor (source
+     * subscriptions are moved onto the survivor before this runs), and the
+     * upvoters of both posts. The actor is dropped by `create`.
+     */
+    notifyPostMerged: ({
+      actorUserId,
+      organizationId,
+      sourcePostId,
+      targetPostId,
+    }: {
+      readonly actorUserId?: string | null;
+      readonly organizationId: string;
+      readonly sourcePostId: string;
+      readonly targetPostId: string;
+    }) =>
+      Effect.gen(function* () {
+        const source = yield* getPostContext({
+          organizationId,
+          postId: sourcePostId,
+        });
+        const target = yield* getPostContext({
+          organizationId,
+          postId: targetPostId,
+        });
+        if (!(source && target)) {
+          return;
+        }
+        const subscribers = yield* db
+          .select({ userId: schema.postSubscriptionTable.userId })
+          .from(schema.postSubscriptionTable)
+          .where(
+            and(
+              eq(schema.postSubscriptionTable.organizationId, organizationId),
+              eq(schema.postSubscriptionTable.postId, targetPostId)
+            )
+          );
+        const upvoters = yield* db
+          .select({ userId: schema.upvoteTable.userId })
+          .from(schema.upvoteTable)
+          .where(
+            and(
+              eq(schema.upvoteTable.organizationId, organizationId),
+              eq(schema.upvoteTable.postId, targetPostId)
+            )
+          );
+        yield* create({
+          ...(actorUserId === undefined ? undefined : { actorUserId }),
+          organizationId,
+          recipientUserIds: [
+            source.creatorId,
+            target.creatorId,
+            ...subscribers.map((subscriber) => subscriber.userId),
+            ...upvoters.map((upvoter) => upvoter.userId),
+          ],
+          kind: "feedback.merged",
+          resourceType: "post",
+          resourceId: sourcePostId,
+          title: "Post merged",
+          body: `"${source.title}" was merged into "${target.title}"`,
+          href: `/${organizationId}/post/${target.boardSlug}/${target.slug}`,
+          deduplicationKey: `feedback.merged:${sourcePostId}:${targetPostId}`,
+        });
+      }),
+
     list: ({
       organizationId,
       recipientUserId,

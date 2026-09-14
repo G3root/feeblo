@@ -38,6 +38,13 @@ export const PostActivityKind = S.Literals([
   // A duplicate post was merged into this post; the merged-in post id is
   // recorded in the activity's `nextValue`.
   "POST_MERGED",
+  // This post was merged into a survivor; the surviving post id is recorded
+  // in the activity's `nextValue`. The mirror image of POST_MERGED, written
+  // on the archived source so its timeline still explains where it went.
+  "POST_MERGED_INTO",
+  // A merge was reverted from this post; the post it was merged into is
+  // recorded in the activity's `nextValue`.
+  "POST_UNMERGED",
 ]);
 
 export type TPostActivityKind = S.Schema.Type<typeof PostActivityKind>;

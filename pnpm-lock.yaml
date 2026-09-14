@@ -216,6 +216,9 @@ importers:
 
   apps/public-feature-board:
     dependencies:
+      '@effect/atom-react':
+        specifier: 'catalog:'
+        version: 4.0.0-rc.112(effect@4.0.0-rc.112)(react@19.2.8)(scheduler@0.27.0)
       '@feeblo/domain':
         specifier: workspace:*
         version: link:../../packages/domain
@@ -225,6 +228,9 @@ importers:
       '@feeblo/post-ui':
         specifier: workspace:*
         version: link:../../packages/post-ui
+      '@feeblo/rpc-client':
+        specifier: workspace:*
+        version: link:../../packages/rpc-client
       '@feeblo/ui':
         specifier: workspace:*
         version: link:../../packages/ui

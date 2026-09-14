@@ -91,6 +91,11 @@ interface TPostMerge {
   targetPostId: string;
 }
 
+interface TPostUnmerge {
+  organizationId: string;
+  sourcePostId: string;
+}
+
 interface TPostFindByCreatorId {
   boardId: string;
   id: string;
@@ -1210,6 +1215,34 @@ const makePostRepository = Effect.gen(function* () {
               )
             );
 
+          // A changelog entry that announced the duplicate follows the
+          // surviving post, so the public changelog keeps a resolvable link
+          // (merged posts are hidden from public post queries). A post can
+          // belong to at most one changelog entry (`changelog_post_postId_uidx`),
+          // so when the survivor is already linked, the duplicate's link is
+          // dropped instead of moved.
+          const targetChangelogLink = alias(
+            schema.changelogPostTable,
+            "merge_target_changelog_link"
+          );
+          yield* tx
+            .update(schema.changelogPostTable)
+            .set({ postId: targetPostId })
+            .where(
+              and(
+                eq(schema.changelogPostTable.postId, sourcePostId),
+                notExists(
+                  tx
+                    .select({ postId: targetChangelogLink.postId })
+                    .from(targetChangelogLink)
+                    .where(eq(targetChangelogLink.postId, targetPostId))
+                )
+              )
+            );
+          yield* tx
+            .delete(schema.changelogPostTable)
+            .where(eq(schema.changelogPostTable.postId, sourcePostId));
+
           yield* tx
             .update(schema.postTable)
             .set({
@@ -1224,6 +1257,62 @@ const makePostRepository = Effect.gen(function* () {
                 eq(schema.postTable.organizationId, organizationId)
               )
             );
+        })
+      ),
+
+    /**
+     * Reverts a merge by restoring the archived source post. Engagement rows
+     * moved by {@link merge} — comments, votes, reactions, tags, followers,
+     * and the changelog link — stay with the survivor, because the merge
+     * discards which rows originally belonged to the source. Resolves to the
+     * id of the post the source was merged into, so the caller can record the
+     * unmerge activity.
+     */
+    unmerge: ({ organizationId, sourcePostId }: TPostUnmerge) =>
+      db.transaction((tx) =>
+        Effect.gen(function* () {
+          const [sourcePost] = yield* tx
+            .select({
+              id: schema.postTable.id,
+              mergedIntoPostId: schema.postTable.mergedIntoPostId,
+            })
+            .from(schema.postTable)
+            .where(
+              and(
+                eq(schema.postTable.id, sourcePostId),
+                eq(schema.postTable.organizationId, organizationId)
+              )
+            )
+            .limit(1);
+
+          if (!sourcePost) {
+            return yield* new FailedToMergePostError({
+              message: "Post not found",
+            });
+          }
+          if (!sourcePost.mergedIntoPostId) {
+            return yield* new FailedToMergePostError({
+              message: "Post is not merged",
+            });
+          }
+
+          const targetPostId = sourcePost.mergedIntoPostId;
+          yield* tx
+            .update(schema.postTable)
+            .set({
+              archivedAt: null,
+              mergedAt: null,
+              mergedIntoPostId: null,
+              updatedAt: yield* DateTime.nowAsDate,
+            })
+            .where(
+              and(
+                eq(schema.postTable.id, sourcePostId),
+                eq(schema.postTable.organizationId, organizationId)
+              )
+            );
+
+          return targetPostId;
         })
       ),
   };

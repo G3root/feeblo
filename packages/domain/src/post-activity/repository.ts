@@ -90,6 +90,12 @@ export type PostActivityInput = PostActivityActor &
     // Records that `mergedPostId` was merged into this post; the id travels
     // in `nextValue` so the timeline can resolve the merged-in post.
     | { readonly kind: "POST_MERGED"; readonly mergedPostId: string }
+    // Mirror of POST_MERGED, written on the archived source: this post was
+    // merged into `targetPostId`, which travels in `nextValue`.
+    | { readonly kind: "POST_MERGED_INTO"; readonly targetPostId: string }
+    // The merge of this post was reverted; `targetPostId` is the post it had
+    // been merged into and now lives in `nextValue`.
+    | { readonly kind: "POST_UNMERGED"; readonly targetPostId: string }
   );
 
 type PostActivityRow = {
@@ -183,10 +189,15 @@ const toRow = (input: PostActivityInput): PostActivityRow => {
         commentId: input.commentId,
       };
     case "POST_MERGED":
+    case "POST_MERGED_INTO":
+    case "POST_UNMERGED":
       return {
         kind: input.kind,
         previousValue: null,
-        nextValue: input.mergedPostId,
+        nextValue:
+          input.kind === "POST_MERGED"
+            ? input.mergedPostId
+            : input.targetPostId,
         commentId: null,
       };
     default: {

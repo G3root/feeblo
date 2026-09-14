@@ -144,11 +144,13 @@ test.describe("feedback workflow", () => {
 
     // The palette footer advertises the keyboard affordances.
     await expect(page.getByText("Navigate", { exact: true })).toBeVisible();
-    await expect(page.getByText("Open", { exact: true })).toBeVisible();
+    await expect(page.getByText("Merge", { exact: true })).toBeVisible();
     await expect(page.getByText("Close", { exact: true })).toBeVisible();
 
     const mergeRpc = waitForRpc(page, "PostMerge");
-    await page.getByRole("option", { name: sourceTitle, exact: true }).click();
+    await page.getByRole("option", { name: sourceTitle }).click();
+    // Merging is destructive, so it asks for confirmation first.
+    await page.getByRole("button", { name: "Merge posts" }).click();
     await mergeRpc;
 
     await expect(
@@ -172,7 +174,8 @@ test.describe("feedback workflow", () => {
     await page.getByRole("menuitem", { name: "Merge to existing" }).click();
 
     const mergeRpc = waitForRpc(page, "PostMerge");
-    await page.getByRole("option", { name: targetTitle, exact: true }).click();
+    await page.getByRole("option", { name: targetTitle }).click();
+    await page.getByRole("button", { name: "Merge posts" }).click();
     await mergeRpc;
 
     // The merged post redirects to the surviving target post.
@@ -201,7 +204,8 @@ test.describe("feedback workflow", () => {
     await page.getByRole("menuitem", { name: "Merge to existing" }).click();
 
     const mergeRpc = waitForRpc(page, "PostMerge");
-    await page.getByRole("option", { name: targetTitle, exact: true }).click();
+    await page.getByRole("option", { name: targetTitle }).click();
+    await page.getByRole("button", { name: "Merge posts" }).click();
     await mergeRpc;
 
     // Redirected to the target, where the source comment now lives.
@@ -231,7 +235,8 @@ test.describe("feedback workflow", () => {
     await page.getByRole("menuitem", { name: "Merge to existing" }).click();
 
     const mergeRpc = waitForRpc(page, "PostMerge");
-    await page.getByRole("option", { name: targetTitle, exact: true }).click();
+    await page.getByRole("option", { name: targetTitle }).click();
+    await page.getByRole("button", { name: "Merge posts" }).click();
     await mergeRpc;
     await expect(page.getByLabel("Post Title")).toHaveValue(targetTitle);
     const targetSlug = new URL(page.url()).pathname.split("/").pop();
@@ -241,6 +246,277 @@ test.describe("feedback workflow", () => {
     const boardUrl = publicBoardUrl(workspace.workspaceName);
     await page.goto(`${boardUrl}/p/${sourceSlug}`);
     await expect(page).toHaveURL(`${boardUrl}/p/${targetSlug}`);
+  });
+
+  test("a merged post shows a banner and can be unmerged", async ({ page }) => {
+    const workspace = await createWorkspace(page);
+    const targetTitle = `Merge target ${randomUUID().slice(0, 8)}`;
+    const sourceTitle = `Merge source ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, targetTitle, "Canonical feedback.");
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, sourceTitle, "Duplicate feedback.");
+    await openPost(page, sourceTitle);
+
+    const origin = new URL(page.url()).origin;
+    const sourcePath = new URL(page.url()).pathname;
+
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await page.getByRole("menuitem", { name: "Merge to existing" }).click();
+    const mergeRpc = waitForRpc(page, "PostMerge");
+    await page.getByRole("option", { name: targetTitle }).click();
+    await page.getByRole("button", { name: "Merge posts" }).click();
+    await mergeRpc;
+    await expect(page.getByLabel("Post Title")).toHaveValue(targetTitle);
+
+    // The archived duplicate explains where it went.
+    await page.goto(`${origin}${sourcePath}`);
+    await expect(page.getByText("Merged post")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: targetTitle, exact: true })
+    ).toBeVisible();
+
+    // The survivor can restore it from the same menu.
+    await page.goto(workspace.organizationUrl);
+    await openPost(page, targetTitle);
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await page.getByRole("menuitem", { name: "Unmerge a post" }).click();
+    const unmergeRpc = waitForRpc(page, "PostUnmerge");
+    await page.getByRole("option", { name: sourceTitle }).click();
+    await unmergeRpc;
+    await expect(page.getByText(`Restored "${sourceTitle}"`)).toBeVisible();
+
+    // The restored post is a normal post again.
+    await page.goto(`${origin}${sourcePath}`);
+    await expect(page.getByLabel("Post Title")).toHaveValue(sourceTitle);
+    await expect(page.getByText("Merged post")).toHaveCount(0);
+  });
+
+  test("merge confirmation can be cancelled without merging", async ({
+    page,
+  }) => {
+    const workspace = await createWorkspace(page);
+    const targetTitle = `Merge target ${randomUUID().slice(0, 8)}`;
+    const sourceTitle = `Merge source ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, targetTitle, "Canonical feedback.");
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, sourceTitle, "Duplicate feedback.");
+    await openPost(page, targetTitle);
+
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await page.getByRole("menuitem", { name: "Merge others to this" }).click();
+    await page.getByRole("option", { name: sourceTitle }).click();
+
+    // Merging is destructive, so it asks for confirmation first.
+    const confirmDialog = page.getByRole("alertdialog");
+    await expect(
+      confirmDialog.getByText(`Merge "${sourceTitle}" into this post?`)
+    ).toBeVisible();
+    await expect(
+      confirmDialog.getByText(/move to the surviving post/)
+    ).toBeVisible();
+
+    await confirmDialog.getByRole("button", { name: "Cancel" }).click();
+
+    // Cancelling returns to the picker without merging: no success toast,
+    // and the post is untouched.
+    await expect(
+      page.getByPlaceholder("Search posts to merge...")
+    ).toBeVisible();
+    await expect(
+      page.getByText(`Merged "${sourceTitle}" into this post`)
+    ).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(
+      page.getByPlaceholder("Search posts to merge...")
+    ).toBeHidden();
+    await expect(page.getByLabel("Post Title")).toHaveValue(targetTitle);
+
+    // The merge affordance is still offered afterwards.
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await expect(
+      page.getByRole("menuitem", { name: "Merge others to this" })
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+  });
+
+  test("merge carries upvotes over to the surviving post", async ({ page }) => {
+    const workspace = await createWorkspace(page);
+    const targetTitle = `Merge target ${randomUUID().slice(0, 8)}`;
+    const sourceTitle = `Merge source ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, targetTitle, "Canonical feedback.");
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, sourceTitle, "Duplicate feedback.");
+    await openPost(page, sourceTitle);
+
+    // Upvote the duplicate before it is merged away, waiting for the toggle
+    // to persist so the merge cannot race it.
+    const upvoteResponse = waitForRpc(page, "UpvoteToggle");
+    await page.getByRole("button", { name: "Upvote" }).click();
+    await upvoteResponse;
+    await expect(page.getByRole("button", { name: "Upvote" })).toContainText(
+      "1"
+    );
+
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await page.getByRole("menuitem", { name: "Merge to existing" }).click();
+
+    const mergeRpc = waitForRpc(page, "PostMerge");
+    await page.getByRole("option", { name: targetTitle }).click();
+    await page.getByRole("button", { name: "Merge posts" }).click();
+    await mergeRpc;
+
+    // Redirected to the survivor, which now carries the source's vote.
+    await expect(page.getByLabel("Post Title")).toHaveValue(targetTitle);
+    await expect(page.getByRole("button", { name: "Upvote" })).toContainText(
+      "1"
+    );
+
+    // The moved vote persisted server-side: still there after a reload.
+    await page.reload();
+    await expect(page.getByLabel("Post Title")).toHaveValue(targetTitle);
+    await expect(page.getByRole("button", { name: "Upvote" })).toContainText(
+      "1"
+    );
+  });
+
+  test("merged source explains where it went and links to the survivor", async ({
+    page,
+  }) => {
+    const workspace = await createWorkspace(page);
+    const targetTitle = `Merge target ${randomUUID().slice(0, 8)}`;
+    const sourceTitle = `Merge source ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, targetTitle, "Canonical feedback.");
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, sourceTitle, "Duplicate feedback.");
+    await openPost(page, sourceTitle);
+
+    const origin = new URL(page.url()).origin;
+    const sourcePath = new URL(page.url()).pathname;
+
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await page.getByRole("menuitem", { name: "Merge to existing" }).click();
+    const mergeRpc = waitForRpc(page, "PostMerge");
+    await page.getByRole("option", { name: targetTitle }).click();
+    await page.getByRole("button", { name: "Merge posts" }).click();
+    await mergeRpc;
+    await expect(page.getByLabel("Post Title")).toHaveValue(targetTitle);
+
+    // The archived duplicate explains where it went.
+    await page.goto(`${origin}${sourcePath}`);
+    await expect(page.getByText("Merged post")).toBeVisible();
+    await expect(
+      page.getByText(
+        "Comments, votes, reactions, and followers live on the surviving post."
+      )
+    ).toBeVisible();
+
+    // The banner links to the surviving post.
+    await page.getByRole("link", { name: targetTitle, exact: true }).click();
+    await expect(page.getByLabel("Post Title")).toHaveValue(targetTitle);
+
+    // The source timeline records where it was merged into.
+    await page.goto(`${origin}${sourcePath}`);
+    await page.getByRole("tab", { name: "Activity" }).click();
+    await expect(page.getByText(`merged into "${targetTitle}"`)).toBeVisible();
+  });
+
+  test("merged post can be unmerged directly from the merged post", async ({
+    page,
+  }) => {
+    const workspace = await createWorkspace(page);
+    const targetTitle = `Merge target ${randomUUID().slice(0, 8)}`;
+    const sourceTitle = `Merge source ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, targetTitle, "Canonical feedback.");
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, sourceTitle, "Duplicate feedback.");
+    await openPost(page, sourceTitle);
+
+    const origin = new URL(page.url()).origin;
+    const sourcePath = new URL(page.url()).pathname;
+
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await page.getByRole("menuitem", { name: "Merge to existing" }).click();
+    const mergeRpc = waitForRpc(page, "PostMerge");
+    await page.getByRole("option", { name: targetTitle }).click();
+    await page.getByRole("button", { name: "Merge posts" }).click();
+    await mergeRpc;
+    await expect(page.getByLabel("Post Title")).toHaveValue(targetTitle);
+
+    // The tombstone offers a direct unmerge with no picker.
+    await page.goto(`${origin}${sourcePath}`);
+    await expect(page.getByText("Merged post")).toBeVisible();
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await expect(
+      page.getByRole("menuitem", { name: "Unmerge this post" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("menuitem", { name: "Merge others to this" })
+    ).toHaveCount(0);
+
+    const unmergeRpc = waitForRpc(page, "PostUnmerge");
+    await page.getByRole("menuitem", { name: "Unmerge this post" }).click();
+    await unmergeRpc;
+    await expect(page.getByText("Post unmerged")).toBeVisible();
+
+    // The banner is gone and the post is a normal post again.
+    await expect(page.getByText("Merged post")).toHaveCount(0);
+    await expect(page.getByLabel("Post Title")).toHaveValue(sourceTitle);
+
+    // The unmerge is recorded on the restored post's timeline.
+    await page.getByRole("tab", { name: "Activity" }).click();
+    await expect(
+      page.getByText(`unmerged the post from "${targetTitle}"`)
+    ).toBeVisible();
+
+    // The restore persisted server-side: still normal after a reload.
+    await page.reload();
+    await expect(page.getByLabel("Post Title")).toHaveValue(sourceTitle);
+    await expect(page.getByText("Merged post")).toHaveCount(0);
+  });
+
+  test("merge picker search filters candidates", async ({ page }) => {
+    const workspace = await createWorkspace(page);
+    const targetTitle = `Merge target ${randomUUID().slice(0, 8)}`;
+    const firstSourceTitle = `Merge source ${randomUUID().slice(0, 8)}`;
+    const secondSourceTitle = `Merge source ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, targetTitle, "Canonical feedback.");
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, firstSourceTitle, "Duplicate feedback.");
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, secondSourceTitle, "Duplicate feedback.");
+    await openPost(page, targetTitle);
+
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await page.getByRole("menuitem", { name: "Merge others to this" }).click();
+
+    const search = page.getByPlaceholder("Search posts to merge...");
+    await expect(search).toBeVisible();
+    await expect(
+      page.getByRole("option", { name: firstSourceTitle })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("option", { name: secondSourceTitle })
+    ).toBeVisible();
+
+    // Typing filters the candidate list down to the match.
+    await search.fill(firstSourceTitle);
+    await expect(
+      page.getByRole("option", { name: firstSourceTitle })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("option", { name: secondSourceTitle })
+    ).toHaveCount(0);
+
+    // Closing without picking leaves the post unmerged.
+    await page.keyboard.press("Escape");
+    await expect(search).toBeHidden();
+    await expect(page.getByLabel("Post Title")).toHaveValue(targetTitle);
   });
 
   test("post creator can toggle their subscription", async ({ page }) => {

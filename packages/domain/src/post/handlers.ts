@@ -76,6 +76,7 @@ import type {
   TPostUpdateContent,
   TPostUpdateEta,
   TPostUpdateTitle,
+  TPostUnmerge,
 } from "./schema";
 import { postLexicalSimilarity, SUGGESTION_MAX_DISTANCE } from "./suggestions";
 
@@ -1393,8 +1394,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         const outboxId = yield* transaction(
           Effect.gen(function* () {
             yield* repository.merge(args);
-            // Record the merge on the surviving target so its timeline shows
-            // which duplicate was folded into it.
+            // Record both directions of the merge: the survivor's timeline
+            // shows which duplicate was folded in, and the archived source's
+            // timeline explains where it went (so the source is not just a
+            // silent tombstone).
             yield* activityRepository.create({
               actorId: session.session.userId,
               actorMemberId: membership?.membershipId ?? null,
@@ -1402,6 +1405,27 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               mergedPostId: args.sourcePostId,
               organizationId: args.organizationId,
               postId: args.targetPostId,
+            });
+            yield* activityRepository.create({
+              actorId: session.session.userId,
+              actorMemberId: membership?.membershipId ?? null,
+              kind: "POST_MERGED_INTO",
+              organizationId: args.organizationId,
+              postId: args.sourcePostId,
+              targetPostId: args.targetPostId,
+            });
+            // In-app notification: subscribers and voters of both posts learn
+            // where the duplicate went. Runs after the repository move so the
+            // survivor queries include the carried-over source rows.
+            yield* Option.match(notifications, {
+              onNone: () => Effect.void,
+              onSome: (service) =>
+                service.notifyPostMerged({
+                  actorUserId: session.session.userId,
+                  organizationId: args.organizationId,
+                  sourcePostId: args.sourcePostId,
+                  targetPostId: args.targetPostId,
+                }),
             });
             if (
               !(yield* entitlementPolicy.mayMaterializeEmailIntent({
@@ -1439,6 +1463,30 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           })
         );
         yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
+      }).pipe(
+        Policy.withPolicy(postPolicy.canMerge(args.organizationId)),
+        withRemapDbErrors("Post", "update")
+      ),
+
+    PostUnmerge: (args: TPostUnmerge) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
+        yield* transaction(
+          Effect.gen(function* () {
+            const targetPostId = yield* repository.unmerge(args);
+            // Restoring a post reverses the tombstone, so the source timeline
+            // records which post it was detached from.
+            yield* activityRepository.create({
+              actorId: session.session.userId,
+              actorMemberId: membership?.membershipId ?? null,
+              kind: "POST_UNMERGED",
+              organizationId: args.organizationId,
+              postId: args.sourcePostId,
+              targetPostId,
+            });
+          })
+        );
       }).pipe(
         Policy.withPolicy(postPolicy.canMerge(args.organizationId)),
         withRemapDbErrors("Post", "update")
