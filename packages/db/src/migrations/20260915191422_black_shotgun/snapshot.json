@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "9f1821c7-65bd-4e8a-8ddb-f2a07d303c56",
+  "id": "a050b009-19e6-4b21-8617-bde832525b42",
   "prevIds": [
     "a1781a8b-f502-4b6f-8227-f17c8e60143c"
   ],
@@ -2213,6 +2213,19 @@
     {
       "type": "text",
       "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "merged_from_post_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "changelog_post"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,
@@ -4202,6 +4215,19 @@
     {
       "type": "text",
       "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "merged_from_post_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "email_subscription"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,
@@ -4735,6 +4761,19 @@
     {
       "type": "text",
       "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "merged_from_post_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "post_reaction"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,
@@ -4936,6 +4975,19 @@
       "generated": null,
       "identity": null,
       "name": "post_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "post_subscription"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "merged_from_post_id",
       "entityType": "columns",
       "schema": "public",
       "table": "post_subscription"
@@ -5313,6 +5365,19 @@
       "generated": null,
       "identity": null,
       "name": "tag_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "post_tag"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "merged_from_post_id",
       "entityType": "columns",
       "schema": "public",
       "table": "post_tag"
@@ -8212,6 +8277,27 @@
       "nameExplicit": true,
       "columns": [
         {
+          "value": "merged_from_post_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "changelog_post_mergedFromPostId_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "changelog_post"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
           "value": "organization_id",
           "isExpression": false,
           "asc": true,
@@ -9360,6 +9446,27 @@
       "nameExplicit": true,
       "columns": [
         {
+          "value": "merged_from_post_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "email_subscription_mergedFromPostId_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "email_subscription"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
           "value": "provider_event_id",
           "isExpression": false,
           "asc": true,
@@ -9527,6 +9634,27 @@
       "method": "btree",
       "concurrently": false,
       "name": "postReaction_postId_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "post_reaction"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "merged_from_post_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "postReaction_mergedFromPostId_idx",
       "entityType": "indexes",
       "schema": "public",
       "table": "post_reaction"
@@ -9709,6 +9837,27 @@
       "method": "btree",
       "concurrently": false,
       "name": "post_subscription_userId_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "post_subscription"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "merged_from_post_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "post_subscription_mergedFromPostId_idx",
       "entityType": "indexes",
       "schema": "public",
       "table": "post_subscription"
@@ -9957,6 +10106,27 @@
       "method": "btree",
       "concurrently": false,
       "name": "post_tag_tagId_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "post_tag"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "merged_from_post_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "post_tag_mergedFromPostId_idx",
       "entityType": "indexes",
       "schema": "public",
       "table": "post_tag"
@@ -11715,6 +11885,23 @@
     {
       "nameExplicit": false,
       "columns": [
+        "merged_from_post_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "post",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "changelog_post_merged_from_post_id_post_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "changelog_post"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
         "organization_id"
       ],
       "schemaTo": "public",
@@ -12344,6 +12531,23 @@
     {
       "nameExplicit": false,
       "columns": [
+        "merged_from_post_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "post",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "email_subscription_merged_from_post_id_post_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "email_subscription"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
         "organization_id"
       ],
       "schemaTo": "public",
@@ -12514,6 +12718,23 @@
     {
       "nameExplicit": false,
       "columns": [
+        "merged_from_post_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "post",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "post_reaction_merged_from_post_id_post_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "post_reaction"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
         "organization_id"
       ],
       "schemaTo": "public",
@@ -12575,6 +12796,23 @@
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "post_subscription_post_id_post_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "post_subscription"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "merged_from_post_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "post",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "post_subscription_merged_from_post_id_post_id_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "post_subscription"
@@ -12747,6 +12985,23 @@
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "post_tag_tag_id_tag_id_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "post_tag"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "merged_from_post_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "post",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "post_tag_merged_from_post_id_post_id_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "post_tag"
