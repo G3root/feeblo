@@ -166,75 +166,19 @@ function CommentThreadRow({
   );
 }
 
-/**
- * Narrows a survivor's comments to the threads that belong to a merged post:
- * roots tagged with `mergedFromPostId === mergedPostId` plus every descendant
- * reply. Replies added on the survivor after the merge are part of the moved
- * discussion, so the merged post's page shows the complete thread even though
- * the rows physically live on the survivor.
- */
-function selectMergedThreadComments(
-  comments: readonly TComment[],
-  mergedPostId: string
-): TComment[] {
-  const byId = new Map(comments.map((comment) => [comment.id, comment]));
-  const mergedRootIds = new Set(
-    comments
-      .filter((comment) => comment.mergedFromPostId === mergedPostId)
-      .map((comment) => comment.id)
-  );
-
-  if (mergedRootIds.size === 0) {
-    return [];
-  }
-
-  const belongsToMergedThread = (comment: TComment): boolean => {
-    let current: TComment | undefined = comment;
-    while (current) {
-      if (mergedRootIds.has(current.id)) {
-        return true;
-      }
-      const parentId: string | null =
-        current.resolvedParentCommentId ?? current.parentCommentId;
-      current = parentId == null ? undefined : byId.get(parentId);
-    }
-    return false;
-  };
-
-  return comments.filter(belongsToMergedThread);
-}
-
 export function CommentsList() {
   const { data: session } = useAuthState();
   const { organizationId, post, isMember } = usePostCollectionData();
   const {
-    collections: { commentCollection, postCollection },
+    collections: { commentCollection },
   } = usePostCollections();
   const postSlug = post.slug;
-  const mergedIntoPostId = post.mergedIntoPostId;
-  // Guests only see PUBLIC comments; members see everything.
-  const visibility = isMember ? undefined : ("PUBLIC" as const);
 
-  // A merged post's comments physically live on its survivor, so resolve the
-  // survivor's slug and subscribe to its comment subset as well. The child
-  // page then filters that subset down to this post's own merged threads.
-  const { data: survivor, isLoading: isSurvivorLoading } = useLiveQuery(
-    (query) => {
-      if (!mergedIntoPostId) {
-        return undefined;
-      }
-      return query
-        .from({ post: postCollection })
-        .where(({ post: survivorPost }) =>
-          eq(survivorPost.id, mergedIntoPostId)
-        )
-        .findOne();
-    },
-    [mergedIntoPostId, postCollection]
-  );
-  const survivorSlug = survivor?.slug;
-
-  const { data: ownComments, isLoading: isOwnCommentsLoading } = useLiveQuery(
+  // A post's list carries its own comments plus the comments merged away from
+  // it while it is merged (see `CommentRepository.findMany`), so a merged
+  // post's page renders its comments from one slug-scoped subset and an
+  // unmerge only changes the rows inside that same subset.
+  const { data: comments, isLoading: isCommentsLoading } = useLiveQuery(
     (q) =>
       q
         .from({ comment: commentCollection })
@@ -242,7 +186,7 @@ export function CommentsList() {
           and(
             eq(comment.organizationId, organizationId),
             eq(comment.postSlug, postSlug),
-            ...(visibility ? [eq(comment.visibility, visibility)] : [])
+            ...(isMember ? [] : [eq(comment.visibility, "PUBLIC")])
           )
         )
         // `nulls: "last"` matters: TanStack DB's desc default is NULLS FIRST
@@ -257,52 +201,9 @@ export function CommentsList() {
     [organizationId, postSlug, isMember]
   );
 
-  const { data: survivorComments, isLoading: isSurvivorCommentsLoading } =
-    useLiveQuery(
-      (q) => {
-        if (!survivorSlug) {
-          return undefined;
-        }
-        return q
-          .from({ comment: commentCollection })
-          .where(({ comment }) =>
-            and(
-              eq(comment.organizationId, organizationId),
-              eq(comment.postSlug, survivorSlug),
-              ...(visibility ? [eq(comment.visibility, visibility)] : [])
-            )
-          )
-          .orderBy(({ comment }) => comment.pinnedAt, {
-            direction: "desc",
-            nulls: "last",
-          })
-          .orderBy(({ comment }) => comment.createdAt, "desc");
-      },
-      [organizationId, survivorSlug, isMember]
-    );
+  const threads = useMemo(() => buildThreads(comments ?? []), [comments]);
 
-  const mergedComments = useMemo(
-    () => selectMergedThreadComments(survivorComments ?? [], post.id),
-    [survivorComments, post.id]
-  );
-
-  // The two subsets arrive pre-ordered; merge them back into one
-  // pinned-first, newest-first list so a pinned merged comment still heads
-  // the page.
-  const comments = useMemo(() => {
-    const combined = [...(ownComments ?? []), ...mergedComments];
-    return combined.sort((left, right) => {
-      const pinnedOrder =
-        Number(right.pinnedAt != null) - Number(left.pinnedAt != null);
-      return pinnedOrder !== 0
-        ? pinnedOrder
-        : right.createdAt.getTime() - left.createdAt.getTime();
-    });
-  }, [ownComments, mergedComments]);
-
-  const threads = useMemo(() => buildThreads(comments), [comments]);
-
-  if (isOwnCommentsLoading || isSurvivorLoading || isSurvivorCommentsLoading) {
+  if (isCommentsLoading) {
     return null;
   }
 

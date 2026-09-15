@@ -11,7 +11,12 @@ export const Comment = S.Struct({
   updatedAt: S.DateFromString,
   organizationId: S.String,
   postId: S.String,
-  /** Denormalized post slug; unique per organization (post_organizationId_slug_uidx). */
+  /**
+   * Slug the comment was listed under. Normally the host post's slug; for a
+   * merged comment it is the slug of the post page that requested it, so a
+   * merged post's page and its survivor can each keep a slug-scoped client
+   * subset over the same comment.
+   */
   postSlug: S.String,
   /** Null on public endpoints for commenters other than the session user. */
   userId: S.NullOr(S.String),

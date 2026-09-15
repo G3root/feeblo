@@ -267,6 +267,68 @@ describe("CommentRpcHandlers", () => {
           expect(comments[0]?.content).toContain("A test comment");
         })
       );
+      it.effect(
+        "returns comments merged away from the post under its slug",
+        () =>
+          Effect.gen(function* () {
+            const postRepository = yield* PostRepository;
+            const handlers = yield* CommentRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const targetPostId = yield* addPost(fixture, fixture.boardId);
+            const commentId = yield* CommentId.generate;
+
+            yield* handlers
+              .CommentCreate(
+                commentCreateInput(fixture, commentId, "Merged comment")
+              )
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            yield* postRepository.merge({
+              organizationId: fixture.organizationId,
+              sourcePostId: fixture.postId,
+              targetPostId,
+            });
+
+            // The merged post's own page lists the comment that now lives on
+            // the survivor, keyed under the requested slug so the client can
+            // keep a single slug-scoped subset per page.
+            const merged = yield* handlers
+              .CommentList({
+                organizationId: fixture.organizationId,
+                slug: fixture.postSlug,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            expect(merged).toHaveLength(1);
+            expect(merged[0]).toMatchObject({
+              id: commentId,
+              mergedFromPostId: fixture.postId,
+              postId: targetPostId,
+              postSlug: fixture.postSlug,
+            });
+
+            // The survivor lists the same comment under its own slug.
+            const survivor = yield* handlers
+              .CommentList({
+                organizationId: fixture.organizationId,
+                slug: targetPostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            expect(survivor).toHaveLength(1);
+            expect(survivor[0]).toMatchObject({
+              id: commentId,
+              mergedFromPostId: fixture.postId,
+              postId: targetPostId,
+              postSlug: targetPostId,
+            });
+          })
+      );
     });
 
     describe("CommentListPublic", () => {
