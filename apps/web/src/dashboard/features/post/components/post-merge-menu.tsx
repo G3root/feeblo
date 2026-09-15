@@ -405,8 +405,13 @@ function PostMergeCommandDialog({
     const merged = (candidates ?? [])
       // A post that already absorbed a merge can never be a source (the
       // repository keeps merges one level deep), so offering it would only
-      // produce a rejected call.
-      .filter((candidate) => !mergeTargetIds.has(candidate.id))
+      // produce a rejected call. Only "into-this" makes the picked post the
+      // source: "into-existing" folds the viewed post into the picked one, and
+      // a survivor is a valid target that can absorb another duplicate.
+      .filter(
+        (candidate) =>
+          direction === "into-existing" || !mergeTargetIds.has(candidate.id)
+      )
       .map((candidate) => ({
         candidate,
         isSuggested: suggestedPostIds.has(candidate.id),
@@ -417,7 +422,7 @@ function PostMergeCommandDialog({
     return [...merged].sort(
       (left, right) => Number(right.isSuggested) - Number(left.isSuggested)
     );
-  }, [candidates, mergeTargetIds, suggestedPostIds]);
+  }, [candidates, direction, mergeTargetIds, suggestedPostIds]);
 
   const merge = async (candidate: MergeCandidate) => {
     if (isPending) {

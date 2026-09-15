@@ -641,6 +641,14 @@ test.describe("feedback workflow", () => {
     await page.getByRole("menuitem", { name: "Merge others to this" }).click();
     await expect(page.getByText("No matching posts.")).toBeVisible();
     await page.keyboard.press("Escape");
+
+    // The survivor stays selectable as a target: "Merge to existing" folds
+    // this post into it, which the repository allows (only the source of a
+    // merge is barred from having merged children).
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await page.getByRole("menuitem", { name: "Merge to existing" }).click();
+    await expect(page.getByRole("option", { name: targetTitle })).toBeVisible();
+    await page.keyboard.press("Escape");
   });
 
   test("a merged duplicate is hidden from lists and read-only until unmerged", async ({

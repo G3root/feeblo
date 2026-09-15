@@ -2343,6 +2343,17 @@ describe("PostRpcHandlers", () => {
             "Source post has merged children and cannot be merged again"
           );
 
+          // The survivor stays a valid *target*: only the source of a merge
+          // is barred from having children, so another duplicate can still be
+          // folded into `secondPostId`.
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId: thirdPostId,
+              targetPostId: secondPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           const posts = yield* db
             .select({
               id: schema.postTable.id,
@@ -2358,7 +2369,7 @@ describe("PostRpcHandlers", () => {
           ).toBeNull();
           expect(
             posts.find((post) => post.id === thirdPostId)?.mergedIntoPostId
-          ).toBeNull();
+          ).toBe(secondPostId);
         })
       );
 
