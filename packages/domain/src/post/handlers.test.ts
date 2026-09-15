@@ -2806,6 +2806,198 @@ describe("PostRpcHandlers", () => {
       );
 
       it.effect(
+        "unmerge returns tags, reactions, followers, email subscribers, and the changelog link",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const sourcePostId = yield* PostId.generate;
+            const targetPostId = yield* PostId.generate;
+
+            for (const [id, title] of [
+              [sourcePostId, "Source feedback"],
+              [targetPostId, "Target feedback"],
+            ] as const) {
+              yield* handlers
+                .PostCreate(postCreateInput(fixture, id, title))
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                );
+            }
+
+            const now = new Date();
+            const tagId = `tag_${fixture.organizationId}`;
+            yield* db.insert(schema.tagTable).values({
+              id: tagId,
+              name: "Restored tag",
+              slug: `restored-tag-${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              creatorId: fixture.userId,
+              creatorMemberId: fixture.membershipId,
+              createdAt: now,
+              updatedAt: now,
+            });
+            const postTagId = `post_tag_${fixture.organizationId}`;
+            yield* db.insert(schema.postTagTable).values({
+              id: postTagId,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              tagId,
+            });
+            const reactionId = `reaction_${fixture.organizationId}`;
+            yield* db.insert(schema.postReactionTable).values({
+              id: reactionId,
+              emoji: "rocket",
+              postId: sourcePostId,
+              userId: fixture.userId,
+            });
+            const subscriptionId = `post_sub_${fixture.organizationId}`;
+            const followerUserId = `follower_${fixture.organizationId}`;
+            yield* db.insert(schema.userTable).values({
+              id: followerUserId,
+              email: `follower_${fixture.organizationId}@example.com`,
+              name: "Follower",
+            });
+            yield* db.insert(schema.postSubscriptionTable).values({
+              id: subscriptionId,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: followerUserId,
+            });
+            const contactId = `email_contact_${fixture.organizationId}`;
+            yield* db.insert(schema.emailContactTable).values({
+              id: contactId,
+              organizationId: fixture.organizationId,
+              email: `subscriber_${fixture.organizationId}@example.com`,
+              verificationState: "verified",
+              verifiedAt: now,
+              createdAt: now,
+              updatedAt: now,
+            });
+            const emailSubscriptionId = `email_sub_${fixture.organizationId}`;
+            yield* db.insert(schema.emailSubscriptionTable).values({
+              id: emailSubscriptionId,
+              organizationId: fixture.organizationId,
+              contactId,
+              topicType: "post",
+              topicId: sourcePostId,
+              source: "explicit",
+              state: "active",
+              createdAt: now,
+              updatedAt: now,
+            });
+            const changelogId = `changelog_${fixture.organizationId}`;
+            yield* db.insert(schema.changelogTable).values({
+              id: changelogId,
+              title: "Announcement",
+              slug: `announcement-${fixture.organizationId}`,
+              content: "x",
+              excerpt: "x",
+              status: "published",
+              organizationId: fixture.organizationId,
+              creatorId: fixture.userId,
+              creatorMemberId: fixture.membershipId,
+              createdAt: now,
+              updatedAt: now,
+            });
+            yield* db.insert(schema.changelogPostTable).values({
+              changelogId,
+              postId: sourcePostId,
+              organizationId: fixture.organizationId,
+            });
+
+            yield* handlers
+              .PostMerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+                targetPostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            yield* handlers
+              .PostUnmerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            // Every provenance-tagged row is back on the source with its tag
+            // cleared, so a later merge records its own origin.
+            const [postTag] = yield* db
+              .select({
+                postId: schema.postTagTable.postId,
+                mergedFromPostId: schema.postTagTable.mergedFromPostId,
+              })
+              .from(schema.postTagTable)
+              .where(eq(schema.postTagTable.id, postTagId));
+            expect(postTag).toEqual({
+              postId: sourcePostId,
+              mergedFromPostId: null,
+            });
+
+            const [reaction] = yield* db
+              .select({
+                postId: schema.postReactionTable.postId,
+                mergedFromPostId: schema.postReactionTable.mergedFromPostId,
+              })
+              .from(schema.postReactionTable)
+              .where(eq(schema.postReactionTable.id, reactionId));
+            expect(reaction).toEqual({
+              postId: sourcePostId,
+              mergedFromPostId: null,
+            });
+
+            const [subscription] = yield* db
+              .select({
+                postId: schema.postSubscriptionTable.postId,
+                mergedFromPostId: schema.postSubscriptionTable.mergedFromPostId,
+              })
+              .from(schema.postSubscriptionTable)
+              .where(eq(schema.postSubscriptionTable.id, subscriptionId));
+            expect(subscription).toEqual({
+              postId: sourcePostId,
+              mergedFromPostId: null,
+            });
+
+            const [emailSubscription] = yield* db
+              .select({
+                topicId: schema.emailSubscriptionTable.topicId,
+                mergedFromPostId:
+                  schema.emailSubscriptionTable.mergedFromPostId,
+              })
+              .from(schema.emailSubscriptionTable)
+              .where(eq(schema.emailSubscriptionTable.id, emailSubscriptionId));
+            expect(emailSubscription).toEqual({
+              topicId: sourcePostId,
+              mergedFromPostId: null,
+            });
+
+            const [changelogLink] = yield* db
+              .select({
+                postId: schema.changelogPostTable.postId,
+                mergedFromPostId: schema.changelogPostTable.mergedFromPostId,
+              })
+              .from(schema.changelogPostTable)
+              .where(eq(schema.changelogPostTable.postId, sourcePostId));
+            expect(changelogLink).toEqual({
+              postId: sourcePostId,
+              mergedFromPostId: null,
+            });
+
+            // Nothing tagged with the source is left on the survivor.
+            const leftovers = yield* db
+              .select({ id: schema.postTagTable.id })
+              .from(schema.postTagTable)
+              .where(eq(schema.postTagTable.postId, targetPostId));
+            expect(leftovers).toEqual([]);
+          })
+      );
+
+      it.effect(
         "unmerge restores a source vote whose voter also voted on the target",
         () =>
           Effect.gen(function* () {
@@ -2941,6 +3133,25 @@ describe("PostRpcHandlers", () => {
               postId: sourcePostId,
               userId: fixture.userId,
             });
+            const tagId = `tag_delete_parent_${fixture.organizationId}`;
+            const now = new Date();
+            yield* db.insert(schema.tagTable).values({
+              id: tagId,
+              name: "Restored tag",
+              slug: `restored-tag-delete-${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              creatorId: fixture.userId,
+              creatorMemberId: fixture.membershipId,
+              createdAt: now,
+              updatedAt: now,
+            });
+            const postTagId = `post_tag_delete_${fixture.organizationId}`;
+            yield* db.insert(schema.postTagTable).values({
+              id: postTagId,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              tagId,
+            });
 
             yield* handlers
               .PostMerge({
@@ -2951,6 +3162,13 @@ describe("PostRpcHandlers", () => {
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
+
+            const [mergedSource] = yield* db
+              .select({ updatedAt: schema.postTable.updatedAt })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, sourcePostId));
+            // Move the (test) clock so the revert is provably a fresh write.
+            yield* TestClock.adjust("1 seconds");
 
             // The survivor's delete is not blocked by the merged child's FK
             // and does not orphan it: the child returns to its board with the
@@ -2970,6 +3188,7 @@ describe("PostRpcHandlers", () => {
                 archivedAt: schema.postTable.archivedAt,
                 mergedAt: schema.postTable.mergedAt,
                 mergedIntoPostId: schema.postTable.mergedIntoPostId,
+                updatedAt: schema.postTable.updatedAt,
               })
               .from(schema.postTable)
               .where(eq(schema.postTable.id, sourcePostId));
@@ -2977,6 +3196,23 @@ describe("PostRpcHandlers", () => {
               archivedAt: null,
               mergedAt: null,
               mergedIntoPostId: null,
+            });
+            // The restored child is a fresh write: its timestamp moves so
+            // list ordering and cache invalidation see the revert.
+            expect(new Date(sourcePost!.updatedAt).getTime()).toBeGreaterThan(
+              new Date(mergedSource!.updatedAt).getTime()
+            );
+
+            const [restoredTag] = yield* db
+              .select({
+                mergedFromPostId: schema.postTagTable.mergedFromPostId,
+                postId: schema.postTagTable.postId,
+              })
+              .from(schema.postTagTable)
+              .where(eq(schema.postTagTable.id, postTagId));
+            expect(restoredTag).toEqual({
+              mergedFromPostId: null,
+              postId: sourcePostId,
             });
 
             const [comment] = yield* db
@@ -3641,6 +3877,16 @@ describe("PostRpcHandlers", () => {
                 name: "Recipient",
               });
             }
+            // In-app inboxes are member-only, so both recipients are members.
+            for (const userId of [subscriberUserId, upvoterUserId]) {
+              yield* db.insert(schema.memberTable).values({
+                id: `member_${userId}`,
+                organizationId: fixture.organizationId,
+                userId,
+                role: "contributor",
+                createdAt: new Date(),
+              });
+            }
             // Both rows start on the source and are carried to the target
             // by the merge before the notification fan-out runs.
             yield* db.insert(schema.postSubscriptionTable).values({
@@ -3715,6 +3961,115 @@ describe("PostRpcHandlers", () => {
                 `/${fixture.organizationId}/post/${targetPost?.boardSlug}/${targetPost?.slug}`
               );
             }
+          })
+        );
+
+        it.effect("notifies restored members when the merge is reverted", () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const sourcePostId = yield* PostId.generate;
+            const targetPostId = yield* PostId.generate;
+
+            for (const [id, title] of [
+              [sourcePostId, "Source feedback"],
+              [targetPostId, "Target feedback"],
+            ] as const) {
+              yield* handlers
+                .PostCreate(postCreateInput(fixture, id, title))
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                );
+            }
+
+            // The follower is a member and follows the source; unmerge moves
+            // that following back onto the source, so they are notified there.
+            const followerUserId = `follower_${sourcePostId}`;
+            // A public-board voter without membership: their vote moves back
+            // too, but their inbox is unreachable, so they are skipped.
+            const guestVoterId = `guest_${sourcePostId}`;
+            for (const userId of [followerUserId, guestVoterId]) {
+              yield* db.insert(schema.userTable).values({
+                id: userId,
+                email: `${userId}@example.com`,
+                name: "Recipient",
+              });
+            }
+            yield* db.insert(schema.memberTable).values({
+              id: `member_${followerUserId}`,
+              organizationId: fixture.organizationId,
+              userId: followerUserId,
+              role: "contributor",
+              createdAt: new Date(),
+            });
+            yield* db.insert(schema.postSubscriptionTable).values({
+              id: `post_sub_${sourcePostId}`,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: followerUserId,
+            });
+            yield* db.insert(schema.upvoteTable).values({
+              id: `upvote_${sourcePostId}`,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: guestVoterId,
+            });
+
+            yield* handlers
+              .PostMerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+                targetPostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            yield* handlers
+              .PostUnmerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const [sourcePost] = yield* db
+              .select({
+                boardSlug: schema.boardTable.slug,
+                slug: schema.postTable.slug,
+              })
+              .from(schema.postTable)
+              .innerJoin(
+                schema.boardTable,
+                eq(schema.boardTable.id, schema.postTable.boardId)
+              )
+              .where(eq(schema.postTable.id, sourcePostId));
+
+            const notifications = yield* db
+              .select({
+                href: schema.notificationTable.href,
+                recipientUserId: schema.notificationTable.recipientUserId,
+                resourceId: schema.notificationTable.resourceId,
+              })
+              .from(schema.notificationTable)
+              .where(
+                and(
+                  eq(
+                    schema.notificationTable.organizationId,
+                    fixture.organizationId
+                  ),
+                  eq(schema.notificationTable.kind, "feedback.unmerged")
+                )
+              );
+
+            expect(
+              notifications.map((notification) => notification.recipientUserId)
+            ).toEqual([followerUserId]);
+            expect(notifications[0]?.resourceId).toBe(sourcePostId);
+            expect(notifications[0]?.href).toBe(
+              `/${fixture.organizationId}/post/${sourcePost?.boardSlug}/${sourcePost?.slug}`
+            );
           })
         );
       });

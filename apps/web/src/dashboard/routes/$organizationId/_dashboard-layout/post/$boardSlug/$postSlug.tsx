@@ -229,6 +229,10 @@ function RouteComponent() {
     );
   }
 
+  // A merged post is a read-only tombstone: its votes, reactions, and voters
+  // live on the survivor now, so those panels would show a misleading subset.
+  const isMerged = post.mergedIntoPostId != null;
+
   return (
     <PostPage.Root
       board={board}
@@ -255,11 +259,19 @@ function RouteComponent() {
             <PostPage.Content />
             <PostMergedPosts />
             <div className="flex items-center justify-between py-1">
-              <PostPage.Reactions />
+              {isMerged ? (
+                <p className="text-muted-foreground text-sm">
+                  Votes and reactions moved to the surviving post.
+                </p>
+              ) : (
+                <>
+                  <PostPage.Reactions />
 
-              <div className="flex items-center gap-2">
-                <PostPage.Vote />
-              </div>
+                  <div className="flex items-center gap-2">
+                    <PostPage.Vote />
+                  </div>
+                </>
+              )}
             </div>
             <Tabs defaultValue="comments">
               <TabsList variant="underline">
@@ -346,8 +358,11 @@ function RouteComponent() {
             </div>
 
             {/* Voter management: add/remove on behalf of customers.
-                Controls self-gate with `votes.onBehalf` (contributor+). */}
-            <PostPage.Voters />
+                Controls self-gate with `votes.onBehalf` (contributor+).
+                Hidden on a merged tombstone: the votes still on this post are
+                only the ones that collided with the survivor's, so the panel
+                would misrepresent who backed it. */}
+            {isMerged ? null : <PostPage.Voters />}
 
             <div>
               <Separator />

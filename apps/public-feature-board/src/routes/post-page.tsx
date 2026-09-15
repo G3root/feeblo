@@ -1,4 +1,4 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import type { TBoard } from "@feeblo/domain/board/schema";
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import type { TPostListItem } from "@feeblo/domain/post/schema";
@@ -11,6 +11,7 @@ import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
@@ -231,7 +232,8 @@ export function PostPage() {
  * post-miss check above, so the `PostResolveMergedPublic` query never runs
  * for ordinary visits. The atom runtime owns dedup, caching, and abort —
  * no manual effect fetch — and the redirect effect below depends only on
- * the resolved primitive slug.
+ * the resolved primitive slug. A lookup failure offers a retry instead of
+ * pretending the post is missing.
  */
 function MergedPostResolver({
   organizationId,
@@ -246,11 +248,14 @@ function MergedPostResolver({
     [organizationId, slug]
   );
   const targetResult = useAtomValue(mergedPostTargetAtom(args));
+  const refresh = useAtomRefresh(mergedPostTargetAtom(args));
   // Derived during render: undefined while loading, string while
-  // redirecting, null when the slug is genuinely unknown.
+  // redirecting, null when the slug is genuinely unknown. A failed lookup is
+  // kept apart from a miss: a transient RPC failure must not tell the visitor
+  // the post no longer exists.
   const targetSlug = Result.builder(targetResult)
     .onInitial(() => undefined)
-    .onFailure(() => null)
+    .onFailure(() => undefined)
     .onSuccess((value) => value)
     .exhaustive();
 
@@ -263,6 +268,24 @@ function MergedPostResolver({
       });
     }
   }, [navigate, targetSlug]);
+
+  if (Result.isFailure(targetResult)) {
+    return (
+      <RootLayout>
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>{m.plane_ideal_dolphin()}</EmptyTitle>
+            <EmptyDescription>{m.mild_green_jannes()}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button onClick={refresh} variant="outline">
+              {m.even_seemly_bear()}
+            </Button>
+          </EmptyContent>
+        </Empty>
+      </RootLayout>
+    );
+  }
 
   if (targetSlug !== null) {
     return <RootLayout>{m.good_extra_giraffe()}</RootLayout>;

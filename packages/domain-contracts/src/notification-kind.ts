@@ -13,6 +13,7 @@ export const NotificationEventType = S.Literals([
   "feedback.commented",
   "feedback.status_changed",
   "feedback.merged",
+  "feedback.unmerged",
   "changelog.published",
   "changelog.updated",
 ]);

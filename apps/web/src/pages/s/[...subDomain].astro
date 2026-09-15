@@ -141,9 +141,13 @@ let pageDescription = `Share feedback, follow the roadmap, and read product upda
 const detail = await resolvePageContent(publicPath, site);
 
 if (detail.kind === "redirect") {
-  // A merged source permanently moved to its survivor: 301 preserves link
-  // equity and sends visitors straight to the canonical discussion.
-  return Astro.redirect(detail.to, 301);
+  // A merged source moves to its survivor, but unmerging is a supported
+  // action: a permanent 301 would keep sending inbound links to the survivor
+  // after the merge is reverted, so this is a temporary redirect that proxies
+  // and browsers must not cache.
+  const redirect = Astro.redirect(detail.to, 302);
+  redirect.headers.set("Cache-Control", "no-store");
+  return redirect;
 }
 
 if (detail.kind === "not-found") {

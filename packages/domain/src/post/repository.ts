@@ -263,13 +263,16 @@ const makePostRepository = Effect.gen(function* () {
 
   /**
    * Moves provenance-tagged engagement back to the post it was merged away
-   * from and clears the tag. Comments and votes are the rows whose original
-   * post is recoverable; reactions, tags, and followers stay with the
-   * survivor because the merge discarded which rows belonged to the source.
+   * from and clears the tag. Comments, votes, reactions, tags, followers, and
+   * email subscriptions carry the source post in `mergedFromPostId`, so they
+   * all return; a changelog link returns unless the survivor already had an
+   * entry (the collision dropped the source's link). Rows the survivor already
+   * had keep a null tag, so they stay put.
+   *
    * A source vote whose voter also voted on the survivor never left the
-   * source (see `merge`), so it is already in place and needs no move.
-   * Runs inside the caller's transaction (the fiber-local connection joins
-   * it), so an unmerge or delete reverts atomically.
+   * source (see `merge`), so it is already in place and needs no move. Runs
+   * inside the caller's transaction (the fiber-local connection joins it), so
+   * an unmerge or delete reverts atomically.
    */
   const restoreMergedEngagement = ({
     organizationId,
@@ -292,6 +295,47 @@ const makePostRepository = Effect.gen(function* () {
           and(
             eq(schema.upvoteTable.organizationId, organizationId),
             eq(schema.upvoteTable.mergedFromPostId, sourcePostId)
+          )
+        );
+      yield* db
+        .update(schema.postReactionTable)
+        .set({ mergedFromPostId: null, postId: sourcePostId })
+        .where(eq(schema.postReactionTable.mergedFromPostId, sourcePostId));
+      yield* db
+        .update(schema.postTagTable)
+        .set({ mergedFromPostId: null, postId: sourcePostId })
+        .where(
+          and(
+            eq(schema.postTagTable.organizationId, organizationId),
+            eq(schema.postTagTable.mergedFromPostId, sourcePostId)
+          )
+        );
+      yield* db
+        .update(schema.postSubscriptionTable)
+        .set({ mergedFromPostId: null, postId: sourcePostId })
+        .where(
+          and(
+            eq(schema.postSubscriptionTable.organizationId, organizationId),
+            eq(schema.postSubscriptionTable.mergedFromPostId, sourcePostId)
+          )
+        );
+      yield* db
+        .update(schema.emailSubscriptionTable)
+        .set({ mergedFromPostId: null, topicId: sourcePostId })
+        .where(
+          and(
+            eq(schema.emailSubscriptionTable.organizationId, organizationId),
+            eq(schema.emailSubscriptionTable.topicType, "post"),
+            eq(schema.emailSubscriptionTable.mergedFromPostId, sourcePostId)
+          )
+        );
+      yield* db
+        .update(schema.changelogPostTable)
+        .set({ mergedFromPostId: null, postId: sourcePostId })
+        .where(
+          and(
+            eq(schema.changelogPostTable.organizationId, organizationId),
+            eq(schema.changelogPostTable.mergedFromPostId, sourcePostId)
           )
         );
     });
@@ -1014,9 +1058,15 @@ const makePostRepository = Effect.gen(function* () {
           });
         }
         if (restoredChildren.length > 0) {
+          const restoredAt = yield* DateTime.nowAsDate;
           yield* db
             .update(schema.postTable)
-            .set({ archivedAt: null, mergedAt: null, mergedIntoPostId: null })
+            .set({
+              archivedAt: null,
+              mergedAt: null,
+              mergedIntoPostId: null,
+              updatedAt: restoredAt,
+            })
             .where(
               and(
                 inArray(
@@ -1136,6 +1186,12 @@ const makePostRepository = Effect.gen(function* () {
       db.transaction((tx) =>
         Effect.gen(function* () {
           const now = yield* DateTime.nowAsDate;
+          // Lock both rows before validating, in id order so two concurrent
+          // merges cannot deadlock. The locks serialize every merge on either
+          // post, which is what makes the chained-merge and archived checks
+          // below authoritative: without them, `A -> T` and `T -> C` running
+          // concurrently both read T unmerged and produce a chain the checks
+          // were meant to reject.
           const posts = yield* tx
             .select({
               id: schema.postTable.id,
@@ -1148,7 +1204,9 @@ const makePostRepository = Effect.gen(function* () {
                 inArray(schema.postTable.id, [sourcePostId, targetPostId]),
                 eq(schema.postTable.organizationId, organizationId)
               )
-            );
+            )
+            .orderBy(schema.postTable.id)
+            .for("update");
 
           const sourcePost = posts.find((post) => post.id === sourcePostId);
           const targetPost = posts.find((post) => post.id === targetPostId);
@@ -1186,7 +1244,10 @@ const makePostRepository = Effect.gen(function* () {
           // Chained merges (A into B, then B into C) would strand A under C:
           // unmerging B restores only rows tagged B, and deleting C cascades
           // A's comments and votes away. Reject a source that already absorbed
-          // a merge so every chain stays a single level deep.
+          // a merge so every chain stays a single level deep. The guard is
+          // authoritative because both post rows are locked above: two
+          // managers merging `A -> T` and `T -> C` at once serialize, and the
+          // second sees the first's `mergedIntoPostId` and is refused.
           const [mergedChild] = yield* tx
             .select({ id: schema.postTable.id })
             .from(schema.postTable)
@@ -1289,7 +1350,12 @@ const makePostRepository = Effect.gen(function* () {
           );
           yield* tx
             .update(schema.postReactionTable)
-            .set({ postId: targetPostId })
+            .set({
+              postId: targetPostId,
+              mergedFromPostId: sql<
+                string | null
+              >`coalesce(${schema.postReactionTable.mergedFromPostId}, ${sourcePostId})`,
+            })
             .where(
               and(
                 eq(schema.postReactionTable.postId, sourcePostId),
@@ -1320,7 +1386,12 @@ const makePostRepository = Effect.gen(function* () {
           );
           yield* tx
             .update(schema.postTagTable)
-            .set({ postId: targetPostId })
+            .set({
+              postId: targetPostId,
+              mergedFromPostId: sql<
+                string | null
+              >`coalesce(${schema.postTagTable.mergedFromPostId}, ${sourcePostId})`,
+            })
             .where(
               and(
                 eq(schema.postTagTable.postId, sourcePostId),
@@ -1350,7 +1421,12 @@ const makePostRepository = Effect.gen(function* () {
           );
           yield* tx
             .update(schema.postSubscriptionTable)
-            .set({ postId: targetPostId })
+            .set({
+              postId: targetPostId,
+              mergedFromPostId: sql<
+                string | null
+              >`coalesce(${schema.postSubscriptionTable.mergedFromPostId}, ${sourcePostId})`,
+            })
             .where(
               and(
                 eq(schema.postSubscriptionTable.postId, sourcePostId),
@@ -1384,7 +1460,12 @@ const makePostRepository = Effect.gen(function* () {
           );
           yield* tx
             .update(schema.emailSubscriptionTable)
-            .set({ topicId: targetPostId })
+            .set({
+              topicId: targetPostId,
+              mergedFromPostId: sql<
+                string | null
+              >`coalesce(${schema.emailSubscriptionTable.mergedFromPostId}, ${sourcePostId})`,
+            })
             .where(
               and(
                 eq(schema.emailSubscriptionTable.topicType, "post"),
@@ -1427,7 +1508,12 @@ const makePostRepository = Effect.gen(function* () {
           );
           yield* tx
             .update(schema.changelogPostTable)
-            .set({ postId: targetPostId })
+            .set({
+              postId: targetPostId,
+              mergedFromPostId: sql<
+                string | null
+              >`coalesce(${schema.changelogPostTable.mergedFromPostId}, ${sourcePostId})`,
+            })
             .where(
               and(
                 eq(schema.changelogPostTable.postId, sourcePostId),
@@ -1457,15 +1543,28 @@ const makePostRepository = Effect.gen(function* () {
                 eq(schema.postTable.organizationId, organizationId)
               )
             );
+          // The survivor's content changed too (it absorbed the discussion),
+          // so its freshness timestamp moves with the merge. The row is
+          // already locked above, so this cannot race another merge.
+          yield* tx
+            .update(schema.postTable)
+            .set({ updatedAt: now })
+            .where(
+              and(
+                eq(schema.postTable.id, targetPostId),
+                eq(schema.postTable.organizationId, organizationId)
+              )
+            );
         })
       ),
 
     /**
-     * Reverts a merge by restoring the archived source post. Comments and
-     * votes moved by {@link merge} carry the source post in
-     * `mergedFromPostId`, so they are moved back with it; reactions, tags,
-     * followers, and the changelog link stay with the survivor, because the
-     * merge discards which rows originally belonged to the source. Resolves
+     * Reverts a merge by restoring the archived source post. Every engagement
+     * table the merge tagged with the source post in `mergedFromPostId`
+     * (comments, votes, reactions, tags, followers, email subscriptions, and
+     * the changelog link) is moved back with it. Rows the survivor already had
+     * stay with the survivor; a changelog link is lost when the survivor
+     * already had an entry, because there is no row left to restore. Resolves
      * to the id of the post the source was merged into, so the caller can
      * record the unmerge activity.
      */
@@ -1484,7 +1583,12 @@ const makePostRepository = Effect.gen(function* () {
                 eq(schema.postTable.organizationId, organizationId)
               )
             )
-            .limit(1);
+            .limit(1)
+            // Serialize unmerge against itself and against a concurrent merge
+            // of the same source: the second caller waits, then re-reads the
+            // cleared `mergedIntoPostId` and is refused instead of restoring
+            // twice.
+            .for("update");
 
           if (!sourcePost) {
             return yield* new FailedToMergePostError({
@@ -1498,17 +1602,29 @@ const makePostRepository = Effect.gen(function* () {
           }
 
           const targetPostId = sourcePost.mergedIntoPostId;
+          const restoredAt = yield* DateTime.nowAsDate;
           yield* tx
             .update(schema.postTable)
             .set({
               archivedAt: null,
               mergedAt: null,
               mergedIntoPostId: null,
-              updatedAt: yield* DateTime.nowAsDate,
+              updatedAt: restoredAt,
             })
             .where(
               and(
                 eq(schema.postTable.id, sourcePostId),
+                eq(schema.postTable.organizationId, organizationId)
+              )
+            );
+          // The survivor lost the engagement it had absorbed, so its freshness
+          // timestamp moves with the revert too.
+          yield* tx
+            .update(schema.postTable)
+            .set({ updatedAt: restoredAt })
+            .where(
+              and(
+                eq(schema.postTable.id, targetPostId),
                 eq(schema.postTable.organizationId, organizationId)
               )
             );

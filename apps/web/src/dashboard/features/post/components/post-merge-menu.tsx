@@ -27,6 +27,7 @@ import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { formatPostStatus } from "@feeblo/web-shared/board/constants";
+import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { GitMergeIcon, Undo02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, isNull, not, useLiveQuery } from "@tanstack/react-db";
@@ -167,6 +168,10 @@ export function PostMergeMenu() {
         .select(({ candidate }) => ({ id: candidate.id })),
     [organizationId, post.id, postCollection]
   );
+  // Merges stay one level deep: a post that has absorbed a merge cannot be a
+  // source, so "Merge to existing" would always be rejected here. The
+  // repository enforces the same rule.
+  const hasMergedChildren = (mergedInPosts ?? []).length > 0;
 
   const unmergeThisPost = async () => {
     if (isUnmergingThis) {
@@ -179,9 +184,12 @@ export function PostMergeMenu() {
         payload: { organizationId, sourcePostId: post.id },
         reactivityKeys: { postSuggestions: [post.id] },
       });
-    } catch {
+    } catch (error) {
       trackEvent("post_unmerged", { success: false });
-      toastManager.add({ title: "Failed to unmerge post", type: "error" });
+      toastManager.add({
+        title: parseRpcError(error, "Failed to unmerge post").message,
+        type: "error",
+      });
       return;
     } finally {
       setIsUnmergingThis(false);
@@ -235,11 +243,16 @@ export function PostMergeMenu() {
                 <HugeiconsIcon icon={GitMergeIcon} />
                 Merge others to this
               </MenuItem>
-              <MenuItem closeOnClick onClick={() => setDialog("into-existing")}>
-                <HugeiconsIcon icon={GitMergeIcon} />
-                Merge to existing
-              </MenuItem>
-              {(mergedInPosts ?? []).length > 0 ? (
+              {hasMergedChildren ? null : (
+                <MenuItem
+                  closeOnClick
+                  onClick={() => setDialog("into-existing")}
+                >
+                  <HugeiconsIcon icon={GitMergeIcon} />
+                  Merge to existing
+                </MenuItem>
+              )}
+              {hasMergedChildren ? (
                 <MenuItem closeOnClick onClick={() => setDialog("unmerge")}>
                   <HugeiconsIcon icon={Undo02Icon} />
                   Unmerge a post
@@ -314,6 +327,31 @@ function PostMergeCommandDialog({
     [suggestionsResult]
   );
 
+  // Survivors of an earlier merge, derived from the posts that point at them.
+  // They are excluded from the picker because the repository refuses a source
+  // with merged children.
+  const { data: parentRows } = useLiveQuery(
+    (query) =>
+      query
+        .from({ post: postCollection })
+        .where(({ post: candidate }) =>
+          eq(candidate.organizationId, organizationId)
+        )
+        .select(({ post: candidate }) => ({
+          mergedIntoPostId: candidate.mergedIntoPostId,
+        })),
+    [organizationId, postCollection]
+  );
+  const mergeTargetIds = useMemo(
+    () =>
+      new Set(
+        (parentRows ?? []).flatMap((row) =>
+          row.mergedIntoPostId ? [row.mergedIntoPostId] : []
+        )
+      ),
+    [parentRows]
+  );
+
   // Candidates are open posts anywhere in the workspace: archived and
   // already-merged rows cannot participate in a merge (repository-enforced),
   // and the viewed post is never its own source or target. The board join
@@ -364,17 +402,22 @@ function PostMergeCommandDialog({
   );
 
   const items = useMemo(() => {
-    const merged = (candidates ?? []).map((candidate) => ({
-      candidate,
-      isSuggested: suggestedPostIds.has(candidate.id),
-      label: candidate.title,
-      value: candidate.id,
-    }));
+    const merged = (candidates ?? [])
+      // A post that already absorbed a merge can never be a source (the
+      // repository keeps merges one level deep), so offering it would only
+      // produce a rejected call.
+      .filter((candidate) => !mergeTargetIds.has(candidate.id))
+      .map((candidate) => ({
+        candidate,
+        isSuggested: suggestedPostIds.has(candidate.id),
+        label: candidate.title,
+        value: candidate.id,
+      }));
     // Stable sort keeps the newest-first order inside each group.
     return [...merged].sort(
       (left, right) => Number(right.isSuggested) - Number(left.isSuggested)
     );
-  }, [candidates, suggestedPostIds]);
+  }, [candidates, mergeTargetIds, suggestedPostIds]);
 
   const merge = async (candidate: MergeCandidate) => {
     if (isPending) {
@@ -391,9 +434,12 @@ function PostMergeCommandDialog({
         payload: { organizationId, sourcePostId, targetPostId },
         reactivityKeys: { postSuggestions: [post.id, candidate.id] },
       });
-    } catch {
+    } catch (error) {
       trackEvent("post_merged", { direction, success: false });
-      toastManager.add({ title: "Failed to merge post", type: "error" });
+      toastManager.add({
+        title: parseRpcError(error, "Failed to merge post").message,
+        type: "error",
+      });
       return;
     } finally {
       setIsPending(false);
@@ -441,9 +487,10 @@ function PostMergeCommandDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>{confirmTitle}</AlertDialogTitle>
             <AlertDialogDescription>
-              Comments, votes, reactions, tags, followers, and any changelog
-              entry move to the surviving post. The merged post is archived and
-              can be unmerged afterwards.
+              Comments, votes, reactions, tags, followers, and email
+              subscriptions move to the surviving post, and come back if the
+              merge is reverted. Entries the survivor already had stay there. A
+              changelog entry moves only when the survivor has none.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -606,9 +653,12 @@ function PostUnmergeCommandDialog({
         payload: { organizationId, sourcePostId: candidate.id },
         reactivityKeys: { postSuggestions: [post.id, candidate.id] },
       });
-    } catch {
+    } catch (error) {
       trackEvent("post_unmerged", { success: false });
-      toastManager.add({ title: "Failed to unmerge post", type: "error" });
+      toastManager.add({
+        title: parseRpcError(error, "Failed to unmerge post").message,
+        type: "error",
+      });
       return;
     } finally {
       setIsPending(false);

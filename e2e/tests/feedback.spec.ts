@@ -608,6 +608,41 @@ test.describe("feedback workflow", () => {
     await expect(page.getByLabel("Post Title")).toHaveValue(targetTitle);
   });
 
+  test("merge picker never offers chained merges", async ({ page }) => {
+    const workspace = await createWorkspace(page);
+    const targetTitle = `Merge target ${randomUUID().slice(0, 8)}`;
+    const sourceTitle = `Merge source ${randomUUID().slice(0, 8)}`;
+    const thirdTitle = `Merge third ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, targetTitle, "Canonical feedback.");
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, sourceTitle, "Duplicate feedback.");
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, thirdTitle, "Third feedback.");
+    await openPost(page, sourceTitle);
+    await mergeCurrentPostInto(page, targetTitle);
+
+    // The survivor already absorbed a merge, so merging it onward would chain
+    // (and the repository refuses it): the doomed direction is not offered.
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await expect(
+      page.getByRole("menuitem", { name: "Unmerge a post" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("menuitem", { name: "Merge to existing" })
+    ).toHaveCount(0);
+    await page.keyboard.press("Escape");
+
+    // The survivor is not offered as a source either: with the duplicate
+    // already merged and the survivor ineligible, no candidate remains.
+    await page.goto(workspace.organizationUrl);
+    await openPost(page, thirdTitle);
+    await page.getByRole("button", { name: "Merge post" }).click();
+    await page.getByRole("menuitem", { name: "Merge others to this" }).click();
+    await expect(page.getByText("No matching posts.")).toBeVisible();
+    await page.keyboard.press("Escape");
+  });
+
   test("a merged duplicate is hidden from lists and read-only until unmerged", async ({
     page,
   }) => {
@@ -639,7 +674,12 @@ test.describe("feedback workflow", () => {
     await page.goto(sourceUrl);
     await expect(page.getByText("Post Merged")).toBeVisible();
     await expect(page.getByLabel("Post Title")).not.toBeEditable();
-    await expect(page.getByRole("button", { name: "Upvote" })).toBeDisabled();
+    // Votes and reactions moved to the survivor, so the tombstone explains
+    // that instead of rendering a partial tally of leftover votes.
+    await expect(
+      page.getByText("Votes and reactions moved to the surviving post.")
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Upvote" })).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Lock post" })
     ).toBeDisabled();

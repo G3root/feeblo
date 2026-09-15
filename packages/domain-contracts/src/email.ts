@@ -21,6 +21,7 @@ export const EmailIntentKind = S.Literals([
   "post.status_changed",
   "post.official_update_published",
   "post.merged",
+  "post.unmerged",
   "post.closed",
 ]);
 

@@ -1479,7 +1479,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               .recordIntent({
                 aggregateId: args.sourcePostId,
                 aggregateType: "post",
-                deduplicationKey: `post.merged:${args.organizationId}:${args.sourcePostId}:${args.targetPostId}`,
+                deduplicationKey: `post.merged:${args.organizationId}:${args.sourcePostId}:${args.targetPostId}:${now.getTime()}`,
                 expiresAt: new Date(now.getTime() + 7 * 86_400_000),
                 kind: "post.merged",
                 organizationId: args.organizationId,
@@ -1511,7 +1511,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
-        yield* transaction(
+        const outboxId = yield* transaction(
           Effect.gen(function* () {
             const targetPostId = yield* repository.unmerge(args);
             // Restoring a post reverses the tombstone, so the source timeline
@@ -1524,8 +1524,56 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               postId: args.sourcePostId,
               targetPostId,
             });
+            // Mirror the merge announcement: everyone told the post moved
+            // learns it is back, after the engagement returned to the source.
+            yield* Option.match(notifications, {
+              onNone: () => Effect.void,
+              onSome: (service) =>
+                service.notifyPostUnmerged({
+                  actorUserId: session.session.userId,
+                  organizationId: args.organizationId,
+                  sourcePostId: args.sourcePostId,
+                  targetPostId,
+                }),
+            });
+            if (
+              !(yield* entitlementPolicy.mayMaterializeEmailIntent({
+                organizationId: args.organizationId,
+                kind: "post.unmerged",
+              }))
+            ) {
+              return undefined;
+            }
+            const now = yield* DateTime.nowAsDate;
+            const result = yield* emailOutbox
+              .recordIntent({
+                aggregateId: args.sourcePostId,
+                aggregateType: "post",
+                // Timestamped so a post merged, unmerged, and merged again
+                // sends a fresh email instead of matching the first attempt.
+                deduplicationKey: `post.unmerged:${args.organizationId}:${args.sourcePostId}:${targetPostId}:${now.getTime()}`,
+                expiresAt: new Date(now.getTime() + 7 * 86_400_000),
+                kind: "post.unmerged",
+                organizationId: args.organizationId,
+                payload: {
+                  kind: "post.unmerged",
+                  postId: args.sourcePostId,
+                  targetPostId,
+                },
+                scheduledAt: now,
+              })
+              .pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message: "Could not record post unmerge email intent.",
+                    })
+                )
+              );
+            return result._tag === "Inserted" ? result.intent.id : undefined;
           })
         );
+        yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
       }).pipe(
         Policy.withPolicy(postPolicy.canMerge(args.organizationId)),
         withRemapDbErrors("Post", "update")

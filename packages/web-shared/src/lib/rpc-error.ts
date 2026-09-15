@@ -52,6 +52,9 @@ const ALLOWED_USER_FACING_TAGS = new Set<string>([
   "UploadLimitError",
   "FailedToCreateCheckoutError",
   "FailedToCreatePortalError",
+  // Merge/unmerge failures carry actionable copy (already merged, archived,
+  // chained merge) that the moderator needs to understand the rejection.
+  "FailedToMergePostError",
 ]);
 
 function extractUserMessage(cause: unknown): string | undefined {

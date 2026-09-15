@@ -38,28 +38,69 @@ const makeNotificationService = Effect.gen(function* () {
           isString(userId) && userId !== input.actorUserId
       );
 
-      yield* Effect.forEach(recipients, (recipientUserId) =>
-        Effect.gen(function* () {
-          const id = yield* NotificationId.generate;
-          yield* db
-            .insert(schema.notificationTable)
-            .values({
-              id,
-              organizationId: input.organizationId,
-              recipientUserId,
-              actorUserId: input.actorUserId ?? null,
-              kind: input.kind,
-              resourceType: input.resourceType,
-              resourceId: input.resourceId,
-              title: input.title,
-              body: input.body ?? null,
-              href: input.href,
-              deduplicationKey: input.deduplicationKey,
-            })
-            .onConflictDoNothing()
-            .pipe(Effect.asVoid);
-        })
+      if (recipients.length === 0) {
+        return;
+      }
+
+      // One insert for the whole fan-out. A merge can notify every voter of
+      // both posts, and a per-recipient round-trip inside the merge
+      // transaction would hold its row locks for the whole fan-out.
+      const rows = yield* Effect.forEach(recipients, (recipientUserId) =>
+        NotificationId.generate.pipe(
+          Effect.map((id) => ({
+            id,
+            organizationId: input.organizationId,
+            recipientUserId,
+            actorUserId: input.actorUserId ?? null,
+            kind: input.kind,
+            resourceType: input.resourceType,
+            resourceId: input.resourceId,
+            title: input.title,
+            body: input.body ?? null,
+            href: input.href,
+            deduplicationKey: input.deduplicationKey,
+          }))
+        )
       );
+      yield* db
+        .insert(schema.notificationTable)
+        .values(rows)
+        .onConflictDoNothing()
+        .pipe(Effect.asVoid);
+    });
+
+  /**
+   * Keeps only recipients who are current members of the workspace. In-app
+   * notifications are member-only (the notification RPCs require membership),
+   * so rows for non-member voters or subscribers would be unreachable. The
+   * merge and unmerge fan-outs reach public-board voters, who often have no
+   * membership.
+   */
+  const filterToMembers = ({
+    organizationId,
+    userIds,
+  }: {
+    readonly organizationId: string;
+    readonly userIds: ReadonlyArray<string | null | undefined>;
+  }) =>
+    Effect.gen(function* () {
+      const candidates = [...new Set(userIds)].filter(
+        (userId): userId is string => isString(userId)
+      );
+      if (candidates.length === 0) {
+        return [];
+      }
+      const members = yield* db
+        .select({ userId: schema.memberTable.userId })
+        .from(schema.memberTable)
+        .where(
+          and(
+            eq(schema.memberTable.organizationId, organizationId),
+            inArray(schema.memberTable.userId, candidates)
+          )
+        );
+      const memberUserIds = new Set(members.map((member) => member.userId));
+      return candidates.filter((userId) => memberUserIds.has(userId));
     });
 
   /**
@@ -442,7 +483,8 @@ const makeNotificationService = Effect.gen(function* () {
      * Tells everyone attached to a merged-away post where it went: its
      * creator, the creator and followers of the survivor (source
      * subscriptions are moved onto the survivor before this runs), and the
-     * upvoters of both posts. The actor is dropped by `create`.
+     * upvoters of both posts. Non-member recipients are dropped (their inbox
+     * is unreachable) and the actor is dropped by `create`.
      */
     notifyPostMerged: ({
       actorUserId,
@@ -485,22 +527,100 @@ const makeNotificationService = Effect.gen(function* () {
               eq(schema.upvoteTable.postId, targetPostId)
             )
           );
+        const crypto = yield* Crypto.Crypto;
+        const eventId = yield* crypto.randomUUIDv4.pipe(Effect.orDie);
         yield* create({
           ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
-          recipientUserIds: [
-            source.creatorId,
-            target.creatorId,
-            ...subscribers.map((subscriber) => subscriber.userId),
-            ...upvoters.map((upvoter) => upvoter.userId),
-          ],
+          recipientUserIds: yield* filterToMembers({
+            organizationId,
+            userIds: [
+              source.creatorId,
+              target.creatorId,
+              ...subscribers.map((subscriber) => subscriber.userId),
+              ...upvoters.map((upvoter) => upvoter.userId),
+            ],
+          }),
           kind: "feedback.merged",
           resourceType: "post",
           resourceId: sourcePostId,
           title: "Post merged",
           body: `"${source.title}" was merged into "${target.title}"`,
           href: `/${organizationId}/post/${target.boardSlug}/${target.slug}`,
-          deduplicationKey: `feedback.merged:${sourcePostId}:${targetPostId}`,
+          // Per-event id: unmerging and merging the same pair again is a new
+          // event and must notify again, while a retried call cannot duplicate
+          // the row because the whole merge transaction is atomic.
+          deduplicationKey: `feedback.merged:${sourcePostId}:${targetPostId}:${eventId}`,
+        });
+      }),
+
+    /**
+     * Tells everyone attached to a restored post that the merge was reverted.
+     * Runs after `unmerge` put the engagement (followers, voters, creators)
+     * back on the source, so both posts are queried directly.
+     */
+    notifyPostUnmerged: ({
+      actorUserId,
+      organizationId,
+      sourcePostId,
+      targetPostId,
+    }: {
+      readonly actorUserId?: string | null;
+      readonly organizationId: string;
+      readonly sourcePostId: string;
+      readonly targetPostId: string;
+    }) =>
+      Effect.gen(function* () {
+        const source = yield* getPostContext({
+          organizationId,
+          postId: sourcePostId,
+        });
+        const target = yield* getPostContext({
+          organizationId,
+          postId: targetPostId,
+        });
+        if (!(source && target)) {
+          return;
+        }
+        const subscribers = yield* db
+          .select({ userId: schema.postSubscriptionTable.userId })
+          .from(schema.postSubscriptionTable)
+          .where(
+            and(
+              eq(schema.postSubscriptionTable.organizationId, organizationId),
+              eq(schema.postSubscriptionTable.postId, sourcePostId)
+            )
+          );
+        const upvoters = yield* db
+          .select({ userId: schema.upvoteTable.userId })
+          .from(schema.upvoteTable)
+          .where(
+            and(
+              eq(schema.upvoteTable.organizationId, organizationId),
+              eq(schema.upvoteTable.postId, sourcePostId)
+            )
+          );
+        const crypto = yield* Crypto.Crypto;
+        const eventId = yield* crypto.randomUUIDv4.pipe(Effect.orDie);
+        yield* create({
+          ...(actorUserId === undefined ? undefined : { actorUserId }),
+          organizationId,
+          recipientUserIds: yield* filterToMembers({
+            organizationId,
+            userIds: [
+              source.creatorId,
+              target.creatorId,
+              ...subscribers.map((subscriber) => subscriber.userId),
+              ...upvoters.map((upvoter) => upvoter.userId),
+            ],
+          }),
+          kind: "feedback.unmerged",
+          resourceType: "post",
+          resourceId: sourcePostId,
+          title: "Post unmerged",
+          body: `"${source.title}" was unmerged from "${target.title}"`,
+          href: `/${organizationId}/post/${source.boardSlug}/${source.slug}`,
+          deduplicationKey: `feedback.unmerged:${sourcePostId}:${targetPostId}:${eventId}`,
         });
       }),
 

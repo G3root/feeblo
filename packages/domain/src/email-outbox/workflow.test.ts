@@ -1736,6 +1736,72 @@ describe("EmailOutbox workflows", () => {
         expect(content?.templatePayload.body).toContain("Duplicate feedback");
       })
     );
+
+    it.effect("points unmerged notifications back at the restored source", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const { organizationId } = yield* fixture;
+        const now = new Date("2026-08-11T00:00:00.000Z");
+        const sourcePostId = yield* PostId.generate;
+        const targetPostId = yield* PostId.generate;
+        yield* db.insert(schema.postTable).values([
+          {
+            id: sourcePostId,
+            organizationId,
+            boardId: `brd_${organizationId}`,
+            statusId: `pst_${organizationId}`,
+            title: "Duplicate feedback",
+            slug: "duplicate-feedback",
+            content: "x",
+            excerpt: "x",
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: targetPostId,
+            organizationId,
+            boardId: `brd_${organizationId}`,
+            statusId: `pst_${organizationId}`,
+            title: "Canonical feedback",
+            slug: "canonical-feedback",
+            content: "x",
+            excerpt: "x",
+            createdAt: now,
+            updatedAt: now,
+          },
+        ]);
+
+        expect(
+          emailSubscriptionTopicForIntent({
+            kind: "post.unmerged",
+            postId: sourcePostId,
+            targetPostId,
+          })
+        ).toEqual({ topicId: sourcePostId, topicType: "post" });
+
+        const content = yield* resolveSubscriptionNotificationContent(
+          "https://app.feeblo.example",
+          {
+            organizationId,
+            payload: {
+              kind: "post.unmerged",
+              postId: sourcePostId,
+              targetPostId,
+            },
+          }
+        );
+
+        expect(content?.topic).toEqual({
+          topicId: sourcePostId,
+          topicType: "post",
+        });
+        expect(content?.templatePayload.actionUrl).toContain(
+          "/duplicate-feedback"
+        );
+        expect(content?.templatePayload.body).toContain("Duplicate feedback");
+        expect(content?.templatePayload.body).toContain("Canonical feedback");
+      })
+    );
   });
 });
 
