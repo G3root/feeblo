@@ -2296,6 +2296,72 @@ describe("PostRpcHandlers", () => {
         )
       );
 
+      it.effect("rejects merging a source that already absorbed a merge", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const firstPostId = yield* PostId.generate;
+          const secondPostId = yield* PostId.generate;
+          const thirdPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [firstPostId, "First feedback"],
+            [secondPostId, "Second feedback"],
+            [thirdPostId, "Third feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId: firstPostId,
+              targetPostId: secondPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          // `secondPostId` now has a merged child, so the chain
+          // `firstPostId -> secondPostId -> thirdPostId` must be refused:
+          // unmerging `secondPostId` could never restore `firstPostId`.
+          const error = yield* Effect.flip(
+            handlers
+              .PostMerge({
+                organizationId: fixture.organizationId,
+                sourcePostId: secondPostId,
+                targetPostId: thirdPostId,
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+
+          expect(error).toBeInstanceOf(FailedToMergePostError);
+          expect(error.message).toBe(
+            "Source post has merged children and cannot be merged again"
+          );
+
+          const posts = yield* db
+            .select({
+              id: schema.postTable.id,
+              mergedIntoPostId: schema.postTable.mergedIntoPostId,
+            })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.organizationId, fixture.organizationId));
+          expect(
+            posts.find((post) => post.id === firstPostId)?.mergedIntoPostId
+          ).toBe(secondPostId);
+          expect(
+            posts.find((post) => post.id === secondPostId)?.mergedIntoPostId
+          ).toBeNull();
+          expect(
+            posts.find((post) => post.id === thirdPostId)?.mergedIntoPostId
+          ).toBeNull();
+        })
+      );
+
       it.effect("archives the source post and records its target", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -2338,7 +2404,7 @@ describe("PostRpcHandlers", () => {
         })
       );
 
-      it.effect("moves engagement set-based and drops duplicate twins", () =>
+      it.effect("moves engagement set-based, keeping colliding votes", () =>
         Effect.gen(function* () {
           const db = yield* currentDb;
           const handlers = yield* PostRpcHandlersEffect;
@@ -2467,7 +2533,8 @@ describe("PostRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
-          // Shared twins collapse to the target row; unique source rows move.
+          // Shared twins collapse to the target row; unique source rows move,
+          // except the colliding vote, which stays parked on the source.
           const targetUpvotes = yield* db
             .select({
               mergedFromPostId: schema.upvoteTable.mergedFromPostId,
@@ -2531,9 +2598,9 @@ describe("PostRpcHandlers", () => {
             .where(eq(schema.commentTable.id, commentId));
           expect(movedComment?.mergedFromPostId).toBe(sourcePostId);
 
-          // Nothing engagement-related may remain on the archived source.
+          // Only engagement whose restoration needs no provenance may remain
+          // on the archived source: reactions, tags, and comments all moved.
           for (const table of [
-            schema.upvoteTable,
             schema.postReactionTable,
             schema.postTagTable,
             schema.commentTable,
@@ -2544,6 +2611,25 @@ describe("PostRpcHandlers", () => {
               .where(eq(table.postId, sourcePostId));
             expect(leftovers).toEqual([]);
           }
+
+          // The colliding vote stays on the source (its only provenance), so
+          // unmerge and survivor delete can put it back; the voter's target
+          // vote keeps its own origin.
+          const sourceUpvotes = yield* db
+            .select({
+              id: schema.upvoteTable.id,
+              mergedFromPostId: schema.upvoteTable.mergedFromPostId,
+              userId: schema.upvoteTable.userId,
+            })
+            .from(schema.upvoteTable)
+            .where(eq(schema.upvoteTable.postId, sourcePostId));
+          expect(sourceUpvotes).toEqual([
+            {
+              id: `upvote_shared_source_${fixture.organizationId}`,
+              mergedFromPostId: null,
+              userId: sharedVoterId,
+            },
+          ]);
         })
       );
 
@@ -2716,6 +2802,100 @@ describe("PostRpcHandlers", () => {
               .from(schema.upvoteTable)
               .where(eq(schema.upvoteTable.postId, targetPostId));
             expect(targetUpvotes).toEqual([]);
+          })
+      );
+
+      it.effect(
+        "unmerge restores a source vote whose voter also voted on the target",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const sourcePostId = yield* PostId.generate;
+            const targetPostId = yield* PostId.generate;
+
+            for (const [id, title] of [
+              [sourcePostId, "Source feedback"],
+              [targetPostId, "Target feedback"],
+            ] as const) {
+              yield* handlers
+                .PostCreate(postCreateInput(fixture, id, title))
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                );
+            }
+
+            const voterId = `user_collision_${fixture.organizationId}`;
+            yield* db.insert(schema.userTable).values({
+              id: voterId,
+              email: `collision_${fixture.organizationId}@example.com`,
+              name: "Voter",
+            });
+            const sourceUpvoteId = yield* UpvoteId.generate;
+            const targetUpvoteId = yield* UpvoteId.generate;
+            yield* db.insert(schema.upvoteTable).values([
+              {
+                id: sourceUpvoteId,
+                organizationId: fixture.organizationId,
+                postId: sourcePostId,
+                userId: voterId,
+              },
+              {
+                id: targetUpvoteId,
+                organizationId: fixture.organizationId,
+                postId: targetPostId,
+                userId: voterId,
+              },
+            ]);
+
+            yield* handlers
+              .PostMerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+                targetPostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            // The colliding source row waits on the source instead of being
+            // deleted, so it is still there when the merge is reverted.
+            const mergedSourceUpvotes = yield* db
+              .select({ id: schema.upvoteTable.id })
+              .from(schema.upvoteTable)
+              .where(eq(schema.upvoteTable.postId, sourcePostId));
+            expect(mergedSourceUpvotes).toEqual([{ id: sourceUpvoteId }]);
+
+            yield* handlers
+              .PostUnmerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const sourceUpvotes = yield* db
+              .select({
+                id: schema.upvoteTable.id,
+                mergedFromPostId: schema.upvoteTable.mergedFromPostId,
+              })
+              .from(schema.upvoteTable)
+              .where(eq(schema.upvoteTable.postId, sourcePostId));
+            expect(sourceUpvotes).toEqual([
+              { id: sourceUpvoteId, mergedFromPostId: null },
+            ]);
+            const remainingTargetUpvotes = yield* db
+              .select({
+                id: schema.upvoteTable.id,
+                mergedFromPostId: schema.upvoteTable.mergedFromPostId,
+              })
+              .from(schema.upvoteTable)
+              .where(eq(schema.upvoteTable.postId, targetPostId));
+            expect(remainingTargetUpvotes).toEqual([
+              { id: targetUpvoteId, mergedFromPostId: null },
+            ]);
           })
       );
 

@@ -266,6 +266,8 @@ const makePostRepository = Effect.gen(function* () {
    * from and clears the tag. Comments and votes are the rows whose original
    * post is recoverable; reactions, tags, and followers stay with the
    * survivor because the merge discarded which rows belonged to the source.
+   * A source vote whose voter also voted on the survivor never left the
+   * source (see `merge`), so it is already in place and needs no move.
    * Runs inside the caller's transaction (the fiber-local connection joins
    * it), so an unmerge or delete reverts atomically.
    */
@@ -1181,6 +1183,26 @@ const makePostRepository = Effect.gen(function* () {
               message: "Target post is archived and cannot be a merge target",
             });
           }
+          // Chained merges (A into B, then B into C) would strand A under C:
+          // unmerging B restores only rows tagged B, and deleting C cascades
+          // A's comments and votes away. Reject a source that already absorbed
+          // a merge so every chain stays a single level deep.
+          const [mergedChild] = yield* tx
+            .select({ id: schema.postTable.id })
+            .from(schema.postTable)
+            .where(
+              and(
+                eq(schema.postTable.mergedIntoPostId, sourcePostId),
+                eq(schema.postTable.organizationId, organizationId)
+              )
+            )
+            .limit(1);
+          if (mergedChild) {
+            return yield* new FailedToMergePostError({
+              message:
+                "Source post has merged children and cannot be merged again",
+            });
+          }
 
           // The partial unique index `comment_post_pinned_uidx` allows at
           // most one pinned comment per post. When the target already has a
@@ -1223,10 +1245,10 @@ const makePostRepository = Effect.gen(function* () {
             .where(eq(schema.commentTable.postId, sourcePostId));
 
           // Set-based reassignment: move every source row without a twin on
-          // the target, then drop the leftover twins. Previously one
-          // SELECT + UPDATE/DELETE per row (2n+1 round-trips holding the
-          // merge transaction open); now two statements per table.
-          // Twins are unique-keyed (upvote: user+post, reaction:
+          // the target, then drop the leftover twins (votes excepted, below).
+          // Previously one SELECT + UPDATE/DELETE per row (2n+1 round-trips
+          // holding the merge transaction open); now two statements per
+          // table. Twins are unique-keyed (upvote: user+post, reaction:
           // user+post+emoji, tag: post+tag), so a moved row can never
           // collide with a later one.
           const targetUpvote = alias(schema.upvoteTable, "merge_target_upvote");
@@ -1254,9 +1276,12 @@ const makePostRepository = Effect.gen(function* () {
                 )
               )
             );
-          yield* tx
-            .delete(schema.upvoteTable)
-            .where(eq(schema.upvoteTable.postId, sourcePostId));
+          // Colliding source votes (the voter already voted on the target)
+          // deliberately stay on the source. Deleting them would destroy the
+          // only record that the voter backed the source, so unmerge and
+          // survivor delete could never put the vote back. Leaving them also
+          // keeps the survivor's tally exact: the voter is counted once via
+          // the target row.
 
           const targetReaction = alias(
             schema.postReactionTable,
