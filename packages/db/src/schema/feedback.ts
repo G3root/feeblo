@@ -582,6 +582,15 @@ export const upvoteTable = pgTable(
     postId: text("post_id")
       .notNull()
       .references(() => postTable.id, { onDelete: "cascade" }),
+    /**
+     * Source post this row moved from when its post was merged into another.
+     * Provenance for the "merged comment" affordances and for restoring the
+     * row when the merge is reverted or the survivor is deleted.
+     */
+    mergedFromPostId: text("merged_from_post_id").references(
+      () => postTable.id,
+      { onDelete: "set null" }
+    ),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
@@ -599,6 +608,7 @@ export const upvoteTable = pgTable(
       table.postId
     ),
     index("upvote_postId_idx").on(table.postId),
+    index("upvote_mergedFromPostId_idx").on(table.mergedFromPostId),
     uniqueIndex("upvote_userId_postId_uidx").on(table.userId, table.postId),
   ]
 );
@@ -717,6 +727,15 @@ export const commentTable = pgTable(
     memberId: text("member_id").references(() => memberTable.id, {
       onDelete: "set null",
     }),
+    /**
+     * Source post this comment moved from when its post was merged into
+     * another. Provenance for the "merged comment" label and for restoring
+     * the comment when the merge is reverted or the survivor is deleted.
+     */
+    mergedFromPostId: text("merged_from_post_id").references(
+      () => postTable.id,
+      { onDelete: "set null" }
+    ),
     visibility: postCommentVisibilityEnum("visibility")
       .default("PUBLIC")
       .notNull(),
@@ -746,6 +765,7 @@ export const commentTable = pgTable(
       table.postId
     ),
     index("comment_postId_pinnedAt_idx").on(table.postId, table.pinnedAt),
+    index("comment_mergedFromPostId_idx").on(table.mergedFromPostId),
     uniqueIndex("comment_post_pinned_uidx")
       .on(table.postId)
       .where(sql`${table.pinnedAt} IS NOT NULL`),

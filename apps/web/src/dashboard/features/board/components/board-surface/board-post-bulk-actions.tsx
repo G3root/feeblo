@@ -135,6 +135,9 @@ function BulkDeleteAlert() {
   const canBulkDelete = useCanBulkDeleteSelectedPosts();
 
   const organizationId = useOrganizationId();
+  const { allowed: canManageAllPosts } = usePolicy(
+    hasPermission(organizationId, "posts.*")
+  );
 
   return (
     <AlertDialog
@@ -167,27 +170,34 @@ function BulkDeleteAlert() {
                 // engaged after the affordance rendered must not be fired.
                 // `queryOnce` evaluates without subscribing; the backend
                 // remains authoritative for anything that slips through.
-                const freshEligibility = deleteEligibilityCollection
-                  ? new Set(
-                      (
-                        await queryOnce((q) =>
-                          q
-                            .from({
-                              eligibility: deleteEligibilityCollection,
-                            })
-                            .where(({ eligibility }) =>
-                              and(
-                                eq(eligibility.organizationId, organizationId),
-                                inArray(eligibility.postId, selectedPostIds)
+                // Contributor-only: the synced set holds the caller's own
+                // untouched posts, so managers (`posts.*`) bypass it entirely
+                // and delete every selected post through the backend policy.
+                const freshEligibility =
+                  !canManageAllPosts && deleteEligibilityCollection
+                    ? new Set(
+                        (
+                          await queryOnce((q) =>
+                            q
+                              .from({
+                                eligibility: deleteEligibilityCollection,
+                              })
+                              .where(({ eligibility }) =>
+                                and(
+                                  eq(
+                                    eligibility.organizationId,
+                                    organizationId
+                                  ),
+                                  inArray(eligibility.postId, selectedPostIds)
+                                )
                               )
-                            )
-                            .select(({ eligibility }) => ({
-                              postId: eligibility.postId,
-                            }))
-                        )
-                      ).map((row) => row.postId)
-                    )
-                  : null;
+                              .select(({ eligibility }) => ({
+                                postId: eligibility.postId,
+                              }))
+                          )
+                        ).map((row) => row.postId)
+                      )
+                    : null;
                 const deletablePosts =
                   freshEligibility === null
                     ? selectedPosts

@@ -30,6 +30,7 @@ import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import { GitMergeIcon, Undo02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, isNull, not, useLiveQuery } from "@tanstack/react-db";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import * as Result from "effect/unstable/reactivity/AsyncResult";
 import { ArrowDownIcon, ArrowUpIcon, CornerDownLeftIcon } from "lucide-react";
@@ -74,8 +75,18 @@ const extractSuggestedPostIds = (suggestions: readonly PostSuggestion[]) =>
  * moves comments, comment reactions, votes, post reactions, tags, and
  * subscriptions between posts, so refreshing only a subset leaves stale
  * counts and chips on the survivor.
+ *
+ * Slug/post-scoped collections sync `on-demand`: `utils.refetch()` only
+ * refreshes subsets that are currently registered, so a survivor page that
+ * was visited before the merge can mount with a cached, pre-merge subset
+ * (comments that have since moved onto it, votes, details). Invalidating the
+ * same scopes through the query client marks inactive subsets stale, so they
+ * refetch when their route mounts instead of surviving on the global
+ * staleTime.
  */
 function useRefetchMergeData() {
+  const { organizationId } = usePostCollectionData();
+  const queryClient = useQueryClient();
   const {
     commentCollection,
     commentReactionCollection,
@@ -88,7 +99,10 @@ function useRefetchMergeData() {
   } = useDashboardCollections();
 
   return async () => {
-    await Promise.all([
+    // The write has already returned when this runs, so a rejected refresh
+    // must not report the merge as failed; settle every request, mirroring
+    // the post-tag-field refetch pattern.
+    await Promise.allSettled([
       commentCollection.utils.refetch(),
       commentReactionCollection.utils.refetch(),
       postActivityCollection.utils.refetch(),
@@ -97,6 +111,28 @@ function useRefetchMergeData() {
       postSubscriptionCollection.utils.refetch(),
       postTagCollection.utils.refetch(),
       upvoteCollection.utils.refetch(),
+      // `refetch()` only covers subsets the collection currently has
+      // registered. Marking the slug/post-scoped scopes stale guarantees a
+      // refresh for a survivor whose cached subset was not active when this
+      // ran, instead of that subset surviving on the global staleTime.
+      queryClient.invalidateQueries({
+        queryKey: ["comment", organizationId],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["comment-reaction", organizationId],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["post-activity", organizationId],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["post-detail", organizationId],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["post-reaction", organizationId],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["post-subscription", organizationId],
+      }),
     ]);
   };
 }
@@ -143,19 +179,23 @@ export function PostMergeMenu() {
         payload: { organizationId, sourcePostId: post.id },
         reactivityKeys: { postSuggestions: [post.id] },
       });
-      await refetchMergeData();
-      trackEvent("post_unmerged", { success: true });
-      toastManager.add({
-        title: "Post unmerged",
-        description: "The post is back on its board.",
-        type: "success",
-      });
     } catch {
       trackEvent("post_unmerged", { success: false });
       toastManager.add({ title: "Failed to unmerge post", type: "error" });
+      return;
     } finally {
       setIsUnmergingThis(false);
     }
+
+    // Record and surface the completed mutation before refreshing, so a slow
+    // or failed refetch cannot look like a failed unmerge.
+    trackEvent("post_unmerged", { success: true });
+    toastManager.add({
+      title: "Post unmerged",
+      description: "The post is back on its board.",
+      type: "success",
+    });
+    await refetchMergeData();
   };
 
   // Merging a post that is already archived is rejected by the repository;
@@ -294,12 +334,15 @@ function PostMergeCommandDialog({
             eq(candidate.statusId, candidateStatus.id),
           "inner"
         )
-        .where(({ post: candidate }) =>
+        .where(({ post: candidate, status: candidateStatus }) =>
           and(
             eq(candidate.organizationId, organizationId),
             isNull(candidate.archivedAt),
             isNull(candidate.mergedIntoPostId),
-            not(eq(candidate.id, post.id))
+            not(eq(candidate.id, post.id)),
+            // Closed posts stay out of the merge picker; the join itself can
+            // only carry a single equality in this query builder version.
+            not(eq(candidateStatus.type, "CLOSED"))
           )
         )
         .orderBy(({ post: candidate }) => candidate.createdAt, "desc")
@@ -348,39 +391,43 @@ function PostMergeCommandDialog({
         payload: { organizationId, sourcePostId, targetPostId },
         reactivityKeys: { postSuggestions: [post.id, candidate.id] },
       });
-
-      await refetchMergeData();
-      trackEvent("post_merged", { direction, success: true });
-
-      toastManager.add({
-        title:
-          direction === "into-this"
-            ? `Merged "${candidate.title}" into this post`
-            : `Merged this post into "${candidate.title}"`,
-        type: "success",
-      });
-
-      setConfirmTarget(null);
-      onOpenChange(false);
-
-      // The viewed post is archived by "into-existing"; send the moderator to
-      // the surviving post instead of leaving them on a merged row.
-      if (direction === "into-existing") {
-        await navigate({
-          params: {
-            boardSlug: candidate.boardSlug,
-            organizationId,
-            postSlug: candidate.slug,
-          },
-          to: "/$organizationId/post/$boardSlug/$postSlug",
-        });
-      }
     } catch {
       trackEvent("post_merged", { direction, success: false });
       toastManager.add({ title: "Failed to merge post", type: "error" });
+      return;
     } finally {
       setIsPending(false);
     }
+
+    // Record and surface the completed mutation before refreshing, so a slow
+    // or failed refetch cannot look like a failed merge.
+    trackEvent("post_merged", { direction, success: true });
+
+    toastManager.add({
+      title:
+        direction === "into-this"
+          ? `Merged "${candidate.title}" into this post`
+          : `Merged this post into "${candidate.title}"`,
+      type: "success",
+    });
+
+    setConfirmTarget(null);
+    onOpenChange(false);
+
+    // The viewed post is archived by "into-existing"; send the moderator to
+    // the surviving post instead of leaving them on a merged row.
+    if (direction === "into-existing") {
+      await navigate({
+        params: {
+          boardSlug: candidate.boardSlug,
+          organizationId,
+          postSlug: candidate.slug,
+        },
+        to: "/$organizationId/post/$boardSlug/$postSlug",
+      });
+    }
+
+    await refetchMergeData();
   };
 
   if (confirmTarget) {
@@ -559,19 +606,23 @@ function PostUnmergeCommandDialog({
         payload: { organizationId, sourcePostId: candidate.id },
         reactivityKeys: { postSuggestions: [post.id, candidate.id] },
       });
-      await refetchMergeData();
-      trackEvent("post_unmerged", { success: true });
-      toastManager.add({
-        title: `Restored "${candidate.title}"`,
-        type: "success",
-      });
-      onOpenChange(false);
     } catch {
       trackEvent("post_unmerged", { success: false });
       toastManager.add({ title: "Failed to unmerge post", type: "error" });
+      return;
     } finally {
       setIsPending(false);
     }
+
+    // Record and surface the completed mutation before refreshing, so a slow
+    // or failed refetch cannot look like a failed unmerge.
+    trackEvent("post_unmerged", { success: true });
+    toastManager.add({
+      title: `Restored "${candidate.title}"`,
+      type: "success",
+    });
+    onOpenChange(false);
+    await refetchMergeData();
   };
 
   return (

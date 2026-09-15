@@ -9,6 +9,11 @@ export const Upvote = S.Struct({
   organizationId: S.String,
   /** Null on public endpoints for voters other than the session user. */
   userId: S.NullOr(S.String),
+  /**
+   * Source post this vote moved from when its post was merged into another;
+   * null for votes cast on the post they currently live on.
+   */
+  mergedFromPostId: S.NullOr(S.String),
   memberId: S.Union([S.String, S.Null]),
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,

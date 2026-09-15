@@ -69,13 +69,18 @@ function VoterAvatar({
  * is activity-logged and re-addable.
  */
 export function VoterPanel() {
-  const { post, organizationId } = usePostCollectionData();
+  const { isMerged, post, organizationId } = usePostCollectionData();
   const {
     collections: { upvoteCollection },
   } = usePostCollections();
   const { data: session } = useAuthState();
   const votesOnBehalfPolicy = usePolicy(
     hasPermission(organizationId, "votes.onBehalf")
+  );
+  // Votes carry over to the survivor on merge, so on-behalf management is
+  // disabled on a merged post until it is unmerged.
+  const canManageVoters = Boolean(
+    session && votesOnBehalfPolicy.allowed && !isMerged
   );
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -173,7 +178,7 @@ export function VoterPanel() {
           />
           {m.safe_shy_firefox({ count: upvotes.length })}
         </h2>
-        {session && votesOnBehalfPolicy.allowed ? (
+        {canManageVoters ? (
           <Popover onOpenChange={setIsAddOpen} open={isAddOpen}>
             <PopoverTrigger
               render={
@@ -242,9 +247,7 @@ export function VoterPanel() {
             </DialogHeader>
             <ul className="max-h-80 space-y-1 overflow-y-auto px-6 pb-6">
               {upvotes.map((upvote) => {
-                const canRemove = Boolean(
-                  session && votesOnBehalfPolicy.allowed && upvote.userId
-                );
+                const canRemove = Boolean(canManageVoters && upvote.userId);
                 return (
                   <li
                     className="group flex items-center gap-2 rounded-md px-1 py-1"

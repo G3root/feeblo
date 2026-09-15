@@ -15,6 +15,11 @@ export const Comment = S.Struct({
   postSlug: S.String,
   /** Null on public endpoints for commenters other than the session user. */
   userId: S.NullOr(S.String),
+  /**
+   * Source post this comment moved from when its post was merged into
+   * another; null for comments authored on the post they currently live on.
+   */
+  mergedFromPostId: S.NullOr(S.String),
   visibility: S.Literals(["PUBLIC", "INTERNAL"]),
   parentCommentId: S.Union([S.String, S.Null]),
   /**

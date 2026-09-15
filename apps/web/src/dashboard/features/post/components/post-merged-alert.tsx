@@ -1,5 +1,11 @@
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
-import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
+import {
+  Alert,
+  AlertAction,
+  AlertDescription,
+  AlertTitle,
+} from "@feeblo/ui/alert";
+import { buttonVariants } from "@feeblo/ui/button";
 import { GitMergeIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
@@ -52,12 +58,20 @@ export function PostMergedAlert() {
   return (
     <Alert variant="info">
       <HugeiconsIcon icon={GitMergeIcon} />
-      <AlertTitle>Merged post</AlertTitle>
+      <AlertTitle>Post Merged</AlertTitle>
       <AlertDescription>
-        This post was merged into{" "}
-        {targetPost && targetBoard ? (
+        {/* A single span keeps the sentence one flex item: the bold target
+            title would otherwise become a second flex item and drop to its
+            own line. */}
+        <span>
+          This post was merged into <b>{targetPost?.title ?? "another post"}</b>
+        </span>
+      </AlertDescription>
+
+      {targetPost && targetBoard ? (
+        <AlertAction>
           <Link
-            className="font-medium underline underline-offset-4"
+            className={buttonVariants({ size: "xs" })}
             params={{
               boardSlug: targetBoard.slug,
               organizationId,
@@ -65,13 +79,10 @@ export function PostMergedAlert() {
             }}
             to="/$organizationId/post/$boardSlug/$postSlug"
           >
-            {targetPost.title}
+            View post
           </Link>
-        ) : (
-          "another post"
-        )}
-        . Comments, votes, reactions, and followers live on the surviving post.
-      </AlertDescription>
+        </AlertAction>
+      ) : null}
     </Alert>
   );
 }

@@ -21,7 +21,7 @@ import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export function PostTagField() {
-  const { post, organizationId, isLocked } = usePostCollectionData();
+  const { post, organizationId, isLocked, isMerged } = usePostCollectionData();
   // Backend mirror: TagPolicy.canSetPostTags = membership AND
   // (posts.* OR tags.* OR post creator). Contributors keep the tag field on
   // their own posts; everyone else needs manager-level posts/tags grants.
@@ -36,7 +36,7 @@ export function PostTagField() {
     hasPermission(organizationId, "tags.create")
   );
 
-  const disabled = isLocked || !canChangeTags;
+  const disabled = isLocked || isMerged || !canChangeTags;
   const { postTagCollection } = useDashboardCollections();
 
   const { data: tags } = useLiveQuery(

@@ -15,7 +15,7 @@ export function CommentDisplayDropdown() {
   const { canModeratePost } = usePostCollectionData();
   const { state } = useCommentDisplay();
 
-  if (!(canModeratePost || state.isAuthor)) {
+  if (state.disabled || !(canModeratePost || state.isAuthor)) {
     return null;
   }
 

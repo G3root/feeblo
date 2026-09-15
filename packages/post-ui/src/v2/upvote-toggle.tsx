@@ -103,6 +103,8 @@ function useUpvote({
         postId,
         userId,
         memberId: membership?.membershipId ?? null,
+        // Optimistic votes are cast on this post, never merged in.
+        mergedFromPostId: null,
         user: {
           name: session.user.name ?? null,
           image: session.user.image ?? null,
@@ -211,14 +213,18 @@ export interface UpvoteButtonProps {
 }
 
 export function UpvoteButton({ variant }: UpvoteButtonProps) {
-  const { isLocked, post, organizationId } = usePostCollectionData();
+  const { isLocked, isMerged, post, organizationId } = usePostCollectionData();
   const {
     collections: { upvoteCollection },
     onAuthRequired,
   } = usePostCollections();
 
+  // A merged post stays disabled until it is unmerged: its votes live on the
+  // survivor, so voting here would split the record.
+  const disabled = isLocked || isMerged;
+
   const { isLoading, isUpvoted, onToggle, upvoteCount } = useUpvote({
-    disabled: isLocked,
+    disabled,
     onAuthRequired: onAuthRequired ?? undefined,
     organizationId,
     postId: post.id,
@@ -231,7 +237,7 @@ export function UpvoteButton({ variant }: UpvoteButtonProps) {
 
   return (
     <UpvoteTrigger
-      disabled={isLocked}
+      disabled={disabled}
       isUpvoted={isUpvoted}
       onToggle={onToggle}
       upvoteCount={upvoteCount}

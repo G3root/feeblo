@@ -4,7 +4,7 @@ import type { TPost } from "@feeblo/domain/post/schema";
 import type { TStatusRoadmapColumn } from "@feeblo/domain/roadmap-column/schema";
 import type { TRoadmap } from "@feeblo/domain/roadmap/schema";
 import type { Collection, UtilsRecord } from "@tanstack/db";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { and, eq, isNull, useLiveQuery } from "@tanstack/react-db";
 import { useCallback, useMemo } from "react";
 
 import type {
@@ -22,6 +22,7 @@ type PostRowLike = Pick<
   | "createdAt"
   | "excerpt"
   | "id"
+  | "mergedIntoPostId"
   | "organizationId"
   | "slug"
   | "statusId"
@@ -240,7 +241,11 @@ export function useRoadmapData<
           and(
             eq(post.organizationId, organizationId),
             eq(postStatus.organizationId, organizationId),
-            eq(board.organizationId, organizationId)
+            eq(board.organizationId, organizationId),
+            // Merged posts are hidden from roadmaps; the survivor is the
+            // canonical lane entry and the duplicate is reachable only
+            // through its merged-posts list (dashboard).
+            isNull(post.mergedIntoPostId)
           )
         )
         .select(({ board, post, postStatus }) => ({

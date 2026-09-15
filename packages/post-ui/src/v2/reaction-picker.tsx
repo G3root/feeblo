@@ -245,9 +245,11 @@ function ReactionPickerContent({ isLoading }: { isLoading: boolean }) {
 }
 
 export function PostReactionPicker() {
-  const { isLocked, post, organizationId } = usePostCollectionData();
+  const { isLocked, isMerged, post, organizationId } = usePostCollectionData();
 
-  const disabled = isLocked;
+  // Merged posts are read-only until unmerged; their reactions moved to the
+  // survivor with the rest of the engagement.
+  const disabled = isLocked || isMerged;
   const postId = post.id;
   const postSlug = post.slug;
   const {

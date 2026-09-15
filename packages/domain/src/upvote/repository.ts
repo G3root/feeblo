@@ -40,6 +40,7 @@ const makeUpvoteRepository = Effect.gen(function* () {
           postId: schema.upvoteTable.postId,
           organizationId: schema.upvoteTable.organizationId,
           userId: schema.upvoteTable.userId,
+          mergedFromPostId: schema.upvoteTable.mergedFromPostId,
           user: {
             name: schema.userTable.name,
             image: schema.userTable.image,

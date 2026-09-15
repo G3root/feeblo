@@ -10,6 +10,7 @@ import {
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { and, eq, queryOnce } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
@@ -21,6 +22,9 @@ import { usePostCollections } from "../providers/post-collections-provider";
 export function PostDeleteDialog() {
   const store = usePostDeleteDialogContext();
   const { collections, organizationId } = usePostCollections();
+  const { allowed: canManageAllPosts } = usePolicy(
+    hasPermission(organizationId, "posts.*")
+  );
   const open = useSelector(store, (state) => state.context.open);
   const navigate = useNavigate();
   return (
@@ -46,9 +50,14 @@ export function PostDeleteDialog() {
 
                 // Revalidate at confirm time without subscribing: a post
                 // engaged after the affordance rendered must not be fired.
-                // Hosts without the collection skip the check; the backend
-                // remains authoritative either way.
-                if (collections.deleteEligibilityCollection) {
+                // Eligibility only gates contributors; managers (`posts.*`)
+                // delete engaged or other members' posts. Hosts without the
+                // collection skip the check; the backend remains authoritative
+                // either way.
+                if (
+                  !canManageAllPosts &&
+                  collections.deleteEligibilityCollection
+                ) {
                   const { deleteEligibilityCollection } = collections;
                   const fresh = await queryOnce((q) =>
                     q

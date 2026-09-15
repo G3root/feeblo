@@ -31,6 +31,7 @@ import {
 import { PostBoardField } from "~/features/post/components/post-board-field";
 import { PostEtaField } from "~/features/post/components/post-eta-field";
 import { PostMergedAlert } from "~/features/post/components/post-merged-alert";
+import { PostMergedPosts } from "~/features/post/components/post-merged-posts";
 import {
   PostPageSkeleton,
   PostDetails,
@@ -252,6 +253,7 @@ function RouteComponent() {
             <PostStatusAlerts />
             <PostMergedAlert />
             <PostPage.Content />
+            <PostMergedPosts />
             <div className="flex items-center justify-between py-1">
               <PostPage.Reactions />
 

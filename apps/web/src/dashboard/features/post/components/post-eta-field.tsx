@@ -46,7 +46,7 @@ function getQuarterValue(year: number, quarter: number) {
 }
 
 export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
-  const { post, isLocked, organizationId } = usePostCollectionData();
+  const { post, isLocked, isMerged, organizationId } = usePostCollectionData();
   const { postCollection } = useDashboardCollections();
   // Backend mirror: PostPolicy.canUpdateEta lets `posts.status` holders
   // (managers and above) set the ETA via PostUpdateEta.
@@ -56,7 +56,7 @@ export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
   const selectedDate = getQuarterDate(post.etaQuarter);
   const [month, setMonth] = useState(selectedDate ?? new Date());
   const [open, setOpen] = useState(false);
-  const isDisabled = disabled || isLocked || !canUpdateEta;
+  const isDisabled = disabled || isLocked || isMerged || !canUpdateEta;
 
   const updatePostEta = createOptimisticAction<{ etaQuarter: string | null }>({
     onMutate: ({ etaQuarter }) => {

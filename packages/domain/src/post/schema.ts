@@ -237,10 +237,11 @@ export const PostMerge = S.Struct({
 export type TPostMerge = S.Schema.Type<typeof PostMerge>;
 
 /**
- * Reverts a merge: the archived source post is restored to the board. Rows
- * moved into the survivor by `PostMerge` (comments, votes, reactions, tags,
- * followers) stay with the survivor — the merge cannot reconstruct their
- * original ownership.
+ * Reverts a merge: the archived source post is restored to the board, and the
+ * comments and votes whose origin the merge recorded return with it. Other
+ * engagement moved by `PostMerge` (reactions, tags, followers, changelog
+ * link) stays with the survivor — the merge cannot reconstruct which rows
+ * belonged to the source.
  */
 export const PostUnmerge = S.Struct({
   organizationId: WorkspaceId.schema,

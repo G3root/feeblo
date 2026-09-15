@@ -13,6 +13,17 @@ export type CommentDisplayState = {
   isEditing: boolean;
   isInternal: boolean;
   pinnedAt: Date | null;
+  /**
+   * Source post this comment was merged away from, when the merge carried it
+   * onto another post. Renders the "Merged comment" label.
+   */
+  mergedFromPostId: string | null;
+  /**
+   * Dashboard route for the source post, when the surface can resolve it.
+   * Public surfaces omit merged posts entirely, so the label renders without
+   * a link there instead of pointing at a redirect loop.
+   */
+  mergedFromHref: string | null;
   /** Post status moved by this comment, when posted as a status update. */
   statusUpdateType: TPostStatusType | null;
   /** Status row label for the status update, when the org set a custom one. */

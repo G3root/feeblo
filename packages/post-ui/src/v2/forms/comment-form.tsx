@@ -191,6 +191,8 @@ export function useCreateCommentAction() {
         organizationId,
         // On-behalf comments keep staff attribution out of the author fields.
         memberId: onBehalf ? null : (membership?.membershipId ?? null),
+        // Optimistic rows are authored on this post, never merged in.
+        mergedFromPostId: null,
         postId,
         postSlug,
         userId: optimisticUserId ?? session.user.id,

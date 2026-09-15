@@ -243,22 +243,41 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   const deletePostEffect = (args: TPostDelete) =>
     Effect.gen(function* () {
       const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, args.organizationId);
       const canDeleteEngagedPost = Permissions.can(
         session,
         args.organizationId,
         "posts.*"
       );
-      const deleted = yield* transaction(
-        repository.delete({
-          id: args.id,
-          organizationId: args.organizationId,
-          boardId: args.boardId,
-          creatorId: session.session.userId,
-          onlyIfNew: !canDeleteEngagedPost,
+      const result = yield* transaction(
+        Effect.gen(function* () {
+          const outcome = yield* repository.delete({
+            id: args.id,
+            organizationId: args.organizationId,
+            boardId: args.boardId,
+            creatorId: session.session.userId,
+            onlyIfNew: !canDeleteEngagedPost,
+          });
+          // Deleting a survivor reverts its merged children so the FK cannot
+          // block the delete and no post is orphaned. Record the reversal on
+          // each child's timeline, mirroring `PostUnmerge`.
+          if (outcome.restoredChildren.length > 0) {
+            yield* activityRepository.createMany(
+              outcome.restoredChildren.map((child) => ({
+                actorId: session.session.userId,
+                actorMemberId: membership?.membershipId ?? null,
+                kind: "POST_UNMERGED" as const,
+                organizationId: args.organizationId,
+                postId: child.id,
+                targetPostId: child.mergedIntoPostId,
+              }))
+            );
+          }
+          return outcome;
         })
       );
 
-      if (!(deleted || canDeleteEngagedPost)) {
+      if (!(result.deleted || canDeleteEngagedPost)) {
         return yield* new Policy.PolicyDeniedError({
           reason: "Posts with comments or other users' votes cannot be deleted",
         });
@@ -267,7 +286,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       // A privileged delete that matched no row means the post does not exist
       // (or belongs to another org/board) — report that instead of silently
       // succeeding.
-      if (!deleted) {
+      if (!result.deleted) {
         return yield* new PostNotFoundError({
           message: "Post not found",
         });
@@ -1259,13 +1278,23 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
     PostUpdateEta: (args: TPostUpdateEta) =>
       updatePostEtaEffect(args).pipe(
-        Policy.withPolicy(postPolicy.canUpdateEta(args.organizationId)),
+        Policy.withPolicy(
+          postPolicy.canUpdateEta({
+            organizationId: args.organizationId,
+            postId: args.id,
+          })
+        ),
         withRemapDbErrors("Post", "update")
       ),
 
     PostUpdateAuthor: (args: TPostUpdateAuthor) =>
       updatePostAuthorEffect(args).pipe(
-        Policy.withPolicy(postPolicy.canUpdateAuthor(args.organizationId)),
+        Policy.withPolicy(
+          postPolicy.canUpdateAuthor({
+            organizationId: args.organizationId,
+            postId: args.id,
+          })
+        ),
         withRemapDbErrors("Post", "update")
       ),
 
@@ -1312,7 +1341,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           })
         );
       }).pipe(
-        Policy.withPolicy(postPolicy.canAdminUpdate(args.organizationId)),
+        Policy.withPolicy(
+          postPolicy.canAdminUpdate({
+            organizationId: args.organizationId,
+            postId: args.id,
+          })
+        ),
         withRemapDbErrors("Post", "update")
       ),
 
@@ -1378,7 +1412,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         );
         yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
       }).pipe(
-        Policy.withPolicy(postPolicy.canAdminUpdate(args.organizationId)),
+        Policy.withPolicy(
+          postPolicy.canAdminUpdate({
+            organizationId: args.organizationId,
+            postId: args.postId,
+          })
+        ),
         withRemapDbErrors("Post", "update")
       ),
 

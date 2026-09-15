@@ -91,14 +91,17 @@ function Title() {
 }
 
 function Content() {
-  const { canManagePost, isLocked } = usePostCollectionData();
+  const { canManagePost, isLocked, isMerged, post } = usePostCollectionData();
 
-  // Post authors get the rich-text editor; everyone else (readers, locked
-  // posts) sees the rendered Markdown.
-  if (canManagePost && !isLocked) {
+  // Post authors get the rich-text editor; everyone else (readers, locked or
+  // merged posts) sees the rendered Markdown.
+  if (canManagePost && !(isLocked || isMerged)) {
     return (
       <Suspense fallback={<ContentSkeleton />}>
-        <PostContentUpdateInput />
+        {/* Keyed by post id: same-route navigation (e.g. redirecting to the
+            survivor after a merge) reuses this component, and an uncontrolled
+            editor would otherwise keep showing the previous post's body. */}
+        <PostContentUpdateInput key={post.id} />
       </Suspense>
     );
   }

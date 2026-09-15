@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-db";
 
 import { useCreateCommentAction } from "../forms/comment-form";
+import { usePostCollectionData } from "../post-page-context";
 import { usePostCollections } from "../providers/post-collections-provider";
 import { CommentDisplayComponent } from "./component";
 
@@ -24,9 +25,38 @@ export function CommentDisplayItem({
   currentUserId,
 }: CommentDisplayItemProps) {
   const {
-    collections: { commentCollection, postStatusCollection },
+    collections: { commentCollection, postCollection, postStatusCollection },
+    getPostHref,
   } = usePostCollections();
+  const { isMerged, post: viewedPost } = usePostCollectionData();
   const createComment = useCreateCommentAction();
+
+  // Resolve the post this comment was merged away from, when present. Public
+  // surfaces omit merged posts from their collection, so `mergedFromPost`
+  // stays undefined there and the label renders without a link instead of
+  // pointing at a redirect loop.
+  const mergedFromPostId = data.mergedFromPostId;
+  const { data: mergedFromPost } = useLiveQuery(
+    (q) => {
+      if (!mergedFromPostId) {
+        return undefined;
+      }
+      return q
+        .from({ post: postCollection })
+        .where(({ post }) => eq(post.id, mergedFromPostId))
+        .findOne();
+    },
+    [mergedFromPostId, postCollection]
+  );
+  // The label marks a comment that was carried in from another post, so it
+  // belongs on the survivor only. On the merged post's own page these are
+  // simply its comments, not merged ones.
+  const showMergedLabel =
+    mergedFromPostId != null && mergedFromPostId !== viewedPost.id;
+  const mergedFromHref =
+    showMergedLabel && mergedFromPost && getPostHref
+      ? getPostHref(mergedFromPost)
+      : null;
 
   // Derive the status-update type by joining the comment's FK onto the
   // org-scoped post status collection (labels/colors live client-side).
@@ -104,8 +134,11 @@ export function CommentDisplayItem({
       commentId={data.id}
       content={data.content}
       createdAt={data.createdAt}
+      disabled={isMerged}
       isAuthor={currentUserId ? data.userId === currentUserId : false}
       isInternal={data.visibility === "INTERNAL"}
+      mergedFromHref={mergedFromHref}
+      mergedFromPostId={showMergedLabel ? mergedFromPostId : null}
       pinnedAt={data.pinnedAt}
       statusUpdateType={statusUpdateType}
       statusUpdateLabel={statusUpdateLabel}

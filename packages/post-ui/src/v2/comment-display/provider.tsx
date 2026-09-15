@@ -22,6 +22,8 @@ export type CommentDisplayProviderProps = {
   isEditing?: boolean;
   isInternal?: boolean;
   pinnedAt?: Date | null;
+  mergedFromPostId?: string | null;
+  mergedFromHref?: string | null;
   statusUpdateType?: TPostStatusType | null;
   statusUpdateColor?: string | null;
   statusUpdateLabel?: string | null;
@@ -70,6 +72,8 @@ export function CommentDisplayProvider({
   isEditing = false,
   isInternal = false,
   pinnedAt = null,
+  mergedFromPostId = null,
+  mergedFromHref = null,
   statusUpdateType = null,
   statusUpdateColor = null,
   statusUpdateLabel = null,
@@ -116,6 +120,8 @@ export function CommentDisplayProvider({
         isEditing,
         isInternal,
         pinnedAt,
+        mergedFromPostId,
+        mergedFromHref,
         postId,
         postSlug,
         statusUpdateType,
@@ -135,6 +141,8 @@ export function CommentDisplayProvider({
       isEditing,
       isInternal,
       pinnedAt,
+      mergedFromPostId,
+      mergedFromHref,
       onCancelEdit,
       onDelete,
       onReply,

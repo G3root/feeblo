@@ -515,6 +515,42 @@ describe("CommentRpcHandlers", () => {
         })
       );
 
+      it.effect("rejects creating on a merged post", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const mergedPostId = yield* addPost(fixture, fixture.boardId);
+          const now = new Date();
+          // A merged source is archived and points at its survivor; the
+          // `isUnlocked` gate denies interaction until it is unmerged.
+          yield* db
+            .update(schema.postTable)
+            .set({
+              archivedAt: now,
+              mergedAt: now,
+              mergedIntoPostId: fixture.postId,
+            })
+            .where(eq(schema.postTable.id, mergedPostId));
+
+          const commentId = yield* CommentId.generate;
+          const error = yield* Effect.flip(
+            handlers
+              .CommentCreate({
+                id: commentId,
+                organizationId: fixture.organizationId,
+                postId: mergedPostId,
+                content: "Comment on merged post",
+                visibility: "PUBLIC" as const,
+                parentCommentId: null,
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
       it.effect("allows replying to a comment on the same post", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;

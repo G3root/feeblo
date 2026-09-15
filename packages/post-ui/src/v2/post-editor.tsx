@@ -354,12 +354,15 @@ export function PostContentUpdateInput() {
     collections: { postCollection, postDetailCollection },
     organizationId,
   } = usePostCollections();
-  const { canManagePost, isLocked, post, pageType } = usePostCollectionData();
+  const { canManagePost, isLocked, isMerged, post, pageType } =
+    usePostCollectionData();
   // Initial body + attachments resolve through the detail collection (the
   // context row is a slim list item without `content`).
   const detail = usePostDetail();
 
-  const disabled = isLocked || !canManagePost;
+  // Merged posts are read-only until unmerged (title/content mutations are
+  // denied by PostPolicy for the same reason).
+  const disabled = isLocked || isMerged || !canManagePost;
 
   const updatePostContent = createOptimisticAction<{
     assetIds: string[];

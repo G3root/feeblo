@@ -17,6 +17,7 @@ type TestPost = {
   content: string;
   createdAt: string;
   id: string;
+  mergedIntoPostId: string | null;
   organizationId: string;
   slug: string;
   statusId: string;
@@ -46,6 +47,7 @@ function post({ id, createdAt }: { id: string; createdAt: string }): TestPost {
     content: `${id} content`,
     createdAt,
     id,
+    mergedIntoPostId: null,
     organizationId: ORGANIZATION_ID,
     slug: id,
     statusId: "st-1",

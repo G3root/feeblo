@@ -77,6 +77,7 @@ const makeCommentRepository = Effect.gen(function* () {
             postId: schema.commentTable.postId,
             postSlug: schema.postTable.slug,
             userId: schema.commentTable.userId,
+            mergedFromPostId: schema.commentTable.mergedFromPostId,
             visibility: schema.commentTable.visibility,
             parentCommentId: schema.commentTable.parentCommentId,
             // Callers of this endpoint are members who see every comment, so
@@ -120,6 +121,7 @@ const makeCommentRepository = Effect.gen(function* () {
           postId: schema.commentTable.postId,
           postSlug: schema.postTable.slug,
           userId: schema.commentTable.userId,
+          mergedFromPostId: schema.commentTable.mergedFromPostId,
           visibility: schema.commentTable.visibility,
           parentCommentId: schema.commentTable.parentCommentId,
           memberId: schema.commentTable.memberId,
