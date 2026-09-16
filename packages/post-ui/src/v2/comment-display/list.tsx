@@ -174,6 +174,10 @@ export function CommentsList() {
   } = usePostCollections();
   const postSlug = post.slug;
 
+  // A post's list carries its own comments plus the comments merged away from
+  // it while it is merged (see `CommentRepository.findMany`), so a merged
+  // post's page renders its comments from one slug-scoped subset and an
+  // unmerge only changes the rows inside that same subset.
   const { data: comments, isLoading: isCommentsLoading } = useLiveQuery(
     (q) =>
       q

@@ -160,6 +160,9 @@ export const publicPostCollection = createCollection(
           id: deletedPost.id,
         })
       );
+      // Same as the dashboard: a survivor delete reverts merged children
+      // server-side, so refresh the synced rows that still point at it.
+      await publicPostCollection.utils.refetch();
       await publicDeleteEligibilityCollection.utils.refetch();
     },
   })

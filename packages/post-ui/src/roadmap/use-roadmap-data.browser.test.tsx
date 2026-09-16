@@ -19,6 +19,7 @@ type TestPost = {
   createdAt: Date;
   excerpt: string;
   id: string;
+  mergedIntoPostId: string | null;
   organizationId: string;
   slug: string;
   statusId: string;
@@ -121,6 +122,7 @@ function post({
     createdAt,
     excerpt: `${id} summary`,
     id,
+    mergedIntoPostId: null,
     organizationId: ORGANIZATION_ID,
     slug: id,
     statusId,

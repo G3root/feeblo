@@ -1,7 +1,12 @@
 import { Badge } from "@feeblo/ui/badge";
 import { formatPostStatus } from "@feeblo/web-shared/board/constants";
-import { CircleLockIcon, Pin02Icon } from "@hugeicons/core-free-icons";
+import {
+  CircleLockIcon,
+  GitMergeIcon,
+  Pin02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { Link } from "@tanstack/react-router";
 
 import { m } from "../../paraglide/messages.js";
 import { useCommentDisplay } from "./context";
@@ -35,6 +40,19 @@ export function CommentDisplayHeader() {
       {state.isInternal && (
         <Badge variant="info">
           <HugeiconsIcon icon={CircleLockIcon} /> {m.quaint_slimy_osprey()}
+        </Badge>
+      )}
+      {state.mergedFromPostId != null && (
+        <Badge
+          render={
+            state.mergedFromHref ? (
+              <Link to={state.mergedFromHref} />
+            ) : undefined
+          }
+          variant="info"
+        >
+          <HugeiconsIcon icon={GitMergeIcon} />
+          {m.curly_brave_quokka()}
         </Badge>
       )}
       {state.pinnedAt != null && (

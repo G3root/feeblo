@@ -76,6 +76,7 @@ import type {
   TPostUpdateContent,
   TPostUpdateEta,
   TPostUpdateTitle,
+  TPostUnmerge,
 } from "./schema";
 import { postLexicalSimilarity, SUGGESTION_MAX_DISTANCE } from "./suggestions";
 
@@ -242,22 +243,41 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   const deletePostEffect = (args: TPostDelete) =>
     Effect.gen(function* () {
       const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, args.organizationId);
       const canDeleteEngagedPost = Permissions.can(
         session,
         args.organizationId,
         "posts.*"
       );
-      const deleted = yield* transaction(
-        repository.delete({
-          id: args.id,
-          organizationId: args.organizationId,
-          boardId: args.boardId,
-          creatorId: session.session.userId,
-          onlyIfNew: !canDeleteEngagedPost,
+      const result = yield* transaction(
+        Effect.gen(function* () {
+          const outcome = yield* repository.delete({
+            id: args.id,
+            organizationId: args.organizationId,
+            boardId: args.boardId,
+            creatorId: session.session.userId,
+            onlyIfNew: !canDeleteEngagedPost,
+          });
+          // Deleting a survivor reverts its merged children so the FK cannot
+          // block the delete and no post is orphaned. Record the reversal on
+          // each child's timeline, mirroring `PostUnmerge`.
+          if (outcome.restoredChildren.length > 0) {
+            yield* activityRepository.createMany(
+              outcome.restoredChildren.map((child) => ({
+                actorId: session.session.userId,
+                actorMemberId: membership?.membershipId ?? null,
+                kind: "POST_UNMERGED" as const,
+                organizationId: args.organizationId,
+                postId: child.id,
+                targetPostId: child.mergedIntoPostId,
+              }))
+            );
+          }
+          return outcome;
         })
       );
 
-      if (!(deleted || canDeleteEngagedPost)) {
+      if (!(result.deleted || canDeleteEngagedPost)) {
         return yield* new Policy.PolicyDeniedError({
           reason: "Posts with comments or other users' votes cannot be deleted",
         });
@@ -266,7 +286,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       // A privileged delete that matched no row means the post does not exist
       // (or belongs to another org/board) — report that instead of silently
       // succeeding.
-      if (!deleted) {
+      if (!result.deleted) {
         return yield* new PostNotFoundError({
           message: "Post not found",
         });
@@ -1004,6 +1024,21 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "select")
       ),
 
+    PostResolveMergedPublic: (args: TPostGet) =>
+      Effect.gen(function* () {
+        const target = yield* repository.findMergedPublicTargetBySlug({
+          organizationId: args.organizationId,
+          slug: args.slug,
+        });
+        return target?.slug ?? null;
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostResolveMergedPublic",
+          level: "read",
+        }),
+        withRemapDbErrors("Post", "select")
+      ),
+
     PostSuggestionsPublic: (args: TPostSuggestions) =>
       Effect.gen(function* () {
         const sessionOption = yield* OptionalCurrentSession;
@@ -1243,13 +1278,23 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
     PostUpdateEta: (args: TPostUpdateEta) =>
       updatePostEtaEffect(args).pipe(
-        Policy.withPolicy(postPolicy.canUpdateEta(args.organizationId)),
+        Policy.withPolicy(
+          postPolicy.canUpdateEta({
+            organizationId: args.organizationId,
+            postId: args.id,
+          })
+        ),
         withRemapDbErrors("Post", "update")
       ),
 
     PostUpdateAuthor: (args: TPostUpdateAuthor) =>
       updatePostAuthorEffect(args).pipe(
-        Policy.withPolicy(postPolicy.canUpdateAuthor(args.organizationId)),
+        Policy.withPolicy(
+          postPolicy.canUpdateAuthor({
+            organizationId: args.organizationId,
+            postId: args.id,
+          })
+        ),
         withRemapDbErrors("Post", "update")
       ),
 
@@ -1296,7 +1341,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           })
         );
       }).pipe(
-        Policy.withPolicy(postPolicy.canAdminUpdate(args.organizationId)),
+        Policy.withPolicy(
+          postPolicy.canAdminUpdate({
+            organizationId: args.organizationId,
+            postId: args.id,
+          })
+        ),
         withRemapDbErrors("Post", "update")
       ),
 
@@ -1362,7 +1412,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         );
         yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
       }).pipe(
-        Policy.withPolicy(postPolicy.canAdminUpdate(args.organizationId)),
+        Policy.withPolicy(
+          postPolicy.canAdminUpdate({
+            organizationId: args.organizationId,
+            postId: args.postId,
+          })
+        ),
         withRemapDbErrors("Post", "update")
       ),
 
@@ -1373,9 +1428,44 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             message: "Source and target posts must be different",
           });
         }
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
         const outboxId = yield* transaction(
           Effect.gen(function* () {
             yield* repository.merge(args);
+            // Record both directions of the merge: the survivor's timeline
+            // shows which duplicate was folded in, and the archived source's
+            // timeline explains where it went (so the source is not just a
+            // silent tombstone).
+            yield* activityRepository.create({
+              actorId: session.session.userId,
+              actorMemberId: membership?.membershipId ?? null,
+              kind: "POST_MERGED",
+              mergedPostId: args.sourcePostId,
+              organizationId: args.organizationId,
+              postId: args.targetPostId,
+            });
+            yield* activityRepository.create({
+              actorId: session.session.userId,
+              actorMemberId: membership?.membershipId ?? null,
+              kind: "POST_MERGED_INTO",
+              organizationId: args.organizationId,
+              postId: args.sourcePostId,
+              targetPostId: args.targetPostId,
+            });
+            // In-app notification: subscribers and voters of both posts learn
+            // where the duplicate went. Runs after the repository move so the
+            // survivor queries include the carried-over source rows.
+            yield* Option.match(notifications, {
+              onNone: () => Effect.void,
+              onSome: (service) =>
+                service.notifyPostMerged({
+                  actorUserId: session.session.userId,
+                  organizationId: args.organizationId,
+                  sourcePostId: args.sourcePostId,
+                  targetPostId: args.targetPostId,
+                }),
+            });
             if (
               !(yield* entitlementPolicy.mayMaterializeEmailIntent({
                 organizationId: args.organizationId,
@@ -1389,7 +1479,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               .recordIntent({
                 aggregateId: args.sourcePostId,
                 aggregateType: "post",
-                deduplicationKey: `post.merged:${args.organizationId}:${args.sourcePostId}:${args.targetPostId}`,
+                deduplicationKey: `post.merged:${args.organizationId}:${args.sourcePostId}:${args.targetPostId}:${now.getTime()}`,
                 expiresAt: new Date(now.getTime() + 7 * 86_400_000),
                 kind: "post.merged",
                 organizationId: args.organizationId,
@@ -1405,6 +1495,78 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                   () =>
                     new InternalServerError({
                       message: "Could not record post merge email intent.",
+                    })
+                )
+              );
+            return result._tag === "Inserted" ? result.intent.id : undefined;
+          })
+        );
+        yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
+      }).pipe(
+        Policy.withPolicy(postPolicy.canMerge(args.organizationId)),
+        withRemapDbErrors("Post", "update")
+      ),
+
+    PostUnmerge: (args: TPostUnmerge) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
+        const outboxId = yield* transaction(
+          Effect.gen(function* () {
+            const targetPostId = yield* repository.unmerge(args);
+            // Restoring a post reverses the tombstone, so the source timeline
+            // records which post it was detached from.
+            yield* activityRepository.create({
+              actorId: session.session.userId,
+              actorMemberId: membership?.membershipId ?? null,
+              kind: "POST_UNMERGED",
+              organizationId: args.organizationId,
+              postId: args.sourcePostId,
+              targetPostId,
+            });
+            // Mirror the merge announcement: everyone told the post moved
+            // learns it is back, after the engagement returned to the source.
+            yield* Option.match(notifications, {
+              onNone: () => Effect.void,
+              onSome: (service) =>
+                service.notifyPostUnmerged({
+                  actorUserId: session.session.userId,
+                  organizationId: args.organizationId,
+                  sourcePostId: args.sourcePostId,
+                  targetPostId,
+                }),
+            });
+            if (
+              !(yield* entitlementPolicy.mayMaterializeEmailIntent({
+                organizationId: args.organizationId,
+                kind: "post.unmerged",
+              }))
+            ) {
+              return undefined;
+            }
+            const now = yield* DateTime.nowAsDate;
+            const result = yield* emailOutbox
+              .recordIntent({
+                aggregateId: args.sourcePostId,
+                aggregateType: "post",
+                // Timestamped so a post merged, unmerged, and merged again
+                // sends a fresh email instead of matching the first attempt.
+                deduplicationKey: `post.unmerged:${args.organizationId}:${args.sourcePostId}:${targetPostId}:${now.getTime()}`,
+                expiresAt: new Date(now.getTime() + 7 * 86_400_000),
+                kind: "post.unmerged",
+                organizationId: args.organizationId,
+                payload: {
+                  kind: "post.unmerged",
+                  postId: args.sourcePostId,
+                  targetPostId,
+                },
+                scheduledAt: now,
+              })
+              .pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message: "Could not record post unmerge email intent.",
                     })
                 )
               );

@@ -26,7 +26,7 @@ const ANCHORED_SUBSCRIBE_TOAST_ID = "post-subscribe";
  * `onInsert`/`onDelete` handlers persist the change to the backend.
  */
 export function SubscribeButton() {
-  const { isLocked, organizationId, post } = usePostCollectionData();
+  const { isLocked, isMerged, organizationId, post } = usePostCollectionData();
   const { data: session } = useAuthState();
   const {
     collections: { postSubscriptionCollection },
@@ -39,7 +39,9 @@ export function SubscribeButton() {
   const isPersistingRef = useRef(false);
   // Anchor for the success toast, so it pops up next to the button.
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const disabled = isLocked;
+  // Followers moved to the survivor on merge; following the merged-away post
+  // would never deliver updates, so the toggle stays disabled until unmerge.
+  const disabled = isLocked || isMerged;
 
   const { data: hasUserSubscribed, isLoading: isSubscriptionLoading } =
     useLiveQuery(

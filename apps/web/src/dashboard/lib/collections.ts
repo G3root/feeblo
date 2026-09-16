@@ -131,6 +131,10 @@ export const postCollection = createCollection(
           organizationId: deletedPost.organizationId,
         })
       );
+      // Deleting a survivor also reverts its merged children server-side, so
+      // the synced rows must be refreshed or the restored duplicates stay
+      // hidden behind their stale `mergedIntoPostId`.
+      await postCollection.utils.refetch();
       await deleteEligibilityCollection.utils.refetch();
     },
   })

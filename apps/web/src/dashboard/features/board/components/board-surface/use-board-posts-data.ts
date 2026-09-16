@@ -210,6 +210,11 @@ export function useBoardPostsData({
         .where(({ matchingTags, post, postStatus }) => {
           let condition = eq(post.organizationId, organizationId);
 
+          // Merged posts are hidden from the board entirely; they stay
+          // reachable through the survivor's merged-posts list (dashboard
+          // only) so the duplicate never competes as a card.
+          condition = and(condition, isNull(post.mergedIntoPostId));
+
           if (boardId) {
             condition = and(condition, eq(post.boardId, boardId));
           }

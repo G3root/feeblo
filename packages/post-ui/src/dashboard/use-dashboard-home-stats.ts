@@ -1,5 +1,12 @@
 import type { Collection, UtilsRecord } from "@tanstack/db";
-import { and, count, eq, inArray, useLiveQuery } from "@tanstack/react-db";
+import {
+  and,
+  count,
+  eq,
+  inArray,
+  isNull,
+  useLiveQuery,
+} from "@tanstack/react-db";
 
 type BoardRowLike = {
   id: string;
@@ -13,6 +20,7 @@ type PostRowLike = {
   createdAt: Date | string;
   excerpt?: string;
   id: string;
+  mergedIntoPostId: string | null;
   organizationId: string;
   slug: string;
   statusId: string;
@@ -119,7 +127,14 @@ export function useDashboardHomeStats<
 
       return q
         .from({ post: postCollection })
-        .where(({ post }) => eq(post.organizationId, organizationId))
+        .where(({ post }) =>
+          and(
+            eq(post.organizationId, organizationId),
+            // Recent posts shows live work; merged duplicates are hidden
+            // until their survivor is opened.
+            isNull(post.mergedIntoPostId)
+          )
+        )
         .orderBy(({ post }) => post.createdAt, "desc")
         .limit(5);
     },

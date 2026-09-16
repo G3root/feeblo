@@ -1,4 +1,7 @@
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
+import type { TBoard } from "@feeblo/domain/board/schema";
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
+import type { TPostListItem } from "@feeblo/domain/post/schema";
 import { AuthButton } from "@feeblo/post-ui/auth-dialog";
 import { PostCommentGuestPrompt } from "@feeblo/post-ui/post-comment-composer";
 import { PostPage as ComposedPostPage } from "@feeblo/post-ui/post-page";
@@ -8,6 +11,7 @@ import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
@@ -15,13 +19,19 @@ import {
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { isString } from "@feeblo/utils/runtime-kind";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { createLazyRoute, useParams } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import {
+  createLazyRoute,
+  useNavigate,
+  useParams,
+} from "@tanstack/react-router";
+import * as Result from "effect/unstable/reactivity/AsyncResult";
+import { type ReactNode, useEffect, useMemo } from "react";
 
 import { BoardNavLink } from "../components/feedback/board-list-card";
 import { PostPageActions } from "../components/feedback/post-page-actions";
 import { PostVoterDialog } from "../components/feedback/post-voter-dialog";
 // import { useUpvote } from "../hooks/use-upvote";
+import { mergedPostTargetAtom } from "../lib/merged-post-atoms";
 import { formatPostStatus } from "../lib/utils";
 import { m } from "../paraglide/messages.js";
 import { getLocale } from "../paraglide/runtime.js";
@@ -128,6 +138,7 @@ export function PostPage() {
   // the detail collection inside the composed content view.
   const post = listPost;
   const postId = post?.id ?? "";
+
   const postTagsQuery = useLiveQuery(
     (q) =>
       q
@@ -151,11 +162,11 @@ export function PostPage() {
     [site.organizationId, postId]
   );
 
-  if (postLoading || postTagsQuery.isLoading) {
+  if (postLoading) {
     return <RootLayout>{m.good_extra_giraffe()}</RootLayout>;
   }
 
-  if (postError || postTagsQuery.isError) {
+  if (postError) {
     return (
       <RootLayout>
         <Empty>
@@ -168,7 +179,37 @@ export function PostPage() {
     );
   }
 
-  if (!(post && board)) {
+  if (post && board) {
+    if (postTagsQuery.isLoading) {
+      return <RootLayout>{m.good_extra_giraffe()}</RootLayout>;
+    }
+    if (postTagsQuery.isError) {
+      return (
+        <RootLayout>
+          <Empty>
+            <EmptyHeader>
+              <EmptyTitle>{m.plane_ideal_dolphin()}</EmptyTitle>
+              <EmptyDescription>{m.mild_green_jannes()}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        </RootLayout>
+      );
+    }
+    return (
+      <PostPageContent
+        board={board}
+        organizationId={organizationId}
+        post={post}
+        postStatus={postStatus ?? undefined}
+        selectedTags={postTagsQuery.data ?? []}
+      />
+    );
+  }
+
+  // Merged posts are excluded from the public post query, so a client-side
+  // navigation to an old slug would land on "not found". Full page loads
+  // never get here (the Astro page 301s them before the SPA boots).
+  if (!site.organizationId) {
     return (
       <RootLayout>
         <Empty>
@@ -181,8 +222,100 @@ export function PostPage() {
     );
   }
 
-  const selectedTags = postTagsQuery.data ?? [];
+  return (
+    <MergedPostResolver organizationId={site.organizationId} slug={slug} />
+  );
+}
 
+/**
+ * Survivor lookup for a missing public slug. Mounted only after the cheap
+ * post-miss check above, so the `PostResolveMergedPublic` query never runs
+ * for ordinary visits. The atom runtime owns dedup, caching, and abort —
+ * no manual effect fetch — and the redirect effect below depends only on
+ * the resolved primitive slug. A lookup failure offers a retry instead of
+ * pretending the post is missing.
+ */
+function MergedPostResolver({
+  organizationId,
+  slug,
+}: {
+  readonly organizationId: string;
+  readonly slug: string;
+}) {
+  const navigate = useNavigate();
+  const args = useMemo(
+    () => ({ organizationId, slug }),
+    [organizationId, slug]
+  );
+  const targetResult = useAtomValue(mergedPostTargetAtom(args));
+  const refresh = useAtomRefresh(mergedPostTargetAtom(args));
+  // Derived during render: undefined while loading, string while
+  // redirecting, null when the slug is genuinely unknown. A failed lookup is
+  // kept apart from a miss: a transient RPC failure must not tell the visitor
+  // the post no longer exists.
+  const targetSlug = Result.builder(targetResult)
+    .onInitial(() => undefined)
+    .onFailure(() => undefined)
+    .onSuccess((value) => value)
+    .exhaustive();
+
+  useEffect(() => {
+    if (isString(targetSlug)) {
+      void navigate({
+        params: { slug: targetSlug },
+        replace: true,
+        to: "/p/$slug",
+      });
+    }
+  }, [navigate, targetSlug]);
+
+  if (Result.isFailure(targetResult)) {
+    return (
+      <RootLayout>
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>{m.plane_ideal_dolphin()}</EmptyTitle>
+            <EmptyDescription>{m.mild_green_jannes()}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button onClick={refresh} variant="outline">
+              {m.even_seemly_bear()}
+            </Button>
+          </EmptyContent>
+        </Empty>
+      </RootLayout>
+    );
+  }
+
+  if (targetSlug !== null) {
+    return <RootLayout>{m.good_extra_giraffe()}</RootLayout>;
+  }
+
+  return (
+    <RootLayout>
+      <Empty>
+        <EmptyHeader>
+          <EmptyTitle>{m.fresh_stout_halibut()}</EmptyTitle>
+          <EmptyDescription>{m.basic_formal_samuel()}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    </RootLayout>
+  );
+}
+
+function PostPageContent({
+  board,
+  organizationId,
+  post,
+  postStatus,
+  selectedTags,
+}: {
+  readonly board: TBoard;
+  readonly organizationId: string;
+  readonly post: TPostListItem;
+  readonly postStatus: TPostStatus | undefined;
+  readonly selectedTags: Array<{ id: string; name: string }>;
+}) {
   return (
     <ComposedPostPage.Root
       board={board}

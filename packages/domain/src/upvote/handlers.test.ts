@@ -7,6 +7,7 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -276,6 +277,42 @@ describe("UpvoteRpcHandlers", () => {
             organizationId: fixture.organizationId,
             locked: true,
           });
+
+          const error = yield* Effect.flip(
+            handlers
+              .UpvoteToggle({
+                organizationId: fixture.organizationId,
+                postId,
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("rejects upvoting on merged posts", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* UpvoteRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+          const survivorPostId = yield* PostId.generate;
+
+          yield* createPost(fixture, postId, "Test post");
+          yield* createPost(fixture, survivorPostId, "Survivor post");
+
+          // A merged source is archived and points at its survivor; the
+          // `isUnlocked` gate denies votes until it is unmerged.
+          const now = new Date();
+          yield* db
+            .update(schema.postTable)
+            .set({
+              archivedAt: now,
+              mergedAt: now,
+              mergedIntoPostId: survivorPostId,
+            })
+            .where(eq(schema.postTable.id, postId));
 
           const error = yield* Effect.flip(
             handlers

@@ -375,6 +375,15 @@ export const postTagTable = pgTable(
     tagId: text("tag_id")
       .notNull()
       .references(() => tagTable.id, { onDelete: "cascade" }),
+    /**
+     * Source post this row moved from when its post was merged into another.
+     * Provenance for restoring the tag when the merge is reverted or the
+     * survivor is deleted.
+     */
+    mergedFromPostId: text("merged_from_post_id").references(
+      () => postTable.id,
+      { onDelete: "set null" }
+    ),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
@@ -389,6 +398,7 @@ export const postTagTable = pgTable(
   (table) => [
     index("post_tag_postId_idx").on(table.postId),
     index("post_tag_tagId_idx").on(table.tagId),
+    index("post_tag_mergedFromPostId_idx").on(table.mergedFromPostId),
     uniqueIndex("post_tag_postId_tagId_uidx").on(table.postId, table.tagId),
   ]
 );
@@ -582,6 +592,15 @@ export const upvoteTable = pgTable(
     postId: text("post_id")
       .notNull()
       .references(() => postTable.id, { onDelete: "cascade" }),
+    /**
+     * Source post this row moved from when its post was merged into another.
+     * Provenance for the "merged comment" affordances and for restoring the
+     * row when the merge is reverted or the survivor is deleted.
+     */
+    mergedFromPostId: text("merged_from_post_id").references(
+      () => postTable.id,
+      { onDelete: "set null" }
+    ),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
@@ -599,6 +618,7 @@ export const upvoteTable = pgTable(
       table.postId
     ),
     index("upvote_postId_idx").on(table.postId),
+    index("upvote_mergedFromPostId_idx").on(table.mergedFromPostId),
     uniqueIndex("upvote_userId_postId_uidx").on(table.userId, table.postId),
   ]
 );
@@ -616,6 +636,15 @@ export const postReactionTable = pgTable(
     postId: text("post_id")
       .notNull()
       .references(() => postTable.id, { onDelete: "cascade" }),
+    /**
+     * Source post this row moved from when its post was merged into another.
+     * Provenance for restoring the reaction when the merge is reverted or the
+     * survivor is deleted.
+     */
+    mergedFromPostId: text("merged_from_post_id").references(
+      () => postTable.id,
+      { onDelete: "set null" }
+    ),
     emoji: text("emoji").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -627,6 +656,7 @@ export const postReactionTable = pgTable(
   },
   (table) => [
     index("postReaction_postId_idx").on(table.postId),
+    index("postReaction_mergedFromPostId_idx").on(table.mergedFromPostId),
     uniqueIndex("postReaction_userId_postId_emoji_uidx").on(
       table.userId,
       table.postId,
@@ -648,6 +678,15 @@ export const postSubscriptionTable = pgTable(
     postId: text("post_id")
       .notNull()
       .references(() => postTable.id, { onDelete: "cascade" }),
+    /**
+     * Source post this row moved from when its post was merged into another.
+     * Provenance for restoring the follower when the merge is reverted or the
+     * survivor is deleted.
+     */
+    mergedFromPostId: text("merged_from_post_id").references(
+      () => postTable.id,
+      { onDelete: "set null" }
+    ),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
@@ -662,6 +701,7 @@ export const postSubscriptionTable = pgTable(
   (table) => [
     index("post_subscription_postId_idx").on(table.postId),
     index("post_subscription_userId_idx").on(table.userId),
+    index("post_subscription_mergedFromPostId_idx").on(table.mergedFromPostId),
     uniqueIndex("post_subscription_postId_userId_uidx").on(
       table.postId,
       table.userId
@@ -717,6 +757,15 @@ export const commentTable = pgTable(
     memberId: text("member_id").references(() => memberTable.id, {
       onDelete: "set null",
     }),
+    /**
+     * Source post this comment moved from when its post was merged into
+     * another. Provenance for the "merged comment" label and for restoring
+     * the comment when the merge is reverted or the survivor is deleted.
+     */
+    mergedFromPostId: text("merged_from_post_id").references(
+      () => postTable.id,
+      { onDelete: "set null" }
+    ),
     visibility: postCommentVisibilityEnum("visibility")
       .default("PUBLIC")
       .notNull(),
@@ -746,6 +795,7 @@ export const commentTable = pgTable(
       table.postId
     ),
     index("comment_postId_pinnedAt_idx").on(table.postId, table.pinnedAt),
+    index("comment_mergedFromPostId_idx").on(table.mergedFromPostId),
     uniqueIndex("comment_post_pinned_uidx")
       .on(table.postId)
       .where(sql`${table.pinnedAt} IS NOT NULL`),
@@ -962,6 +1012,16 @@ export const changelogPostTable = pgTable(
     postId: text("post_id")
       .notNull()
       .references(() => postTable.id, { onDelete: "cascade" }),
+    /**
+     * Source post this link moved from when its post was merged into another.
+     * Provenance for restoring the changelog link when the merge is reverted
+     * or the survivor is deleted. Null when the link was dropped because the
+     * survivor already had an entry, which is not recoverable.
+     */
+    mergedFromPostId: text("merged_from_post_id").references(
+      () => postTable.id,
+      { onDelete: "set null" }
+    ),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
@@ -972,6 +1032,7 @@ export const changelogPostTable = pgTable(
   (table) => [
     primaryKey({ columns: [table.changelogId, table.postId] }),
     uniqueIndex("changelog_post_postId_uidx").on(table.postId),
+    index("changelog_post_mergedFromPostId_idx").on(table.mergedFromPostId),
     index("changelog_post_organizationId_idx").on(table.organizationId),
   ]
 );
@@ -1266,6 +1327,15 @@ export const emailSubscriptionTable = pgTable(
       .$type<TEmailSubscriptionTopicType>()
       .notNull(),
     topicId: text("topic_id"),
+    /**
+     * Source post this subscription moved from when its post was merged into
+     * another. Provenance for restoring the subscription when the merge is
+     * reverted or the survivor is deleted.
+     */
+    mergedFromPostId: text("merged_from_post_id").references(
+      () => postTable.id,
+      { onDelete: "set null" }
+    ),
     source: text("source").$type<TEmailSubscriptionSource>().notNull(),
     state: text("state").$type<TEmailSubscriptionState>().notNull(),
     verificationTokenHash: text("verification_token_hash"),
@@ -1302,6 +1372,7 @@ export const emailSubscriptionTable = pgTable(
       table.state,
       table.organizationId
     ),
+    index("email_subscription_mergedFromPostId_idx").on(table.mergedFromPostId),
   ]
 );
 

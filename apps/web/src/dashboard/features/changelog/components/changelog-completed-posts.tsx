@@ -37,6 +37,9 @@ export function ChangelogCompletedPosts({
           and(
             eq(post.organizationId, organizationId),
             eq(status.type, "COMPLETED"),
+            // Merged duplicates are hidden everywhere; only the survivor is
+            // pickable for a changelog entry.
+            isNull(post.mergedIntoPostId),
             or(
               isNull(assignment.postId),
               isUndefined(assignment.postId),

@@ -68,8 +68,14 @@ export const emailSubscriptionTopicForIntent = (
       return { topicId: null, topicType: "changelog" };
     case "post.status_changed":
     case "post.official_update_published":
-    case "post.merged":
     case "post.closed":
+      return { topicId: payload.postId, topicType: "post" };
+    // The merge reassigns subscriptions to the surviving post, so the
+    // notification is delivered on the target topic. Unmerging restores the
+    // subscriptions to the source, so that one delivers on the source topic.
+    case "post.merged":
+      return { topicId: payload.targetPostId, topicType: "post" };
+    case "post.unmerged":
       return { topicId: payload.postId, topicType: "post" };
     default:
       return undefined;
@@ -244,21 +250,39 @@ export const resolveSubscriptionNotificationContent = (
       case "post.status_changed":
       case "post.official_update_published":
       case "post.merged":
+      case "post.unmerged":
       case "post.closed": {
         // Snapshot post reads transactionally as well.
-        // SAFETY: every payload variant matching these four kind tags carries a postId.
+        // SAFETY: every payload variant matching these five kind tags carries a postId.
         const postId = intent.payload.postId;
         const payloadKind = intent.payload.kind;
         const payloadBody =
           intent.payload.kind === "post.official_update_published"
             ? intent.payload.body
             : undefined;
+        // A merge notification is about the source post but must land on the
+        // surviving target: the source is archived and its public URL
+        // redirects. An unmerge reverses that: the source is live again, so it
+        // is the linked post while the survivor's title moves into the body.
+        const urlPostId =
+          intent.payload.kind === "post.merged"
+            ? intent.payload.targetPostId
+            : postId;
+        // The other post the event names: the merged-away source for a merge,
+        // the survivor for an unmerge. Both titles make the email readable
+        // without opening either post.
+        const counterpartPostId =
+          intent.payload.kind === "post.merged"
+            ? intent.payload.postId
+            : intent.payload.kind === "post.unmerged"
+              ? intent.payload.targetPostId
+              : undefined;
         return yield* transaction(
           Effect.gen(function* () {
             const txDb = yield* Database.Database;
             const post = yield* txDb.query.postTable.findFirst({
               where: {
-                id: postId,
+                id: urlPostId,
                 organizationId: intent.organizationId,
               },
               columns: { slug: true, title: true },
@@ -270,12 +294,31 @@ export const resolveSubscriptionNotificationContent = (
             if (!post) {
               return undefined;
             }
+            const counterpart = counterpartPostId
+              ? yield* txDb.query.postTable.findFirst({
+                  where: {
+                    id: counterpartPostId,
+                    organizationId: intent.organizationId,
+                  },
+                  columns: { title: true },
+                })
+              : undefined;
+            // The subject of a merge email is the source post that was
+            // folded in, even though the link points at the target. For an
+            // unmerge the linked post (the restored source) is the subject.
+            const displayTitle =
+              payloadKind === "post.merged"
+                ? (counterpart?.title ?? post.title)
+                : post.title;
+            const counterpartTitle = counterpart?.title ?? "another post";
             const url = `${appUrl}/${intent.organizationId}/post/${post.board?.slug ?? ""}/${post.slug}`;
             let event = `moved to ${titleCase(post.postStatus?.type ?? "updated")}`;
             if (payloadKind === "post.official_update_published") {
               event = "updated by the workspace team";
             } else if (payloadKind === "post.merged") {
               event = "merged";
+            } else if (payloadKind === "post.unmerged") {
+              event = "unmerged";
             } else if (payloadKind === "post.closed") {
               event = "closed";
             }
@@ -283,7 +326,7 @@ export const resolveSubscriptionNotificationContent = (
               template: "subscription-notification" as const,
               topic: {
                 topicType: "post" as const,
-                topicId: postId,
+                topicId: urlPostId,
               },
               templatePayload: {
                 actionLabel: "View post",
@@ -292,10 +335,14 @@ export const resolveSubscriptionNotificationContent = (
                   payloadKind === "post.official_update_published" &&
                   payloadBody !== undefined
                     ? payloadBody
-                    : `A post you follow was ${event}.`,
+                    : payloadKind === "post.merged"
+                      ? `"${displayTitle}" was merged into this post.`
+                      : payloadKind === "post.unmerged"
+                        ? `"${displayTitle}" was unmerged from "${counterpartTitle}".`
+                        : `A post you follow was ${event}.`,
                 eyebrow: "Feedback",
-                posts: [{ label: post.title, url }],
-                title: `Post ${event}: ${post.title}`,
+                posts: [{ label: displayTitle, url }],
+                title: `Post ${event}: ${displayTitle}`,
               },
             } satisfies PostNotificationContent;
           })

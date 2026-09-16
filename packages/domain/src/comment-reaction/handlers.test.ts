@@ -24,11 +24,13 @@ import { CommentReactionRepository } from "./repository";
 
 describe("CommentReactionRpcHandlers", () => {
   type Fixture = {
+    boardId: LegidOf<"BoardId">;
     commentId: LegidOf<"CommentId">;
     membershipId: string;
     organizationId: LegidOf<"WorkspaceId">;
     postId: LegidOf<"PostId">;
     postSlug: string;
+    statusId: LegidOf<"PostStatusId">;
     userId: string;
   };
   const session = (f: Fixture, member = true): Session => ({
@@ -127,11 +129,13 @@ describe("CommentReactionRpcHandlers", () => {
         parentCommentId: null,
       });
       return {
+        boardId,
         commentId,
         membershipId,
         organizationId,
         postId,
         postSlug,
+        statusId,
         userId,
       } satisfies Fixture;
     });
@@ -186,6 +190,61 @@ describe("CommentReactionRpcHandlers", () => {
             userId: f.userId,
             memberId: f.membershipId,
             emoji: "rocket",
+          });
+        })
+      );
+      it.effect("lists reactions for comments merged away from the post", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const postRepository = yield* PostRepository;
+          const handlers = yield* CommentReactionRpcHandlersEffect;
+          const f = yield* fixture();
+          const targetPostId = yield* PostId.generate;
+          const now = new Date();
+
+          yield* db.insert(schema.postTable).values({
+            id: targetPostId,
+            title: "Target post",
+            content: "Target content",
+            slug: targetPostId,
+            excerpt: "Target content",
+            boardId: f.boardId,
+            organizationId: f.organizationId,
+            statusId: f.statusId,
+            creatorId: f.userId,
+            creatorMemberId: f.membershipId,
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* handlers
+            .CommentReactionToggle({
+              commentId: f.commentId,
+              emoji: "rocket",
+              organizationId: f.organizationId,
+              postId: f.postId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f)));
+          yield* postRepository.merge({
+            organizationId: f.organizationId,
+            sourcePostId: f.postId,
+            targetPostId,
+          });
+
+          // The merged post's page lists the comment's reactions (and thus
+          // the counts) under its own slug, matching the comment list.
+          const reactions = yield* handlers
+            .CommentReactionList({
+              organizationId: f.organizationId,
+              slug: f.postSlug,
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f)));
+
+          expect(reactions).toHaveLength(1);
+          expect(reactions[0]).toMatchObject({
+            commentId: f.commentId,
+            emoji: "rocket",
+            postId: targetPostId,
+            postSlug: f.postSlug,
           });
         })
       );

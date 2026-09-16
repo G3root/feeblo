@@ -40,7 +40,7 @@ export function PostTitleInput({ className, ...props }: PostTitleInputProps) {
 }
 
 export function PostTitleUpdateInput() {
-  const { canManagePost, post, pageType } = usePostCollectionData();
+  const { canManagePost, isMerged, post, pageType } = usePostCollectionData();
   const {
     collections: { postCollection },
     organizationId,
@@ -49,6 +49,11 @@ export function PostTitleUpdateInput() {
   const defaultValue = post.title;
   const postId = post.id;
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // A merged post is read-only until unmerged, so the title renders as plain
+  // text (same as a non-manager view) instead of offering an edit that the
+  // backend policy would reject.
+  const isEditable = canManagePost && !isMerged;
 
   const updatePostTitle = createOptimisticAction<{ title: string }>({
     onMutate: ({ title }) => {
@@ -114,8 +119,12 @@ export function PostTitleUpdateInput() {
   return (
     <PostTitleInput
       defaultValue={defaultValue}
-      onBlur={canManagePost ? handleBlur : undefined}
-      readOnly={!canManagePost}
+      // Uncontrolled input: remount on post change so same-route navigation
+      // (e.g. redirecting after a merge) resets the visible value instead of
+      // leaving the previous post's title in the field.
+      key={postId}
+      onBlur={isEditable ? handleBlur : undefined}
+      readOnly={!isEditable}
       ref={inputRef}
     />
   );

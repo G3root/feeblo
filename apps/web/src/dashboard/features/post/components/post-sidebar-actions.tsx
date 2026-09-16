@@ -28,6 +28,8 @@ import { usePublicSiteUrl } from "~/hooks/use-site";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
+import { PostMergeMenu } from "./post-merge-menu";
+
 type DialogAction = "lock" | null;
 type PostAdminAction = "lock";
 
@@ -56,6 +58,7 @@ function PostAdminActionButtons() {
     canDeletePost,
     canModeratePost,
     isLocked,
+    isMerged,
     organizationId,
   } = usePostCollectionData();
   const { postActivityCollection, postCollection } = useDashboardCollections();
@@ -124,6 +127,8 @@ function PostAdminActionButtons() {
 
   return (
     <>
+      <PostMergeMenu />
+
       <Tooltip>
         <TooltipTrigger
           render={(props) => (
@@ -131,7 +136,7 @@ function PostAdminActionButtons() {
               {...props}
               aria-label={lockLabel}
               className="rounded-full"
-              disabled={!canModeratePost}
+              disabled={!canModeratePost || isMerged}
               onClick={() => setDialogAction("lock")}
               size="icon-sm"
               variant="outline"
@@ -152,7 +157,10 @@ function PostAdminActionButtons() {
               {...props}
               aria-label="Delete post"
               className="rounded-full"
-              disabled={!canDeletePost}
+              // A merged post is read-only until unmerged; delete goes through
+              // the unmerge path (or the survivor's delete, which reverts the
+              // merge first).
+              disabled={!canDeletePost || isMerged}
               onClick={() =>
                 postDialogStore.send({
                   type: "toggle",

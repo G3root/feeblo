@@ -24,7 +24,7 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
  * post) the author renders as static text.
  */
 export function PostAuthorField() {
-  const { post, organizationId, isLocked } = usePostCollectionData();
+  const { post, organizationId, isLocked, isMerged } = usePostCollectionData();
   const { postCollection, postActivityCollection } = useDashboardCollections();
   // Backend mirror: PostPolicy.canUpdateAuthor lets `posts.createOnBehalf`
   // holders (managers and above) reattribute a post via PostUpdateAuthor.
@@ -71,7 +71,7 @@ export function PostAuthorField() {
 
   return (
     <AuthorPicker
-      disabled={isLocked || !canUpdateAuthor}
+      disabled={isLocked || isMerged || !canUpdateAuthor}
       display={{
         name: post.user.name ?? "Unknown author",
         avatarUrl: post.user.image,

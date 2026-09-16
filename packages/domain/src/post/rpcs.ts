@@ -20,6 +20,7 @@ import {
   PostMerge,
   PostOfficialUpdatePublish,
   PostSuggestions,
+  PostUnmerge,
   PostUpdate,
   PostUpdateAuthor,
   PostUpdateContent,
@@ -59,6 +60,17 @@ export class PostRpcs extends RpcGroup.make(
   Rpc.make("PostGetPublic", {
     payload: PostGet,
     success: Post,
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+
+  // Resolves a merged source slug to its surviving target slug so public
+  // detail routes can 301 redirect instead of 404ing. Returns null when the
+  // source is not a publicly visible merged post.
+  Rpc.make("PostResolveMergedPublic", {
+    payload: PostGet,
+    success: Schema.NullOr(Schema.String),
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   })
     .middleware(OptionalAuthMiddleware)
@@ -192,6 +204,12 @@ export class PostRpcs extends RpcGroup.make(
   Rpc.make("PostMerge", {
     success: Schema.Void,
     payload: PostMerge,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostUnmerge", {
+    success: Schema.Void,
+    payload: PostUnmerge,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 

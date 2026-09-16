@@ -1,6 +1,6 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
 import type { InsertComment } from "@feeblo/db/schema/feedback";
-import { and, desc, eq, isNotNull, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, isNotNull, or, sql, type SQL } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -59,13 +59,41 @@ const makeCommentRepository = Effect.gen(function* () {
   return {
     findMany: ({ organizationId, slug, visibility }: FindManyComments) =>
       Effect.gen(function* () {
-        const where: SQL[] = [];
+        // Resolve the requested post so its own comments and the comments
+        // merged away from it can be listed together. The list is requested
+        // per post page, and a merged comment is presented under each page
+        // that shows it: `postSlug` therefore carries the requested slug, not
+        // the host post's slug, so callers can key their live queries and
+        // reaction subsets by the page they are on.
+        const requestedPost = yield* db
+          .select({ id: schema.postTable.id })
+          .from(schema.postTable)
+          .where(
+            and(
+              eq(schema.postTable.organizationId, organizationId),
+              eq(schema.postTable.slug, slug)
+            )
+          )
+          .limit(1)
+          .pipe(Effect.map(EffectArray.get(0)));
+
+        if (Option.isNone(requestedPost)) {
+          return [];
+        }
+
+        // `or` types as possibly-undefined, so spread it the same way the
+        // rest of the codebase handles optional predicates.
+        const requestedScope = or(
+          eq(schema.commentTable.postId, requestedPost.value.id),
+          eq(schema.commentTable.mergedFromPostId, requestedPost.value.id)
+        );
+        const where: SQL[] = [
+          eq(schema.commentTable.organizationId, organizationId),
+          ...(requestedScope ? [requestedScope] : []),
+        ];
         if (visibility) {
           where.push(eq(schema.commentTable.visibility, visibility));
         }
-
-        where.push(eq(schema.commentTable.organizationId, organizationId));
-        where.push(eq(schema.postTable.slug, slug));
 
         return yield* db
           .select({
@@ -75,8 +103,9 @@ const makeCommentRepository = Effect.gen(function* () {
             updatedAt: schema.commentTable.updatedAt,
             organizationId: schema.commentTable.organizationId,
             postId: schema.commentTable.postId,
-            postSlug: schema.postTable.slug,
+            postSlug: sql<string>`${slug}`,
             userId: schema.commentTable.userId,
+            mergedFromPostId: schema.commentTable.mergedFromPostId,
             visibility: schema.commentTable.visibility,
             parentCommentId: schema.commentTable.parentCommentId,
             // Callers of this endpoint are members who see every comment, so
@@ -94,10 +123,6 @@ const makeCommentRepository = Effect.gen(function* () {
           .innerJoin(
             schema.userTable,
             eq(schema.commentTable.userId, schema.userTable.id)
-          )
-          .innerJoin(
-            schema.postTable,
-            eq(schema.commentTable.postId, schema.postTable.id)
           )
           .where(and(...where))
           .orderBy(
@@ -120,6 +145,7 @@ const makeCommentRepository = Effect.gen(function* () {
           postId: schema.commentTable.postId,
           postSlug: schema.postTable.slug,
           userId: schema.commentTable.userId,
+          mergedFromPostId: schema.commentTable.mergedFromPostId,
           visibility: schema.commentTable.visibility,
           parentCommentId: schema.commentTable.parentCommentId,
           memberId: schema.commentTable.memberId,

@@ -26,6 +26,8 @@ import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { ResolvePrincipalService } from "../identity/service";
+import { NotificationService } from "../notification/service";
+import * as Policy from "../policy";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError } from "../rpc-errors";
@@ -42,7 +44,7 @@ import {
   DEFAULT_POST_EMBEDDING_MODEL,
   PostEmbeddingService,
 } from "./embedding-service";
-import { PostNotFoundError } from "./errors";
+import { FailedToMergePostError, PostNotFoundError } from "./errors";
 import { PostRpcHandlersEffect } from "./handlers";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
@@ -895,6 +897,85 @@ describe("PostRpcHandlers", () => {
           );
 
           expect(error._tag).toBe("PostNotFoundError");
+        })
+      );
+    });
+
+    describe("PostResolveMergedPublic", () => {
+      it.effect("resolves a merged public source to the target slug", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [sourcePostId, "Duplicate feedback"],
+            [targetPostId, "Canonical feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          const posts = yield* handlers
+            .PostList({
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          const source = posts.find((post) => post.id === sourcePostId);
+          const target = posts.find((post) => post.id === targetPostId);
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const resolved = yield* handlers
+            .PostResolveMergedPublic({
+              organizationId: fixture.organizationId,
+              // SAFETY: The list lookup above guarantees the slug.
+              slug: source!.slug,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+          expect(resolved).toBe(target?.slug);
+        })
+      );
+
+      it.effect("returns null for a post that was not merged", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Live feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const posts = yield* handlers
+            .PostList({
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          const post = posts.find((row) => row.id === postId);
+
+          const resolved = yield* handlers
+            .PostResolveMergedPublic({
+              organizationId: fixture.organizationId,
+              // SAFETY: The list lookup above guarantees the slug.
+              slug: post!.slug,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+          expect(resolved).toBeNull();
         })
       );
     });
@@ -2215,6 +2296,83 @@ describe("PostRpcHandlers", () => {
         )
       );
 
+      it.effect("rejects merging a source that already absorbed a merge", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const firstPostId = yield* PostId.generate;
+          const secondPostId = yield* PostId.generate;
+          const thirdPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [firstPostId, "First feedback"],
+            [secondPostId, "Second feedback"],
+            [thirdPostId, "Third feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId: firstPostId,
+              targetPostId: secondPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          // `secondPostId` now has a merged child, so the chain
+          // `firstPostId -> secondPostId -> thirdPostId` must be refused:
+          // unmerging `secondPostId` could never restore `firstPostId`.
+          const error = yield* Effect.flip(
+            handlers
+              .PostMerge({
+                organizationId: fixture.organizationId,
+                sourcePostId: secondPostId,
+                targetPostId: thirdPostId,
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+
+          expect(error).toBeInstanceOf(FailedToMergePostError);
+          expect(error.message).toBe(
+            "Source post has merged children and cannot be merged again"
+          );
+
+          // The survivor stays a valid *target*: only the source of a merge
+          // is barred from having children, so another duplicate can still be
+          // folded into `secondPostId`.
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId: thirdPostId,
+              targetPostId: secondPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const posts = yield* db
+            .select({
+              id: schema.postTable.id,
+              mergedIntoPostId: schema.postTable.mergedIntoPostId,
+            })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.organizationId, fixture.organizationId));
+          expect(
+            posts.find((post) => post.id === firstPostId)?.mergedIntoPostId
+          ).toBe(secondPostId);
+          expect(
+            posts.find((post) => post.id === secondPostId)?.mergedIntoPostId
+          ).toBeNull();
+          expect(
+            posts.find((post) => post.id === thirdPostId)?.mergedIntoPostId
+          ).toBe(secondPostId);
+        })
+      );
+
       it.effect("archives the source post and records its target", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -2257,7 +2415,7 @@ describe("PostRpcHandlers", () => {
         })
       );
 
-      it.effect("moves engagement set-based and drops duplicate twins", () =>
+      it.effect("moves engagement set-based, keeping colliding votes", () =>
         Effect.gen(function* () {
           const db = yield* currentDb;
           const handlers = yield* PostRpcHandlersEffect;
@@ -2386,14 +2544,28 @@ describe("PostRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
-          // Shared twins collapse to the target row; unique source rows move.
+          // Shared twins collapse to the target row; unique source rows move,
+          // except the colliding vote, which stays parked on the source.
           const targetUpvotes = yield* db
-            .select({ userId: schema.upvoteTable.userId })
+            .select({
+              mergedFromPostId: schema.upvoteTable.mergedFromPostId,
+              userId: schema.upvoteTable.userId,
+            })
             .from(schema.upvoteTable)
             .where(eq(schema.upvoteTable.postId, targetPostId));
           expect(targetUpvotes.map((upvote) => upvote.userId).sort()).toEqual(
             [sharedVoterId, sourceOnlyVoterId].sort()
           );
+          // The moved vote records where it came from; the shared twin that
+          // collapsed onto the target does not claim provenance.
+          expect(
+            targetUpvotes.find((upvote) => upvote.userId === sourceOnlyVoterId)
+              ?.mergedFromPostId
+          ).toBe(sourcePostId);
+          expect(
+            targetUpvotes.find((upvote) => upvote.userId === sharedVoterId)
+              ?.mergedFromPostId
+          ).toBeNull();
 
           const targetReactions = yield* db
             .select({
@@ -2431,9 +2603,15 @@ describe("PostRpcHandlers", () => {
             commentId,
           ]);
 
-          // Nothing engagement-related may remain on the archived source.
+          const [movedComment] = yield* db
+            .select({ mergedFromPostId: schema.commentTable.mergedFromPostId })
+            .from(schema.commentTable)
+            .where(eq(schema.commentTable.id, commentId));
+          expect(movedComment?.mergedFromPostId).toBe(sourcePostId);
+
+          // Only engagement whose restoration needs no provenance may remain
+          // on the archived source: reactions, tags, and comments all moved.
           for (const table of [
-            schema.upvoteTable,
             schema.postReactionTable,
             schema.postTagTable,
             schema.commentTable,
@@ -2444,8 +2622,1468 @@ describe("PostRpcHandlers", () => {
               .where(eq(table.postId, sourcePostId));
             expect(leftovers).toEqual([]);
           }
+
+          // The colliding vote stays on the source (its only provenance), so
+          // unmerge and survivor delete can put it back; the voter's target
+          // vote keeps its own origin.
+          const sourceUpvotes = yield* db
+            .select({
+              id: schema.upvoteTable.id,
+              mergedFromPostId: schema.upvoteTable.mergedFromPostId,
+              userId: schema.upvoteTable.userId,
+            })
+            .from(schema.upvoteTable)
+            .where(eq(schema.upvoteTable.postId, sourcePostId));
+          expect(sourceUpvotes).toEqual([
+            {
+              id: `upvote_shared_source_${fixture.organizationId}`,
+              mergedFromPostId: null,
+              userId: sharedVoterId,
+            },
+          ]);
         })
       );
+
+      it.effect(
+        "unpins the source comment when the target already has one",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const sourcePostId = yield* PostId.generate;
+            const targetPostId = yield* PostId.generate;
+
+            for (const [id, title] of [
+              [sourcePostId, "Source feedback"],
+              [targetPostId, "Target feedback"],
+            ] as const) {
+              yield* handlers
+                .PostCreate(postCreateInput(fixture, id, title))
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                );
+            }
+
+            const sourceCommentId = yield* CommentId.generate;
+            const targetCommentId = yield* CommentId.generate;
+            const pinnedAt = new Date();
+            yield* db.insert(schema.commentTable).values([
+              {
+                id: sourceCommentId,
+                content: "Source pinned comment",
+                organizationId: fixture.organizationId,
+                pinnedAt,
+                postId: sourcePostId,
+                userId: fixture.userId,
+              },
+              {
+                id: targetCommentId,
+                content: "Target pinned comment",
+                organizationId: fixture.organizationId,
+                pinnedAt,
+                postId: targetPostId,
+                userId: fixture.userId,
+              },
+            ]);
+
+            yield* handlers
+              .PostMerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+                targetPostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const targetComments = yield* db
+              .select({
+                id: schema.commentTable.id,
+                pinnedAt: schema.commentTable.pinnedAt,
+              })
+              .from(schema.commentTable)
+              .where(eq(schema.commentTable.postId, targetPostId));
+
+            expect(targetComments).toHaveLength(2);
+            // The partial unique index allows one pinned comment per post; the
+            // target's pin wins and the moved source comment arrives unpinned.
+            expect(
+              targetComments
+                .filter((comment) => comment.pinnedAt !== null)
+                .map((comment) => comment.id)
+            ).toEqual([targetCommentId]);
+          })
+      );
+
+      it.effect(
+        "unmerge returns the comments and votes that carried over",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const sourcePostId = yield* PostId.generate;
+            const targetPostId = yield* PostId.generate;
+
+            for (const [id, title] of [
+              [sourcePostId, "Source feedback"],
+              [targetPostId, "Target feedback"],
+            ] as const) {
+              yield* handlers
+                .PostCreate(postCreateInput(fixture, id, title))
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                );
+            }
+
+            const voterId = `user_unmerge_${fixture.organizationId}`;
+            yield* db.insert(schema.userTable).values({
+              id: voterId,
+              email: `unmerge_${fixture.organizationId}@example.com`,
+              name: "Voter",
+            });
+            const upvoteId = yield* UpvoteId.generate;
+            yield* db.insert(schema.upvoteTable).values({
+              id: upvoteId,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: voterId,
+            });
+            const commentId = yield* CommentId.generate;
+            yield* db.insert(schema.commentTable).values({
+              id: commentId,
+              content: "Source comment",
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: fixture.userId,
+            });
+
+            yield* handlers
+              .PostMerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+                targetPostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            yield* handlers
+              .PostUnmerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            // Engagement tagged with the source returns with it, and the tag
+            // is cleared so a later merge records its own origin.
+            const [comment] = yield* db
+              .select({
+                postId: schema.commentTable.postId,
+                mergedFromPostId: schema.commentTable.mergedFromPostId,
+              })
+              .from(schema.commentTable)
+              .where(eq(schema.commentTable.id, commentId));
+            expect(comment).toMatchObject({
+              postId: sourcePostId,
+              mergedFromPostId: null,
+            });
+
+            const [upvote] = yield* db
+              .select({
+                postId: schema.upvoteTable.postId,
+                mergedFromPostId: schema.upvoteTable.mergedFromPostId,
+              })
+              .from(schema.upvoteTable)
+              .where(eq(schema.upvoteTable.id, upvoteId));
+            expect(upvote).toMatchObject({
+              postId: sourcePostId,
+              mergedFromPostId: null,
+            });
+
+            const targetComments = yield* db
+              .select({ id: schema.commentTable.id })
+              .from(schema.commentTable)
+              .where(eq(schema.commentTable.postId, targetPostId));
+            expect(targetComments).toEqual([]);
+            const targetUpvotes = yield* db
+              .select({ id: schema.upvoteTable.id })
+              .from(schema.upvoteTable)
+              .where(eq(schema.upvoteTable.postId, targetPostId));
+            expect(targetUpvotes).toEqual([]);
+          })
+      );
+
+      it.effect(
+        "unmerge returns tags, reactions, followers, email subscribers, and the changelog link",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const sourcePostId = yield* PostId.generate;
+            const targetPostId = yield* PostId.generate;
+
+            for (const [id, title] of [
+              [sourcePostId, "Source feedback"],
+              [targetPostId, "Target feedback"],
+            ] as const) {
+              yield* handlers
+                .PostCreate(postCreateInput(fixture, id, title))
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                );
+            }
+
+            const now = new Date();
+            const tagId = `tag_${fixture.organizationId}`;
+            yield* db.insert(schema.tagTable).values({
+              id: tagId,
+              name: "Restored tag",
+              slug: `restored-tag-${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              creatorId: fixture.userId,
+              creatorMemberId: fixture.membershipId,
+              createdAt: now,
+              updatedAt: now,
+            });
+            const postTagId = `post_tag_${fixture.organizationId}`;
+            yield* db.insert(schema.postTagTable).values({
+              id: postTagId,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              tagId,
+            });
+            const reactionId = `reaction_${fixture.organizationId}`;
+            yield* db.insert(schema.postReactionTable).values({
+              id: reactionId,
+              emoji: "rocket",
+              postId: sourcePostId,
+              userId: fixture.userId,
+            });
+            const subscriptionId = `post_sub_${fixture.organizationId}`;
+            const followerUserId = `follower_${fixture.organizationId}`;
+            yield* db.insert(schema.userTable).values({
+              id: followerUserId,
+              email: `follower_${fixture.organizationId}@example.com`,
+              name: "Follower",
+            });
+            yield* db.insert(schema.postSubscriptionTable).values({
+              id: subscriptionId,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: followerUserId,
+            });
+            const contactId = `email_contact_${fixture.organizationId}`;
+            yield* db.insert(schema.emailContactTable).values({
+              id: contactId,
+              organizationId: fixture.organizationId,
+              email: `subscriber_${fixture.organizationId}@example.com`,
+              verificationState: "verified",
+              verifiedAt: now,
+              createdAt: now,
+              updatedAt: now,
+            });
+            const emailSubscriptionId = `email_sub_${fixture.organizationId}`;
+            yield* db.insert(schema.emailSubscriptionTable).values({
+              id: emailSubscriptionId,
+              organizationId: fixture.organizationId,
+              contactId,
+              topicType: "post",
+              topicId: sourcePostId,
+              source: "explicit",
+              state: "active",
+              createdAt: now,
+              updatedAt: now,
+            });
+            const changelogId = `changelog_${fixture.organizationId}`;
+            yield* db.insert(schema.changelogTable).values({
+              id: changelogId,
+              title: "Announcement",
+              slug: `announcement-${fixture.organizationId}`,
+              content: "x",
+              excerpt: "x",
+              status: "published",
+              organizationId: fixture.organizationId,
+              creatorId: fixture.userId,
+              creatorMemberId: fixture.membershipId,
+              createdAt: now,
+              updatedAt: now,
+            });
+            yield* db.insert(schema.changelogPostTable).values({
+              changelogId,
+              postId: sourcePostId,
+              organizationId: fixture.organizationId,
+            });
+
+            yield* handlers
+              .PostMerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+                targetPostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            yield* handlers
+              .PostUnmerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            // Every provenance-tagged row is back on the source with its tag
+            // cleared, so a later merge records its own origin.
+            const [postTag] = yield* db
+              .select({
+                postId: schema.postTagTable.postId,
+                mergedFromPostId: schema.postTagTable.mergedFromPostId,
+              })
+              .from(schema.postTagTable)
+              .where(eq(schema.postTagTable.id, postTagId));
+            expect(postTag).toEqual({
+              postId: sourcePostId,
+              mergedFromPostId: null,
+            });
+
+            const [reaction] = yield* db
+              .select({
+                postId: schema.postReactionTable.postId,
+                mergedFromPostId: schema.postReactionTable.mergedFromPostId,
+              })
+              .from(schema.postReactionTable)
+              .where(eq(schema.postReactionTable.id, reactionId));
+            expect(reaction).toEqual({
+              postId: sourcePostId,
+              mergedFromPostId: null,
+            });
+
+            const [subscription] = yield* db
+              .select({
+                postId: schema.postSubscriptionTable.postId,
+                mergedFromPostId: schema.postSubscriptionTable.mergedFromPostId,
+              })
+              .from(schema.postSubscriptionTable)
+              .where(eq(schema.postSubscriptionTable.id, subscriptionId));
+            expect(subscription).toEqual({
+              postId: sourcePostId,
+              mergedFromPostId: null,
+            });
+
+            const [emailSubscription] = yield* db
+              .select({
+                topicId: schema.emailSubscriptionTable.topicId,
+                mergedFromPostId:
+                  schema.emailSubscriptionTable.mergedFromPostId,
+              })
+              .from(schema.emailSubscriptionTable)
+              .where(eq(schema.emailSubscriptionTable.id, emailSubscriptionId));
+            expect(emailSubscription).toEqual({
+              topicId: sourcePostId,
+              mergedFromPostId: null,
+            });
+
+            const [changelogLink] = yield* db
+              .select({
+                postId: schema.changelogPostTable.postId,
+                mergedFromPostId: schema.changelogPostTable.mergedFromPostId,
+              })
+              .from(schema.changelogPostTable)
+              .where(eq(schema.changelogPostTable.postId, sourcePostId));
+            expect(changelogLink).toEqual({
+              postId: sourcePostId,
+              mergedFromPostId: null,
+            });
+
+            // Nothing tagged with the source is left on the survivor.
+            const leftovers = yield* db
+              .select({ id: schema.postTagTable.id })
+              .from(schema.postTagTable)
+              .where(eq(schema.postTagTable.postId, targetPostId));
+            expect(leftovers).toEqual([]);
+          })
+      );
+
+      it.effect(
+        "unmerge restores a source vote whose voter also voted on the target",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const sourcePostId = yield* PostId.generate;
+            const targetPostId = yield* PostId.generate;
+
+            for (const [id, title] of [
+              [sourcePostId, "Source feedback"],
+              [targetPostId, "Target feedback"],
+            ] as const) {
+              yield* handlers
+                .PostCreate(postCreateInput(fixture, id, title))
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                );
+            }
+
+            const voterId = `user_collision_${fixture.organizationId}`;
+            yield* db.insert(schema.userTable).values({
+              id: voterId,
+              email: `collision_${fixture.organizationId}@example.com`,
+              name: "Voter",
+            });
+            const sourceUpvoteId = yield* UpvoteId.generate;
+            const targetUpvoteId = yield* UpvoteId.generate;
+            yield* db.insert(schema.upvoteTable).values([
+              {
+                id: sourceUpvoteId,
+                organizationId: fixture.organizationId,
+                postId: sourcePostId,
+                userId: voterId,
+              },
+              {
+                id: targetUpvoteId,
+                organizationId: fixture.organizationId,
+                postId: targetPostId,
+                userId: voterId,
+              },
+            ]);
+
+            yield* handlers
+              .PostMerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+                targetPostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            // The colliding source row waits on the source instead of being
+            // deleted, so it is still there when the merge is reverted.
+            const mergedSourceUpvotes = yield* db
+              .select({ id: schema.upvoteTable.id })
+              .from(schema.upvoteTable)
+              .where(eq(schema.upvoteTable.postId, sourcePostId));
+            expect(mergedSourceUpvotes).toEqual([{ id: sourceUpvoteId }]);
+
+            yield* handlers
+              .PostUnmerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const sourceUpvotes = yield* db
+              .select({
+                id: schema.upvoteTable.id,
+                mergedFromPostId: schema.upvoteTable.mergedFromPostId,
+              })
+              .from(schema.upvoteTable)
+              .where(eq(schema.upvoteTable.postId, sourcePostId));
+            expect(sourceUpvotes).toEqual([
+              { id: sourceUpvoteId, mergedFromPostId: null },
+            ]);
+            const remainingTargetUpvotes = yield* db
+              .select({
+                id: schema.upvoteTable.id,
+                mergedFromPostId: schema.upvoteTable.mergedFromPostId,
+              })
+              .from(schema.upvoteTable)
+              .where(eq(schema.upvoteTable.postId, targetPostId));
+            expect(remainingTargetUpvotes).toEqual([
+              { id: targetUpvoteId, mergedFromPostId: null },
+            ]);
+          })
+      );
+
+      it.effect(
+        "deleting a survivor reverts its merged children and records the reversal",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const sourcePostId = yield* PostId.generate;
+            const targetPostId = yield* PostId.generate;
+
+            for (const [id, title] of [
+              [sourcePostId, "Source feedback"],
+              [targetPostId, "Target feedback"],
+            ] as const) {
+              yield* handlers
+                .PostCreate(postCreateInput(fixture, id, title))
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                );
+            }
+
+            const voterId = `user_delete_parent_${fixture.organizationId}`;
+            yield* db.insert(schema.userTable).values({
+              id: voterId,
+              email: `delete_parent_${fixture.organizationId}@example.com`,
+              name: "Voter",
+            });
+            const upvoteId = yield* UpvoteId.generate;
+            yield* db.insert(schema.upvoteTable).values({
+              id: upvoteId,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: voterId,
+            });
+            const commentId = yield* CommentId.generate;
+            yield* db.insert(schema.commentTable).values({
+              id: commentId,
+              content: "Source comment",
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: fixture.userId,
+            });
+            const tagId = `tag_delete_parent_${fixture.organizationId}`;
+            const now = new Date();
+            yield* db.insert(schema.tagTable).values({
+              id: tagId,
+              name: "Restored tag",
+              slug: `restored-tag-delete-${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              creatorId: fixture.userId,
+              creatorMemberId: fixture.membershipId,
+              createdAt: now,
+              updatedAt: now,
+            });
+            const postTagId = `post_tag_delete_${fixture.organizationId}`;
+            yield* db.insert(schema.postTagTable).values({
+              id: postTagId,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              tagId,
+            });
+
+            yield* handlers
+              .PostMerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+                targetPostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const [mergedSource] = yield* db
+              .select({ updatedAt: schema.postTable.updatedAt })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, sourcePostId));
+            // Move the (test) clock so the revert is provably a fresh write.
+            yield* TestClock.adjust("1 seconds");
+
+            // The survivor's delete is not blocked by the merged child's FK
+            // and does not orphan it: the child returns to its board with the
+            // engagement that had been carried onto the survivor.
+            yield* handlers
+              .PostDelete({
+                boardId: fixture.boardId,
+                id: targetPostId,
+                organizationId: fixture.organizationId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const [sourcePost] = yield* db
+              .select({
+                archivedAt: schema.postTable.archivedAt,
+                mergedAt: schema.postTable.mergedAt,
+                mergedIntoPostId: schema.postTable.mergedIntoPostId,
+                updatedAt: schema.postTable.updatedAt,
+              })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, sourcePostId));
+            expect(sourcePost).toMatchObject({
+              archivedAt: null,
+              mergedAt: null,
+              mergedIntoPostId: null,
+            });
+            // The restored child is a fresh write: its timestamp moves so
+            // list ordering and cache invalidation see the revert.
+            expect(new Date(sourcePost!.updatedAt).getTime()).toBeGreaterThan(
+              new Date(mergedSource!.updatedAt).getTime()
+            );
+
+            const [restoredTag] = yield* db
+              .select({
+                mergedFromPostId: schema.postTagTable.mergedFromPostId,
+                postId: schema.postTagTable.postId,
+              })
+              .from(schema.postTagTable)
+              .where(eq(schema.postTagTable.id, postTagId));
+            expect(restoredTag).toEqual({
+              mergedFromPostId: null,
+              postId: sourcePostId,
+            });
+
+            const [comment] = yield* db
+              .select({
+                postId: schema.commentTable.postId,
+                mergedFromPostId: schema.commentTable.mergedFromPostId,
+              })
+              .from(schema.commentTable)
+              .where(eq(schema.commentTable.id, commentId));
+            expect(comment).toMatchObject({
+              postId: sourcePostId,
+              mergedFromPostId: null,
+            });
+
+            const [upvote] = yield* db
+              .select({
+                postId: schema.upvoteTable.postId,
+                mergedFromPostId: schema.upvoteTable.mergedFromPostId,
+              })
+              .from(schema.upvoteTable)
+              .where(eq(schema.upvoteTable.id, upvoteId));
+            expect(upvote).toMatchObject({
+              postId: sourcePostId,
+              mergedFromPostId: null,
+            });
+
+            const remainingTargets = yield* db
+              .select({ id: schema.postTable.id })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, targetPostId));
+            expect(remainingTargets).toEqual([]);
+
+            const [activity] = yield* db
+              .select({
+                kind: schema.postActivityTable.kind,
+                nextValue: schema.postActivityTable.nextValue,
+                postId: schema.postActivityTable.postId,
+              })
+              .from(schema.postActivityTable)
+              .where(
+                and(
+                  eq(schema.postActivityTable.postId, sourcePostId),
+                  eq(schema.postActivityTable.kind, "POST_UNMERGED")
+                )
+              );
+            expect(activity).toMatchObject({
+              kind: "POST_UNMERGED",
+              nextValue: targetPostId,
+              postId: sourcePostId,
+            });
+          })
+      );
+
+      it.effect("rejects mutations on a merged post until it is unmerged", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [sourcePostId, "Source feedback"],
+            [targetPostId, "Target feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const titleError = yield* Effect.flip(
+            handlers
+              .PostUpdateTitle({
+                boardId: fixture.boardId,
+                id: sourcePostId,
+                organizationId: fixture.organizationId,
+                title: "Renamed feedback",
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+          expect(titleError).toBeInstanceOf(Policy.PolicyDeniedError);
+
+          const etaError = yield* Effect.flip(
+            handlers
+              .PostUpdateEta({
+                etaQuarter: "2026-Q1",
+                id: sourcePostId,
+                organizationId: fixture.organizationId,
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+          expect(etaError).toBeInstanceOf(Policy.PolicyDeniedError);
+
+          const adminError = yield* Effect.flip(
+            handlers
+              .PostAdminUpdate({
+                id: sourcePostId,
+                locked: true,
+                organizationId: fixture.organizationId,
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+          expect(adminError).toBeInstanceOf(Policy.PolicyDeniedError);
+        })
+      );
+
+      it.effect("moves post and email subscriptions and dedupes twins", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [sourcePostId, "Source feedback"],
+            [targetPostId, "Target feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          const sharedUserId = `user_shared_sub_${fixture.organizationId}`;
+          const sourceOnlyUserId = `user_source_only_sub_${fixture.organizationId}`;
+          for (const [id, email] of [
+            [sharedUserId, `shared_sub_${fixture.organizationId}@example.com`],
+            [
+              sourceOnlyUserId,
+              `source_sub_${fixture.organizationId}@example.com`,
+            ],
+          ] as const) {
+            yield* db.insert(schema.userTable).values({
+              id,
+              email,
+              name: "Subscriber",
+            });
+          }
+
+          yield* db.insert(schema.postSubscriptionTable).values([
+            {
+              id: `post_sub_shared_source_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: sharedUserId,
+            },
+            {
+              id: `post_sub_shared_target_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              postId: targetPostId,
+              userId: sharedUserId,
+            },
+            {
+              id: `post_sub_source_only_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: sourceOnlyUserId,
+            },
+          ]);
+
+          const sharedContactId = `email_contact_shared_${fixture.organizationId}`;
+          const sourceOnlyContactId = `email_contact_source_${fixture.organizationId}`;
+          const now = new Date();
+          yield* db.insert(schema.emailContactTable).values([
+            {
+              id: sharedContactId,
+              organizationId: fixture.organizationId,
+              email: `shared_sub_${fixture.organizationId}@example.com`,
+              verificationState: "verified",
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              id: sourceOnlyContactId,
+              organizationId: fixture.organizationId,
+              email: `source_sub_${fixture.organizationId}@example.com`,
+              verificationState: "verified",
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]);
+          yield* db.insert(schema.emailSubscriptionTable).values([
+            {
+              id: `email_sub_shared_source_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              contactId: sharedContactId,
+              topicType: "post",
+              topicId: sourcePostId,
+              source: "explicit",
+              state: "active",
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              id: `email_sub_shared_target_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              contactId: sharedContactId,
+              topicType: "post",
+              topicId: targetPostId,
+              source: "explicit",
+              state: "active",
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              id: `email_sub_source_only_${fixture.organizationId}`,
+              organizationId: fixture.organizationId,
+              contactId: sourceOnlyContactId,
+              topicType: "post",
+              topicId: sourcePostId,
+              source: "explicit",
+              state: "active",
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]);
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const targetSubscriptions = yield* db
+            .select({ userId: schema.postSubscriptionTable.userId })
+            .from(schema.postSubscriptionTable)
+            .where(eq(schema.postSubscriptionTable.postId, targetPostId));
+          const targetSubscriberIds = targetSubscriptions.map(
+            (row) => row.userId
+          );
+          // The shared subscriber is deduped to a single target row; the
+          // source-only subscriber is carried over. (The fixture creator is
+          // auto-subscribed on create and is intentionally ignored here.)
+          expect(
+            targetSubscriberIds.filter((id) => id === sharedUserId)
+          ).toHaveLength(1);
+          expect(targetSubscriberIds).toContain(sourceOnlyUserId);
+
+          const targetEmailSubscriptions = yield* db
+            .select({ contactId: schema.emailSubscriptionTable.contactId })
+            .from(schema.emailSubscriptionTable)
+            .where(eq(schema.emailSubscriptionTable.topicId, targetPostId));
+          const targetEmailContactIds = targetEmailSubscriptions.map(
+            (row) => row.contactId
+          );
+          expect(
+            targetEmailContactIds.filter((id) => id === sharedContactId)
+          ).toHaveLength(1);
+          expect(targetEmailContactIds).toContain(sourceOnlyContactId);
+
+          // No subscription may remain pointed at the archived source.
+          const leftoverPostSubscriptions = yield* db
+            .select({ id: schema.postSubscriptionTable.id })
+            .from(schema.postSubscriptionTable)
+            .where(eq(schema.postSubscriptionTable.postId, sourcePostId));
+          expect(leftoverPostSubscriptions).toEqual([]);
+
+          const leftoverEmailSubscriptions = yield* db
+            .select({ id: schema.emailSubscriptionTable.id })
+            .from(schema.emailSubscriptionTable)
+            .where(eq(schema.emailSubscriptionTable.topicId, sourcePostId));
+          expect(leftoverEmailSubscriptions).toEqual([]);
+        })
+      );
+
+      it.effect("records a merge activity on the target", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [sourcePostId, "Source feedback"],
+            [targetPostId, "Target feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const [activity] = yield* db
+            .select({
+              actorId: schema.postActivityTable.actorId,
+              kind: schema.postActivityTable.kind,
+              nextValue: schema.postActivityTable.nextValue,
+              postId: schema.postActivityTable.postId,
+            })
+            .from(schema.postActivityTable)
+            .where(
+              and(
+                eq(schema.postActivityTable.postId, targetPostId),
+                eq(schema.postActivityTable.kind, "POST_MERGED")
+              )
+            );
+
+          expect(activity).toMatchObject({
+            actorId: fixture.userId,
+            kind: "POST_MERGED",
+            nextValue: sourcePostId,
+            postId: targetPostId,
+          });
+        })
+      );
+
+      it.effect("records the mirror merge activity on the source", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [sourcePostId, "Source feedback"],
+            [targetPostId, "Target feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const [activity] = yield* db
+            .select({
+              actorId: schema.postActivityTable.actorId,
+              kind: schema.postActivityTable.kind,
+              nextValue: schema.postActivityTable.nextValue,
+              postId: schema.postActivityTable.postId,
+            })
+            .from(schema.postActivityTable)
+            .where(
+              and(
+                eq(schema.postActivityTable.postId, sourcePostId),
+                eq(schema.postActivityTable.kind, "POST_MERGED_INTO")
+              )
+            );
+
+          // The archived source keeps a pointer to its survivor instead of
+          // becoming a silent tombstone.
+          expect(activity).toMatchObject({
+            actorId: fixture.userId,
+            kind: "POST_MERGED_INTO",
+            nextValue: targetPostId,
+            postId: sourcePostId,
+          });
+        })
+      );
+
+      it.effect("moves a changelog link to the survivor", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+          const now = new Date();
+
+          for (const [id, title] of [
+            [sourcePostId, "Source feedback"],
+            [targetPostId, "Target feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          const changelogId = `changelog_${sourcePostId}`;
+          yield* db.insert(schema.changelogTable).values({
+            id: changelogId,
+            title: "Release notes",
+            slug: `release-${sourcePostId}`,
+            content: "Shipped",
+            organizationId: fixture.organizationId,
+            creatorId: fixture.userId,
+            creatorMemberId: fixture.membershipId,
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* db.insert(schema.changelogPostTable).values({
+            changelogId,
+            postId: sourcePostId,
+            organizationId: fixture.organizationId,
+          });
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const links = yield* db
+            .select({ postId: schema.changelogPostTable.postId })
+            .from(schema.changelogPostTable)
+            .where(
+              eq(
+                schema.changelogPostTable.organizationId,
+                fixture.organizationId
+              )
+            );
+
+          // The public changelog hides merged posts, so the entry must follow
+          // the survivor or the link silently disappears.
+          expect(links.map((link) => link.postId)).toEqual([targetPostId]);
+        })
+      );
+
+      it.effect(
+        "drops the source changelog link when the survivor already has one",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const sourcePostId = yield* PostId.generate;
+            const targetPostId = yield* PostId.generate;
+            const now = new Date();
+
+            for (const [id, title] of [
+              [sourcePostId, "Source feedback"],
+              [targetPostId, "Target feedback"],
+            ] as const) {
+              yield* handlers
+                .PostCreate(postCreateInput(fixture, id, title))
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                );
+            }
+
+            const changelogId = `changelog_${sourcePostId}`;
+            yield* db.insert(schema.changelogTable).values({
+              id: changelogId,
+              title: "Release notes",
+              slug: `release-${sourcePostId}`,
+              content: "Shipped",
+              organizationId: fixture.organizationId,
+              creatorId: fixture.userId,
+              creatorMemberId: fixture.membershipId,
+              createdAt: now,
+              updatedAt: now,
+            });
+            yield* db.insert(schema.changelogPostTable).values([
+              {
+                changelogId,
+                postId: sourcePostId,
+                organizationId: fixture.organizationId,
+              },
+              {
+                changelogId,
+                postId: targetPostId,
+                organizationId: fixture.organizationId,
+              },
+            ]);
+
+            yield* handlers
+              .PostMerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+                targetPostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const links = yield* db
+              .select({ postId: schema.changelogPostTable.postId })
+              .from(schema.changelogPostTable)
+              .where(
+                eq(
+                  schema.changelogPostTable.organizationId,
+                  fixture.organizationId
+                )
+              );
+
+            // A post can sit in only one changelog entry, so the survivor's
+            // existing link wins and the duplicate's link is dropped.
+            expect(links.map((link) => link.postId)).toEqual([targetPostId]);
+          })
+      );
+
+      it.effect(
+        "unmerge restores the archived source and records the reversal",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const sourcePostId = yield* PostId.generate;
+            const targetPostId = yield* PostId.generate;
+
+            for (const [id, title] of [
+              [sourcePostId, "Source feedback"],
+              [targetPostId, "Target feedback"],
+            ] as const) {
+              yield* handlers
+                .PostCreate(postCreateInput(fixture, id, title))
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                );
+            }
+
+            yield* handlers
+              .PostMerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+                targetPostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            yield* handlers
+              .PostUnmerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const [sourcePost] = yield* db
+              .select({
+                archivedAt: schema.postTable.archivedAt,
+                mergedAt: schema.postTable.mergedAt,
+                mergedIntoPostId: schema.postTable.mergedIntoPostId,
+              })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, sourcePostId));
+
+            expect(sourcePost).toMatchObject({
+              archivedAt: null,
+              mergedAt: null,
+              mergedIntoPostId: null,
+            });
+
+            const [activity] = yield* db
+              .select({
+                kind: schema.postActivityTable.kind,
+                nextValue: schema.postActivityTable.nextValue,
+                postId: schema.postActivityTable.postId,
+              })
+              .from(schema.postActivityTable)
+              .where(
+                and(
+                  eq(schema.postActivityTable.postId, sourcePostId),
+                  eq(schema.postActivityTable.kind, "POST_UNMERGED")
+                )
+              );
+
+            expect(activity).toMatchObject({
+              kind: "POST_UNMERGED",
+              nextValue: targetPostId,
+              postId: sourcePostId,
+            });
+          })
+      );
+
+      it.effect("rejects unmerging a post that is not merged", () =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const postId = yield* PostId.generate;
+
+            yield* handlers
+              .PostCreate(
+                postCreateInput(fixture, postId, "Not merged feedback")
+              )
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const error = yield* Effect.flip(
+              handlers
+                .PostUnmerge({
+                  organizationId: fixture.organizationId,
+                  sourcePostId: postId,
+                })
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                )
+            );
+
+            expect(error).toBeInstanceOf(FailedToMergePostError);
+            expect(error.message).toBe("Post is not merged");
+          })
+        )
+      );
+    });
+
+    describe("PostMerge notifications", () => {
+      layer(
+        Layer.merge(
+          TestLayer,
+          NotificationService.layer.pipe(
+            Layer.provide(Database.PgliteDatabaseLive)
+          )
+        )
+      )("merge notifications", (it) => {
+        it.effect("notifies carried-over subscribers and voters", () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const sourcePostId = yield* PostId.generate;
+            const targetPostId = yield* PostId.generate;
+
+            for (const [id, title] of [
+              [sourcePostId, "Source feedback"],
+              [targetPostId, "Target feedback"],
+            ] as const) {
+              yield* handlers
+                .PostCreate(postCreateInput(fixture, id, title))
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                );
+            }
+
+            const subscriberUserId = `subscriber_${sourcePostId}`;
+            const upvoterUserId = `upvoter_${sourcePostId}`;
+            for (const userId of [subscriberUserId, upvoterUserId]) {
+              yield* db.insert(schema.userTable).values({
+                id: userId,
+                email: `${userId}@example.com`,
+                name: "Recipient",
+              });
+            }
+            // In-app inboxes are member-only, so both recipients are members.
+            for (const userId of [subscriberUserId, upvoterUserId]) {
+              yield* db.insert(schema.memberTable).values({
+                id: `member_${userId}`,
+                organizationId: fixture.organizationId,
+                userId,
+                role: "contributor",
+                createdAt: new Date(),
+              });
+            }
+            // Both rows start on the source and are carried to the target
+            // by the merge before the notification fan-out runs.
+            yield* db.insert(schema.postSubscriptionTable).values({
+              id: `post_sub_${sourcePostId}`,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: subscriberUserId,
+            });
+            yield* db.insert(schema.upvoteTable).values({
+              id: `upvote_${sourcePostId}`,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: upvoterUserId,
+            });
+
+            yield* handlers
+              .PostMerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+                targetPostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const [targetPost] = yield* db
+              .select({
+                boardSlug: schema.boardTable.slug,
+                slug: schema.postTable.slug,
+              })
+              .from(schema.postTable)
+              .innerJoin(
+                schema.boardTable,
+                eq(schema.boardTable.id, schema.postTable.boardId)
+              )
+              .where(eq(schema.postTable.id, targetPostId));
+
+            const notifications = yield* db
+              .select({
+                body: schema.notificationTable.body,
+                href: schema.notificationTable.href,
+                kind: schema.notificationTable.kind,
+                recipientUserId: schema.notificationTable.recipientUserId,
+                resourceId: schema.notificationTable.resourceId,
+              })
+              .from(schema.notificationTable)
+              .where(
+                and(
+                  eq(
+                    schema.notificationTable.organizationId,
+                    fixture.organizationId
+                  ),
+                  eq(schema.notificationTable.kind, "feedback.merged")
+                )
+              );
+
+            expect(
+              notifications
+                .map((notification) => notification.recipientUserId)
+                .sort()
+            ).toEqual([subscriberUserId, upvoterUserId].sort());
+            // The merger never notifies themselves.
+            expect(
+              notifications.some(
+                (notification) =>
+                  notification.recipientUserId === fixture.userId
+              )
+            ).toBe(false);
+            for (const notification of notifications) {
+              expect(notification.resourceId).toBe(sourcePostId);
+              expect(notification.href).toBe(
+                `/${fixture.organizationId}/post/${targetPost?.boardSlug}/${targetPost?.slug}`
+              );
+            }
+          })
+        );
+
+        it.effect("notifies restored members when the merge is reverted", () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const sourcePostId = yield* PostId.generate;
+            const targetPostId = yield* PostId.generate;
+
+            for (const [id, title] of [
+              [sourcePostId, "Source feedback"],
+              [targetPostId, "Target feedback"],
+            ] as const) {
+              yield* handlers
+                .PostCreate(postCreateInput(fixture, id, title))
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                );
+            }
+
+            // The follower is a member and follows the source; unmerge moves
+            // that following back onto the source, so they are notified there.
+            const followerUserId = `follower_${sourcePostId}`;
+            // A public-board voter without membership: their vote moves back
+            // too, but their inbox is unreachable, so they are skipped.
+            const guestVoterId = `guest_${sourcePostId}`;
+            for (const userId of [followerUserId, guestVoterId]) {
+              yield* db.insert(schema.userTable).values({
+                id: userId,
+                email: `${userId}@example.com`,
+                name: "Recipient",
+              });
+            }
+            yield* db.insert(schema.memberTable).values({
+              id: `member_${followerUserId}`,
+              organizationId: fixture.organizationId,
+              userId: followerUserId,
+              role: "contributor",
+              createdAt: new Date(),
+            });
+            yield* db.insert(schema.postSubscriptionTable).values({
+              id: `post_sub_${sourcePostId}`,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: followerUserId,
+            });
+            yield* db.insert(schema.upvoteTable).values({
+              id: `upvote_${sourcePostId}`,
+              organizationId: fixture.organizationId,
+              postId: sourcePostId,
+              userId: guestVoterId,
+            });
+
+            yield* handlers
+              .PostMerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+                targetPostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            yield* handlers
+              .PostUnmerge({
+                organizationId: fixture.organizationId,
+                sourcePostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const [sourcePost] = yield* db
+              .select({
+                boardSlug: schema.boardTable.slug,
+                slug: schema.postTable.slug,
+              })
+              .from(schema.postTable)
+              .innerJoin(
+                schema.boardTable,
+                eq(schema.boardTable.id, schema.postTable.boardId)
+              )
+              .where(eq(schema.postTable.id, sourcePostId));
+
+            const notifications = yield* db
+              .select({
+                href: schema.notificationTable.href,
+                recipientUserId: schema.notificationTable.recipientUserId,
+                resourceId: schema.notificationTable.resourceId,
+              })
+              .from(schema.notificationTable)
+              .where(
+                and(
+                  eq(
+                    schema.notificationTable.organizationId,
+                    fixture.organizationId
+                  ),
+                  eq(schema.notificationTable.kind, "feedback.unmerged")
+                )
+              );
+
+            expect(
+              notifications.map((notification) => notification.recipientUserId)
+            ).toEqual([followerUserId]);
+            expect(notifications[0]?.resourceId).toBe(sourcePostId);
+            expect(notifications[0]?.href).toBe(
+              `/${fixture.organizationId}/post/${sourcePost?.boardSlug}/${sourcePost?.slug}`
+            );
+          })
+        );
+      });
     });
   });
 });

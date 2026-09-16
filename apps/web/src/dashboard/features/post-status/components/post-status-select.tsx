@@ -8,11 +8,11 @@ import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export function PostStatusSelect({ disabled = false }: { disabled?: boolean }) {
-  const { post, organizationId, isLocked } = usePostCollectionData();
+  const { post, organizationId, isLocked, isMerged } = usePostCollectionData();
   const { allowed: canChangeStatus } = usePolicy(
     hasPermission(organizationId, "posts.status")
   );
-  const isDisabled = disabled || isLocked || !canChangeStatus;
+  const isDisabled = disabled || isLocked || isMerged || !canChangeStatus;
   const { postCollection, postStatusCollection } = useDashboardCollections();
 
   const { data: postStatuses } = useLiveQuery(

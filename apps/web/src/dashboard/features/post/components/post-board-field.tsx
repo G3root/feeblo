@@ -9,11 +9,12 @@ import { useNavigate } from "@tanstack/react-router";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export function PostBoardField({ disabled = false }: { disabled?: boolean }) {
-  const { post, board, organizationId, isLocked } = usePostCollectionData();
+  const { post, board, organizationId, isLocked, isMerged } =
+    usePostCollectionData();
   const { allowed: canMovePost } = usePolicy(
     hasPermission(organizationId, "posts.move")
   );
-  const isDisabled = disabled || isLocked || !canMovePost;
+  const isDisabled = disabled || isLocked || isMerged || !canMovePost;
   const navigate = useNavigate();
   const { boardCollection, postCollection } = useDashboardCollections();
 

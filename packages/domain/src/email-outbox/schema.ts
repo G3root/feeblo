@@ -65,6 +65,12 @@ export const PostMergedEmailIntentPayload = Schema.Struct({
   targetPostId: PostId.schema,
 });
 
+export const PostUnmergedEmailIntentPayload = Schema.Struct({
+  kind: Schema.tag("post.unmerged"),
+  postId: PostId.schema,
+  targetPostId: PostId.schema,
+});
+
 export const PostClosedEmailIntentPayload = Schema.Struct({
   kind: Schema.tag("post.closed"),
   postId: PostId.schema,
@@ -82,6 +88,7 @@ export const EmailIntentPayload = Schema.Union([
   PostStatusChangedEmailIntentPayload,
   PostOfficialUpdatePublishedEmailIntentPayload,
   PostMergedEmailIntentPayload,
+  PostUnmergedEmailIntentPayload,
   PostClosedEmailIntentPayload,
 ]).pipe(Schema.toTaggedUnion("kind"));
 

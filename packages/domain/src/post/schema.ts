@@ -228,6 +228,16 @@ export type TPostOfficialUpdatePublish = S.Schema.Type<
   typeof PostOfficialUpdatePublish
 >;
 
+/**
+ * Folds the source post into the target: its engagement moves to the survivor
+ * and the source is archived with `mergedIntoPostId` set. Engagement with a
+ * twin already on the target (same voter, tag, follower, or email recipient)
+ * is collapsed into the target's row, so a subsequent unmerge cannot restore
+ * it. A source comment pinned while the survivor already had a pinned comment
+ * arrives unpinned, and the pin is not restored by an unmerge. Merges stay
+ * one level deep: a post that has itself absorbed a merge cannot be merged
+ * again.
+ */
 export const PostMerge = S.Struct({
   organizationId: WorkspaceId.schema,
   sourcePostId: PostId.schema,
@@ -235,6 +245,21 @@ export const PostMerge = S.Struct({
 });
 
 export type TPostMerge = S.Schema.Type<typeof PostMerge>;
+
+/**
+ * Reverts a merge: the archived source post is restored to the board, and
+ * every engagement row the merge tagged with the source post returns with it
+ * (comments, votes, reactions, tags, followers, email subscriptions, and the
+ * changelog link). Rows the survivor already had stay with the survivor, and
+ * a changelog link is lost when the survivor already had an entry because
+ * there is no row left to move back.
+ */
+export const PostUnmerge = S.Struct({
+  organizationId: WorkspaceId.schema,
+  sourcePostId: PostId.schema,
+});
+
+export type TPostUnmerge = S.Schema.Type<typeof PostUnmerge>;
 
 /**
  * Minimal deliverability shape for author input. Synthetic inboxes are

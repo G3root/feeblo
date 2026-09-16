@@ -10,6 +10,7 @@ import {
   eq,
   inArray,
   isNotNull,
+  isNull,
   ne,
   notExists,
   type SQL,
@@ -46,6 +47,37 @@ interface TPostFindMany {
 interface TPostFindDeletableIds {
   organizationId: string;
   userId: string;
+}
+
+interface TPostFindMergedIds {
+  ids: readonly string[];
+  organizationId: string;
+}
+
+interface TPostFindMergedChildIds {
+  organizationId: string;
+  /** Survivor post ids whose merged children should be resolved. */
+  postIds: readonly string[];
+}
+
+interface TPostMergedChild {
+  id: string;
+  mergedIntoPostId: string;
+}
+
+interface TRestoreMergedEngagement {
+  organizationId: string;
+  /** Merged-away post whose provenance-tagged engagement returns to it. */
+  sourcePostId: string;
+}
+
+interface TPostDeleteResult {
+  deleted: boolean;
+  /**
+   * Merged children reverted by the delete (with the survivor they pointed
+   * at), so callers can record the reversal on each child's timeline.
+   */
+  restoredChildren: readonly TPostMergedChild[];
 }
 
 interface TPostFindPublicBySlug {
@@ -88,6 +120,11 @@ interface TPostMerge {
   organizationId: string;
   sourcePostId: string;
   targetPostId: string;
+}
+
+interface TPostUnmerge {
+  organizationId: string;
+  sourcePostId: string;
 }
 
 interface TPostFindByCreatorId {
@@ -188,6 +225,120 @@ const selectPostListFields = (opts?: { contactFallback?: boolean }) => {
 
 const makePostRepository = Effect.gen(function* () {
   const db = yield* currentDb;
+
+  /**
+   * Survivor posts that currently have merged children, resolved under a row
+   * lock. Deleting a survivor must revert those children first: the
+   * `post_merged_into_same_organization_fk` restrict would otherwise fail the
+   * delete, and a merged post must never outlive its target.
+   */
+  const findMergedChildIds = ({
+    organizationId,
+    postIds,
+  }: TPostFindMergedChildIds) =>
+    db
+      .select({
+        id: schema.postTable.id,
+        mergedIntoPostId: schema.postTable.mergedIntoPostId,
+      })
+      .from(schema.postTable)
+      .where(
+        and(
+          inArray(schema.postTable.mergedIntoPostId, postIds),
+          eq(schema.postTable.organizationId, organizationId)
+        )
+      )
+      .for("update")
+      .pipe(
+        // The `inArray` above already excludes null targets; the flatMap is
+        // what teaches the compiler the same fact.
+        Effect.map((rows) =>
+          rows.flatMap((row): TPostMergedChild[] =>
+            row.mergedIntoPostId === null
+              ? []
+              : [{ id: row.id, mergedIntoPostId: row.mergedIntoPostId }]
+          )
+        )
+      );
+
+  /**
+   * Moves provenance-tagged engagement back to the post it was merged away
+   * from and clears the tag. Comments, votes, reactions, tags, followers, and
+   * email subscriptions carry the source post in `mergedFromPostId`, so they
+   * all return; a changelog link returns unless the survivor already had an
+   * entry (the collision dropped the source's link). Rows the survivor already
+   * had keep a null tag, so they stay put.
+   *
+   * A source vote whose voter also voted on the survivor never left the
+   * source (see `merge`), so it is already in place and needs no move. Runs
+   * inside the caller's transaction (the fiber-local connection joins it), so
+   * an unmerge or delete reverts atomically.
+   */
+  const restoreMergedEngagement = ({
+    organizationId,
+    sourcePostId,
+  }: TRestoreMergedEngagement) =>
+    Effect.gen(function* () {
+      yield* db
+        .update(schema.commentTable)
+        .set({ mergedFromPostId: null, postId: sourcePostId })
+        .where(
+          and(
+            eq(schema.commentTable.organizationId, organizationId),
+            eq(schema.commentTable.mergedFromPostId, sourcePostId)
+          )
+        );
+      yield* db
+        .update(schema.upvoteTable)
+        .set({ mergedFromPostId: null, postId: sourcePostId })
+        .where(
+          and(
+            eq(schema.upvoteTable.organizationId, organizationId),
+            eq(schema.upvoteTable.mergedFromPostId, sourcePostId)
+          )
+        );
+      yield* db
+        .update(schema.postReactionTable)
+        .set({ mergedFromPostId: null, postId: sourcePostId })
+        .where(eq(schema.postReactionTable.mergedFromPostId, sourcePostId));
+      yield* db
+        .update(schema.postTagTable)
+        .set({ mergedFromPostId: null, postId: sourcePostId })
+        .where(
+          and(
+            eq(schema.postTagTable.organizationId, organizationId),
+            eq(schema.postTagTable.mergedFromPostId, sourcePostId)
+          )
+        );
+      yield* db
+        .update(schema.postSubscriptionTable)
+        .set({ mergedFromPostId: null, postId: sourcePostId })
+        .where(
+          and(
+            eq(schema.postSubscriptionTable.organizationId, organizationId),
+            eq(schema.postSubscriptionTable.mergedFromPostId, sourcePostId)
+          )
+        );
+      yield* db
+        .update(schema.emailSubscriptionTable)
+        .set({ mergedFromPostId: null, topicId: sourcePostId })
+        .where(
+          and(
+            eq(schema.emailSubscriptionTable.organizationId, organizationId),
+            eq(schema.emailSubscriptionTable.topicType, "post"),
+            eq(schema.emailSubscriptionTable.mergedFromPostId, sourcePostId)
+          )
+        );
+      yield* db
+        .update(schema.changelogPostTable)
+        .set({ mergedFromPostId: null, postId: sourcePostId })
+        .where(
+          and(
+            eq(schema.changelogPostTable.organizationId, organizationId),
+            eq(schema.changelogPostTable.mergedFromPostId, sourcePostId)
+          )
+        );
+    });
 
   return {
     /**
@@ -344,6 +495,7 @@ const makePostRepository = Effect.gen(function* () {
             eq(schema.postTable.organizationId, organizationId),
             eq(schema.postTable.creatorId, userId),
             eq(schema.postTable.boardId, boardId),
+            isNull(schema.postTable.mergedIntoPostId),
             notExists(
               db
                 .select({ id: schema.commentTable.id })
@@ -380,6 +532,7 @@ const makePostRepository = Effect.gen(function* () {
             eq(schema.postTable.organizationId, organizationId),
             eq(schema.postTable.creatorId, userId),
             eq(schema.postTable.boardId, boardId),
+            isNull(schema.postTable.mergedIntoPostId),
             notExists(
               db
                 .select({ id: schema.commentTable.id })
@@ -415,6 +568,9 @@ const makePostRepository = Effect.gen(function* () {
           and(
             eq(schema.postTable.organizationId, organizationId),
             eq(schema.postTable.creatorId, userId),
+            // Merged posts are read-only until unmerged, so they are never
+            // deletable (policy denies it too).
+            isNull(schema.postTable.mergedIntoPostId),
             notExists(
               db
                 .select({ id: schema.commentTable.id })
@@ -432,6 +588,23 @@ const makePostRepository = Effect.gen(function* () {
                   )
                 )
             )
+          )
+        ),
+
+    /**
+     * Merged subset of the requested posts. Policies use this to keep merged
+     * posts read-only until they are unmerged (title, content, status,
+     * delete, and admin mutations all deny by id).
+     */
+    findMergedIds: ({ ids, organizationId }: TPostFindMergedIds) =>
+      db
+        .select({ id: schema.postTable.id })
+        .from(schema.postTable)
+        .where(
+          and(
+            inArray(schema.postTable.id, ids),
+            eq(schema.postTable.organizationId, organizationId),
+            isNotNull(schema.postTable.mergedIntoPostId)
           )
         ),
 
@@ -519,6 +692,43 @@ const makePostRepository = Effect.gen(function* () {
         .pipe(Effect.map((rows) => rows[0]));
     },
 
+    /**
+     * Resolves a publicly visible merged source slug to the slug of the
+     * surviving target, so public detail routes can redirect inbound links
+     * (and merge-notification emails) instead of 404ing. Returns undefined
+     * when the source is not merged, either board is private, or the target
+     * is itself archived/merged.
+     */
+    findMergedPublicTargetBySlug: ({
+      organizationId,
+      slug,
+    }: TPostFindPublicBySlug) => {
+      const sourcePost = alias(schema.postTable, "merged_source_post");
+      const sourceBoard = alias(schema.boardTable, "merged_source_board");
+      const targetPost = alias(schema.postTable, "merged_target_post");
+      const targetBoard = alias(schema.boardTable, "merged_target_board");
+
+      return db
+        .select({ slug: targetPost.slug })
+        .from(sourcePost)
+        .innerJoin(sourceBoard, eq(sourceBoard.id, sourcePost.boardId))
+        .innerJoin(targetPost, eq(targetPost.id, sourcePost.mergedIntoPostId))
+        .innerJoin(targetBoard, eq(targetBoard.id, targetPost.boardId))
+        .where(
+          and(
+            eq(sourcePost.organizationId, organizationId),
+            eq(sourcePost.slug, slug),
+            isNotNull(sourcePost.mergedIntoPostId),
+            eq(sourceBoard.visibility, "PUBLIC"),
+            isNull(targetPost.archivedAt),
+            isNull(targetPost.mergedIntoPostId),
+            eq(targetBoard.visibility, "PUBLIC")
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0]));
+    },
+
     findSuggestionCandidates: ({
       boardId,
       embedding,
@@ -602,7 +812,11 @@ const makePostRepository = Effect.gen(function* () {
             and(
               eq(schema.postTable.id, id),
               eq(schema.postTable.organizationId, organizationId),
-              sql`${schema.postTable.lockedAt} is null`
+              isNull(schema.postTable.lockedAt),
+              // Merged posts are read-only until they are unmerged: every
+              // interaction gate (comments, votes, reactions, subscriptions)
+              // flows through this check.
+              isNull(schema.postTable.mergedIntoPostId)
             )
           );
         return rows.length > 0;
@@ -622,7 +836,9 @@ const makePostRepository = Effect.gen(function* () {
               eq(schema.postTable.id, id),
               eq(schema.postTable.organizationId, organizationId),
               eq(schema.boardTable.visibility, "PUBLIC"),
-              sql`${schema.postTable.lockedAt} is null`
+              isNull(schema.postTable.lockedAt),
+              // Same rule as `isUnlocked`, applied to the public surfaces.
+              isNull(schema.postTable.mergedIntoPostId)
             )
           );
         return rows.length > 0;
@@ -789,7 +1005,7 @@ const makePostRepository = Effect.gen(function* () {
         // Nothing matched (missing id or wrong org/board) — report "not
         // deleted" instead of vacuously comparing two empty lists.
         if (posts.length === 0) {
-          return false;
+          return { deleted: false, restoredChildren: [] };
         }
 
         if (onlyIfNew) {
@@ -821,8 +1037,45 @@ const makePostRepository = Effect.gen(function* () {
             );
 
           if (newPosts.length !== posts.length) {
-            return false;
+            return { deleted: false, restoredChildren: [] };
           }
+        }
+
+        // A post that absorbed merged duplicates cannot be deleted while
+        // they still point at it (`post_merged_into_same_organization_fk`
+        // restrict) and must never leave them orphaned. Revert every merged
+        // child first, restoring the engagement recorded as coming from it,
+        // so the delete succeeds and no post is left hidden behind a target
+        // that no longer exists.
+        const restoredChildren = yield* findMergedChildIds({
+          organizationId,
+          postIds: posts.map((post) => post.id),
+        });
+        for (const child of restoredChildren) {
+          yield* restoreMergedEngagement({
+            organizationId,
+            sourcePostId: child.id,
+          });
+        }
+        if (restoredChildren.length > 0) {
+          const restoredAt = yield* DateTime.nowAsDate;
+          yield* db
+            .update(schema.postTable)
+            .set({
+              archivedAt: null,
+              mergedAt: null,
+              mergedIntoPostId: null,
+              updatedAt: restoredAt,
+            })
+            .where(
+              and(
+                inArray(
+                  schema.postTable.id,
+                  restoredChildren.map((child) => child.id)
+                ),
+                eq(schema.postTable.organizationId, organizationId)
+              )
+            );
         }
 
         const deleted = yield* db
@@ -830,7 +1083,10 @@ const makePostRepository = Effect.gen(function* () {
           .where(postScope)
           .returning({ id: schema.postTable.id });
 
-        return deleted.length === posts.length;
+        return {
+          deleted: deleted.length === posts.length,
+          restoredChildren,
+        } satisfies TPostDeleteResult;
       });
     },
 
@@ -930,6 +1186,12 @@ const makePostRepository = Effect.gen(function* () {
       db.transaction((tx) =>
         Effect.gen(function* () {
           const now = yield* DateTime.nowAsDate;
+          // Lock both rows before validating, in id order so two concurrent
+          // merges cannot deadlock. The locks serialize every merge on either
+          // post, which is what makes the chained-merge and archived checks
+          // below authoritative: without them, `A -> T` and `T -> C` running
+          // concurrently both read T unmerged and produce a chain the checks
+          // were meant to reject.
           const posts = yield* tx
             .select({
               id: schema.postTable.id,
@@ -942,7 +1204,9 @@ const makePostRepository = Effect.gen(function* () {
                 inArray(schema.postTable.id, [sourcePostId, targetPostId]),
                 eq(schema.postTable.organizationId, organizationId)
               )
-            );
+            )
+            .orderBy(schema.postTable.id)
+            .for("update");
 
           const sourcePost = posts.find((post) => post.id === sourcePostId);
           const targetPost = posts.find((post) => post.id === targetPostId);
@@ -977,23 +1241,86 @@ const makePostRepository = Effect.gen(function* () {
               message: "Target post is archived and cannot be a merge target",
             });
           }
+          // Chained merges (A into B, then B into C) would strand A under C:
+          // unmerging B restores only rows tagged B, and deleting C cascades
+          // A's comments and votes away. Reject a source that already absorbed
+          // a merge so every chain stays a single level deep. The guard is
+          // authoritative because both post rows are locked above: two
+          // managers merging `A -> T` and `T -> C` at once serialize, and the
+          // second sees the first's `mergedIntoPostId` and is refused.
+          const [mergedChild] = yield* tx
+            .select({ id: schema.postTable.id })
+            .from(schema.postTable)
+            .where(
+              and(
+                eq(schema.postTable.mergedIntoPostId, sourcePostId),
+                eq(schema.postTable.organizationId, organizationId)
+              )
+            )
+            .limit(1);
+          if (mergedChild) {
+            return yield* new FailedToMergePostError({
+              message:
+                "Source post has merged children and cannot be merged again",
+            });
+          }
 
+          // The partial unique index `comment_post_pinned_uidx` allows at
+          // most one pinned comment per post. When the target already has a
+          // pinned comment, unpin the source's first so the bulk
+          // reassignment below cannot violate the index; otherwise the
+          // source's pinned comment becomes the target's.
+          const [targetPinnedComment] = yield* tx
+            .select({ id: schema.commentTable.id })
+            .from(schema.commentTable)
+            .where(
+              and(
+                eq(schema.commentTable.postId, targetPostId),
+                isNotNull(schema.commentTable.pinnedAt)
+              )
+            )
+            .limit(1);
+          if (targetPinnedComment) {
+            yield* tx
+              .update(schema.commentTable)
+              .set({ pinnedAt: null })
+              .where(
+                and(
+                  eq(schema.commentTable.postId, sourcePostId),
+                  isNotNull(schema.commentTable.pinnedAt)
+                )
+              );
+          }
+          // `mergedFromPostId` records the source post on every moved row so
+          // the survivor can label and link the comment, and so an unmerge or
+          // delete can restore it. `coalesce` keeps the earliest origin when
+          // a post that already absorbed another merge is merged again.
           yield* tx
             .update(schema.commentTable)
-            .set({ postId: targetPostId })
+            .set({
+              postId: targetPostId,
+              mergedFromPostId: sql<
+                string | null
+              >`coalesce(${schema.commentTable.mergedFromPostId}, ${sourcePostId})`,
+            })
             .where(eq(schema.commentTable.postId, sourcePostId));
 
           // Set-based reassignment: move every source row without a twin on
-          // the target, then drop the leftover twins. Previously one
-          // SELECT + UPDATE/DELETE per row (2n+1 round-trips holding the
-          // merge transaction open); now two statements per table.
-          // Twins are unique-keyed (upvote: user+post, reaction:
+          // the target, then drop the leftover twins (votes excepted, below).
+          // Previously one SELECT + UPDATE/DELETE per row (2n+1 round-trips
+          // holding the merge transaction open); now two statements per
+          // table. Twins are unique-keyed (upvote: user+post, reaction:
           // user+post+emoji, tag: post+tag), so a moved row can never
           // collide with a later one.
           const targetUpvote = alias(schema.upvoteTable, "merge_target_upvote");
           yield* tx
             .update(schema.upvoteTable)
-            .set({ postId: targetPostId })
+            .set({
+              postId: targetPostId,
+              mergedFromPostId: sql<
+                string | null
+              >`coalesce(${schema.upvoteTable.mergedFromPostId}, ${sourcePostId})`,
+            })
             .where(
               and(
                 eq(schema.upvoteTable.postId, sourcePostId),
@@ -1010,9 +1337,12 @@ const makePostRepository = Effect.gen(function* () {
                 )
               )
             );
-          yield* tx
-            .delete(schema.upvoteTable)
-            .where(eq(schema.upvoteTable.postId, sourcePostId));
+          // Colliding source votes (the voter already voted on the target)
+          // deliberately stay on the source. Deleting them would destroy the
+          // only record that the voter backed the source, so unmerge and
+          // survivor delete could never put the vote back. Leaving them also
+          // keeps the survivor's tally exact: the voter is counted once via
+          // the target row.
 
           const targetReaction = alias(
             schema.postReactionTable,
@@ -1020,7 +1350,12 @@ const makePostRepository = Effect.gen(function* () {
           );
           yield* tx
             .update(schema.postReactionTable)
-            .set({ postId: targetPostId })
+            .set({
+              postId: targetPostId,
+              mergedFromPostId: sql<
+                string | null
+              >`coalesce(${schema.postReactionTable.mergedFromPostId}, ${sourcePostId})`,
+            })
             .where(
               and(
                 eq(schema.postReactionTable.postId, sourcePostId),
@@ -1051,7 +1386,12 @@ const makePostRepository = Effect.gen(function* () {
           );
           yield* tx
             .update(schema.postTagTable)
-            .set({ postId: targetPostId })
+            .set({
+              postId: targetPostId,
+              mergedFromPostId: sql<
+                string | null
+              >`coalesce(${schema.postTagTable.mergedFromPostId}, ${sourcePostId})`,
+            })
             .where(
               and(
                 eq(schema.postTagTable.postId, sourcePostId),
@@ -1072,6 +1412,123 @@ const makePostRepository = Effect.gen(function* () {
             .delete(schema.postTagTable)
             .where(eq(schema.postTagTable.postId, sourcePostId));
 
+          // Followers move with the post so subscribers keep receiving
+          // updates. A user following both posts keeps the target
+          // subscription; the duplicate source row is dropped.
+          const targetSubscription = alias(
+            schema.postSubscriptionTable,
+            "merge_target_subscription"
+          );
+          yield* tx
+            .update(schema.postSubscriptionTable)
+            .set({
+              postId: targetPostId,
+              mergedFromPostId: sql<
+                string | null
+              >`coalesce(${schema.postSubscriptionTable.mergedFromPostId}, ${sourcePostId})`,
+            })
+            .where(
+              and(
+                eq(schema.postSubscriptionTable.postId, sourcePostId),
+                notExists(
+                  tx
+                    .select({ id: targetSubscription.id })
+                    .from(targetSubscription)
+                    .where(
+                      and(
+                        eq(targetSubscription.postId, targetPostId),
+                        eq(
+                          targetSubscription.userId,
+                          schema.postSubscriptionTable.userId
+                        )
+                      )
+                    )
+                )
+              )
+            );
+          yield* tx
+            .delete(schema.postSubscriptionTable)
+            .where(eq(schema.postSubscriptionTable.postId, sourcePostId));
+
+          // Email subscribers follow the surviving post too, so a merged-away
+          // post does not silently orphan their consent. A contact who
+          // already has a target-topic row keeps that row (and its explicit
+          // verified/unsubscribed state); the duplicate source row is dropped.
+          const targetEmailSubscription = alias(
+            schema.emailSubscriptionTable,
+            "merge_target_email_subscription"
+          );
+          yield* tx
+            .update(schema.emailSubscriptionTable)
+            .set({
+              topicId: targetPostId,
+              mergedFromPostId: sql<
+                string | null
+              >`coalesce(${schema.emailSubscriptionTable.mergedFromPostId}, ${sourcePostId})`,
+            })
+            .where(
+              and(
+                eq(schema.emailSubscriptionTable.topicType, "post"),
+                eq(schema.emailSubscriptionTable.topicId, sourcePostId),
+                notExists(
+                  tx
+                    .select({ id: targetEmailSubscription.id })
+                    .from(targetEmailSubscription)
+                    .where(
+                      and(
+                        eq(
+                          targetEmailSubscription.contactId,
+                          schema.emailSubscriptionTable.contactId
+                        ),
+                        eq(targetEmailSubscription.topicType, "post"),
+                        eq(targetEmailSubscription.topicId, targetPostId)
+                      )
+                    )
+                )
+              )
+            );
+          yield* tx
+            .delete(schema.emailSubscriptionTable)
+            .where(
+              and(
+                eq(schema.emailSubscriptionTable.topicType, "post"),
+                eq(schema.emailSubscriptionTable.topicId, sourcePostId)
+              )
+            );
+
+          // A changelog entry that announced the duplicate follows the
+          // surviving post, so the public changelog keeps a resolvable link
+          // (merged posts are hidden from public post queries). A post can
+          // belong to at most one changelog entry (`changelog_post_postId_uidx`),
+          // so when the survivor is already linked, the duplicate's link is
+          // dropped instead of moved.
+          const targetChangelogLink = alias(
+            schema.changelogPostTable,
+            "merge_target_changelog_link"
+          );
+          yield* tx
+            .update(schema.changelogPostTable)
+            .set({
+              postId: targetPostId,
+              mergedFromPostId: sql<
+                string | null
+              >`coalesce(${schema.changelogPostTable.mergedFromPostId}, ${sourcePostId})`,
+            })
+            .where(
+              and(
+                eq(schema.changelogPostTable.postId, sourcePostId),
+                notExists(
+                  tx
+                    .select({ postId: targetChangelogLink.postId })
+                    .from(targetChangelogLink)
+                    .where(eq(targetChangelogLink.postId, targetPostId))
+                )
+              )
+            );
+          yield* tx
+            .delete(schema.changelogPostTable)
+            .where(eq(schema.changelogPostTable.postId, sourcePostId));
+
           yield* tx
             .update(schema.postTable)
             .set({
@@ -1086,6 +1543,101 @@ const makePostRepository = Effect.gen(function* () {
                 eq(schema.postTable.organizationId, organizationId)
               )
             );
+          // The survivor's content changed too (it absorbed the discussion),
+          // so its freshness timestamp moves with the merge. The row is
+          // already locked above, so this cannot race another merge.
+          yield* tx
+            .update(schema.postTable)
+            .set({ updatedAt: now })
+            .where(
+              and(
+                eq(schema.postTable.id, targetPostId),
+                eq(schema.postTable.organizationId, organizationId)
+              )
+            );
+        })
+      ),
+
+    /**
+     * Reverts a merge by restoring the archived source post. Every engagement
+     * table the merge tagged with the source post in `mergedFromPostId`
+     * (comments, votes, reactions, tags, followers, email subscriptions, and
+     * the changelog link) is moved back with it. Rows the survivor already had
+     * stay with the survivor; a changelog link is lost when the survivor
+     * already had an entry, because there is no row left to restore. Resolves
+     * to the id of the post the source was merged into, so the caller can
+     * record the unmerge activity.
+     */
+    unmerge: ({ organizationId, sourcePostId }: TPostUnmerge) =>
+      db.transaction((tx) =>
+        Effect.gen(function* () {
+          const [sourcePost] = yield* tx
+            .select({
+              id: schema.postTable.id,
+              mergedIntoPostId: schema.postTable.mergedIntoPostId,
+            })
+            .from(schema.postTable)
+            .where(
+              and(
+                eq(schema.postTable.id, sourcePostId),
+                eq(schema.postTable.organizationId, organizationId)
+              )
+            )
+            .limit(1)
+            // Serialize unmerge against itself and against a concurrent merge
+            // of the same source: the second caller waits, then re-reads the
+            // cleared `mergedIntoPostId` and is refused instead of restoring
+            // twice.
+            .for("update");
+
+          if (!sourcePost) {
+            return yield* new FailedToMergePostError({
+              message: "Post not found",
+            });
+          }
+          if (!sourcePost.mergedIntoPostId) {
+            return yield* new FailedToMergePostError({
+              message: "Post is not merged",
+            });
+          }
+
+          const targetPostId = sourcePost.mergedIntoPostId;
+          const restoredAt = yield* DateTime.nowAsDate;
+          yield* tx
+            .update(schema.postTable)
+            .set({
+              archivedAt: null,
+              mergedAt: null,
+              mergedIntoPostId: null,
+              updatedAt: restoredAt,
+            })
+            .where(
+              and(
+                eq(schema.postTable.id, sourcePostId),
+                eq(schema.postTable.organizationId, organizationId)
+              )
+            );
+          // The survivor lost the engagement it had absorbed, so its freshness
+          // timestamp moves with the revert too.
+          yield* tx
+            .update(schema.postTable)
+            .set({ updatedAt: restoredAt })
+            .where(
+              and(
+                eq(schema.postTable.id, targetPostId),
+                eq(schema.postTable.organizationId, organizationId)
+              )
+            );
+
+          // Engagement the merge carried over returns with the post: rows
+          // tagged with this source are moved back, so unmerging restores
+          // the discussion the duplicate had before it was folded in.
+          yield* restoreMergedEngagement({
+            organizationId,
+            sourcePostId,
+          });
+
+          return targetPostId;
         })
       ),
   };

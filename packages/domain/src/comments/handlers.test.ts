@@ -267,6 +267,68 @@ describe("CommentRpcHandlers", () => {
           expect(comments[0]?.content).toContain("A test comment");
         })
       );
+      it.effect(
+        "returns comments merged away from the post under its slug",
+        () =>
+          Effect.gen(function* () {
+            const postRepository = yield* PostRepository;
+            const handlers = yield* CommentRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const targetPostId = yield* addPost(fixture, fixture.boardId);
+            const commentId = yield* CommentId.generate;
+
+            yield* handlers
+              .CommentCreate(
+                commentCreateInput(fixture, commentId, "Merged comment")
+              )
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            yield* postRepository.merge({
+              organizationId: fixture.organizationId,
+              sourcePostId: fixture.postId,
+              targetPostId,
+            });
+
+            // The merged post's own page lists the comment that now lives on
+            // the survivor, keyed under the requested slug so the client can
+            // keep a single slug-scoped subset per page.
+            const merged = yield* handlers
+              .CommentList({
+                organizationId: fixture.organizationId,
+                slug: fixture.postSlug,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            expect(merged).toHaveLength(1);
+            expect(merged[0]).toMatchObject({
+              id: commentId,
+              mergedFromPostId: fixture.postId,
+              postId: targetPostId,
+              postSlug: fixture.postSlug,
+            });
+
+            // The survivor lists the same comment under its own slug.
+            const survivor = yield* handlers
+              .CommentList({
+                organizationId: fixture.organizationId,
+                slug: targetPostId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            expect(survivor).toHaveLength(1);
+            expect(survivor[0]).toMatchObject({
+              id: commentId,
+              mergedFromPostId: fixture.postId,
+              postId: targetPostId,
+              postSlug: targetPostId,
+            });
+          })
+      );
     });
 
     describe("CommentListPublic", () => {
@@ -505,6 +567,42 @@ describe("CommentRpcHandlers", () => {
                 organizationId: fixture.organizationId,
                 postId: lockedPostId,
                 content: "Comment on locked post",
+                visibility: "PUBLIC" as const,
+                parentCommentId: null,
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("rejects creating on a merged post", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const mergedPostId = yield* addPost(fixture, fixture.boardId);
+          const now = new Date();
+          // A merged source is archived and points at its survivor; the
+          // `isUnlocked` gate denies interaction until it is unmerged.
+          yield* db
+            .update(schema.postTable)
+            .set({
+              archivedAt: now,
+              mergedAt: now,
+              mergedIntoPostId: fixture.postId,
+            })
+            .where(eq(schema.postTable.id, mergedPostId));
+
+          const commentId = yield* CommentId.generate;
+          const error = yield* Effect.flip(
+            handlers
+              .CommentCreate({
+                id: commentId,
+                organizationId: fixture.organizationId,
+                postId: mergedPostId,
+                content: "Comment on merged post",
                 visibility: "PUBLIC" as const,
                 parentCommentId: null,
               })

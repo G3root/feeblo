@@ -16,6 +16,12 @@ type TIsCreator = {
   boardId: string;
 };
 
+/** Post-scoped reference used by policies that only need the id. */
+type TPostRef = {
+  organizationId: string;
+  postId: string;
+};
+
 type TCanCreate = {
   organizationId: string;
   /** True when the payload attributes the post to a resolved customer. */
@@ -122,6 +128,24 @@ const makePostPolicy = Effect.gen(function* () {
       })
     );
 
+  /**
+   * Guards the read-only merged state: a post merged into another is hidden
+   * from lists and disabled for every mutation until it is unmerged. Bulk
+   * callers pass every id; a single merged id denies the whole operation.
+   */
+  const isNotMerged = (args: {
+    organizationId: string;
+    postId: string | readonly string[];
+  }) =>
+    Policy.policy(() =>
+      repository
+        .findMergedIds({
+          ids: Schema.is(PostIds)(args.postId) ? args.postId : [args.postId],
+          organizationId: args.organizationId,
+        })
+        .pipe(Effect.map((posts) => posts.length === 0))
+    );
+
   const isUnlockedPublic = (args: TIsUnlocked) =>
     Policy.policy(() =>
       repository.isUnlockedPublic({
@@ -172,6 +196,10 @@ const makePostPolicy = Effect.gen(function* () {
     if (args.source === "public") {
       return Policy.all(
         Policy.hasRestrictedOrganizationScope(args.organizationId),
+        isNotMerged({
+          organizationId: args.organizationId,
+          postId: args.postId,
+        }),
         isNewPostOwnerOrPrivileged({
           organizationId: args.organizationId,
           postId: args.postId,
@@ -181,6 +209,10 @@ const makePostPolicy = Effect.gen(function* () {
     }
     return Policy.all(
       Policy.hasMembership(args.organizationId),
+      isNotMerged({
+        organizationId: args.organizationId,
+        postId: args.postId,
+      }),
       isNewPostOwnerOrPrivileged({
         organizationId: args.organizationId,
         postId: args.postId,
@@ -206,6 +238,10 @@ const makePostPolicy = Effect.gen(function* () {
     }
     return Policy.all(
       Policy.hasMembership(args.organizationId),
+      isNotMerged({
+        organizationId: args.organizationId,
+        postId: args.postId,
+      }),
       isOwner({
         organizationId: args.organizationId,
         postId: args.postId,
@@ -217,6 +253,10 @@ const makePostPolicy = Effect.gen(function* () {
   const canUpdateProperties = (args: TCanUpdateProperties) =>
     Policy.all(
       Policy.hasMembership(args.organizationId),
+      isNotMerged({
+        organizationId: args.organizationId,
+        postId: args.postId,
+      }),
       Policy.any(
         Policy.canPermission(args.organizationId, "posts.status"),
         Policy.all(
@@ -243,23 +283,29 @@ const makePostPolicy = Effect.gen(function* () {
    * attribution boundary applies whether the customer is named at creation
    * or reassigned later.
    */
-  const canUpdateAuthor = (organizationId: string) =>
+  const canUpdateAuthor = (args: TPostRef) =>
     Policy.all(
-      Policy.hasMembership(organizationId),
-      Policy.canPermission(organizationId, "posts.createOnBehalf")
+      Policy.hasMembership(args.organizationId),
+      isNotMerged(args),
+      Policy.canPermission(args.organizationId, "posts.createOnBehalf")
     );
 
   /** ETA is a post property reserved for managers and above (`posts.status`). */
-  const canUpdateEta = (organizationId: string) =>
+  const canUpdateEta = (args: TPostRef) =>
     Policy.all(
-      Policy.hasMembership(organizationId),
-      Policy.canPermission(organizationId, "posts.status")
+      Policy.hasMembership(args.organizationId),
+      isNotMerged(args),
+      Policy.canPermission(args.organizationId, "posts.status")
     );
 
-  const canAdminUpdate = (organizationId: string) =>
-    Policy.canPermission(organizationId, "posts.*");
+  const canAdminUpdate = (args: TPostRef) =>
+    Policy.all(
+      isNotMerged(args),
+      Policy.canPermission(args.organizationId, "posts.*")
+    );
 
-  const canMerge = canAdminUpdate;
+  const canMerge = (organizationId: string) =>
+    Policy.canPermission(organizationId, "posts.*");
 
   return {
     isUnlocked,

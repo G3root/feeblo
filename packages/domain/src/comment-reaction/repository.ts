@@ -1,7 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import { CommentReactionId } from "@feeblo/id";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
-import { and, eq } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -26,43 +26,61 @@ const makeCommentReactionRepository = Effect.gen(function* () {
 
   return {
     list: ({ organizationId, slug }: TCommentReactionList) =>
-      db
-        .select({
-          id: schema.commentReactionTable.id,
-          commentId: schema.commentReactionTable.commentId,
-          postId: schema.commentTable.postId,
-          postSlug: schema.postTable.slug,
-          organizationId: schema.commentTable.organizationId,
-          userId: schema.commentReactionTable.userId,
-          memberId: schema.commentReactionTable.memberId,
-          emoji: schema.commentReactionTable.emoji,
-          createdAt: schema.commentReactionTable.createdAt,
-          updatedAt: schema.commentReactionTable.updatedAt,
-        })
-        .from(schema.commentReactionTable)
-        .innerJoin(
-          schema.commentTable,
-          eq(schema.commentTable.id, schema.commentReactionTable.commentId)
-        )
-        .innerJoin(
-          schema.postTable,
-          eq(schema.postTable.id, schema.commentTable.postId)
-        )
-        .where(
-          and(
-            eq(schema.commentTable.organizationId, organizationId),
-            eq(schema.postTable.slug, slug)
+      Effect.gen(function* () {
+        // Mirrors the comment list: reactions of comments merged away from
+        // the requested post are listed under it too, keyed by the requested
+        // slug, so a merged post's page can render its comments' reactions
+        // from a single slug-scoped subset.
+        const requestedPost = yield* db
+          .select({ id: schema.postTable.id })
+          .from(schema.postTable)
+          .where(
+            and(
+              eq(schema.postTable.organizationId, organizationId),
+              eq(schema.postTable.slug, slug)
+            )
           )
-        )
-        .pipe(
-          Effect.map((reactions) =>
-            reactions.map((reaction) => ({
-              ...reaction,
-              // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-              emoji: reaction.emoji as ReactionEmoji,
-            }))
+          .limit(1)
+          .pipe(Effect.map(EffectArray.get(0)));
+
+        if (Option.isNone(requestedPost)) {
+          return [];
+        }
+
+        const reactions = yield* db
+          .select({
+            id: schema.commentReactionTable.id,
+            commentId: schema.commentReactionTable.commentId,
+            postId: schema.commentTable.postId,
+            postSlug: sql<string>`${slug}`,
+            organizationId: schema.commentTable.organizationId,
+            userId: schema.commentReactionTable.userId,
+            memberId: schema.commentReactionTable.memberId,
+            emoji: schema.commentReactionTable.emoji,
+            createdAt: schema.commentReactionTable.createdAt,
+            updatedAt: schema.commentReactionTable.updatedAt,
+          })
+          .from(schema.commentReactionTable)
+          .innerJoin(
+            schema.commentTable,
+            eq(schema.commentTable.id, schema.commentReactionTable.commentId)
           )
-        ),
+          .where(
+            and(
+              eq(schema.commentTable.organizationId, organizationId),
+              or(
+                eq(schema.commentTable.postId, requestedPost.value.id),
+                eq(schema.commentTable.mergedFromPostId, requestedPost.value.id)
+              )
+            )
+          );
+
+        return reactions.map((reaction) => ({
+          ...reaction,
+          // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+          emoji: reaction.emoji as ReactionEmoji,
+        }));
+      }),
 
     listPublic: ({ organizationId, slug }: TCommentReactionList) =>
       db
