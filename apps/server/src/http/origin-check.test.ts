@@ -26,6 +26,16 @@ const App = (config: AllowedOriginConfig) =>
       "/rpc",
       HttpServerResponse.text("read", { status: 200 })
     ),
+    HttpRouter.add(
+      "POST",
+      "/api/auth/sign-in/email",
+      HttpServerResponse.text("auth", { status: 200 })
+    ),
+    HttpRouter.add(
+      "POST",
+      "/api/media/upload",
+      HttpServerResponse.text("media", { status: 200 })
+    ),
     HttpRouter.middleware(makeOriginCheckMiddleware(config), { global: true })
   );
 
@@ -46,17 +56,22 @@ const withApp = <A, E, R>(
 
 const post = (
   handler: (request: Request) => Promise<globalThis.Response>,
-  headers: Record<string, string>
+  headers: Record<string, string>,
+  path = "/rpc"
 ) =>
   Effect.promise(() =>
     handler(
-      new Request("https://api.feeblo.com/rpc", {
+      new Request(`https://api.feeblo.com${path}`, {
         body: "{}\n",
         headers,
         method: "POST",
       })
     )
   );
+
+const SESSION_COOKIE = {
+  cookie: "better-auth.session_token=signed.token",
+};
 
 it.live("rejects a POST from an untrusted origin", () =>
   withApp(productionConfig, (app) =>
@@ -113,6 +128,52 @@ it.live("allows same-site and non-browser requests", () =>
       const noHeaders = yield* post(app.handler, {});
       expect(sameSite.status).toBe(200);
       expect(noHeaders.status).toBe(200);
+    })
+  )
+);
+
+it.live(
+  "rejects a cookie-bearing headerless POST to a cookie-authenticated Effect route",
+  () =>
+    withApp(productionConfig, (app) =>
+      Effect.gen(function* () {
+        const rpc = yield* post(app.handler, SESSION_COOKIE);
+        const media = yield* post(
+          app.handler,
+          SESSION_COOKIE,
+          "/api/media/upload"
+        );
+        expect(rpc.status).toBe(403);
+        expect(media.status).toBe(403);
+      })
+    )
+);
+
+it.live(
+  "leaves better-auth routes and cookie-less requests to their own controls",
+  () =>
+    withApp(productionConfig, (app) =>
+      Effect.gen(function* () {
+        const betterAuth = yield* post(
+          app.handler,
+          SESSION_COOKIE,
+          "/api/auth/sign-in/email"
+        );
+        const noCookie = yield* post(app.handler, {});
+        expect(betterAuth.status).toBe(200);
+        expect(noCookie.status).toBe(200);
+      })
+    )
+);
+
+it.live("allows a cookie-bearing browser request with fetch metadata", () =>
+  withApp(productionConfig, (app) =>
+    Effect.gen(function* () {
+      const response = yield* post(app.handler, {
+        ...SESSION_COOKIE,
+        "sec-fetch-site": "same-site",
+      });
+      expect(response.status).toBe(200);
     })
   )
 );

@@ -183,17 +183,29 @@ const relTokens = (value: Properties[string]): Set<string> => {
 };
 
 /**
- * hast counterpart of {@link secureBlankTarget}, applied after
- * `rehype-sanitize` so `rel="noopener noreferrer"` is always present on
- * `target="_blank"` links.
+ * Browsing-context keywords that keep the link in the current context and
+ * therefore cannot hand `window.opener` to a new document. Every other
+ * non-empty target (`_blank` and any named window) opens or reuses a browsing
+ * context that must not get an opener handle back to the Feeblo page.
  */
-const rehypeSecureBlankTarget = () => (tree: Root) => {
+const SAME_CONTEXT_TARGETS = new Set(["_self", "_parent", "_top"]);
+
+/**
+ * hast counterpart of {@link secureBlankTarget}, applied after
+ * `rehype-sanitize` so `rel="noopener noreferrer"` is always present on links
+ * that target a new named or blank browsing context.
+ */
+const rehypeSecureLinkTargets = () => (tree: Root) => {
   visit(tree, "element", (node: Element) => {
     if (node.tagName !== "a") {
       return;
     }
     const target = node.properties?.target;
-    if (!isString(target) || target.trim().toLowerCase() !== "_blank") {
+    if (!isString(target)) {
+      return;
+    }
+    const normalizedTarget = target.trim().toLowerCase();
+    if (normalizedTarget === "" || SAME_CONTEXT_TARGETS.has(normalizedTarget)) {
       return;
     }
     const tokens = relTokens(node.properties.rel);
@@ -206,7 +218,7 @@ const rehypeSecureBlankTarget = () => (tree: Root) => {
 const sanitizer = unified()
   .use(rehypeParse, { fragment: true })
   .use(rehypeSanitize, SANITIZE_SCHEMA)
-  .use(rehypeSecureBlankTarget)
+  .use(rehypeSecureLinkTargets)
   .use(rehypeStringify)
   .freeze();
 

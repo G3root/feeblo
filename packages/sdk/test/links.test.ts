@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { authenticateLink, startLinkAuthentication } from "../src/links";
+import {
+  authenticateLink,
+  isAutoLoginTargetAllowed,
+  startLinkAuthentication,
+} from "../src/links";
 
 describe("data-feeblo-link", () => {
   afterEach(() => {
@@ -56,6 +60,37 @@ describe("data-feeblo-link", () => {
     expect(new URLSearchParams(url.hash.slice(1)).get("ssoToken")).toBe(
       "signed.jwt.token"
     );
+  });
+
+  it("requires HTTPS for non-loopback token targets", () => {
+    expect(
+      isAutoLoginTargetAllowed("http://feedback.example.com/", [
+        "http://feedback.example.com",
+      ])
+    ).toBe(false);
+    expect(
+      isAutoLoginTargetAllowed("https://feedback.example.com/", [
+        "https://feedback.example.com",
+      ])
+    ).toBe(true);
+  });
+
+  it("allows plain HTTP only for loopback hosts", () => {
+    expect(
+      isAutoLoginTargetAllowed("http://localhost:3000/", [
+        "http://localhost:3000",
+      ])
+    ).toBe(true);
+    expect(
+      isAutoLoginTargetAllowed("http://127.0.0.1:3000/", [
+        "http://127.0.0.1:3000",
+      ])
+    ).toBe(true);
+    expect(
+      isAutoLoginTargetAllowed("http://board.localhost:3000/", [
+        "http://board.localhost:3000",
+      ])
+    ).toBe(true);
   });
 
   it("never attaches the token to a link outside the allowed origins", () => {
