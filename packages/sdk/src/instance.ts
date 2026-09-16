@@ -41,6 +41,32 @@ const isObjectValue = <T>(value: T): boolean => {
   );
 };
 
+/**
+ * Origins whose `data-feeblo-link` anchors may receive the SSO token: the
+ * embedding page origin, the configured widget host, and any explicitly
+ * configured `autoLoginOrigins` (for customer feedback domains). Anything
+ * else is refused so injected links cannot exfiltrate the token.
+ */
+function resolveAutoLoginOrigins(options: EmbedOptions): string[] {
+  const origins = new Set<string>();
+  const addOrigin = (value: string) => {
+    try {
+      const origin = new URL(value, window.location.href).origin;
+      if (origin !== "null") {
+        origins.add(origin);
+      }
+    } catch {
+      // Ignore malformed configuration values.
+    }
+  };
+  addOrigin(window.location.origin);
+  addOrigin(resolveBaseUrl(options));
+  for (const origin of options.autoLoginOrigins ?? []) {
+    addOrigin(origin);
+  }
+  return [...origins];
+}
+
 let currentEmbed: Embed | null = null;
 let currentOrgId: string | null = null;
 let globalCleanup: (() => void) | null = null;
@@ -214,7 +240,9 @@ export function init(
 
   setupGlobalListeners();
   startTriggerScanning(embed, embed.logger);
-  linkCleanup = startLinkAuthentication(embed, embed.logger);
+  linkCleanup = startLinkAuthentication(embed, embed.logger, {
+    allowedOrigins: resolveAutoLoginOrigins(resolvedOptions),
+  });
 
   if (embed.logger.enabled) {
     banner(organizationId, resolveBaseUrl(resolvedOptions));

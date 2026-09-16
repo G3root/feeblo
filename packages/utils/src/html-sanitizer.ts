@@ -1,10 +1,21 @@
-import DOMPurify from "dompurify";
-import { Window } from "happy-dom";
+import type { Element, Properties, Root } from "hast";
+import rehypeParse from "rehype-parse";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import rehypeStringify from "rehype-stringify";
+import { unified } from "unified";
+import { visit } from "unist-util-visit";
 
-const domWindow = new Window();
+import { isString } from "./runtime-kind";
+
 const REL_TOKEN_SEPARATOR = /\s+/;
 
-/** Adds safe opener isolation to links targeting a new browsing context. */
+/**
+ * Adds safe opener isolation to links targeting a new browsing context.
+ *
+ * Works on the minimal DOM-node shape (astring for tests and callers that
+ * already parsed HTML) as well as being reused conceptually by the hast
+ * plugin below, which applies the same rule after sanitization.
+ */
 export const secureBlankTarget = (node: {
   readonly tagName: string;
   readonly getAttribute: (name: string) => string | null;
@@ -24,7 +35,7 @@ export const secureBlankTarget = (node: {
   node.setAttribute("rel", [...relTokens].join(" "));
 };
 
-// Configure DOMPurify allow-lists
+// Configure the sanitizer allow-list
 export const ALLOWED_TAGS = [
   // Text formatting
   "strong",
@@ -124,13 +135,82 @@ export const ALLOWED_ATTR = [
   "id",
 ];
 
+// hast property names (camelCase) map to the HTML attributes above: `class` is
+// `className`, `colspan` is `colSpan`, `rowspan` is `rowSpan`.
+const SHARED_ATTRIBUTES = ["className", "id"] as const;
+
+/**
+ * Schema for `hast-util-sanitize`. The sanitizer runs on a parsed hast tree,
+ * not on an emulated browser DOM: unlike DOMPurify-under-happy-dom it walks
+ * every node deterministically and cannot fail open for nested elements.
+ *
+ * Dangerous URL schemes are handled by `protocols`, which rejects
+ * `javascript:`, `vbscript:`, and `data:` URLs while keeping relative links.
+ */
+const SANITIZE_SCHEMA = {
+  ...defaultSchema,
+  tagNames: ALLOWED_TAGS.filter((tag) => tag !== "#text"),
+  attributes: {
+    ...defaultSchema.attributes,
+    "*": [...SHARED_ATTRIBUTES],
+    a: ["href", "title", "target", "rel", ...SHARED_ATTRIBUTES],
+    img: ["src", "alt", "width", "height", ...SHARED_ATTRIBUTES],
+    ol: ["start", "reversed", ...SHARED_ATTRIBUTES],
+    li: ["value", ...SHARED_ATTRIBUTES],
+    td: ["colSpan", "rowSpan", "headers", ...SHARED_ATTRIBUTES],
+    th: ["colSpan", "rowSpan", "headers", ...SHARED_ATTRIBUTES],
+    details: ["open", ...SHARED_ATTRIBUTES],
+  },
+  protocols: {
+    href: ["http", "https", "mailto", "tel"],
+    src: ["http", "https"],
+  },
+};
+
+const relTokens = (value: Properties[string]): Set<string> => {
+  const tokens = new Set<string>();
+  const values = Array.isArray(value) ? value : [value];
+  for (const entry of values) {
+    if (isString(entry)) {
+      for (const token of entry.split(REL_TOKEN_SEPARATOR)) {
+        if (token) {
+          tokens.add(token);
+        }
+      }
+    }
+  }
+  return tokens;
+};
+
+/**
+ * hast counterpart of {@link secureBlankTarget}, applied after
+ * `rehype-sanitize` so `rel="noopener noreferrer"` is always present on
+ * `target="_blank"` links.
+ */
+const rehypeSecureBlankTarget = () => (tree: Root) => {
+  visit(tree, "element", (node: Element) => {
+    if (node.tagName !== "a") {
+      return;
+    }
+    const target = node.properties?.target;
+    if (!isString(target) || target.trim().toLowerCase() !== "_blank") {
+      return;
+    }
+    const tokens = relTokens(node.properties.rel);
+    tokens.add("noopener");
+    tokens.add("noreferrer");
+    node.properties.rel = [...tokens];
+  });
+};
+
+const sanitizer = unified()
+  .use(rehypeParse, { fragment: true })
+  .use(rehypeSanitize, SANITIZE_SCHEMA)
+  .use(rehypeSecureBlankTarget)
+  .use(rehypeStringify)
+  .freeze();
+
 export class HtmlSanitizer {
-  // private urlNormalizer: UrlNormalizer;
-
-  // constructor(urlNormalizer: UrlNormalizer) {
-  //   this.urlNormalizer = urlNormalizer;
-  // }
-
   sanitizeHtml(html: string): string {
     // Reject overly large content without parsing to avoid performance issues
     if (html.length > 10_000) {
@@ -138,75 +218,7 @@ export class HtmlSanitizer {
       return "";
     }
 
-    // Create a custom DOMPurify instance with hooks for URL sanitization
-    const customPurify = DOMPurify(domWindow);
-
-    // Configure DOMPurify
-    customPurify.setConfig({
-      ALLOWED_TAGS,
-      ALLOWED_ATTR,
-      ALLOW_DATA_ATTR: false,
-      ALLOW_UNKNOWN_PROTOCOLS: false,
-      SAFE_FOR_TEMPLATES: true,
-      WHOLE_DOCUMENT: false,
-      RETURN_DOM: false,
-      RETURN_DOM_FRAGMENT: false,
-      FORCE_BODY: false,
-      IN_PLACE: false,
-      KEEP_CONTENT: true,
-      ADD_TAGS: ["#text"],
-      ADD_ATTR: [],
-      // Not needed, we use the safer allow list
-      FORBID_TAGS: [],
-      // Not needed, we use the safer allow list
-      FORBID_ATTR: [],
-    });
-
-    // Add hook to handle URL sanitization and dangerous content in attributes
-    customPurify.addHook("afterSanitizeAttributes", (node) => {
-      // Handle href attributes
-      // if (node.hasAttribute?.("href")) {
-      //   const url = node.getAttribute("href") || "";
-      //   const sanitizedUrl = this.urlNormalizer.sanitizeUrl(url, "href");
-      //   node.setAttribute("href", sanitizedUrl);
-      // }
-
-      // // Handle src attributes
-      // if (node.hasAttribute?.("src")) {
-      //   const url = node.getAttribute("src") || "";
-      //   const sanitizedUrl = this.urlNormalizer.sanitizeUrl(url, "src");
-      //   node.setAttribute("src", sanitizedUrl);
-      // }
-
-      const sanitizeAttributeValue = (_value: string) => {
-        // Title and alt parsing is too ambiguous. We need to fully remove it
-        void _value;
-        return "";
-      };
-
-      // Handle alt attributes that might contain HTML
-      if (node.hasAttribute?.("alt")) {
-        const alt = node.getAttribute("alt") || "";
-        node.setAttribute("alt", sanitizeAttributeValue(alt));
-      }
-      // Handle title attributes that might contain HTML
-      if (node.hasAttribute?.("title")) {
-        const title = node.getAttribute("title") || "";
-        node.setAttribute("title", sanitizeAttributeValue(title));
-      }
-
-      // Prevent reverse tabnabbing: a link opened in a new tab must not give
-      // the target document a `window.opener` handle back to this document.
-      // Existing rel tokens (e.g. `nofollow`) are preserved alongside the
-      // added security tokens.
-      secureBlankTarget(node);
-    });
-
-    // Remove all hooks after sanitization to avoid leaking
-    const result = customPurify.sanitize(html);
-
-    // Clear hooks
-    customPurify.removeAllHooks();
+    const result = String(sanitizer.processSync(html));
 
     // Post-process to ensure trailing newlines match expected output
     // Only add newline if result is not empty

@@ -181,8 +181,8 @@ export const makeRateLimitLayer = (
           : memoryStore.pipe(
               Layer.tap(() =>
                 Effect.logWarning(
-                  "REDIS_URL is not set: falling back to in-memory rate limiting, " +
-                    "which is not shared across server instances. Configure " +
+                  "ALLOW_IN_MEMORY_RATE_LIMIT is set: rate limits are per-instance " +
+                    "and are not shared across server instances. Configure " +
                     "REDIS_URL for production deployments."
                 )
               )

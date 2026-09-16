@@ -64,6 +64,13 @@ export type WidgetModule = Exclude<WidgetMode, "hub">;
 export type WidgetPlacement = "bottom-left" | "bottom-right";
 
 export interface EmbedOptions {
+  /**
+   * Extra origins whose `data-feeblo-link` anchors may receive the SSO token.
+   * The widget host origin and the embedding page origin are always allowed;
+   * list a custom feedback domain here so tokens are never attached to links
+   * pointing at an attacker-controlled host.
+   */
+  autoLoginOrigins?: readonly string[] | undefined;
   baseUrl?: string | undefined;
   containerStyles?: Partial<CSSStyleDeclaration> | undefined;
   debug?: boolean | undefined;

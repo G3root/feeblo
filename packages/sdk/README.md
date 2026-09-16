@@ -158,6 +158,15 @@ Links marked with `data-feeblo-link` receive the JWT from the most recent `ident
 
 The SDK adds `?ssoToken=JWT` on mouse, keyboard, and context-menu interaction. The public board exchanges it for a restricted session cookie and immediately removes the token from the visible URL.
 
+For safety, the token is only attached to links whose origin is the embedding page origin, a subdomain of the embedding page host (for example `feedback.yourdomain.com` from `yourdomain.com`), the configured `baseUrl` widget host, or an origin listed in `autoLoginOrigins`. List any other feedback domain explicitly:
+
+```js
+Feeblo.init("org_123", {
+  user: { id: "u_1", token: jwt },
+  autoLoginOrigins: ["https://feedback.otherdomain.com"],
+});
+```
+
 ## Triggers
 
 Any element with the `data-feeblo-feedback` attribute automatically opens the widget when clicked. The SDK continuously scans the DOM for new triggers, so they can be added at any time.
