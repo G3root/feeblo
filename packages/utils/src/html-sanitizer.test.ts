@@ -103,6 +103,20 @@ describe("HtmlSanitizer", () => {
     expect(output).toContain('rel="nofollow noopener noreferrer"');
   });
 
+  it("hardens named targets but leaves same-context targets alone", () => {
+    const named = sanitize(
+      `<p><a href="https://example.com" target="account-window">x</a></p>`
+    );
+    expect(named).toContain('rel="noopener noreferrer"');
+
+    for (const target of ["_self", "_parent", "_top"]) {
+      const output = sanitize(
+        `<p><a href="https://example.com" target="${target}">x</a></p>`
+      );
+      expect(output).not.toContain("noopener");
+    }
+  });
+
   it("returns an empty string for oversized input", () => {
     expect(sanitize("a".repeat(10_001))).toBe("");
   });

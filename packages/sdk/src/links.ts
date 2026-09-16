@@ -39,12 +39,30 @@ export function authenticateLink(link: HTMLAnchorElement, token: string): void {
 }
 
 /**
+ * Hosts where plain HTTP may carry the token: local development only. HTTPS
+ * is required everywhere else because the fragment token is a bearer
+ * credential that a network observer could otherwise replay.
+ */
+const isLoopbackHost = (hostname: string): boolean => {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return (
+    normalized === "localhost" ||
+    normalized.endsWith(".localhost") ||
+    normalized === "127.0.0.1" ||
+    normalized === "::1"
+  );
+};
+
+/**
  * Limits which link hosts may receive the SSO token. The SSO token is a
  * bearer credential, so an injected `<a data-feeblo-link href="https://evil">`
  * must not be able to exfiltrate it. Allowed targets are the page origin, the
  * configured widget base URL origin, explicitly listed `autoLoginOrigins`,
  * and subdomains of the embedding page (the common
  * `yourdomain.com` -> `feedback.yourdomain.com` board layout).
+ *
+ * Plain HTTP is only accepted for loopback hosts; every other target must be
+ * HTTPS, including origins supplied through `baseUrl` or `autoLoginOrigins`.
  */
 export function isAutoLoginTargetAllowed(
   href: string,
@@ -53,6 +71,9 @@ export function isAutoLoginTargetAllowed(
   try {
     const url = new URL(href, window.location.href);
     if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return false;
+    }
+    if (url.protocol === "http:" && !isLoopbackHost(url.hostname)) {
       return false;
     }
     if (allowedOrigins.includes(url.origin)) {
