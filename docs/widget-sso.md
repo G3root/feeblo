@@ -101,6 +101,7 @@ The SSO endpoint maps failures to better-auth errors via the `jwt-auto-login` pl
 - The signing secret is a tenant credential: keep it in server-side config only, never ship it to the browser.
 - SSO sessions are restricted to the workspace (`restrictedToOrganizationId`) and cannot be used to access the dashboard.
 - Prefer passing the SSO token in a fragment (`data-feeblo-link` widget flow) over a query string: query strings leak into logs, history and the `Referer` header, and a token in a URL is replayable until it expires.
+- The widget only attaches the token to `data-feeblo-link` anchors on the embedding page origin, subdomains of the embedding page host, the configured widget `baseUrl` origin, or origins listed in the SDK's `autoLoginOrigins`. Other hosts are refused so injected links cannot exfiltrate the token; list a custom feedback domain in `autoLoginOrigins` when it is not a subdomain of the embedding page.
 
 ## Tests
 

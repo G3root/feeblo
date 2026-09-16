@@ -170,23 +170,26 @@ export const makeRateLimitLayer = (
     RateLimiter.RateLimiterStore,
     Redis.RedisError
   > =
-    useTestMailer || config.nodeEnv === "test"
-      ? memoryStore
-      : config.redisUrl !== undefined
-        ? RateLimiter.layerStoreRedis({ prefix: "feeblo:rate-limit" }).pipe(
-            Layer.provide(NodeRedis.layer(redisOptions(config.redisUrl)))
-          )
-        : config.nodeEnv === "development"
-          ? memoryStore
-          : memoryStore.pipe(
-              Layer.tap(() =>
-                Effect.logWarning(
-                  "REDIS_URL is not set: falling back to in-memory rate limiting, " +
-                    "which is not shared across server instances. Configure " +
-                    "REDIS_URL for production deployments."
-                )
+    // A configured Redis store always wins so rate limits stay shared, even
+    // when the test mailer is enabled; the in-memory fallbacks below only
+    // apply when no Redis URL is available.
+    config.redisUrl !== undefined
+      ? RateLimiter.layerStoreRedis({ prefix: "feeblo:rate-limit" }).pipe(
+          Layer.provide(NodeRedis.layer(redisOptions(config.redisUrl)))
+        )
+      : useTestMailer ||
+          config.nodeEnv === "test" ||
+          config.nodeEnv === "development"
+        ? memoryStore
+        : memoryStore.pipe(
+            Layer.tap(() =>
+              Effect.logWarning(
+                "ALLOW_IN_MEMORY_RATE_LIMIT is set: rate limits are per-instance " +
+                  "and are not shared across server instances. Configure " +
+                  "REDIS_URL for production deployments."
               )
-            );
+            )
+          );
 
   return RateLimitService.layer.pipe(
     Layer.provide(RateLimiter.layer),

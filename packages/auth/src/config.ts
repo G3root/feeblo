@@ -1,8 +1,42 @@
 import { optionalString } from "@feeblo/config/effect";
 import * as Config from "effect/Config";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
+
+/**
+ * Minimum byte length for `AUTH_ENCRYPTION_KEY`. The key signs better-auth
+ * session cookies, encrypts OAuth state, derives email-subscription tokens,
+ * and falls back to encrypting integration credentials, so a short or default
+ * value (for example the `"secret"` shipped in `.env.example`) would make all
+ * of those forgeable. Enforced in production so local development keeps the
+ * documented placeholder workflow.
+ */
+const MIN_AUTH_ENCRYPTION_KEY_BYTES = 32;
+
+const assertProductionEncryptionKey = (
+  nodeEnv: string,
+  secret: Redacted.Redacted<string>
+) =>
+  Effect.gen(function* () {
+    if (nodeEnv !== "production") {
+      return;
+    }
+    const byteLength = new TextEncoder().encode(
+      Redacted.value(secret)
+    ).byteLength;
+    if (byteLength < MIN_AUTH_ENCRYPTION_KEY_BYTES) {
+      return yield* Effect.fail(
+        new Config.ConfigError(
+          new ConfigProvider.SourceError({
+            message: `AUTH_ENCRYPTION_KEY must be at least ${MIN_AUTH_ENCRYPTION_KEY_BYTES} bytes in production (received ${byteLength}). Generate one with: openssl rand -hex 32`,
+          })
+        )
+      );
+    }
+  });
 
 export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
   make: Effect.gen(function* () {
@@ -33,6 +67,8 @@ export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
     const autoSignInAfterSignUp = yield* Config.boolean(
       "AUTH_AUTO_SIGN_IN_AFTER_SIGN_UP"
     ).pipe(Config.withDefault(false));
+
+    yield* assertProductionEncryptionKey(nodeEnv, secret);
 
     return {
       apiUrl,
