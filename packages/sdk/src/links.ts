@@ -38,14 +38,55 @@ export function authenticateLink(link: HTMLAnchorElement, token: string): void {
   link.href = url.toString();
 }
 
+/**
+ * Limits which link hosts may receive the SSO token. The SSO token is a
+ * bearer credential, so an injected `<a data-feeblo-link href="https://evil">`
+ * must not be able to exfiltrate it. Allowed targets are the page origin, the
+ * configured widget base URL origin, explicitly listed `autoLoginOrigins`,
+ * and subdomains of the embedding page (the common
+ * `yourdomain.com` -> `feedback.yourdomain.com` board layout).
+ */
+export function isAutoLoginTargetAllowed(
+  href: string,
+  allowedOrigins: readonly string[]
+): boolean {
+  try {
+    const url = new URL(href, window.location.href);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return false;
+    }
+    if (allowedOrigins.includes(url.origin)) {
+      return true;
+    }
+    const page = new URL(window.location.href);
+    return (
+      url.hostname !== "" &&
+      url.protocol === page.protocol &&
+      url.port === page.port &&
+      (url.hostname === page.hostname ||
+        url.hostname.endsWith(`.${page.hostname}`))
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function startLinkAuthentication(
   target: LinkTarget,
-  logger?: Logger
+  logger?: Logger,
+  options?: { readonly allowedOrigins?: readonly string[] | undefined }
 ): () => void {
+  const allowedOrigins = options?.allowedOrigins ?? [window.location.origin];
   const handleInteraction = (event: Event) => {
     const link = findFeebloLink(event.target);
     const token = target.getAutoLoginToken();
     if (!(link && token)) {
+      return;
+    }
+    if (!isAutoLoginTargetAllowed(link.href, allowedOrigins)) {
+      if (logger?.enabled) {
+        logger("link", "blocked", { origin: link.origin });
+      }
       return;
     }
 

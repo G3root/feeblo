@@ -17,7 +17,7 @@
     "machine-translate": "inlang machine translate --project ../../project.inlang"
   },
   "dependencies": {
-    "@astrojs/node": "11.0.0",
+    "@astrojs/node": "^11.1.5",
     "@astrojs/react": "^6.0.2",
     "@astrojs/rss": "^4.0.19",
     "@astrojs/solid-js": "^7.0.1",
@@ -53,7 +53,7 @@
     "@types/react-dom": "catalog:",
     "@xstate/store": "^3.17.5",
     "@xstate/store-react": "^1.0.1",
-    "astro": "^7.1.6",
+    "astro": "^7.3.2",
     "astro-seo": "^1.1.0",
     "better-auth": "catalog:",
     "class-variance-authority": "catalog:",

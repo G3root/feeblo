@@ -1,5 +1,6 @@
 import { parseClientIpProxyTrust } from "@feeblo/domain/client-ip";
 import * as Config from "effect/Config";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -116,6 +117,27 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         Config.option,
         Effect.map(Option.getOrUndefined)
       );
+      // Shared rate-limit store is mandatory in production: an in-memory
+      // fallback silently gives every replica its own buckets, so an attacker
+      // can multiply a public rate limit by the instance count. Operators who
+      // deliberately run a single instance can opt in explicitly.
+      const allowInMemoryRateLimit = yield* Config.boolean(
+        "ALLOW_IN_MEMORY_RATE_LIMIT"
+      ).pipe(Config.withDefault(false));
+      if (
+        nodeEnv === "production" &&
+        redisUrl === undefined &&
+        !allowInMemoryRateLimit
+      ) {
+        return yield* Effect.fail(
+          new Config.ConfigError(
+            new ConfigProvider.SourceError({
+              message:
+                "REDIS_URL is required in production so rate limits are shared across instances. Set REDIS_URL, or set ALLOW_IN_MEMORY_RATE_LIMIT=true to explicitly accept per-instance limits.",
+            })
+          )
+        );
+      }
       const sentryEnvironment = yield* Config.string("SENTRY_ENVIRONMENT").pipe(
         Config.withDefault(nodeEnv)
       );
@@ -129,6 +151,25 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       const trustAllProxyHeaders = yield* Config.boolean(
         "TRUST_PROXY_HEADERS"
       ).pipe(Config.withDefault(false));
+      // Browser origins the operator explicitly trusts (better-auth
+      // `trustedOrigins`). Also honored by the API CORS and CSRF origin
+      // checks so a custom sign-in origin is not accepted by better-auth but
+      // rejected by the API.
+      const authTrustedOrigins = yield* Config.string(
+        "AUTH_TRUSTED_ORIGINS"
+      ).pipe(
+        Config.option,
+        Effect.map(
+          Option.match({
+            onNone: () => [],
+            onSome: (value) =>
+              value
+                .split(",")
+                .map((entry) => entry.trim())
+                .filter((entry) => entry.length > 0),
+          })
+        )
+      );
       const trustedProxyIps = yield* Config.string("TRUSTED_PROXY_IPS").pipe(
         Config.option,
         Effect.map(
@@ -150,9 +191,11 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       );
 
       return {
+        allowInMemoryRateLimit,
         apiUrl,
         appUrl,
         appRootDomain,
+        authTrustedOrigins,
         clientIpProxyTrust,
         githubAppId,
         githubAppSlug,

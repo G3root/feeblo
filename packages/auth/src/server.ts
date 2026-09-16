@@ -718,6 +718,10 @@ export const initAuthHandler = (
           disableSignUp: true,
           expiresIn: 8 * 60, // 8 minutes
           overrideDefaultEmailVerification: true,
+          // Never persist verification codes in plaintext: the verification
+          // table would otherwise expose usable password-reset and
+          // email-verification OTPs to anyone with database read access.
+          storeOTP: "hashed",
 
           async sendVerificationOTP({ email, otp, type }, ctx) {
             // Some Better Auth flows invoke this callback directly instead of

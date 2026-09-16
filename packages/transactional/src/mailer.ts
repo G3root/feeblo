@@ -344,11 +344,11 @@ const makeNodemailerTransport = Effect.gen(function* () {
           });
 
           return {
-            acceptedRecipientCount: receipt.accepted.length,
+            acceptedRecipientCount: (receipt.accepted ?? []).length,
             messageId: receipt.messageId,
-            rejectedRecipientCount: receipt.rejected.length,
-            ...(smtpResponseCode(receipt.response) !== undefined && {
-              responseCode: smtpResponseCode(receipt.response),
+            rejectedRecipientCount: (receipt.rejected ?? []).length,
+            ...(smtpResponseCode(receipt.response ?? "") !== undefined && {
+              responseCode: smtpResponseCode(receipt.response ?? ""),
             }),
           };
         },
