@@ -2687,7 +2687,9 @@ describe("PostRpcHandlers", () => {
             })
             .from(schema.postReactionTable)
             .where(eq(schema.postReactionTable.postId, sourcePostId));
-          expect(sourceReactions).toEqual([{ userId: sharedVoterId, emoji: "👍" }]);
+          expect(sourceReactions).toEqual([
+            { userId: sharedVoterId, emoji: "👍" },
+          ]);
 
           const sourceTags = yield* db
             .select({ tagId: schema.postTagTable.tagId })
