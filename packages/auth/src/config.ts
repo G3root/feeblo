@@ -6,10 +6,10 @@ import * as Layer from "effect/Layer";
 
 export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
   make: Effect.gen(function* () {
-    const appUrl = yield* Config.string("APP_URL");
-    const apiUrl = yield* Config.string("API_URL");
-    const appRootDomain = yield* Config.string("APP_ROOT_DOMAIN");
-    const secret = yield* Config.redacted("AUTH_ENCRYPTION_KEY");
+    const appUrl = yield* Config.String("APP_URL");
+    const apiUrl = yield* Config.String("API_URL");
+    const appRootDomain = yield* Config.String("APP_ROOT_DOMAIN");
+    const secret = yield* Config.Redacted("AUTH_ENCRYPTION_KEY");
     const githubClientId = yield* optionalString("GITHUB_CLIENT_ID");
     const githubClientSecret = yield* optionalString("GITHUB_CLIENT_SECRET");
     const googleClientId = yield* optionalString("GOOGLE_CLIENT_ID");
@@ -21,16 +21,16 @@ export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
     const trustedOrigins = yield* optionalString("AUTH_TRUSTED_ORIGINS");
     const turnstileKey = yield* optionalString("TURNSTILE_SECRET_KEY");
     const allowedEmails = yield* optionalString("ALLOWED_EMAILS");
-    const nodeEnv = yield* Config.string("NODE_ENV").pipe(
+    const nodeEnv = yield* Config.String("NODE_ENV").pipe(
       Config.withDefault("development")
     );
-    const signUpEnabled = yield* Config.boolean("AUTH_SIGN_UP_ENABLED").pipe(
+    const signUpEnabled = yield* Config.Boolean("AUTH_SIGN_UP_ENABLED").pipe(
       Config.withDefault(true)
     );
-    const emailVerificationRequired = yield* Config.boolean(
+    const emailVerificationRequired = yield* Config.Boolean(
       "AUTH_EMAIL_VERIFICATION_REQUIRED"
     ).pipe(Config.withDefault(true));
-    const autoSignInAfterSignUp = yield* Config.boolean(
+    const autoSignInAfterSignUp = yield* Config.Boolean(
       "AUTH_AUTO_SIGN_IN_AFTER_SIGN_UP"
     ).pipe(Config.withDefault(false));
 

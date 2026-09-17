@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
-import { FastCheck } from "effect/testing";
+import * as Schema from "effect/Schema";
 import * as Headers from "effect/unstable/http/Headers";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import ipaddr from "ipaddr.js";
@@ -254,19 +254,20 @@ describe("isTrustedProxy", () => {
     expect(isTrustedProxy("2001:db8::7", trust)).toBe(true);
   });
 
+  const octet = Schema.Int.pipe(
+    Schema.check(Schema.isBetween({ minimum: 0, maximum: 255 }))
+  );
+  const octetQuad = Schema.Array(octet).pipe(
+    Schema.check(Schema.isMinLength(4)),
+    Schema.check(Schema.isMaxLength(4))
+  );
+  const prefixLength = Schema.Int.pipe(
+    Schema.check(Schema.isBetween({ minimum: 0, maximum: 32 }))
+  );
+
   it.prop(
     "matches generated IPv4 CIDRs according to their numeric prefixes",
-    [
-      FastCheck.array(FastCheck.integer({ min: 0, max: 255 }), {
-        minLength: 4,
-        maxLength: 4,
-      }),
-      FastCheck.array(FastCheck.integer({ min: 0, max: 255 }), {
-        minLength: 4,
-        maxLength: 4,
-      }),
-      FastCheck.integer({ min: 0, max: 32 }),
-    ],
+    [octetQuad, octetQuad, prefixLength],
     ([networkOctets, candidateOctets, prefixLength]) => {
       const network = networkOctets.join(".");
       const candidate = candidateOctets.join(".");
@@ -289,7 +290,12 @@ describe("isTrustedProxy", () => {
 
   it.prop(
     "accepts generated canonical IPv6 addresses as exact trusted peers",
-    [FastCheck.uint8Array({ minLength: 16, maxLength: 16 })],
+    [
+      Schema.Uint8Array.pipe(
+        Schema.check(Schema.isMinLength(16)),
+        Schema.check(Schema.isMaxLength(16))
+      ),
+    ],
     ([addressBytes]) => {
       const address = ipaddr.fromByteArray([...addressBytes]).toString();
       const trust = proxyTrust([address]);

@@ -40,7 +40,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@distilled.cloud/github": "1.0.0-rc.4",
+    "@distilled.cloud/github": "1.0.0-rc.11",
     "@feeblo/db": "workspace:*",
     "@feeblo/domain": "workspace:*",
     "@feeblo/domain-contracts": "workspace:*",

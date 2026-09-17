@@ -11,97 +11,97 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
   "ServerConfig",
   {
     make: Effect.gen(function* () {
-      const appUrl = yield* Config.string("APP_URL");
-      const apiUrl = yield* Config.string("API_URL");
-      const appRootDomain = yield* Config.string("APP_ROOT_DOMAIN");
-      const nodeEnv = yield* Config.string("NODE_ENV").pipe(
+      const appUrl = yield* Config.String("APP_URL");
+      const apiUrl = yield* Config.String("API_URL");
+      const appRootDomain = yield* Config.String("APP_ROOT_DOMAIN");
+      const nodeEnv = yield* Config.String("NODE_ENV").pipe(
         Config.withDefault("development")
       );
-      const githubAppId = yield* Config.string(
+      const githubAppId = yield* Config.String(
         "GITHUB_INTEGRATION_APP_ID"
       ).pipe(Config.option, Effect.map(Option.getOrUndefined));
-      const githubAppSlug = yield* Config.string(
+      const githubAppSlug = yield* Config.String(
         "GITHUB_INTEGRATION_APP_SLUG"
       ).pipe(Config.option, Effect.map(Option.getOrUndefined));
-      const githubClientId = yield* Config.string(
+      const githubClientId = yield* Config.String(
         "GITHUB_INTEGRATION_CLIENT_ID"
       ).pipe(Config.option, Effect.map(Option.getOrUndefined));
-      const githubClientSecret = yield* Config.redacted(
+      const githubClientSecret = yield* Config.Redacted(
         "GITHUB_INTEGRATION_CLIENT_SECRET"
       ).pipe(
         Config.option,
         Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
       );
-      const githubWebhookSecret = yield* Config.redacted(
+      const githubWebhookSecret = yield* Config.Redacted(
         "GITHUB_INTEGRATION_WEBHOOK_SECRET"
       ).pipe(
         Config.option,
         Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
       );
-      const githubPrivateKey = yield* Config.redacted(
+      const githubPrivateKey = yield* Config.Redacted(
         "GITHUB_INTEGRATION_PRIVATE_KEY"
       ).pipe(
         Config.option,
         Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
       );
-      const integrationEncryptionKey = yield* Config.redacted(
+      const integrationEncryptionKey = yield* Config.Redacted(
         "INTEGRATION_ENCRYPTION_KEY"
       ).pipe(
         Config.option,
         Effect.flatMap(
           Option.match({
-            onNone: () => Config.redacted("AUTH_ENCRYPTION_KEY"),
+            onNone: () => Config.Redacted("AUTH_ENCRYPTION_KEY"),
             onSome: Effect.succeed,
           })
         )
       );
       // Slack App credentials are optional; the integration only registers
       // when the client id, client secret, and signing secret are all set.
-      const slackClientId = yield* Config.string("SLACK_CLIENT_ID").pipe(
+      const slackClientId = yield* Config.String("SLACK_CLIENT_ID").pipe(
         Config.option,
         Effect.map(Option.getOrUndefined)
       );
-      const slackClientSecret = yield* Config.redacted(
+      const slackClientSecret = yield* Config.Redacted(
         "SLACK_CLIENT_SECRET"
       ).pipe(
         Config.option,
         Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
       );
-      const slackSigningSecret = yield* Config.redacted(
+      const slackSigningSecret = yield* Config.Redacted(
         "SLACK_SIGNING_SECRET"
       ).pipe(
         Config.option,
         Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
       );
-      const slackOauthRedirectUrl = yield* Config.string(
+      const slackOauthRedirectUrl = yield* Config.String(
         "SLACK_OAUTH_REDIRECT_URL"
       ).pipe(Config.option, Effect.map(Option.getOrUndefined));
       // Discord App credentials are optional; the integration only registers
       // when the client id, client secret, bot token, and public key are set.
-      const discordClientId = yield* Config.string("DISCORD_CLIENT_ID").pipe(
+      const discordClientId = yield* Config.String("DISCORD_CLIENT_ID").pipe(
         Config.option,
         Effect.map(Option.getOrUndefined)
       );
-      const discordClientSecret = yield* Config.redacted(
+      const discordClientSecret = yield* Config.Redacted(
         "DISCORD_CLIENT_SECRET"
       ).pipe(
         Config.option,
         Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
       );
-      const discordBotToken = yield* Config.redacted("DISCORD_BOT_TOKEN").pipe(
+      const discordBotToken = yield* Config.Redacted("DISCORD_BOT_TOKEN").pipe(
         Config.option,
         Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
       );
-      const discordPublicKey = yield* Config.string("DISCORD_PUBLIC_KEY").pipe(
+      const discordPublicKey = yield* Config.String("DISCORD_PUBLIC_KEY").pipe(
         Config.option,
         Effect.map(Option.getOrUndefined)
       );
-      const discordOauthRedirectUrl = yield* Config.string(
+      const discordOauthRedirectUrl = yield* Config.String(
         "DISCORD_OAUTH_REDIRECT_URL"
       ).pipe(Config.option, Effect.map(Option.getOrUndefined));
       // Outbound-webhook egress policy override: private-network receivers
       // are honored in development only (see makeWebhookIntegrationConfig).
-      const integrationAllowPrivateNetwork = yield* Config.boolean(
+      const integrationAllowPrivateNetwork = yield* Config.Boolean(
         "INTEGRATION_ALLOW_PRIVATE_NETWORK"
       ).pipe(Config.withDefault(false));
       const integrationConnectionConcurrency = yield* Config.schema(
@@ -112,24 +112,24 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         Schema.Int.check(Schema.isGreaterThan(0)),
         "INTEGRATION_GLOBAL_CONCURRENCY"
       ).pipe(Config.withDefault(25));
-      const redisUrl = yield* Config.string("REDIS_URL").pipe(
+      const redisUrl = yield* Config.String("REDIS_URL").pipe(
         Config.option,
         Effect.map(Option.getOrUndefined)
       );
-      const sentryEnvironment = yield* Config.string("SENTRY_ENVIRONMENT").pipe(
+      const sentryEnvironment = yield* Config.String("SENTRY_ENVIRONMENT").pipe(
         Config.withDefault(nodeEnv)
       );
-      const sentryDsn = yield* Config.string("SENTRY_DSN").pipe(
+      const sentryDsn = yield* Config.String("SENTRY_DSN").pipe(
         Config.option,
         Effect.map(Option.getOrUndefined)
       );
-      const sentryTracesSampleRate = yield* Config.number(
+      const sentryTracesSampleRate = yield* Config.Number(
         "SENTRY_TRACES_SAMPLE_RATE"
       ).pipe(Config.withDefault(0.1));
-      const trustAllProxyHeaders = yield* Config.boolean(
+      const trustAllProxyHeaders = yield* Config.Boolean(
         "TRUST_PROXY_HEADERS"
       ).pipe(Config.withDefault(false));
-      const trustedProxyIps = yield* Config.string("TRUSTED_PROXY_IPS").pipe(
+      const trustedProxyIps = yield* Config.String("TRUSTED_PROXY_IPS").pipe(
         Config.option,
         Effect.map(
           Option.match({

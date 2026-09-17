@@ -9,12 +9,12 @@ export class VerificationOtpConfig extends Context.Service<VerificationOtpConfig
   "VerificationOtpConfig",
   {
     make: Effect.gen(function* () {
-      const appUrl = yield* Config.string("APP_URL").pipe(
+      const appUrl = yield* Config.String("APP_URL").pipe(
         Effect.mapError(
           () => new InternalServerError({ message: "Missing APP_URL" })
         )
       );
-      const secret = yield* Config.string("AUTH_ENCRYPTION_KEY").pipe(
+      const secret = yield* Config.String("AUTH_ENCRYPTION_KEY").pipe(
         Effect.mapError(
           () =>
             new InternalServerError({ message: "Missing AUTH_ENCRYPTION_KEY" })

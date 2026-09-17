@@ -1,5 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { eq } from "drizzle-orm";
+import * as ByteSize from "effect/ByteSize";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -60,8 +61,11 @@ export const ProfileApiLive = HttpApiBuilder.group(
               () => new InternalServerError({ message: "Failed to read file" })
             )
           );
-        const maxSize = FileSystem.Size(MAX_PROFILE_IMAGE_BYTES);
-        if (fileInfo.size === FileSystem.Size(0) || fileInfo.size > maxSize) {
+        const maxSize = ByteSize.bytes(MAX_PROFILE_IMAGE_BYTES);
+        if (
+          ByteSize.isZero(fileInfo.size) ||
+          ByteSize.isGreaterThan(fileInfo.size, maxSize)
+        ) {
           return yield* new BadRequestError({
             message: "Profile image must be between 1B and 5MB",
           });

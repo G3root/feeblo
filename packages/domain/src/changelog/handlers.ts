@@ -14,8 +14,8 @@ import {
   rollbackPreparedEditorAssets,
   syncChangelogAssetReferences,
 } from "../asset/service";
+import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { EmailOutboxRepository } from "../email-outbox/repository";
-import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
