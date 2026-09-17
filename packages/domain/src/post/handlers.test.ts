@@ -771,6 +771,55 @@ describe("PostRpcHandlers", () => {
             expect(error).toBeInstanceOf(PostNotFoundError);
           })
       );
+
+      it.effect("refuses to delete a post that was merged away", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const repository = yield* PostRepository;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [sourcePostId, "Source feedback"],
+            [targetPostId, "Target feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          // The delete policy denies merged posts before the transaction, so
+          // this reaches the repository directly — the locked re-check is what
+          // backs up a policy/transaction race and must refuse the delete.
+          const result = yield* repository.delete({
+            boardId: fixture.boardId,
+            creatorId: fixture.userId,
+            id: sourcePostId,
+            onlyIfNew: false,
+            organizationId: fixture.organizationId,
+          });
+
+          expect(result).toEqual({ deleted: false, restoredChildren: [] });
+
+          const [post] = yield* db
+            .select({ mergedIntoPostId: schema.postTable.mergedIntoPostId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, sourcePostId));
+          expect(post).toMatchObject({ mergedIntoPostId: targetPostId });
+        })
+      );
     });
 
     describe("PostDeleteEligibilityList", () => {

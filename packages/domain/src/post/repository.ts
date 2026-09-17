@@ -987,6 +987,7 @@ const makePostRepository = Effect.gen(function* () {
         // child list even if an unmerge raced the scan above.
         const lockedPosts = yield* db
           .select({
+            boardId: schema.postTable.boardId,
             id: schema.postTable.id,
             mergedIntoPostId: schema.postTable.mergedIntoPostId,
           })
@@ -1003,8 +1004,19 @@ const makePostRepository = Effect.gen(function* () {
           .orderBy(schema.postTable.id)
           .for("update");
 
-        const posts = lockedPosts.filter((post) => survivorIdSet.has(post.id));
-        if (posts.length === 0) {
+        // Re-validate every scanned survivor against the locked row: the
+        // pre-transaction policy saw an older snapshot, so a concurrent move
+        // or merge can leave a survivor on another board or already merged
+        // into a post outside this delete's scope. Refuse before reverting
+        // any merged child — otherwise a delete that then matches nothing
+        // would leave the survivor alive with its children already unmerged.
+        const posts = lockedPosts.filter(
+          (post) =>
+            survivorIdSet.has(post.id) &&
+            post.boardId === boardId &&
+            post.mergedIntoPostId === null
+        );
+        if (posts.length !== survivorIds.length) {
           return { deleted: false, restoredChildren: [] };
         }
 
@@ -1085,7 +1097,16 @@ const makePostRepository = Effect.gen(function* () {
 
         const deleted = yield* db
           .delete(schema.postTable)
-          .where(postScope)
+          .where(
+            and(
+              inArray(
+                schema.postTable.id,
+                posts.map((post) => post.id)
+              ),
+              eq(schema.postTable.organizationId, organizationId),
+              eq(schema.postTable.boardId, boardId)
+            )
+          )
           .returning({ id: schema.postTable.id });
 
         return {
