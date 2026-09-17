@@ -2667,19 +2667,35 @@ describe("PostRpcHandlers", () => {
             .where(eq(schema.commentTable.id, commentId));
           expect(movedComment?.mergedFromPostId).toBe(sourcePostId);
 
-          // Only engagement whose restoration needs no provenance may remain
-          // on the archived source: reactions, tags, and comments all moved.
-          for (const table of [
-            schema.postReactionTable,
-            schema.postTagTable,
-            schema.commentTable,
-          ] as const) {
-            const leftovers = yield* db
-              .select({ id: table.id })
-              .from(table)
-              .where(eq(table.postId, sourcePostId));
-            expect(leftovers).toEqual([]);
-          }
+          // Engagement whose restoration needs no provenance moved off the
+          // archived source: comments always, and twins with no target
+          // counterpart (the source-only reaction and tag). Only the
+          // colliding twins — the shared reaction and the shared tag — stay
+          // parked on the source next to the colliding vote, keeping the
+          // user's record of engaging with the source until an unmerge
+          // returns it.
+          const leftoverComments = yield* db
+            .select({ id: schema.commentTable.id })
+            .from(schema.commentTable)
+            .where(eq(schema.commentTable.postId, sourcePostId));
+          expect(leftoverComments).toEqual([]);
+
+          const sourceReactions = yield* db
+            .select({
+              userId: schema.postReactionTable.userId,
+              emoji: schema.postReactionTable.emoji,
+            })
+            .from(schema.postReactionTable)
+            .where(eq(schema.postReactionTable.postId, sourcePostId));
+          expect(sourceReactions).toEqual([{ userId: sharedVoterId, emoji: "👍" }]);
+
+          const sourceTags = yield* db
+            .select({ tagId: schema.postTagTable.tagId })
+            .from(schema.postTagTable)
+            .where(eq(schema.postTagTable.postId, sourcePostId));
+          expect(sourceTags.map((row) => row.tagId)).toEqual([
+            `tag_shared_${fixture.organizationId}`,
+          ]);
 
           // The colliding vote stays on the source (its only provenance), so
           // unmerge and survivor delete can put it back; the voter's target
@@ -3454,6 +3470,7 @@ describe("PostRpcHandlers", () => {
           ]);
 
           const sharedContactId = `email_contact_shared_${fixture.organizationId}`;
+          const sharedContactEmail = `shared_sub_${fixture.organizationId}@example.com`;
           const sourceOnlyContactId = `email_contact_source_${fixture.organizationId}`;
           const now = new Date();
           yield* db.insert(schema.emailContactTable).values([
@@ -3545,18 +3562,39 @@ describe("PostRpcHandlers", () => {
           ).toHaveLength(1);
           expect(targetEmailContactIds).toContain(sourceOnlyContactId);
 
-          // No subscription may remain pointed at the archived source.
+          // Followers and contacts who already follow the target keep the
+          // source row parked on the archived source, so an unmerge can
+          // return them; only rows with no target twin moved. This includes
+          // the fixture creator's auto-subscriptions on both posts.
           const leftoverPostSubscriptions = yield* db
-            .select({ id: schema.postSubscriptionTable.id })
+            .select({ userId: schema.postSubscriptionTable.userId })
             .from(schema.postSubscriptionTable)
             .where(eq(schema.postSubscriptionTable.postId, sourcePostId));
-          expect(leftoverPostSubscriptions).toEqual([]);
+          expect(
+            leftoverPostSubscriptions.map((row) => row.userId).sort()
+          ).toEqual([sharedUserId, fixture.userId].sort());
 
           const leftoverEmailSubscriptions = yield* db
-            .select({ id: schema.emailSubscriptionTable.id })
+            .select({ email: schema.emailContactTable.email })
             .from(schema.emailSubscriptionTable)
+            .innerJoin(
+              schema.emailContactTable,
+              eq(
+                schema.emailContactTable.id,
+                schema.emailSubscriptionTable.contactId
+              )
+            )
             .where(eq(schema.emailSubscriptionTable.topicId, sourcePostId));
-          expect(leftoverEmailSubscriptions).toEqual([]);
+          // Emails are stored normalized, so compare case-insensitively.
+          expect(
+            leftoverEmailSubscriptions
+              .map((row) => row.email.toLowerCase())
+              .sort()
+          ).toEqual(
+            [sharedContactEmail, fixture.creatorEmail]
+              .map((email) => email.toLowerCase())
+              .sort()
+          );
         })
       );
 
