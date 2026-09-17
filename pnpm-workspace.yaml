@@ -72,4 +72,4 @@ overrides:
   prosemirror-model: ^1.25.9
   "@effect/platform-node-shared": 4.0.0-rc.115
 patchedDependencies:
-  '@effect-aws/s3@1.0.0-beta.5': patches/@effect-aws__s3@1.0.0-beta.5.patch
+  "@effect-aws/s3@1.0.0-beta.5": patches/@effect-aws__s3@1.0.0-beta.5.patch
