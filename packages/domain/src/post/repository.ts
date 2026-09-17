@@ -368,6 +368,12 @@ const makePostRepository = Effect.gen(function* () {
         )
         .limit(1)
         .pipe(Effect.map((rows) => rows[0])),
+    /**
+     * Locks the post row (`SELECT ... FOR UPDATE`) and returns the fields the
+     * update handlers compare and re-validate inside the transaction,
+     * including `mergedIntoPostId` so a concurrent merge is caught after the
+     * lock instead of slipping past the pre-transaction policy.
+     */
     findActivityState: ({ id, organizationId }: TPostById) =>
       db
         .select({
@@ -379,6 +385,7 @@ const makePostRepository = Effect.gen(function* () {
           creatorMemberId: schema.postTable.creatorMemberId,
           etaQuarter: schema.postTable.etaQuarter,
           lockedAt: schema.postTable.lockedAt,
+          mergedIntoPostId: schema.postTable.mergedIntoPostId,
           slug: schema.postTable.slug,
           statusId: schema.postTable.statusId,
           title: schema.postTable.title,

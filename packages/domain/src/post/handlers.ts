@@ -178,6 +178,36 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         }),
     });
 
+  /**
+   * Reads the post row locked by `findActivityState` inside the enclosing
+   * transaction and fails with `FailedToUpdatePostError` when the row is
+   * missing or with `PolicyDeniedError` when it has been merged. The
+   * `isNotMerged` policy runs before the transaction, so a concurrent merge
+   * can win that race; the locked row is the authoritative answer. Denies
+   * before no-change returns and before any write or asset sync. IDs are
+   * plain DB strings here: `postTable` columns are unbranded `text()`.
+   */
+  const requireNotMergedActivityState = (args: {
+    id: string;
+    organizationId: string;
+  }) =>
+    repository.findActivityState(args).pipe(
+      Effect.flatMap((previous) =>
+        previous === undefined
+          ? Effect.fail(new FailedToUpdatePostError())
+          : Effect.succeed(previous)
+      ),
+      Effect.flatMap((post) =>
+        post.mergedIntoPostId === null
+          ? Effect.succeed(post)
+          : Effect.fail(
+              new Policy.PolicyDeniedError({
+                reason: "This post has been merged into another post",
+              })
+            )
+      )
+    );
+
   const suggestionsEffect = (args: TPostSuggestions, publicOnly: boolean) =>
     Effect.gen(function* () {
       const input = postEmbeddingInput(args);
@@ -314,13 +344,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       const membership = Policy.getMembership(session, args.organizationId);
       const outboxId = yield* transaction(
         Effect.gen(function* () {
-          const previous = yield* repository.findActivityState({
-            id: args.id,
-            organizationId: args.organizationId,
-          });
-          if (!previous) {
-            return yield* new FailedToUpdatePostError();
-          }
+          const previous = yield* requireNotMergedActivityState(args);
           const actor = {
             actorId: session.session.userId,
             actorMemberId: membership?.membershipId ?? null,
@@ -451,13 +475,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       const membership = Policy.getMembership(session, args.organizationId);
       yield* transaction(
         Effect.gen(function* () {
-          const previous = yield* repository.findActivityState({
-            id: args.id,
-            organizationId: args.organizationId,
-          });
-          if (!previous) {
-            return yield* new FailedToUpdatePostError();
-          }
+          const previous = yield* requireNotMergedActivityState(args);
           if (previous.etaQuarter === args.etaQuarter) {
             return;
           }
@@ -492,13 +510,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       });
       yield* transaction(
         Effect.gen(function* () {
-          const previous = yield* repository.findActivityState({
-            id: args.id,
-            organizationId: args.organizationId,
-          });
-          if (!previous) {
-            return yield* new FailedToUpdatePostError();
-          }
+          const previous = yield* requireNotMergedActivityState(args);
           // Attribution resolves inside the same transaction as the
           // mutation, exactly like on-behalf creation. Posts carry no
           // user-keyed rows of their own, so no shadow user is needed.
@@ -608,13 +620,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       let title = "";
       yield* transaction(
         Effect.gen(function* () {
-          const previous = yield* repository.findActivityState({
-            id: args.id,
-            organizationId: args.organizationId,
-          });
-          if (!previous) {
-            return yield* new FailedToUpdatePostError();
-          }
+          const previous = yield* requireNotMergedActivityState(args);
           title = previous.title;
           contentChanged = previous.content !== prepared.content;
           if (!contentChanged) {
@@ -677,13 +683,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       let content = "";
       yield* transaction(
         Effect.gen(function* () {
-          const previous = yield* repository.findActivityState({
-            id: args.id,
-            organizationId: args.organizationId,
-          });
-          if (!previous) {
-            return yield* new FailedToUpdatePostError();
-          }
+          const previous = yield* requireNotMergedActivityState(args);
           content = previous.content;
           titleChanged = previous.title !== args.title;
           if (!titleChanged) {
@@ -1304,13 +1304,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         const membership = Policy.getMembership(session, args.organizationId);
         yield* transaction(
           Effect.gen(function* () {
-            const previous = yield* repository.findActivityState({
-              id: args.id,
-              organizationId: args.organizationId,
-            });
-            if (!previous) {
-              return yield* new FailedToUpdatePostError();
-            }
+            const previous = yield* requireNotMergedActivityState(args);
             const actor = {
               actorId: session.session.userId,
               actorMemberId: membership?.membershipId ?? null,
@@ -1357,13 +1351,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
         const outboxId = yield* transaction(
           Effect.gen(function* () {
-            const post = yield* repository.findActivityState({
+            yield* requireNotMergedActivityState({
               id: args.postId,
               organizationId: args.organizationId,
             });
-            if (post === undefined) {
-              return yield* new FailedToUpdatePostError();
-            }
             yield* activityRepository.create({
               actorId: session.session.userId,
               actorMemberId: membership?.membershipId ?? null,

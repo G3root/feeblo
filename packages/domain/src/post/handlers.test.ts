@@ -13,8 +13,10 @@ import {
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { and, eq, inArray, sql } from "drizzle-orm";
+import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { TestClock } from "effect/testing";
@@ -252,22 +254,78 @@ describe("PostRpcHandlers", () => {
     EntitlementPolicy.layer
   ).pipe(Layer.provideMerge(RepositoriesTest));
 
-  const TestLayer = Layer.mergeAll(
-    HandlerTest,
+  const IntegrationEventRecorderTest = Layer.succeed(
+    IntegrationEventRecorder,
+    IntegrationEventRecorder.of({
+      recordIntegrationEvent: ({ event }) =>
+        Effect.sync(() => {
+          recordedIntegrationEvents.push(event);
+        }).pipe(Effect.as({ deliveryCount: 0, eventRecorded: false })),
+    })
+  );
+
+  // Runtime dependencies shared by every handler suite; the gated race
+  // variant below swaps only the policy wiring.
+  const HandlerRuntimeTest = Layer.mergeAll(
     Database.PgliteDatabaseLive,
     NodeCrypto.layer,
     S3Test,
     EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
-    Layer.succeed(
-      IntegrationEventRecorder,
-      IntegrationEventRecorder.of({
-        recordIntegrationEvent: ({ event }) =>
-          Effect.sync(() => {
-            recordedIntegrationEvents.push(event);
-          }).pipe(Effect.as({ deliveryCount: 0, eventRecorded: false })),
-      })
-    )
+    IntegrationEventRecorderTest
   );
+
+  const TestLayer = Layer.mergeAll(HandlerTest, HandlerRuntimeTest);
+
+  /**
+   * Pauses the real merged-state policy after it has evaluated against the
+   * unmerged row, so a test can commit a merge before the handler's locked
+   * transaction runs and reproduces the policy/transaction race.
+   */
+  class MergeRaceGate extends Context.Service<
+    MergeRaceGate,
+    {
+      readonly allowUpdate: Deferred.Deferred<void>;
+      readonly policyEvaluated: Deferred.Deferred<void>;
+    }
+  >()("MergeRaceGate") {}
+
+  const MergeRaceGateLive = Layer.effect(
+    MergeRaceGate,
+    Effect.gen(function* () {
+      return {
+        allowUpdate: yield* Deferred.make<void>(),
+        policyEvaluated: yield* Deferred.make<void>(),
+      };
+    })
+  );
+
+  const GatedPostPolicy = Layer.effect(
+    PostPolicy,
+    Effect.gen(function* () {
+      const gate = yield* MergeRaceGate;
+      const realPolicy = yield* PostPolicy;
+      return PostPolicy.of({
+        ...realPolicy,
+        canUpdate: (args) =>
+          realPolicy.canUpdate(args).pipe(
+            Effect.tap(() => Deferred.succeed(gate.policyEvaluated, undefined)),
+            Effect.andThen(Deferred.await(gate.allowUpdate))
+          ),
+        canUpdateEta: (args) =>
+          realPolicy.canUpdateEta(args).pipe(
+            Effect.tap(() => Deferred.succeed(gate.policyEvaluated, undefined)),
+            Effect.andThen(Deferred.await(gate.allowUpdate))
+          ),
+      });
+    })
+  ).pipe(Layer.provide(PostPolicy.layer));
+
+  const GatedHandlerTest = Layer.mergeAll(
+    Layer.provideMerge(GatedPostPolicy, MergeRaceGateLive),
+    EntitlementPolicy.layer
+  ).pipe(Layer.provideMerge(RepositoriesTest));
+
+  const GatedTestLayer = Layer.mergeAll(GatedHandlerTest, HandlerRuntimeTest);
 
   layer(TestLayer)("handlers", (it) => {
     describe("PostList", () => {
@@ -4085,5 +4143,126 @@ describe("PostRpcHandlers", () => {
         );
       });
     });
+  });
+
+  layer(GatedTestLayer)("handlers with a gated merged policy", (it) => {
+    it.effect(
+      "rejects an update whose merge lands after the policy check",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const gate = yield* MergeRaceGate;
+          const fixture = yield* makeFixture();
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [sourcePostId, "Source feedback"],
+            [targetPostId, "Target feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          // The real policy has evaluated `isNotMerged` against the unmerged
+          // row and is paused before the update enters its transaction.
+          const updateFiber = yield* handlers
+            .PostUpdateTitle({
+              boardId: fixture.boardId,
+              id: sourcePostId,
+              organizationId: fixture.organizationId,
+              title: "Renamed feedback",
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture)),
+              Effect.forkChild
+            );
+          yield* Deferred.await(gate.policyEvaluated);
+
+          // A concurrent merge commits while the update waits, so the policy
+          // result the update carries is stale.
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* Deferred.succeed(gate.allowUpdate, undefined);
+
+          const error = yield* Fiber.join(updateFiber).pipe(Effect.flip);
+          expect(error).toBeInstanceOf(Policy.PolicyDeniedError);
+
+          const [post] = yield* db
+            .select({
+              mergedIntoPostId: schema.postTable.mergedIntoPostId,
+              title: schema.postTable.title,
+            })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, sourcePostId));
+          expect(post).toMatchObject({
+            mergedIntoPostId: targetPostId,
+            title: "Source feedback",
+          });
+        })
+    );
+
+    it.effect(
+      "rejects an ETA update whose merge lands after the policy check",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const gate = yield* MergeRaceGate;
+          const fixture = yield* makeFixture();
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [sourcePostId, "Source feedback"],
+            [targetPostId, "Target feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          // Same race as above, through the ETA handler's own locked
+          // transaction (`canUpdateEta` policy path).
+          const updateFiber = yield* handlers
+            .PostUpdateEta({
+              id: sourcePostId,
+              organizationId: fixture.organizationId,
+              etaQuarter: "2026-Q3",
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              ),
+              Effect.forkChild
+            );
+          yield* Deferred.await(gate.policyEvaluated);
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* Deferred.succeed(gate.allowUpdate, undefined);
+
+          const error = yield* Fiber.join(updateFiber).pipe(Effect.flip);
+          expect(error).toBeInstanceOf(Policy.PolicyDeniedError);
+        })
+    );
   });
 });
