@@ -19,7 +19,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import { TestClock } from "effect/testing";
-import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
+import * as PersistedQueue from "effect/unstable/persistence/PersistedQueue";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
@@ -30,16 +30,20 @@ import {
   emailSubscriptionTopicForIntent,
   resolveSubscriptionNotificationContent,
 } from "./content";
-import { EmailOutboxRepository } from "./repository";
 import {
-  EmailDeliveryWorkflow,
-  EmailOutboxDispatcherWorkflow,
-  EmailOutboxWorkflowLayer,
+  EmailOutboxQueues,
+  EmailOutboxWorkerLayer,
+  enqueueEmailDelivery,
   materializeEmailIntent,
   reconcileEmailOutbox,
-} from "./workflow";
+  wakeEmailOutbox,
+} from "./queue";
+import { EmailOutboxRepository } from "./repository";
 
-const TestLayer = EmailOutboxWorkflowLayer.pipe(
+const TestLayer = EmailOutboxWorkerLayer.pipe(
+  Layer.provideMerge(EmailOutboxQueues.layer),
+  Layer.provideMerge(PersistedQueue.layer),
+  Layer.provideMerge(PersistedQueue.layerStoreMemory),
   Layer.provideMerge(
     EmailOutboxConfig.layerTest(new URL("https://test.feeblo.example"))
   ),
@@ -57,7 +61,6 @@ const TestLayer = EmailOutboxWorkflowLayer.pipe(
   Layer.provideMerge(
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   ),
-  Layer.provideMerge(WorkflowEngine.layerMemory),
   Layer.provideMerge(Database.PgliteDatabaseLive)
 );
 
@@ -296,6 +299,31 @@ const waitForDelivery = (
     );
   });
 
+const waitForDeliveryById = (
+  deliveryId: string,
+  predicate: (
+    delivery: typeof schema.emailDeliveryTable.$inferSelect
+  ) => boolean
+) =>
+  Effect.gen(function* () {
+    const db = yield* Database.Database;
+    let lastObservedState = "missing";
+    for (let poll = 0; poll < 100; poll += 1) {
+      const [delivery] = yield* db
+        .select()
+        .from(schema.emailDeliveryTable)
+        .where(eq(schema.emailDeliveryTable.id, deliveryId));
+      if (delivery !== undefined && predicate(delivery)) {
+        return delivery;
+      }
+      lastObservedState = delivery?.state ?? "missing";
+      yield* Effect.yieldNow;
+    }
+    return yield* Effect.die(
+      `Email delivery did not reach the expected state; last state=${lastObservedState}`
+    );
+  });
+
 const waitForIntentState = (outboxId: string, state: string) =>
   Effect.gen(function* () {
     const repository = yield* EmailOutboxRepository;
@@ -308,8 +336,8 @@ const waitForIntentState = (outboxId: string, state: string) =>
     return yield* Effect.die("Email intent did not reach the expected state");
   });
 
-describe("EmailOutbox workflows", () => {
-  layer(TestLayer)("memory workflow engine", (it) => {
+describe("EmailOutbox queues", () => {
+  layer(TestLayer)("memory persisted queue", (it) => {
     it.effect(
       "reconciliation recovers a missed submission wake and sends only the free owner",
       () =>
@@ -403,7 +431,11 @@ describe("EmailOutbox workflows", () => {
 
           const deliveryIds = yield* materializeEmailIntent(intentId);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            enqueueEmailDelivery(deliveryId)
+          );
+          yield* waitForDelivery(
+            intentId,
+            (delivery) => delivery.state === "accepted"
           );
           const mailbox = yield* testMailerState;
           expect(mailbox.sentMessages.map((message) => message.to)).toEqual([
@@ -423,10 +455,7 @@ describe("EmailOutbox workflows", () => {
             outcomes: [{ _tag: "temporaryFailure" }, { _tag: "accepted" }],
           });
           const { intentId } = yield* fixture;
-          yield* EmailOutboxDispatcherWorkflow.execute(
-            { outboxId: intentId },
-            { discard: true }
-          );
+          yield* wakeEmailOutbox(intentId);
           yield* waitForDelivery(
             intentId,
             (delivery) =>
@@ -511,7 +540,7 @@ describe("EmailOutbox workflows", () => {
           }
           const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            enqueueEmailDelivery(deliveryId)
           );
           yield* waitForDelivery(
             intent.intent.id,
@@ -719,7 +748,11 @@ describe("EmailOutbox workflows", () => {
             .update(schema.siteTable)
             .set({ changelogVisibility: "HIDDEN", updatedAt: new Date() })
             .where(eq(schema.siteTable.organizationId, organizationId));
-          yield* EmailDeliveryWorkflow.execute({ deliveryId });
+          yield* enqueueEmailDelivery(deliveryId);
+          yield* waitForDeliveryById(
+            deliveryId,
+            (candidate) => candidate.state === "suppressed"
+          );
           const [delivery] = yield* db
             .select({ state: schema.emailDeliveryTable.state })
             .from(schema.emailDeliveryTable)
@@ -794,10 +827,7 @@ describe("EmailOutbox workflows", () => {
           }
           // The first attempt claims the delivery, renders it, and the
           // provider fails temporarily, deferring the retry.
-          yield* EmailDeliveryWorkflow.execute(
-            { deliveryId },
-            { discard: true }
-          );
+          yield* enqueueEmailDelivery(deliveryId);
           yield* waitForDelivery(
             intent.intent.id,
             (delivery) =>
@@ -855,7 +885,7 @@ describe("EmailOutbox workflows", () => {
           }
           const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            enqueueEmailDelivery(deliveryId)
           );
           yield* waitForDelivery(
             intent.intent.id,
@@ -956,7 +986,7 @@ describe("EmailOutbox workflows", () => {
           }
           const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            enqueueEmailDelivery(deliveryId)
           );
           yield* waitForDelivery(
             intent.intent.id,
@@ -1056,9 +1086,11 @@ describe("EmailOutbox workflows", () => {
               eq(schema.emailSubscriptionTable.id, subscriber.subscriptionId)
             );
 
-          yield* EmailDeliveryWorkflow.execute({
-            deliveryId: delivery.delivery.id,
-          });
+          yield* enqueueEmailDelivery(delivery.delivery.id);
+          yield* waitForDeliveryById(
+            delivery.delivery.id,
+            (candidate) => candidate.state === "suppressed"
+          );
 
           expect((yield* testMailerState).attempts).toBe(0);
           expect(
@@ -1104,7 +1136,11 @@ describe("EmailOutbox workflows", () => {
           }
           const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            enqueueEmailDelivery(deliveryId)
+          );
+          yield* waitForDelivery(
+            intent.intent.id,
+            (delivery) => delivery.state === "accepted"
           );
           const mailbox = yield* testMailerState;
           expect(mailbox.sentMessages).toHaveLength(1);
@@ -1177,7 +1213,7 @@ describe("EmailOutbox workflows", () => {
             })),
           });
           const { intentId } = yield* fixture;
-          yield* EmailOutboxDispatcherWorkflow.execute({ outboxId: intentId });
+          yield* wakeEmailOutbox(intentId);
           yield* waitForDelivery(
             intentId,
             (delivery) => delivery.state === "failed"
@@ -1200,7 +1236,7 @@ describe("EmailOutbox workflows", () => {
             outcomes: [{ _tag: "accepted", accepted: false }],
           });
           const { intentId } = yield* fixture;
-          yield* EmailOutboxDispatcherWorkflow.execute({ outboxId: intentId });
+          yield* wakeEmailOutbox(intentId);
           yield* waitForDelivery(
             intentId,
             (delivery) => delivery.state === "failed"
@@ -1233,10 +1269,7 @@ describe("EmailOutbox workflows", () => {
             ],
           });
           const { intentId } = yield* fixture;
-          yield* EmailOutboxDispatcherWorkflow.execute(
-            { outboxId: intentId },
-            { discard: true }
-          );
+          yield* wakeEmailOutbox(intentId);
           for (const _attempt of [1, 2, 3, 4]) {
             const delivery = yield* waitForDelivery(
               intentId,
@@ -1295,9 +1328,11 @@ describe("EmailOutbox workflows", () => {
             return yield* Effect.die("Expected queued orphan delivery");
           }
           yield* reconcileEmailOutbox();
-          yield* EmailDeliveryWorkflow.execute({
-            deliveryId: delivery.delivery.id,
-          });
+          yield* enqueueEmailDelivery(delivery.delivery.id);
+          yield* waitForDeliveryById(
+            delivery.delivery.id,
+            (queued) => queued.state === "accepted"
+          );
           expect(
             (yield* repository.findDeliveryById(delivery.delivery.id))?.state
           ).toBe("accepted");
@@ -1347,10 +1382,7 @@ describe("EmailOutbox workflows", () => {
             })
             .where(eq(schema.emailDeliveryTable.id, delivery.delivery.id));
 
-          yield* EmailDeliveryWorkflow.execute(
-            { deliveryId: delivery.delivery.id },
-            { discard: true }
-          );
+          yield* enqueueEmailDelivery(delivery.delivery.id);
           yield* reconcileEmailOutbox();
           yield* waitForDelivery(
             intentId,
@@ -1371,12 +1403,12 @@ describe("EmailOutbox workflows", () => {
     );
 
     it.effect(
-      "does not send again when a terminal delivery workflow is replayed",
+      "does not send again when a completed delivery element is replayed",
       () =>
         Effect.gen(function* () {
           yield* resetTestMailer({ outcomes: [{ _tag: "permanentFailure" }] });
           const { intentId } = yield* fixture;
-          yield* EmailOutboxDispatcherWorkflow.execute({ outboxId: intentId });
+          yield* wakeEmailOutbox(intentId);
           yield* waitForDelivery(
             intentId,
             (delivery) => delivery.state === "failed"
@@ -1390,7 +1422,7 @@ describe("EmailOutbox workflows", () => {
             return yield* Effect.die("Expected delivery");
           }
           const attemptsBeforeReplay = (yield* testMailerState).attempts;
-          yield* EmailDeliveryWorkflow.execute({ deliveryId: delivery.id });
+          yield* enqueueEmailDelivery(delivery.id);
           expect((yield* testMailerState).attempts).toBe(attemptsBeforeReplay);
         })
     );
@@ -1487,11 +1519,15 @@ describe("EmailOutbox workflows", () => {
           const deliveryIds = yield* materializeEmailIntent(intentId);
           expect(deliveryIds).toHaveLength(1);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            enqueueEmailDelivery(deliveryId)
           );
-          // Terminal: replaying the workflow must not retry the send.
+          yield* waitForDelivery(
+            intentId,
+            (delivery) => delivery.state === "no_organization_access"
+          );
+          // Terminal: replaying a completed element must not retry the send.
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            enqueueEmailDelivery(deliveryId)
           );
 
           const [delivery] = yield* db
@@ -1536,7 +1572,11 @@ describe("EmailOutbox workflows", () => {
           const publicDeliveryIds =
             yield* materializeEmailIntent(publicIntentId);
           yield* Effect.forEach(publicDeliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            enqueueEmailDelivery(deliveryId)
+          );
+          yield* waitForDelivery(
+            publicIntentId,
+            (delivery) => delivery.state === "accepted"
           );
           const [publicDelivery] = yield* db
             .select()
@@ -1561,7 +1601,11 @@ describe("EmailOutbox workflows", () => {
           const privateDeliveryIds =
             yield* materializeEmailIntent(privateIntentId);
           yield* Effect.forEach(privateDeliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            enqueueEmailDelivery(deliveryId)
+          );
+          yield* waitForDelivery(
+            privateIntentId,
+            (delivery) => delivery.state === "no_organization_access"
           );
           const [privateDelivery] = yield* db
             .select()
@@ -1627,7 +1671,11 @@ describe("EmailOutbox workflows", () => {
           );
           const deliveryIds = yield* materializeEmailIntent(intentId);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            enqueueEmailDelivery(deliveryId)
+          );
+          yield* waitForDelivery(
+            intentId,
+            (delivery) => delivery.state === "accepted"
           );
           const mailbox = yield* testMailerState;
           expect(
@@ -1660,7 +1708,11 @@ describe("EmailOutbox workflows", () => {
           );
           const deliveryIds = yield* materializeEmailIntent(intentId);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            enqueueEmailDelivery(deliveryId)
+          );
+          yield* waitForDelivery(
+            intentId,
+            (delivery) => delivery.state === "accepted"
           );
           const mailbox = yield* testMailerState;
           expect(mailbox.sentMessages.map((message) => message.to)).toEqual([
@@ -1805,9 +1857,12 @@ describe("EmailOutbox workflows", () => {
   });
 });
 
-describe("EmailOutbox workflows with plain-HTTP API_URL", () => {
+describe("EmailOutbox queues with plain-HTTP API_URL", () => {
   layer(
-    EmailOutboxWorkflowLayer.pipe(
+    EmailOutboxWorkerLayer.pipe(
+      Layer.provideMerge(EmailOutboxQueues.layer),
+      Layer.provideMerge(PersistedQueue.layer),
+      Layer.provideMerge(PersistedQueue.layerStoreMemory),
       Layer.provideMerge(
         EmailOutboxConfig.layerTest(
           new URL("https://test.feeblo.example"),
@@ -1828,10 +1883,9 @@ describe("EmailOutbox workflows with plain-HTTP API_URL", () => {
       Layer.provideMerge(
         EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
       ),
-      Layer.provideMerge(WorkflowEngine.layerMemory),
       Layer.provideMerge(Database.PgliteDatabaseLive)
     )
-  )("memory workflow engine", (it) => {
+  )("memory persisted queue", (it) => {
     it.effect(
       "fails changelog deliveries terminally instead of emailing an HTTP tokenized link",
       () =>
@@ -1908,7 +1962,7 @@ describe("EmailOutbox workflows with plain-HTTP API_URL", () => {
           }
           const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            enqueueEmailDelivery(deliveryId)
           );
           yield* waitForDelivery(
             intent.intent.id,

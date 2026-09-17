@@ -63,6 +63,6 @@ export const deliverySourceStatesFor = (
 ): readonly TEmailDeliveryState[] =>
   deliveryStates.filter((from) => canTransitionDelivery(from, to));
 
-/** Terminal delivery states are safe no-ops when a workflow is replayed. */
+/** Terminal delivery states are safe no-ops when the queue replays an element. */
 export const isTerminalDeliveryState = (state: TEmailDeliveryState): boolean =>
   transitionTargets[state].length === 0;

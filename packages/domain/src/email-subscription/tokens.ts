@@ -34,7 +34,7 @@ export interface DeriveEmailSubscriptionTokenInput {
 }
 
 const makeEmailSubscriptionTokenService = Effect.gen(function* () {
-  const signingSecret = yield* Config.redacted("AUTH_ENCRYPTION_KEY");
+  const signingSecret = yield* Config.Redacted("AUTH_ENCRYPTION_KEY");
 
   const deriveToken = Effect.fn("EmailSubscriptionToken.derive")(function* ({
     purpose,

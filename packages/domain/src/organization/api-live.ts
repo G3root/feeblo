@@ -1,6 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import { can } from "@feeblo/permissions";
 import { eq } from "drizzle-orm";
+import * as ByteSize from "effect/ByteSize";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -80,8 +81,11 @@ export const OrganizationApiLive = HttpApiBuilder.group(
                   new InternalServerError({ message: "Failed to read file" })
               )
             );
-          const maxSize = FileSystem.Size(MAX_ORGANIZATION_LOGO_BYTES);
-          if (fileInfo.size === FileSystem.Size(0) || fileInfo.size > maxSize) {
+          const maxSize = ByteSize.bytes(MAX_ORGANIZATION_LOGO_BYTES);
+          if (
+            ByteSize.isZero(fileInfo.size) ||
+            ByteSize.isGreaterThan(fileInfo.size, maxSize)
+          ) {
             return yield* new BadRequestError({
               message: "Workspace logo must be between 1B and 5MB",
             });

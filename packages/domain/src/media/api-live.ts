@@ -1,3 +1,4 @@
+import * as ByteSize from "effect/ByteSize";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -65,9 +66,14 @@ export const MediaApiLive = HttpApiBuilder.group(
               () => new InternalServerError({ message: "Failed to read file" })
             )
           );
-        const maxSize = FileSystem.Size(MAX_IMAGE_BYTES);
-        if (fileInfo.size === FileSystem.Size(0) || fileInfo.size > maxSize) {
-          const maxSizeMb = Math.round(Number(maxSize) / (1024 * 1024));
+        const maxSize = ByteSize.bytes(MAX_IMAGE_BYTES);
+        if (
+          ByteSize.isZero(fileInfo.size) ||
+          ByteSize.isGreaterThan(fileInfo.size, maxSize)
+        ) {
+          const maxSizeMb = Math.round(
+            ByteSize.toNumberUnsafe(maxSize) / (1024 * 1024)
+          );
           return yield* new BadRequestError({
             message: `File must be between 1B and ${maxSizeMb}MB`,
           });

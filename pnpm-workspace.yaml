@@ -19,12 +19,12 @@ catalog:
   "@dotenvx/dotenvx": ^1.75.1
   "@effect-aws/client-s3": 2.0.0-beta.6
   "@effect-aws/s3": 1.0.0-beta.5
-  "@effect/ai-openai": 4.0.0-rc.112
-  "@effect/atom-react": 4.0.0-rc.112
-  "@effect/platform-node": 4.0.0-rc.112
-  "@effect/sql-pg": 4.0.0-rc.112
-  "@effect/sql-pglite": 4.0.0-rc.112
-  "@effect/vitest": 4.0.0-rc.112
+  "@effect/ai-openai": 4.0.0-rc.115
+  "@effect/atom-react": 4.0.0-rc.115
+  "@effect/platform-node": 4.0.0-rc.115
+  "@effect/sql-pg": 4.0.0-rc.115
+  "@effect/sql-pglite": 4.0.0-rc.115
+  "@effect/vitest": 4.0.0-rc.115
   "@floating-ui/dom": ^1.8.0
   "@isaacs/ttlcache": ^2.1.5
   "@polar-sh/better-auth": ^1.8.3
@@ -49,7 +49,7 @@ catalog:
   drizzle-kit: 1.0.0-rc.4
   drizzle-orm: 1.0.0-rc.5-169397b
   drizzle-seed: 1.0.0-rc.4
-  effect: 4.0.0-rc.112
+  effect: 4.0.0-rc.115
   jose: ^6.2.3
   postgres: ^3.4.7
   react: ^19.2.8
@@ -70,4 +70,6 @@ catalog:
 nodeLinker: hoisted
 overrides:
   prosemirror-model: ^1.25.9
-  "@effect/platform-node-shared": 4.0.0-rc.112
+  "@effect/platform-node-shared": 4.0.0-rc.115
+patchedDependencies:
+  "@effect-aws/s3@1.0.0-beta.5": patches/@effect-aws__s3@1.0.0-beta.5.patch

@@ -75,7 +75,7 @@ Dashboard RPC (PostCreate / CommentCreate / UpvoteAddOnBehalf …)
   -> post_activity records actor (member) + subject + provenance metadata
   -> subscriptions recorded per policy
 
-Email outbox dispatcher / delivery workflow
+Email outbox dispatcher / delivery queues
   -> existing plan, consent, suppression checks
   -> NEW: organization-access eligibility check per recipient
 ```

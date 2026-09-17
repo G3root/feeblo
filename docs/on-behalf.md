@@ -86,11 +86,11 @@ Split identities therefore cannot persist: the first time the customer signs up 
 
 ## Where things live
 
-| Concern             | Path                                           |
-| ------------------- | ---------------------------------------------- |
-| Resolver            | `packages/domain/src/identity/service.ts`      |
-| Linking             | `packages/domain/src/identity/linking.ts`      |
-| Access evaluation   | `packages/domain/src/email-outbox/access.ts`   |
-| Delivery gate       | `packages/domain/src/email-outbox/workflow.ts` |
-| Shadow provisioning | `packages/domain/src/user/repository.ts`       |
-| Plan and decisions  | `plan-on-behalf.md` (repo root)                |
+| Concern             | Path                                         |
+| ------------------- | -------------------------------------------- |
+| Resolver            | `packages/domain/src/identity/service.ts`    |
+| Linking             | `packages/domain/src/identity/linking.ts`    |
+| Access evaluation   | `packages/domain/src/email-outbox/access.ts` |
+| Delivery gate       | `packages/domain/src/email-outbox/queue.ts`  |
+| Shadow provisioning | `packages/domain/src/user/repository.ts`     |
+| Plan and decisions  | `plan-on-behalf.md` (repo root)              |

@@ -70,7 +70,7 @@ export class MailerConfig extends Context.Service<MailerConfig>()(
       );
       const service = yield* optionalString("SMTP_SERVICE");
       const username = yield* optionalString("SMTP_USERNAME");
-      const password = yield* Config.redacted("SMTP_PASSWORD").pipe(
+      const password = yield* Config.Redacted("SMTP_PASSWORD").pipe(
         Config.option
       );
       const defaultFrom = yield* optionalString("SMTP_FROM_ADDRESS").pipe(

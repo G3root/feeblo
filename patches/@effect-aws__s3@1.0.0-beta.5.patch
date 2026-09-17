@@ -1,0 +1,26 @@
+diff --git a/dist/esm/internal/multipartUpload.js b/dist/esm/internal/multipartUpload.js
+index 19a098d09f89ec246c09c7b256f1153cead97965..c88afcd752263c98d82502113d629135e8558200 100644
+--- a/dist/esm/internal/multipartUpload.js
++++ b/dist/esm/internal/multipartUpload.js
+@@ -128,7 +128,7 @@ const getChunk = (data, partSize) => {
+     }
+     throw new Error("Body Data is unsupported format, expected data to be one of: string | Uint8Array | Buffer | Readable | ReadableStream | Blob | Stream.Stream<Uint8Array>;.");
+ };
+-const MIN_PART_SIZE = FileSystem.MiB(5);
++const MIN_PART_SIZE = 5 * 1024 * 1024;
+ /** @internal */
+ export const make = Effect.gen(function* () {
+     const s3 = yield* S3Service;
+diff --git a/src/internal/multipartUpload.ts b/src/internal/multipartUpload.ts
+index c5001d827fa3acf16c780edbe347a60d2bbdc71e..be26c994174296f61c34fb40c4febadcf934b481 100644
+--- a/src/internal/multipartUpload.ts
++++ b/src/internal/multipartUpload.ts
+@@ -193,7 +193,7 @@ type PutObjectError =
+ 
+ export type S3ServiceErrors = PutObjectError | S3ServiceError;
+ 
+-const MIN_PART_SIZE = FileSystem.MiB(5);
++const MIN_PART_SIZE = 5 * 1024 * 1024;
+ 
+ /** @internal */
+ export const make: Effect.Effect<MultipartUpload, never, S3Service> = Effect.gen(function*() {
