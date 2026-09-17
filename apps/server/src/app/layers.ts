@@ -45,7 +45,6 @@ import { SlackFeedbackServiceLive } from "@feeblo/integration-slack/slack-feedba
 import { SlackUserServiceLive } from "@feeblo/integration-slack/slack-user-service";
 import type { Mailer } from "@feeblo/transactional/mailer";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
-import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import type * as Ref from "effect/Ref";
@@ -161,35 +160,21 @@ export const makeWebhookIntegrationConfig = (config: ServerConfigValue) => {
 };
 
 export const makeRateLimitLayer = (
-  config: ServerConfigValue,
-  useTestMailer: boolean
+  config: ServerConfigValue
 ): Layer.Layer<RateLimitService, Redis.RedisError> => {
-  const memoryStore = RateLimiter.layerStoreMemory;
-
+  // A configured Redis store always wins so rate limits stay shared, even
+  // when the test mailer is enabled. The in-memory fallback applies only in
+  // test/development: config fails startup in production without REDIS_URL,
+  // so a memory store can never silently serve production traffic.
   const RateLimitStoreLayer: Layer.Layer<
     RateLimiter.RateLimiterStore,
     Redis.RedisError
   > =
-    // A configured Redis store always wins so rate limits stay shared, even
-    // when the test mailer is enabled; the in-memory fallbacks below only
-    // apply when no Redis URL is available.
     config.redisUrl !== undefined
       ? RateLimiter.layerStoreRedis({ prefix: "feeblo:rate-limit" }).pipe(
           Layer.provide(NodeRedis.layer(redisOptions(config.redisUrl)))
         )
-      : useTestMailer ||
-          config.nodeEnv === "test" ||
-          config.nodeEnv === "development"
-        ? memoryStore
-        : memoryStore.pipe(
-            Layer.tap(() =>
-              Effect.logWarning(
-                "ALLOW_IN_MEMORY_RATE_LIMIT is set: rate limits are per-instance " +
-                  "and are not shared across server instances. Configure " +
-                  "REDIS_URL for production deployments."
-              )
-            )
-          );
+      : RateLimiter.layerStoreMemory;
 
   return RateLimitService.layer.pipe(
     Layer.provide(RateLimiter.layer),

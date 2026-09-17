@@ -57,7 +57,7 @@ export const program = Effect.gen(function* () {
   > => (mailbox ? makeMailerTestLayer(mailbox) : Mailer.layer);
 
   const WorkFlowLayer = makeWorkflowLayer(mailbox, makeMailerLayer);
-  const RateLimitLayer = makeRateLimitLayer(config, useTestMailer);
+  const RateLimitLayer = makeRateLimitLayer(config);
   const AuthLayer = makeAuthLayer(makeMailerLayer, RateLimitLayer);
 
   // Built once so the integration kernel and the HTTP layer tree share a

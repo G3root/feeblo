@@ -196,23 +196,7 @@ describe("ServerConfig production rate-limit store", () => {
         REDIS_URL: "redis://redis:6379/0",
       });
 
-      expect(config.allowInMemoryRateLimit).toBe(false);
       expect(config.redisUrl).toBe("redis://redis:6379/0");
     })
-  );
-
-  it.effect(
-    "starts in production without REDIS_URL when per-instance limits are explicit",
-    () =>
-      Effect.gen(function* () {
-        const config = yield* loadServerConfig({
-          ALLOW_IN_MEMORY_RATE_LIMIT: "true",
-          NODE_ENV: "production",
-          REDIS_URL: undefined,
-        });
-
-        expect(config.allowInMemoryRateLimit).toBe(true);
-        expect(config.redisUrl).toBeUndefined();
-      })
   );
 });

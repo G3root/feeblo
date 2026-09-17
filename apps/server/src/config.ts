@@ -119,21 +119,13 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       );
       // Shared rate-limit store is mandatory in production: an in-memory
       // fallback silently gives every replica its own buckets, so an attacker
-      // can multiply a public rate limit by the instance count. Operators who
-      // deliberately run a single instance can opt in explicitly.
-      const allowInMemoryRateLimit = yield* Config.boolean(
-        "ALLOW_IN_MEMORY_RATE_LIMIT"
-      ).pipe(Config.withDefault(false));
-      if (
-        nodeEnv === "production" &&
-        redisUrl === undefined &&
-        !allowInMemoryRateLimit
-      ) {
+      // can multiply a public rate limit by the instance count.
+      if (nodeEnv === "production" && redisUrl === undefined) {
         return yield* Effect.fail(
           new Config.ConfigError(
             new ConfigProvider.SourceError({
               message:
-                "REDIS_URL is required in production so rate limits are shared across instances. Set REDIS_URL, or set ALLOW_IN_MEMORY_RATE_LIMIT=true to explicitly accept per-instance limits.",
+                "REDIS_URL is required in production so rate limits are shared across instances. Set REDIS_URL.",
             })
           )
         );
@@ -191,7 +183,6 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       );
 
       return {
-        allowInMemoryRateLimit,
         apiUrl,
         appUrl,
         appRootDomain,
