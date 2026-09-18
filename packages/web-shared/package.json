@@ -123,7 +123,7 @@
     "@feeblo/config": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@vitest/browser-playwright": "^4.1.10",
+    "@vitest/browser-playwright": "^4.1.11",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "vitest-browser-react": "^2.2.0"

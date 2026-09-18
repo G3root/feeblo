@@ -20,6 +20,7 @@ import { unified } from "unified";
 
 import { rehypeCodeHighlight } from "./rehype-code-highlight";
 import { rehypeJoinParagraph } from "./rehype-join-paragraph";
+import { rehypeSafeUrlAttributes } from "./rehype-safe-urls";
 import { customBreakHandler } from "./remark-break-handler";
 
 const unescapeUnderscore = (str: string) => {
@@ -54,6 +55,7 @@ function createHtmlProcessor() {
     .use(remarkGfm)
     .use(remarkRehype)
     .use(rehypeCodeHighlight)
+    .use(rehypeSafeUrlAttributes)
     .use(rehypeStringify)
     .freeze();
 }

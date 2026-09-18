@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { authenticateLink, startLinkAuthentication } from "../src/links";
+import {
+  authenticateLink,
+  isAutoLoginTargetAllowed,
+  startLinkAuthentication,
+} from "../src/links";
 
 describe("data-feeblo-link", () => {
   afterEach(() => {
@@ -42,10 +46,97 @@ describe("data-feeblo-link", () => {
     link.appendChild(child);
     document.body.appendChild(link);
 
+    const stop = startLinkAuthentication(
+      {
+        getAutoLoginToken: () => "signed.jwt.token",
+      },
+      undefined,
+      { allowedOrigins: ["https://feedback.example.com"] }
+    );
+    child.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    stop();
+
+    const url = new URL(link.href);
+    expect(new URLSearchParams(url.hash.slice(1)).get("ssoToken")).toBe(
+      "signed.jwt.token"
+    );
+  });
+
+  it("requires HTTPS for non-loopback token targets", () => {
+    expect(
+      isAutoLoginTargetAllowed("http://feedback.example.com/", [
+        "http://feedback.example.com",
+      ])
+    ).toBe(false);
+    expect(
+      isAutoLoginTargetAllowed("https://feedback.example.com/", [
+        "https://feedback.example.com",
+      ])
+    ).toBe(true);
+  });
+
+  it("allows plain HTTP only for loopback hosts", () => {
+    expect(
+      isAutoLoginTargetAllowed("http://localhost:3000/", [
+        "http://localhost:3000",
+      ])
+    ).toBe(true);
+    expect(
+      isAutoLoginTargetAllowed("http://127.0.0.1:3000/", [
+        "http://127.0.0.1:3000",
+      ])
+    ).toBe(true);
+    expect(
+      isAutoLoginTargetAllowed("http://board.localhost:3000/", [
+        "http://board.localhost:3000",
+      ])
+    ).toBe(true);
+  });
+
+  it("never attaches the token to a link outside the allowed origins", () => {
+    const link = document.createElement("a");
+    link.href = "https://evil.example/";
+    link.setAttribute("data-feeblo-link", "");
+    document.body.appendChild(link);
+    const originalHref = link.href;
+
+    const stop = startLinkAuthentication(
+      { getAutoLoginToken: () => "signed.jwt.token" },
+      undefined,
+      { allowedOrigins: ["https://feedback.example.com"] }
+    );
+    link.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    stop();
+
+    expect(link.href).toBe(originalHref);
+  });
+
+  it("defaults to the embedding page origin", () => {
+    const link = document.createElement("a");
+    link.href = "https://evil.example/";
+    link.setAttribute("data-feeblo-link", "");
+    document.body.appendChild(link);
+    const originalHref = link.href;
+
     const stop = startLinkAuthentication({
       getAutoLoginToken: () => "signed.jwt.token",
     });
-    child.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    link.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    stop();
+
+    expect(link.href).toBe(originalHref);
+  });
+
+  it("allows board subdomains of the embedding page", () => {
+    const link = document.createElement("a");
+    link.href = `${window.location.protocol}//feedback.${window.location.host}/roadmap`;
+    link.setAttribute("data-feeblo-link", "");
+    document.body.appendChild(link);
+
+    const stop = startLinkAuthentication({
+      getAutoLoginToken: () => "signed.jwt.token",
+    });
+    link.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     stop();
 
     const url = new URL(link.href);

@@ -13,8 +13,10 @@ import {
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { and, eq, inArray, sql } from "drizzle-orm";
+import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { TestClock } from "effect/testing";
@@ -252,22 +254,78 @@ describe("PostRpcHandlers", () => {
     EntitlementPolicy.layer
   ).pipe(Layer.provideMerge(RepositoriesTest));
 
-  const TestLayer = Layer.mergeAll(
-    HandlerTest,
+  const IntegrationEventRecorderTest = Layer.succeed(
+    IntegrationEventRecorder,
+    IntegrationEventRecorder.of({
+      recordIntegrationEvent: ({ event }) =>
+        Effect.sync(() => {
+          recordedIntegrationEvents.push(event);
+        }).pipe(Effect.as({ deliveryCount: 0, eventRecorded: false })),
+    })
+  );
+
+  // Runtime dependencies shared by every handler suite; the gated race
+  // variant below swaps only the policy wiring.
+  const HandlerRuntimeTest = Layer.mergeAll(
     Database.PgliteDatabaseLive,
     NodeCrypto.layer,
     S3Test,
     EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
-    Layer.succeed(
-      IntegrationEventRecorder,
-      IntegrationEventRecorder.of({
-        recordIntegrationEvent: ({ event }) =>
-          Effect.sync(() => {
-            recordedIntegrationEvents.push(event);
-          }).pipe(Effect.as({ deliveryCount: 0, eventRecorded: false })),
-      })
-    )
+    IntegrationEventRecorderTest
   );
+
+  const TestLayer = Layer.mergeAll(HandlerTest, HandlerRuntimeTest);
+
+  /**
+   * Pauses the real merged-state policy after it has evaluated against the
+   * unmerged row, so a test can commit a merge before the handler's locked
+   * transaction runs and reproduces the policy/transaction race.
+   */
+  class MergeRaceGate extends Context.Service<
+    MergeRaceGate,
+    {
+      readonly allowUpdate: Deferred.Deferred<void>;
+      readonly policyEvaluated: Deferred.Deferred<void>;
+    }
+  >()("MergeRaceGate") {}
+
+  const MergeRaceGateLive = Layer.effect(
+    MergeRaceGate,
+    Effect.gen(function* () {
+      return {
+        allowUpdate: yield* Deferred.make<void>(),
+        policyEvaluated: yield* Deferred.make<void>(),
+      };
+    })
+  );
+
+  const GatedPostPolicy = Layer.effect(
+    PostPolicy,
+    Effect.gen(function* () {
+      const gate = yield* MergeRaceGate;
+      const realPolicy = yield* PostPolicy;
+      return PostPolicy.of({
+        ...realPolicy,
+        canUpdate: (args) =>
+          realPolicy.canUpdate(args).pipe(
+            Effect.tap(() => Deferred.succeed(gate.policyEvaluated, undefined)),
+            Effect.andThen(Deferred.await(gate.allowUpdate))
+          ),
+        canUpdateEta: (args) =>
+          realPolicy.canUpdateEta(args).pipe(
+            Effect.tap(() => Deferred.succeed(gate.policyEvaluated, undefined)),
+            Effect.andThen(Deferred.await(gate.allowUpdate))
+          ),
+      });
+    })
+  ).pipe(Layer.provide(PostPolicy.layer));
+
+  const GatedHandlerTest = Layer.mergeAll(
+    Layer.provideMerge(GatedPostPolicy, MergeRaceGateLive),
+    EntitlementPolicy.layer
+  ).pipe(Layer.provideMerge(RepositoriesTest));
+
+  const GatedTestLayer = Layer.mergeAll(GatedHandlerTest, HandlerRuntimeTest);
 
   layer(TestLayer)("handlers", (it) => {
     describe("PostList", () => {
@@ -712,6 +770,55 @@ describe("PostRpcHandlers", () => {
 
             expect(error).toBeInstanceOf(PostNotFoundError);
           })
+      );
+
+      it.effect("refuses to delete a post that was merged away", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const repository = yield* PostRepository;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [sourcePostId, "Source feedback"],
+            [targetPostId, "Target feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          // The delete policy denies merged posts before the transaction, so
+          // this reaches the repository directly — the locked re-check is what
+          // backs up a policy/transaction race and must refuse the delete.
+          const result = yield* repository.delete({
+            boardId: fixture.boardId,
+            creatorId: fixture.userId,
+            id: sourcePostId,
+            onlyIfNew: false,
+            organizationId: fixture.organizationId,
+          });
+
+          expect(result).toEqual({ deleted: false, restoredChildren: [] });
+
+          const [post] = yield* db
+            .select({ mergedIntoPostId: schema.postTable.mergedIntoPostId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, sourcePostId));
+          expect(post).toMatchObject({ mergedIntoPostId: targetPostId });
+        })
       );
     });
 
@@ -2609,19 +2716,37 @@ describe("PostRpcHandlers", () => {
             .where(eq(schema.commentTable.id, commentId));
           expect(movedComment?.mergedFromPostId).toBe(sourcePostId);
 
-          // Only engagement whose restoration needs no provenance may remain
-          // on the archived source: reactions, tags, and comments all moved.
-          for (const table of [
-            schema.postReactionTable,
-            schema.postTagTable,
-            schema.commentTable,
-          ] as const) {
-            const leftovers = yield* db
-              .select({ id: table.id })
-              .from(table)
-              .where(eq(table.postId, sourcePostId));
-            expect(leftovers).toEqual([]);
-          }
+          // Engagement whose restoration needs no provenance moved off the
+          // archived source: comments always, and twins with no target
+          // counterpart (the source-only reaction and tag). Only the
+          // colliding twins — the shared reaction and the shared tag — stay
+          // parked on the source next to the colliding vote, keeping the
+          // user's record of engaging with the source until an unmerge
+          // returns it.
+          const leftoverComments = yield* db
+            .select({ id: schema.commentTable.id })
+            .from(schema.commentTable)
+            .where(eq(schema.commentTable.postId, sourcePostId));
+          expect(leftoverComments).toEqual([]);
+
+          const sourceReactions = yield* db
+            .select({
+              userId: schema.postReactionTable.userId,
+              emoji: schema.postReactionTable.emoji,
+            })
+            .from(schema.postReactionTable)
+            .where(eq(schema.postReactionTable.postId, sourcePostId));
+          expect(sourceReactions).toEqual([
+            { userId: sharedVoterId, emoji: "👍" },
+          ]);
+
+          const sourceTags = yield* db
+            .select({ tagId: schema.postTagTable.tagId })
+            .from(schema.postTagTable)
+            .where(eq(schema.postTagTable.postId, sourcePostId));
+          expect(sourceTags.map((row) => row.tagId)).toEqual([
+            `tag_shared_${fixture.organizationId}`,
+          ]);
 
           // The colliding vote stays on the source (its only provenance), so
           // unmerge and survivor delete can put it back; the voter's target
@@ -3396,6 +3521,7 @@ describe("PostRpcHandlers", () => {
           ]);
 
           const sharedContactId = `email_contact_shared_${fixture.organizationId}`;
+          const sharedContactEmail = `shared_sub_${fixture.organizationId}@example.com`;
           const sourceOnlyContactId = `email_contact_source_${fixture.organizationId}`;
           const now = new Date();
           yield* db.insert(schema.emailContactTable).values([
@@ -3487,18 +3613,39 @@ describe("PostRpcHandlers", () => {
           ).toHaveLength(1);
           expect(targetEmailContactIds).toContain(sourceOnlyContactId);
 
-          // No subscription may remain pointed at the archived source.
+          // Followers and contacts who already follow the target keep the
+          // source row parked on the archived source, so an unmerge can
+          // return them; only rows with no target twin moved. This includes
+          // the fixture creator's auto-subscriptions on both posts.
           const leftoverPostSubscriptions = yield* db
-            .select({ id: schema.postSubscriptionTable.id })
+            .select({ userId: schema.postSubscriptionTable.userId })
             .from(schema.postSubscriptionTable)
             .where(eq(schema.postSubscriptionTable.postId, sourcePostId));
-          expect(leftoverPostSubscriptions).toEqual([]);
+          expect(
+            leftoverPostSubscriptions.map((row) => row.userId).sort()
+          ).toEqual([sharedUserId, fixture.userId].sort());
 
           const leftoverEmailSubscriptions = yield* db
-            .select({ id: schema.emailSubscriptionTable.id })
+            .select({ email: schema.emailContactTable.email })
             .from(schema.emailSubscriptionTable)
+            .innerJoin(
+              schema.emailContactTable,
+              eq(
+                schema.emailContactTable.id,
+                schema.emailSubscriptionTable.contactId
+              )
+            )
             .where(eq(schema.emailSubscriptionTable.topicId, sourcePostId));
-          expect(leftoverEmailSubscriptions).toEqual([]);
+          // Emails are stored normalized, so compare case-insensitively.
+          expect(
+            leftoverEmailSubscriptions
+              .map((row) => row.email.toLowerCase())
+              .sort()
+          ).toEqual(
+            [sharedContactEmail, fixture.creatorEmail]
+              .map((email) => email.toLowerCase())
+              .sort()
+          );
         })
       );
 
@@ -4085,5 +4232,126 @@ describe("PostRpcHandlers", () => {
         );
       });
     });
+  });
+
+  layer(GatedTestLayer)("handlers with a gated merged policy", (it) => {
+    it.effect(
+      "rejects an update whose merge lands after the policy check",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const gate = yield* MergeRaceGate;
+          const fixture = yield* makeFixture();
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [sourcePostId, "Source feedback"],
+            [targetPostId, "Target feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          // The real policy has evaluated `isNotMerged` against the unmerged
+          // row and is paused before the update enters its transaction.
+          const updateFiber = yield* handlers
+            .PostUpdateTitle({
+              boardId: fixture.boardId,
+              id: sourcePostId,
+              organizationId: fixture.organizationId,
+              title: "Renamed feedback",
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture)),
+              Effect.forkChild
+            );
+          yield* Deferred.await(gate.policyEvaluated);
+
+          // A concurrent merge commits while the update waits, so the policy
+          // result the update carries is stale.
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* Deferred.succeed(gate.allowUpdate, undefined);
+
+          const error = yield* Fiber.join(updateFiber).pipe(Effect.flip);
+          expect(error).toBeInstanceOf(Policy.PolicyDeniedError);
+
+          const [post] = yield* db
+            .select({
+              mergedIntoPostId: schema.postTable.mergedIntoPostId,
+              title: schema.postTable.title,
+            })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, sourcePostId));
+          expect(post).toMatchObject({
+            mergedIntoPostId: targetPostId,
+            title: "Source feedback",
+          });
+        })
+    );
+
+    it.effect(
+      "rejects an ETA update whose merge lands after the policy check",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const gate = yield* MergeRaceGate;
+          const fixture = yield* makeFixture();
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+
+          for (const [id, title] of [
+            [sourcePostId, "Source feedback"],
+            [targetPostId, "Target feedback"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          // Same race as above, through the ETA handler's own locked
+          // transaction (`canUpdateEta` policy path).
+          const updateFiber = yield* handlers
+            .PostUpdateEta({
+              id: sourcePostId,
+              organizationId: fixture.organizationId,
+              etaQuarter: "2026-Q3",
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              ),
+              Effect.forkChild
+            );
+          yield* Deferred.await(gate.policyEvaluated);
+
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* Deferred.succeed(gate.allowUpdate, undefined);
+
+          const error = yield* Fiber.join(updateFiber).pipe(Effect.flip);
+          expect(error).toBeInstanceOf(Policy.PolicyDeniedError);
+        })
+    );
   });
 });

@@ -177,3 +177,26 @@ describe("ServerConfig integration encryption key", () => {
       })
   );
 });
+
+describe("ServerConfig production rate-limit store", () => {
+  it.effect("fails startup in production without REDIS_URL", () =>
+    Effect.gen(function* () {
+      const exit = yield* Effect.exit(
+        loadServerConfig({ NODE_ENV: "production", REDIS_URL: undefined })
+      );
+
+      expect(Exit.isFailure(exit)).toBe(true);
+    })
+  );
+
+  it.effect("starts in production with REDIS_URL", () =>
+    Effect.gen(function* () {
+      const config = yield* loadServerConfig({
+        NODE_ENV: "production",
+        REDIS_URL: "redis://redis:6379/0",
+      });
+
+      expect(config.redisUrl).toBe("redis://redis:6379/0");
+    })
+  );
+});

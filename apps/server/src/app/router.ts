@@ -22,6 +22,7 @@ import {
   e2eSetPlanRouter,
   testMailboxRouter,
 } from "../http/e2e";
+import { makeOriginCheckMiddleware } from "../http/origin-check";
 import {
   BetterAuthRouterLive,
   DocsRoute,
@@ -54,11 +55,14 @@ export const makePublicRouters = (
 export const makeMergedRoutes = ({
   appUrl,
   integrationRuntime,
+  nodeEnv,
   publicRouters,
 }: {
   /** Dashboard base URL handed to provider routers for redirects. */
   readonly appUrl: string;
   readonly integrationRuntime: IntegrationRuntime;
+  /** Used to keep the API reference out of production builds. */
+  readonly nodeEnv: string;
   readonly publicRouters: ReturnType<typeof makePublicRouters>;
 }) =>
   Layer.mergeAll(
@@ -78,7 +82,7 @@ export const makeMergedRoutes = ({
     ),
     HttpRoute,
     BetterAuthRouterLive,
-    DocsRoute,
+    ...(nodeEnv === "production" ? [] : [DocsRoute]),
     makeSlackRouters({
       appUrl,
       registry: integrationRuntime.registry,
@@ -107,6 +111,13 @@ export const withGlobalMiddleware = <A, E, R>(
         }),
         { global: true }
       )
+    ),
+    // CORS decorates responses but never blocks requests, so credentialed
+    // state-changing requests need an explicit origin check (CSRF defense).
+    Layer.provide(
+      HttpRouter.middleware(makeOriginCheckMiddleware(config), {
+        global: true,
+      })
     ),
     Layer.provide(
       HttpRouter.middleware(bodySizeLimitMiddleware, { global: true })
