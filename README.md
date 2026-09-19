@@ -130,7 +130,7 @@ After adding the webhook to an existing Polar organization, resend `product.crea
 
 ## Deployment
 
-Production deployments use the Docker images referenced in `docker-compose.yml` (`ghcr.io/g3root/feeblo-server` and `ghcr.io/g3root/feeblo-web`). Images are published automatically to GHCR on pushes to `main` and version tags. The dashboard can alternatively be deployed to Cloudflare using the Wrangler configuration in `apps/web/wrangler.jsonc`.
+Production deployments use the Docker images referenced in `docker-compose.yml` (`ghcr.io/g3root/feeblo-server` and `ghcr.io/g3root/feeblo-web`). Images are published automatically to GHCR: pushes to `main` produce `edge` and `sha-*` tags, while version tags produce the release version, `major.minor`, `major`, and `latest` tags. The dashboard can alternatively be deployed to Cloudflare using the Wrangler configuration in `apps/web/wrangler.jsonc`.
 
 Production startup enforces two safety checks: `AUTH_ENCRYPTION_KEY` must be at least 32 bytes, and `REDIS_URL` must be set so rate limits are shared across server instances.
 

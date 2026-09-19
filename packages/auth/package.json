@@ -1,5 +1,6 @@
 {
   "name": "@feeblo/auth",
+  "private": true,
   "type": "module",
   "exports": {
     ".": {

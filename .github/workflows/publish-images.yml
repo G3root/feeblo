@@ -134,7 +134,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract staging metadata
+      - name: Extract main-branch metadata
         if: github.event_name == 'workflow_run'
         id: staging-meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -142,7 +142,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
           tags: |
             type=sha,format=long
-            type=raw,value=latest
+            type=raw,value=edge
 
       - name: Extract release metadata
         if: github.event_name == 'release'
@@ -150,11 +150,14 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
+          # `latest` is moved explicitly below, and only by release tags;
+          # main-branch builds are published as `edge`.
           flavor: latest=false
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+            type=raw,value=latest
 
       - name: Create multi-platform manifest
         id: manifest

@@ -1,6 +1,6 @@
 {
   "name": "@feeblo/sdk-react",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": false,
   "description": "React bindings for the Feeblo feedback widget SDK.",
   "keywords": [
