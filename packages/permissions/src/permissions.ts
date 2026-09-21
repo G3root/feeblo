@@ -57,6 +57,7 @@ const PERMISSION_ACTIONS = {
   companies: ["create", "update", "delete"],
   webhooks: ["manage"],
   integrations: ["manage"],
+  apiKeys: ["manage"],
 } as const satisfies Record<string, readonly string[]>;
 
 type PermissionGroups = typeof PERMISSION_ACTIONS;
@@ -89,6 +90,7 @@ export const PERMISSIONS = [
   ...createPermissions("companies", PERMISSION_ACTIONS.companies),
   ...createPermissions("webhooks", PERMISSION_ACTIONS.webhooks),
   ...createPermissions("integrations", PERMISSION_ACTIONS.integrations),
+  ...createPermissions("apiKeys", PERMISSION_ACTIONS.apiKeys),
 ] satisfies readonly Permission[];
 
 export type PermissionDefinition = {

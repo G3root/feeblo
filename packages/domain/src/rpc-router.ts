@@ -2,6 +2,7 @@ import * as Layer from "effect/Layer";
 import * as RpcSerialization from "effect/unstable/rpc/RpcSerialization";
 import * as RpcServer from "effect/unstable/rpc/RpcServer";
 
+import { ApiKeyRpcHandlers } from "./api-key/handlers";
 import { AttributeDefinitionRpcHandlers } from "./attribute-definition/handlers";
 import { BillingRpcHandlers } from "./billing/handlers";
 import { BoardRpcHandlers } from "./board/handlers";
@@ -74,7 +75,7 @@ export const makeRpcRoute = <RIn, ROut, E>(
         ChangelogSubscriptionRpcHandlers
       )
     ),
-    Layer.provide(JwtSecretRpcHandlers),
+    Layer.provide(Layer.merge(JwtSecretRpcHandlers, ApiKeyRpcHandlers)),
     Layer.provide(
       Layer.mergeAll(MembershipRpcHandlers, NotificationRpcHandlers)
     ),

@@ -1,4 +1,5 @@
 import { NodeRedis } from "@effect/platform-node";
+import { toAuthHandler } from "@feeblo/auth/auth-handler";
 import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
 import { BoardRepository } from "@feeblo/domain/board/repository";
@@ -21,6 +22,8 @@ import { NotificationService } from "@feeblo/domain/notification/service";
 import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
 import { PostSubscriptionRepository } from "@feeblo/domain/post-subscription/repository";
 import { PostRepository } from "@feeblo/domain/post/repository";
+import { PublicApiConfig } from "@feeblo/domain/public-api/config";
+import { PublicApiRepository } from "@feeblo/domain/public-api/repository";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
 import { Auth } from "@feeblo/domain/session-middleware";
 import { SiteRepository } from "@feeblo/domain/site/repository";
@@ -45,6 +48,7 @@ import { SlackFeedbackServiceLive } from "@feeblo/integration-slack/slack-feedba
 import { SlackUserServiceLive } from "@feeblo/integration-slack/slack-user-service";
 import type { Mailer } from "@feeblo/transactional/mailer";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
+import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import type * as Ref from "effect/Ref";
@@ -198,7 +202,11 @@ export const makeWorkflowLayer = (
 export const makeAuthLayer = (
   makeMailerLayer: () => Layer.Layer<Mailer, Layer.Error<typeof Mailer.layer>>,
   rateLimitLayer: Layer.Layer<RateLimitService, Redis.RedisError>
-) => Layer.effect(Auth, initAuthHandler(makeMailerLayer, rateLimitLayer));
+) =>
+  Layer.effect(
+    Auth,
+    Effect.map(initAuthHandler(makeMailerLayer, rateLimitLayer), toAuthHandler)
+  );
 
 export const makeServiceLayers = ({
   config,
@@ -294,6 +302,8 @@ export const makeServiceLayers = ({
       Layer.provide(Database.DatabaseContextLive)
     ),
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
-    WorkspaceRepository.layer
+    WorkspaceRepository.layer,
+    PublicApiRepository.layer,
+    PublicApiConfig.layer
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
 };

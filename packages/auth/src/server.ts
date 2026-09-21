@@ -52,6 +52,7 @@ import type * as Redis from "effect/unstable/persistence/Redis";
 import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 
 import { drizzleAdapter } from "./adapter/drizzle-adapter";
+import { publicApiKeyPlugin } from "./api-key-config";
 import { clientTimeZoneHeader, isValidTimeZone } from "./client-time-zone";
 import { AuthConfig } from "./config";
 import {
@@ -472,6 +473,7 @@ export const initAuthHandler = (
           member: schema.memberTable,
           invitation: schema.invitationTable,
           twoFactor: schema.twoFactorTable,
+          apikey: schema.apiKeyTable,
         },
       }),
 
@@ -714,6 +716,15 @@ export const initAuthHandler = (
             );
           },
         }),
+
+        // Organization-owned machine credentials for the Public API. The
+        // plugin owns credential material; every authorization decision stays
+        // with Feeblo (`apiKeys.manage` and the `publicApi` entitlement at
+        // creation, key scopes per request in the Public API middleware). Its
+        // own endpoints are additionally gated by the `apiKey` statements in
+        // `organizationAccessControl`, which is why those grants exist.
+        publicApiKeyPlugin,
+
         emailOTP({
           disableSignUp: true,
           expiresIn: 8 * 60, // 8 minutes

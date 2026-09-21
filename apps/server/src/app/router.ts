@@ -1,5 +1,6 @@
 import { makeClientIpGlobalMiddleware } from "@feeblo/domain/client-ip";
 import { HttpRoute } from "@feeblo/domain/http/router";
+import { PublicApiRoute } from "@feeblo/domain/public-api/router";
 import { makeRpcRoute } from "@feeblo/domain/rpc-router";
 import { makeDiscordRouters } from "@feeblo/integration-discord/routers";
 import { DiscordManagementRpcHandlers } from "@feeblo/integration-discord/rpc-handlers";
@@ -81,6 +82,10 @@ export const makeMergedRoutes = ({
       )
     ),
     HttpRoute,
+    // The Public API is mounted in every environment, including production:
+    // it is the paid feature, and its OpenAPI document is the customer-facing
+    // reference. The dashboard's internal Api stays dev-only below.
+    PublicApiRoute,
     BetterAuthRouterLive,
     ...(nodeEnv === "production" ? [] : [DocsRoute]),
     makeSlackRouters({

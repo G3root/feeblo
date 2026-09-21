@@ -78,7 +78,9 @@ Admin and owner are intentionally equivalent for authorization. `owner` is kept 
 | Settings | Manage teammates | No | No | Yes |
 | Settings | Delete the workspace | No | No | Yes |
 
-The matrix is the authorization contract, including capabilities planned for future product surfaces. Board import, CSV export, create-post-form customization, outbound webhook management, and configurable post fields or statuses are not currently shipped. They must receive distinct named permissions and matching backend/frontend gates when implemented; no existing generic permission should be reused for them.
+The matrix is the authorization contract, including capabilities planned for future product surfaces. Board import, CSV export, create-post-form customization, and configurable post fields or statuses are not currently shipped. They must receive distinct named permissions and matching backend/frontend gates when implemented; no existing generic permission should be reused for them.
+
+The Developer row is implemented in pieces: outbound webhook management uses the named `webhooks.manage`, the Public API's keys use the named `apiKeys.manage`, and widget SSO keys still gate on the generic `workspace.update` (see the migration checklist below).
 
 ### Layer 2 — Named permissions
 
@@ -89,6 +91,7 @@ boards.*             changelog.*         posts.*
 comments.*           members.invite      members.remove
 members.assign       site.*              roadmap.*
 billing.*            contacts.*          companies.*
+webhooks.manage      integrations.manage apiKeys.manage
 ```
 
 `packages/permissions/src/permissions.ts` is the catalog (id + label + description, anchored to the backend policy it maps to). Its `createPermissions(resource, actions)` utility creates the action permissions and the matching `{resource}.*` wildcard. `roleGrants` resolves a wildcard grant for action checks. `src/role-permissions.ts` is the role → permission table. Roles inherit permissions from lower ranks automatically (`permissionsForRole`).
@@ -186,6 +189,7 @@ The DB `member.role` column is `text` (not an enum), so the rename is a data mig
 
 - `apps/web/src/dashboard/routes/$organizationId/settings/*` still use the `hasOwnerOrAdminRole` convenience alias (works, maps to `workspace.update`). Prefer explicit permissions (`site.*`, `members.invite`/`members.remove`) when next touched.
 - `members.tsx` parses `member.role.split(",")` from the DB — replace with a `Role`-typed mapper when the member collection schema is tightened.
+- `packages/domain/src/jwt-secret/handlers.ts` gates widget SSO key management on `workspace.update`. Prefer a named permission when the module is next touched.
 - `packages/domain/src/policy.ts#hasOrganizationRole` remains exported for legacy call sites; prefer `canPermission` in new code.
 
 ## Renaming a role or adding one

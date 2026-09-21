@@ -16,7 +16,8 @@ export type CapabilityFeatureKey =
   | "removeBranding"
   | "subscriberEmails"
   | "widgetSso"
-  | "integrations";
+  | "integrations"
+  | "publicApi";
 export type PlanFeatureKey = LimitFeatureKey | CapabilityFeatureKey;
 
 type PlanLimits = Record<LimitFeatureKey, number | null>;
@@ -90,6 +91,10 @@ export const PLAN_FEATURE_CATALOG = {
     kind: "capability",
     label: "Integrations",
   },
+  publicApi: {
+    kind: "capability",
+    label: "Public API",
+  },
 } as const satisfies Record<PlanFeatureKey, PlanFeatureDefinition>;
 
 const defineFeatureOrder =
@@ -111,6 +116,7 @@ const CAPABILITY_FEATURE_ORDER = defineFeatureOrder<CapabilityFeatureKey>()([
   "roadmap",
   "changelog",
   "integrations",
+  "publicApi",
   "subscriberEmails",
   "unlimitedEndUsers",
   "unlimitedPosts",
@@ -140,6 +146,7 @@ export const PLAN_ENTITLEMENTS = {
       subscriberEmails: false,
       widgetSso: false,
       integrations: false,
+      publicApi: false,
     },
   },
   starter: {
@@ -161,6 +168,7 @@ export const PLAN_ENTITLEMENTS = {
       subscriberEmails: true,
       widgetSso: true,
       integrations: true,
+      publicApi: true,
     },
   },
   professional: {
@@ -182,6 +190,7 @@ export const PLAN_ENTITLEMENTS = {
       subscriberEmails: true,
       widgetSso: true,
       integrations: true,
+      publicApi: true,
     },
   },
 } as const satisfies Record<OrganizationPlan, PlanEntitlements>;

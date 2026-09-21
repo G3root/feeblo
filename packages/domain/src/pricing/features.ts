@@ -38,6 +38,7 @@ export const PLAN_PRICING_FEATURES = {
     },
     { key: "crmEntries", label: "Unlimited CRM Entries" },
     { key: "integrations", label: "Integrations" },
+    { key: "publicApi", label: "Public API" },
     {
       key: "subscriberEmails",
       label: "Subscriber Email Notifications",
