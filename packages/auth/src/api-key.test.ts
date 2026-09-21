@@ -237,6 +237,45 @@ describe("api-key plugin wiring", () => {
     );
 
   /**
+   * Builds the mounted route's request headers, adding the session cookie
+   * only when the request is meant to be authenticated.
+   */
+  const apiKeyCreateHeaders = (cookie: string | undefined) => {
+    const headers = new Headers({
+      "content-type": "application/json",
+      origin: "http://localhost:3000",
+    });
+    if (cookie) {
+      headers.set("cookie", cookie);
+    }
+    return headers;
+  };
+
+  /**
+   * Posts the plugin's mounted create route with an optional session cookie.
+   * The cookie is optional so the same request can be sent anonymously, which
+   * is the ordering the plan gate must never act on.
+   */
+  const postApiKeyCreate = (
+    auth: ReturnType<typeof makeAuth>,
+    options: {
+      readonly cookie?: string;
+      /** Raw JSON value for the body field, so coercion can be exercised. */
+      readonly organizationIdBody: unknown;
+    }
+  ) =>
+    auth.handler(
+      new Request("http://localhost:3000/api/auth/api-key/create", {
+        method: "POST",
+        headers: apiKeyCreateHeaders(options.cookie),
+        body: JSON.stringify({
+          organizationId: options.organizationIdBody,
+          name: "Production",
+        }),
+      })
+    );
+
+  /**
    * Signs a user up through better-auth, joins them to the workspace, then
    * posts the plugin's mounted create route with that session cookie. This is
    * the HTTP path a member could call directly, so it exercises the plan gate
@@ -250,7 +289,7 @@ describe("api-key plugin wiring", () => {
       readonly organizationId: string;
       /** Raw JSON value for the body field, so coercion can be exercised. */
       readonly organizationIdBody?: unknown;
-      readonly role: "owner" | "admin";
+      readonly role: "owner" | "admin" | "manager";
     }
   ) => {
     const signUp = await auth.api.signUpEmail({
@@ -272,20 +311,10 @@ describe("api-key plugin wiring", () => {
       })
     );
 
-    return auth.handler(
-      new Request("http://localhost:3000/api/auth/api-key/create", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: sessionCookieFrom(signUp.headers),
-          origin: "http://localhost:3000",
-        },
-        body: JSON.stringify({
-          organizationId: options.organizationIdBody ?? options.organizationId,
-          name: "Production",
-        }),
-      })
-    );
+    return postApiKeyCreate(auth, {
+      cookie: sessionCookieFrom(signUp.headers),
+      organizationIdBody: options.organizationIdBody ?? options.organizationId,
+    });
   };
 
   const perTestTimeout = 30_000;
@@ -446,6 +475,100 @@ describe("api-key plugin wiring", () => {
       });
 
       expect(response.status).toBe(403);
+      expect(await keysFor(organizationId)).toHaveLength(0);
+    },
+    perTestTimeout
+  );
+
+  it(
+    "answers an anonymous create with unauthorized, not the plan gate",
+    async () => {
+      const auth = makeAuth();
+      const organizationId = await seedOrganization("anon_free");
+
+      const response = await postApiKeyCreate(auth, {
+        organizationIdBody: organizationId,
+      });
+
+      // The plan gate must not answer before authentication: a Free workspace
+      // would otherwise return its upgrade error to an anonymous caller and
+      // reveal that no paid subscription exists.
+      expect(response.status).toBe(401);
+      expect(await response.json()).toMatchObject({
+        code: "UNAUTHORIZED_SESSION",
+      });
+      expect(await keysFor(organizationId)).toHaveLength(0);
+    },
+    perTestTimeout
+  );
+
+  it(
+    "answers an anonymous create for a paid workspace with unauthorized",
+    async () => {
+      const auth = makeAuth();
+      const organizationId = await seedOrganization("anon_paid");
+      await seedPlan(organizationId, "starter");
+
+      const response = await postApiKeyCreate(auth, {
+        organizationIdBody: organizationId,
+      });
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toMatchObject({
+        code: "UNAUTHORIZED_SESSION",
+      });
+      expect(await keysFor(organizationId)).toHaveLength(0);
+    },
+    perTestTimeout
+  );
+
+  it(
+    "answers a non-member create with forbidden, not the plan gate",
+    async () => {
+      const auth = makeAuth();
+      const organizationId = await seedOrganization("nonmember_free");
+
+      const signUp = await auth.api.signUpEmail({
+        body: {
+          email: `nonmember-${organizationId}@example.com`,
+          password: "password-1234",
+          name: "Outsider",
+        },
+        returnHeaders: true,
+      });
+
+      const response = await postApiKeyCreate(auth, {
+        cookie: sessionCookieFrom(signUp.headers),
+        organizationIdBody: organizationId,
+      });
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({
+        code: "USER_NOT_MEMBER_OF_ORGANIZATION",
+      });
+      expect(await keysFor(organizationId)).toHaveLength(0);
+    },
+    perTestTimeout
+  );
+
+  it(
+    "answers a member without api-key permission with forbidden, not the plan gate",
+    async () => {
+      const auth = makeAuth();
+      const organizationId = await seedOrganization("manager_free");
+
+      const response = await createApiKeyOverHttp(auth, {
+        email: `manager-free-${organizationId}@example.com`,
+        organizationId,
+        role: "manager",
+      });
+
+      // A manager is a member but has no `apiKey` grant; the ACL denial must
+      // come before the plan lookup so the response carries no plan detail.
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({
+        code: "INSUFFICIENT_API_KEY_PERMISSIONS",
+      });
       expect(await keysFor(organizationId)).toHaveLength(0);
     },
     perTestTimeout

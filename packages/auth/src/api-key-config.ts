@@ -1,9 +1,17 @@
-import { apiKey } from "@better-auth/api-key";
+import { apiKey, API_KEY_ERROR_CODES } from "@better-auth/api-key";
 import type { ApiKeyConfigurationOptions } from "@better-auth/api-key";
 import {
   PUBLIC_API_DEFAULT_SCOPES,
   toPublicApiScopeStatements,
 } from "@feeblo/domain/public-api/scopes";
+import type { GenericEndpointContext } from "better-auth";
+import { APIError, getSessionFromCtx } from "better-auth/api";
+import { hasPermission } from "better-auth/plugins/organization";
+
+import {
+  ORGANIZATION_ROLES,
+  organizationAccessControl,
+} from "./organization-roles";
 
 /**
  * Configuration for the api-key plugin, shared by the server composition and
@@ -54,7 +62,82 @@ export const publicApiKeyPlugin = apiKey(publicApiKeyOptions);
 export const PUBLIC_API_KEY_CREATE_PATH = "/api-key/create";
 
 /**
- * Applies the `publicApi` plan entitlement to API-key creation.
+ * Rejects key creation before the plan lookup can answer unless the caller is
+ * an authenticated member allowed to mint a workspace credential.
+ *
+ * `assertPublicApiEntitled` answers whether an organization *may* hold a key,
+ * not *who* is asking. Running it first would return the plan decision to an
+ * unauthenticated or unauthorized caller, revealing whether the workspace has
+ * a paid subscription and letting that caller trigger billing lookups. The
+ * mounted endpoint performs the same session and ACL checks, but only after
+ * this hook has returned, so the gate repeats them here — with the plugin's
+ * own error codes — to keep the ordering safe.
+ *
+ * Server-side `auth.api.*` calls do not carry a request: they are made by
+ * trusted in-process code, and the plugin authorizes the explicit `userId`
+ * they pass in the endpoint. Only request-bearing callers — every caller that
+ * reaches the mounted route through `auth.handler` — are checked here.
+ */
+const assertApiKeyCreator = async (
+  ctx: GenericEndpointContext,
+  organizationId: string
+): Promise<void> => {
+  if (!ctx.request) {
+    return;
+  }
+
+  const session = await getSessionFromCtx(ctx, { disableCookieCache: true });
+  const userId = session?.user.id;
+  if (!userId) {
+    throw APIError.from(
+      "UNAUTHORIZED",
+      API_KEY_ERROR_CODES.UNAUTHORIZED_SESSION
+    );
+  }
+
+  const member = await ctx.context.adapter.findOne<{ role: string }>({
+    model: "member",
+    where: [
+      { field: "userId", value: userId },
+      { field: "organizationId", value: organizationId },
+    ],
+  });
+  if (!member) {
+    throw APIError.from(
+      "FORBIDDEN",
+      API_KEY_ERROR_CODES.USER_NOT_MEMBER_OF_ORGANIZATION
+    );
+  }
+
+  // Mirrors the plugin's `checkOrgApiKeyPermission`: the organization ACL
+  // grants `apiKey: ["create"]` to owner and admin, and the creator role
+  // bypasses the ACL so an owner can always mint a credential.
+  const permitted = await hasPermission(
+    {
+      role: member.role,
+      options: {
+        ac: organizationAccessControl,
+        roles: ORGANIZATION_ROLES,
+        creatorRole: "owner",
+      },
+      permissions: { apiKey: ["create"] },
+      organizationId,
+      allowCreatorAllPermissions: true,
+    },
+    ctx
+  );
+  if (!permitted) {
+    throw APIError.from(
+      "FORBIDDEN",
+      API_KEY_ERROR_CODES.INSUFFICIENT_API_KEY_PERMISSIONS
+    );
+  }
+};
+
+/**
+ * Applies the `publicApi` plan entitlement to API-key creation, after
+ * authenticating and authorizing the caller (see `assertApiKeyCreator`) so the
+ * plan decision only ever reaches a member who could create the key.
  *
  * The plugin's own endpoints authorize through the organization ACL, which
  * decides *who* may hold a credential but cannot see billing. The dashboard RPC
@@ -70,10 +153,7 @@ export const PUBLIC_API_KEY_CREATE_PATH = "/api-key/create";
  * downgrade so a workspace can clean up its keys.
  */
 export const enforcePublicApiKeyPlan = async (
-  ctx: {
-    readonly path: string;
-    readonly body?: { readonly organizationId?: unknown } | undefined;
-  },
+  ctx: GenericEndpointContext,
   assertPublicApiEntitled: (organizationId: string) => Promise<void>
 ): Promise<void> => {
   if (ctx.path !== PUBLIC_API_KEY_CREATE_PATH) {
@@ -96,5 +176,6 @@ export const enforcePublicApiKeyPlan = async (
     return;
   }
 
+  await assertApiKeyCreator(ctx, organizationId);
   await assertPublicApiEntitled(organizationId);
 };
