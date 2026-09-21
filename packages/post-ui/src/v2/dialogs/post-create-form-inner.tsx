@@ -12,6 +12,7 @@ import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
+import { refetchInBackground } from "@feeblo/web-shared/collections";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
@@ -275,9 +276,11 @@ export function PostCreateForm() {
       // dropped when the mutation settles, so refetch failures propagate
       // to the submit handler instead of being suppressed.
       await postCollection.utils.refetch();
-      // A new own post is immediately deletable: refresh the hint set so
-      // its detail affordance doesn't wait for the next sync.
-      await deleteEligibilityCollection?.utils.refetch();
+      // A new own post is immediately deletable: refresh the hint set in the
+      // background so submit doesn't wait on a second round trip for it.
+      if (deleteEligibilityCollection) {
+        refetchInBackground(deleteEligibilityCollection.utils.refetch());
+      }
       return canonicalSlug;
     },
   });

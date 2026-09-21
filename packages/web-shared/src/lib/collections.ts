@@ -147,3 +147,26 @@ export function createRpcCollectionHelpers(
 
   return { organizationScopedQueryKey, resolvePostSlug, slugScopedQueryKey };
 }
+
+/**
+ * Refetch derived collections without blocking the mutation that triggered
+ * them.
+ *
+ * Only the mutation's own collection belongs in an `await`: every refetch is
+ * its own RPC round trip, so awaiting a secondary collection inside a
+ * mutation handler holds the optimistic state open for the length of that
+ * round trip. Secondary refetches run detached instead — the collection keeps
+ * its current rows until the refetch lands, and a failure is contained
+ * because the collection reports it through its own sync error state while
+ * the settled mutation stays successful.
+ *
+ * Call sites still order correctly: start the refetch after the persisting
+ * `fetchRpc` resolves, so the server has the write before the read-back.
+ */
+export function refetchInBackground(
+  ...refetches: ReadonlyArray<Promise<unknown>>
+): void {
+  for (const refetch of refetches) {
+    refetch.catch(() => undefined);
+  }
+}

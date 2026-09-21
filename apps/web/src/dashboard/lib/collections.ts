@@ -19,6 +19,7 @@ import {
   createRpcCollectionHelpers,
   eqFilterValue,
   postSlugFromPath,
+  refetchInBackground,
 } from "@feeblo/web-shared/collections";
 import {
   getCommentReactionCollectionKey,
@@ -118,7 +119,9 @@ export const postCollection = createCollection(
         })
       );
 
-      await postActivityCollection.utils.refetch();
+      // The post row is the mutation target (already reconciled optimistically)
+      // and the activity entry is derived from it: refresh the entry detached.
+      refetchInBackground(postActivityCollection.utils.refetch());
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -133,9 +136,12 @@ export const postCollection = createCollection(
       );
       // Deleting a survivor also reverts its merged children server-side, so
       // the synced rows must be refreshed or the restored duplicates stay
-      // hidden behind their stale `mergedIntoPostId`.
+      // hidden behind their stale `mergedIntoPostId`. This collection is the
+      // mutation target, so the read-back is awaited.
       await postCollection.utils.refetch();
-      await deleteEligibilityCollection.utils.refetch();
+      // The delete-hint set is derived: refresh it detached so the delete
+      // settles without waiting on a second round trip.
+      refetchInBackground(deleteEligibilityCollection.utils.refetch());
     },
   })
 );
@@ -786,9 +792,15 @@ export const commentCollection = createCollection(
         {}
       );
 
-      await postActivityCollection.utils.refetch();
-      await postCollection.utils.refetch();
-      await deleteEligibilityCollection.utils.refetch();
+      // The comment row is the mutation target and is already reconciled
+      // optimistically; the activity timeline, post rows, and delete-hint set
+      // are derived from it, so they refresh detached rather than holding the
+      // insert open for three round trips.
+      refetchInBackground(
+        postActivityCollection.utils.refetch(),
+        postCollection.utils.refetch(),
+        deleteEligibilityCollection.utils.refetch()
+      );
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -804,9 +816,13 @@ export const commentCollection = createCollection(
         {}
       );
 
-      await postActivityCollection.utils.refetch();
-      await postCollection.utils.refetch();
-      await deleteEligibilityCollection.utils.refetch();
+      // Same as the insert path: the optimistic delete already removed the
+      // row, so the derived collections refresh detached.
+      refetchInBackground(
+        postActivityCollection.utils.refetch(),
+        postCollection.utils.refetch(),
+        deleteEligibilityCollection.utils.refetch()
+      );
     },
     onUpdate: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -824,7 +840,8 @@ export const commentCollection = createCollection(
         {}
       );
 
-      await postActivityCollection.utils.refetch();
+      // Only the activity entry is derived from an edit: refresh it detached.
+      refetchInBackground(postActivityCollection.utils.refetch());
     },
   })
 );
@@ -983,8 +1000,14 @@ export const upvoteCollection = createCollection(
           postId: newUpvote.postId,
         })
       );
-      await postCollection.utils.refetch();
-      await deleteEligibilityCollection.utils.refetch();
+      // The upvote row is the mutation target and holds the toggle
+      // optimistically; vote counts derive from this collection client-side
+      // (post rows carry no count), so the post rows and the delete-hint set
+      // are derived refreshes that run detached.
+      refetchInBackground(
+        postCollection.utils.refetch(),
+        deleteEligibilityCollection.utils.refetch()
+      );
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -996,8 +1019,11 @@ export const upvoteCollection = createCollection(
           postId: deletedUpvote.postId,
         })
       );
-      await postCollection.utils.refetch();
-      await deleteEligibilityCollection.utils.refetch();
+      // Same as the insert path: derived refreshes run detached.
+      refetchInBackground(
+        postCollection.utils.refetch(),
+        deleteEligibilityCollection.utils.refetch()
+      );
     },
   })
 );

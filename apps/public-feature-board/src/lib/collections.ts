@@ -9,6 +9,7 @@ import {
   createRpcCollectionHelpers,
   eqFilterValue,
   postSlugFromPath,
+  refetchInBackground,
 } from "@feeblo/web-shared/collections";
 import {
   getChangelogSubscriptionCollectionKey,
@@ -161,9 +162,13 @@ export const publicPostCollection = createCollection(
         })
       );
       // Same as the dashboard: a survivor delete reverts merged children
-      // server-side, so refresh the synced rows that still point at it.
+      // server-side, so refresh the synced rows that still point at it. This
+      // collection is the mutation target, so the read-back is awaited.
       await publicPostCollection.utils.refetch();
-      await publicDeleteEligibilityCollection.utils.refetch();
+      // The delete-hint set is derived from the write, not part of it: it
+      // refreshes in the background so the delete settles without waiting on
+      // a second round trip.
+      refetchInBackground(publicDeleteEligibilityCollection.utils.refetch());
     },
   })
 );
@@ -465,8 +470,13 @@ export const publicCommentCollection = createCollection(
           statusUpdateId: newComment.statusUpdateId ?? null,
         })
       );
-      await publicPostCollection.utils.refetch();
-      await publicDeleteEligibilityCollection.utils.refetch();
+      // The comment is already reconciled optimistically; the post rows'
+      // comment counts and the delete-hint set are derived, so both refresh
+      // detached instead of holding the insert open for two round trips.
+      refetchInBackground(
+        publicPostCollection.utils.refetch(),
+        publicDeleteEligibilityCollection.utils.refetch()
+      );
     },
     onUpdate: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -493,8 +503,12 @@ export const publicCommentCollection = createCollection(
           postId: deletedComment.postId,
         })
       );
-      await publicPostCollection.utils.refetch();
-      await publicDeleteEligibilityCollection.utils.refetch();
+      // Same as the create path: the optimistic delete already removed the
+      // row, so the derived post counts and delete hints refresh detached.
+      refetchInBackground(
+        publicPostCollection.utils.refetch(),
+        publicDeleteEligibilityCollection.utils.refetch()
+      );
     },
   })
 );
@@ -598,7 +612,9 @@ export const publicUpvoteCollection = createCollection(
           postId: newUpvote.postId,
         })
       );
-      await publicDeleteEligibilityCollection.utils.refetch();
+      // The upvote collection holds the toggle optimistically; the
+      // delete-hint set is derived, so it refreshes detached.
+      refetchInBackground(publicDeleteEligibilityCollection.utils.refetch());
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -610,7 +626,8 @@ export const publicUpvoteCollection = createCollection(
           postId: deletedUpvote.postId,
         })
       );
-      await publicDeleteEligibilityCollection.utils.refetch();
+      // Same as the insert path: the derived hint set refreshes detached.
+      refetchInBackground(publicDeleteEligibilityCollection.utils.refetch());
     },
   })
 );

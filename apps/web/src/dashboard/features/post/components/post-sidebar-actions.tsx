@@ -13,6 +13,7 @@ import { CopyButton } from "@feeblo/ui/copy-button";
 import { toastManager } from "@feeblo/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { refetchInBackground } from "@feeblo/web-shared/collections";
 import {
   CircleLockIcon,
   CircleUnlockIcon,
@@ -87,8 +88,11 @@ function PostAdminActionButtons() {
         })
       );
 
+      // The post row is the mutation target (already reconciled
+      // optimistically); the lock/unlock activity entry is derived, so it
+      // refreshes detached.
       await postCollection.utils.refetch();
-      await postActivityCollection.utils.refetch();
+      refetchInBackground(postActivityCollection.utils.refetch());
     },
   });
 

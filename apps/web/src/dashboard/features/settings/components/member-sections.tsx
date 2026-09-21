@@ -30,6 +30,7 @@ import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { authClient } from "@feeblo/web-shared/auth-client";
+import { refetchInBackground } from "@feeblo/web-shared/collections";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   hasOwnerOrAdminRole,
@@ -717,10 +718,11 @@ function InviteMemberForm() {
         return;
       }
 
-      await Promise.all([
-        membersCollection.utils.refetch(),
-        invitationsCollection.utils.refetch(),
-      ]);
+      // The invitation is the entity this write created; the member list only
+      // changes once the invite is accepted, so it refreshes detached instead
+      // of gating the success toast.
+      await invitationsCollection.utils.refetch();
+      refetchInBackground(membersCollection.utils.refetch());
       trackEvent("org_member_invited", { role: value.role, success: true });
       toastManager.add({
         title: "Invitation sent",

@@ -1,5 +1,6 @@
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { toastManager } from "@feeblo/ui/toast";
+import { refetchInBackground } from "@feeblo/web-shared/collections";
 import {
   allPolicy,
   anyPolicy,
@@ -104,11 +105,11 @@ export function PostTagField() {
     }
 
     // The tags were saved; refreshing local collections afterwards must not
-    // surface "Failed to update tags" if a refetch rejects.
-    await Promise.allSettled([
-      postTagCollection.utils.refetch(),
-      postActivityCollection.utils.refetch(),
-    ]);
+    // surface "Failed to update tags" if a refetch rejects. The post's tag rows
+    // are the affected collection, so their read-back is awaited (settled);
+    // the tag activity entry is derived and refreshes detached.
+    await Promise.allSettled([postTagCollection.utils.refetch()]);
+    refetchInBackground(postActivityCollection.utils.refetch());
 
     if (showSuccessToast) {
       toastManager.add({
