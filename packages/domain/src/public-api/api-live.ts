@@ -112,18 +112,28 @@ export const PublicApiLive = HttpApiBuilder.group(
               )
             );
 
-          const mapperContext = {
-            appUrl: config.appUrl,
-            organizationId: caller.organizationId,
-          } as const;
+          return yield* Option.match(page, {
+            // Not found rather than an empty page: a missing board and an
+            // empty board must not look the same, and another workspace's
+            // board is reported as missing so the id cannot probe at all.
+            onNone: () => Effect.fail(notFoundError("Board not found.")),
+            onSome: (found) => {
+              const mapperContext = {
+                appUrl: config.appUrl,
+                organizationId: caller.organizationId,
+              } as const;
 
-          return {
-            data: page.posts.map((post) =>
-              toPublicApiPostSummary(post, mapperContext)
-            ),
-            nextCursor:
-              page.nextCursor === null ? null : encodeCursor(page.nextCursor),
-          } satisfies TPublicApiPostPage;
+              return Effect.succeed({
+                data: found.posts.map((post) =>
+                  toPublicApiPostSummary(post, mapperContext)
+                ),
+                nextCursor:
+                  found.nextCursor === null
+                    ? null
+                    : encodeCursor(found.nextCursor),
+              } satisfies TPublicApiPostPage);
+            },
+          });
         })
       )
       .handle("getPost", ({ params }) =>

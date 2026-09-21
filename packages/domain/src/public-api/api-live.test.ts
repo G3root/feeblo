@@ -46,6 +46,12 @@ const AuthTest = Layer.succeed(Auth, {
     getSession: async () => null,
     createApiKey: unusedApiKeyMethod(),
     verifyApiKey: async ({ body }) => {
+      if (body.key === "fbk_verifier_failure") {
+        // A verifier/database rejection carrying detail that must not reach
+        // the client, only the server-side log.
+        throw new Error("connection failed: password=secret");
+      }
+
       const record = acceptedKeys.get(body.key);
       return record === undefined
         ? { valid: false as const, key: null }
@@ -324,6 +330,23 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect("does not leak verification failures to the client", () =>
+    Effect.gen(function* () {
+      const response = yield* executeRequest(
+        "/api/v1/posts/pst_whatever",
+        "fbk_verifier_failure"
+      );
+
+      expect(response.status).toBe(500);
+      const raw = responseBody(response);
+      const body = decodeError(raw);
+      expect(body._tag).toBe("INTERNAL_ERROR");
+      // The fixed public message, never the library or database detail.
+      expect(body.message).toBe("The request could not be completed.");
+      expect(raw).not.toContain("password=secret");
+    })
+  );
+
   it.effect("refuses a workspace on the free plan", () =>
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace({ plan: "free" });
@@ -373,6 +396,40 @@ layer(makeTestApp())("public api v1", (it) => {
       );
 
       // 404 rather than 403: a 403 would confirm the id exists elsewhere.
+      expect(response.status).toBe(404);
+      expect(decodeError(responseBody(response))._tag).toBe("NOT_FOUND");
+    })
+  );
+
+  it.effect("reports another workspace's board as not found", () =>
+    Effect.gen(function* () {
+      const mine = yield* seedWorkspace();
+      const theirs = yield* seedWorkspace();
+      registerKey("fbk_board_mine", mine.organizationId);
+      registerKey("fbk_board_theirs", theirs.organizationId);
+
+      const response = yield* executeRequest(
+        `/api/v1/boards/${theirs.boardId}/posts`,
+        "fbk_board_mine"
+      );
+
+      // 404 rather than a successful empty page: the two must not look alike,
+      // and a 403 would confirm the id exists in another workspace.
+      expect(response.status).toBe(404);
+      expect(decodeError(responseBody(response))._tag).toBe("NOT_FOUND");
+    })
+  );
+
+  it.effect("reports an unknown board as not found", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_board_missing", workspace.organizationId);
+
+      const response = yield* executeRequest(
+        "/api/v1/boards/brd_does_not_exist/posts",
+        "fbk_board_missing"
+      );
+
       expect(response.status).toBe(404);
       expect(decodeError(responseBody(response))._tag).toBe("NOT_FOUND");
     })

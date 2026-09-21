@@ -17,7 +17,7 @@ GET /api/v1/boards/brd_example/posts HTTP/1.1
 x-api-key: fbk_...
 ```
 
-Keys are **organization-owned machine credentials**. A key reads and writes only the workspace that owns it; no request parameter can change that, and there is no way to reach another workspace's data. Keys are stored hashed — the plaintext value is shown once, when the key is created, and cannot be retrieved again.
+Keys are **organization-owned machine credentials**. A key reads only the workspace that owns it; no request parameter can change that, and there is no way to reach another workspace's data. Keys are stored hashed — the plaintext value is shown once, when the key is created, and cannot be retrieved again.
 
 | Failure | Status | Code |
 | --- | --- | --- |

@@ -45,3 +45,56 @@ export const publicApiKeyOptions = {
 } satisfies ApiKeyConfigurationOptions;
 
 export const publicApiKeyPlugin = apiKey(publicApiKeyOptions);
+
+/**
+ * The plugin route that mints a key. The dashboard never calls it directly —
+ * the `ApiKeyCreate` RPC does — but any session can POST it, so the plan gate
+ * below must cover it.
+ */
+export const PUBLIC_API_KEY_CREATE_PATH = "/api-key/create";
+
+/**
+ * Applies the `publicApi` plan entitlement to API-key creation.
+ *
+ * The plugin's own endpoints authorize through the organization ACL, which
+ * decides *who* may hold a credential but cannot see billing. The dashboard RPC
+ * applies `ApiKeyPolicy.canCreate` (the `apiKeys.manage` permission plus the
+ * `publicApi` entitlement); without this check an admin or owner on a Free
+ * workspace could bypass the plan gate by POSTing the plugin's mounted route
+ * directly. `assertPublicApiEntitled` runs the same server-side
+ * `EntitlementPolicy.canUsePublicApi` check and is injected so the auth
+ * package's tests can wire the real policy without rebuilding the whole auth
+ * handler.
+ *
+ * Only creation is gated: listing and revoking must keep working after a
+ * downgrade so a workspace can clean up its keys.
+ */
+export const enforcePublicApiKeyPlan = async (
+  ctx: {
+    readonly path: string;
+    readonly body?: { readonly organizationId?: unknown } | undefined;
+  },
+  assertPublicApiEntitled: (organizationId: string) => Promise<void>
+): Promise<void> => {
+  if (ctx.path !== PUBLIC_API_KEY_CREATE_PATH) {
+    return;
+  }
+
+  const rawOrganizationId = ctx.body?.["organizationId"];
+  // A missing organization id is the endpoint's own validation error; do not
+  // turn it into a plan lookup.
+  if (rawOrganizationId === undefined) {
+    return;
+  }
+
+  // The endpoint's body schema coerces the value to a string
+  // (`z.coerce.string()`), so the gate must coerce the same way. Skipping a
+  // value the endpoint will accept would let `[organizationId]` through as
+  // `organizationId`; `String` matches zod's coercion for JSON values.
+  const organizationId = String(rawOrganizationId);
+  if (organizationId.length === 0) {
+    return;
+  }
+
+  await assertPublicApiEntitled(organizationId);
+};

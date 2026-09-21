@@ -7,7 +7,6 @@ import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { healShadowsForVerifiedUser } from "@feeblo/domain/identity/linking";
 import { MembershipPolicy } from "@feeblo/domain/membership/policies";
 import { MembershipRepository } from "@feeblo/domain/membership/repository";
-import { PolicyDeniedError } from "@feeblo/domain/policy";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
 import { WelcomeUserWorkflow } from "@feeblo/domain/user/workflows";
 import {
@@ -52,7 +51,7 @@ import type * as Redis from "effect/unstable/persistence/Redis";
 import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 
 import { drizzleAdapter } from "./adapter/drizzle-adapter";
-import { publicApiKeyPlugin } from "./api-key-config";
+import { enforcePublicApiKeyPlan, publicApiKeyPlugin } from "./api-key-config";
 import { clientTimeZoneHeader, isValidTimeZone } from "./client-time-zone";
 import { AuthConfig } from "./config";
 import {
@@ -61,6 +60,7 @@ import {
 } from "./organization-roles";
 import { jwtAutoLogin } from "./plugins/jwt-auto-login/plugin";
 import type { JwtAutoLoginOptions } from "./plugins/jwt-auto-login/types";
+import { mapPolicyDeniedToApiError } from "./policy-api-error";
 import { AUTH_SESSION_DURATION_SECONDS } from "./session";
 import { getTrustedOrigins, isEmailBlocked, isTemporaryEmail } from "./utils";
 
@@ -228,16 +228,6 @@ export const initAuthHandler = (
           })
         );
       },
-    };
-
-    const mapPolicyDeniedToApiError = <T>(error: T) => {
-      if (error instanceof PolicyDeniedError) {
-        return new APIError("FORBIDDEN", {
-          message: error.reason ?? "Forbidden",
-        });
-      }
-
-      return error;
     };
 
     const runCallbackPolicy = async (
@@ -777,6 +767,19 @@ export const initAuthHandler = (
 
       hooks: {
         before: createAuthMiddleware(async (ctx) => {
+          // The mounted `/api-key/create` route authorizes through the
+          // organization ACL, which decides *who* may hold a credential but
+          // cannot see billing. Apply the same `publicApi` entitlement the
+          // dashboard RPC applies, so a Free workspace cannot mint a key by
+          // calling the plugin's route directly.
+          await enforcePublicApiKeyPlan(ctx, (organizationId) =>
+            runCallbackPolicy(
+              EntitlementPolicy.use((policy) =>
+                policy.canUsePublicApi(organizationId)
+              )
+            )
+          );
+
           if (
             (ctx.path.startsWith("/sign-in") ||
               ctx.path.startsWith("/sign-up") ||

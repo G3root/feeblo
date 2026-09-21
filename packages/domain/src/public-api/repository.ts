@@ -254,6 +254,26 @@ const makePublicApiRepository = Effect.gen(function* () {
       statusId,
     }: TListBoardPosts) =>
       Effect.gen(function* () {
+        // Distinguish an empty board from one that does not exist in this
+        // workspace before running the page query: otherwise both come back as
+        // a successful empty page, and the caller cannot tell them apart. A
+        // board of another workspace is reported the same way as a missing
+        // one, so the id cannot be used to probe other workspaces.
+        const board = yield* db
+          .select({ id: schema.boardTable.id })
+          .from(schema.boardTable)
+          .where(
+            and(
+              eq(schema.boardTable.id, boardId),
+              eq(schema.boardTable.organizationId, organizationId)
+            )
+          )
+          .limit(1);
+
+        if (board.length === 0) {
+          return Option.none();
+        }
+
         const conditions: SQL[] = [
           eq(schema.postTable.organizationId, organizationId),
           eq(schema.postTable.boardId, boardId),
@@ -300,7 +320,7 @@ const makePublicApiRepository = Effect.gen(function* () {
         const hasMore = rows.length > limit;
         const pageRows = hasMore ? rows.slice(0, limit) : rows;
         if (pageRows.length === 0) {
-          return { posts: [], nextCursor: null };
+          return Option.some({ posts: [], nextCursor: null });
         }
 
         const postIds = pageRows.map((row) => row.id);
@@ -316,7 +336,7 @@ const makePublicApiRepository = Effect.gen(function* () {
 
         const lastRow = pageRows[pageRows.length - 1];
 
-        return {
+        return Option.some({
           posts: pageRows.map((row) => ({
             ...toSource(
               row,
@@ -332,7 +352,7 @@ const makePublicApiRepository = Effect.gen(function* () {
             hasMore && lastRow !== undefined
               ? { createdAt: lastRow.createdAt, id: lastRow.id }
               : null,
-        };
+        });
       }).pipe(withRemapDbErrors("PublicApiPost", "select")),
 
     /** A single post, including its stored (already sanitized) body. */

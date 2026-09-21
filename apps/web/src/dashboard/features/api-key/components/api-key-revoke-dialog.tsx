@@ -12,6 +12,7 @@ import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useSelector } from "@xstate/store-react";
+import { useState } from "react";
 
 import { useOrganizationId } from "~/hooks/use-organization-id";
 
@@ -29,6 +30,7 @@ export function ApiKeyRevokeDialog() {
   const open = useSelector(store, (state) => state.context.open);
   const keyName = useSelector(store, (state) => state.context.data.keyName);
   const revokeApiKey = useAtomSet(revokeApiKeyAtom, { mode: "promise" });
+  const [isRevoking, setIsRevoking] = useState(false);
 
   return (
     <AlertDialog
@@ -48,8 +50,10 @@ export function ApiKeyRevokeDialog() {
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <Button
+            loading={isRevoking}
             onClick={async () => {
               const { keyId } = store.get().context.data;
+              setIsRevoking(true);
               try {
                 await revokeApiKey({
                   payload: { keyId, organizationId },
@@ -64,6 +68,8 @@ export function ApiKeyRevokeDialog() {
                   title: "Could not revoke API key",
                   type: "error",
                 });
+              } finally {
+                setIsRevoking(false);
               }
             }}
             variant="destructive"

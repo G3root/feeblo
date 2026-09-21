@@ -132,11 +132,17 @@ export const makeApiKeyAuthMiddlewareLive = (
           // Server-side verification: the plugin's verifier is a server-only
           // endpoint, so a bearer key cannot be validated by reaching it over
           // HTTP, and it checks `enabled`, expiry, and the stored hash.
-          const verified = yield* Effect.tryPromise({
-            try: () => auth.api.verifyApiKey({ body: { key: presented } }),
-            catch: (cause) =>
-              internalError(`API key verification failed: ${String(cause)}`),
-          });
+          // Verification failures can carry library or database detail, so the
+          // cause is logged server-side and the public body stays fixed.
+          const verified = yield* Effect.promise(() =>
+            auth.api.verifyApiKey({ body: { key: presented } })
+          ).pipe(
+            Effect.catchCause((cause) =>
+              Effect.logError("API key verification failed", cause).pipe(
+                Effect.andThen(Effect.fail(internalError()))
+              )
+            )
+          );
 
           const record = verified.valid ? verified.key : null;
           if (record === null) {
