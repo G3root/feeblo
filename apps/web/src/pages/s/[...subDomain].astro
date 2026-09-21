@@ -10,6 +10,7 @@ import {
 } from "@feeblo/web-shared/json-ld";
 import { resolveSite } from "~/lib/site";
 import { PublicBoardIsland } from "../../public-board/public-board-island";
+import PublicBoardSsrFallback from "../../public-board/public-board-ssr-fallback.astro";
 import PublicBoardLayout from "../../layouts/PublicBoardLayout.astro";
 
 export const prerender = false;
@@ -214,6 +215,7 @@ if (post) {
   title={pageTitle}
 >
   <main>
+    <PublicBoardSsrFallback />
     <PublicBoardIsland client:only="react" site={site} />
   </main>
 </PublicBoardLayout>
