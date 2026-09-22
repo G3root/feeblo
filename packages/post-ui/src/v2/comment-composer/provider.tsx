@@ -39,6 +39,12 @@ export type CommentComposerProviderProps = {
   onAuthorCreate?: (values: { email: string; name: string }) => void;
   /** Controlled visibility; when omitted the composer keeps its own copy. */
   isPrivate?: boolean;
+  /**
+   * Host-owned pending state for composers that submit through a native form
+   * (e.g. a TanStack form's `isSubmitting`). Renders the submit button as
+   * loading and keeps the composer inert until it clears.
+   */
+  isSubmitting?: boolean;
   onCancel?: () => void;
   onContentChange?: (content: string) => void;
   onSubmit?: (value: CommentComposerSubmitValue) => void | Promise<void>;
@@ -90,6 +96,7 @@ function CommentComposerController(props: CommentComposerProviderProps) {
     content,
     disabled = false,
     isPrivate,
+    isSubmitting = false,
     placeholder,
     privateLabel = m.day_slow_sheep(),
     publicLabel = m.whole_sleek_florian(),
@@ -250,6 +257,7 @@ function CommentComposerController(props: CommentComposerProviderProps) {
         authorDisplay,
         authorPicker,
         disabled,
+        isSubmitting,
         placeholder,
         showAuthorToggle,
         showVisibilityToggle,
@@ -262,6 +270,7 @@ function CommentComposerController(props: CommentComposerProviderProps) {
       authorPicker,
       cancelLabel,
       disabled,
+      isSubmitting,
       placeholder,
       privateLabel,
       publicLabel,

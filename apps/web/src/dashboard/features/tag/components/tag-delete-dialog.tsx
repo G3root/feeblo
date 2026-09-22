@@ -9,6 +9,7 @@ import {
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
+import { settleOptimisticMutation } from "@feeblo/web-shared/collections";
 import { useSelector } from "@xstate/store-react";
 
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -35,22 +36,26 @@ export function TagDeleteDialog() {
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <Button
-            onClick={async () => {
-              try {
-                const tagId = store.get().context.data.tagId;
-                const tx = tagCollection.delete(tagId);
-                await tx.isPersisted.promise;
-                toastManager.add({
-                  title: "Tag deleted successfully",
-                  type: "success",
-                });
-                store.send({ type: "toggle" });
-              } catch {
-                toastManager.add({
-                  title: "Failed to delete tag",
-                  type: "error",
-                });
-              }
+            onClick={() => {
+              const tagId = store.get().context.data.tagId;
+              // The row is removed optimistically; close the confirm in the
+              // same tick and settle persistence in the background.
+              store.send({ type: "toggle" });
+              settleOptimisticMutation(
+                () => tagCollection.delete(tagId),
+                () => {
+                  toastManager.add({
+                    title: "Tag deleted successfully",
+                    type: "success",
+                  });
+                },
+                () => {
+                  toastManager.add({
+                    title: "Failed to delete tag",
+                    type: "error",
+                  });
+                }
+              );
             }}
             type="button"
             variant="destructive"

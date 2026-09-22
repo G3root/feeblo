@@ -30,7 +30,10 @@ import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { authClient } from "@feeblo/web-shared/auth-client";
-import { refetchInBackground } from "@feeblo/web-shared/collections";
+import {
+  refetchInBackground,
+  settleOptimisticMutation,
+} from "@feeblo/web-shared/collections";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   hasOwnerOrAdminRole,
@@ -467,36 +470,39 @@ function MemberListItem({
         <PolicyGuard policy={hasPermission(organizationId, "members.assign")}>
           {({ allowed }) => (
             <Select
-              onValueChange={async (value) => {
+              onValueChange={(value) => {
                 if (!value) {
                   throw new Error("value not found");
                   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
                 }
                 // SAFETY: The upstream contract guarantees this value here.
-                const tx = membersCollection.update(id, (draft) => {
-                  // SAFETY: The upstream contract guarantees this value here.
-                  draft.role = value as Role;
-                });
-                try {
-                  await tx.isPersisted.promise;
-                  trackEvent("org_member_role_changed", {
-                    role: value,
-                    success: true,
-                  });
-                  toastManager.add({
-                    title: "Member role updated",
-                    type: "success",
-                  });
-                } catch {
-                  trackEvent("org_member_role_changed", {
-                    role: value,
-                    success: false,
-                  });
-                  toastManager.add({
-                    title: "Failed to update role",
-                    type: "error",
-                  });
-                }
+                settleOptimisticMutation(
+                  () =>
+                    membersCollection.update(id, (draft) => {
+                      // SAFETY: The upstream contract guarantees this value here.
+                      draft.role = value as Role;
+                    }),
+                  () => {
+                    trackEvent("org_member_role_changed", {
+                      role: value,
+                      success: true,
+                    });
+                    toastManager.add({
+                      title: "Member role updated",
+                      type: "success",
+                    });
+                  },
+                  () => {
+                    trackEvent("org_member_role_changed", {
+                      role: value,
+                      success: false,
+                    });
+                    toastManager.add({
+                      title: "Failed to update role",
+                      type: "error",
+                    });
+                  }
+                );
               }}
               value={role}
             >
@@ -531,22 +537,26 @@ function MemberListItem({
             <Button
               aria-label={`Remove ${name}`}
               disabled={!(allowed && canManageTarget) || isCurrentUser}
-              onClick={async () => {
-                const tx = membersCollection.delete(id);
-                try {
-                  await tx.isPersisted.promise;
-                  trackEvent("org_member_removed", { success: true });
-                  toastManager.add({
-                    title: "Member removed",
-                    type: "success",
-                  });
-                } catch {
-                  trackEvent("org_member_removed", { success: false });
-                  toastManager.add({
-                    title: "Failed to remove member",
-                    type: "error",
-                  });
-                }
+              onClick={() => {
+                // The row is removed optimistically; the toast reports the
+                // persistence outcome without holding the click.
+                settleOptimisticMutation(
+                  () => membersCollection.delete(id),
+                  () => {
+                    trackEvent("org_member_removed", { success: true });
+                    toastManager.add({
+                      title: "Member removed",
+                      type: "success",
+                    });
+                  },
+                  () => {
+                    trackEvent("org_member_removed", { success: false });
+                    toastManager.add({
+                      title: "Failed to remove member",
+                      type: "error",
+                    });
+                  }
+                );
               }}
               size="icon-sm"
               title={
@@ -625,22 +635,26 @@ function InvitationListItem({
         {({ allowed }) => (
           <Button
             disabled={!allowed}
-            onClick={async () => {
-              const tx = invitationsCollection.delete(id);
-              try {
-                await tx.isPersisted.promise;
-                trackEvent("org_invitation_revoked", { success: true });
-                toastManager.add({
-                  title: "Invitation revoked",
-                  type: "success",
-                });
-              } catch {
-                trackEvent("org_invitation_revoked", { success: false });
-                toastManager.add({
-                  title: "Failed to revoke invitation",
-                  type: "error",
-                });
-              }
+            onClick={() => {
+              // The row is removed optimistically; the toast reports the
+              // persistence outcome without holding the click.
+              settleOptimisticMutation(
+                () => invitationsCollection.delete(id),
+                () => {
+                  trackEvent("org_invitation_revoked", { success: true });
+                  toastManager.add({
+                    title: "Invitation revoked",
+                    type: "success",
+                  });
+                },
+                () => {
+                  trackEvent("org_invitation_revoked", { success: false });
+                  toastManager.add({
+                    title: "Failed to revoke invitation",
+                    type: "error",
+                  });
+                }
+              );
             }}
             size="icon-sm"
             type="button"

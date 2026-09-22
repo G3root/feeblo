@@ -1,3 +1,4 @@
+import { PostStatusType } from "@feeblo/domain-contracts/post-status-type";
 import { ChangelogId, WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
@@ -27,6 +28,31 @@ export const Changelog = S.Struct({
 });
 
 export type TChangelog = S.Schema.Type<typeof Changelog>;
+
+/**
+ * A post announced by a changelog entry, reduced to what the public detail
+ * page renders (title, link, status).
+ */
+export const ChangelogLinkedPost = S.Struct({
+  id: S.String,
+  slug: S.String,
+  status: PostStatusType,
+  title: S.String,
+});
+
+export type TChangelogLinkedPost = S.Schema.Type<typeof ChangelogLinkedPost>;
+
+/**
+ * Public single-entry response: the entry body plus the posts it announced.
+ * Embedding the linked posts keeps the public detail page from subscribing to
+ * the whole post and changelog-link collections just to render one section.
+ */
+export const ChangelogDetail = S.Struct({
+  ...Changelog.fields,
+  posts: S.Array(ChangelogLinkedPost),
+});
+
+export type TChangelogDetail = S.Schema.Type<typeof ChangelogDetail>;
 
 export const ChangelogList = S.Struct({
   organizationId: S.String,

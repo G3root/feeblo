@@ -168,7 +168,7 @@ const makeTagRepository = Effect.gen(function* () {
         .pipe(Effect.asVoid),
 
     findPostTags: (
-      { organizationId }: TPostTagList,
+      { organizationId, slug }: TPostTagList,
       options?: { publicOnly?: boolean }
     ) =>
       db
@@ -192,6 +192,7 @@ const makeTagRepository = Effect.gen(function* () {
         .where(
           and(
             eq(schema.postTagTable.organizationId, organizationId),
+            ...(slug ? [eq(schema.postTable.slug, slug)] : []),
             ...(options?.publicOnly
               ? [eq(schema.boardTable.visibility, "PUBLIC")]
               : [])

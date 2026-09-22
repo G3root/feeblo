@@ -11,6 +11,8 @@ interface TUpvoteList {
   organizationId: string;
   /** Restricts the list to a single post. */
   postId?: string;
+  /** Restricts the list to a single post by slug (public detail pages). */
+  slug?: string;
   /** Restricts the list to upvotes on public boards (used by public endpoints). */
   publicOnly?: boolean;
 }
@@ -33,7 +35,7 @@ const makeUpvoteRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   return {
-    list: ({ organizationId, publicOnly = false, postId }: TUpvoteList) =>
+    list: ({ organizationId, publicOnly = false, postId, slug }: TUpvoteList) =>
       db
         .select({
           id: schema.upvoteTable.id,
@@ -66,7 +68,8 @@ const makeUpvoteRepository = Effect.gen(function* () {
           and(
             eq(schema.upvoteTable.organizationId, organizationId),
             ...(publicOnly ? [eq(schema.boardTable.visibility, "PUBLIC")] : []),
-            ...(postId ? [eq(schema.upvoteTable.postId, postId)] : [])
+            ...(postId ? [eq(schema.upvoteTable.postId, postId)] : []),
+            ...(slug ? [eq(schema.postTable.slug, slug)] : [])
           )
         ),
 

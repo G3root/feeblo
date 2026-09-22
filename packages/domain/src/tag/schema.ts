@@ -54,6 +54,12 @@ export type TPostTagAssignment = S.Schema.Type<typeof PostTagAssignment>;
 
 export const PostTagList = S.Struct({
   organizationId: S.String,
+  /**
+   * Restricts the list to one post by slug. Public detail pages resolve
+   * their tags through the route slug, so they never pull every tag
+   * assignment in the organization just to render one post.
+   */
+  slug: S.optional(S.String),
 });
 
 export type TPostTagList = S.Schema.Type<typeof PostTagList>;

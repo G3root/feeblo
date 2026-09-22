@@ -346,3 +346,70 @@ export const jwtSecretTable = pgTable(
 
 export type Organization = typeof organizationTable.$inferSelect;
 export type NewOrganization = typeof organizationTable.$inferInsert;
+
+/**
+ * Public API credentials, owned by @better-auth/api-key.
+ *
+ * The plugin owns this table's shape: object keys are better-auth's field
+ * names and must keep matching its `apikey` model, because the Drizzle
+ * adapter resolves fields through the schema object handed to it in
+ * `packages/auth/src/server.ts`. `referenceId` is an organization id — the
+ * Public API issues organization-owned machine keys only, never user keys —
+ * so the cascading foreign key both scopes key lifetime to the workspace and
+ * makes a misconfigured user reference fail loudly instead of inserting. The
+ * `rateLimit*`, `refill*`, and `remaining` columns exist because the plugin
+ * writes them; the plugin's own limiter is disabled, so they hold defaults
+ * and per-key limiting runs through the Redis `RateLimitService` instead.
+ *
+ * `creatorId` is the one column the plugin does not know: the `ApiKeyCreate`
+ * handler writes it right after the plugin inserts the row. It is the acting
+ * user, not a membership id, so the key keeps an owner to point at after that
+ * member leaves, and `set null` keeps the credential itself alive.
+ */
+export const apiKeyTable = pgTable(
+  "apikey",
+  {
+    id: text("id").primaryKey(),
+    configId: text("config_id").default("default").notNull(),
+    name: text("name"),
+    start: text("start"),
+    referenceId: text("reference_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    creatorId: text("creator_id").references(() => userTable.id, {
+      onDelete: "set null",
+    }),
+    prefix: text("prefix"),
+    // SHA-256 of the presented key, never the key itself.
+    key: text("key").notNull(),
+    refillInterval: integer("refill_interval"),
+    refillAmount: integer("refill_amount"),
+    lastRefillAt: timestamp("last_refill_at", { withTimezone: true }),
+    enabled: boolean("enabled").default(true).notNull(),
+    rateLimitEnabled: boolean("rate_limit_enabled").default(true).notNull(),
+    rateLimitTimeWindow: integer("rate_limit_time_window"),
+    rateLimitMax: integer("rate_limit_max"),
+    requestCount: integer("request_count").default(0).notNull(),
+    remaining: integer("remaining"),
+    lastRequest: timestamp("last_request", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    // Scope statements, JSON-encoded by the plugin.
+    permissions: text("permissions"),
+    metadata: text("metadata"),
+  },
+  (table) => [
+    index("apiKey_configId_idx").on(table.configId),
+    index("apiKey_referenceId_idx").on(table.referenceId),
+    index("apiKey_key_idx").on(table.key),
+  ]
+);
+
+export type ApiKey = typeof apiKeyTable.$inferSelect;
+export type NewApiKey = typeof apiKeyTable.$inferInsert;

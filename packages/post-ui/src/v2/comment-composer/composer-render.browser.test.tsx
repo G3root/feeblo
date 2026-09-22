@@ -114,4 +114,16 @@ describe("CommentComposer rerender behavior", () => {
       expect(renderCounts.toggle).toBe(1);
     });
   });
+
+  it("shows the host-owned submit pending state on the submit button", async () => {
+    const view = await render(
+      <CommentComposerProvider isSubmitting>
+        <SubmitButton />
+      </CommentComposerProvider>
+    );
+
+    const submit = view.getByRole("button");
+    await expect.element(submit).toHaveAttribute("data-loading", "");
+    await expect.element(submit).toBeDisabled();
+  });
 });

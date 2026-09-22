@@ -207,21 +207,24 @@ const ANCHORED_SAVE_TOAST_ID = "post-save";
 const PostEditorSubmit = memo(function PostEditorSubmit() {
   const { actions, meta, state } = usePostEditor();
   const saveButtonRef = useRef<HTMLButtonElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   return (
     <div className="flex items-center justify-end pt-2">
       <Button
         aria-label={m.ornate_bad_toad()}
-        disabled={state.disabled}
+        disabled={state.disabled || isSubmitting}
+        loading={isSubmitting}
         onClick={async () => {
           // Capture the anchor synchronously: awaiting the submit can unmount
           // or replace the button, which would null `saveButtonRef.current`
           // (or detach the element) before the toast is added.
           const anchor = saveButtonRef.current;
-          if (!anchor) {
+          if (!anchor || isSubmitting) {
             return;
           }
 
+          setIsSubmitting(true);
           try {
             await actions.onSubmit();
 
@@ -239,6 +242,8 @@ const PostEditorSubmit = memo(function PostEditorSubmit() {
             });
           } catch {
             // Failure feedback is surfaced by the onSubmit handler.
+          } finally {
+            setIsSubmitting(false);
           }
         }}
         ref={saveButtonRef}

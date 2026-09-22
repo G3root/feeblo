@@ -9,6 +9,7 @@ import {
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
+import { settleOptimisticMutation } from "@feeblo/web-shared/collections";
 import { useSelector } from "@xstate/store-react";
 
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -36,22 +37,26 @@ export function ChangelogCategoryDeleteDialog() {
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <Button
-            onClick={async () => {
-              try {
-                const categoryId = store.get().context.data.categoryId;
-                const tx = changelogCategoryCollection.delete(categoryId);
-                await tx.isPersisted.promise;
-                toastManager.add({
-                  title: "Category deleted successfully",
-                  type: "success",
-                });
-                store.send({ type: "toggle" });
-              } catch {
-                toastManager.add({
-                  title: "Failed to delete category",
-                  type: "error",
-                });
-              }
+            onClick={() => {
+              const categoryId = store.get().context.data.categoryId;
+              // The row is removed optimistically; close the confirm in the
+              // same tick and settle persistence in the background.
+              store.send({ type: "toggle" });
+              settleOptimisticMutation(
+                () => changelogCategoryCollection.delete(categoryId),
+                () => {
+                  toastManager.add({
+                    title: "Category deleted successfully",
+                    type: "success",
+                  });
+                },
+                () => {
+                  toastManager.add({
+                    title: "Failed to delete category",
+                    type: "error",
+                  });
+                }
+              );
             }}
             type="button"
             variant="destructive"

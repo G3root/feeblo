@@ -10,6 +10,7 @@ import {
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { settleOptimisticMutation } from "@feeblo/web-shared/collections";
 import { useSelector } from "@xstate/store-react";
 
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -37,21 +38,28 @@ export function CompanyDeleteDialog() {
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <Button
-            onClick={async () => {
-              try {
-                const companyId = store.get().context.data.companyId;
-                const tx = companyCollection.delete(companyId);
-                await tx.isPersisted.promise;
-                trackEvent("company_deleted", { success: true });
-                store.send({ type: "toggle" });
-                toastManager.add({ title: "Company deleted", type: "success" });
-              } catch {
-                trackEvent("company_deleted", { success: false });
-                toastManager.add({
-                  title: "Failed to delete company",
-                  type: "error",
-                });
-              }
+            onClick={() => {
+              const companyId = store.get().context.data.companyId;
+              // The row is removed optimistically; close the confirm in the
+              // same tick and settle persistence in the background.
+              store.send({ type: "toggle" });
+              settleOptimisticMutation(
+                () => companyCollection.delete(companyId),
+                () => {
+                  trackEvent("company_deleted", { success: true });
+                  toastManager.add({
+                    title: "Company deleted",
+                    type: "success",
+                  });
+                },
+                () => {
+                  trackEvent("company_deleted", { success: false });
+                  toastManager.add({
+                    title: "Failed to delete company",
+                    type: "error",
+                  });
+                }
+              );
             }}
             variant="destructive"
           >

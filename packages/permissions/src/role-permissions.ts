@@ -49,6 +49,7 @@ export const ROLE_PERMISSIONS = {
     "companies.*",
     "webhooks.manage",
     "integrations.manage",
+    "apiKeys.manage",
   ],
   // Owner is retained for legacy workspaces. It intentionally adds no grants:
   // owner and admin have the same effective permissions.

@@ -124,15 +124,40 @@ export const postCollection = createCollection(
       refetchInBackground(postActivityCollection.utils.refetch());
     },
     onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedPost } = mutation;
+      const [firstMutation] = transaction.mutations;
 
-      await fetchRpc((rpc) =>
-        rpc.PostDelete({
-          id: deletedPost.id,
-          boardId: deletedPost.boardId,
-          organizationId: deletedPost.organizationId,
-        })
+      if (!firstMutation) {
+        return;
+      }
+
+      const { organizationId } = firstMutation.original;
+      // Deletes can arrive one at a time (row actions) or as one transaction
+      // with many mutations (bulk selection). Group them into one bulk RPC
+      // per board so both paths share the server call.
+      const postIdsByBoardId = new Map<string, string[]>();
+
+      for (const mutation of transaction.mutations) {
+        const { original: deletedPost } = mutation;
+        const postIds = postIdsByBoardId.get(deletedPost.boardId) ?? [];
+        postIds.push(deletedPost.id);
+        postIdsByBoardId.set(deletedPost.boardId, postIds);
+      }
+
+      // Settle every board's RPC before rejecting: `Promise.all` fail-fast
+      // would strand a successful board's optimistic deletes behind the
+      // failing one. The read-back below then runs in both outcomes, so the
+      // rollback a rejection triggers reveals the reconciled rows instead of
+      // resurrecting posts the server already deleted.
+      const results = await Promise.allSettled(
+        [...postIdsByBoardId.entries()].map(([boardId, postIds]) =>
+          fetchRpc((rpc) =>
+            rpc.PostDelete({
+              id: postIds,
+              boardId,
+              organizationId,
+            })
+          )
+        )
       );
       // Deleting a survivor also reverts its merged children server-side, so
       // the synced rows must be refreshed or the restored duplicates stay
@@ -142,6 +167,11 @@ export const postCollection = createCollection(
       // The delete-hint set is derived: refresh it detached so the delete
       // settles without waiting on a second round trip.
       refetchInBackground(deleteEligibilityCollection.utils.refetch());
+
+      const failure = results.find((result) => result.status === "rejected");
+      if (failure) {
+        throw failure.reason;
+      }
     },
   })
 );
@@ -1638,6 +1668,12 @@ export const roadmapCollection = createCollection(
           organizationId: deletedRoadmap.organizationId,
         })
       );
+
+      // Deleting the primary promotes a successor in the same server
+      // transaction; read the rows back so the cached `isPrimary` flags match
+      // the handoff instead of leaving the organization without a primary in
+      // the client cache.
+      await roadmapCollection.utils.refetch();
     },
   })
 );

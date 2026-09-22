@@ -473,9 +473,13 @@ export function PostCreateForm() {
         </div>
         <div className="flex items-center justify-end gap-3">
           <PostCreateMoreField form={form} />
-          <Button type="submit" variant="brand">
-            {m.lucky_game_cowfish()}
-          </Button>
+          <form.Subscribe selector={(state) => state.isSubmitting}>
+            {(isSubmitting) => (
+              <Button loading={isSubmitting} type="submit" variant="brand">
+                {m.lucky_game_cowfish()}
+              </Button>
+            )}
+          </form.Subscribe>
         </div>
       </DialogFooter>
     </form>

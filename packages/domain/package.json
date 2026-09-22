@@ -4,6 +4,21 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./api-key/errors": {
+      "default": "./src/api-key/errors.ts"
+    },
+    "./api-key/handlers": {
+      "default": "./src/api-key/handlers.ts"
+    },
+    "./api-key/repository": {
+      "default": "./src/api-key/repository.ts"
+    },
+    "./api-key/rpcs": {
+      "default": "./src/api-key/rpcs.ts"
+    },
+    "./api-key/schema": {
+      "default": "./src/api-key/schema.ts"
+    },
     "./asset/repository": {
       "default": "./src/asset/repository.ts"
     },
@@ -27,6 +42,9 @@
     },
     "./attribute-definition/validation": {
       "default": "./src/attribute-definition/validation.ts"
+    },
+    "./auth-handler": {
+      "default": "./src/auth-handler.ts"
     },
     "./auth/verification-otp": {
       "default": "./src/auth/verification-otp/index.ts"
@@ -348,6 +366,39 @@
     },
     "./pricing/schema": {
       "default": "./src/pricing/schema.ts"
+    },
+    "./public-api/api-contract": {
+      "default": "./src/public-api/api-contract.ts"
+    },
+    "./public-api/api-live": {
+      "default": "./src/public-api/api-live.ts"
+    },
+    "./public-api/config": {
+      "default": "./src/public-api/config.ts"
+    },
+    "./public-api/cursor": {
+      "default": "./src/public-api/cursor.ts"
+    },
+    "./public-api/errors": {
+      "default": "./src/public-api/errors.ts"
+    },
+    "./public-api/mappers": {
+      "default": "./src/public-api/mappers.ts"
+    },
+    "./public-api/middleware": {
+      "default": "./src/public-api/middleware.ts"
+    },
+    "./public-api/repository": {
+      "default": "./src/public-api/repository.ts"
+    },
+    "./public-api/router": {
+      "default": "./src/public-api/router.ts"
+    },
+    "./public-api/schema": {
+      "default": "./src/public-api/schema.ts"
+    },
+    "./public-api/scopes": {
+      "default": "./src/public-api/scopes.ts"
     },
     "./rate-limit": {
       "default": "./src/rate-limit.ts"

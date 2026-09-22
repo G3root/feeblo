@@ -41,6 +41,11 @@ const sessionsByCookieName = new Map<string, string>([
   [COOKIE_B, "token-b"],
 ]);
 
+const unusedApiKeyMethod = () => () =>
+  Promise.reject(
+    new Error("This test composition does not administer API keys")
+  );
+
 const AuthTest = Layer.succeed(Auth, {
   handler: () => new Response(),
   api: {
@@ -54,6 +59,10 @@ const AuthTest = Layer.succeed(Auth, {
         ? testSession
         : null;
     },
+    // This composition never administers API keys. Failing loudly keeps a
+    // future accidental call visible instead of silently succeeding.
+    createApiKey: unusedApiKeyMethod(),
+    verifyApiKey: unusedApiKeyMethod(),
   },
 });
 

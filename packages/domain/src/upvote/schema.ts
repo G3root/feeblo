@@ -28,6 +28,12 @@ export type TUpvote = S.Schema.Type<typeof Upvote>;
 export const UpvoteList = S.Struct({
   organizationId: WorkspaceId.schema,
   postId: S.optional(PostId.schema),
+  /**
+   * Restricts the list to one post by slug. Public detail pages resolve their
+   * votes through the route slug, so they never pull every vote in the
+   * organization just to count one post.
+   */
+  slug: S.optional(S.String),
 });
 
 export type TUpvoteList = S.Schema.Type<typeof UpvoteList>;

@@ -31,6 +31,10 @@ describe("plan feature catalog", () => {
       key: "integrations",
       label: "Integrations",
     });
+    expect(rows).not.toContainEqual({
+      key: "publicApi",
+      label: "Public API",
+    });
   });
 
   it("projects starter enforcement values into customer-facing feature rows", () => {
@@ -53,6 +57,7 @@ describe("plan feature catalog", () => {
         unlimitedEndUsers: true,
         unlimitedPosts: true,
         integrations: true,
+        publicApi: true,
       },
     });
 
@@ -68,6 +73,7 @@ describe("plan feature catalog", () => {
       { key: "roadmap", label: "Roadmap" },
       { key: "changelog", label: "Changelog" },
       { key: "integrations", label: "Integrations" },
+      { key: "publicApi", label: "Public API" },
       {
         key: "subscriberEmails",
         label: "Subscriber Email Notifications",

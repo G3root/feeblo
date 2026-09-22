@@ -9,10 +9,10 @@ import {
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
+import { settleOptimisticMutation } from "@feeblo/web-shared/collections";
 import { SparklesIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useSelector } from "@xstate/store-react";
-import { useState } from "react";
 
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import { useEntitlements } from "~/hooks/use-entitlements";
@@ -29,7 +29,6 @@ export function ToggleRoadmapVisibilityDialog() {
   );
   const { entitlements } = useEntitlements();
   const upgradePlanStore = useUpgradePlanDialogContext();
-  const [isPending, setIsPending] = useState(false);
 
   const isPrivate = currentVisibility === "private";
   const nextVisibility = isPrivate ? "public" : "private";
@@ -54,38 +53,35 @@ export function ToggleRoadmapVisibilityDialog() {
       "Making a roadmap private requires the Starter plan or higher.";
   }
 
-  if (isPending) {
-    actionLabel = "Updating...";
-  }
-
-  const handleConfirm = async () => {
+  const handleConfirm = () => {
     if (requiresUpgrade) {
       store.send({ type: "toggle" });
       upgradePlanStore.send({ type: "toggle" });
       return;
     }
 
-    setIsPending(true);
-    try {
-      const tx = roadmapCollection.update(roadmapId, (draft) => {
-        draft.visibility = nextVisibility;
-        draft.updatedAt = new Date();
-      });
-      await tx.isPersisted.promise;
-
-      store.send({ type: "toggle" });
-      toastManager.add({
-        title: isPrivate ? "Roadmap is now public" : "Roadmap is now private",
-        type: "success",
-      });
-    } catch {
-      toastManager.add({
-        title: "Failed to update roadmap visibility",
-        type: "error",
-      });
-    } finally {
-      setIsPending(false);
-    }
+    // The visibility flips optimistically; close the confirm in the same tick
+    // and settle persistence in the background.
+    store.send({ type: "toggle" });
+    settleOptimisticMutation(
+      () =>
+        roadmapCollection.update(roadmapId, (draft) => {
+          draft.visibility = nextVisibility;
+          draft.updatedAt = new Date();
+        }),
+      () => {
+        toastManager.add({
+          title: isPrivate ? "Roadmap is now public" : "Roadmap is now private",
+          type: "success",
+        });
+      },
+      () => {
+        toastManager.add({
+          title: "Failed to update roadmap visibility",
+          type: "error",
+        });
+      }
+    );
   };
 
   return (
@@ -99,16 +95,14 @@ export function ToggleRoadmapVisibilityDialog() {
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
           {requiresUpgrade ? (
             <Button onClick={handleConfirm}>
               <HugeiconsIcon icon={SparklesIcon} />
               Upgrade plan
             </Button>
           ) : (
-            <Button disabled={isPending} onClick={handleConfirm}>
-              {actionLabel}
-            </Button>
+            <Button onClick={handleConfirm}>{actionLabel}</Button>
           )}
         </AlertDialogFooter>
       </AlertDialogPopup>

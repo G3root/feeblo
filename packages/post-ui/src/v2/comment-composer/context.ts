@@ -29,6 +29,12 @@ export type CommentComposerState = {
   /** Picker UI rendered in the options popover's author section. */
   authorPicker: ReactNode | null;
   disabled: boolean;
+  /**
+   * Host-owned pending state for composers that submit through a native form
+   * (e.g. a TanStack form's `isSubmitting`). The provider-driven `onSubmit`
+   * path keeps its pending state in the store instead.
+   */
+  isSubmitting: boolean;
   placeholder: string | undefined;
   showAuthorToggle: boolean;
   showVisibilityToggle: boolean;
@@ -75,16 +81,17 @@ export function useCommentComposer() {
 }
 
 /**
- * The composer is inert while the host disables it or while a submit started
- * by the composer itself is still in flight.
+ * The composer is inert while the host disables it, while a host-owned
+ * native-form submit is in flight, or while a submit started by the composer
+ * itself is still in flight.
  */
 export function useCommentComposerIsDisabled(): boolean {
   const { state } = useCommentComposer();
-  const isSubmitting = useCommentComposerState(
+  const isStoreSubmitting = useCommentComposerState(
     (context) => context.isSubmitting
   );
 
-  return state.disabled || isSubmitting;
+  return state.disabled || state.isSubmitting || isStoreSubmitting;
 }
 
 export function useCommentComposerPlaceholder(): string {

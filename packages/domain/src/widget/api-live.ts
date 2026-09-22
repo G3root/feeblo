@@ -1,6 +1,7 @@
 import { transaction } from "@feeblo/db";
 import { asLegid, type LegidOf, PostId, PostStatusId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
+import { markdownToHtmlCached } from "@feeblo/utils/markdown";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -61,7 +62,15 @@ export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
   const entries = yield* repository.findManyPublished({ organizationId });
 
   return entries.map((entry) => {
-    const { sanitizedHtml } = sanitizeMarkdown(entry.content);
+    // Changelog rows store already-sanitized Markdown (see
+    // `changelog/handlers.ts`), so render through the isolate-local HTML
+    // cache instead of re-running the three-pipeline sanitizer for every
+    // entry on every request. `markdownToHtml` still drops unsafe URLs
+    // (`rehypeSafeUrlAttributes`), keeping pre-sanitization rows safe.
+    const sanitizedHtml = markdownToHtmlCached(
+      `${entry.id}:${String(entry.updatedAt)}`,
+      entry.content
+    );
 
     return {
       id: entry.id,

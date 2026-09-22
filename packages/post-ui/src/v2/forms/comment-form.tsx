@@ -335,10 +335,11 @@ export const CommentComposerField = withForm({
                                     }
                                   />
                                 }
-                                disabled={disabled || isSubmitting}
+                                disabled={disabled}
                                 isPrivate={
                                   visibility.state.value === "INTERNAL"
                                 }
+                                isSubmitting={isSubmitting}
                                 onContentChange={field.handleChange}
                                 onStatusUpdateIdChange={
                                   statusUpdate.handleChange

@@ -33,6 +33,7 @@ import { Route as DashboardOrganizationIdSettingsChangelogCategoriesRouteImport 
 import { Route as DashboardOrganizationIdSettingsChangelogPrivacyRouteImport } from "./routes/_dashboard/$organizationId/settings/changelog-privacy"
 import { Route as DashboardOrganizationIdSettingsCustomAttributesRouteImport } from "./routes/_dashboard/$organizationId/settings/custom-attributes"
 import { Route as DashboardOrganizationIdSettingsCustomizeRouteImport } from "./routes/_dashboard/$organizationId/settings/customize"
+import { Route as DashboardOrganizationIdSettingsDevelopersRouteImport } from "./routes/_dashboard/$organizationId/settings/developers"
 import { Route as DashboardOrganizationIdSettingsFeedbackTagsRouteImport } from "./routes/_dashboard/$organizationId/settings/feedback-tags"
 import { Route as DashboardOrganizationIdSettingsMembersRouteImport } from "./routes/_dashboard/$organizationId/settings/members"
 import { Route as DashboardOrganizationIdSettingsPreferencesRouteImport } from "./routes/_dashboard/$organizationId/settings/preferences"
@@ -188,6 +189,12 @@ const DashboardOrganizationIdSettingsCustomizeRoute =
   DashboardOrganizationIdSettingsCustomizeRouteImport.update({
     id: "/customize",
     path: "/customize",
+    getParentRoute: () => DashboardOrganizationIdSettingsRoute,
+  } as any)
+const DashboardOrganizationIdSettingsDevelopersRoute =
+  DashboardOrganizationIdSettingsDevelopersRouteImport.update({
+    id: "/developers",
+    path: "/developers",
     getParentRoute: () => DashboardOrganizationIdSettingsRoute,
   } as any)
 const DashboardOrganizationIdSettingsFeedbackTagsRoute =
@@ -387,6 +394,7 @@ export interface FileRoutesByFullPath {
   "/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
   "/$organizationId/settings/custom-attributes": typeof DashboardOrganizationIdSettingsCustomAttributesRoute
   "/$organizationId/settings/customize": typeof DashboardOrganizationIdSettingsCustomizeRoute
+  "/$organizationId/settings/developers": typeof DashboardOrganizationIdSettingsDevelopersRoute
   "/$organizationId/settings/feedback-tags": typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof DashboardOrganizationIdSettingsMembersRoute
   "/$organizationId/settings/preferences": typeof DashboardOrganizationIdSettingsPreferencesRoute
@@ -439,6 +447,7 @@ export interface FileRoutesByTo {
   "/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
   "/$organizationId/settings/custom-attributes": typeof DashboardOrganizationIdSettingsCustomAttributesRoute
   "/$organizationId/settings/customize": typeof DashboardOrganizationIdSettingsCustomizeRoute
+  "/$organizationId/settings/developers": typeof DashboardOrganizationIdSettingsDevelopersRoute
   "/$organizationId/settings/feedback-tags": typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof DashboardOrganizationIdSettingsMembersRoute
   "/$organizationId/settings/preferences": typeof DashboardOrganizationIdSettingsPreferencesRoute
@@ -493,6 +502,7 @@ export interface FileRoutesById {
   "/_dashboard/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
   "/_dashboard/$organizationId/settings/custom-attributes": typeof DashboardOrganizationIdSettingsCustomAttributesRoute
   "/_dashboard/$organizationId/settings/customize": typeof DashboardOrganizationIdSettingsCustomizeRoute
+  "/_dashboard/$organizationId/settings/developers": typeof DashboardOrganizationIdSettingsDevelopersRoute
   "/_dashboard/$organizationId/settings/feedback-tags": typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
   "/_dashboard/$organizationId/settings/members": typeof DashboardOrganizationIdSettingsMembersRoute
   "/_dashboard/$organizationId/settings/preferences": typeof DashboardOrganizationIdSettingsPreferencesRoute
@@ -548,6 +558,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/changelog-privacy"
     | "/$organizationId/settings/custom-attributes"
     | "/$organizationId/settings/customize"
+    | "/$organizationId/settings/developers"
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
     | "/$organizationId/settings/preferences"
@@ -600,6 +611,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/changelog-privacy"
     | "/$organizationId/settings/custom-attributes"
     | "/$organizationId/settings/customize"
+    | "/$organizationId/settings/developers"
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
     | "/$organizationId/settings/preferences"
@@ -653,6 +665,7 @@ export interface FileRouteTypes {
     | "/_dashboard/$organizationId/settings/changelog-privacy"
     | "/_dashboard/$organizationId/settings/custom-attributes"
     | "/_dashboard/$organizationId/settings/customize"
+    | "/_dashboard/$organizationId/settings/developers"
     | "/_dashboard/$organizationId/settings/feedback-tags"
     | "/_dashboard/$organizationId/settings/members"
     | "/_dashboard/$organizationId/settings/preferences"
@@ -863,6 +876,13 @@ declare module "@tanstack/react-router" {
       path: "/customize"
       fullPath: "/$organizationId/settings/customize"
       preLoaderRoute: typeof DashboardOrganizationIdSettingsCustomizeRouteImport
+      parentRoute: typeof DashboardOrganizationIdSettingsRoute
+    }
+    "/_dashboard/$organizationId/settings/developers": {
+      id: "/_dashboard/$organizationId/settings/developers"
+      path: "/developers"
+      fullPath: "/$organizationId/settings/developers"
+      preLoaderRoute: typeof DashboardOrganizationIdSettingsDevelopersRouteImport
       parentRoute: typeof DashboardOrganizationIdSettingsRoute
     }
     "/_dashboard/$organizationId/settings/feedback-tags": {
@@ -1130,6 +1150,7 @@ interface DashboardOrganizationIdSettingsRouteChildren {
   DashboardOrganizationIdSettingsChangelogPrivacyRoute: typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
   DashboardOrganizationIdSettingsCustomAttributesRoute: typeof DashboardOrganizationIdSettingsCustomAttributesRoute
   DashboardOrganizationIdSettingsCustomizeRoute: typeof DashboardOrganizationIdSettingsCustomizeRoute
+  DashboardOrganizationIdSettingsDevelopersRoute: typeof DashboardOrganizationIdSettingsDevelopersRoute
   DashboardOrganizationIdSettingsFeedbackTagsRoute: typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
   DashboardOrganizationIdSettingsMembersRoute: typeof DashboardOrganizationIdSettingsMembersRoute
   DashboardOrganizationIdSettingsPreferencesRoute: typeof DashboardOrganizationIdSettingsPreferencesRoute
@@ -1158,6 +1179,8 @@ const DashboardOrganizationIdSettingsRouteChildren: DashboardOrganizationIdSetti
       DashboardOrganizationIdSettingsCustomAttributesRoute,
     DashboardOrganizationIdSettingsCustomizeRoute:
       DashboardOrganizationIdSettingsCustomizeRoute,
+    DashboardOrganizationIdSettingsDevelopersRoute:
+      DashboardOrganizationIdSettingsDevelopersRoute,
     DashboardOrganizationIdSettingsFeedbackTagsRoute:
       DashboardOrganizationIdSettingsFeedbackTagsRoute,
     DashboardOrganizationIdSettingsMembersRoute:

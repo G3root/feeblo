@@ -10,6 +10,7 @@ import {
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { settleOptimisticMutation } from "@feeblo/web-shared/collections";
 import { useSelector } from "@xstate/store-react";
 
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -53,31 +54,35 @@ export function CustomAttributeDeleteDialog() {
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <Button
-            onClick={async () => {
-              try {
-                const { attributeId } = store.get().context.data;
-                const collection = getCollection(entityType, collections);
-                const tx = collection.delete(attributeId);
-                await tx.isPersisted.promise;
-                trackEvent("custom_attribute_deleted", {
-                  entity_type: entityType,
-                  success: true,
-                });
-                store.send({ type: "toggle" });
-                toastManager.add({
-                  title: "Attribute deleted successfully",
-                  type: "success",
-                });
-              } catch {
-                trackEvent("custom_attribute_deleted", {
-                  entity_type: entityType,
-                  success: false,
-                });
-                toastManager.add({
-                  title: "Failed to delete attribute",
-                  type: "error",
-                });
-              }
+            onClick={() => {
+              const { attributeId } = store.get().context.data;
+              const collection = getCollection(entityType, collections);
+              // The row is removed optimistically; close the confirm in the
+              // same tick and settle persistence in the background.
+              store.send({ type: "toggle" });
+              settleOptimisticMutation(
+                () => collection.delete(attributeId),
+                () => {
+                  trackEvent("custom_attribute_deleted", {
+                    entity_type: entityType,
+                    success: true,
+                  });
+                  toastManager.add({
+                    title: "Attribute deleted successfully",
+                    type: "success",
+                  });
+                },
+                () => {
+                  trackEvent("custom_attribute_deleted", {
+                    entity_type: entityType,
+                    success: false,
+                  });
+                  toastManager.add({
+                    title: "Failed to delete attribute",
+                    type: "error",
+                  });
+                }
+              );
             }}
             variant="destructive"
           >

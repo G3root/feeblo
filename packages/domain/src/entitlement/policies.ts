@@ -150,6 +150,17 @@ const makeEntitlementPolicy = Effect.gen(function* () {
       }
     });
 
+  const canUsePublicApi = (organizationId: string) =>
+    Effect.gen(function* () {
+      const { entitlements } = yield* findEntitlements(organizationId);
+
+      if (!entitlements.capabilities.publicApi) {
+        return yield* new Policy.PolicyDeniedError({
+          reason: "The Public API requires the Starter plan or higher.",
+        });
+      }
+    });
+
   const canAssignPrivilegedRole = <E, R>(
     args: TCanAssignPrivilegedRole & {
       privilegedRoleCount: Effect.Effect<number, E, R>;
@@ -257,6 +268,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     canUpdateBoardVisibility,
     canHidePoweredByBranding,
     canUseWidgetSso,
+    canUsePublicApi,
     canAssignPrivilegedRole,
     canCreateRoadmap,
     canUpdateRoadmapVisibility,

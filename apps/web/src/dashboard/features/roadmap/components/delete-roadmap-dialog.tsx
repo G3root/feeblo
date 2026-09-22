@@ -9,7 +9,7 @@ import {
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
-import { eq, useLiveQuery } from "@tanstack/react-db";
+import { settleOptimisticMutation } from "@feeblo/web-shared/collections";
 import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 
@@ -24,64 +24,34 @@ export function DeleteRoadmapDialog() {
   const navigate = useNavigate();
   const organizationId = useOrganizationId();
 
-  const { data: roadmaps, isLoading } = useLiveQuery(
-    (q) =>
-      q
-        .from({ roadmap: roadmapCollection })
-        .where(({ roadmap }) => eq(roadmap.organizationId, organizationId))
-        .orderBy(({ roadmap }) => roadmap.createdAt, "asc"),
-    [organizationId]
-  );
-
-  const handleDelete = async () => {
+  const handleDelete = () => {
     const id = store.get().context.data.roadmapId;
-    const deletedRoadmap = isLoading ? undefined : roadmapCollection.get(id);
 
-    try {
-      const tx = roadmapCollection.delete(id);
-      await tx.isPersisted.promise;
-    } catch {
-      toastManager.add({
-        title: "Failed to delete roadmap",
-        type: "error",
-      });
-      return;
-    }
-
-    if (!isLoading && deletedRoadmap?.isPrimary) {
-      try {
-        const nextRoadmap = (roadmaps ?? []).find(
-          (roadmap) => roadmap.id !== id
-        );
-
-        if (nextRoadmap) {
-          const primaryTx = roadmapCollection.update(
-            nextRoadmap.id,
-            (draft) => {
-              draft.isPrimary = true;
-              draft.updatedAt = new Date();
-            }
-          );
-          await primaryTx.isPersisted.promise;
-        }
-      } catch {
-        toastManager.add({
-          title: "Failed to promote a replacement primary roadmap",
-          type: "error",
-        });
-      }
-    }
-
+    // The row is removed optimistically; close and navigate now so a slow
+    // network never holds the confirm open. `RoadmapDelete` promotes a
+    // successor atomically server-side, and the collection read-back picks
+    // up the new primary — the client must not promote one itself.
     store.send({ type: "toggle" });
-    toastManager.add({
-      title: "Roadmap deleted successfully",
-      type: "success",
-    });
-
-    await navigate({
+    void navigate({
       to: "/$organizationId/roadmap",
       params: { organizationId },
     });
+
+    settleOptimisticMutation(
+      () => roadmapCollection.delete(id),
+      () => {
+        toastManager.add({
+          title: "Roadmap deleted successfully",
+          type: "success",
+        });
+      },
+      () => {
+        toastManager.add({
+          title: "Failed to delete roadmap",
+          type: "error",
+        });
+      }
+    );
   };
 
   return (

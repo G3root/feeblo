@@ -556,7 +556,7 @@ export function ChangelogEditorSubmitAction() {
     <form.Subscribe selector={(state) => state.isSubmitting}>
       {(isSubmitting) => (
         <div className="flex items-center gap-2">
-          <Button disabled={isSubmitting} type="submit" variant="outline">
+          <Button loading={isSubmitting} type="submit" variant="outline">
             Save
           </Button>
           {changelog.status === "published" ? (

@@ -14,6 +14,7 @@ import {
   rollbackPreparedEditorAssets,
   syncChangelogAssetReferences,
 } from "../asset/service";
+import { ChangelogPostRepository } from "../changelog-post/repository";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { EntitlementPolicy } from "../entitlement/policies";
@@ -40,6 +41,7 @@ import type {
 
 export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* ChangelogRepository;
+  const changelogPostRepository = yield* ChangelogPostRepository;
   const emailOutbox = yield* EmailOutboxRepository;
   const entitlementPolicy = yield* EntitlementPolicy;
   const changelogPolicy = yield* ChangelogPolicy;
@@ -139,7 +141,14 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             message: "Changelog entry not found",
           });
         }
-        return entry;
+        // Embedded so the public detail page renders its "shipped" list from
+        // this single response instead of syncing every post and changelog
+        // link in the organization.
+        const posts = yield* changelogPostRepository.findLinkedPostsPublished({
+          changelogId: entry.id,
+          organizationId: args.organizationId,
+        });
+        return { ...entry, posts };
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "ChangelogGetPublic",
@@ -424,6 +433,7 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(SiteRepository.layer),
   Layer.provide(ChangelogRepository.layer),
+  Layer.provide(ChangelogPostRepository.layer),
   Layer.provide(EmailOutboxRepository.layer),
   Layer.provide(NotificationService.layer)
 );
