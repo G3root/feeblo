@@ -9,6 +9,7 @@ import {
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
+import { settleOptimisticMutation } from "@feeblo/web-shared/collections";
 import { useSelector } from "@xstate/store-react";
 
 import { m } from "../../paraglide/messages.js";
@@ -36,22 +37,27 @@ export function CommentDeleteDialog() {
         <AlertDialogFooter>
           <AlertDialogCancel>{m.early_careful_coyote()}</AlertDialogCancel>
           <Button
-            onClick={async () => {
-              try {
-                const id = store.get().context.data.commentId;
-                const tx = commentCollection.delete(id);
-                await tx.isPersisted.promise;
-                toastManager.add({
-                  title: m.mealy_soft_elk(),
-                  type: "success",
-                });
-                store.send({ type: "toggle" });
-              } catch {
-                toastManager.add({
-                  title: m.day_spare_herring(),
-                  type: "error",
-                });
-              }
+            onClick={() => {
+              const id = store.get().context.data.commentId;
+              // The row is removed optimistically, so the confirm closes in
+              // the same tick; persistence settles in the background and
+              // rollback + toast surface any failure.
+              store.send({ type: "toggle" });
+              settleOptimisticMutation(
+                () => commentCollection.delete(id),
+                () => {
+                  toastManager.add({
+                    title: m.mealy_soft_elk(),
+                    type: "success",
+                  });
+                },
+                () => {
+                  toastManager.add({
+                    title: m.day_spare_herring(),
+                    type: "error",
+                  });
+                }
+              );
             }}
             variant="destructive"
           >

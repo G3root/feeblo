@@ -9,6 +9,7 @@ import {
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
+import { settleOptimisticMutation } from "@feeblo/web-shared/collections";
 import { useSelector } from "@xstate/store-react";
 
 import { m } from "../../paraglide/messages.js";
@@ -43,26 +44,32 @@ export function CommentVisibilityDialog() {
         <AlertDialogFooter>
           <AlertDialogCancel>{m.early_careful_coyote()}</AlertDialogCancel>
           <Button
-            onClick={async () => {
-              try {
-                const { commentId, isInternal } = store.get().context.data;
-                const tx = commentCollection.update(commentId, (draft) => {
-                  draft.visibility = isInternal ? "PUBLIC" : "INTERNAL";
-                });
-                await tx.isPersisted.promise;
-                toastManager.add({
-                  title: isInternal
-                    ? m.moving_vivid_duck()
-                    : m.giant_factual_midge(),
-                  type: "success",
-                });
-                store.send({ type: "toggle" });
-              } catch {
-                toastManager.add({
-                  title: m.patient_dry_iguana(),
-                  type: "error",
-                });
-              }
+            onClick={() => {
+              const { commentId, isInternal } = store.get().context.data;
+              // The visibility flips optimistically, so close the confirm in
+              // the same tick; persistence settles in the background and
+              // rollback + toast surface any failure.
+              store.send({ type: "toggle" });
+              settleOptimisticMutation(
+                () =>
+                  commentCollection.update(commentId, (draft) => {
+                    draft.visibility = isInternal ? "PUBLIC" : "INTERNAL";
+                  }),
+                () => {
+                  toastManager.add({
+                    title: isInternal
+                      ? m.moving_vivid_duck()
+                      : m.giant_factual_midge(),
+                    type: "success",
+                  });
+                },
+                () => {
+                  toastManager.add({
+                    title: m.patient_dry_iguana(),
+                    type: "error",
+                  });
+                }
+              );
             }}
             variant="destructive"
           >

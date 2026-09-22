@@ -1,4 +1,6 @@
 import type { TComment } from "@feeblo/domain/src/comments/schema.js";
+import { toastManager } from "@feeblo/ui/toast";
+import { settleOptimisticMutation } from "@feeblo/web-shared/collections";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import {
   and,
@@ -151,16 +153,37 @@ export function CommentDisplayItem({
           parentCommentId: data.id,
         })
       }
-      onTogglePin={async () => {
-        const tx = togglePinAction({});
-        await tx.isPersisted.promise;
+      onTogglePin={() => {
+        // The pinned flag flips optimistically; persistence settles in the
+        // background so the click never waits on the round trip.
+        settleOptimisticMutation(
+          () => togglePinAction({}),
+          undefined,
+          () => {
+            toastManager.add({
+              title: "Failed to update pinned comment",
+              type: "error",
+            });
+          }
+        );
       }}
-      onUpdate={async ({ content, isPrivate }) => {
-        const tx = commentCollection.update(data.id, (draft) => {
-          draft.content = content;
-          draft.visibility = isPrivate ? "INTERNAL" : "PUBLIC";
-        });
-        await tx.isPersisted.promise;
+      onUpdate={({ content, isPrivate }) => {
+        // The body is already reconciled optimistically; the editor closes
+        // without waiting, and a rejected update rolls back with a toast.
+        settleOptimisticMutation(
+          () =>
+            commentCollection.update(data.id, (draft) => {
+              draft.content = content;
+              draft.visibility = isPrivate ? "INTERNAL" : "PUBLIC";
+            }),
+          undefined,
+          () => {
+            toastManager.add({
+              title: "Failed to update comment",
+              type: "error",
+            });
+          }
+        );
       }}
       postId={data.postId}
       postSlug={data.postSlug}

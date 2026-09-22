@@ -12,6 +12,10 @@ import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import {
+  refetchInBackground,
+  settleOptimisticMutation,
+} from "@feeblo/web-shared/collections";
+import {
   hasMembership,
   hasPermission,
   usePolicy,
@@ -25,7 +29,6 @@ import {
   useSelectedPosts,
 } from "~/features/board/state/board-store-context";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 /**
@@ -216,54 +219,54 @@ function BulkDeleteAlert() {
                       "These posts can no longer be deleted. The selection was refreshed.",
                     type: "error",
                   });
-                  await deleteEligibilityCollection?.utils.refetch();
+                  refetchInBackground(
+                    deleteEligibilityCollection?.utils.refetch()
+                  );
                   store.send({ type: "setBulkDeleteOpen", open: false });
                   return;
                 }
 
-                const postIdsByBoardId = new Map<string, string[]>();
-
-                for (const selectedPost of deletablePosts) {
-                  const boardPostIds =
-                    postIdsByBoardId.get(selectedPost.boardId) ?? [];
-                  boardPostIds.push(selectedPost.postId);
-                  postIdsByBoardId.set(selectedPost.boardId, boardPostIds);
-                }
-
-                await Promise.all(
-                  [...postIdsByBoardId.entries()].map(([boardId, postIds]) =>
-                    fetchRpc((rpc) =>
-                      rpc.PostDelete({
-                        id: postIds,
-                        boardId,
-                        organizationId,
-                      })
-                    )
-                  )
-                );
-
-                await postCollection.utils.refetch();
-                trackEvent("post_deleted", { mode: "bulk", success: true });
-
+                // The rows are removed optimistically in one transaction;
+                // the collection handler groups them into one bulk RPC per
+                // board. Close the confirm now and settle persistence in the
+                // background so a slow network never holds the dialog open.
                 store.send({ type: "clearSelection" });
                 store.send({ type: "setBulkDeleteOpen", open: false });
-                toastManager.add({
-                  title:
-                    skippedCount > 0
-                      ? `${deletablePosts.length} post${
-                          deletablePosts.length === 1 ? "" : "s"
-                        } deleted, ${skippedCount} skipped (no longer deletable)`
-                      : `${deletablePosts.length} post${
-                          deletablePosts.length === 1 ? "" : "s"
-                        } deleted successfully`,
-                  type: "success",
-                });
-              } catch (error) {
+                settleOptimisticMutation(
+                  () =>
+                    postCollection.delete(
+                      deletablePosts.map((selectedPost) => selectedPost.postId)
+                    ),
+                  () => {
+                    trackEvent("post_deleted", { mode: "bulk", success: true });
+                    toastManager.add({
+                      title:
+                        skippedCount > 0
+                          ? `${deletablePosts.length} post${
+                              deletablePosts.length === 1 ? "" : "s"
+                            } deleted, ${skippedCount} skipped (no longer deletable)`
+                          : `${deletablePosts.length} post${
+                              deletablePosts.length === 1 ? "" : "s"
+                            } deleted successfully`,
+                      type: "success",
+                    });
+                  },
+                  () => {
+                    trackEvent("post_deleted", {
+                      mode: "bulk",
+                      success: false,
+                    });
+                    toastManager.add({
+                      title: "Failed to delete selected posts",
+                      type: "error",
+                    });
+                  }
+                );
+              } catch {
                 trackEvent("post_deleted", {
                   mode: "bulk",
                   success: false,
                 });
-                console.error(error);
                 toastManager.add({
                   title: "Failed to delete selected posts",
                   type: "error",

@@ -94,13 +94,14 @@ function RegisterRoute() {
       </Card>
 
       <form.Subscribe
-        selector={(state) => state.isSubmitting || !state.canSubmit}
+        selector={(state) => [state.isSubmitting, !state.canSubmit] as const}
       >
-        {(isDisabled) => (
+        {([isSubmitting, isInvalid]) => (
           <Button
             className="w-full"
-            disabled={isDisabled}
+            disabled={isInvalid}
             form="register-form"
+            loading={isSubmitting}
             size="lg"
             type="submit"
           >

@@ -10,6 +10,7 @@ import {
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { settleOptimisticMutation } from "@feeblo/web-shared/collections";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { and, eq, queryOnce } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
@@ -86,19 +87,35 @@ export function PostDeleteDialog() {
                   }
                 }
 
-                const tx = collections.postCollection.delete(id, {
-                  optimistic: false,
-                });
-                await tx.isPersisted.promise;
-                trackEvent("post_deleted", { mode: "single", success: true });
+                // The row is removed optimistically; close and redirect now
+                // so high-latency networks don't hold the confirm open.
                 store.send({ type: "toggle" });
-                toastManager.add({
-                  title: m.direct_true_fireant(),
-                  type: "success",
-                });
                 if (redirectOptions) {
-                  navigate(redirectOptions);
+                  void navigate(redirectOptions);
                 }
+                settleOptimisticMutation(
+                  () => collections.postCollection.delete(id),
+                  () => {
+                    trackEvent("post_deleted", {
+                      mode: "single",
+                      success: true,
+                    });
+                    toastManager.add({
+                      title: m.direct_true_fireant(),
+                      type: "success",
+                    });
+                  },
+                  () => {
+                    trackEvent("post_deleted", {
+                      mode: "single",
+                      success: false,
+                    });
+                    toastManager.add({
+                      title: m.known_known_vole(),
+                      type: "error",
+                    });
+                  }
+                );
               } catch {
                 trackEvent("post_deleted", { mode: "single", success: false });
                 toastManager.add({

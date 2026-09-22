@@ -24,7 +24,8 @@ function SubscribeButton({
       {(isSubmitting) => (
         <Button
           {...props}
-          disabled={disabled || isSubmitting}
+          disabled={disabled}
+          loading={isSubmitting}
           type={type}
           variant={variant}
         >

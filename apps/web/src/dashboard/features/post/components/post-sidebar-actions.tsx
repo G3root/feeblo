@@ -13,7 +13,10 @@ import { CopyButton } from "@feeblo/ui/copy-button";
 import { toastManager } from "@feeblo/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
-import { refetchInBackground } from "@feeblo/web-shared/collections";
+import {
+  refetchInBackground,
+  settleOptimisticMutation,
+} from "@feeblo/web-shared/collections";
 import {
   CircleLockIcon,
   CircleUnlockIcon,
@@ -65,9 +68,6 @@ function PostAdminActionButtons() {
   const { postActivityCollection, postCollection } = useDashboardCollections();
   const postDialogStore = usePostDeleteDialogContext();
   const [dialogAction, setDialogAction] = useState<DialogAction>(null);
-  const [pendingAction, setPendingAction] = useState<PostAdminAction | null>(
-    null
-  );
 
   const lockLabel = isLocked ? "Unlock post" : "Lock post";
 
@@ -96,37 +96,29 @@ function PostAdminActionButtons() {
     },
   });
 
-  const handleAction = async (action: PostAdminAction) => {
-    setPendingAction(action);
+  const handleAction = (action: PostAdminAction) => {
+    const nextLocked = action === "lock" ? !isLocked : isLocked;
 
-    try {
-      const nextLocked = action === "lock" ? !isLocked : isLocked;
-
-      const transaction = updatePostAdminState({
-        locked: nextLocked,
-      });
-      await transaction.isPersisted.promise;
-
-      trackEvent("post_lock_changed", { locked: nextLocked, success: true });
-
-      toastManager.add({
-        title: isLocked ? "Post unlocked" : "Post locked",
-        type: "success",
-      });
-
-      setDialogAction(null);
-    } catch {
-      trackEvent("post_lock_changed", {
-        locked: action === "lock" ? !isLocked : isLocked,
-        success: false,
-      });
-      toastManager.add({
-        title: "Failed to update lock status",
-        type: "error",
-      });
-    } finally {
-      setPendingAction(null);
-    }
+    // The lock flag flips optimistically; close the confirm in the same tick
+    // and settle persistence in the background.
+    setDialogAction(null);
+    settleOptimisticMutation(
+      () => updatePostAdminState({ locked: nextLocked }),
+      () => {
+        trackEvent("post_lock_changed", { locked: nextLocked, success: true });
+        toastManager.add({
+          title: isLocked ? "Post unlocked" : "Post locked",
+          type: "success",
+        });
+      },
+      () => {
+        trackEvent("post_lock_changed", { locked: nextLocked, success: false });
+        toastManager.add({
+          title: "Failed to update lock status",
+          type: "error",
+        });
+      }
+    );
   };
 
   return (
@@ -197,8 +189,7 @@ function PostAdminActionButtons() {
             : "This will prevent further interaction until the post is unlocked."
         }
         isOpen={dialogAction === "lock"}
-        isPending={pendingAction === "lock"}
-        onConfirm={() => void handleAction("lock")}
+        onConfirm={() => handleAction("lock")}
         onOpenChange={(open) => setDialogAction(open ? "lock" : null)}
         title={isLocked ? "Unlock Post" : "Lock Post"}
       />
@@ -209,14 +200,12 @@ function PostAdminActionButtons() {
 function ConfirmActionDialog({
   description,
   isOpen,
-  isPending,
   onConfirm,
   onOpenChange,
   title,
 }: {
   description: string;
   isOpen: boolean;
-  isPending: boolean;
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -229,10 +218,8 @@ function ConfirmActionDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
-          <Button disabled={isPending} onClick={onConfirm}>
-            {isPending ? "Updating..." : "Continue"}
-          </Button>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <Button onClick={onConfirm}>Continue</Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>
