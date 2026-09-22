@@ -19,6 +19,11 @@ interface TRevoke {
   organizationId: string;
 }
 
+interface TAssignCreator {
+  keyId: string;
+  creatorId: string;
+}
+
 /**
  * Scope statements as the api-key plugin persists them: a JSON string in
  * `apikey.permissions`. Undecodable values degrade to "no scopes" rather than
@@ -46,6 +51,7 @@ const toSummary = (row: ApiKeyRow): TApiKeySummary => ({
   scopes: listPublicApiScopes(
     Option.getOrUndefined(decodeScopeStatements(row.permissions))
   ),
+  creatorId: row.creatorId,
   createdAt: row.createdAt,
   lastRequest: row.lastRequest,
   expiresAt: row.expiresAt,
@@ -77,6 +83,19 @@ const makeApiKeyRepository = Effect.gen(function* () {
           Effect.map((rows) => rows.map(toSummary)),
           withRemapDbErrors("ApiKey", "select")
         ),
+
+    /**
+     * Records who minted a key. The api-key plugin owns row creation and does
+     * not know this column, so the `ApiKeyCreate` handler writes it immediately
+     * after the plugin inserts. Never fails on zero rows: a key that vanished
+     * between the two writes is already gone.
+     */
+    assignCreator: ({ keyId, creatorId }: TAssignCreator) =>
+      db
+        .update(schema.apiKeyTable)
+        .set({ creatorId })
+        .where(eq(schema.apiKeyTable.id, keyId))
+        .pipe(withRemapDbErrors("ApiKey", "update")),
 
     /**
      * Deletes one key. Both predicates matter: `id` selects the key, and

@@ -14,27 +14,33 @@ import { WorkspaceRepository } from "../workspace/repository";
 import { ApiKeyPolicy } from "./policies";
 import { ApiKeyRepository } from "./repository";
 import { ApiKeyRpcs } from "./rpcs";
-import type {
-  ApiKeyAuthCreated,
-  TApiKeyCreate,
-  TApiKeyList,
-  TApiKeyRevoke,
-  TApiKeySummary,
+import {
+  API_KEY_EXPIRATION_SECONDS,
+  type ApiKeyAuthCreated,
+  type TApiKeyCreate,
+  type TApiKeyList,
+  type TApiKeyRevoke,
+  type TApiKeySummary,
 } from "./schema";
 
 /**
  * Shapes the plugin's created-key record into the dashboard's summary. Written
  * out field by field on purpose: the plugin returns its whole table row, and
  * naming each field is what keeps a future column from appearing in the UI by
- * accident.
+ * accident. `creatorId` comes from the session, because the plugin does not
+ * write that column.
  */
-const toCreatedSummary = (created: ApiKeyAuthCreated): TApiKeySummary => ({
+const toCreatedSummary = (
+  created: ApiKeyAuthCreated,
+  creatorId: string
+): TApiKeySummary => ({
   id: created.id,
   name: created.name,
   start: created.start,
   prefix: created.prefix,
   enabled: created.enabled,
   scopes: listPublicApiScopes(created.permissions),
+  creatorId,
   createdAt: created.createdAt,
   lastRequest: created.lastRequest,
   expiresAt: created.expiresAt,
@@ -46,7 +52,7 @@ export const ApiKeyRpcHandlersEffect = Effect.gen(function* () {
   const auth = yield* Auth;
 
   return {
-    ApiKeyCreate: ({ name, organizationId }: TApiKeyCreate) =>
+    ApiKeyCreate: ({ name, organizationId, expiration }: TApiKeyCreate) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
 
@@ -62,6 +68,7 @@ export const ApiKeyRpcHandlersEffect = Effect.gen(function* () {
                 organizationId,
                 userId: session.user.id,
                 name,
+                expiresIn: API_KEY_EXPIRATION_SECONDS[expiration],
                 permissions: toPublicApiScopeStatements(
                   PUBLIC_API_DEFAULT_SCOPES
                 ),
@@ -74,7 +81,19 @@ export const ApiKeyRpcHandlersEffect = Effect.gen(function* () {
             }),
         });
 
-        return { key: created.key, summary: toCreatedSummary(created) };
+        // The plugin's table has no acting-user column, so the creator is
+        // recorded right after the insert. A failure here leaves a working key
+        // with an unknown creator rather than failing a request whose key was
+        // already minted and returned.
+        yield* repository.assignCreator({
+          keyId: created.id,
+          creatorId: session.user.id,
+        });
+
+        return {
+          key: created.key,
+          summary: toCreatedSummary(created, session.user.id),
+        };
       }).pipe(
         Policy.withPolicy(apiKeyPolicy.canCreate(organizationId)),
         withRemapDbErrors("ApiKey", "create")

@@ -41,19 +41,27 @@ const AuthTest = Layer.succeed(Auth, {
   handler: () => new Response(),
   api: {
     getSession: async () => null,
-    createApiKey: async ({ body }): Promise<ApiKeyAuthCreated> => ({
-      id: "apikey_created",
-      name: body.name,
-      start: "fbk_ab",
-      prefix: "fbk_",
-      enabled: true,
-      createdAt: new Date("2026-09-18T00:00:00.000Z"),
-      lastRequest: null,
-      expiresAt: null,
-      referenceId: body.organizationId,
-      permissions: body.permissions ?? null,
-      key: "fbk_plaintext_returned_once",
-    }),
+    createApiKey: async ({ body }): Promise<ApiKeyAuthCreated> => {
+      const createdAt = new Date("2026-09-18T00:00:00.000Z");
+      return {
+        id: "apikey_created",
+        name: body.name,
+        start: "fbk_ab",
+        prefix: "fbk_",
+        enabled: true,
+        createdAt,
+        lastRequest: null,
+        // Mirrors the plugin: `null` never expires, otherwise the lifetime is
+        // added to creation time.
+        expiresAt:
+          body.expiresIn === null
+            ? null
+            : new Date(createdAt.getTime() + body.expiresIn * 1000),
+        referenceId: body.organizationId,
+        permissions: body.permissions ?? null,
+        key: "fbk_plaintext_returned_once",
+      };
+    },
     verifyApiKey: async () => ({ valid: false, key: null }),
   },
 });
@@ -206,6 +214,7 @@ describe("ApiKeyRpcHandlers", () => {
             .ApiKeyCreate({
               name: "Production",
               organizationId: fixture.organizationId,
+              expiration: "30d",
             })
             .pipe(
               Effect.provideService(
@@ -222,9 +231,11 @@ describe("ApiKeyRpcHandlers", () => {
             prefix: "fbk_",
             enabled: true,
             scopes: ["boards.read", "posts.read"],
+            creatorId: fixture.userId,
             createdAt: new Date("2026-09-18T00:00:00.000Z"),
             lastRequest: null,
-            expiresAt: null,
+            // 30 days after the double's creation date.
+            expiresAt: new Date("2026-10-18T00:00:00.000Z"),
           });
         })
     );
@@ -238,6 +249,7 @@ describe("ApiKeyRpcHandlers", () => {
           .ApiKeyCreate({
             name: "Production",
             organizationId: fixture.organizationId,
+            expiration: "never",
           })
           .pipe(
             Effect.provideService(
@@ -263,6 +275,7 @@ describe("ApiKeyRpcHandlers", () => {
           .ApiKeyCreate({
             name: "Production",
             organizationId: fixture.organizationId,
+            expiration: "never",
           })
           .pipe(
             Effect.provideService(

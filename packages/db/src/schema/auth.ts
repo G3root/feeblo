@@ -360,6 +360,11 @@ export type NewOrganization = typeof organizationTable.$inferInsert;
  * `rateLimit*`, `refill*`, and `remaining` columns exist because the plugin
  * writes them; the plugin's own limiter is disabled, so they hold defaults
  * and per-key limiting runs through the Redis `RateLimitService` instead.
+ *
+ * `creatorId` is the one column the plugin does not know: the `ApiKeyCreate`
+ * handler writes it right after the plugin inserts the row. It is the acting
+ * user, not a membership id, so the key keeps an owner to point at after that
+ * member leaves, and `set null` keeps the credential itself alive.
  */
 export const apiKeyTable = pgTable(
   "apikey",
@@ -371,6 +376,9 @@ export const apiKeyTable = pgTable(
     referenceId: text("reference_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
+    creatorId: text("creator_id").references(() => userTable.id, {
+      onDelete: "set null",
+    }),
     prefix: text("prefix"),
     // SHA-256 of the presented key, never the key itself.
     key: text("key").notNull(),

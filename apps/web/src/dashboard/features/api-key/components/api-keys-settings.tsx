@@ -32,22 +32,16 @@ import {
 import { ApiKeyRevokeDialog } from "./api-key-revoke-dialog";
 
 export function ApiKeysSettings({
-  apiUrl,
   organizationId,
 }: {
-  readonly apiUrl: string;
   readonly organizationId: string;
 }) {
-  return (
-    <ApiKeysSettingsContent apiUrl={apiUrl} organizationId={organizationId} />
-  );
+  return <ApiKeysSettingsContent organizationId={organizationId} />;
 }
 
 function ApiKeysSettingsContent({
-  apiUrl,
   organizationId,
 }: {
-  readonly apiUrl: string;
   readonly organizationId: string;
 }) {
   const createDialogStore = useApiKeyCreateDialogContext();
@@ -131,8 +125,6 @@ function ApiKeysSettingsContent({
             <ApiKeyCard apiKey={key} key={key.id} />
           ))}
         </CardFrame>
-
-        <ApiEndpointCard apiUrl={apiUrl} />
       </div>
 
       <ApiKeyCreateDialog onCreated={setOneTimeKey} />
@@ -246,57 +238,5 @@ function ApiKeyCard({ apiKey }: { readonly apiKey: ApiKey }) {
         </div>
       </CardPanel>
     </Card>
-  );
-}
-
-/**
- * The base URL and the machine-readable contract, so an integrator can start
- * without hunting through the dashboard for them.
- */
-function ApiEndpointCard({ apiUrl }: { readonly apiUrl: string }) {
-  const baseUrl = `${apiUrl}/api/v1`;
-
-  return (
-    <CardFrame>
-      <CardFrameHeader>
-        <CardFrameTitle>Endpoint</CardFrameTitle>
-        <CardFrameDescription>
-          Send the key in the <code>x-api-key</code> header. The OpenAPI
-          document describes every route, scope, and error code.
-        </CardFrameDescription>
-      </CardFrameHeader>
-      <Card>
-        <CardPanel className="grid gap-3">
-          <div className="grid gap-1">
-            <span className="text-muted-foreground text-xs">Base URL</span>
-            <div className="flex items-center gap-2">
-              <code className="bg-muted min-w-0 flex-1 truncate rounded px-2 py-1 text-sm">
-                {baseUrl}
-              </code>
-              <CopyButton
-                onCopy={() => baseUrl}
-                size="sm"
-                successMessage="Base URL copied"
-                tooltipPopup="Copy base URL"
-                variant="outline"
-              >
-                Copy
-              </CopyButton>
-            </div>
-          </div>
-          <div className="grid gap-1">
-            <span className="text-muted-foreground text-xs">OpenAPI</span>
-            <a
-              className="text-sm underline underline-offset-4"
-              href={`${baseUrl}/openapi.json`}
-              rel="noreferrer"
-              target="_blank"
-            >
-              {baseUrl}/openapi.json
-            </a>
-          </div>
-        </CardPanel>
-      </Card>
-    </CardFrame>
   );
 }

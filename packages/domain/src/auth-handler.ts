@@ -62,6 +62,8 @@ export type AuthHandler = {
         readonly organizationId: string;
         readonly userId: string;
         readonly name: string;
+        /** Lifetime in seconds; `null` mints a key that does not expire. */
+        readonly expiresIn: number | null;
         // Mutable arrays on purpose: this is the plugin's statement shape,
         // and a readonly array is not assignable to it.
         readonly permissions?: { readonly [resource: string]: string[] };

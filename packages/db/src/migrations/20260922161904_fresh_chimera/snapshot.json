@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "7161beb4-21ad-421a-978f-b3ced42b2ef8",
+  "id": "7cc4a4de-ae7f-4916-8980-a581934ce420",
   "prevIds": [
     "a050b009-19e6-4b21-8617-bde832525b42"
   ],
@@ -652,6 +652,19 @@
       "generated": null,
       "identity": null,
       "name": "reference_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "apikey"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "creator_id",
       "entityType": "columns",
       "schema": "public",
       "table": "apikey"
@@ -11944,6 +11957,23 @@
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "apikey_reference_id_organization_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "apikey"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "creator_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "user",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "apikey_creator_id_user_id_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "apikey"

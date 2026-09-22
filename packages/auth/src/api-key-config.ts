@@ -34,12 +34,15 @@ export const publicApiKeyOptions = {
   // Free-form metadata is disabled: it would give customers a place to park
   // personal data beside a credential.
   enableMetadata: false,
-  // Keys do not expire. Expiry on a calendar the customer did not choose
-  // breaks unattended integrations; revocation is the explicit control, and
-  // the dashboard surfaces `lastRequest` per key.
+  // Each key gets the lifetime the creator picked in the dashboard: 7 days
+  // through 1 year, or never, which stays the default because expiry on a
+  // calendar the customer did not choose breaks unattended integrations.
+  // Revocation remains the explicit control; the plugin only enforces the
+  // chosen window, and 365 days is its own ceiling so "1 year" fits exactly.
   keyExpiration: {
     defaultExpiresIn: null,
-    disableCustomExpiresTime: true,
+    disableCustomExpiresTime: false,
+    maxExpiresIn: 365,
   },
   startingCharactersConfig: { shouldStore: true, charactersLength: 6 },
   // Per-key limiting runs through the Redis `RateLimitService`, which

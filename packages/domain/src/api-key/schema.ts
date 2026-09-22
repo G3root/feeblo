@@ -13,6 +13,8 @@ export const ApiKeySummary = S.Struct({
   prefix: S.NullOr(S.String),
   enabled: S.Boolean,
   scopes: S.Array(S.String),
+  /** The user who minted the key; null once that user is deleted. */
+  creatorId: S.NullOr(S.String),
   createdAt: S.DateFromString,
   lastRequest: S.NullOr(S.DateFromString),
   expiresAt: S.NullOr(S.DateFromString),
@@ -28,9 +30,33 @@ export const ApiKeyCreated = S.Struct({
 
 export type TApiKeyCreated = S.Schema.Type<typeof ApiKeyCreated>;
 
+/**
+ * Calendar lifetimes offered in the create dialog, and the seconds each one
+ * means to the plugin. The vocabulary is shared with the dashboard form so a
+ * new choice cannot appear in the UI without a lifetime behind it, and
+ * `1 year` is exactly the plugin's own 365-day ceiling (`maxExpiresIn`).
+ */
+export const API_KEY_EXPIRATIONS = ["7d", "30d", "3m", "1y", "never"] as const;
+
+const DAY_SECONDS = 24 * 60 * 60;
+
+export const API_KEY_EXPIRATION_SECONDS = {
+  "7d": 7 * DAY_SECONDS,
+  "30d": 30 * DAY_SECONDS,
+  "3m": 90 * DAY_SECONDS,
+  "1y": 365 * DAY_SECONDS,
+  never: null,
+} satisfies Record<(typeof API_KEY_EXPIRATIONS)[number], number | null>;
+
+export const ApiKeyExpiration = S.Literals(API_KEY_EXPIRATIONS);
+
+export type TApiKeyExpiration = S.Schema.Type<typeof ApiKeyExpiration>;
+
 export const ApiKeyCreate = S.Struct({
   organizationId: WorkspaceId.schema,
   name: S.String.check(S.isLengthBetween(1, 32)),
+  /** How long the key stays valid; `never` is the plugin's null expiry. */
+  expiration: ApiKeyExpiration,
 });
 
 export type TApiKeyCreate = S.Schema.Type<typeof ApiKeyCreate>;

@@ -4,6 +4,7 @@ CREATE TABLE "apikey" (
 	"name" text,
 	"start" text,
 	"reference_id" text NOT NULL,
+	"creator_id" text,
 	"prefix" text,
 	"key" text NOT NULL,
 	"refill_interval" integer,
@@ -26,4 +27,5 @@ CREATE TABLE "apikey" (
 CREATE INDEX "apiKey_configId_idx" ON "apikey" ("config_id");--> statement-breakpoint
 CREATE INDEX "apiKey_referenceId_idx" ON "apikey" ("reference_id");--> statement-breakpoint
 CREATE INDEX "apiKey_key_idx" ON "apikey" ("key");--> statement-breakpoint
-ALTER TABLE "apikey" ADD CONSTRAINT "apikey_reference_id_organization_id_fkey" FOREIGN KEY ("reference_id") REFERENCES "organization"("id") ON DELETE CASCADE;
+ALTER TABLE "apikey" ADD CONSTRAINT "apikey_reference_id_organization_id_fkey" FOREIGN KEY ("reference_id") REFERENCES "organization"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "apikey" ADD CONSTRAINT "apikey_creator_id_user_id_fkey" FOREIGN KEY ("creator_id") REFERENCES "user"("id") ON DELETE SET NULL;

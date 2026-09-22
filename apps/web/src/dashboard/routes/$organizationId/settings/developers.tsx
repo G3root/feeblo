@@ -1,4 +1,3 @@
-import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -10,11 +9,6 @@ import {
 import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-
-// Read once at module scope, like `use-site.ts`: the dashboard runs in the
-// browser, and the value only changes when the deployment changes.
-const { apiUrl: configuredApiUrl } = getRuntimePublicEnv();
-const apiUrl = configuredApiUrl?.replace(/\/+$/, "") ?? "";
 
 export const Route = createFileRoute("/$organizationId/settings/developers")({
   component: DevelopersSettingsRoute,
@@ -44,7 +38,7 @@ function DevelopersSettingsRoute() {
             </SettingsLayout.HeaderDescription>
           </SettingsLayout.Header>
           <SettingsLayout.Content>
-            <ApiKeysSettings apiUrl={apiUrl} organizationId={organizationId} />
+            <ApiKeysSettings organizationId={organizationId} />
           </SettingsLayout.Content>
         </SettingsLayout.Root>
       </ApiKeyRevokeDialogProvider>

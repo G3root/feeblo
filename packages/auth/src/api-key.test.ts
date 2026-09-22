@@ -352,6 +352,71 @@ describe("api-key plugin wiring", () => {
   );
 
   it(
+    "honors the requested lifetime and refuses one past the one-year ceiling",
+    async () => {
+      const auth = makeAuth();
+      const { organizationId, userId } = await seedMember("admin");
+
+      const thirtyDays = 30 * 24 * 60 * 60;
+      const rotating = await auth.api.createApiKey({
+        body: {
+          organizationId,
+          userId,
+          name: "Rotating",
+          expiresIn: thirtyDays,
+          permissions: { boards: ["read"], posts: ["read"] },
+        },
+      });
+
+      const expiresAt = rotating.expiresAt;
+      expect(expiresAt).not.toBeNull();
+      const daysAway =
+        ((expiresAt?.getTime() ?? Date.now()) - Date.now()) /
+        (24 * 60 * 60 * 1000);
+      expect(daysAway).toBeGreaterThan(29.9);
+      expect(daysAway).toBeLessThan(30.1);
+
+      // 365 days — the dashboard's "1 year" — sits exactly on the plugin's
+      // default ceiling.
+      const yearly = await auth.api.createApiKey({
+        body: {
+          organizationId,
+          userId,
+          name: "Yearly",
+          expiresIn: 365 * 24 * 60 * 60,
+          permissions: { boards: ["read"], posts: ["read"] },
+        },
+      });
+      expect(yearly.expiresAt).not.toBeNull();
+
+      // Past the ceiling is refused; the dashboard offers nothing longer.
+      await expect(
+        auth.api.createApiKey({
+          body: {
+            organizationId,
+            userId,
+            name: "Too long",
+            expiresIn: 366 * 24 * 60 * 60,
+            permissions: { boards: ["read"], posts: ["read"] },
+          },
+        })
+      ).rejects.toThrow("larger than the predefined maximum");
+
+      // Omitting the lifetime means "never expires", the dialog's default.
+      const forever = await auth.api.createApiKey({
+        body: {
+          organizationId,
+          userId,
+          name: "Forever",
+          permissions: { boards: ["read"], posts: ["read"] },
+        },
+      });
+      expect(forever.expiresAt).toBeNull();
+    },
+    perTestTimeout
+  );
+
+  it(
     "verifies a live key, rejects a scope it does not hold, and rejects it after revocation",
     async () => {
       const auth = makeAuth();
