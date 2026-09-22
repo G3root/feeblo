@@ -1,5 +1,5 @@
 import { currentDb, schema } from "@feeblo/db";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -53,6 +53,49 @@ const makeChangelogPostRepository = Effect.gen(function* () {
             eq(schema.boardTable.visibility, "PUBLIC")
           )
         ),
+
+    /**
+     * Posts linked to one published changelog entry, with the fields the
+     * public detail page renders. Board visibility keeps private posts out of
+     * the public response; ordering matches the page's previous
+     * link-created-desc order.
+     */
+    findLinkedPostsPublished: ({
+      changelogId,
+      organizationId,
+    }: {
+      readonly changelogId: string;
+      readonly organizationId: string;
+    }) =>
+      db
+        .select({
+          id: schema.postTable.id,
+          slug: schema.postTable.slug,
+          status: schema.postStatusTable.type,
+          title: schema.postTable.title,
+        })
+        .from(schema.changelogPostTable)
+        .innerJoin(
+          schema.postTable,
+          eq(schema.changelogPostTable.postId, schema.postTable.id)
+        )
+        .innerJoin(
+          schema.postStatusTable,
+          eq(schema.postTable.statusId, schema.postStatusTable.id)
+        )
+        .innerJoin(
+          schema.boardTable,
+          eq(schema.postTable.boardId, schema.boardTable.id)
+        )
+        .where(
+          and(
+            eq(schema.changelogPostTable.organizationId, organizationId),
+            eq(schema.changelogPostTable.changelogId, changelogId),
+            eq(schema.boardTable.visibility, "PUBLIC"),
+            isNull(schema.postTable.mergedIntoPostId)
+          )
+        )
+        .orderBy(desc(schema.changelogPostTable.createdAt)),
 
     findEligible: ({ postId, organizationId }: TChangelogPostCreate) =>
       db

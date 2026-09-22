@@ -18,6 +18,7 @@ import {
   getPostSubscriptionCollectionKey,
   getUpvoteCollectionKey,
 } from "@feeblo/web-shared/reaction-keys";
+import { isRpcErrorTag } from "@feeblo/web-shared/rpc-error";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import {
@@ -64,6 +65,19 @@ function getCurrentPostSlug() {
   }
 
   return postSlugFromPath(window.location.pathname, "p", 1);
+}
+
+/**
+ * Changelog detail pages are served at `/changelog/:slug`; same route-slug
+ * fallback as post pages so the single-entry collection self-keys when it is
+ * preloaded from a route loader.
+ */
+function getCurrentChangelogSlug() {
+  if (!hasWindow()) {
+    return undefined;
+  }
+
+  return postSlugFromPath(window.location.pathname, "changelog", 1);
 }
 
 /**
@@ -313,34 +327,50 @@ export const publicChangelogCategoryLinkCollection = createCollection(
   })
 );
 
-export const getPublicChangelogPostKey = ({
-  changelogId,
-  postId,
-}: {
-  changelogId: string;
-  postId: string;
-}) => `${changelogId}:${postId}`;
-
-export const publicChangelogPostCollection = createCollection(
+/**
+ * Single-entry changelog detail, used by `/changelog/:slug`. On-demand and
+ * slug-scoped: the visit resolves one body (plus its linked posts) through
+ * `ChangelogGetPublic` instead of syncing the list's up-to-100 full bodies.
+ */
+export const publicChangelogDetailCollection = createCollection(
   queryCollectionOptions({
+    queryKey: (opts) =>
+      organizationScopedQueryKey(
+        "public-changelog-detail",
+        eqFilterValue(parseLoadSubsetOptions(opts).filters, "slug") ??
+          getCurrentChangelogSlug()
+      ),
+    syncMode: "on-demand",
     staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => organizationScopedQueryKey("public-changelog-post"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
+      const filters = parseLoadSubsetOptions(
+        ctx.meta?.loadSubsetOptions
+      ).filters;
+      const slug = eqFilterValue(filters, "slug") ?? getCurrentChangelogSlug();
 
-      if (!organizationId) {
+      if (!(slug && organizationId)) {
         return [];
       }
 
-      const data = await fetchRpc(
-        (rpc) => rpc.ChangelogPostListPublic({ organizationId }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
+      try {
+        const entry = await fetchRpc(
+          (rpc) => rpc.ChangelogGetPublic({ organizationId, slug }),
+          { signal: ctx.signal }
+        );
+        return [entry];
+      } catch (error) {
+        // A missing or hidden entry resolves to an empty collection so the
+        // page renders its not-found state; transport failures still surface
+        // through the query error state.
+        if (isRpcErrorTag(error, "ChangelogNotFoundError")) {
+          return [];
+        }
+        throw error;
+      }
     },
     queryClient,
-    getKey: getPublicChangelogPostKey,
+    getKey: (item) => item.id,
   })
 );
 
@@ -396,17 +426,29 @@ export const publicTagCollection = createCollection(
 
 export const publicPostTagCollection = createCollection(
   queryCollectionOptions({
+    // Slug-scoped and on-demand: only the viewed post's tag assignments are
+    // fetched, not every assignment in the organization. The query key
+    // resolves the route slug, so the preloaded subset and the component's
+    // postId-filtered subscription share one cache entry.
+    queryKey: (opts) =>
+      slugScopedQueryKey(
+        "public-post-tag",
+        parseLoadSubsetOptions(opts).filters
+      ),
+    syncMode: "on-demand",
     staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => organizationScopedQueryKey("public-post-tag"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
+      const slug = resolvePostSlug(
+        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+      );
 
-      if (!organizationId) {
+      if (!(slug && organizationId)) {
         return [];
       }
 
       const data = await fetchRpc(
-        (rpc) => rpc.PostTagListPublic({ organizationId }),
+        (rpc) => rpc.PostTagListPublic({ organizationId, slug }),
         {
           signal: ctx.signal,
         }
@@ -632,6 +674,74 @@ export const publicUpvoteCollection = createCollection(
   })
 );
 
+/**
+ * Slug-scoped counterpart of `publicUpvoteCollection`, used by post detail
+ * pages. On-demand: the route loader preloads the subset while the upvote
+ * button and voter dialog subscribe by `postId`; both resolve the same
+ * route-slug query key, so only this post's votes are fetched instead of
+ * every vote in the organization.
+ */
+export const publicPostUpvoteCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: (opts) =>
+      slugScopedQueryKey(
+        "public-post-upvote",
+        parseLoadSubsetOptions(opts).filters,
+        getCurrentUserId()
+      ),
+    syncMode: "on-demand",
+    staleTime: Duration.toMillis(Duration.minutes(5)),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+      const slug = resolvePostSlug(
+        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+      );
+
+      if (!(slug && organizationId)) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.UpvoteListPublic({ organizationId, slug }),
+        {
+          signal: ctx.signal,
+        }
+      );
+
+      return [...data];
+    },
+    // SAFETY: The endpoint/API contract guarantees this response shape.
+    queryClient,
+    // SAFETY: The endpoint/API contract guarantees this response shape.
+    getKey: getUpvoteCollectionKey as (item: UpvoteRow) => string,
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: newUpvote } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.UpvoteTogglePublic({
+          organizationId: getMutationOrganizationId(),
+          postId: newUpvote.postId,
+        })
+      );
+      // Same derived-refresh contract as the org-wide collection.
+      refetchInBackground(publicDeleteEligibilityCollection.utils.refetch());
+    },
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: deletedUpvote } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.UpvoteTogglePublic({
+          organizationId: getMutationOrganizationId(),
+          postId: deletedUpvote.postId,
+        })
+      );
+      refetchInBackground(publicDeleteEligibilityCollection.utils.refetch());
+    },
+  })
+);
+
 export const publicPostReactionCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) =>
@@ -819,11 +929,21 @@ export const publicPostDetailCollection = createCollection(
         return [];
       }
 
-      const post = await fetchRpc(
-        (rpc) => rpc.PostGetPublic({ organizationId, slug }),
-        { signal: ctx.signal }
-      );
-      return [post];
+      try {
+        const post = await fetchRpc(
+          (rpc) => rpc.PostGetPublic({ organizationId, slug }),
+          { signal: ctx.signal }
+        );
+        return [post];
+      } catch (error) {
+        // A missing or merged-away slug resolves to an empty collection so
+        // the detail page renders its not-found/merge-resolver state instead
+        // of an error; transport failures still surface through the query.
+        if (isRpcErrorTag(error, "PostNotFoundError")) {
+          return [];
+        }
+        throw error;
+      }
     },
     queryClient,
     getKey: (item) => item.id,
@@ -869,7 +989,7 @@ export const publicCollections = {
   publicChangelogCategoryCollection,
   publicChangelogCategoryLinkCollection,
   publicChangelogCollection,
-  publicChangelogPostCollection,
+  publicChangelogDetailCollection,
   publicCommentCollection,
   publicCommentReactionCollection,
   publicDeleteEligibilityCollection,
@@ -878,6 +998,7 @@ export const publicCollections = {
   publicPostReactionCollection,
   publicPostStatusCollection,
   publicPostSubscriptionCollection,
+  publicPostUpvoteCollection,
   publicChangelogSubscriptionCollection,
   publicPostTagCollection,
   publicRoadmapCollection,

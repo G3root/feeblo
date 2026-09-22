@@ -6,6 +6,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 
+import { ChangelogPostRepository } from "../changelog-post/repository";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { S3UploadService } from "../services/s3";
@@ -101,6 +102,7 @@ describe("ChangelogRpcHandlers", () => {
     });
   const Repositories = Layer.mergeAll(
     ChangelogRepository.layer,
+    ChangelogPostRepository.layer,
     EmailOutboxRepository.layer,
     SiteRepository.layer,
     WorkspaceRepository.layer
