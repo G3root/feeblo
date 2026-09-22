@@ -27,6 +27,7 @@ import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { formatPostStatus } from "@feeblo/web-shared/board/constants";
+import { refetchInBackground } from "@feeblo/web-shared/collections";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { GitMergeIcon, Undo02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -100,14 +101,17 @@ function useRefetchMergeData() {
   } = useDashboardCollections();
 
   return async () => {
-    // The write has already returned when this runs, so a rejected refresh
-    // must not report the merge as failed; settle every request, mirroring
-    // the post-tag-field refetch pattern.
-    await Promise.allSettled([
+    // The merge writes post rows (source tombstone, survivor) and moves every
+    // other row between posts. The post rows are the mutation target, so their
+    // read-back is awaited — settled, because the write has already returned
+    // and a rejected refresh must not report the merge as failed. Everything
+    // else is derived from the move and refreshes detached, so the dialog does
+    // not wait on eight round trips.
+    await Promise.allSettled([postCollection.utils.refetch()]);
+    refetchInBackground(
       commentCollection.utils.refetch(),
       commentReactionCollection.utils.refetch(),
       postActivityCollection.utils.refetch(),
-      postCollection.utils.refetch(),
       postReactionCollection.utils.refetch(),
       postSubscriptionCollection.utils.refetch(),
       postTagCollection.utils.refetch(),
@@ -133,8 +137,8 @@ function useRefetchMergeData() {
       }),
       queryClient.invalidateQueries({
         queryKey: ["post-subscription", organizationId],
-      }),
-    ]);
+      })
+    );
   };
 }
 

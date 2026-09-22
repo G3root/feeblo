@@ -7,6 +7,7 @@ import {
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { refetchInBackground } from "@feeblo/web-shared/collections";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 
@@ -41,13 +42,13 @@ export function PostAuthorField() {
           author,
         })
       );
-      // The author join (`post.user`) and the AUTHOR_CHANGED timeline entry
-      // both derive from refetched collections; a refetch failure after a
-      // successful write must not surface as an update failure.
-      await Promise.allSettled([
-        postCollection.utils.refetch(),
-        postActivityCollection.utils.refetch(),
-      ]);
+      // The author join (`post.user`) derives from the affected post row, so
+      // its read-back is awaited — settled, because a refetch failure after a
+      // successful write must not surface as an update failure. The
+      // AUTHOR_CHANGED timeline entry is derived too but does not gate the
+      // toast, so it refreshes detached.
+      await Promise.allSettled([postCollection.utils.refetch()]);
+      refetchInBackground(postActivityCollection.utils.refetch());
       trackEvent("post_updated", { field: "author", success: true });
       toastManager.add({
         title: "Author updated",

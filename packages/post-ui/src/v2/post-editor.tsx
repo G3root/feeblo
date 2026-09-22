@@ -2,6 +2,7 @@ import { Button } from "@feeblo/ui/button";
 import { Editor, finalizeEditorContent } from "@feeblo/ui/editor";
 import { EditorProvider } from "@feeblo/ui/editor/editor-store";
 import { anchoredToastManager, toastManager } from "@feeblo/ui/toast";
+import { refetchInBackground } from "@feeblo/web-shared/collections";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { createOptimisticAction } from "@tanstack/react-db";
 import {
@@ -394,8 +395,11 @@ export function PostContentUpdateInput() {
               assetIds,
             })
       );
+      // The detail row is the mutation target, so its read-back is awaited
+      // before the optimistic state settles. The list row's derived excerpt
+      // refreshes detached instead of adding a second round trip to the save.
       await postDetailCollection.utils.refetch();
-      await postCollection.utils.refetch();
+      refetchInBackground(postCollection.utils.refetch());
     },
   });
 

@@ -1065,7 +1065,15 @@ test.describe("post author reassignment", () => {
       ).toBeVisible();
       await expect(visitorPage.getByText(customerName)).toHaveCount(0);
       await visitorPage.getByRole("link", { name: title }).click();
-      await expect(visitorPage.getByText(title)).toBeVisible();
+      // The detail view renders the title in a read-only input, which no
+      // list card has, so asserting its value proves the detail view rendered
+      // instead of the previous page still being on screen.
+      await expect(
+        visitorPage.getByRole("textbox", { name: "Post Title" })
+      ).toHaveValue(title);
+      await expect(
+        visitorPage.getByText("Contact-only author display.")
+      ).toBeVisible();
       await expect(visitorPage.getByText(customerName)).toHaveCount(0);
       await assertNoPageErrors(visitorPage);
     } finally {
