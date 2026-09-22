@@ -294,7 +294,6 @@ SDK errors are thrown or reported as `EmbedError`, which carries a stable `code`
 ```bash
 pnpm -F @feeblo/sdk dev      # Vite preview harness at http://localhost:5173
 pnpm -F @feeblo/sdk build    # Emits dist/feeblo-sdk.js + UMD + type declarations
-pnpm -F @feeblo/sdk check-types
 pnpm -F @feeblo/sdk lint
 ```
 

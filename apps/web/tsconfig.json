@@ -22,7 +22,7 @@
     // The dashboard and the workspace packages it imports were written under
     // the Astro strict config (and the packages' own tsconfigs disable these
     // four). Re-enabling them here would typecheck other packages' sources
-    // under stricter rules than their own `check-types` runs with.
+    // under stricter rules than their own tsconfigs use.
     "exactOptionalPropertyTypes": false,
     "noUncheckedIndexedAccess": false,
     "noUnusedLocals": false,

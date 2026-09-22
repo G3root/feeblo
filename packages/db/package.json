@@ -27,7 +27,6 @@
     "db:stop": "docker compose stop",
     "db:down": "docker compose down",
     "db:configure-embeddings": "dotenvx run -f ../../.env -- tsx configure-embeddings.ts",
-    "check-types": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {

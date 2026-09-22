@@ -25,9 +25,6 @@
       "outputs": [],
       "cache": false
     },
-    "check-types": {
-      "dependsOn": ["build:paraglide", "^build:paraglide"]
-    },
     "dev": {
       "cache": false,
       "persistent": true

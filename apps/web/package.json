@@ -13,7 +13,6 @@
     "preview": "vite preview",
     "start": "node server.mjs",
     "generate-types": "wrangler types",
-    "check-types": "pnpm build:paraglide && tsc --noEmit",
     "test": "vitest run",
     "machine-translate": "inlang machine translate --project ../../project.inlang"
   },

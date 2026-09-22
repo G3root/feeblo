@@ -93,7 +93,6 @@ integrations/
 | `pnpm dev` | Run all dev tasks across the workspace |
 | `pnpm dev:server` / `pnpm dev:web` / `pnpm dev:native` | Run a single app |
 | `pnpm build` | Build all packages and apps |
-| `pnpm check-types` | Typecheck the whole workspace |
 | `pnpm db:push` | Push schema to the database |
 | `pnpm db:generate` | Generate SQL migrations from schema changes |
 | `pnpm db:migrate` | Run pending migrations |

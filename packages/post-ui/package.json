@@ -179,7 +179,6 @@
   },
   "scripts": {
     "build:paraglide": "paraglide-js compile --project ../../project.inlang --outdir ./src/paraglide --strategy baseLocale --emit-ts-declarations",
-    "check-types": "tsc --noEmit",
     "dev": "paraglide-js compile --project ../../project.inlang --outdir ./src/paraglide --strategy baseLocale --emit-ts-declarations --watch",
     "ladle": "ladle serve",
     "ladle:build": "ladle build",

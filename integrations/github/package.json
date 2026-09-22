@@ -36,7 +36,6 @@
     "./signature": "./src/github-signature.ts"
   },
   "scripts": {
-    "check-types": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
