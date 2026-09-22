@@ -12,15 +12,15 @@ import {
 } from "~/features/tag/dialog-stores";
 import { tagCollection } from "~/lib/collections";
 
-export const Route = createFileRoute("/_dashboard/$organizationId/settings/feedback-tags")(
-  {
-    component: RouteComponent,
-    beforeLoad: async () => {
-      await tagCollection.preload();
-      return null;
-    },
-  }
-);
+export const Route = createFileRoute(
+  "/_dashboard/$organizationId/settings/feedback-tags"
+)({
+  component: RouteComponent,
+  beforeLoad: async () => {
+    await tagCollection.preload();
+    return null;
+  },
+});
 
 function RouteComponent() {
   return (

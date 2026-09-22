@@ -20,7 +20,9 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 import { jwtSecretCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
 
-export const Route = createFileRoute("/_dashboard/$organizationId/settings/security")({
+export const Route = createFileRoute(
+  "/_dashboard/$organizationId/settings/security"
+)({
   component: RouteComponent,
   beforeLoad: async ({ params }) => {
     const session = await getAuthSession();

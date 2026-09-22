@@ -13,7 +13,9 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePlan } from "~/hooks/use-plan";
 import { siteCollection, workspacePlanCollection } from "~/lib/collections";
 
-export const Route = createFileRoute("/_dashboard/$organizationId/settings/customize")({
+export const Route = createFileRoute(
+  "/_dashboard/$organizationId/settings/customize"
+)({
   component: RouteComponent,
   beforeLoad: async () => {
     await Promise.all([

@@ -52,9 +52,7 @@ function resolveSubdomain(hostname: string, rootDomain: string) {
  */
 export function isDashboardHost(hostname: string, rootDomain: string) {
   const subdomain = resolveSubdomain(hostname, rootDomain);
-  return (
-    !subdomain || subdomain.toLowerCase() === DASHBOARD_SUBDOMAIN
-  );
+  return !subdomain || subdomain.toLowerCase() === DASHBOARD_SUBDOMAIN;
 }
 
 function isFeedbackWidgetPath(pathname: string) {
@@ -149,7 +147,11 @@ export function createPublicBoardRewrite(
       return url;
     },
     output: ({ url }) => {
-      const pathname = toPublicPath(url.pathname, url.hostname, getRootDomain());
+      const pathname = toPublicPath(
+        url.pathname,
+        url.hostname,
+        getRootDomain()
+      );
       if (pathname !== url.pathname) {
         url.pathname = pathname;
       }

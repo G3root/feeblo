@@ -17,7 +17,9 @@ import {
   upvoteCollection,
 } from "~/lib/collections";
 
-export const Route = createFileRoute("/_dashboard/$organizationId/_dashboard-layout/")({
+export const Route = createFileRoute(
+  "/_dashboard/$organizationId/_dashboard-layout/"
+)({
   component: RouteComponent,
   beforeLoad: async () => {
     await Promise.all([

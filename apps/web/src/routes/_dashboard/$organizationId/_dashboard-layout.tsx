@@ -7,7 +7,9 @@ import {
   workspacePlanCollection,
 } from "~/lib/collections";
 
-export const Route = createFileRoute("/_dashboard/$organizationId/_dashboard-layout")({
+export const Route = createFileRoute(
+  "/_dashboard/$organizationId/_dashboard-layout"
+)({
   beforeLoad: async () => {
     // Shell-level collections only: the sidebar and plan gates need these
     // on every page. Page-specific collections (posts, tags, changelogs,

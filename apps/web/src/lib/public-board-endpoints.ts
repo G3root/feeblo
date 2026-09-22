@@ -30,7 +30,9 @@ function resolveSubdomain(request: Request) {
   });
 }
 
-export async function resolveBoardSite(request: Request): Promise<TSite | null> {
+export async function resolveBoardSite(
+  request: Request
+): Promise<TSite | null> {
   const subdomain = resolveSubdomain(request);
   return subdomain ? resolveSite(subdomain) : null;
 }
@@ -338,7 +340,9 @@ export async function handleBoardRss(request: Request) {
     }
 
     if (content !== "") {
-      parts.push(`<description><![CDATA[${escapeCdata(content)}]]></description>`);
+      parts.push(
+        `<description><![CDATA[${escapeCdata(content)}]]></description>`
+      );
     }
 
     return `    <item>\n      ${parts.join("\n      ")}\n    </item>`;

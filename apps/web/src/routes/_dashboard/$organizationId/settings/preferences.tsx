@@ -11,7 +11,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 
-export const Route = createFileRoute("/_dashboard/$organizationId/settings/preferences")({
+export const Route = createFileRoute(
+  "/_dashboard/$organizationId/settings/preferences"
+)({
   component: PreferencesSettingsPage,
 });
 

@@ -39,7 +39,9 @@ import { usePlan } from "~/hooks/use-plan";
 import { usePlanCatalog } from "~/hooks/use-plan-catalog";
 import { workspacePlanCollection } from "~/lib/collections";
 
-export const Route = createFileRoute("/_dashboard/$organizationId/settings/billing")({
+export const Route = createFileRoute(
+  "/_dashboard/$organizationId/settings/billing"
+)({
   validateSearch: (search) =>
     z
       .object({

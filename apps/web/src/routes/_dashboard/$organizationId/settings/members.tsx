@@ -9,7 +9,9 @@ import {
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { invitationsCollection, membersCollection } from "~/lib/collections";
 
-export const Route = createFileRoute("/_dashboard/$organizationId/settings/members")({
+export const Route = createFileRoute(
+  "/_dashboard/$organizationId/settings/members"
+)({
   component: MembersSettingsPage,
   beforeLoad: async ({ params }) => {
     const session = getCachedAuthSession();

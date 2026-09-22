@@ -7,7 +7,9 @@ import {
   organizationCollection,
 } from "~/lib/collections";
 
-export const Route = createFileRoute("/_dashboard/$organizationId/settings/workspace")({
+export const Route = createFileRoute(
+  "/_dashboard/$organizationId/settings/workspace"
+)({
   component: WorkspaceSettingsPage,
   beforeLoad: async () => {
     await Promise.all([
