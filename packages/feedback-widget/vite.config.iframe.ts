@@ -59,12 +59,4 @@ export default defineConfig({
       },
     },
   },
-  server: {
-    port: 5174,
-    // The iframe document is served by the Start dev server on a different
-    // origin (`localhost:3001` or `*.localhost:3001`), so the dev bundle is
-    // requested cross-origin. Vite's default `cors` already allows localhost
-    // origins; this only widens it to the configured root domain hosts.
-    cors: true,
-  },
 });
