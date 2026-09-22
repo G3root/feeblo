@@ -10,7 +10,6 @@ import {
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { settleOptimisticMutation } from "@feeblo/web-shared/collections";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 
@@ -25,25 +24,13 @@ export function DeleteRoadmapDialog() {
   const navigate = useNavigate();
   const organizationId = useOrganizationId();
 
-  const { data: roadmaps, isLoading } = useLiveQuery(
-    (q) =>
-      q
-        .from({ roadmap: roadmapCollection })
-        .where(({ roadmap }) => eq(roadmap.organizationId, organizationId))
-        .orderBy(({ roadmap }) => roadmap.createdAt, "asc"),
-    [organizationId]
-  );
-
   const handleDelete = () => {
     const id = store.get().context.data.roadmapId;
-    const deletedRoadmap = isLoading ? undefined : roadmapCollection.get(id);
-    const nextRoadmap =
-      !isLoading && deletedRoadmap?.isPrimary
-        ? (roadmaps ?? []).find((roadmap) => roadmap.id !== id)
-        : undefined;
 
     // The row is removed optimistically; close and navigate now so a slow
-    // network never holds the confirm open.
+    // network never holds the confirm open. `RoadmapDelete` promotes a
+    // successor atomically server-side, and the collection read-back picks
+    // up the new primary — the client must not promote one itself.
     store.send({ type: "toggle" });
     void navigate({
       to: "/$organizationId/roadmap",
@@ -53,22 +40,6 @@ export function DeleteRoadmapDialog() {
     settleOptimisticMutation(
       () => roadmapCollection.delete(id),
       () => {
-        if (nextRoadmap) {
-          settleOptimisticMutation(
-            () =>
-              roadmapCollection.update(nextRoadmap.id, (draft) => {
-                draft.isPrimary = true;
-                draft.updatedAt = new Date();
-              }),
-            undefined,
-            () => {
-              toastManager.add({
-                title: "Failed to promote a replacement primary roadmap",
-                type: "error",
-              });
-            }
-          );
-        }
         toastManager.add({
           title: "Roadmap deleted successfully",
           type: "success",

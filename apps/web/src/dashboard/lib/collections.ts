@@ -143,7 +143,12 @@ export const postCollection = createCollection(
         postIdsByBoardId.set(deletedPost.boardId, postIds);
       }
 
-      await Promise.all(
+      // Settle every board's RPC before rejecting: `Promise.all` fail-fast
+      // would strand a successful board's optimistic deletes behind the
+      // failing one. The read-back below then runs in both outcomes, so the
+      // rollback a rejection triggers reveals the reconciled rows instead of
+      // resurrecting posts the server already deleted.
+      const results = await Promise.allSettled(
         [...postIdsByBoardId.entries()].map(([boardId, postIds]) =>
           fetchRpc((rpc) =>
             rpc.PostDelete({
@@ -162,6 +167,11 @@ export const postCollection = createCollection(
       // The delete-hint set is derived: refresh it detached so the delete
       // settles without waiting on a second round trip.
       refetchInBackground(deleteEligibilityCollection.utils.refetch());
+
+      const failure = results.find((result) => result.status === "rejected");
+      if (failure) {
+        throw failure.reason;
+      }
     },
   })
 );
@@ -1658,6 +1668,12 @@ export const roadmapCollection = createCollection(
           organizationId: deletedRoadmap.organizationId,
         })
       );
+
+      // Deleting the primary promotes a successor in the same server
+      // transaction; read the rows back so the cached `isPrimary` flags match
+      // the handoff instead of leaving the organization without a primary in
+      // the client cache.
+      await roadmapCollection.utils.refetch();
     },
   })
 );
