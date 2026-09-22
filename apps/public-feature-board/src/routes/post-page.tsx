@@ -3,13 +3,13 @@ import type { TBoard } from "@feeblo/domain/board/schema";
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import type { TPostListItem } from "@feeblo/domain/post/schema";
 import { AuthButton } from "@feeblo/post-ui/auth-dialog";
-import { PostCommentGuestPrompt } from "@feeblo/post-ui/post-comment-composer";
-import { PostPage as ComposedPostPage } from "@feeblo/post-ui/post-page";
-import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import {
   PostCollectionsProvider,
   usePostCollections,
 } from "@feeblo/post-ui/post-collections-provider";
+import { PostCommentGuestPrompt } from "@feeblo/post-ui/post-comment-composer";
+import { PostPage as ComposedPostPage } from "@feeblo/post-ui/post-page";
+import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { SubscribeCard } from "@feeblo/post-ui/subscribe-toggle";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";

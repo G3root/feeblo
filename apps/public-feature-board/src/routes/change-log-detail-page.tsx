@@ -33,8 +33,10 @@ export const Route = createLazyRoute("/changelog/$changelogSlug")({
 export function ChangeLogDetailPage() {
   const site = useSite();
   const { changelogSlug } = useParams({ from: "/changelog/$changelogSlug" });
-  const { publicChangelogCategoryLinkCollection, publicChangelogDetailCollection } =
-    usePublicCollections();
+  const {
+    publicChangelogCategoryLinkCollection,
+    publicChangelogDetailCollection,
+  } = usePublicCollections();
   const {
     data: changelog,
     isLoading,

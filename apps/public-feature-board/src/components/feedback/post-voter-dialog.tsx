@@ -1,3 +1,4 @@
+import { usePostCollections } from "@feeblo/post-ui/post-collections-provider";
 import { AvatarGroup, AvatarGroupCount } from "@feeblo/ui/avatar";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -9,7 +10,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@feeblo/ui/dialog";
-import { usePostCollections } from "@feeblo/post-ui/post-collections-provider";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useMemo } from "react";
