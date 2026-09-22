@@ -1,8 +1,23 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/geist-mono";
 @import "tailwindcss" source(none);
 @import "@feeblo/web-shared/styles.css";
 @import "@feeblo/web-shared/typeset.css";
 
 @source "../**/*.{ts,tsx}";
+
+/*
+ * The widget iframe used to inherit these from Astro's font pipeline (the
+ * `FeedbackWidgetLayout` rendered `<Font cssVariable="--font-inter">`). The
+ * standalone build has no such pipeline, so the fontsource packages above
+ * provide the same variable fonts and these unlayered variables feed the
+ * `font-sans`/`font-mono` mappings in `theme.css`.
+ */
+:root {
+  --font-inter: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-geist-mono:
+    "Geist Mono Variable", ui-monospace, SFMono-Regular, monospace;
+}
 
 @keyframes gradient {
   0% {

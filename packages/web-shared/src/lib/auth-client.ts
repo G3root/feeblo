@@ -13,9 +13,16 @@ const API_URL = getRuntimePublicEnv().apiUrl;
 // page origin.
 const resolvedApiUrl =
   API_URL?.startsWith("/") && hasWindow() ? window.location.origin : API_URL;
-const baseUrl = resolvedApiUrl?.endsWith("/")
-  ? resolvedApiUrl
-  : `${resolvedApiUrl}/`;
+// The auth client is browser-only — every call site is a client component,
+// atom, or event handler — but TanStack Start's route graph still imports this
+// module into the server bundle, and better-auth validates the base URL at
+// construction. A server import therefore gets a syntactically valid
+// placeholder that no server code calls.
+const baseUrl = resolvedApiUrl
+  ? resolvedApiUrl.endsWith("/")
+    ? resolvedApiUrl
+    : `${resolvedApiUrl}/`
+  : "http://localhost/";
 
 export const verificationOtpEndpoint = `${baseUrl}api/auth/verification-otp`;
 export const profilePictureUploadEndpoint = `${baseUrl}api/profile/picture`;

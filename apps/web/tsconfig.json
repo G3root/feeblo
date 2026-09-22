@@ -1,19 +1,44 @@
 {
   "$schema": "https://raw.githubusercontent.com/Effect-TS/language-service/refs/heads/main/schema.json",
-  "extends": "astro/tsconfigs/strict",
-  "include": [".astro/types.d.ts", "**/*", "./worker-configuration.d.ts"],
-  "exclude": ["dist"],
+  "extends": "@feeblo/config/tsconfig.base.json",
+  "include": [
+    "src",
+    "types",
+    "*.d.ts",
+    "vite.config.ts",
+    "worker-configuration.d.ts"
+  ],
+  "exclude": ["dist", ".vite", "public/widget"],
   "compilerOptions": {
-    "strictNullChecks": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "noEmit": true,
+    // TanStack Start's compiler moves `createServerFn` handlers out of the
+    // client bundle by pattern; `verbatimModuleSyntax` keeps type-only imports
+    // as real imports in that intermediate output and can drag server modules
+    // into the browser graph, so Start's docs recommend turning it off.
+    "verbatimModuleSyntax": false,
+    // The dashboard and the workspace packages it imports were written under
+    // the Astro strict config (and the packages' own tsconfigs disable these
+    // four). Re-enabling them here would typecheck other packages' sources
+    // under stricter rules than their own `check-types` runs with.
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noImplicitOverride": false,
+    "types": ["node", "vite/client", "@cloudflare/workers-types"],
     "paths": {
       "~/*": ["./src/dashboard/*"],
-      "@/paraglide/*": ["./src/paraglide/*"]
+      "@/*": ["./src/*"],
+      "@/paraglide/*": ["./src/paraglide/*"],
+      "@feeblo/public-feature-board": ["./types/public-feature-board.d.ts"]
     },
     "plugins": [
       {
         "name": "@effect/language-service"
       }
-    ],
-    "jsx": "preserve"
+    ]
   }
 }

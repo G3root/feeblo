@@ -1,0 +1,69 @@
+import {
+  Select,
+  SelectPopup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@feeblo/ui/select";
+import { useTheme } from "@feeblo/ui/theme-provider";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { SettingsItem } from "~/features/settings/components/settings-item";
+import { SettingsLayout } from "~/features/settings/components/settings-layout";
+
+export const Route = createFileRoute("/_dashboard/$organizationId/settings/preferences")({
+  component: PreferencesSettingsPage,
+});
+
+function PreferencesSettingsPage() {
+  const { themeMode, setTheme } = useTheme();
+
+  return (
+    <SettingsLayout.Root>
+      <SettingsLayout.Header>
+        <SettingsLayout.HeaderTitle>Preferences</SettingsLayout.HeaderTitle>
+      </SettingsLayout.Header>
+      <SettingsLayout.Content>
+        <SettingsItem.Root>
+          <SettingsItem.Header>
+            <SettingsItem.Title>Interface and theme</SettingsItem.Title>
+          </SettingsItem.Header>
+          <SettingsItem.Content>
+            <SettingsItem.Item>
+              <SettingsItem.ItemContent>
+                <SettingsItem.FieldGroup>
+                  <SettingsItem.Field>
+                    <SettingsItem.FieldContent>
+                      <SettingsItem.FieldLabel>Theme</SettingsItem.FieldLabel>
+                      <SettingsItem.FieldDescription>
+                        Choose light, dark, or follow your system setting.
+                      </SettingsItem.FieldDescription>
+                    </SettingsItem.FieldContent>
+                    <SettingsItem.ItemActions>
+                      <Select
+                        onValueChange={(value) =>
+                          // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
+                          setTheme(value as "light" | "dark" | "auto")
+                        }
+                        value={themeMode}
+                      >
+                        <SelectTrigger className="w-36">
+                          <SelectValue className="capitalize" />
+                        </SelectTrigger>
+                        <SelectPopup>
+                          <SelectItem value="light">Light</SelectItem>
+                          <SelectItem value="dark">Dark</SelectItem>
+                          <SelectItem value="auto">System</SelectItem>
+                        </SelectPopup>
+                      </Select>
+                    </SettingsItem.ItemActions>
+                  </SettingsItem.Field>
+                </SettingsItem.FieldGroup>
+              </SettingsItem.ItemContent>
+            </SettingsItem.Item>
+          </SettingsItem.Content>
+        </SettingsItem.Root>
+      </SettingsLayout.Content>
+    </SettingsLayout.Root>
+  );
+}

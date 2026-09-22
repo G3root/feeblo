@@ -64,7 +64,8 @@ USER astro
 
 COPY --from=builder --chown=astro:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=astro:nodejs /app/apps/web/dist ./dist
+COPY --from=builder --chown=astro:nodejs /app/apps/web/server.mjs ./server.mjs
 
 EXPOSE 4321
 
-CMD ["node", "./dist/server/entry.mjs"]
+CMD ["node", "./server.mjs"]

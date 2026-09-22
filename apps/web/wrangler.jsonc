@@ -3,11 +3,7 @@
   "compatibility_date": "2026-06-10",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "name": "feeblo",
-  "main": "@astrojs/cloudflare/entrypoints/server",
-  "assets": {
-    "directory": "./dist",
-    "binding": "ASSETS",
-  },
+  "main": "@tanstack/react-start/server-entry",
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,
