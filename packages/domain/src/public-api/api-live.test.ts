@@ -626,5 +626,56 @@ layer(makeTestApp({ limit: 1, window: Duration.minutes(1) }))(
           expect(otherResponse.status).toBe(200);
         })
     );
+
+    it.effect(
+      "spends the budget before the plan gate rejects a downgrade",
+      () =>
+        Effect.gen(function* () {
+          const workspace = yield* seedWorkspace({ plan: "free" });
+          registerKey("fbk_free_limited", workspace.organizationId);
+
+          // The plan gate reads the database, so the first request must spend the
+          // budget before the gate can reject it.
+          const first = yield* executeRequest(
+            `/api/v1/posts/${workspace.postId}`,
+            "fbk_free_limited"
+          );
+          expect(first.status).toBe(403);
+          expect(decodeError(responseBody(first))._tag).toBe(
+            "PLAN_REQUIRES_UPGRADE"
+          );
+
+          const second = yield* executeRequest(
+            `/api/v1/posts/${workspace.postId}`,
+            "fbk_free_limited"
+          );
+          expect(second.status).toBe(429);
+          expect(decodeError(responseBody(second))._tag).toBe("RATE_LIMITED");
+        })
+    );
+
+    it.effect("does not spend budget on an invalid key", () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        registerKey("fbk_valid_after_invalid", workspace.organizationId);
+
+        const rejected = yield* executeRequest(
+          `/api/v1/posts/${workspace.postId}`,
+          "fbk_not_a_key"
+        );
+        expect(rejected.status).toBe(401);
+        expect(decodeError(responseBody(rejected))._tag).toBe(
+          "INVALID_API_KEY"
+        );
+
+        // An unverified key has no budget to spend, so the valid key's first
+        // request still succeeds.
+        const accepted = yield* executeRequest(
+          `/api/v1/posts/${workspace.postId}`,
+          "fbk_valid_after_invalid"
+        );
+        expect(accepted.status).toBe(200);
+      })
+    );
   }
 );

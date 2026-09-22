@@ -151,24 +151,13 @@ export const makeApiKeyAuthMiddlewareLive = (
 
           const organizationId = record.referenceId;
 
-          // Plan gate on every request, not only at key creation: a workspace
-          // that downgraded must stop being served, and the distinct code tells
-          // the caller's logs the difference between "bad key" and "billing".
-          yield* entitlementPolicy.canUsePublicApi(organizationId).pipe(
-            Effect.catchTag("PolicyDenied", () =>
-              Effect.fail(planRequiresUpgradeError())
-            ),
-            // The plan lookup reads the database; a driver failure here is a
-            // server problem, not a plan problem.
-            withRemapDbErrors("PublicApiPlan", "select"),
-            Effect.catchTag("InternalServerError", () =>
-              Effect.fail(internalError("The request could not be completed."))
-            )
-          );
-
           // Per key rather than per IP: a customer behind a shared NAT is not
           // throttled by neighbours, and a leaked key cannot escape its budget by
           // rotating source addresses.
+          //
+          // Runs before the plan gate: the gate reads the database, so a
+          // verified key must spend budget before it can trigger that lookup,
+          // including a downgraded key that the gate will then reject.
           yield* rateLimitService
             .consume({
               key: `public-api:key:${record.id}`,
@@ -188,6 +177,21 @@ export const makeApiKeyAuthMiddlewareLive = (
                 )
               )
             );
+
+          // Plan gate on every request, not only at key creation: a workspace
+          // that downgraded must stop being served, and the distinct code tells
+          // the caller's logs the difference between "bad key" and "billing".
+          yield* entitlementPolicy.canUsePublicApi(organizationId).pipe(
+            Effect.catchTag("PolicyDenied", () =>
+              Effect.fail(planRequiresUpgradeError())
+            ),
+            // The plan lookup reads the database; a driver failure here is a
+            // server problem, not a plan problem.
+            withRemapDbErrors("PublicApiPlan", "select"),
+            Effect.catchTag("InternalServerError", () =>
+              Effect.fail(internalError("The request could not be completed."))
+            )
+          );
 
           return yield* effect.pipe(
             Effect.provideService(PublicApiCaller, {
