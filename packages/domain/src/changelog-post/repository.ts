@@ -91,7 +91,8 @@ const makeChangelogPostRepository = Effect.gen(function* () {
           and(
             eq(schema.changelogPostTable.organizationId, organizationId),
             eq(schema.changelogPostTable.changelogId, changelogId),
-            eq(schema.boardTable.visibility, "PUBLIC")
+            eq(schema.boardTable.visibility, "PUBLIC"),
+            isNull(schema.postTable.mergedIntoPostId)
           )
         )
         .orderBy(desc(schema.changelogPostTable.createdAt)),

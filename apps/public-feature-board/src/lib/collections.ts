@@ -686,7 +686,8 @@ export const publicPostUpvoteCollection = createCollection(
     queryKey: (opts) =>
       slugScopedQueryKey(
         "public-post-upvote",
-        parseLoadSubsetOptions(opts).filters
+        parseLoadSubsetOptions(opts).filters,
+        getCurrentUserId()
       ),
     syncMode: "on-demand",
     staleTime: Duration.toMillis(Duration.minutes(5)),
