@@ -120,7 +120,15 @@ test.describe("roadmap", () => {
 
         await plannedLane.getByRole("button", { name: title }).click();
         await expect(visitorPage).toHaveURL(publicPostUrlPattern);
-        await expect(visitorPage.getByText(title)).toBeVisible();
+        // The detail view renders the title in a read-only input, which no
+        // list or roadmap card has, so asserting its value proves the detail
+        // view rendered instead of the previous page still being on screen.
+        await expect(
+          visitorPage.getByRole("textbox", { name: "Post Title" })
+        ).toHaveValue(title);
+        await expect(
+          visitorPage.getByText("Visitors can follow this on the roadmap.")
+        ).toBeVisible();
       } finally {
         await visitorContext.close();
       }
