@@ -21,6 +21,9 @@
     "./auth-client-ip-header": {
       "default": "./src/auth-client-ip-header.ts"
     },
+    "./auth-handler": {
+      "default": "./src/auth-handler.ts"
+    },
     "./session": {
       "types": "./src/session.ts",
       "default": "./src/session.ts"
@@ -31,6 +34,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@better-auth/api-key": "catalog:",
     "@effect/platform-node": "catalog:",
     "@feeblo/config": "workspace:*",
     "@feeblo/db": "workspace:*",

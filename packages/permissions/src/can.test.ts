@@ -81,6 +81,13 @@ describe("role permissions", () => {
     expect(roleGrants("owner", "webhooks.manage")).toBe(true);
   });
 
+  it("grants API key management only to administrators and owners", () => {
+    expect(roleGrants("contributor", "apiKeys.manage")).toBe(false);
+    expect(roleGrants("manager", "apiKeys.manage")).toBe(false);
+    expect(roleGrants("admin", "apiKeys.manage")).toBe(true);
+    expect(roleGrants("owner", "apiKeys.manage")).toBe(true);
+  });
+
   it("creates action permissions and one resource wildcard", () => {
     expect(createPermissions("posts", ["create", "delete"] as const)).toEqual([
       "posts.create",

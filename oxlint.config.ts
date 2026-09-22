@@ -146,6 +146,38 @@ export default defineConfig({
         ],
       },
     },
+    {
+      // Architecture boundary for the Public API (see ADR 0004). Response
+      // schemas from the dashboard and the public portal carry internal actor
+      // identifiers (`creatorId`, `creatorMemberId`) that must never reach an
+      // API key's owner, and the session middleware would let a machine
+      // credential resolve into a member session. The Public API owns its DTOs
+      // in `public-api/schema.ts` and reads the key seam from `auth-handler`.
+      files: ["packages/domain/src/public-api/**"],
+      rules: {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: [
+                  "**/post/schema",
+                  "**/widget/schema",
+                  "**/public-actor",
+                  "**/session-middleware",
+                  "@feeblo/domain/post/schema",
+                  "@feeblo/domain/widget/schema",
+                  "@feeblo/domain/public-actor",
+                  "@feeblo/domain/session-middleware",
+                ],
+                message:
+                  "The Public API must not import dashboard or portal response schemas (they carry internal actor identifiers) or the session middleware (a machine key must never resolve into a session). Define DTOs in public-api/schema.ts and use the key seam from auth-handler.",
+              },
+            ],
+          },
+        ],
+      },
+    },
   ],
   options: {
     // Revisit once Oxlint's tsgolint path can integrate with @effect/tsgo diagnostics.

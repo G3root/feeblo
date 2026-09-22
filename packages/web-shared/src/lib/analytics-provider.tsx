@@ -28,6 +28,10 @@ import type * as React from "react";
 // ---------------------------------------------------------------------------
 
 export interface AnalyticsEvents {
+  // ── API keys ─────────────────────────────────────────────────────────────
+  api_key_created: { success: boolean };
+  api_key_revoked: { success: boolean };
+
   // ── Changelog ────────────────────────────────────────────────────────────
   changelog_created: { success: boolean };
   changelog_deleted: { success: boolean };

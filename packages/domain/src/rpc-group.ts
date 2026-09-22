@@ -1,3 +1,4 @@
+import { ApiKeyRpcs } from "./api-key/rpcs";
 import { AttributeDefinitionRpcs } from "./attribute-definition/rpcs";
 import { BillingRpcs } from "./billing/rpcs";
 import { BoardRpcs } from "./board/rpcs";
@@ -39,6 +40,7 @@ export const AllRpcs = PostRpcs.merge(PostActivityRpcs).merge(
     ChangelogSubscriptionRpcs
   ),
   JwtSecretRpcs,
+  ApiKeyRpcs,
   MembershipRpcs,
   NotificationRpcs,
   OrganizationRpcs,

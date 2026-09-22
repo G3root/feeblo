@@ -1,4 +1,3 @@
-import type { Role } from "@feeblo/permissions";
 import { isString } from "@feeblo/utils/runtime-kind";
 import { parseCookie } from "cookie-es";
 import * as Context from "effect/Context";
@@ -9,6 +8,7 @@ import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
 import * as RpcMiddleware from "effect/unstable/rpc/RpcMiddleware";
 
+import { Auth, type AuthHandler, type Session } from "./auth-handler";
 import { UnauthorizedError } from "./rpc-errors";
 import {
   getSessionCookieName,
@@ -22,40 +22,14 @@ const getSessionCookie = (): string => getSessionCookieName();
 /** Pure helper for server composition that injects the API URL via Config. */
 export const getSessionCookieForApiUrl = getSessionCookieNameForUrl;
 
-//TODO: infer session later
-export type Session = {
-  readonly user: {
-    readonly id: string;
-    readonly email: string;
-    readonly name: string;
-    readonly restrictedToOrganizationId?: string | null | undefined;
-  };
-  readonly session: {
-    readonly userId: string;
-    readonly token: string;
-  };
-  readonly organizations: ReadonlyArray<{
-    readonly id: string;
-  }>;
-  readonly memberships: ReadonlyArray<{
-    readonly membershipId: string;
-    readonly organizationId: string;
-    readonly role: Role;
-  }>;
-};
-
-export type AuthHandler = {
-  readonly handler: (request: Request) => Response | Promise<Response>;
-  readonly api: {
-    readonly getSession: (args: {
-      readonly headers: Headers;
-    }) => Promise<Session | null>;
-  };
-};
-
-export class Auth extends Context.Service<Auth, AuthHandler>()(
-  "@feeblo/api/Auth"
-) {}
+/**
+ * The credential seam lives in its own module so that authorization surfaces
+ * which must never resolve a session can forbid this module outright — the
+ * Public API does exactly that (see the boundary override in `oxlint.config.ts`
+ * and ADR 0004). Re-exported here for the many call sites that already import
+ * it alongside session services.
+ */
+export { Auth, type AuthHandler, type Session };
 
 /** @effect-leakable-service */
 export class CurrentSession extends Context.Service<CurrentSession, Session>()(

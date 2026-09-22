@@ -12,6 +12,7 @@ import {
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { hasPermission } from "@feeblo/web-shared/use-policy";
 import {
+  ApiIcon,
   ArrowLeft01Icon,
   Building03Icon,
   Chat01Icon,
@@ -92,6 +93,12 @@ const settingsItems = [
         icon: Settings05Icon,
         permission: "webhooks.manage" as const,
         to: "/$organizationId/settings/webhooks" as const,
+      },
+      {
+        label: "Developers",
+        icon: ApiIcon,
+        permission: "apiKeys.manage" as const,
+        to: "/$organizationId/settings/developers" as const,
       },
       {
         label: "Integrations",

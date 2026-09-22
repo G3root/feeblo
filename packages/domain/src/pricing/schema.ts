@@ -28,6 +28,7 @@ const PlanCapabilities = S.Struct({
   subscriberEmails: S.Boolean,
   widgetSso: S.Boolean,
   integrations: S.Boolean,
+  publicApi: S.Boolean,
 } satisfies { readonly [K in CapabilityFeatureKey]: S.Schema<boolean> });
 
 export const PlanPrice = S.Struct({
