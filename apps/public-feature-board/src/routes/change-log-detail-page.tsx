@@ -33,13 +33,8 @@ export const Route = createLazyRoute("/changelog/$changelogSlug")({
 export function ChangeLogDetailPage() {
   const site = useSite();
   const { changelogSlug } = useParams({ from: "/changelog/$changelogSlug" });
-  const {
-    publicChangelogCategoryLinkCollection,
-    publicChangelogCollection,
-    publicChangelogPostCollection,
-    publicPostCollection,
-    publicPostStatusCollection,
-  } = usePublicCollections();
+  const { publicChangelogCategoryLinkCollection, publicChangelogDetailCollection } =
+    usePublicCollections();
   const {
     data: changelog,
     isLoading,
@@ -47,7 +42,7 @@ export function ChangeLogDetailPage() {
   } = useLiveQuery(
     (q) =>
       q
-        .from({ changelog: publicChangelogCollection })
+        .from({ changelog: publicChangelogDetailCollection })
         .where(({ changelog }) =>
           and(
             eq(changelog.organizationId, site.organizationId),
@@ -78,35 +73,10 @@ export function ChangeLogDetailPage() {
   );
   const categoryIds = categoryLinks.map((link) => link.categoryId);
 
-  const {
-    data: linkedPosts = [],
-    isError: isLinkedPostsError,
-    isLoading: isLinkedPostsLoading,
-  } = useLiveQuery(
-    (q) => {
-      if (!changelog) {
-        return undefined;
-      }
-
-      return q
-        .from({ link: publicChangelogPostCollection })
-        .innerJoin({ post: publicPostCollection }, ({ link, post }) =>
-          eq(link.postId, post.id)
-        )
-        .innerJoin({ status: publicPostStatusCollection }, ({ post, status }) =>
-          eq(post.statusId, status.id)
-        )
-        .where(({ link }) => eq(link.changelogId, changelog.id))
-        .orderBy(({ link }) => link.createdAt, "desc")
-        .select(({ post, status }) => ({
-          id: post.id,
-          slug: post.slug,
-          status: status.type,
-          title: post.title,
-        }));
-    },
-    [changelog?.id]
-  );
+  // Linked posts ship inside the single-entry response (`ChangelogDetail`),
+  // so the page never syncs every post, status, or changelog link in the
+  // organization just to render this section.
+  const linkedPosts = changelog?.posts ?? [];
 
   if (isLoading) {
     return <ChangelogPageLayout>{m.quick_tidy_javelina()}</ChangelogPageLayout>;
@@ -187,15 +157,7 @@ export function ChangeLogDetailPage() {
 
           <ChangelogSubscribeButton />
 
-          {isLinkedPostsError ? (
-            <p className="text-muted-foreground text-sm">
-              {m.sour_topical_niklas()}
-            </p>
-          ) : isLinkedPostsLoading ? (
-            <p className="text-muted-foreground text-sm">
-              {m.yummy_civil_kangaroo()}
-            </p>
-          ) : linkedPosts.length > 0 ? (
+          {linkedPosts.length > 0 ? (
             <section
               aria-labelledby="linked-posts-heading"
               className="space-y-3"

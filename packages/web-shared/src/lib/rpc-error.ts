@@ -118,3 +118,23 @@ export function parseRpcError<T>(
 
   return { kind: "unexpected", message: fallback };
 }
+
+/**
+ * True when a thrown `fetchRpc` failure is a typed domain error with the given
+ * tag. Collections use this to translate "not found" into an empty result (so
+ * pages render their empty/not-found state) while letting transport and other
+ * domain failures surface through the query error state.
+ */
+export function isRpcErrorTag<T>(error: T, tag: string): boolean {
+  if (!(error instanceof RpcError)) {
+    return false;
+  }
+
+  const failure = Cause.findErrorOption(error.cause);
+  if (Option.isNone(failure)) {
+    return false;
+  }
+
+  const decoded = decodeUserFacingError(failure.value);
+  return Option.isSome(decoded) && decoded.value._tag === tag;
+}

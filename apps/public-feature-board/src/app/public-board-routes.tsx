@@ -15,6 +15,7 @@ import {
   publicChangelogCategoryCollection,
   publicChangelogCategoryLinkCollection,
   publicChangelogCollection,
+  publicChangelogDetailCollection,
   publicCommentCollection,
   publicCommentReactionCollection,
   publicDeleteEligibilityCollection,
@@ -23,6 +24,7 @@ import {
   publicPostReactionCollection,
   publicPostStatusCollection,
   publicPostTagCollection,
+  publicPostUpvoteCollection,
   publicRoadmapCollection,
   publicRoadmapColumnCollection,
   publicTagCollection,
@@ -94,6 +96,20 @@ function createPublicPostSubsetQueries(slug: string) {
         .where(({ subscription }) =>
           eq(subscription.organizationId, organizationId)
         )
+    ),
+    // Upvotes and post-tag assignments have no `postSlug` column either; like
+    // the subscription subset they load org-scoped and the collection's query
+    // key/queryFn resolve the route slug, so only the viewed post's rows are
+    // fetched. The component subscriptions filter the loaded rows by postId.
+    postTags: createLiveQueryCollection((query) =>
+      query
+        .from({ postTag: publicPostTagCollection })
+        .where(({ postTag }) => eq(postTag.organizationId, organizationId))
+    ),
+    upvotes: createLiveQueryCollection((query) =>
+      query
+        .from({ upvote: publicPostUpvoteCollection })
+        .where(({ upvote }) => eq(upvote.organizationId, organizationId))
     ),
   };
 }
@@ -228,12 +244,11 @@ const postRoute = createRoute({
 
     await Promise.all([
       publicBoardCollection.preload(),
-      publicUpvoteCollection.preload(),
-      publicPostCollection.preload(),
       publicPostStatusCollection.preload(),
-      publicPostTagCollection.preload(),
       publicTagCollection.preload(),
       subsetQueries.postDetail.preload(),
+      subsetQueries.postTags.preload(),
+      subsetQueries.upvotes.preload(),
       subsetQueries.comments.preload(),
       subsetQueries.commentReactions.preload(),
       subsetQueries.postReactions.preload(),
@@ -267,9 +282,24 @@ const changelogRoute = createRoute({
 const changelogDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/changelog/$changelogSlug",
-  beforeLoad: async () => {
+  beforeLoad: async ({ params }) => {
+    const { changelogSlug } = params;
+    // The single-entry body (with its linked posts) replaces the old full
+    // list preload: one response instead of up to `PUBLIC_CHANGELOG_LIMIT`
+    // full bodies. Categories and their links stay eager — both are small.
+    const changelogDetail = createLiveQueryCollection((query) =>
+      query
+        .from({ changelog: publicChangelogDetailCollection })
+        .where(({ changelog }) =>
+          and(
+            eq(changelog.organizationId, getCurrentOrganizationId() ?? ""),
+            eq(changelog.slug, changelogSlug)
+          )
+        )
+    );
+
     await Promise.all([
-      publicChangelogCollection.preload(),
+      changelogDetail.preload(),
       publicChangelogCategoryCollection.preload(),
       publicChangelogCategoryLinkCollection.preload(),
     ]);

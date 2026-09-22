@@ -9,12 +9,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@feeblo/ui/dialog";
+import { usePostCollections } from "@feeblo/post-ui/post-collections-provider";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useMemo } from "react";
 
 import { m } from "../../paraglide/messages.js";
-import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
 
 type PostVoter = {
@@ -54,11 +54,16 @@ function PostVoterDialogRoot({
 }) {
   const site = useSite();
   const organizationId = site.organizationId;
-  const { publicUpvoteCollection } = usePublicCollections();
+  // The surrounding surface's collection: post detail pages override this
+  // with the slug-scoped `publicPostUpvoteCollection`, so the dialog lists
+  // only the viewed post's voters instead of syncing every org vote.
+  const {
+    collections: { upvoteCollection },
+  } = usePostCollections();
   const { data: upvotes } = useLiveQuery(
     (q) =>
       q
-        .from({ upvote: publicUpvoteCollection })
+        .from({ upvote: upvoteCollection })
         .where(({ upvote }) =>
           and(
             eq(upvote.postId, postId),
@@ -66,7 +71,7 @@ function PostVoterDialogRoot({
           )
         )
         .orderBy(({ upvote }) => upvote.createdAt, "asc"),
-    [organizationId, postId]
+    [organizationId, postId, upvoteCollection]
   );
 
   const voterData = useMemo(() => {

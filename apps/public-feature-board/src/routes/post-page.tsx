@@ -6,6 +6,10 @@ import { AuthButton } from "@feeblo/post-ui/auth-dialog";
 import { PostCommentGuestPrompt } from "@feeblo/post-ui/post-comment-composer";
 import { PostPage as ComposedPostPage } from "@feeblo/post-ui/post-page";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
+import {
+  PostCollectionsProvider,
+  usePostCollections,
+} from "@feeblo/post-ui/post-collections-provider";
 import { SubscribeCard } from "@feeblo/post-ui/subscribe-toggle";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
@@ -31,6 +35,7 @@ import { BoardNavLink } from "../components/feedback/board-list-card";
 import { PostPageActions } from "../components/feedback/post-page-actions";
 import { PostVoterDialog } from "../components/feedback/post-voter-dialog";
 // import { useUpvote } from "../hooks/use-upvote";
+import { publicPostUpvoteCollection } from "../lib/collections";
 import { mergedPostTargetAtom } from "../lib/merged-post-atoms";
 import { formatPostStatus } from "../lib/utils";
 import { m } from "../paraglide/messages.js";
@@ -96,14 +101,19 @@ export function PostPage() {
   const { slug } = useParams({ from: "/p/$slug" });
   const {
     publicBoardCollection,
-    publicPostCollection,
+    publicPostDetailCollection,
     publicPostStatusCollection,
     publicPostTagCollection,
     publicTagCollection,
   } = usePublicCollections();
 
+  // The detail row carries every display field (plus the body), so the page
+  // never syncs the whole organization's post list just to render one post.
+  // A missing or merged-away slug resolves to an empty result (the
+  // collection translates `PostNotFoundError`), which falls through to the
+  // merge resolver below.
   const {
-    data: postRow,
+    data: post,
     isError: postError,
     isLoading: postLoading,
   } = useLiveQuery(
@@ -113,17 +123,7 @@ export function PostPage() {
       }
 
       return q
-        .from({ post: publicPostCollection })
-        .join(
-          { postStatus: publicPostStatusCollection },
-          ({ post, postStatus }) => eq(post.statusId, postStatus.id),
-          "left"
-        )
-        .join(
-          { board: publicBoardCollection },
-          ({ post, board }) => eq(post.boardId, board.id),
-          "left"
-        )
+        .from({ post: publicPostDetailCollection })
         .where(({ post }) =>
           and(eq(post.slug, slug), eq(post.organizationId, site.organizationId))
         )
@@ -131,12 +131,36 @@ export function PostPage() {
     },
     [site.organizationId, slug]
   );
-  const listPost = postRow?.post;
-  const postStatus = postRow?.postStatus;
-  const board = postRow?.board;
-  // The list row carries every display field; the body streams in through
-  // the detail collection inside the composed content view.
-  const post = listPost;
+
+  // Board and status stay small org-scoped collections; look them up by the
+  // detail row's ids instead of joining the full post list.
+  const { data: board } = useLiveQuery(
+    (q) => {
+      if (!post) {
+        return undefined;
+      }
+
+      return q
+        .from({ board: publicBoardCollection })
+        .where(({ board }) => eq(board.id, post.boardId))
+        .findOne();
+    },
+    [post?.boardId]
+  );
+  const { data: postStatus } = useLiveQuery(
+    (q) => {
+      if (!post) {
+        return undefined;
+      }
+
+      return q
+        .from({ postStatus: publicPostStatusCollection })
+        .where(({ postStatus }) => eq(postStatus.id, post.statusId))
+        .findOne();
+    },
+    [post?.statusId]
+  );
+
   const postId = post?.id ?? "";
 
   const postTagsQuery = useLiveQuery(
@@ -196,13 +220,15 @@ export function PostPage() {
       );
     }
     return (
-      <PostPageContent
-        board={board}
-        organizationId={organizationId}
-        post={post}
-        postStatus={postStatus ?? undefined}
-        selectedTags={postTagsQuery.data ?? []}
-      />
+      <ScopedPostUpvoteCollection>
+        <PostPageContent
+          board={board}
+          organizationId={organizationId}
+          post={post}
+          postStatus={postStatus ?? undefined}
+          selectedTags={postTagsQuery.data ?? []}
+        />
+      </ScopedPostUpvoteCollection>
     );
   }
 
@@ -224,6 +250,36 @@ export function PostPage() {
 
   return (
     <MergedPostResolver organizationId={site.organizationId} slug={slug} />
+  );
+}
+
+/**
+ * Post detail reads and writes votes through the slug-scoped collection, so
+ * the page never syncs every vote in the organization (see
+ * `publicPostUpvoteCollection`). The shell's org-wide collection still backs
+ * list surfaces; this provider overrides only the detail subtree.
+ */
+function ScopedPostUpvoteCollection({ children }: { children: ReactNode }) {
+  const value = usePostCollections();
+  const collections = useMemo(
+    () => ({
+      ...value.collections,
+      upvoteCollection: publicPostUpvoteCollection,
+    }),
+    [value.collections]
+  );
+
+  return (
+    <PostCollectionsProvider
+      collections={collections}
+      getPostHref={value.getPostHref}
+      onAuthRequired={value.onAuthRequired}
+      organizationId={value.organizationId}
+      persistPost={value.persistPost}
+      suggestPosts={value.suggestPosts}
+    >
+      {children}
+    </PostCollectionsProvider>
   );
 }
 
