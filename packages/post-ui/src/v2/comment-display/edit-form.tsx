@@ -16,11 +16,13 @@ export function CommentDisplayEditForm() {
         isPrivate={isPrivate}
         onCancel={actions.onCancelEdit}
         onContentChange={setContent}
-        onSubmit={async ({
+        onSubmit={({
           content: submittedContent,
           isPrivate: submittedIsPrivate,
         }) => {
-          await actions.onUpdate({
+          // The comment body updates optimistically, so close the editor in
+          // the same tick; the host surfaces persistence failures.
+          void actions.onUpdate({
             content: submittedContent,
             isPrivate: submittedIsPrivate,
           });

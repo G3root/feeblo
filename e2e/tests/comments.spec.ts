@@ -430,6 +430,48 @@ test.describe("comment management", () => {
     }
   );
 
+  test("closes the delete confirm before the delete RPC resolves", async ({
+    page,
+  }) => {
+    await createWorkspace(page);
+    const title = `Optimistic delete ${randomUUID().slice(0, 8)}`;
+    const commentText = `Slow delete ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, title, "Post to exercise optimistic deletion.");
+    await dismissToast(page, "Post created successfully");
+    await openPost(page, title);
+    await addComment(page, commentText);
+
+    const card = commentCard(page, commentText);
+    await expect(card).toBeVisible();
+
+    // Hold the delete RPC open so the assertions below prove the dialog
+    // closes and the row disappears on the optimistic update, not on
+    // persistence.
+    await page.route(
+      (url) => url.pathname.startsWith("/rpc"),
+      async (route) => {
+        if (route.request().postData()?.includes("CommentDelete")) {
+          await new Promise((resolve) => setTimeout(resolve, 3_000));
+        }
+        await route.continue();
+      }
+    );
+
+    await clickCommentMenuItem(page, card, "Delete");
+    const dialog = page.getByRole("alertdialog", {
+      name: "Delete Comment",
+    });
+    await expect(dialog).toBeVisible();
+
+    const deleted = waitForRpc(page, "CommentDelete");
+    await dialog.getByRole("button", { name: "Continue" }).click();
+
+    await expect(dialog).toBeHidden({ timeout: 1_000 });
+    await expect(card).toHaveCount(0, { timeout: 1_000 });
+    await deleted;
+  });
+
   test(
     "makes a comment internal and persists the visibility",
     { tag: "@critical" },

@@ -124,15 +124,35 @@ export const postCollection = createCollection(
       refetchInBackground(postActivityCollection.utils.refetch());
     },
     onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedPost } = mutation;
+      const [firstMutation] = transaction.mutations;
 
-      await fetchRpc((rpc) =>
-        rpc.PostDelete({
-          id: deletedPost.id,
-          boardId: deletedPost.boardId,
-          organizationId: deletedPost.organizationId,
-        })
+      if (!firstMutation) {
+        return;
+      }
+
+      const { organizationId } = firstMutation.original;
+      // Deletes can arrive one at a time (row actions) or as one transaction
+      // with many mutations (bulk selection). Group them into one bulk RPC
+      // per board so both paths share the server call.
+      const postIdsByBoardId = new Map<string, string[]>();
+
+      for (const mutation of transaction.mutations) {
+        const { original: deletedPost } = mutation;
+        const postIds = postIdsByBoardId.get(deletedPost.boardId) ?? [];
+        postIds.push(deletedPost.id);
+        postIdsByBoardId.set(deletedPost.boardId, postIds);
+      }
+
+      await Promise.all(
+        [...postIdsByBoardId.entries()].map(([boardId, postIds]) =>
+          fetchRpc((rpc) =>
+            rpc.PostDelete({
+              id: postIds,
+              boardId,
+              organizationId,
+            })
+          )
+        )
       );
       // Deleting a survivor also reverts its merged children server-side, so
       // the synced rows must be refreshed or the restored duplicates stay

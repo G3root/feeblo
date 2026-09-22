@@ -170,3 +170,35 @@ export function refetchInBackground(
     refetch.catch(() => undefined);
   }
 }
+
+/** Minimal structural view of a TanStack DB transaction. */
+type SettleableTransaction = {
+  isPersisted: { promise: Promise<unknown> };
+};
+
+/**
+ * Starts an optimistic mutation whose UI has already moved on (the dialog
+ * closed, the row was removed) and reports the outcome without blocking.
+ *
+ * `collection.delete`/`update` throw synchronously when the target row is no
+ * longer in the collection, so the mutation creation is guarded too: both the
+ * synchronous throw and a later persistence rejection route through `onError`
+ * instead of an uncaught error or an unhandled rejection. Callers own the
+ * rollback UX; the collection reverts the optimistic state on failure.
+ */
+export function settleOptimisticMutation(
+  mutate: () => SettleableTransaction,
+  onSuccess: (() => void) | undefined,
+  onError: () => void
+): void {
+  let transaction: SettleableTransaction;
+
+  try {
+    transaction = mutate();
+  } catch {
+    onError();
+    return;
+  }
+
+  void transaction.isPersisted.promise.then(onSuccess, onError);
+}
