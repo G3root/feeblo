@@ -7,7 +7,9 @@ import { WebhooksSettings } from "~/features/webhook/components/webhooks-setting
 import { WebhookCreateDialogProvider } from "~/features/webhook/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 
-export const Route = createFileRoute("/_dashboard/$organizationId/settings/webhooks/")({
+export const Route = createFileRoute(
+  "/_dashboard/$organizationId/settings/webhooks/"
+)({
   component: WebhooksSettingsRoute,
 });
 

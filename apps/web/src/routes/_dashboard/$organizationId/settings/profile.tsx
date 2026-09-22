@@ -8,7 +8,9 @@ import {
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 
-export const Route = createFileRoute("/_dashboard/$organizationId/settings/profile")({
+export const Route = createFileRoute(
+  "/_dashboard/$organizationId/settings/profile"
+)({
   component: ProfileSettingsPage,
 });
 

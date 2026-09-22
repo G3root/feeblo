@@ -29,9 +29,7 @@ declare module "@feeblo/public-feature-board" {
     setLocale: SetLocaleFn;
   }
 
-  export function initPublicBoardI18n(
-    runtime: PublicBoardI18nRuntime
-  ): void;
+  export function initPublicBoardI18n(runtime: PublicBoardI18nRuntime): void;
 
   export function isPublicBoardI18nInitialized(): boolean;
 }

@@ -8,8 +8,12 @@ import {
 import { createServerFn } from "@tanstack/react-start";
 import type { ReactNode } from "react";
 
+import {
+  envScript,
+  localeScript,
+  themeScript,
+} from "@/lib/pre-hydration-scripts";
 import { getLocale, getTextDirection } from "@/paraglide/runtime.js";
-import { envScript, localeScript, themeScript } from "@/lib/pre-hydration-scripts";
 import {
   apiPreconnectOrigins,
   getBrowserPublicEnv,

@@ -16,7 +16,9 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useSite } from "~/hooks/use-site";
 import { siteCollection } from "~/lib/collections";
 
-export const Route = createFileRoute("/_dashboard/$organizationId/settings/roadmap")({
+export const Route = createFileRoute(
+  "/_dashboard/$organizationId/settings/roadmap"
+)({
   component: RouteComponent,
   beforeLoad: async () => {
     await siteCollection.preload();

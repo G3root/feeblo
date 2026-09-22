@@ -78,20 +78,20 @@ const gitHubConfig: IntegrationCardConfig<GitHubConnection> = {
   configureTo: "/$organizationId/settings/integrations/github",
 };
 
-export const Route = createFileRoute("/_dashboard/$organizationId/settings/integrations/")(
-  {
-    validateSearch: (search) =>
-      z
-        .object({
-          discord: z.enum(["connected", "error"]).optional(),
-          github: z.enum(["connected", "error"]).optional(),
-          slack: z.enum(["connected", "error"]).optional(),
-          message: z.string().min(1).optional(),
-        })
-        .parse(search),
-    component: IntegrationsSettingsRoute,
-  }
-);
+export const Route = createFileRoute(
+  "/_dashboard/$organizationId/settings/integrations/"
+)({
+  validateSearch: (search) =>
+    z
+      .object({
+        discord: z.enum(["connected", "error"]).optional(),
+        github: z.enum(["connected", "error"]).optional(),
+        slack: z.enum(["connected", "error"]).optional(),
+        message: z.string().min(1).optional(),
+      })
+      .parse(search),
+  component: IntegrationsSettingsRoute,
+});
 
 function IntegrationsSettingsRoute() {
   const organizationId = useOrganizationId();

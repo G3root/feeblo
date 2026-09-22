@@ -15,9 +15,8 @@ import { z } from "zod";
 
 import { RegisterShell } from "~/features/register/components/register-shell";
 import { RegisterWorkspaceStep } from "~/features/register/components/register-workspace-step";
-import { fetchRpc } from "~/lib/runtime";
-
 import { registerFormOpts } from "~/features/register/shared-form";
+import { fetchRpc } from "~/lib/runtime";
 
 const SearchSchema = z.object({
   redirectTo: z.string().optional(),
