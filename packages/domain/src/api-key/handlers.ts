@@ -27,12 +27,12 @@ import {
  * Shapes the plugin's created-key record into the dashboard's summary. Written
  * out field by field on purpose: the plugin returns its whole table row, and
  * naming each field is what keeps a future column from appearing in the UI by
- * accident. `creatorId` comes from the session, because the plugin does not
- * write that column.
+ * accident. `creatorId` comes from the attribution write (or `null` when that
+ * write failed), because the plugin does not write that column.
  */
 const toCreatedSummary = (
   created: ApiKeyAuthCreated,
-  creatorId: string
+  creatorId: string | null
 ): TApiKeySummary => ({
   id: created.id,
   name: created.name,
@@ -82,17 +82,25 @@ export const ApiKeyRpcHandlersEffect = Effect.gen(function* () {
         });
 
         // The plugin's table has no acting-user column, so the creator is
-        // recorded right after the insert. A failure here leaves a working key
-        // with an unknown creator rather than failing a request whose key was
-        // already minted and returned.
-        yield* repository.assignCreator({
-          keyId: created.id,
-          creatorId: session.user.id,
-        });
+        // recorded right after the insert. Attribution is best-effort: the
+        // plaintext is returned exactly once, so failing the request here
+        // would strand a live row whose key nobody can ever see. The summary
+        // reports the `null` the row actually holds when the write fails.
+        const creatorId = yield* repository
+          .assignCreator({ keyId: created.id, creatorId: session.user.id })
+          .pipe(
+            Effect.as(session.user.id),
+            Effect.catchTag("InternalServerError", (error) =>
+              Effect.logWarning(
+                "Failed to record the API key creator",
+                error
+              ).pipe(Effect.as(null))
+            )
+          );
 
         return {
           key: created.key,
-          summary: toCreatedSummary(created, session.user.id),
+          summary: toCreatedSummary(created, creatorId),
         };
       }).pipe(
         Policy.withPolicy(apiKeyPolicy.canCreate(organizationId)),

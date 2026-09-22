@@ -8,6 +8,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import { EntitlementPolicy } from "../entitlement/policies";
+import { InternalServerError } from "../rpc-errors";
 import { Auth, CurrentSession, type Session } from "../session-middleware";
 import { WorkspaceRepository } from "../workspace/repository";
 import { ApiKeyRpcHandlersEffect } from "./handlers";
@@ -203,6 +204,23 @@ describe("ApiKeyRpcHandlers", () => {
   );
 
   layer(TestLayer)("handlers", (it) => {
+    /**
+     * The plugin stores the key before the creator is attributed, so the
+     * attribution write is a second, separate write. This repository always
+     * fails it to prove the request still returns the one-time plaintext
+     * instead of stranding a live key nobody can reveal.
+     */
+    const FailAttributionRepository = Layer.succeed(ApiKeyRepository, {
+      assignCreator: () =>
+        Effect.fail(
+          new InternalServerError({
+            message: "Failed to record the API key creator",
+          })
+        ),
+      listForOrganization: () => Effect.succeed([]),
+      revoke: () => Effect.void,
+    });
+
     it.effect(
       "returns the plaintext once and a scoped summary for an owner",
       () =>
@@ -237,6 +255,34 @@ describe("ApiKeyRpcHandlers", () => {
             // 30 days after the double's creation date.
             expiresAt: new Date("2026-10-18T00:00:00.000Z"),
           });
+        })
+    );
+
+    it.effect(
+      "still returns the key when creator attribution fails after the insert",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* ApiKeyRpcHandlersEffect.pipe(
+            Effect.provide(FailAttributionRepository)
+          );
+          const fixture = yield* makeFixture("starter");
+
+          const created = yield* handlers
+            .ApiKeyCreate({
+              name: "Production",
+              organizationId: fixture.organizationId,
+              expiration: "never",
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "owner")
+              )
+            );
+
+          expect(created.key).toBe("fbk_plaintext_returned_once");
+          // The summary reports what the row holds, not the intended creator.
+          expect(created.summary.creatorId).toBeNull();
         })
     );
 
