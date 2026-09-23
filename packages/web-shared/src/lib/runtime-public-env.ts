@@ -1,3 +1,5 @@
+import { hasWindow } from "@feeblo/utils/runtime-kind";
+
 type ProcessEnv = Record<string, string>;
 
 function parseRuntimePublicEnv(env: ProcessEnv) {
@@ -13,6 +15,10 @@ function parseRuntimePublicEnv(env: ProcessEnv) {
 }
 
 function readClientRuntimePublicEnv() {
+  if (!hasWindow()) {
+    return parseRuntimePublicEnv({});
+  }
+
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const runtimeWindow = window as Window & {
     global?: { __ENV?: ProcessEnv };

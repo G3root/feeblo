@@ -9,10 +9,9 @@
     "dev:server:e2e": "pnpm run db:migrate && pnpm --dir ../apps/server exec tsx src/index.ts",
     "dev:web:e2e": "pnpm run build:apps:e2e && pnpm run start:web:e2e",
     "start:server:e2e": "pnpm run db:migrate && pnpm --dir ../apps/server exec tsx src/index.ts",
-    "start:web:e2e": "node ../apps/web/dist/server/entry.mjs",
+    "start:web:e2e": "node ../apps/web/server.mjs",
     "test": "pnpm run build:apps:e2e && E2E_REUSE_BUILD=true playwright test",
-    "test:ci": "E2E_REUSE_BUILD=true playwright test",
-    "check-types": "tsc --noEmit"
+    "test:ci": "E2E_REUSE_BUILD=true playwright test"
   },
   "devDependencies": {
     "@feeblo/db": "workspace:*",

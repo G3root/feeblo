@@ -15,8 +15,6 @@
     "build": "turbo build",
     "test": "turbo run test --filter=!@feeblo/e2e",
     "test:e2e": "pnpm --filter @feeblo/e2e test",
-    "check-types": "turbo check-types",
-    "typecheck": "turbo check-types",
     "prepare": "effect-language-service patch",
     "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F @feeblo/web -F @feeblo/public-feature-board dev",

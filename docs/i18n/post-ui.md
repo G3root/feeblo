@@ -27,5 +27,5 @@ Zod messages are dynamic through `{ error: () => m.<key>() }` (Zod v4).
 ## Tooling
 
 - `build:paraglide` / `dev` (watch) / `machine-translate`.
-- Turbo `check-types` and `test` depend on `build:paraglide`, so generated types exist before `tsc` and the Vitest browser tests.
+- Turbo `test` depends on `build:paraglide`, so generated types exist before the Vitest browser tests.
 - Browser tests live in `src/**/*.browser.test.tsx` and render with the `baseLocale` fallback (English) unless a test calls `initPostUiI18n`.

@@ -5,7 +5,16 @@ import * as Exit from "effect/Exit";
 import { RpcError } from "./rpc-error";
 import { getRuntimePublicEnv } from "./runtime-public-env";
 
-const runtime = createRuntime(getRuntimePublicEnv().apiUrl);
+// The runtime is created on first use rather than at module scope: TanStack
+// Start imports this module into the server bundle too, where the browser-only
+// public env is empty (and `createRuntime` rejects an undefined API URL). Every
+// caller is client-side, so the lazy read is equivalent on the browser.
+let runtime: ReturnType<typeof createRuntime> | null = null;
+
+function getRuntime() {
+  runtime ??= createRuntime(getRuntimePublicEnv().apiUrl);
+  return runtime;
+}
 
 /**
  * Runs an Effect with the default runtime and optional AbortSignal.
@@ -13,9 +22,9 @@ const runtime = createRuntime(getRuntimePublicEnv().apiUrl);
  */
 export async function runEffect<A, E, R>(
   effect: Effect.Effect<A, E, R>,
-  options?: { signal?: AbortSignal; runtime?: typeof runtime }
+  options?: { signal?: AbortSignal; runtime?: ReturnType<typeof createRuntime> }
 ): Promise<A> {
-  const result = await (options?.runtime ?? runtime).runPromiseExit(
+  const result = await (options?.runtime ?? getRuntime()).runPromiseExit(
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     effect as Effect.Effect<A, E, never>,
     { signal: options?.signal }

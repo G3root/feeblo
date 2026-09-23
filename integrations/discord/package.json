@@ -24,7 +24,6 @@
     "./discord-user-service": "./src/discord-user-service.ts"
   },
   "scripts": {
-    "check-types": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {

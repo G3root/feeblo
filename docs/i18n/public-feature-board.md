@@ -24,4 +24,3 @@ Plurals are not supported by the message-format plugin: add one message per vari
 - `pnpm --filter @feeblo/public-feature-board build:paraglide` — one-shot compile with `.d.ts` declarations.
 - `pnpm --filter @feeblo/public-feature-board dev` — watch mode.
 - `pnpm dev:web` — runs the Astro dev server and the board's watcher together.
-- Turbo wires `check-types` to `build:paraglide` (with `outputs: ["src/paraglide/**"]`) so generated types exist before `tsc` and `astro check`.

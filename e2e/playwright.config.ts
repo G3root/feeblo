@@ -102,7 +102,7 @@ export default defineConfig({
     },
     {
       command: reuseBuiltApps
-        ? "node ../apps/web/dist/server/entry.mjs"
+        ? "node ../apps/web/server.mjs"
         : "pnpm run dev:web:e2e",
       cwd: configDir,
       env: e2eEnv,

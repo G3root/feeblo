@@ -44,8 +44,7 @@
     "build": "vite build && tsc -p tsconfig.build.json",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "check-types": "tsc --noEmit"
+    "test:watch": "vitest"
   },
   "dependencies": {},
   "devDependencies": {

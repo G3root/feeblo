@@ -99,7 +99,6 @@ Supported events: `widgetReady`, `widgetOpened`, `widgetClosed`, `identityChange
 
 ```bash
 pnpm -F @feeblo/sdk-react test        # browser tests via vitest-browser-react
-pnpm -F @feeblo/sdk-react check-types
 pnpm -F @feeblo/sdk-react build       # ESM bundle + declarations into dist/
 ```
 

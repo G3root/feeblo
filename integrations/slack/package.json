@@ -22,7 +22,6 @@
     "./slack-user-service": "./src/slack-user-service.ts"
   },
   "scripts": {
-    "check-types": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {

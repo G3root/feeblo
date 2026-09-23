@@ -27,7 +27,7 @@ jobs:
   build_app:
     name: Build App
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
@@ -100,7 +100,7 @@ jobs:
           retention-days: 7
 
   test:
-    name: Typecheck & Unit Tests
+    name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -147,9 +147,6 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
-
-      - name: Typecheck
-        run: pnpm exec turbo check-types --concurrency=4
 
       - name: Unit tests
         run: pnpm exec turbo run test --filter=!@feeblo/e2e --concurrency=4

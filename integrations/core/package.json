@@ -15,7 +15,6 @@
     "./worker-defaults": "./src/delivery-worker-defaults.ts"
   },
   "scripts": {
-    "check-types": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {

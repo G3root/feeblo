@@ -36,12 +36,14 @@ catalog:
   "@tanstack/query-db-collection": 1.2.4
   "@tanstack/react-db": ^0.2.1
   "@tanstack/react-form": ^1.33.3
-  "@tanstack/react-router": ^1.170.19
+  "@tanstack/react-router": ^1.170.38
+  "@tanstack/react-start": ^1.168.57
   "@tanstack/react-virtual": ^3.13.23
   "@tanstack/react-query": ^5.101.0
   "@types/node": ^24.12.2
   "@types/react": ^19.2.18
   "@types/react-dom": ^19.2.4
+  "@vitejs/plugin-react": ^6.1.1
   alchemy: ^0.82.1
   better-auth: 1.7.2
   class-variance-authority: ^0.7.1
