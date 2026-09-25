@@ -88,13 +88,20 @@ export default defineConfig({
     "eslint/no-underscore-dangle": "off",
     "react/no-children-prop": "off",
 
-    // The 17 rules below were disabled while `options.typeAware` was false, so
-    // they could not run at all. Type-aware linting is on now; only these two
-    // stay off, each for a stated reason.
+    // The rules below were disabled while `options.typeAware` was false, so they
+    // could not run at all. Type-aware linting is on now; these three stay off,
+    // each for a stated reason.
     "typescript/no-unsafe-type-assertion": "off",
     // 131 findings that are all the same non-defect: an explicit type argument
     // that matches the parameter's default. Pure style, no signal.
     "typescript/no-unnecessary-type-arguments": "off",
+    // Off for an unsafe `--fix`, not for the rule's intent. In
+    // `packages/permissions/src/permissions.ts` it judged the assertion on
+    // `${resource}.${action}` unnecessary and removed it, which widened the
+    // result to `string[]` and broke `tsc` — the autofix workflow then committed
+    // that break. It also reported 92 sites repo-wide, so the fix/break cycle
+    // was not going to end on its own. Re-enable only if the fixer is fixed.
+    "typescript/no-unnecessary-type-assertion": "off",
 
     // Tests place assertions inside vi.waitFor / Promise callbacks, which the
     // plugin reports as standalone expects even though they run within a test.
