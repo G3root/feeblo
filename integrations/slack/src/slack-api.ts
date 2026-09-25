@@ -147,6 +147,31 @@ export type SlackOAuthAccessResponse = Schema.Schema.Type<
 >;
 
 /**
+ * The fields `classifySlackApiError` reads, lifted off a decoded Slack body.
+ *
+ * `classifySlackApiError` decodes its input against `SlackApiErrorEnvelope`,
+ * which requires `ok: false` and a string `error`. Drop either one and the
+ * decode fails silently, so every `error`-based classification — `invalid_auth`,
+ * `missing_scope`, the channel errors — falls through to a permanent rejection,
+ * and a 429 loses its `retry_after`. That failure is invisible at the call site,
+ * which is why this is a named, tested function rather than an inline spread.
+ *
+ * The fields are lifted rather than spread because the decoded body is
+ * untrusted JSON: an array spreads to indexed keys instead of an envelope.
+ */
+export const slackErrorResponse = (body: Schema.Json, status: number) =>
+  isPlainObject(body)
+    ? {
+        ...("ok" in body && { ok: body.ok }),
+        ...("error" in body && { error: body.error }),
+        ...("response_metadata" in body && {
+          response_metadata: body.response_metadata,
+        }),
+        status,
+      }
+    : { status };
+
+/**
  * Classifies a failed Slack API response into the typed provider failure
  * algebra. `SlackApiErrorEnvelope` fields are decoded so transient errors can
  * be retried with the correct backoff.
@@ -323,23 +348,8 @@ export const makeSlackApiClient = (): SlackApiClient => {
     if (isObject(body) && body !== null && "ok" in body && body.ok === true) {
       return body;
     }
-    // Only `error` and `response_metadata` are read off a failed response, so
-    // lift them out explicitly rather than spreading the decoded body: the body
-    // is untrusted JSON, and a non-plain object — an array, most plausibly —
-    // spreads to indexed keys instead of the envelope the classifier reads.
-    const errorEnvelope = isPlainObject(body)
-      ? {
-          ...("error" in body && { error: body.error }),
-          ...("response_metadata" in body && {
-            response_metadata: body.response_metadata,
-          }),
-        }
-      : {};
     return yield* classifySlackApiError(
-      {
-        ...errorEnvelope,
-        status,
-      },
+      slackErrorResponse(body, status),
       input.context
     );
   });
