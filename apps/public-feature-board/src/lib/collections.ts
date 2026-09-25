@@ -123,8 +123,15 @@ const { organizationScopedQueryKey, resolvePostSlug, slugScopedQueryKey } =
     getPostSlug: getCurrentPostSlug,
   });
 
+/**
+ * Every collection carries an explicit `id`: `createCollection` generates a
+ * random UUID when the config has none, and Workers forbid generating random
+ * values in global scope. An unnamed collection in the SSR bundle takes every
+ * request down with it, so treat the ids as required, not optional.
+ */
 export const publicPostCollection = createCollection(
   queryCollectionOptions({
+    id: "publicPostCollection",
     staleTime: Duration.toMillis(Duration.minutes(5)),
     queryKey: () => organizationScopedQueryKey("public-post"),
     queryFn: async (ctx) => {
@@ -189,6 +196,7 @@ export const publicPostCollection = createCollection(
 
 export const publicPostStatusCollection = createCollection(
   queryCollectionOptions({
+    id: "publicPostStatusCollection",
     staleTime: Duration.toMillis(Duration.minutes(5)),
     queryKey: () => organizationScopedQueryKey("public-post-status"),
 
@@ -213,6 +221,7 @@ export const publicPostStatusCollection = createCollection(
 
 export const publicRoadmapCollection = createCollection(
   queryCollectionOptions({
+    id: "publicRoadmapCollection",
     staleTime: Duration.toMillis(Duration.minutes(5)),
     queryKey: () => organizationScopedQueryKey("public-roadmap"),
     queryFn: async (ctx) => {
@@ -236,6 +245,7 @@ export const publicRoadmapCollection = createCollection(
 
 export const publicRoadmapColumnCollection = createCollection(
   queryCollectionOptions({
+    id: "publicRoadmapColumnCollection",
     staleTime: Duration.toMillis(Duration.minutes(5)),
     queryKey: () => organizationScopedQueryKey("public-roadmap-column"),
     queryFn: async (ctx) => {
@@ -259,6 +269,7 @@ export const publicRoadmapColumnCollection = createCollection(
 
 export const publicChangelogCollection = createCollection(
   queryCollectionOptions({
+    id: "publicChangelogCollection",
     staleTime: Duration.toMillis(Duration.minutes(5)),
     queryKey: () => organizationScopedQueryKey("public-changelog"),
     queryFn: async (ctx) => {
@@ -282,6 +293,7 @@ export const publicChangelogCollection = createCollection(
 
 export const publicChangelogCategoryCollection = createCollection(
   queryCollectionOptions({
+    id: "publicChangelogCategoryCollection",
     staleTime: Duration.toMillis(Duration.minutes(5)),
     queryKey: () => organizationScopedQueryKey("public-changelog-category"),
     queryFn: async (ctx) => {
@@ -305,6 +317,7 @@ export const publicChangelogCategoryCollection = createCollection(
 
 export const publicChangelogCategoryLinkCollection = createCollection(
   queryCollectionOptions({
+    id: "publicChangelogCategoryLinkCollection",
     staleTime: Duration.toMillis(Duration.minutes(5)),
     queryKey: () =>
       organizationScopedQueryKey("public-changelog-category-link"),
@@ -334,6 +347,7 @@ export const publicChangelogCategoryLinkCollection = createCollection(
  */
 export const publicChangelogDetailCollection = createCollection(
   queryCollectionOptions({
+    id: "publicChangelogDetailCollection",
     queryKey: (opts) =>
       organizationScopedQueryKey(
         "public-changelog-detail",
@@ -376,6 +390,7 @@ export const publicChangelogDetailCollection = createCollection(
 
 export const publicBoardCollection = createCollection(
   queryCollectionOptions({
+    id: "publicBoardCollection",
     staleTime: Duration.toMillis(Duration.minutes(5)),
     queryKey: () => organizationScopedQueryKey("public-board"),
 
@@ -401,6 +416,7 @@ export const publicBoardCollection = createCollection(
 
 export const publicTagCollection = createCollection(
   queryCollectionOptions({
+    id: "publicTagCollection",
     staleTime: Duration.toMillis(Duration.minutes(5)),
     queryKey: () => organizationScopedQueryKey("public-tag"),
     queryFn: async (ctx) => {
@@ -426,6 +442,7 @@ export const publicTagCollection = createCollection(
 
 export const publicPostTagCollection = createCollection(
   queryCollectionOptions({
+    id: "publicPostTagCollection",
     // Slug-scoped and on-demand: only the viewed post's tag assignments are
     // fetched, not every assignment in the organization. The query key
     // resolves the route slug, so the preloaded subset and the component's
@@ -463,6 +480,7 @@ export const publicPostTagCollection = createCollection(
 
 export const publicCommentCollection = createCollection(
   queryCollectionOptions({
+    id: "publicCommentCollection",
     queryKey: (opts) =>
       slugScopedQueryKey(
         "public-comment",
@@ -557,6 +575,7 @@ export const publicCommentCollection = createCollection(
 
 export const publicCommentReactionCollection = createCollection(
   queryCollectionOptions({
+    id: "publicCommentReactionCollection",
     queryKey: (opts) =>
       slugScopedQueryKey(
         "public-comment-reaction",
@@ -622,6 +641,7 @@ export const publicCommentReactionCollection = createCollection(
 
 export const publicUpvoteCollection = createCollection(
   queryCollectionOptions({
+    id: "publicUpvoteCollection",
     queryKey: organizationScopedQueryKey("public-upvote"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
@@ -683,6 +703,7 @@ export const publicUpvoteCollection = createCollection(
  */
 export const publicPostUpvoteCollection = createCollection(
   queryCollectionOptions({
+    id: "publicPostUpvoteCollection",
     queryKey: (opts) =>
       slugScopedQueryKey(
         "public-post-upvote",
@@ -744,6 +765,7 @@ export const publicPostUpvoteCollection = createCollection(
 
 export const publicPostReactionCollection = createCollection(
   queryCollectionOptions({
+    id: "publicPostReactionCollection",
     queryKey: (opts) =>
       slugScopedQueryKey(
         "public-post-reaction",
@@ -805,6 +827,7 @@ export const publicPostReactionCollection = createCollection(
 
 export const publicPostSubscriptionCollection = createCollection(
   queryCollectionOptions({
+    id: "publicPostSubscriptionCollection",
     queryKey: (opts) =>
       slugScopedQueryKey(
         "public-post-subscription",
@@ -866,6 +889,7 @@ export const publicPostSubscriptionCollection = createCollection(
 
 export const publicChangelogSubscriptionCollection = createCollection(
   queryCollectionOptions({
+    id: "publicChangelogSubscriptionCollection",
     queryKey: () =>
       organizationScopedQueryKey(
         "public-changelog-subscription",
@@ -909,6 +933,7 @@ export const publicChangelogSubscriptionCollection = createCollection(
 
 export const publicPostDetailCollection = createCollection(
   queryCollectionOptions({
+    id: "publicPostDetailCollection",
     // Keyed by the explicit `slug` filter with a fallback to the route
     // slug, so detail subscribers (routes, content views) share one cache
     // entry per post regardless of where they subscribe from.
@@ -958,6 +983,7 @@ export const publicPostDetailCollection = createCollection(
  */
 export const publicDeleteEligibilityCollection = createCollection(
   queryCollectionOptions({
+    id: "publicDeleteEligibilityCollection",
     queryKey: () => organizationScopedQueryKey("public-delete-eligibility"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
