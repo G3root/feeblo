@@ -240,7 +240,7 @@ export const drizzleAdapter = (
         model: string,
         builder: any,
         data: Record<string, any>,
-        where?: Where[] | undefined
+        where?: Where[]
       ) => {
         if (config.provider !== "mysql") {
           const c: any[] = await runQuery(builder.returning());
