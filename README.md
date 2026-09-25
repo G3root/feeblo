@@ -1,6 +1,6 @@
 # Feeblo
 
-Open-source customer feedback platform — collect feature requests, roadmaps, changelogs, and an embeddable feedback widget. Built as a pnpm + Turborepo monorepo using [Effect](https://effect.website), [Drizzle](https://orm.drizzle.team), and [Astro](https://astro.build).
+Open-source customer feedback platform — collect feature requests, roadmaps, changelogs, and an embeddable feedback widget. Built as a pnpm + Turborepo monorepo using [Effect](https://effect.website), [Drizzle](https://orm.drizzle.team), and [TanStack Start](https://tanstack.com/start).
 
 Licensed under the [GNU AGPL-3.0](./LICENSE).
 
@@ -8,46 +8,51 @@ Licensed under the [GNU AGPL-3.0](./LICENSE).
 
 ```
 apps/
-  server/              Effect-based HTTP API (rolldown build, tsx dev)
-  web/                 Astro dashboard (React + Solid islands, Cloudflare deploy)
-  public-feature-board/  Public feature board UI package (TanStack Router/DB)
+  server/               Effect HTTP API: RPC route, Public API, integration providers
+  web/                  Dashboard (TanStack Start, React, Cloudflare)
+  public-feature-board/ Public portal: boards, roadmap, changelog (TanStack Start)
 packages/
-  auth/                better-auth integration
-  db/                  Drizzle schemas + migrations (PostgreSQL)
-  db-migrator/         Migration runner
-  domain/              Core domain: users, workspaces, boards, posts, comments,
-                       upvotes, reactions, changelogs, tags, billing, S3, RPC router
-  feedback-widget/     SolidJS embeddable widget
-  post-ui/             Post rendering components
-  id/                  ID generation
-  permissions/         Permission policies
-  rpc-client/          Typed RPC client
-  sdk/                 Embeddable feedback widget SDK (UMD + ESM)
-  transactional/       Transactional email templates
-  ui/                  Shared UI primitives (shadcn-style)
-  utils/               Shared utilities
-  web-shared/          Shared web code
+  auth/                 better-auth wiring, organization ACL, API-key plugin
+  config/               Shared tsconfig base and Effect Config helpers
+  db/                   Drizzle schema, migrations, PGlite test database, seed/nuke
+  db-migrator/          Standalone migration runner for deployments
+  domain/               Domain behavior: schemas, repositories, RPC contracts, handlers
+  domain-contracts/     Schemas and vocabularies both browser and server may import
+  feedback-widget/      SolidJS iframe widget bundle
+  id/                   Branded identifier types
+  permissions/          Member permission catalog
+  post-ui/              Post, comment, and roadmap surface shared by dashboard and portal
+  rpc-client/           Effect RPC client
+  sdk/                  Published SDK (ESM + UMD)
+  sdk-react/            Published React bindings for the SDK
+  transactional/        Email templates and mailer
+  ui/                   Shared UI primitives
+  utils/                Shared primitives, including runtime type guards
+  web-shared/           Browser-side shared code: collections, auth context, error parsing
 integrations/
-  core/                Delivery pipeline, provider registry, event recording
-  slack/ discord/      Provider adapters (Slack, Discord, GitHub, webhook)
-  github/ webhook/
+  core/                 Provider registry, delivery worker, credential encryption
+  discord/ github/      Provider adapters
+  slack/ webhook/
+e2e/                    Playwright end-to-end suite
+docker/                 Local development infrastructure
+docs/                   Topic docs and docs/adr/ decision records
 ```
 
 ## Tech stack
 
-- **Runtime/Server:** Node 26+, Effect v4, `@effect/platform-node`, `@effect/sql-pg`
-- **Database:** PostgreSQL via Drizzle ORM (`drizzle-kit` for migrations)
-- **Auth:** better-auth (with Polar billing integration)
-- **Web:** Astro 7, React 19 + Solid.js islands, TanStack Router/DB/Query/Form, Tailwind v4
-- **SDK:** Framework-agnostic Vite-built widget (Floating UI positioning)
-- **Tooling:** pnpm 11, Turborepo, oxlint + oxfmt, Vitest, Playwright, TypeScript 6
-- **Infra/Deploy:** Docker, Cloudflare (dashboard via Wrangler)
+- **Runtime/Server:** Node 26, Effect v4, `@effect/platform-node`, `@effect/sql-pg`
+- **Database:** PostgreSQL with pgvector via Drizzle ORM; PGlite (`@effect/sql-pglite`) for tests
+- **Auth:** better-auth, with Polar for billing
+- **Web:** TanStack Start, React 19, TanStack Router/DB/Query/Form, Tailwind v4
+- **Widget:** SolidJS, Vite-built, Floating UI positioning
+- **Tooling:** pnpm 11, Turborepo, Oxlint + Oxfmt (type-aware via `@effect/tsgo`), Vitest, Playwright, TypeScript 7
+- **Infra/Deploy:** Docker, Cloudflare via Wrangler
 
 ## Prerequisites
 
 - Node.js `^26.4.0`
 - pnpm `^11.0.3`
-- Docker (for local Postgres / MinIO / SMTP) — optional but recommended
+- Docker (for local Postgres, Redis, MinIO, and mail) — optional but recommended
 
 ## Getting started
 
@@ -57,6 +62,8 @@ integrations/
    pnpm install
    ```
 
+   `prepare` runs `effect-tsgo patch` here, which wires the Effect language service into `tsc` and Oxlint. If Effect diagnostics never appear later, that step did not run.
+
 2. Copy the environment file and fill in values:
 
    ```sh
@@ -65,7 +72,7 @@ integrations/
 
    Required configuration includes `DATABASE_URL`, `AUTH_ENCRYPTION_KEY`, `APP_URL`, `API_URL`, `APP_ROOT_DOMAIN`, SMTP settings, and media upload (S3-compatible) settings. See `.env.example` for details.
 
-3. Start local infrastructure (Postgres / MinIO / mail) and run migrations + seed:
+3. Start local infrastructure and run migrations plus seed:
 
    ```sh
    pnpm db:start
@@ -73,18 +80,32 @@ integrations/
    pnpm db:seed
    ```
 
-4. Run the dev servers (API + web in parallel via Turbo):
+   `pnpm db:start` brings up `docker/docker-compose.dev.yml`: Postgres on **54323**, Redis on **63799**, Mailpit on 8025/1025, and MinIO on 9001/9002. Those ports are deliberate — they are non-standard so the stack can coexist with a system Postgres or Redis, and `.env.example` is written against them. Do not expect 5432.
+
+   Both compose files pin the same `container_name`s, so the dev stack and the production stack in `docker-compose.yml` cannot run at once. If you have started the root one, `docker compose down` from the repo root first.
+
+4. Run the dev servers (API and web in parallel via Turbo):
 
    ```sh
    pnpm dev
    ```
 
-   Or run individually:
+   Or run them individually:
 
    ```sh
    pnpm dev:server   # API on http://localhost:3000
    pnpm dev:web      # Dashboard on http://localhost:3001
    ```
+
+## Quality gate
+
+```sh
+pnpm check
+```
+
+That runs every package's `tsc --noEmit`, then type-aware Oxlint, then the formatter check. It needs no database, no build output, and no env file, and CI runs it on every push. Run it before opening a pull request.
+
+`AGENTS.md` is the repo law: commands, architecture, and the changes that need an owner decision. `CONTEXT.md` fixes the product's vocabulary. `docs/adr/` records why specific boundaries exist.
 
 ## Common scripts
 
@@ -93,19 +114,25 @@ integrations/
 | `pnpm dev` | Run all dev tasks across the workspace |
 | `pnpm dev:server` / `pnpm dev:web` / `pnpm dev:native` | Run a single app |
 | `pnpm build` | Build all packages and apps |
+| `pnpm check` | The gate: typecheck, lint, and format check |
+| `pnpm typecheck` | Types only, cached per package |
+| `pnpm test` | Unit tests (`@feeblo/e2e` excluded) |
+| `pnpm test:e2e` | Playwright end-to-end suite |
+| `pnpm lint` / `pnpm lint:fix` | Lint and format check / autofix |
+| `pnpm fmt` / `pnpm fmt:check` | Format / verify formatting only |
+| `pnpm db:start` | Start local Postgres, Redis, Mailpit, and MinIO |
+| `pnpm db:stop` / `pnpm db:down` | Stop / tear down the local stack |
+| `pnpm db:watch` | Same as `db:start`, in the foreground |
 | `pnpm db:push` | Push schema to the database |
 | `pnpm db:generate` | Generate SQL migrations from schema changes |
 | `pnpm db:migrate` | Run pending migrations |
 | `pnpm db:seed` | Seed the database with sample data |
 | `pnpm db:studio` | Open Drizzle Studio |
 | `pnpm db:nuke` | Drop and recreate the database |
-| `pnpm db:start` / `pnpm db:stop` / `pnpm db:down` | Start/stop/teardown local DB container |
-| `pnpm format` | Format with Biome |
-| `pnpm check` / `pnpm fix` | Ultracite lint check / autofix |
 
 ## Feedback widget SDK
 
-The embeddable SDK lives in `packages/sdk` and ships ESM + UMD builds. See [`packages/sdk/README.md`](./packages/sdk/README.md) for installation and usage.
+The embeddable SDK lives in `packages/sdk` and ships ESM + UMD builds, with React bindings in `packages/sdk-react`. See [`packages/sdk/README.md`](./packages/sdk/README.md) for installation and usage.
 
 ## Billing
 
