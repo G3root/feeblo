@@ -20,5 +20,7 @@
     "**/routeTree.gen.ts": true,
     "repos/**": true
   },
-  "js/ts.preferences.autoImportFileExcludePatterns": ["repos/**"]
+  "js/ts.preferences.autoImportFileExcludePatterns": ["repos/**"],
+  "js/ts.experimental.useTsgo": true,
+  "js/ts.tsdk.additionalLocations": ["./node_modules/typescript/bin"]
 }

@@ -14,7 +14,8 @@
     "start": "node server.mjs",
     "generate-types": "wrangler types",
     "test": "vitest run",
-    "machine-translate": "inlang machine translate --project ../../project.inlang"
+    "machine-translate": "inlang machine translate --project ../../project.inlang",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@base-ui/react": "catalog:",

@@ -27,7 +27,8 @@
     "db:stop": "docker compose stop",
     "db:down": "docker compose down",
     "db:configure-embeddings": "dotenvx run -f ../../.env -- tsx configure-embeddings.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@effect/sql-pg": "catalog:",

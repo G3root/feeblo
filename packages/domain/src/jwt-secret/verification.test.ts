@@ -29,12 +29,13 @@ const basePayload = (): jose.JWTPayload => ({
   exp: futureExp(),
 });
 
+const signTokenEffect = (payload: jose.JWTPayload, secret: string) =>
+  Effect.promise(() => signToken(payload, secret));
+
 describe("verifyJwt", () => {
   it.effect("verifies a token bound to the organization via aud with exp", () =>
     Effect.gen(function* () {
-      const token = yield* Effect.promise(() =>
-        signToken(basePayload(), SECRET)
-      );
+      const token = yield* signTokenEffect(basePayload(), SECRET);
 
       const payload = yield* verifyJwt(token, [SECRET], ORGANIZATION_ID);
 
@@ -44,75 +45,99 @@ describe("verifyJwt", () => {
     })
   );
 
-  it("rejects a token with the organization only in the iss claim", async () => {
-    const token = await signToken(
-      { sub: "u_1", iss: ORGANIZATION_ID, iat: nowSeconds(), exp: futureExp() },
-      SECRET
-    );
+  it.effect("rejects a token with the organization only in the iss claim", () =>
+    Effect.gen(function* () {
+      const token = yield* signTokenEffect(
+        {
+          sub: "u_1",
+          iss: ORGANIZATION_ID,
+          iat: nowSeconds(),
+          exp: futureExp(),
+        },
+        SECRET
+      );
 
-    await expect(
-      Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID))
-    ).rejects.toBeInstanceOf(UnauthorizedError);
-  });
+      const error = yield* Effect.flip(
+        verifyJwt(token, [SECRET], ORGANIZATION_ID)
+      );
+      expect(error).toBeInstanceOf(UnauthorizedError);
+    })
+  );
 
-  it("rejects a token without an exp claim (exp is required)", async () => {
-    const token = await signToken(
-      {
-        sub: "u_1",
-        email: "test@example.com",
-        name: "Ada",
-        aud: ORGANIZATION_ID,
-        iat: nowSeconds(),
-      },
-      SECRET
-    );
+  it.effect("rejects a token without an exp claim (exp is required)", () =>
+    Effect.gen(function* () {
+      const token = yield* signTokenEffect(
+        {
+          sub: "u_1",
+          email: "test@example.com",
+          name: "Ada",
+          aud: ORGANIZATION_ID,
+          iat: nowSeconds(),
+        },
+        SECRET
+      );
 
-    await expect(
-      Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID))
-    ).rejects.toBeInstanceOf(UnauthorizedError);
-  });
+      const error = yield* Effect.flip(
+        verifyJwt(token, [SECRET], ORGANIZATION_ID)
+      );
+      expect(error).toBeInstanceOf(UnauthorizedError);
+    })
+  );
 
-  it("rejects a token without an iat claim (iat is required)", async () => {
-    const { iat: _iat, ...payloadWithoutIat } = basePayload();
-    const token = await signToken(payloadWithoutIat, SECRET);
+  it.effect("rejects a token without an iat claim (iat is required)", () =>
+    Effect.gen(function* () {
+      const { iat: _iat, ...payloadWithoutIat } = basePayload();
+      const token = yield* signTokenEffect(payloadWithoutIat, SECRET);
 
-    await expect(
-      Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID))
-    ).rejects.toBeInstanceOf(UnauthorizedError);
-  });
+      const error = yield* Effect.flip(
+        verifyJwt(token, [SECRET], ORGANIZATION_ID)
+      );
+      expect(error).toBeInstanceOf(UnauthorizedError);
+    })
+  );
 
-  it("rejects a token expired relative to the pinned nowSeconds (seam drives jose)", async () => {
-    // Valid at mint time, but the verification instant is pinned far enough
-    // ahead that jose must judge it expired. Passes only if `currentDate` is
-    // derived from options.nowSeconds rather than the wall clock.
-    const now = nowSeconds();
-    const token = await signToken(
-      { ...basePayload(), iat: now, exp: now + 3600 },
-      SECRET
-    );
+  it.effect(
+    "rejects a token expired relative to the pinned nowSeconds (seam drives jose)",
+    () =>
+      Effect.gen(function* () {
+        // Valid at mint time, but the verification instant is pinned far enough
+        // ahead that jose must judge it expired. Passes only if `currentDate` is
+        // derived from options.nowSeconds rather than the wall clock.
+        const now = nowSeconds();
+        const token = yield* signTokenEffect(
+          { ...basePayload(), iat: now, exp: now + 3600 },
+          SECRET
+        );
 
-    await expect(
-      Effect.runPromise(
-        verifyJwt(token, [SECRET], ORGANIZATION_ID, {
-          nowSeconds: now + 2 * 3600,
-        })
-      )
-    ).rejects.toBeInstanceOf(UnauthorizedError);
-  });
+        const error = yield* Effect.flip(
+          verifyJwt(token, [SECRET], ORGANIZATION_ID, {
+            nowSeconds: now + 2 * 3600,
+          })
+        );
+        expect(error).toBeInstanceOf(UnauthorizedError);
+      })
+  );
 
-  it("rejects an expired token when exp is present", async () => {
-    const token = await signToken({ ...basePayload(), exp: pastExp() }, SECRET);
+  it.effect("rejects an expired token when exp is present", () =>
+    Effect.gen(function* () {
+      const token = yield* signTokenEffect(
+        { ...basePayload(), exp: pastExp() },
+        SECRET
+      );
 
-    await expect(
-      Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID))
-    ).rejects.toBeInstanceOf(UnauthorizedError);
-  });
+      const error = yield* Effect.flip(
+        verifyJwt(token, [SECRET], ORGANIZATION_ID)
+      );
+      expect(error).toBeInstanceOf(UnauthorizedError);
+    })
+  );
 
   it.effect("accepts a token expired within the clock-skew leeway", () =>
     Effect.gen(function* () {
       const now = nowSeconds();
-      const token = yield* Effect.promise(() =>
-        signToken({ ...basePayload(), iat: now - 60, exp: now - 5 }, SECRET)
+      const token = yield* signTokenEffect(
+        { ...basePayload(), iat: now - 60, exp: now - 5 },
+        SECRET
       );
 
       const payload = yield* verifyJwt(token, [SECRET], ORGANIZATION_ID, {
@@ -122,30 +147,31 @@ describe("verifyJwt", () => {
     })
   );
 
-  it("rejects a token with iat more than the clock-skew leeway in the future", async () => {
-    const now = nowSeconds();
-    const token = await signToken(
-      { ...basePayload(), iat: now + CLOCK_SKEW_LEEWAY_SECONDS + 1 },
-      SECRET
-    );
+  it.effect(
+    "rejects a token with iat more than the clock-skew leeway in the future",
+    () =>
+      Effect.gen(function* () {
+        const now = nowSeconds();
+        const token = yield* signTokenEffect(
+          { ...basePayload(), iat: now + CLOCK_SKEW_LEEWAY_SECONDS + 1 },
+          SECRET
+        );
 
-    await expect(
-      Effect.runPromise(
-        verifyJwt(token, [SECRET], ORGANIZATION_ID, { nowSeconds: now })
-      )
-    ).rejects.toBeInstanceOf(UnauthorizedError);
-  });
+        const error = yield* Effect.flip(
+          verifyJwt(token, [SECRET], ORGANIZATION_ID, { nowSeconds: now })
+        );
+        expect(error).toBeInstanceOf(UnauthorizedError);
+      })
+  );
 
   it.effect("accepts a token with iat within the clock-skew leeway", () =>
     Effect.gen(function* () {
       const now = nowSeconds();
-      const token = yield* Effect.promise(() =>
-        signToken(
-          // Exactly at the boundary is accepted: only strictly beyond the
-          // leeway is rejected.
-          { ...basePayload(), iat: now + CLOCK_SKEW_LEEWAY_SECONDS },
-          SECRET
-        )
+      const token = yield* signTokenEffect(
+        // Exactly at the boundary is accepted: only strictly beyond the
+        // leeway is rejected.
+        { ...basePayload(), iat: now + CLOCK_SKEW_LEEWAY_SECONDS },
+        SECRET
       );
 
       const payload = yield* verifyJwt(token, [SECRET], ORGANIZATION_ID, {
@@ -155,32 +181,33 @@ describe("verifyJwt", () => {
     })
   );
 
-  it("rejects a token with a lifetime beyond the 24h default cap", async () => {
-    const token = await signToken(
-      {
-        ...basePayload(),
-        iat: nowSeconds(),
-        exp: nowSeconds() + 25 * 3600,
-      },
-      SECRET
-    );
+  it.effect("rejects a token with a lifetime beyond the 24h default cap", () =>
+    Effect.gen(function* () {
+      const token = yield* signTokenEffect(
+        {
+          ...basePayload(),
+          iat: nowSeconds(),
+          exp: nowSeconds() + 25 * 3600,
+        },
+        SECRET
+      );
 
-    await expect(
-      Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID))
-    ).rejects.toBeInstanceOf(UnauthorizedError);
-  });
+      const error = yield* Effect.flip(
+        verifyJwt(token, [SECRET], ORGANIZATION_ID)
+      );
+      expect(error).toBeInstanceOf(UnauthorizedError);
+    })
+  );
 
   it.effect("accepts a token with a lifetime within the default cap", () =>
     Effect.gen(function* () {
-      const token = yield* Effect.promise(() =>
-        signToken(
-          {
-            ...basePayload(),
-            iat: nowSeconds(),
-            exp: nowSeconds() + 23 * 3600,
-          },
-          SECRET
-        )
+      const token = yield* signTokenEffect(
+        {
+          ...basePayload(),
+          iat: nowSeconds(),
+          exp: nowSeconds() + 23 * 3600,
+        },
+        SECRET
       );
 
       const payload = yield* verifyJwt(token, [SECRET], ORGANIZATION_ID);
@@ -188,34 +215,33 @@ describe("verifyJwt", () => {
     })
   );
 
-  it("respects a per-workspace maxTokenLifetime override", async () => {
-    // 2-hour cap: a 3-hour token must be rejected even though the 24h
-    // default would accept it.
-    const token = await signToken(
-      {
-        ...basePayload(),
-        iat: nowSeconds(),
-        exp: nowSeconds() + 3 * 3600,
-      },
-      SECRET
-    );
+  it.effect("respects a per-workspace maxTokenLifetime override", () =>
+    Effect.gen(function* () {
+      // 2-hour cap: a 3-hour token must be rejected even though the 24h
+      // default would accept it.
+      const token = yield* signTokenEffect(
+        {
+          ...basePayload(),
+          iat: nowSeconds(),
+          exp: nowSeconds() + 3 * 3600,
+        },
+        SECRET
+      );
 
-    await expect(
-      Effect.runPromise(
+      const error = yield* Effect.flip(
         verifyJwt(token, [SECRET], ORGANIZATION_ID, {
           maxTokenLifetime: Duration.hours(2),
         })
-      )
-    ).rejects.toBeInstanceOf(UnauthorizedError);
-  });
+      );
+      expect(error).toBeInstanceOf(UnauthorizedError);
+    })
+  );
 
   it.effect("accepts a token within a tightened per-workspace cap", () =>
     Effect.gen(function* () {
-      const token = yield* Effect.promise(() =>
-        signToken(
-          { ...basePayload(), iat: nowSeconds(), exp: nowSeconds() + 3600 },
-          SECRET
-        )
+      const token = yield* signTokenEffect(
+        { ...basePayload(), iat: nowSeconds(), exp: nowSeconds() + 3600 },
+        SECRET
       );
 
       const payload = yield* verifyJwt(token, [SECRET], ORGANIZATION_ID, {
@@ -225,31 +251,35 @@ describe("verifyJwt", () => {
     })
   );
 
-  it("rejects a token bound to a different organization", async () => {
-    const token = await signToken(
-      { ...basePayload(), aud: "org_other" },
-      SECRET
-    );
+  it.effect("rejects a token bound to a different organization", () =>
+    Effect.gen(function* () {
+      const token = yield* signTokenEffect(
+        { ...basePayload(), aud: "org_other" },
+        SECRET
+      );
 
-    await expect(
-      Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID))
-    ).rejects.toBeInstanceOf(UnauthorizedError);
-  });
+      const error = yield* Effect.flip(
+        verifyJwt(token, [SECRET], ORGANIZATION_ID)
+      );
+      expect(error).toBeInstanceOf(UnauthorizedError);
+    })
+  );
 
-  it("rejects an unbound token (no aud claim)", async () => {
-    const { aud: _aud, ...payloadWithoutAud } = basePayload();
-    const token = await signToken(payloadWithoutAud, SECRET);
+  it.effect("rejects an unbound token (no aud claim)", () =>
+    Effect.gen(function* () {
+      const { aud: _aud, ...payloadWithoutAud } = basePayload();
+      const token = yield* signTokenEffect(payloadWithoutAud, SECRET);
 
-    await expect(
-      Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID))
-    ).rejects.toBeInstanceOf(UnauthorizedError);
-  });
+      const error = yield* Effect.flip(
+        verifyJwt(token, [SECRET], ORGANIZATION_ID)
+      );
+      expect(error).toBeInstanceOf(UnauthorizedError);
+    })
+  );
 
   it.effect("succeeds when at least one secret matches", () =>
     Effect.gen(function* () {
-      const token = yield* Effect.promise(() =>
-        signToken(basePayload(), OTHER_SECRET)
-      );
+      const token = yield* signTokenEffect(basePayload(), OTHER_SECRET);
 
       const payload = yield* verifyJwt(
         token,
@@ -261,17 +291,23 @@ describe("verifyJwt", () => {
     })
   );
 
-  it("fails when no secret matches", async () => {
-    const token = await signToken(basePayload(), "c".repeat(64));
+  it.effect("fails when no secret matches", () =>
+    Effect.gen(function* () {
+      const token = yield* signTokenEffect(basePayload(), "c".repeat(64));
 
-    await expect(
-      Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID))
-    ).rejects.toBeInstanceOf(UnauthorizedError);
-  });
+      const error = yield* Effect.flip(
+        verifyJwt(token, [SECRET], ORGANIZATION_ID)
+      );
+      expect(error).toBeInstanceOf(UnauthorizedError);
+    })
+  );
 
-  it("fails for a malformed token", async () => {
-    await expect(
-      Effect.runPromise(verifyJwt("not-a-token", [SECRET], ORGANIZATION_ID))
-    ).rejects.toBeInstanceOf(UnauthorizedError);
-  });
+  it.effect("fails for a malformed token", () =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(
+        verifyJwt("not-a-token", [SECRET], ORGANIZATION_ID)
+      );
+      expect(error).toBeInstanceOf(UnauthorizedError);
+    })
+  );
 });

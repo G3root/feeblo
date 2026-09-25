@@ -25,7 +25,8 @@
     "email:dev": "email dev --dir ./src/templates --port 3005",
     "email:export": "email export",
     "email:start": "email start",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@feeblo/config": "workspace:*",

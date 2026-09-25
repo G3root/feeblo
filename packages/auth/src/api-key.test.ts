@@ -47,6 +47,13 @@ const databaseDirectory = mkdtempSync(join(tmpdir(), "feeblo-auth-apikey-"));
 process.env.DATABASE_URL = `pglite:${databaseDirectory}`;
 await migratePglite(process.env.DATABASE_URL);
 
+// This suite deliberately builds runtimes by hand, which
+// `effect-tests/no-manual-effect-runtime-in-tests` otherwise bans in tests.
+// One PGlite database is migrated once for the whole file (the migration set
+// takes seconds), it is shared through the better-auth adapter as a plain
+// value rather than inside an Effect, and `afterAll` disposes it. A per-test
+// `it.layer` would re-migrate for every test in the file.
+/* oxlint-disable effect-tests/no-manual-effect-runtime-in-tests */
 const runtime: ManagedRuntime.ManagedRuntime<
   Database.Database,
   SqlError.SqlError | Config.ConfigError

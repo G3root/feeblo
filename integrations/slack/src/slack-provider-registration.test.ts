@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 
+import { describe, expect, it } from "@effect/vitest";
 import {
   asLegid,
   IntegrationConnectionId,
@@ -16,7 +17,6 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Redacted from "effect/Redacted";
-import { describe, expect, it } from "vitest";
 
 import type { SlackApiClient } from "./slack-api";
 import {
@@ -138,217 +138,250 @@ const makePostMessageSpy = () => {
 };
 
 describe("slack provider registration", () => {
-  it("posts channel-update blocks for feedback.post.created deliveries", async () => {
-    const spy = makePostMessageSpy();
-    const registration = makeSlackProviderRegistration({
-      apiClient: spy.apiClient,
-      credentialResolver,
-      signingSecret,
-    });
-    const handler = registration.handlers.find(
-      (candidate) => candidate.capabilityKey === "channel.notifications"
-    );
-    expect(handler).toBeDefined();
+  it.effect(
+    "posts channel-update blocks for feedback.post.created deliveries",
+    () =>
+      Effect.gen(function* () {
+        const spy = makePostMessageSpy();
+        const registration = makeSlackProviderRegistration({
+          apiClient: spy.apiClient,
+          credentialResolver,
+          signingSecret,
+        });
+        const handler = registration.handlers.find(
+          (candidate) => candidate.capabilityKey === "channel.notifications"
+        );
+        expect(handler).toBeDefined();
 
-    const result = await Effect.runPromiseExit(
-      handler?.deliver(deliveryInput()) ?? Effect.never
-    );
-    expect(Exit.isSuccess(result)).toBe(true);
+        const result = yield* Effect.exit(
+          handler?.deliver(deliveryInput()) ?? Effect.never
+        );
+        expect(Exit.isSuccess(result)).toBe(true);
 
-    const call = spy.getLastCall();
-    expect(call?.channelId).toBe("C123");
-    expect(call?.text).toBe("Dark mode please");
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    const header = call?.blocks[0] as { text: { text: string } };
-    expect(header.text.text).toBe("Dark mode please");
-    expect(call?.blocks[1]).toMatchObject({
-      elements: [
-        {
-          text: expect.stringContaining("*Customer Tier:* Enterprise"),
-          type: "mrkdwn",
+        const call = spy.getLastCall();
+        expect(call?.channelId).toBe("C123");
+        expect(call?.text).toBe("Dark mode please");
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+        const header = call?.blocks[0] as { text: { text: string } };
+        expect(header.text.text).toBe("Dark mode please");
+        expect(call?.blocks[1]).toMatchObject({
+          elements: [
+            {
+              text: expect.stringContaining("*Customer Tier:* Enterprise"),
+              type: "mrkdwn",
+            },
+          ],
+          type: "context",
+        });
+      })
+  );
+
+  it.effect("rejects unsupported event types as invalid configuration", () =>
+    Effect.gen(function* () {
+      const spy = makePostMessageSpy();
+      const registration = makeSlackProviderRegistration({
+        apiClient: spy.apiClient,
+        credentialResolver,
+        signingSecret,
+      });
+      const handler = registration.handlers[0];
+      const result = yield* Effect.exit(
+        handler?.deliver(
+          deliveryInput({
+            event: {
+              ...deliveryInput().event,
+              type: "feedback.post.status_changed",
+            },
+          })
+        ) ?? Effect.never
+      );
+      expect(Exit.isFailure(result)).toBe(true);
+      expect(Exit.isFailure(result) && result.cause).toBeDefined();
+    })
+  );
+
+  it.effect("classifies a missing bot token as invalid configuration", () =>
+    Effect.gen(function* () {
+      const spy = makePostMessageSpy();
+      const registration = makeSlackProviderRegistration({
+        apiClient: spy.apiClient,
+        credentialResolver: {
+          loadSlackCredentials: () =>
+            Effect.fail(
+              new IntegrationProviderInvalidConfigurationError({
+                message: "no credentials",
+                provider: slackProviderKey,
+              })
+            ),
         },
-      ],
-      type: "context",
-    });
-  });
+        signingSecret,
+      });
+      const handler = registration.handlers[0];
+      const result = yield* Effect.exit(
+        handler?.deliver(deliveryInput()) ?? Effect.never
+      );
+      expect(Exit.isFailure(result)).toBe(true);
+    })
+  );
 
-  it("rejects unsupported event types as invalid configuration", async () => {
-    const spy = makePostMessageSpy();
-    const registration = makeSlackProviderRegistration({
-      apiClient: spy.apiClient,
-      credentialResolver,
-      signingSecret,
-    });
-    const handler = registration.handlers[0];
-    const result = await Effect.runPromiseExit(
-      handler?.deliver(
-        deliveryInput({
-          event: {
-            ...deliveryInput().event,
-            type: "feedback.post.status_changed",
+  it.effect("verifies inbound signatures before parsing", () =>
+    Effect.gen(function* () {
+      const registration = makeSlackProviderRegistration({
+        credentialResolver,
+        signingSecret,
+      });
+      const commands = registration.inboundHandlers.find(
+        (candidate) => candidate.capabilityKey === "commands"
+      );
+      expect(commands).toBeDefined();
+
+      const rawBody =
+        "team_id=T123&user_id=U123&text=hello&command=%2Ffeeblo&channel_id=C1&channel_name=general&user_name=alice&token=token&trigger_id=trig&response_url=https%3A%2F%2Fhooks.slack.com%2Fx&team_domain=acme";
+      const timestamp = String(Math.floor(Date.now() / 1000));
+      const signature = `v0=${createHmac(
+        "sha256",
+        Redacted.value(signingSecret)
+      )
+        .update(`v0:${timestamp}:${rawBody}`)
+        .digest("hex")}`;
+
+      const response = yield* (
+        commands?.handle({
+          headers: {
+            "x-slack-request-timestamp": timestamp,
+            "x-slack-signature": signature,
           },
-        })
-      ) ?? Effect.never
-    );
-    expect(Exit.isFailure(result)).toBe(true);
-    expect(Exit.isFailure(result) && result.cause).toBeDefined();
-  });
-
-  it("classifies a missing bot token as invalid configuration", async () => {
-    const spy = makePostMessageSpy();
-    const registration = makeSlackProviderRegistration({
-      apiClient: spy.apiClient,
-      credentialResolver: {
-        loadSlackCredentials: () =>
-          Effect.fail(
-            new IntegrationProviderInvalidConfigurationError({
-              message: "no credentials",
-              provider: slackProviderKey,
-            })
-          ),
-      },
-      signingSecret,
-    });
-    const handler = registration.handlers[0];
-    const result = await Effect.runPromiseExit(
-      handler?.deliver(deliveryInput()) ?? Effect.never
-    );
-    expect(Exit.isFailure(result)).toBe(true);
-  });
-
-  it("verifies inbound signatures before parsing", async () => {
-    const registration = makeSlackProviderRegistration({
-      credentialResolver,
-      signingSecret,
-    });
-    const commands = registration.inboundHandlers.find(
-      (candidate) => candidate.capabilityKey === "commands"
-    );
-    expect(commands).toBeDefined();
-
-    const rawBody =
-      "team_id=T123&user_id=U123&text=hello&command=%2Ffeeblo&channel_id=C1&channel_name=general&user_name=alice&token=token&trigger_id=trig&response_url=https%3A%2F%2Fhooks.slack.com%2Fx&team_domain=acme";
-    const timestamp = String(Math.floor(Date.now() / 1000));
-    const signature = `v0=${createHmac("sha256", Redacted.value(signingSecret))
-      .update(`v0:${timestamp}:${rawBody}`)
-      .digest("hex")}`;
-
-    const response = await Effect.runPromise(
-      commands?.handle({
-        headers: {
-          "x-slack-request-timestamp": timestamp,
-          "x-slack-signature": signature,
-        },
-        rawBody,
-      }) ?? Effect.never
-    );
-    expect(response.status).toBe(200);
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    const parsed = response.body as { kind: string; payload: { text: string } };
-    expect(parsed.kind).toBe("slash_command");
-    expect(parsed.payload.text).toBe("hello");
-  });
-
-  it("rejects unsigned inbound requests", async () => {
-    const registration = makeSlackProviderRegistration({
-      credentialResolver,
-      signingSecret,
-    });
-    const commands = registration.inboundHandlers.find(
-      (candidate) => candidate.capabilityKey === "commands"
-    );
-    const response = await Effect.runPromise(
-      commands?.handle({
-        headers: {},
-        rawBody: "team_id=T123",
-      }) ?? Effect.never
-    );
-    expect(response.status).toBe(401);
-  });
-
-  it("parses form-encoded interactive payloads (view submissions)", async () => {
-    const registration = makeSlackProviderRegistration({
-      credentialResolver,
-      signingSecret,
-    });
-    const interactive = registration.inboundHandlers.find(
-      (candidate) => candidate.capabilityKey === "message.action"
-    );
-    expect(interactive).toBeDefined();
-
-    const payload = {
-      type: "view_submission",
-      team: { id: "T123", domain: "acme" },
-      user: { id: "U123", name: "alice" },
-      view: {
-        id: "V123",
-        callback_id: "feeblo_feedback_modal",
-        private_metadata: '{"channelId":"C1"}',
-        state: { values: {} },
-      },
-    };
-    // Slack delivers interactive payloads as `payload=<urlencoded JSON>`.
-    const rawBody = `payload=${encodeURIComponent(JSON.stringify(payload))}`;
-    const timestamp = String(Math.floor(Date.now() / 1000));
-    const signature = `v0=${createHmac("sha256", Redacted.value(signingSecret))
-      .update(`v0:${timestamp}:${rawBody}`)
-      .digest("hex")}`;
-
-    const response = await Effect.runPromise(
-      interactive?.handle({
-        headers: {
-          "x-slack-request-timestamp": timestamp,
-          "x-slack-signature": signature,
-        },
-        rawBody,
-      }) ?? Effect.never
-    );
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    expect(response.status).toBe(200);
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    const parsed = response.body as { kind: string; payload: { type: string } };
-    expect(parsed.kind).toBe("interactive");
-    expect(parsed.payload.type).toBe("view_submission");
-  });
-
-  it("accepts raw JSON interactive payloads", async () => {
-    const registration = makeSlackProviderRegistration({
-      credentialResolver,
-      signingSecret,
-    });
-    const interactive = registration.inboundHandlers.find(
-      (candidate) => candidate.capabilityKey === "message.action"
-    );
-    const payload = {
-      type: "message_action",
-      callback_id: "send_to_feeblo",
-      team: { id: "T123", domain: "acme" },
-      user: { id: "U123", name: "alice" },
-      channel: { id: "C1", name: "general" },
-      message: { type: "message", text: "hello", ts: "1.2" },
-      trigger_id: "trigger",
-      response_url: "https://hooks.slack.com/x",
-    };
-    const rawBody = JSON.stringify(payload);
-    const timestamp = String(Math.floor(Date.now() / 1000));
-    const signature = `v0=${createHmac("sha256", Redacted.value(signingSecret))
-      .update(`v0:${timestamp}:${rawBody}`)
-      .digest("hex")}`;
-
-    const response = await Effect.runPromise(
-      interactive?.handle({
-        headers: {
-          "x-slack-request-timestamp": timestamp,
-          "x-slack-signature": signature,
-        },
-        rawBody,
-      }) ?? Effect.never
+          rawBody,
+        }) ?? Effect.never
+      );
+      expect(response.status).toBe(200);
       // SAFETY: The endpoint/API contract guarantees this response shape.
-    );
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    expect(response.status).toBe(200);
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    const parsed = response.body as { kind: string; payload: { type: string } };
-    expect(parsed.payload.type).toBe("message_action");
-  });
+      const parsed = response.body as {
+        kind: string;
+        payload: { text: string };
+      };
+      expect(parsed.kind).toBe("slash_command");
+      expect(parsed.payload.text).toBe("hello");
+    })
+  );
+
+  it.effect("rejects unsigned inbound requests", () =>
+    Effect.gen(function* () {
+      const registration = makeSlackProviderRegistration({
+        credentialResolver,
+        signingSecret,
+      });
+      const commands = registration.inboundHandlers.find(
+        (candidate) => candidate.capabilityKey === "commands"
+      );
+      const response = yield* (
+        commands?.handle({
+          headers: {},
+          rawBody: "team_id=T123",
+        }) ?? Effect.never
+      );
+      expect(response.status).toBe(401);
+    })
+  );
+
+  it.effect("parses form-encoded interactive payloads (view submissions)", () =>
+    Effect.gen(function* () {
+      const registration = makeSlackProviderRegistration({
+        credentialResolver,
+        signingSecret,
+      });
+      const interactive = registration.inboundHandlers.find(
+        (candidate) => candidate.capabilityKey === "message.action"
+      );
+      expect(interactive).toBeDefined();
+
+      const payload = {
+        type: "view_submission",
+        team: { id: "T123", domain: "acme" },
+        user: { id: "U123", name: "alice" },
+        view: {
+          id: "V123",
+          callback_id: "feeblo_feedback_modal",
+          private_metadata: '{"channelId":"C1"}',
+          state: { values: {} },
+        },
+      };
+      // Slack delivers interactive payloads as `payload=<urlencoded JSON>`.
+      const rawBody = `payload=${encodeURIComponent(JSON.stringify(payload))}`;
+      const timestamp = String(Math.floor(Date.now() / 1000));
+      const signature = `v0=${createHmac(
+        "sha256",
+        Redacted.value(signingSecret)
+      )
+        .update(`v0:${timestamp}:${rawBody}`)
+        .digest("hex")}`;
+
+      const response = yield* (
+        interactive?.handle({
+          headers: {
+            "x-slack-request-timestamp": timestamp,
+            "x-slack-signature": signature,
+          },
+          rawBody,
+        }) ?? Effect.never
+      );
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      expect(response.status).toBe(200);
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      const parsed = response.body as {
+        kind: string;
+        payload: { type: string };
+      };
+      expect(parsed.kind).toBe("interactive");
+      expect(parsed.payload.type).toBe("view_submission");
+    })
+  );
+
+  it.effect("accepts raw JSON interactive payloads", () =>
+    Effect.gen(function* () {
+      const registration = makeSlackProviderRegistration({
+        credentialResolver,
+        signingSecret,
+      });
+      const interactive = registration.inboundHandlers.find(
+        (candidate) => candidate.capabilityKey === "message.action"
+      );
+      const payload = {
+        type: "message_action",
+        callback_id: "send_to_feeblo",
+        team: { id: "T123", domain: "acme" },
+        user: { id: "U123", name: "alice" },
+        channel: { id: "C1", name: "general" },
+        message: { type: "message", text: "hello", ts: "1.2" },
+        trigger_id: "trigger",
+        response_url: "https://hooks.slack.com/x",
+      };
+      const rawBody = JSON.stringify(payload);
+      const timestamp = String(Math.floor(Date.now() / 1000));
+      const signature = `v0=${createHmac(
+        "sha256",
+        Redacted.value(signingSecret)
+      )
+        .update(`v0:${timestamp}:${rawBody}`)
+        .digest("hex")}`;
+
+      const response = yield* (
+        interactive?.handle({
+          headers: {
+            "x-slack-request-timestamp": timestamp,
+            "x-slack-signature": signature,
+          },
+          rawBody,
+        }) ?? Effect.never
+      );
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      expect(response.status).toBe(200);
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      const parsed = response.body as {
+        kind: string;
+        payload: { type: string };
+      };
+      expect(parsed.payload.type).toBe("message_action");
+    })
+  );
 });

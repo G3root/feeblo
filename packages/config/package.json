@@ -7,6 +7,9 @@
     "./effect": "./src/effect.ts",
     "./tsconfig.base.json": "./tsconfig.base.json"
   },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "effect": "catalog:"
   },

@@ -24,6 +24,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  checks:
+    name: Typecheck, Lint, Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+          disable-telemetry: true
+          allowed-endpoints: >
+            api.github.com:443 github.com:443 nodejs.org:443
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node
+
+      # `turbo run check` runs each package's `tsc --noEmit`, then the
+      # type-aware Oxlint pass (which owns the Effect diagnostics), then the
+      # formatter check. It needs no database, no build output, and no env.
+      - name: Check and test
+        run: pnpm check
+
   build_app:
     name: Build App
     runs-on: ubuntu-latest

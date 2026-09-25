@@ -184,7 +184,8 @@
     "ladle:build": "ladle build",
     "machine-translate": "inlang machine translate --project ../../project.inlang",
     "test": "vitest run --config vitest.config.ts",
-    "test:watch": "vitest --config vitest.config.ts"
+    "test:watch": "vitest --config vitest.config.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@feeblo/domain": "workspace:*",

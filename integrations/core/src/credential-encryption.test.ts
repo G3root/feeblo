@@ -1,8 +1,8 @@
+import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
-import { describe, expect, it } from "vitest";
 
 import {
   decryptIntegrationCredentialMaterial,
@@ -18,22 +18,20 @@ const TestCredentialMaterial = Schema.Struct({
 });
 
 describe("integration credential material", () => {
-  it("round-trips material through encrypt and decrypt", async () => {
-    const ciphertext = await Effect.runPromise(
-      encryptIntegrationCredentialMaterial(
+  it.effect("round-trips material through encrypt and decrypt", () =>
+    Effect.gen(function* () {
+      const ciphertext = yield* encryptIntegrationCredentialMaterial(
         encryptionKey,
         TestCredentialMaterial,
         {
           oauthState: "state-nonce",
           secret: "provider-secret",
         }
-      )
-    );
-    expect(ciphertext).not.toContain("state-nonce");
-    expect(ciphertext).not.toContain("provider-secret");
+      );
+      expect(ciphertext).not.toContain("state-nonce");
+      expect(ciphertext).not.toContain("provider-secret");
 
-    const decrypted = await Effect.runPromise(
-      decryptIntegrationCredentialMaterial(
+      const decrypted = yield* decryptIntegrationCredentialMaterial(
         encryptionKey,
         TestCredentialMaterial,
         ciphertext,
@@ -45,57 +43,63 @@ describe("integration credential material", () => {
             ? undefined
             : { oauthState: material.oauthState }),
         })
-      )
-    );
-    expect(decrypted.oauthState).toBe("state-nonce");
-    if (decrypted.secret === undefined) {
-      throw new Error("expected secret");
-    }
-    expect(Redacted.value(decrypted.secret)).toBe("provider-secret");
-  });
+      );
+      expect(decrypted.oauthState).toBe("state-nonce");
+      if (decrypted.secret === undefined) {
+        throw new Error("expected secret");
+      }
+      expect(Redacted.value(decrypted.secret)).toBe("provider-secret");
+    })
+  );
 
-  it("rejects a short encryption key", async () => {
-    const result = await Effect.runPromiseExit(
-      encryptIntegrationCredentialMaterial(
-        Redacted.make("short"),
-        TestCredentialMaterial,
-        {}
-      )
-    );
-    expect(Exit.isFailure(result)).toBe(true);
-  });
+  it.effect("rejects a short encryption key", () =>
+    Effect.gen(function* () {
+      const result = yield* Effect.exit(
+        encryptIntegrationCredentialMaterial(
+          Redacted.make("short"),
+          TestCredentialMaterial,
+          {}
+        )
+      );
+      expect(Exit.isFailure(result)).toBe(true);
+    })
+  );
 
-  it("fails to decrypt malformed ciphertext", async () => {
-    const result = await Effect.runPromiseExit(
-      decryptIntegrationCredentialMaterial(
-        encryptionKey,
-        TestCredentialMaterial,
-        "not-ciphertext",
-        (material) => material
-      )
-    );
-    expect(Exit.isFailure(result)).toBe(true);
-  });
+  it.effect("fails to decrypt malformed ciphertext", () =>
+    Effect.gen(function* () {
+      const result = yield* Effect.exit(
+        decryptIntegrationCredentialMaterial(
+          encryptionKey,
+          TestCredentialMaterial,
+          "not-ciphertext",
+          (material) => material
+        )
+      );
+      expect(Exit.isFailure(result)).toBe(true);
+    })
+  );
 
-  it("fails to decrypt material that decodes against the wrong schema", async () => {
-    const ciphertext = await Effect.runPromise(
-      encryptIntegrationCredentialMaterial(
-        encryptionKey,
-        TestCredentialMaterial,
-        {
-          secret: "provider-secret",
-        }
-      )
-    );
-    const WrongMaterial = Schema.Struct({ required: Schema.String });
-    const result = await Effect.runPromiseExit(
-      decryptIntegrationCredentialMaterial(
-        encryptionKey,
-        WrongMaterial,
-        ciphertext,
-        (material) => material
-      )
-    );
-    expect(Exit.isFailure(result)).toBe(true);
-  });
+  it.effect(
+    "fails to decrypt material that decodes against the wrong schema",
+    () =>
+      Effect.gen(function* () {
+        const ciphertext = yield* encryptIntegrationCredentialMaterial(
+          encryptionKey,
+          TestCredentialMaterial,
+          {
+            secret: "provider-secret",
+          }
+        );
+        const WrongMaterial = Schema.Struct({ required: Schema.String });
+        const result = yield* Effect.exit(
+          decryptIntegrationCredentialMaterial(
+            encryptionKey,
+            WrongMaterial,
+            ciphertext,
+            (material) => material
+          )
+        );
+        expect(Exit.isFailure(result)).toBe(true);
+      })
+  );
 });

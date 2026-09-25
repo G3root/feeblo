@@ -22,7 +22,8 @@
     "./slack-user-service": "./src/slack-user-service.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@feeblo/db": "workspace:*",

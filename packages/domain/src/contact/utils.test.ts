@@ -292,41 +292,36 @@ describe("parseContactCustomAttributes", () => {
     })
   );
 
-  it("fails when required attribute is missing", async () => {
-    const def = makeContactDef({
-      key: "requiredField",
-      isRequired: true,
-    });
-    await expect(
-      Effect.runPromise(parseContactCustomAttributes({}, [def]))
-    ).rejects.toBeInstanceOf(DataValidationError);
-    await expect(
-      Effect.runPromise(parseContactCustomAttributes({}, [def]))
-    ).rejects.toThrow('Missing required attribute "requiredField"');
-  });
+  it.effect("fails when required attribute is missing", () =>
+    Effect.gen(function* () {
+      const def = makeContactDef({
+        key: "requiredField",
+        isRequired: true,
+      });
+      const error = yield* Effect.flip(parseContactCustomAttributes({}, [def]));
+      expect(error).toBeInstanceOf(DataValidationError);
+      expect(error.message).toContain(
+        'Missing required attribute "requiredField"'
+      );
+    })
+  );
 
-  it("fails on invalid value for INTEGER attribute", async () => {
-    const def = makeContactDef({
-      key: "age",
-      type: "INTEGER",
-    });
-    await expect(
-      Effect.runPromise(
+  it.effect("fails on invalid value for INTEGER attribute", () =>
+    Effect.gen(function* () {
+      const def = makeContactDef({
+        key: "age",
+        type: "INTEGER",
+      });
+      const error = yield* Effect.flip(
         parseContactCustomAttributes(
           { customFields: { age: "not-a-number" } },
           [def]
         )
-      )
-    ).rejects.toBeInstanceOf(DataValidationError);
-    await expect(
-      Effect.runPromise(
-        parseContactCustomAttributes(
-          { customFields: { age: "not-a-number" } },
-          [def]
-        )
-      )
-    ).rejects.toThrow('Invalid value for attribute "age"');
-  });
+      );
+      expect(error).toBeInstanceOf(DataValidationError);
+      expect(error.message).toContain('Invalid value for attribute "age"');
+    })
+  );
 
   it.effect("validates INTEGER attribute within min/max range", () =>
     Effect.gen(function* () {
@@ -345,18 +340,19 @@ describe("parseContactCustomAttributes", () => {
     })
   );
 
-  it("fails when INTEGER is out of range", async () => {
-    const def = makeContactDef({
-      key: "score",
-      type: "INTEGER",
-      config: { min: 1, max: 100 },
-    });
-    await expect(
-      Effect.runPromise(
+  it.effect("fails when INTEGER is out of range", () =>
+    Effect.gen(function* () {
+      const def = makeContactDef({
+        key: "score",
+        type: "INTEGER",
+        config: { min: 1, max: 100 },
+      });
+      const error = yield* Effect.flip(
         parseContactCustomAttributes({ customFields: { score: 101 } }, [def])
-      )
-    ).rejects.toBeInstanceOf(DataValidationError);
-  });
+      );
+      expect(error).toBeInstanceOf(DataValidationError);
+    })
+  );
 
   it.effect("parses a BOOLEAN attribute", () =>
     Effect.gen(function* () {
@@ -408,28 +404,22 @@ describe("parseContactCustomAttributes", () => {
       })
   );
 
-  it("rejects a non-date string for a DATE attribute", async () => {
-    const def = makeContactDef({
-      key: "birthday",
-      type: "DATE",
-    });
-    await expect(
-      Effect.runPromise(
+  it.effect("rejects a non-date string for a DATE attribute", () =>
+    Effect.gen(function* () {
+      const def = makeContactDef({
+        key: "birthday",
+        type: "DATE",
+      });
+      const error = yield* Effect.flip(
         parseContactCustomAttributes(
           { customFields: { birthday: "not-a-date" } },
           [def]
         )
-      )
-    ).rejects.toBeInstanceOf(DataValidationError);
-    await expect(
-      Effect.runPromise(
-        parseContactCustomAttributes(
-          { customFields: { birthday: "not-a-date" } },
-          [def]
-        )
-      )
-    ).rejects.toThrow('Invalid value for attribute "birthday"');
-  });
+      );
+      expect(error).toBeInstanceOf(DataValidationError);
+      expect(error.message).toContain('Invalid value for attribute "birthday"');
+    })
+  );
 
   it.effect("allows null value for non-required attribute", () =>
     Effect.gen(function* () {
@@ -478,32 +468,34 @@ describe("parseContactCustomAttributes", () => {
     })
   );
 
-  it("fails when TEXT does not match pattern", async () => {
-    const def = makeContactDef({
-      key: "code",
-      type: "TEXT",
-      config: { pattern: "^[A-Z]{3}$" },
-    });
-    await expect(
-      Effect.runPromise(
+  it.effect("fails when TEXT does not match pattern", () =>
+    Effect.gen(function* () {
+      const def = makeContactDef({
+        key: "code",
+        type: "TEXT",
+        config: { pattern: "^[A-Z]{3}$" },
+      });
+      const error = yield* Effect.flip(
         parseContactCustomAttributes({ customFields: { code: "abc" } }, [def])
-      )
-    ).rejects.toBeInstanceOf(DataValidationError);
-  });
+      );
+      expect(error).toBeInstanceOf(DataValidationError);
+    })
+  );
 
-  it("reports invalid TEXT pattern syntax as a validation failure", async () => {
-    const def = makeContactDef({
-      key: "code",
-      type: "TEXT",
-      config: { pattern: "[" },
-    });
+  it.effect("reports invalid TEXT pattern syntax as a validation failure", () =>
+    Effect.gen(function* () {
+      const def = makeContactDef({
+        key: "code",
+        type: "TEXT",
+        config: { pattern: "[" },
+      });
 
-    await expect(
-      Effect.runPromise(
+      const error = yield* Effect.flip(
         parseContactCustomAttributes({ customFields: { code: "ABC" } }, [def])
-      )
-    ).rejects.toThrow("configured validation pattern");
-  });
+      );
+      expect(error.message).toContain("configured validation pattern");
+    })
+  );
 });
 
 describe("parseCompanyCustomAttributes", () => {
@@ -563,15 +555,16 @@ describe("parseCompanyCustomAttributes", () => {
     })
   );
 
-  it("fails when required company attribute is missing", async () => {
-    const def = makeCompanyDef({
-      key: "industry",
-      isRequired: true,
-    });
-    await expect(
-      Effect.runPromise(parseCompanyCustomAttributes({}, [def]))
-    ).rejects.toBeInstanceOf(DataValidationError);
-  });
+  it.effect("fails when required company attribute is missing", () =>
+    Effect.gen(function* () {
+      const def = makeCompanyDef({
+        key: "industry",
+        isRequired: true,
+      });
+      const error = yield* Effect.flip(parseCompanyCustomAttributes({}, [def]));
+      expect(error).toBeInstanceOf(DataValidationError);
+    })
+  );
 });
 
 describe("parsePersonAttributes", () => {
@@ -595,30 +588,28 @@ describe("parsePersonAttributes", () => {
     })
   );
 
-  it("fails when required contact fields are missing", async () => {
-    await expect(
-      Effect.runPromise(parsePersonAttributes({}, contactDefs, companyDefs))
-    ).rejects.toBeInstanceOf(DataValidationError);
-    await expect(
-      Effect.runPromise(parsePersonAttributes({}, contactDefs, companyDefs))
-    ).rejects.toThrow("Invalid contact fields");
-  });
+  it.effect("fails when required contact fields are missing", () =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(
+        parsePersonAttributes({}, contactDefs, companyDefs)
+      );
+      expect(error).toBeInstanceOf(DataValidationError);
+      expect(error.message).toContain("Invalid contact fields");
+    })
+  );
 
-  it("fails on invalid email type", async () => {
-    // SAFETY: The test intentionally feeds a malformed JWT payload whose `sub`
-    // claim is a number; parsing at the boundary keeps the single cast honest.
-    const malformedPayload = JSON.parse('{"sub":123}') as JWTPayload;
-    await expect(
-      Effect.runPromise(
+  it.effect("fails on invalid email type", () =>
+    Effect.gen(function* () {
+      // SAFETY: The test intentionally feeds a malformed JWT payload whose `sub`
+      // claim is a number; parsing at the boundary keeps the single cast honest.
+      const malformedPayload = JSON.parse('{"sub":123}') as JWTPayload;
+      const error = yield* Effect.flip(
         parsePersonAttributes(malformedPayload, contactDefs, companyDefs)
-      )
-    ).rejects.toBeInstanceOf(DataValidationError);
-    await expect(
-      Effect.runPromise(
-        parsePersonAttributes(malformedPayload, contactDefs, companyDefs)
-      )
-    ).rejects.toThrow("Invalid contact fields");
-  });
+      );
+      expect(error).toBeInstanceOf(DataValidationError);
+      expect(error.message).toContain("Invalid contact fields");
+    })
+  );
 
   it.effect("parses contact custom attributes alongside common fields", () =>
     Effect.gen(function* () {
@@ -736,11 +727,14 @@ describe("parsePersonAttributes", () => {
     })
   );
 
-  it("fails for non-object data (null)", async () => {
-    await expect(
-      Effect.runPromise(parsePersonAttributes(null, contactDefs, companyDefs))
-    ).rejects.toBeInstanceOf(DataValidationError);
-  });
+  it.effect("fails for non-object data (null)", () =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(
+        parsePersonAttributes(null, contactDefs, companyDefs)
+      );
+      expect(error).toBeInstanceOf(DataValidationError);
+    })
+  );
 
   it.effect("ignores excess properties on common fields", () =>
     Effect.gen(function* () {

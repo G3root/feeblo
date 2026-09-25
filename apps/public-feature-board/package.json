@@ -13,7 +13,8 @@
     "build:paraglide": "paraglide-js compile --project ../../project.inlang --outdir ./src/paraglide --strategy baseLocale --emit-ts-declarations",
     "dev": "paraglide-js compile --project ../../project.inlang --outdir ./src/paraglide --strategy baseLocale --emit-ts-declarations --watch",
     "machine-translate": "inlang machine translate --project ../../project.inlang",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@effect/atom-react": "catalog:",

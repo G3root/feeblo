@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/Effect-TS/language-service/refs/heads/main/schema.json",
+  "$schema": "./node_modules/@effect/tsgo/schema.json",
   "compilerOptions": {
     "target": "ESNext",
     "module": "ESNext",
@@ -25,8 +25,11 @@
     "plugins": [
       {
         "name": "@effect/language-service",
-        "ignoreEffectSuggestionsInTscExitCode": true,
-        "ignoreEffectWarningsInTscExitCode": true
+        // Effect diagnostics are reported by Oxlint (`effecttsgo/*` rules in
+        // oxlint.config.ts), which @effect/tsgo patches into both tools.
+        // Reporting them here too would double every finding. tsc keeps the
+        // language service for refactors, quickinfo, and completions.
+        "diagnostics": false
       }
     ],
     "types": ["node", "@cloudflare/workers-types"]

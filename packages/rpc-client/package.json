@@ -8,6 +8,9 @@
       "default": "./src/index.ts"
     }
   },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@feeblo/domain": "workspace:*",
     "effect": "catalog:"
