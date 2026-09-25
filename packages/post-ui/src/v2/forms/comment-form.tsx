@@ -99,15 +99,14 @@ export function useCommentComposerStatusOptions(): readonly TPostStatusOption[] 
     collections: { postStatusCollection },
   } = usePostCollections();
 
-  const { data: postStatuses } = useLiveQuery(
-    (q) =>
+  const { data: postStatuses } = useLiveQuery({
+    query: (q) =>
       q
         .from({ postStatus: postStatusCollection })
         .where(({ postStatus }) =>
           eq(postStatus.organizationId, organizationId)
         ),
-    [organizationId]
-  );
+  });
 
   return useMemo(
     () =>

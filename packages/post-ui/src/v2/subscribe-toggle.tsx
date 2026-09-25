@@ -44,8 +44,8 @@ export function SubscribeButton() {
   const disabled = isLocked || isMerged;
 
   const { data: hasUserSubscribed, isLoading: isSubscriptionLoading } =
-    useLiveQuery(
-      (q) => {
+    useLiveQuery({
+      query: (q) => {
         if (!(postId && session)) {
           return undefined;
         }
@@ -61,8 +61,7 @@ export function SubscribeButton() {
           .select(({ subscription }) => ({ id: subscription.id }))
           .findOne();
       },
-      [organizationId, postId, session?.user.id]
-    );
+    });
 
   if (isSubscriptionLoading) {
     return null;

@@ -41,8 +41,8 @@ export function ChangeLogDetailPage() {
     data: changelog,
     isLoading,
     isError,
-  } = useLiveQuery(
-    (q) =>
+  } = useLiveQuery({
+    query: (q) =>
       q
         .from({ changelog: publicChangelogDetailCollection })
         .where(({ changelog }) =>
@@ -52,11 +52,10 @@ export function ChangeLogDetailPage() {
           )
         )
         .findOne(),
-    [site.organizationId, changelogSlug]
-  );
+  });
 
-  const { data: categoryLinks = [] } = useLiveQuery(
-    (q) => {
+  const { data: categoryLinks = [] } = useLiveQuery({
+    query: (q) => {
       if (!changelog) {
         return undefined;
       }
@@ -71,8 +70,7 @@ export function ChangeLogDetailPage() {
         )
         .select(({ link }) => ({ categoryId: link.categoryId }));
     },
-    [changelog?.id, site.organizationId]
-  );
+  });
   const categoryIds = categoryLinks.map((link) => link.categoryId);
 
   // Linked posts ship inside the single-entry response (`ChangelogDetail`),

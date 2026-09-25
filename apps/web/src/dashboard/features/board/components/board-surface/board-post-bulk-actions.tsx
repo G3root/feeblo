@@ -42,7 +42,6 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
 function useCanBulkDeleteSelectedPosts(): boolean {
   const organizationId = useOrganizationId();
   const selectedPostIds = useSelectedPostIds();
-  const selectionKey = selectedPostIds.join(",");
 
   const { allowed: canManageAllPosts } = usePolicy(
     hasPermission(organizationId, "posts.*")
@@ -55,8 +54,8 @@ function useCanBulkDeleteSelectedPosts(): boolean {
   const contributorCase =
     !canManageAllPosts && isMember && selectedPostIds.length > 0;
   const { deleteEligibilityCollection } = useDashboardCollections();
-  const { data: eligibleRows } = useLiveQuery(
-    (q) => {
+  const { data: eligibleRows } = useLiveQuery({
+    query: (q) => {
       if (!contributorCase || !deleteEligibilityCollection) {
         return undefined;
       }
@@ -70,9 +69,7 @@ function useCanBulkDeleteSelectedPosts(): boolean {
         )
         .select(({ eligibility }) => ({ postId: eligibility.postId }));
     },
-    // selectionKey encodes selectedPostIds as the query re-key.
-    [contributorCase, deleteEligibilityCollection, organizationId, selectionKey]
-  );
+  });
 
   if (canManageAllPosts) {
     return true;

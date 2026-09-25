@@ -91,32 +91,29 @@ function ContactPage() {
   const editDialogStore = useContactEditDialogContext();
   const deleteDialogStore = useContactDeleteDialogContext();
   const companyEditDialogStore = useCompanyEditDialogContext();
-  const contactsQuery = useLiveQuery(
-    (q) =>
+  const contactsQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ contact: contactCollection })
         .where(({ contact }) => eq(contact.organizationId, organizationId))
         .orderBy(({ contact }) => contact.updatedAt, "desc"),
-    [organizationId]
-  );
+  });
   const contacts = contactsQuery.data ?? [];
-  const { data: definitions = [] } = useLiveQuery(
-    (q) =>
+  const { data: definitions = [] } = useLiveQuery({
+    query: (q) =>
       q
         .from({ definition: contactAttributeDefinitionCollection })
         .where(({ definition }) =>
           eq(definition.organizationId, organizationId)
         )
         .orderBy(({ definition }) => definition.createdAt, "asc"),
-    [organizationId]
-  );
-  const { data: companies = [] } = useLiveQuery(
-    (q) =>
+  });
+  const { data: companies = [] } = useLiveQuery({
+    query: (q) =>
       q
         .from({ company: companyCollection })
         .where(({ company }) => eq(company.organizationId, organizationId)),
-    [organizationId]
-  );
+  });
   const companiesById = new Map(companies.map((c) => [c.id, c]));
 
   const { entitlements } = useEntitlements();

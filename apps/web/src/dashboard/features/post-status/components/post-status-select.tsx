@@ -15,15 +15,14 @@ export function PostStatusSelect({ disabled = false }: { disabled?: boolean }) {
   const isDisabled = disabled || isLocked || isMerged || !canChangeStatus;
   const { postCollection, postStatusCollection } = useDashboardCollections();
 
-  const { data: postStatuses } = useLiveQuery(
-    (q) =>
+  const { data: postStatuses } = useLiveQuery({
+    query: (q) =>
       q
         .from({ postStatus: postStatusCollection })
         .where(({ postStatus }) =>
           eq(postStatus.organizationId, organizationId)
         ),
-    [organizationId]
-  );
+  });
 
   if (!postStatuses) {
     return null;

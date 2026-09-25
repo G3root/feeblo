@@ -20,7 +20,7 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { useRenameBoardDialogContext } from "../dialog-stores";
-import { boardFormOpts } from "../shared-form";
+import { type BoardFormValues, boardFormOpts } from "../shared-form";
 import { BoardVisibilityField } from "./board-visibility-field";
 
 export function RenameBoardDialog() {
@@ -46,10 +46,9 @@ function RenameBoardForm() {
   const { boardCollection } = useDashboardCollections();
   const store = useRenameBoardDialogContext();
   const boardId = useSelector(store, (state) => state.context.data.boardId);
-  const navigate = useNavigate();
 
-  const { data } = useLiveQuery(
-    (q) =>
+  const { data } = useLiveQuery({
+    query: (q) =>
       q
         .from({ board: boardCollection })
         .where((board) =>
@@ -60,10 +59,23 @@ function RenameBoardForm() {
         )
         .orderBy((board) => board.board.createdAt, "desc")
         .limit(1),
-    [boardId]
-  );
+  });
 
   const board = data[0];
+
+  if (!board) {
+    return null;
+  }
+
+  return <RenameBoardFormFields board={board} />;
+}
+
+function RenameBoardFormFields({ board }: { board: BoardFormValues }) {
+  const organizationId = useOrganizationId();
+  const { boardCollection } = useDashboardCollections();
+  const store = useRenameBoardDialogContext();
+  const boardId = useSelector(store, (state) => state.context.data.boardId);
+  const navigate = useNavigate();
 
   const form = useAppForm({
     ...boardFormOpts,

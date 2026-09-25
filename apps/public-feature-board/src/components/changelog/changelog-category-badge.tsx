@@ -23,14 +23,13 @@ export function ChangelogCategoryBadges({
 function ChangelogCategoryBadge({ categoryId }: { categoryId: string }) {
   const { publicChangelogCategoryCollection } = usePublicCollections();
 
-  const categoryQuery = useLiveQuery(
-    (q) =>
+  const categoryQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ category: publicChangelogCategoryCollection })
         .where(({ category }) => eq(category.id, categoryId))
         .findOne(),
-    [categoryId]
-  );
+  });
 
   const category = categoryQuery.data;
 

@@ -701,18 +701,17 @@ export function ChangelogEditorCategoryField() {
   const { changelogCategoryCollection, changelogCategoryLinkCollection } =
     useDashboardCollections();
 
-  const categoriesQuery = useLiveQuery(
-    (q) =>
+  const categoriesQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ category: changelogCategoryCollection })
         .where(({ category }) => eq(category.organizationId, organizationId))
         .orderBy(({ category }) => category.createdAt, "asc"),
-    [organizationId]
-  );
+  });
   const categories = categoriesQuery.data ?? [];
 
-  const linksQuery = useLiveQuery(
-    (q) =>
+  const linksQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ link: changelogCategoryLinkCollection })
         .where(({ link }) =>
@@ -721,8 +720,7 @@ export function ChangelogEditorCategoryField() {
             eq(link.organizationId, organizationId)
           )
         ),
-    [organizationId, changelog.id]
-  );
+  });
   const links = linksQuery.data ?? [];
 
   const selectedCategoryIds = new Set(links.map((link) => link.categoryId));

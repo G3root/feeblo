@@ -69,8 +69,8 @@ function ContactEditForm() {
   } = useDashboardCollections();
   const store = useContactEditDialogContext();
   const contactId = useSelector(store, (state) => state.context.data.contactId);
-  const { data } = useLiveQuery(
-    (q) =>
+  const { data } = useLiveQuery({
+    query: (q) =>
       q
         .from({ contact: contactCollection })
         .where(({ contact }) =>
@@ -81,34 +81,30 @@ function ContactEditForm() {
         )
         .orderBy(({ contact }) => contact.updatedAt, "desc")
         .limit(1),
-    [contactId, organizationId]
-  );
+  });
   const contact = data[0];
-  const definitionsQuery = useLiveQuery(
-    (q) =>
+  const definitionsQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ definition: contactAttributeDefinitionCollection })
         .where(({ definition }) =>
           eq(definition.organizationId, organizationId)
         )
         .orderBy(({ definition }) => definition.createdAt, "asc"),
-    [organizationId]
-  );
-  const attributeValuesQuery = useLiveQuery(
-    (q) =>
+  });
+  const attributeValuesQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ value: contactAttributeValueCollection })
         .where(({ value }) => eq(value.contactId, contactId)),
-    [contactId]
-  );
-  const companiesQuery = useLiveQuery(
-    (q) =>
+  });
+  const companiesQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ company: companyCollection })
         .where(({ company }) => eq(company.organizationId, organizationId))
         .orderBy(({ company }) => company.name, "asc"),
-    [organizationId]
-  );
+  });
 
   if (
     !contact ||

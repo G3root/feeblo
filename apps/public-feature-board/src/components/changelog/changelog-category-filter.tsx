@@ -29,16 +29,15 @@ export function ChangelogCategoryFilter() {
     (state) => state.context.selectedCategoryIds
   );
 
-  const { data: categories = [] } = useLiveQuery(
-    (q) =>
+  const { data: categories = [] } = useLiveQuery({
+    query: (q) =>
       q
         .from({ category: publicChangelogCategoryCollection })
         .where(({ category }) =>
           eq(category.organizationId, site.organizationId)
         )
         .orderBy(({ category }) => category.name, "asc"),
-    [site.organizationId]
-  );
+  });
 
   const selectedCategorySet = new Set(selectedCategoryIds);
 

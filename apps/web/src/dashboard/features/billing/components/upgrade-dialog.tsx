@@ -72,11 +72,12 @@ function UpgradePlanDialogPopup() {
 
   const catalog = usePlanCatalog();
 
-  const { data: workspacePlans, isLoading: plansLoading } = useLiveQuery((q) =>
-    q
-      .from({ plan: workspacePlanCollection })
-      .where(({ plan }) => eq(plan.organizationId, organizationId))
-  );
+  const { data: workspacePlans, isLoading: plansLoading } = useLiveQuery({
+    query: (q) =>
+      q
+        .from({ plan: workspacePlanCollection })
+        .where(({ plan }) => eq(plan.organizationId, organizationId)),
+  });
 
   if (catalog.isPending || plansLoading) {
     return <UpgradePlanDialogSkeleton />;

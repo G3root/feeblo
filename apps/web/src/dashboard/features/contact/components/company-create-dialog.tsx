@@ -68,33 +68,30 @@ function CompanyCreateForm() {
   const store = useCompanyCreateDialogContext();
   const upgradePlanStore = useUpgradePlanDialogContext();
   const { entitlements } = useEntitlements();
-  const { data: companies = [] } = useLiveQuery(
-    (q) =>
+  const { data: companies = [] } = useLiveQuery({
+    query: (q) =>
       q
         .from({ company: companyCollection })
         .where(({ company }) => eq(company.organizationId, organizationId)),
-    [organizationId]
-  );
-  const { data: contacts = [] } = useLiveQuery(
-    (q) =>
+  });
+  const { data: contacts = [] } = useLiveQuery({
+    query: (q) =>
       q
         .from({ contact: contactCollection })
         .where(({ contact }) => eq(contact.organizationId, organizationId)),
-    [organizationId]
-  );
+  });
   const crmLimit = entitlements.limits.crmEntries;
   const totalCrmEntries = companies.length + contacts.length;
   const atLimit = crmLimit !== null && totalCrmEntries >= crmLimit;
-  const definitionsQuery = useLiveQuery(
-    (q) =>
+  const definitionsQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ definition: companyAttributeDefinitionCollection })
         .where(({ definition }) =>
           eq(definition.organizationId, organizationId)
         )
         .orderBy(({ definition }) => definition.createdAt, "asc"),
-    [organizationId]
-  );
+  });
   const definitions = definitionsQuery.data ?? [];
   const form = useAppForm({
     defaultValues: { attributes: {}, externalId: "", name: "" },

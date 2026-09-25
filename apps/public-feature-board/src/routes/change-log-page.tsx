@@ -66,8 +66,8 @@ export function ChangelogPage() {
   const normalizedSearch = search.trim();
   const hasActiveCategoryFilter = selectedCategoryIds.length > 0;
 
-  const { data: matchingLinks = [] } = useLiveQuery(
-    (q) =>
+  const { data: matchingLinks = [] } = useLiveQuery({
+    query: (q) =>
       q
         .from({ link: publicChangelogCategoryLinkCollection })
         .where(({ link }) =>
@@ -77,8 +77,7 @@ export function ChangelogPage() {
           )
         )
         .select(({ link }) => ({ changelogId: link.changelogId })),
-    [site.organizationId, ...selectedCategoryIds]
-  );
+  });
 
   const uniqueChangelogIds = useMemo(
     () => [...new Set(matchingLinks.map((l) => l.changelogId))],
@@ -89,8 +88,8 @@ export function ChangelogPage() {
     data: changelogs = [],
     isLoading,
     isError,
-  } = useLiveQuery(
-    (q) =>
+  } = useLiveQuery({
+    query: (q) =>
       q
         .from({ changelog: publicChangelogCollection })
         .where(({ changelog }) => {
@@ -113,21 +112,14 @@ export function ChangelogPage() {
           return condition;
         })
         .orderBy(({ changelog }) => changelog.publishedAt, "desc"),
-    [
-      site.organizationId,
-      normalizedSearch,
-      hasActiveCategoryFilter,
-      uniqueChangelogIds,
-    ]
-  );
+  });
 
-  const { data: categoryLinks = [] } = useLiveQuery(
-    (q) =>
+  const { data: categoryLinks = [] } = useLiveQuery({
+    query: (q) =>
       q
         .from({ link: publicChangelogCategoryLinkCollection })
         .where(({ link }) => eq(link.organizationId, site.organizationId)),
-    [site.organizationId]
-  );
+  });
   const categoryIdsByChangelog = new Map<string, string[]>();
   for (const link of categoryLinks) {
     const ids = categoryIdsByChangelog.get(link.changelogId) ?? [];

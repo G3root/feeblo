@@ -15,16 +15,15 @@ export const usePrivilegedMemberLimit = () => {
   );
   const { entitlements } = useEntitlements();
 
-  const membersQuery = useLiveQuery(
-    (q) =>
+  const membersQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ member: membersCollection })
         .where(({ member }) => eq(member.organizationId, organizationId)),
-    [organizationId]
-  );
+  });
 
-  const invitationsQuery = useLiveQuery(
-    (q) => {
+  const invitationsQuery = useLiveQuery({
+    query: (q) => {
       if (isPolicyPending || !canListInvitations) {
         return undefined;
       }
@@ -37,8 +36,7 @@ export const usePrivilegedMemberLimit = () => {
           )
         );
     },
-    [organizationId, isPolicyPending, canListInvitations]
-  );
+  });
 
   const privilegedMemberCount = (membersQuery.data ?? []).filter((member) =>
     isPrivilegedRole(member.role.split(",")[0] ?? "")

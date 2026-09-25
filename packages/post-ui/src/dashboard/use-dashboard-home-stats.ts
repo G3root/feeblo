@@ -91,8 +91,8 @@ export function useDashboardHomeStats<
   TPostStatus,
   TUpvote
 >): UseDashboardHomeStatsResult<TBoard, TPost, TPostStatus> {
-  const boardsQuery = useLiveQuery(
-    (q) => {
+  const boardsQuery = useLiveQuery({
+    query: (q) => {
       if (!organizationId) {
         return undefined;
       }
@@ -101,11 +101,10 @@ export function useDashboardHomeStats<
         .from({ board: boardCollection })
         .where(({ board }) => eq(board.organizationId, organizationId));
     },
-    [organizationId]
-  );
+  });
 
-  const statusesQuery = useLiveQuery(
-    (q) => {
+  const statusesQuery = useLiveQuery({
+    query: (q) => {
       if (!organizationId) {
         return undefined;
       }
@@ -116,11 +115,10 @@ export function useDashboardHomeStats<
           eq(postStatus.organizationId, organizationId)
         );
     },
-    [organizationId]
-  );
+  });
 
-  const recentPostsQuery = useLiveQuery(
-    (q) => {
+  const recentPostsQuery = useLiveQuery({
+    query: (q) => {
       if (!organizationId) {
         return undefined;
       }
@@ -138,14 +136,12 @@ export function useDashboardHomeStats<
         .orderBy(({ post }) => post.createdAt, "desc")
         .limit(5);
     },
-    [organizationId]
-  );
+  });
 
   const recentPostIds = (recentPostsQuery.data ?? []).map((post) => post.id);
-  const recentPostIdsKey = recentPostIds.join(",");
 
-  const upvoteCountsQuery = useLiveQuery(
-    (q) => {
+  const upvoteCountsQuery = useLiveQuery({
+    query: (q) => {
       if (!organizationId || recentPostIds.length === 0) {
         return undefined;
       }
@@ -164,8 +160,7 @@ export function useDashboardHomeStats<
           postId: upvote.postId,
         }));
     },
-    [organizationId, recentPostIdsKey]
-  );
+  });
 
   const isError =
     boardsQuery.isError ||

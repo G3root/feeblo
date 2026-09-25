@@ -233,41 +233,36 @@ export function PostActivityList({
   organizationId: string;
 }) {
   const { data: activities, isLoading } = useLiveQuery(activityQuery);
-  const { data: statuses } = useLiveQuery(
-    (query) =>
+  const { data: statuses } = useLiveQuery({
+    query: (query) =>
       query
         .from({ status: postStatusCollection })
         .where(({ status }) => eq(status.organizationId, organizationId)),
-    [organizationId]
-  );
-  const { data: boards } = useLiveQuery(
-    (query) =>
+  });
+  const { data: boards } = useLiveQuery({
+    query: (query) =>
       query
         .from({ board: boardCollection })
         .where(({ board }) => eq(board.organizationId, organizationId)),
-    [organizationId]
-  );
-  const { data: tags } = useLiveQuery(
-    (query) =>
+  });
+  const { data: tags } = useLiveQuery({
+    query: (query) =>
       query
         .from({ tag: tagCollection })
         .where(({ tag }) => eq(tag.organizationId, organizationId)),
-    [organizationId]
-  );
-  const { data: contacts } = useLiveQuery(
-    (query) =>
+  });
+  const { data: contacts } = useLiveQuery({
+    query: (query) =>
       query
         .from({ contact: contactCollection })
         .where(({ contact }) => eq(contact.organizationId, organizationId)),
-    [organizationId]
-  );
-  const { data: posts } = useLiveQuery(
-    (query) =>
+  });
+  const { data: posts } = useLiveQuery({
+    query: (query) =>
       query
         .from({ post: postCollection })
         .where(({ post }) => eq(post.organizationId, organizationId)),
-    [organizationId]
-  );
+  });
 
   const statusNames = useMemo(
     () =>

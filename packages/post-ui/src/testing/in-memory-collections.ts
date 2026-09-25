@@ -1,5 +1,5 @@
 import type { SyncConfig } from "@tanstack/db";
-import { createCollection } from "@tanstack/react-db";
+import { BasicIndex, createCollection } from "@tanstack/react-db";
 
 type WriteOp<T extends object> = Parameters<
   SyncConfig<T, string>["sync"]
@@ -77,6 +77,10 @@ export function createMockCollection<T extends object>({
     getKey,
     sync,
     startSync: true,
+    // Mirror production collections, which index join/filter fields, so test
+    // queries exercise the indexed path instead of scanning local data.
+    autoIndex: "eager",
+    defaultIndexType: BasicIndex,
     onInsert: async () => {
       // In-memory sync has no persistence to await.
     },

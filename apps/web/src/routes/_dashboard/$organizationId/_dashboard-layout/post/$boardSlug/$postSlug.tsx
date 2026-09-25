@@ -158,8 +158,8 @@ function RouteComponent() {
     hasPermission(organizationId, "integrations.manage")
   );
 
-  const { data: postRow, isLoading: isPostLoading } = useLiveQuery(
-    (q) => {
+  const { data: postRow, isLoading: isPostLoading } = useLiveQuery({
+    query: (q) => {
       return q
         .from({ post: postCollection })
 
@@ -173,8 +173,7 @@ function RouteComponent() {
         )
         .findOne();
     },
-    [organizationId, postSlug]
-  );
+  });
 
   const board = postRow?.board;
   const post = postRow?.post;
