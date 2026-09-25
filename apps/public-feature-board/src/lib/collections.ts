@@ -1010,6 +1010,36 @@ publicDeleteEligibilityCollection.createIndex((row) => row.postId, {
   indexType: BasicIndex,
 });
 
+// Live-query joins: posts to board/status, post tags to tags, roadmap
+// columns to roadmap/status. Indexes keep joins off the scan path.
+publicPostCollection.createIndex((row) => row.boardId, {
+  indexType: BasicIndex,
+});
+publicPostCollection.createIndex((row) => row.statusId, {
+  indexType: BasicIndex,
+});
+publicPostStatusCollection.createIndex((row) => row.id, {
+  indexType: BasicIndex,
+});
+publicBoardCollection.createIndex((row) => row.id, {
+  indexType: BasicIndex,
+});
+publicTagCollection.createIndex((row) => row.id, {
+  indexType: BasicIndex,
+});
+publicPostTagCollection.createIndex((row) => row.tagId, {
+  indexType: BasicIndex,
+});
+publicRoadmapCollection.createIndex((row) => row.id, {
+  indexType: BasicIndex,
+});
+publicRoadmapColumnCollection.createIndex((row) => row.statusId, {
+  indexType: BasicIndex,
+});
+publicRoadmapColumnCollection.createIndex((row) => row.roadmapId, {
+  indexType: BasicIndex,
+});
+
 export const publicCollections = {
   publicBoardCollection,
   publicChangelogCategoryCollection,

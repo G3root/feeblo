@@ -48,8 +48,8 @@ function RenameBoardForm() {
   const boardId = useSelector(store, (state) => state.context.data.boardId);
   const navigate = useNavigate();
 
-  const { data } = useLiveQuery(
-    (q) =>
+  const { data } = useLiveQuery({
+    query: (q) =>
       q
         .from({ board: boardCollection })
         .where((board) =>
@@ -60,8 +60,7 @@ function RenameBoardForm() {
         )
         .orderBy((board) => board.board.createdAt, "desc")
         .limit(1),
-    [boardId]
-  );
+  });
 
   const board = data[0];
 

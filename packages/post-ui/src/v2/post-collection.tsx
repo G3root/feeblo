@@ -49,8 +49,8 @@ export function PostCollectionDataProvider({
     collections: { deleteEligibilityCollection },
   } = usePostCollections();
   const contributorCase = isPostCreator && !canManageAllPosts;
-  const eligibilityQuery = useLiveQuery(
-    (q) => {
+  const eligibilityQuery = useLiveQuery({
+    query: (q) => {
       if (!contributorCase || !deleteEligibilityCollection || !post?.id) {
         return undefined;
       }
@@ -65,8 +65,7 @@ export function PostCollectionDataProvider({
         .select(({ eligibility }) => ({ postId: eligibility.postId }))
         .findOne();
     },
-    [contributorCase, deleteEligibilityCollection, organizationId, post?.id]
-  );
+  });
   const canDeletePost =
     canManageAllPosts || (isPostCreator && eligibilityQuery.data != null);
 

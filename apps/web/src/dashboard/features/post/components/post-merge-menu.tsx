@@ -159,8 +159,8 @@ export function PostMergeMenu() {
   const [isUnmergingThis, setIsUnmergingThis] = useState(false);
 
   // Used to decide whether the "Unmerge a post" picker has anything to show.
-  const { data: mergedInPosts } = useLiveQuery(
-    (query) =>
+  const { data: mergedInPosts } = useLiveQuery({
+    query: (query) =>
       query
         .from({ candidate: postCollection })
         .where(({ candidate }) =>
@@ -170,8 +170,7 @@ export function PostMergeMenu() {
           )
         )
         .select(({ candidate }) => ({ id: candidate.id })),
-    [organizationId, post.id, postCollection]
-  );
+  });
   // Merges stay one level deep: a post that has absorbed a merge cannot be a
   // source, so "Merge to existing" would always be rejected here. The
   // repository enforces the same rule.
@@ -334,8 +333,8 @@ function PostMergeCommandDialog({
   // Survivors of an earlier merge, derived from the posts that point at them.
   // They are excluded from the picker because the repository refuses a source
   // with merged children.
-  const { data: parentRows } = useLiveQuery(
-    (query) =>
+  const { data: parentRows } = useLiveQuery({
+    query: (query) =>
       query
         .from({ post: postCollection })
         .where(({ post: candidate }) =>
@@ -344,8 +343,7 @@ function PostMergeCommandDialog({
         .select(({ post: candidate }) => ({
           mergedIntoPostId: candidate.mergedIntoPostId,
         })),
-    [organizationId, postCollection]
-  );
+  });
   const mergeTargetIds = useMemo(
     () =>
       new Set(
@@ -360,8 +358,8 @@ function PostMergeCommandDialog({
   // already-merged rows cannot participate in a merge (repository-enforced),
   // and the viewed post is never its own source or target. The board join
   // labels each candidate so cross-board merges stay unambiguous.
-  const { data: candidates } = useLiveQuery(
-    (query) =>
+  const { data: candidates } = useLiveQuery({
+    query: (query) =>
       query
         .from({ post: postCollection })
         .join(
@@ -396,14 +394,7 @@ function PostMergeCommandDialog({
           statusType: status.type,
           title: candidate.title,
         })),
-    [
-      boardCollection,
-      organizationId,
-      post.id,
-      postCollection,
-      postStatusCollection,
-    ]
-  );
+  });
 
   const items = useMemo(() => {
     const merged = (candidates ?? [])
@@ -601,8 +592,8 @@ function PostUnmergeCommandDialog({
   const [isPending, setIsPending] = useState(false);
 
   // Every post previously merged into the viewed post, newest first.
-  const { data: mergedPosts } = useLiveQuery(
-    (query) =>
+  const { data: mergedPosts } = useLiveQuery({
+    query: (query) =>
       query
         .from({ post: postCollection })
         .join(
@@ -632,14 +623,7 @@ function PostUnmergeCommandDialog({
           statusType: status.type,
           title: candidate.title,
         })),
-    [
-      boardCollection,
-      organizationId,
-      post.id,
-      postCollection,
-      postStatusCollection,
-    ]
-  );
+  });
 
   const items = useMemo(
     () =>

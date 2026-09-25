@@ -56,10 +56,9 @@ function ChangelogIndexContent({ organizationId }: { organizationId: string }) {
   const statuses = useSelector(store, (s) => s.context.filters.statuses);
 
   const normalizedSearch = search.trim();
-  const statusesKey = statuses.join(",");
 
-  const changelogsQuery = useLiveQuery(
-    (q) =>
+  const changelogsQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ changelog: changelogCollection })
         .where(({ changelog }) => {
@@ -79,8 +78,7 @@ function ChangelogIndexContent({ organizationId }: { organizationId: string }) {
           return condition;
         })
         .orderBy(({ changelog }) => changelog.updatedAt, "desc"),
-    [organizationId, statusesKey, normalizedSearch]
-  );
+  });
   const visibleChangelogs = changelogsQuery.data ?? [];
   const filterLabel =
     statuses.length === 1 ? FILTER_LABELS[statuses[0]] : FILTER_LABELS.all;

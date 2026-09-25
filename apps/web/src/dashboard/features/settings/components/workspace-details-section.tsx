@@ -18,8 +18,8 @@ export function WorkspaceDetailsSection() {
   const organizationId = useOrganizationId();
   const { allowed: canManageOrganization, isPending: isPolicyPending } =
     usePolicy(hasOwnerOrAdminRole(organizationId));
-  const organizationQuery = useLiveQuery(
-    (q) =>
+  const organizationQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ membership: membershipCollection })
         .join(
@@ -29,8 +29,7 @@ export function WorkspaceDetailsSection() {
         )
         .where(({ organization }) => eq(organization.id, organizationId))
         .findOne(),
-    [organizationId]
-  );
+  });
 
   const organization = organizationQuery.data?.organization ?? null;
 

@@ -42,8 +42,8 @@ function EditRoadmapForm() {
   const store = useEditRoadmapDialogContext();
   const data = useSelector(store, (state) => state.context.data);
 
-  const roadmapQuery = useLiveQuery(
-    (q) =>
+  const roadmapQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ roadmap: roadmapCollection })
         .where(({ roadmap }) =>
@@ -59,17 +59,15 @@ function EditRoadmapForm() {
           visibility: roadmap.visibility,
         }))
         .findOne(),
-    [organizationId, data.roadmapId]
-  );
+  });
 
-  const columnsQuery = useLiveQuery(
-    (q) =>
+  const columnsQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ column: roadmapColumnCollection })
         .where(({ column }) => eq(column.roadmapId, data.roadmapId))
         .orderBy(({ column }) => column.position, "asc"),
-    [data.roadmapId]
-  );
+  });
 
   if (!(roadmapQuery.data && columnsQuery.data)) {
     throw new Error("not found");

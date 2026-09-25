@@ -36,8 +36,8 @@ export function ChangelogSubscribeButton() {
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   const { data: hasUserSubscribed, isLoading: isSubscriptionLoading } =
-    useLiveQuery(
-      (q) => {
+    useLiveQuery({
+      query: (q) => {
         if (!(organizationId && session)) {
           return undefined;
         }
@@ -52,8 +52,7 @@ export function ChangelogSubscribeButton() {
           .select(({ subscription }) => ({ id: subscription.id }))
           .findOne();
       },
-      [organizationId, session?.user.id]
-    );
+    });
 
   // Wait for the authoritative auth/subscription state before rendering, so a
   // signed-in subscriber never sees a stale "Subscribe" flash.

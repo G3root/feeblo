@@ -25,13 +25,12 @@ export function WorkspaceSwitcher() {
   const navigate = useNavigate();
   const organizationId = useOrganizationId();
   const { organizationCollection } = useDashboardCollections();
-  const organizationsQuery = useLiveQuery(
-    (q) =>
+  const organizationsQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ organization: organizationCollection })
         .orderBy(({ organization }) => organization.createdAt, "desc"),
-    []
-  );
+  });
 
   const data = organizationsQuery.data ?? [];
 
@@ -97,13 +96,12 @@ export function WorkspaceSwitcher() {
 function WorkspacePlan() {
   const organizationId = useOrganizationId();
   const { workspacePlanCollection } = useDashboardCollections();
-  const workspacePlan = useLiveQuery(
-    (q) =>
+  const workspacePlan = useLiveQuery({
+    query: (q) =>
       q
         .from({ plan: workspacePlanCollection })
         .where(({ plan }) => eq(plan.organizationId, organizationId)),
-    [organizationId]
-  );
+  });
 
   const plan = workspacePlan?.data?.[0]?.plan ?? "free";
 

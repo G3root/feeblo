@@ -82,7 +82,7 @@ vi.mock("@tanstack/react-db", () => ({
   ),
   eq: () => ({ __eq: true }),
   queryOnce: vi.fn(),
-  useLiveQuery: vi.fn((query: (q: never) => MockLiveResult) => {
+  useLiveQuery: vi.fn((config: { query: (q: never) => MockLiveResult }) => {
     let alias = "";
     const fakeQ = {
       from: (
@@ -94,7 +94,7 @@ vi.mock("@tanstack/react-db", () => ({
       },
     };
     // SAFETY: Test fixture: `never` marks an intentionally unsupported input to assert rejection.
-    query(fakeQ as never);
+    config.query(fakeQ as never);
     if (alias === "member") {
       return { data: memberData };
     }

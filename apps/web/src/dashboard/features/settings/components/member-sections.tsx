@@ -80,21 +80,17 @@ interface OrganizationInvitationRow {
 
 export function MembersSection() {
   const organizationId = useOrganizationId();
-  const { allowed: canListInvitations, isPending: isPolicyPending } = usePolicy(
-    hasPermission(organizationId, "members.invite")
-  );
   const { data: session } = useAuthState();
   const { atLimit: atPrivilegedLimit } = usePrivilegedMemberLimit();
   const [search, setSearch] = React.useState("");
 
-  const membersQuery = useLiveQuery(
-    (q) => {
+  const membersQuery = useLiveQuery({
+    query: (q) => {
       return q
         .from({ member: membersCollection })
         .where(({ member }) => eq(member.organizationId, organizationId));
     },
-    [organizationId, canListInvitations, isPolicyPending]
-  );
+  });
   const membersData = membersQuery.data;
   const members = React.useMemo(() => {
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
@@ -244,8 +240,8 @@ export function InvitationsSection() {
   );
   const [search, setSearch] = React.useState("");
 
-  const invitationsQuery = useLiveQuery(
-    (q) => {
+  const invitationsQuery = useLiveQuery({
+    query: (q) => {
       if (isPolicyPending || !canListInvitations) {
         return undefined;
       }
@@ -258,9 +254,7 @@ export function InvitationsSection() {
           )
         );
     },
-    [organizationId, canListInvitations, isPolicyPending]
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-  );
+  });
   const invitationsData = invitationsQuery.data;
   const invitations = React.useMemo(() => {
     // SAFETY: The upstream contract guarantees this value here.

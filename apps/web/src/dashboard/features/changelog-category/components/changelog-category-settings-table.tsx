@@ -49,14 +49,13 @@ export function ChangelogCategorySettingsTable() {
   const deleteDialogStore = useChangelogCategoryDeleteDialogContext();
   const planQuery = usePlan();
 
-  const categoriesQuery = useLiveQuery(
-    (q) =>
+  const categoriesQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ category: changelogCategoryCollection })
         .where(({ category }) => eq(category.organizationId, organizationId))
         .orderBy(({ category }) => category.createdAt, "asc"),
-    [organizationId]
-  );
+  });
 
   const categories = categoriesQuery?.data ?? [];
   const plan = planQuery.data?.plan;

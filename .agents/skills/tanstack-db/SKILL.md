@@ -1,116 +1,88 @@
 ---
 name: tanstack-db
-description: Work with TanStack DB reactive client-side data store in this repo
+description: >
+  Work with the TanStack DB reactive client-side data store in this repo:
+  createCollection with queryCollectionOptions and other adapters, live queries
+  via the query builder (from, where, join, select, groupBy, orderBy, limit),
+  optimistic mutations with the draft proxy, transactions, persistence,
+  preloading in route loaders, and React hooks from @tanstack/react-db.
+  Entry point for the tanstack-db sub-skills.
+type: core
+library: db
+library_version: '0.9.2'
 ---
 
-# TanStack DB
+# TanStack DB — Core Concepts
 
-This codebase uses TanStack DB for reactive client-side data stores with normalized collections, live queries, and optimistic mutations.
+TanStack DB is a reactive client-side data store. It loads data into typed
+collections from any backend (REST APIs, sync engines, local storage), provides
+sub-millisecond live queries via differential dataflow, and supports instant
+optimistic mutations with automatic rollback.
+
+This repo is React + TanStack Start. Import everything from
+`@tanstack/react-db`, which re-exports all of `@tanstack/db`. It uses
+`@tanstack/query-db-collection` for RPC-backed collections.
 
 ## Source Of Truth
 
 Use the current TanStack DB source, not memory or older examples.
 
-1. If `~/.local/share/opencode/repos/github.com/TanStack/db` is missing, clone `https://github.com/TanStack/db` there. Do there, not in the skill folder.
-2. Search `~/.local/share/opencode/repos/github.com/TanStack/db` for exact APIs, examples, tests, and naming patterns before answering or implementing TanStack DB-specific code.
-3. Also inspect existing repo code for local house style before introducing new patterns.
-4. Prefer answers and implementations backed by specific source files or nearby repo examples.
+1. If `~/.local/share/opencode/repos/github.com/TanStack/db` is missing, clone
+   `https://github.com/TanStack/db` there. Do that, not in the skill folder.
+2. Check the installed package versions before answering:
+   `@tanstack/db` **0.9.2**, `@tanstack/react-db` **0.4.1**,
+   `@tanstack/query-db-collection` **1.2.15**, `@tanstack/db-ivm` **0.1.22**.
+   The package sources under `node_modules/@tanstack/*` are authoritative for
+   the installed version; the clone is for docs, examples, and tests.
+3. Search `node_modules/@tanstack/*/skills` and the cloned repo for exact APIs,
+   examples, tests, and naming patterns before writing TanStack DB code.
+4. Inspect existing repo code first and follow its patterns. The two collection
+   factories are `apps/web/src/dashboard/lib/collections.ts` and
+   `apps/public-feature-board/src/lib/collections.ts`.
 
-## Core Concepts
+## Sub-Skills
 
-TanStack DB is a reactive client-side data store providing normalized collections, sub-millisecond live queries via differential dataflow (d2ts), and instant optimistic mutations with automatic rollback. It supports multiple data sources through a unified collection API with framework adapters for React, Vue, Svelte, Solid, and Angular.
+| Need to...                                       | Read                        |
+| ------------------------------------------------ | --------------------------- |
+| Create a collection, pick an adapter, add schema | collection-setup/SKILL.md   |
+| Query data with where, join, groupBy, select     | live-queries/SKILL.md       |
+| Insert, update, delete with optimistic UI        | mutations-optimistic/SKILL.md |
+| Build a custom sync adapter                      | custom-adapter/SKILL.md     |
+| Persist collections to SQLite (offline cache)    | persistence/SKILL.md        |
+| Preload collections in route loaders             | meta-framework/SKILL.md     |
+| Use React hooks (useLiveQuery, Suspense, paced)  | react-db/SKILL.md           |
 
-## Key Domains
+Other framework skills (`vue-db`, `svelte-db`, `solid-db`, `angular-db`) and
+`offline` (from `@tanstack/offline-transactions`) ship in their own packages;
+none of them are installed in this repo.
 
-| Domain                       | Description                                                                                                                | Skills                |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| Collection Setup & Schema    | Creating and configuring typed collections from any data source, with schema validation and adapter-specific sync patterns | collection-setup      |
-| Live Query Construction      | Building SQL-like reactive queries with expressions, joins, aggregations, and incremental view maintenance                 | live-queries          |
-| Framework Integration        | Binding live queries to UI framework components using hooks, dependency tracking, Suspense, and pagination                 | framework-integration |
-| Mutations & Optimistic State | Writing data with instant optimistic feedback, transaction lifecycles, and automatic rollback                              | mutations-optimistic  |
-| Meta-Framework Integration   | Client-side preloading of collections in route loaders for TanStack Start, Next.js, Remix, etc.                            | meta-framework        |
-| Custom Adapter Authoring     | Building custom collection adapters that implement the SyncConfig contract                                                 | custom-adapter        |
-| Offline Transactions         | Offline-first transaction queueing with persistence, retry, and multi-tab coordination                                     | offline               |
+## Quick Decision Tree
 
-## Guidelines
+- Setting up for the first time? → collection-setup
+- Building queries on collection data? → live-queries
+- Writing data / handling optimistic state? → mutations-optimistic
+- Using React hooks? → react-db
+- Preloading in route loaders (TanStack Start)? → meta-framework
+- Building an adapter for a new backend? → custom-adapter
+- Persisting collections to SQLite? → persistence
 
-- Prefer current TanStack DB APIs and project-local patterns over old blog posts, examples, or package-memory guesses.
-- **Always prefer query operators over JS** — Live queries are incrementally maintained via D2 differential dataflow. A `.where(eq(...))` only recomputes the delta on data changes, while `.filter()` in JS re-runs from scratch. This applies even for trivial transformations.
-- **The update API is Immer-style** — `collection.update(id, (draft) => { draft.title = "new" })` not `collection.update(id, { ...item, title: "new" })`. This is the single most common mutation API mistake.
-- **Collection type selection matters** — Don't default to bare `createCollection` or `localOnlyCollectionOptions`. Each backend has a dedicated adapter that handles sync, handlers, and utilities correctly.
-- `localOnlyCollectionOptions` is a valid prototyping strategy — upgrading to a real backend adapter is a clean path.
-- **SSR is not supported yet** — Collections are client-side only. Routes using collections must set `ssr: false`. Preloading happens in client-side route loaders, not on the server.
-- **Transactions stack** — Concurrent transactions build optimistic state on top of each other. Use TanStack Pacer for sequential execution when ordering matters.
-- **Offline is hard — only when needed** — Don't steer users toward offline unless they need it. PowerSync/RxDB handle their own local persistence, which is different from offline transaction queuing.
-- Use `StandardSchema` for schema validation (Zod, Valibot, ArkType, Effect Schema).
-- Keep HTTP handlers thin: decode input, read request context, call services, and map transport errors. Put business rules in services.
+## Repo Rules
 
-## Common Failure Modes
+- **`useLiveQuery` takes the config object** — `useLiveQuery({ query: (q) => ... })`.
+  Never pass a legacy dependency array; the repo was migrated off it. Query
+  identity is derived from the structured query IR, so captured values re-run
+  the query automatically. Use `queryKey` only for opaque `.fn.*` queries.
+- **Always prefer query operators over JS** — `eq`, `inArray`, `like`, etc. are
+  incrementally maintained; `.filter()` in JS re-runs from scratch.
+- **The update API is Immer-style** — `collection.update(id, (draft) => { ... })`.
+- **Every collection has an explicit `id`** — Workers forbid random values in
+  global scope, and the SSR bundle imports these modules at startup.
+- **Index join and filter fields** — joins warn in dev when the loaded side has
+  no index. Follow the existing `createIndex(..., { indexType: BasicIndex })`
+  style in both collection files.
+- **SSR is not supported for collections** — routes using collections set
+  `ssr: false`; preload in client-side route loaders.
 
-### Collection Setup & Schema
-- `queryFn` returning empty array deletes all data — always merge or return existing data.
-- `getKey` returning undefined — must return a stable string ID.
-- `TInput` not superset of `TOutput` with schema transforms — schema output must be assignable.
-- Providing both explicit type param and schema — pick one.
-- React Native missing `crypto.randomUUID` — polyfill required.
-- Direct writes overridden by next query sync — use `queryFn` that merges, or use `onSync` to preserve local writes.
+## Version
 
-### Live Query Construction
-- Using `===` instead of `eq()` in where clauses — use query operators, not JS.
-- Filtering/transforming data in JS instead of query operators — breaks incremental maintenance.
-- `.distinct()` without `.select()` — must select first.
-- `.having()` without `.groupBy()` — not valid.
-- `.limit()`/`.offset()` without `.orderBy()` — results are non-deterministic.
-- Join condition using operator other than `eq()` — only equality joins supported.
-- Passing source directly instead of `{alias: collection}` — use aliased form for joins.
-
-### Mutations & Optimistic State
-- Passing object to `update()` instead of mutating draft — use Immer-style draft callback.
-- `onMutate` callback returning a Promise — must be synchronous.
-- `insert`/`update`/`delete` without handler or ambient transaction — handlers must be configured.
-- `.mutate()` after transaction no longer pending — transaction context is lost.
-- Attempting to change primary key via `update` — primary keys are immutable.
-- Inserting item with duplicate key — use `upsert` or generate unique IDs.
-- Not awaiting refetch after mutation in query collection handler — causes stale data.
-
-### Framework Integration
-- Missing external values in `deps` array — query won't re-run on external changes.
-- Reading Solid signals outside query function — must read inside the query function.
-- `useLiveSuspenseQuery` without Error Boundary — will crash.
-- Svelte props not wrapped in getter functions — use `() => prop`.
-
-### Meta-Framework Integration
-- Not preloading collections in route loaders — causes loading waterfall.
-- Not setting `ssr: false` on routes using collections — SSR will fail.
-- Creating new collection instances inside loaders on every navigation — reuse instances.
-
-### Custom Adapter Authoring
-- Not calling `markReady()` in sync implementation — collection never becomes ready.
-- Race condition: subscribing after initial fetch — subscribe before fetching.
-- `write()` called without `begin()` — transaction must be started first.
-
-### Offline Transactions
-- Using offline transactions when not needed — adds unnecessary complexity.
-- Not handling `NonRetriableError` for permanent failures — will retry forever.
-- Multiple tabs executing same queued transaction — use leader election.
-
-## Testing Patterns
-
-- Use the repo's existing test helpers and live tests for collections, queries, and mutations.
-- For framework integration tests, use the framework-specific test utilities (React Testing Library, Vue Test Utils, etc.).
-- Test optimistic mutations by verifying draft state before the async operation completes.
-- Test live queries by mutating data and verifying the query result updates reactively.
-- Test custom adapters by verifying the `SyncConfig` contract is fulfilled: `begin`/`write`/`commit`/`markReady`/`loadSubset`.
-
-## Package Reference
-
-| Package                         | Purpose                                      |
-| ------------------------------- | -------------------------------------------- |
-| `@tanstack/db`                  | Core: collections, live queries, transactions |
-| `@tanstack/react-db`            | React hooks (`useLiveQuery`, `useLiveSuspenseQuery`) |
-| `@tanstack/vue-db`              | Vue composables                              |
-| `@tanstack/svelte-db`           | Svelte stores                                |
-| `@tanstack/solid-db`            | SolidJS signals                              |
-| `@tanstack/angular-db`          | Angular services                             |
-| `@tanstack/offline-transactions`| Offline transaction queueing                 |
-| `@tanstack/db-collection-e2e`   | End-to-end test utilities                    |
+Targets `@tanstack/db` v0.9.2.

@@ -86,8 +86,8 @@ function CustomAttributeEditForm() {
 
   const collection = getCollection(entityType, collections);
 
-  const { data } = useLiveQuery(
-    (q) =>
+  const { data } = useLiveQuery({
+    query: (q) =>
       q
         .from({ attribute: collection })
         .where((a) =>
@@ -98,8 +98,7 @@ function CustomAttributeEditForm() {
         )
         .orderBy((a) => a.attribute.createdAt, "desc")
         .limit(1),
-    [organizationId, attributeId]
-  );
+  });
 
   const attribute = data[0];
 

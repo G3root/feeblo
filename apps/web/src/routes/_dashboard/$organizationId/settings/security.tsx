@@ -80,13 +80,12 @@ function SecuritySettingsContent({
   // same-tick double click that a re-render-based disabled attribute could miss.
   const isGeneratingRef = useRef(false);
 
-  const { data: secrets, isLoading } = useLiveQuery(
-    (q) =>
+  const { data: secrets, isLoading } = useLiveQuery({
+    query: (q) =>
       q
         .from({ secret: jwtSecretCollection })
         .where(({ secret }) => eq(secret.organizationId, organizationId)),
-    [organizationId]
-  );
+  });
 
   const now = new Date();
 

@@ -60,8 +60,8 @@ function PostVoterDialogRoot({
   const {
     collections: { upvoteCollection },
   } = usePostCollections();
-  const { data: upvotes } = useLiveQuery(
-    (q) =>
+  const { data: upvotes } = useLiveQuery({
+    query: (q) =>
       q
         .from({ upvote: upvoteCollection })
         .where(({ upvote }) =>
@@ -71,8 +71,7 @@ function PostVoterDialogRoot({
           )
         )
         .orderBy(({ upvote }) => upvote.createdAt, "asc"),
-    [organizationId, postId, upvoteCollection]
-  );
+  });
 
   const voterData = useMemo(() => {
     if (!upvotes?.length) {

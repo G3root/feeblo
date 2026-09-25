@@ -277,6 +277,11 @@ postStatusCollection.createIndex((row) => row.organizationId, {
   indexType: BasicIndex,
 });
 
+// Board, changelog, and merge queries join posts against status rows by id.
+postStatusCollection.createIndex((row) => row.id, {
+  indexType: BasicIndex,
+});
+
 export const changelogCollection = createCollection(
   queryCollectionOptions({
     id: "changelogCollection",
@@ -503,6 +508,11 @@ export const changelogPostCollection = createCollection(
   })
 );
 
+// Changelog completed-posts joins changelog entries against posts by post id.
+changelogPostCollection.createIndex((row) => row.postId, {
+  indexType: BasicIndex,
+});
+
 export const boardCollection = createCollection(
   queryCollectionOptions({
     id: "boardCollection",
@@ -570,6 +580,11 @@ export const boardCollection = createCollection(
 );
 
 boardCollection.createIndex((row) => row.organizationId, {
+  indexType: BasicIndex,
+});
+
+// Post board queries join posts against boards by id.
+boardCollection.createIndex((row) => row.id, {
   indexType: BasicIndex,
 });
 
@@ -688,6 +703,11 @@ export const membershipCollection = createCollection(
   })
 );
 
+// Workspace details joins memberships against organizations by org id.
+membershipCollection.createIndex((row) => row.organizationId, {
+  indexType: BasicIndex,
+});
+
 export const organizationCollection = createCollection(
   queryCollectionOptions({
     id: "organizationCollection",
@@ -715,6 +735,11 @@ export const organizationCollection = createCollection(
     },
   })
 );
+
+// Workspace details joins memberships against organizations by org id.
+organizationCollection.createIndex((row) => row.id, {
+  indexType: BasicIndex,
+});
 
 export const membersCollection = createCollection(
   queryCollectionOptions({

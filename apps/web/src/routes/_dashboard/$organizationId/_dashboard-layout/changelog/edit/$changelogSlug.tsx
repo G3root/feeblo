@@ -62,8 +62,8 @@ function RouteComponent() {
   const { organizationId, changelogSlug } = Route.useParams();
   const { changelogCollection } = useDashboardCollections();
 
-  const changelogQuery = useLiveQuery(
-    (q) =>
+  const changelogQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ changelog: changelogCollection })
         .where(({ changelog }) =>
@@ -73,8 +73,7 @@ function RouteComponent() {
           )
         )
         .findOne(),
-    [organizationId, changelogSlug]
-  );
+  });
   const changelog = changelogQuery.data;
 
   if (changelogQuery.isLoading) {

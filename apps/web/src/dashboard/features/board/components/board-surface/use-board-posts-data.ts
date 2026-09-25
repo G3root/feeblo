@@ -90,8 +90,8 @@ type UseBoardPostsDataOptions = {
 
 function useBoardPostStatuses(organizationId: string) {
   const { postStatusCollection } = useDashboardCollections();
-  return useLiveQuery(
-    (q) => {
+  return useLiveQuery({
+    query: (q) => {
       if (!organizationId) {
         return undefined;
       }
@@ -107,8 +107,7 @@ function useBoardPostStatuses(organizationId: string) {
           label: postStatus.label,
         }));
     },
-    [organizationId]
-  );
+  });
 }
 
 export function useBoardPostsData({
@@ -133,8 +132,6 @@ export function useBoardPostsData({
   // the public board): the input stays responsive while the live query
   // re-runs over the overfetched collection at lower priority.
   const deferredSearch = useDeferredValue(normalizedSearch);
-  const statusesKey = statuses.join(",");
-  const tagIdsKey = tagIds.join(",");
 
   const postStatusesQuery = useBoardPostStatuses(organizationId);
 
@@ -150,8 +147,8 @@ export function useBoardPostsData({
   //   instead of every upvote row materialized),
   // - tag matching is a grouped subquery joined in place, so there is no
   //   JS id-list bridge and no giant dep key.
-  const postsQuery = useLiveQuery(
-    (q) => {
+  const postsQuery = useLiveQuery({
+    query: (q) => {
       if (!organizationId) {
         return undefined;
       }
@@ -296,17 +293,7 @@ export function useBoardPostsData({
           user: post.user,
         }));
     },
-    [
-      boardId,
-      organizationId,
-      postStatusFilter,
-      deferredSearch,
-      statusesKey,
-      statusOperator,
-      tagIdsKey,
-      tagOperator,
-    ]
-  );
+  });
 
   const posts: BoardPostRow[] = postsQuery.data ?? [];
 

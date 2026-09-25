@@ -39,16 +39,15 @@ const RoadmapColumnsSection = withForm({
     const organizationId = useOrganizationId();
     const [openItems, setOpenItems] = useState<string[]>([]);
 
-    const { data: statuses } = useLiveQuery(
-      (q) =>
+    const { data: statuses } = useLiveQuery({
+      query: (q) =>
         q
           .from({ postStatus: postStatusCollection })
           .where(({ postStatus }) =>
             eq(postStatus.organizationId, organizationId)
           )
           .orderBy(({ postStatus }) => postStatus.orderIndex, "asc"),
-      [organizationId]
-    );
+    });
 
     const statusOptions = statuses ?? [];
     const openItemIds = new Set(openItems);

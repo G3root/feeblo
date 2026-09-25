@@ -116,8 +116,8 @@ export function PostPage() {
     data: post,
     isError: postError,
     isLoading: postLoading,
-  } = useLiveQuery(
-    (q) => {
+  } = useLiveQuery({
+    query: (q) => {
       if (!site.organizationId) {
         return undefined;
       }
@@ -129,13 +129,12 @@ export function PostPage() {
         )
         .findOne();
     },
-    [site.organizationId, slug]
-  );
+  });
 
   // Board and status stay small org-scoped collections; look them up by the
   // detail row's ids instead of joining the full post list.
-  const { data: board } = useLiveQuery(
-    (q) => {
+  const { data: board } = useLiveQuery({
+    query: (q) => {
       if (!post) {
         return undefined;
       }
@@ -145,10 +144,9 @@ export function PostPage() {
         .where(({ board }) => eq(board.id, post.boardId))
         .findOne();
     },
-    [post?.boardId]
-  );
-  const { data: postStatus } = useLiveQuery(
-    (q) => {
+  });
+  const { data: postStatus } = useLiveQuery({
+    query: (q) => {
       if (!post) {
         return undefined;
       }
@@ -158,13 +156,12 @@ export function PostPage() {
         .where(({ postStatus }) => eq(postStatus.id, post.statusId))
         .findOne();
     },
-    [post?.statusId]
-  );
+  });
 
   const postId = post?.id ?? "";
 
-  const postTagsQuery = useLiveQuery(
-    (q) =>
+  const postTagsQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ postTag: publicPostTagCollection })
         .join(
@@ -183,8 +180,7 @@ export function PostPage() {
           id: tag.id,
           name: tag.name,
         })),
-    [site.organizationId, postId]
-  );
+  });
 
   if (postLoading) {
     return <RootLayout>{m.good_extra_giraffe()}</RootLayout>;

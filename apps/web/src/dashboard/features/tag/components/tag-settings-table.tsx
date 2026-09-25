@@ -52,14 +52,13 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
   const editDialogStore = useTagEditDialogContext();
   const deleteDialogStore = useTagDeleteDialogContext();
 
-  const tagsQuery = useLiveQuery(
-    (q) =>
+  const tagsQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ tag: tagCollection })
         .where(({ tag }) => eq(tag.organizationId, organizationId))
         .orderBy(({ tag }) => tag.updatedAt, "desc"),
-    [organizationId]
-  );
+  });
 
   const tags = tagsQuery?.data;
   const handleCreate = () =>

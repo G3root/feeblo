@@ -44,8 +44,8 @@ function TagRenameForm() {
   const store = useTagEditDialogContext();
   const tagId = useSelector(store, (state) => state.context.data.tagId);
 
-  const { data } = useLiveQuery(
-    (q) =>
+  const { data } = useLiveQuery({
+    query: (q) =>
       q
         .from({ tag: tagCollection })
         .where((tag) =>
@@ -53,8 +53,7 @@ function TagRenameForm() {
         )
         .orderBy((tag) => tag.tag.createdAt, "desc")
         .limit(1),
-    [organizationId, tagId]
-  );
+  });
 
   const tag = data[0];
 

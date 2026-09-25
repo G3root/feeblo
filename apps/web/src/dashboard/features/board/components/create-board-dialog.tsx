@@ -62,13 +62,12 @@ function CreateBoardForm() {
   const upgradePlanStore = useUpgradePlanDialogContext();
   const { entitlements } = useEntitlements();
 
-  const { data: boards } = useLiveQuery(
-    (q) =>
+  const { data: boards } = useLiveQuery({
+    query: (q) =>
       q
         .from({ board: boardCollection })
         .where(({ board }) => eq(board.organizationId, organizationId)),
-    [organizationId]
-  );
+  });
 
   const boardCount = boards?.length ?? 0;
   const boardLimit = entitlements.limits.feedbackBoards;

@@ -40,8 +40,8 @@ export function PostTagField() {
   const disabled = isLocked || isMerged || !canChangeTags;
   const { postTagCollection } = useDashboardCollections();
 
-  const { data: tags } = useLiveQuery(
-    (q) => {
+  const { data: tags } = useLiveQuery({
+    query: (q) => {
       return q
         .from({ tags: tagCollection })
         .where(({ tags }) => eq(tags.organizationId, organizationId))
@@ -50,11 +50,10 @@ export function PostTagField() {
           name: tags.name,
         }));
     },
-    [organizationId]
-  );
+  });
 
-  const { data: postTags } = useLiveQuery(
-    (q) => {
+  const { data: postTags } = useLiveQuery({
+    query: (q) => {
       if (!post.id) {
         return undefined;
       }
@@ -69,8 +68,7 @@ export function PostTagField() {
           typeId: tags.postId,
         }));
     },
-    [organizationId, post.id]
-  );
+  });
 
   const handleTagSelect = async (
     option: TagSelectOption,

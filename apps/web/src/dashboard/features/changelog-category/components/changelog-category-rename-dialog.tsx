@@ -54,8 +54,8 @@ function ChangelogCategoryRenameForm() {
     (state) => state.context.data.categoryId
   );
 
-  const { data } = useLiveQuery(
-    (q) =>
+  const { data } = useLiveQuery({
+    query: (q) =>
       q
         .from({ category: changelogCategoryCollection })
         .where(({ category }) =>
@@ -66,8 +66,7 @@ function ChangelogCategoryRenameForm() {
         )
         .orderBy(({ category }) => category.createdAt, "desc")
         .limit(1),
-    [organizationId, categoryId]
-  );
+  });
 
   const category = data[0];
 

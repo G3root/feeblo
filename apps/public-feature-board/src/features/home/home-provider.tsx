@@ -55,29 +55,27 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     data: statuses = [],
     isError: statusError,
     isLoading: statusLoading,
-  } = useLiveQuery(
-    (q) =>
+  } = useLiveQuery({
+    query: (q) =>
       q
         .from({ status: publicPostStatusCollection })
         .where(({ status }) => eq(status.organizationId, site.organizationId)),
-    [site.organizationId]
-  );
+  });
 
   const {
     data: boards = [],
     isError: boardError,
     isLoading: boardLoading,
-  } = useLiveQuery(
-    (q) =>
+  } = useLiveQuery({
+    query: (q) =>
       q
         .from({ board: publicBoardCollection })
         .where(({ board }) => eq(board.organizationId, site.organizationId))
         .orderBy(({ board }) => board.name, "asc"),
-    [site.organizationId]
-  );
+  });
 
-  const { data: statusCounts = [] } = useLiveQuery(
-    (q) =>
+  const { data: statusCounts = [] } = useLiveQuery({
+    query: (q) =>
       q
         .from({ post: publicPostCollection })
         .where(({ post }) => eq(post.organizationId, site.organizationId))
@@ -86,11 +84,10 @@ export function HomeProvider({ children }: { children: ReactNode }) {
           statusId: post.statusId,
           count: count(post.id),
         })),
-    [site.organizationId]
-  );
+  });
 
-  const { data: boardCounts = [] } = useLiveQuery(
-    (q) =>
+  const { data: boardCounts = [] } = useLiveQuery({
+    query: (q) =>
       q
         .from({ post: publicPostCollection })
         .where(({ post }) => eq(post.organizationId, site.organizationId))
@@ -99,8 +96,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
           boardId: post.boardId,
           count: count(post.id),
         })),
-    [site.organizationId]
-  );
+  });
 
   const { selectedBoard, selectedStatus, sortBy, updateFilters } =
     useHomePageFilters({
@@ -112,8 +108,8 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     data: filteredPosts = [],
     isError: filteredPostsError,
     isLoading: filteredPostsLoading,
-  } = useLiveQuery(
-    (q) => {
+  } = useLiveQuery({
+    query: (q) => {
       if (
         !site.organizationId ||
         statusLoading ||
@@ -218,18 +214,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
 
       return projectedQuery;
     },
-    [
-      site.organizationId,
-      statusLoading,
-      boardLoading,
-      statusError,
-      boardError,
-      selectedBoard,
-      selectedStatus,
-      sortBy,
-      deferredSearch,
-    ]
-  );
+  });
 
   const statusItems = useMemo(() => {
     const countMap = new Map(statusCounts.map((s) => [s.statusId, s.count]));
