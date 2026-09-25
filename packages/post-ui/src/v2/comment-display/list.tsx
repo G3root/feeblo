@@ -178,8 +178,8 @@ export function CommentsList() {
   // it while it is merged (see `CommentRepository.findMany`), so a merged
   // post's page renders its comments from one slug-scoped subset and an
   // unmerge only changes the rows inside that same subset.
-  const { data: comments, isLoading: isCommentsLoading } = useLiveQuery(
-    (q) =>
+  const { data: comments, isLoading: isCommentsLoading } = useLiveQuery({
+    query: (q) =>
       q
         .from({ comment: commentCollection })
         .where(({ comment }) =>
@@ -198,8 +198,7 @@ export function CommentsList() {
           nulls: "last",
         })
         .orderBy(({ comment }) => comment.createdAt, "desc"),
-    [organizationId, postSlug, isMember]
-  );
+  });
 
   const threads = useMemo(() => buildThreads(comments ?? []), [comments]);
 

@@ -75,31 +75,28 @@ function ContactCreateForm() {
   const store = useContactCreateDialogContext();
   const upgradePlanStore = useUpgradePlanDialogContext();
   const { entitlements } = useEntitlements();
-  const { data: definitions = [] } = useLiveQuery(
-    (q) =>
+  const { data: definitions = [] } = useLiveQuery({
+    query: (q) =>
       q
         .from({ definition: contactAttributeDefinitionCollection })
         .where(({ definition }) =>
           eq(definition.organizationId, organizationId)
         )
         .orderBy(({ definition }) => definition.createdAt, "asc"),
-    [organizationId]
-  );
-  const { data: companies = [] } = useLiveQuery(
-    (q) =>
+  });
+  const { data: companies = [] } = useLiveQuery({
+    query: (q) =>
       q
         .from({ company: companyCollection })
         .where(({ company }) => eq(company.organizationId, organizationId))
         .orderBy(({ company }) => company.name, "asc"),
-    [organizationId]
-  );
-  const { data: contacts = [] } = useLiveQuery(
-    (q) =>
+  });
+  const { data: contacts = [] } = useLiveQuery({
+    query: (q) =>
       q
         .from({ contact: contactCollection })
         .where(({ contact }) => eq(contact.organizationId, organizationId)),
-    [organizationId]
-  );
+  });
   const crmLimit = entitlements.limits.crmEntries;
   const totalCrmEntries = contacts.length + companies.length;
   const atLimit = crmLimit !== null && totalCrmEntries >= crmLimit;

@@ -54,8 +54,8 @@ function ChangelogCategoryRenameForm() {
     (state) => state.context.data.categoryId
   );
 
-  const { data } = useLiveQuery(
-    (q) =>
+  const { data } = useLiveQuery({
+    query: (q) =>
       q
         .from({ category: changelogCategoryCollection })
         .where(({ category }) =>
@@ -66,10 +66,28 @@ function ChangelogCategoryRenameForm() {
         )
         .orderBy(({ category }) => category.createdAt, "desc")
         .limit(1),
-    [organizationId, categoryId]
-  );
+  });
 
   const category = data[0];
+
+  if (!category) {
+    return null;
+  }
+
+  return <ChangelogCategoryRenameFormFields category={category} />;
+}
+
+function ChangelogCategoryRenameFormFields({
+  category,
+}: {
+  category: { icon: string; name: string };
+}) {
+  const { changelogCategoryCollection } = useDashboardCollections();
+  const store = useChangelogCategoryEditDialogContext();
+  const categoryId = useSelector(
+    store,
+    (state) => state.context.data.categoryId
+  );
 
   const defaultValues: ChangelogCategoryFormValues = {
     name: category.name,

@@ -86,8 +86,8 @@ export function VoterPanel() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  const { data: upvotes = [], isLoading } = useLiveQuery(
-    (q) =>
+  const { data: upvotes = [], isLoading } = useLiveQuery({
+    query: (q) =>
       q
         .from({ upvote: upvoteCollection })
         .where(({ upvote }) =>
@@ -96,8 +96,7 @@ export function VoterPanel() {
             eq(upvote.postId, post.id)
           )
         ),
-    [organizationId, post.id]
-  );
+  });
 
   // Plain async functions, deliberately NOT createOptimisticAction: that API
   // skips mutationFn entirely when onMutate stages zero collection

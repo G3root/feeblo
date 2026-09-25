@@ -18,14 +18,13 @@ export function PostBoardField({ disabled = false }: { disabled?: boolean }) {
   const navigate = useNavigate();
   const { boardCollection, postCollection } = useDashboardCollections();
 
-  const { data: allBoards } = useLiveQuery(
-    (q) => {
+  const { data: allBoards } = useLiveQuery({
+    query: (q) => {
       return q
         .from({ board: boardCollection })
         .where(({ board }) => eq(board.organizationId, organizationId));
     },
-    [organizationId]
-  );
+  });
 
   if (!allBoards) {
     return null;

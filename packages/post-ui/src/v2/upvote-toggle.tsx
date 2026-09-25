@@ -39,8 +39,8 @@ function useUpvote({
 }: UseUpvoteParams) {
   const { data: session } = useAuthState();
 
-  const { data: upvotes, isLoading: isUpvotesLoading } = useLiveQuery(
-    (q) =>
+  const { data: upvotes, isLoading: isUpvotesLoading } = useLiveQuery({
+    query: (q) =>
       q
         .from({ upvote: upvoteCollection })
         .where(({ upvote }) =>
@@ -50,12 +50,11 @@ function useUpvote({
           )
         )
         .select(({ upvote }) => ({ id: upvote.id })),
-    [organizationId, postId]
-  );
+  });
 
   const { data: hasUserUpvoted, isLoading: isUserUpvotedLoading } =
-    useLiveQuery(
-      (q) => {
+    useLiveQuery({
+      query: (q) => {
         if (!session) return undefined;
         return q
           .from({ upvote: upvoteCollection })
@@ -69,8 +68,7 @@ function useUpvote({
           .select(({ upvote }) => ({ id: upvote.id }))
           .findOne();
       },
-      [organizationId, postId, session?.user.id]
-    );
+    });
 
   const isLoading = isUpvotesLoading || isUserUpvotedLoading;
   const upvoteCount = upvotes?.length ?? 0;

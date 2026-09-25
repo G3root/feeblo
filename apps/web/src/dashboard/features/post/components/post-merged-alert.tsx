@@ -25,8 +25,8 @@ export function PostMergedAlert() {
   const { boardCollection, postCollection } = useDashboardCollections();
   const mergedIntoPostId = post.mergedIntoPostId;
 
-  const { data: target } = useLiveQuery(
-    (query) => {
+  const { data: target } = useLiveQuery({
+    query: (query) => {
       if (!mergedIntoPostId) {
         return undefined;
       }
@@ -45,8 +45,7 @@ export function PostMergedAlert() {
         )
         .findOne();
     },
-    [boardCollection, mergedIntoPostId, organizationId, postCollection]
-  );
+  });
 
   if (!(isMerged && mergedIntoPostId)) {
     return null;

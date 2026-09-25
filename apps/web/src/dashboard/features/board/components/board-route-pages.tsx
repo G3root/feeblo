@@ -33,8 +33,8 @@ function BoardFeedbackPage({
   organizationId,
 }: BoardPageProps) {
   const { boardCollection } = useDashboardCollections();
-  const { data: board } = useLiveQuery(
-    (q) =>
+  const { data: board } = useLiveQuery({
+    query: (q) =>
       q
         .from({ board: boardCollection })
         .where((entry) =>
@@ -44,8 +44,7 @@ function BoardFeedbackPage({
           )
         )
         .findOne(),
-    [boardSlug, organizationId]
-  );
+  });
 
   if (!board) {
     return (

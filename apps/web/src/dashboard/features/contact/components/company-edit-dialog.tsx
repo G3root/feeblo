@@ -64,8 +64,8 @@ function CompanyEditFormLoader({ mode }: { mode: "display" | "edit" }) {
   const store = useCompanyEditDialogContext();
   const companyId = useSelector(store, (state) => state.context.data.companyId);
 
-  const { data } = useLiveQuery(
-    (q) =>
+  const { data } = useLiveQuery({
+    query: (q) =>
       q
         .from({ company: companyCollection })
         .where(({ company }) =>
@@ -76,26 +76,23 @@ function CompanyEditFormLoader({ mode }: { mode: "display" | "edit" }) {
         )
         .orderBy(({ company }) => company.updatedAt, "desc")
         .limit(1),
-    [companyId, organizationId]
-  );
+  });
   const company = data?.[0];
-  const definitionsQuery = useLiveQuery(
-    (q) =>
+  const definitionsQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ definition: companyAttributeDefinitionCollection })
         .where(({ definition }) =>
           eq(definition.organizationId, organizationId)
         )
         .orderBy(({ definition }) => definition.createdAt, "asc"),
-    [organizationId]
-  );
-  const valuesQuery = useLiveQuery(
-    (q) =>
+  });
+  const valuesQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ value: companyAttributeValueCollection })
         .where(({ value }) => eq(value.companyId, companyId)),
-    [companyId]
-  );
+  });
 
   if (!company) {
     return null;

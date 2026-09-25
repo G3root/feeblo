@@ -47,25 +47,23 @@ export function ChangelogListView({
 }) {
   const { changelogCategoryCollection, changelogCategoryLinkCollection } =
     useDashboardCollections();
-  const categoriesQuery = useLiveQuery(
-    (q) =>
+  const categoriesQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ category: changelogCategoryCollection })
         .where(({ category }) => eq(category.organizationId, organizationId)),
-    [organizationId]
-  );
+  });
   const categories = categoriesQuery.data ?? [];
   const categoryById = new Map(
     categories.map((category) => [category.id, category])
   );
 
-  const linksQuery = useLiveQuery(
-    (q) =>
+  const linksQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ link: changelogCategoryLinkCollection })
         .where(({ link }) => eq(link.organizationId, organizationId)),
-    [organizationId]
-  );
+  });
   const links = linksQuery.data ?? [];
   const categoryIdsByChangelog = new Map<string, string[]>();
   for (const link of links) {

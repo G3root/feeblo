@@ -108,8 +108,8 @@ function BoardFilterRoot({
   const store = useBoardStore();
   const { postStatusCollection, tagCollection } = useDashboardCollections();
   const filters = useBoardFilterState();
-  const { data: postStatuses } = useLiveQuery(
-    (q) =>
+  const { data: postStatuses } = useLiveQuery({
+    query: (q) =>
       q
         .from({ postStatus: postStatusCollection })
         .where(({ postStatus }) =>
@@ -120,10 +120,9 @@ function BoardFilterRoot({
           type: postStatus.type,
           label: postStatus.label,
         })),
-    [organizationId]
-  );
-  const { data: tags } = useLiveQuery(
-    (q) => {
+  });
+  const { data: tags } = useLiveQuery({
+    query: (q) => {
       return q
         .from({ tags: tagCollection })
         .where(({ tags }) => eq(tags.organizationId, organizationId))
@@ -132,8 +131,7 @@ function BoardFilterRoot({
           name: tags.name,
         }));
     },
-    [organizationId]
-  );
+  });
 
   const clearStatusFilter = useCallback(() => {
     store.send({ type: "setStatusOperator", operator: "isAnyOf" });

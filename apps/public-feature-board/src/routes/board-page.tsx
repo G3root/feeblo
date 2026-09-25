@@ -71,8 +71,8 @@ export function BoardPage() {
     data: board,
     isError: boardError,
     isLoading: boardLoading,
-  } = useLiveQuery(
-    (q) => {
+  } = useLiveQuery({
+    query: (q) => {
       if (!(site.organizationId && boardSlug)) {
         return undefined;
       }
@@ -88,15 +88,14 @@ export function BoardPage() {
         )
         .findOne();
     },
-    [site.organizationId, boardSlug]
-  );
+  });
 
   const {
     data: posts = [],
     isError: postsError,
     isLoading: postsLoading,
-  } = useLiveQuery(
-    (q) => {
+  } = useLiveQuery({
+    query: (q) => {
       if (!board?.id) {
         return undefined;
       }
@@ -125,8 +124,7 @@ export function BoardPage() {
           },
         }));
     },
-    [board?.id, site.organizationId]
-  );
+  });
 
   if (boardLoading || (board && postsLoading)) {
     return (

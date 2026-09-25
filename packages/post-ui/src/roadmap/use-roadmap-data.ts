@@ -126,8 +126,8 @@ export function useRoadmapData<
   TRoadmapRow,
   TRoadmapColumnRow
 >): UseRoadmapDataResult {
-  const roadmapsQuery = useLiveQuery(
-    (q) => {
+  const roadmapsQuery = useLiveQuery({
+    query: (q) => {
       if (!organizationId) {
         return undefined;
       }
@@ -153,11 +153,10 @@ export function useRoadmapData<
         }))
         .orderBy(({ roadmap }) => roadmap.createdAt, "asc");
     },
-    [organizationId, slug]
-  );
+  });
 
-  const allRoadmapsQuery = useLiveQuery(
-    (q) => {
+  const allRoadmapsQuery = useLiveQuery({
+    query: (q) => {
       if (!organizationId || slug === undefined) {
         return undefined;
       }
@@ -179,11 +178,10 @@ export function useRoadmapData<
         }))
         .orderBy(({ roadmap }) => roadmap.createdAt, "asc");
     },
-    [organizationId, slug]
-  );
+  });
 
-  const columnsQuery = useLiveQuery(
-    (q) => {
+  const columnsQuery = useLiveQuery({
+    query: (q) => {
       if (!organizationId) {
         return undefined;
       }
@@ -216,11 +214,10 @@ export function useRoadmapData<
         }))
         .orderBy(({ column }) => column.position, "asc");
     },
-    [organizationId]
-  );
+  });
 
-  const postsQuery = useLiveQuery(
-    (q) => {
+  const postsQuery = useLiveQuery({
+    query: (q) => {
       if (!organizationId) {
         return undefined;
       }
@@ -261,8 +258,7 @@ export function useRoadmapData<
         }))
         .orderBy(({ post }) => post.createdAt, "desc");
     },
-    [organizationId]
-  );
+  });
 
   const isError =
     roadmapsQuery.isError ||

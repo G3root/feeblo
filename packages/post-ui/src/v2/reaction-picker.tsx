@@ -259,8 +259,8 @@ export function PostReactionPicker() {
   const { data: session } = useAuthState();
 
   const { data: reactionCounts, isLoading: isReactionCountsLoading } =
-    useLiveQuery(
-      (q) => {
+    useLiveQuery({
+      query: (q) => {
         if (!postSlug) {
           return undefined;
         }
@@ -279,11 +279,10 @@ export function PostReactionPicker() {
           }))
           .orderBy(({ postReaction }) => postReaction.emoji, "asc");
       },
-      [organizationId, postSlug]
-    );
+    });
 
-  const { data: userReactions } = useLiveQuery(
-    (q) => {
+  const { data: userReactions } = useLiveQuery({
+    query: (q) => {
       if (!(postSlug && session?.user?.id)) {
         return undefined;
       }
@@ -301,8 +300,7 @@ export function PostReactionPicker() {
         }))
         .distinct();
     },
-    [organizationId, postSlug, session?.user?.id]
-  );
+  });
 
   const currentUserReactions = useLastKnownUserReactions(
     `${postSlug}:${organizationId}:${session?.user?.id ?? "anonymous"}`,
@@ -416,8 +414,8 @@ export function CommentReactionPicker({
   const { data: session } = useAuthState();
 
   const { data: reactionCounts, isLoading: isReactionCountsLoading } =
-    useLiveQuery(
-      (q) => {
+    useLiveQuery({
+      query: (q) => {
         if (!postSlug) {
           return undefined;
         }
@@ -436,11 +434,10 @@ export function CommentReactionPicker({
           }))
           .orderBy(({ commentReaction }) => commentReaction.emoji, "asc");
       },
-      [organizationId, postSlug]
-    );
+    });
 
-  const { data: userReactions } = useLiveQuery(
-    (q) => {
+  const { data: userReactions } = useLiveQuery({
+    query: (q) => {
       if (!(postSlug && session?.user?.id)) {
         return undefined;
       }
@@ -458,8 +455,7 @@ export function CommentReactionPicker({
         }))
         .distinct();
     },
-    [organizationId, postSlug, session?.user?.id]
-  );
+  });
 
   const currentUserReactions = useLastKnownUserReactions(
     `${postSlug}:${commentId}:${organizationId}:${session?.user?.id ?? "anonymous"}`,

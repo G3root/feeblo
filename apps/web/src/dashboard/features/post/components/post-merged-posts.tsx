@@ -24,8 +24,8 @@ export function PostMergedPosts() {
   const { boardCollection, postCollection, postStatusCollection } =
     useDashboardCollections();
 
-  const { data: mergedPosts } = useLiveQuery(
-    (query) =>
+  const { data: mergedPosts } = useLiveQuery({
+    query: (query) =>
       query
         .from({ post: postCollection })
         .join(
@@ -55,14 +55,7 @@ export function PostMergedPosts() {
           statusType: status.type,
           title: candidate.title,
         })),
-    [
-      boardCollection,
-      organizationId,
-      post.id,
-      postCollection,
-      postStatusCollection,
-    ]
-  );
+  });
 
   if (!mergedPosts || mergedPosts.length === 0) {
     return null;

@@ -11,14 +11,13 @@ export const useSite = () => {
   const organizationId = useOrganizationId();
   const { siteCollection } = useDashboardCollections();
 
-  const { data: site } = useLiveQuery(
-    (q) =>
+  const { data: site } = useLiveQuery({
+    query: (q) =>
       q
         .from({ site: siteCollection })
         .where(({ site }) => eq(site.organizationId, organizationId))
         .findOne(),
-    [organizationId]
-  );
+  });
 
   return site;
 };

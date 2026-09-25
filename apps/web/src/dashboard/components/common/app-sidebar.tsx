@@ -230,15 +230,14 @@ function BoardList() {
   const organizationId = useOrganizationId();
   const { boardCollection } = useDashboardCollections();
 
-  const boardQuery = useLiveQuery(
-    (q) =>
+  const boardQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ board: boardCollection })
         .where((board) => eq(board.board.organizationId, organizationId))
 
         .orderBy((board) => board.board.createdAt, "desc"),
-    [organizationId]
-  );
+  });
 
   if (boardQuery.isLoading) {
     return (

@@ -60,22 +60,20 @@ export function CustomAttributesSettings() {
   const editDialogStore = useCustomAttributeEditDialogContext();
   const deleteDialogStore = useCustomAttributeDeleteDialogContext();
 
-  const contactAttributesQuery = useLiveQuery(
-    (query) =>
+  const contactAttributesQuery = useLiveQuery({
+    query: (query) =>
       query
         .from({ attribute: contactAttributeDefinitionCollection })
         .where(({ attribute }) => eq(attribute.organizationId, organizationId))
         .orderBy(({ attribute }) => attribute.createdAt, "asc"),
-    [organizationId]
-  );
-  const companyAttributesQuery = useLiveQuery(
-    (query) =>
+  });
+  const companyAttributesQuery = useLiveQuery({
+    query: (query) =>
       query
         .from({ attribute: companyAttributeDefinitionCollection })
         .where(({ attribute }) => eq(attribute.organizationId, organizationId))
         .orderBy(({ attribute }) => attribute.createdAt, "asc"),
-    [organizationId]
-  );
+  });
 
   const openCreateDialog = (entityType: CustomAttributeEntityType) =>
     dialogStore.send({ type: "toggle", data: { entityType } });

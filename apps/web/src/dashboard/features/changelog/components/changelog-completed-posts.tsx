@@ -22,8 +22,8 @@ export function ChangelogCompletedPosts({
   const { changelogPostCollection, postCollection, postStatusCollection } =
     useDashboardCollections();
   const { changelog, isOwner } = useChangelogEditorContext();
-  const completedPostsQuery = useLiveQuery(
-    (q) =>
+  const completedPostsQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ post: postCollection })
         .innerJoin({ status: postStatusCollection }, ({ post, status }) =>
@@ -53,8 +53,7 @@ export function ChangelogCompletedPosts({
           id: post.id,
           title: post.title,
         })),
-    [changelog.id, organizationId]
-  );
+  });
   const completedPosts = completedPostsQuery.data ?? [];
 
   const updateAssignment = async ({

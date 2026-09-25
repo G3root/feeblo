@@ -67,13 +67,12 @@ export function ContactTableRow({
   updatePolicy: ClientPolicy;
 }) {
   const { contactAttributeValueCollection } = useDashboardCollections();
-  const { data: values = [] } = useLiveQuery(
-    (q) =>
+  const { data: values = [] } = useLiveQuery({
+    query: (q) =>
       q
         .from({ value: contactAttributeValueCollection })
         .where(({ value }) => eq(value.contactId, contact.id)),
-    [contact.id]
-  );
+  });
   const valuesByAttributeId = new Map(
     values.map((value) => [value.attributeId, value])
   );

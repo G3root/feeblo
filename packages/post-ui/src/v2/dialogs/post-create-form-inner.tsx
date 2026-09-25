@@ -184,8 +184,8 @@ export function PostCreateForm() {
     hasPermission(organizationId, "posts.createOnBehalf")
   );
 
-  const { data: member } = useLiveQuery(
-    (q) => {
+  const { data: member } = useLiveQuery({
+    query: (q) => {
       if (!(membersCollection && organizationId && session?.user?.id)) {
         return undefined;
       }
@@ -199,11 +199,10 @@ export function PostCreateForm() {
         )
         .findOne();
     },
-    [organizationId, session?.user?.id]
-  );
+  });
 
-  const { data: boards = [] } = useLiveQuery(
-    (q) => {
+  const { data: boards = [] } = useLiveQuery({
+    query: (q) => {
       if (!organizationId) {
         return undefined;
       }
@@ -211,10 +210,9 @@ export function PostCreateForm() {
         .from({ board: boardCollection })
         .where(({ board }) => eq(board.organizationId, organizationId));
     },
-    [organizationId]
-  );
-  const { data: postStatuses = [] } = useLiveQuery(
-    (q) => {
+  });
+  const { data: postStatuses = [] } = useLiveQuery({
+    query: (q) => {
       if (!organizationId) {
         return undefined;
       }
@@ -225,8 +223,7 @@ export function PostCreateForm() {
           eq(postStatus.organizationId, organizationId)
         );
     },
-    [organizationId]
-  );
+  });
 
   const initialStatus =
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.

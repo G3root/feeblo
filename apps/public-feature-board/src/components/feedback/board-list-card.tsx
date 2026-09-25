@@ -10,13 +10,12 @@ export function BoardListCard() {
   const site = useSite();
   const { publicBoardCollection } = usePublicCollections();
 
-  const { data } = useLiveQuery(
-    (q) =>
+  const { data } = useLiveQuery({
+    query: (q) =>
       q
         .from({ board: publicBoardCollection })
         .where(({ board }) => eq(board.organizationId, site.organizationId)),
-    [site.organizationId]
-  );
+  });
 
   return (
     <div>

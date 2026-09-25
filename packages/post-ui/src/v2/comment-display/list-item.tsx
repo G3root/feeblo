@@ -38,8 +38,8 @@ export function CommentDisplayItem({
   // stays undefined there and the label renders without a link instead of
   // pointing at a redirect loop.
   const mergedFromPostId = data.mergedFromPostId;
-  const { data: mergedFromPost } = useLiveQuery(
-    (q) => {
+  const { data: mergedFromPost } = useLiveQuery({
+    query: (q) => {
       if (!mergedFromPostId) {
         return undefined;
       }
@@ -48,8 +48,7 @@ export function CommentDisplayItem({
         .where(({ post }) => eq(post.id, mergedFromPostId))
         .findOne();
     },
-    [mergedFromPostId, postCollection]
-  );
+  });
   // The label marks a comment that was carried in from another post, so it
   // belongs on the survivor only. On the merged post's own page these are
   // simply its comments, not merged ones.
@@ -62,16 +61,14 @@ export function CommentDisplayItem({
 
   // Derive the status-update type by joining the comment's FK onto the
   // org-scoped post status collection (labels/colors live client-side).
-  const { data: statusUpdateRows } = useLiveQuery(
-    (q) =>
+  const { data: statusUpdateRows } = useLiveQuery({
+    query: (q) =>
       q
         .from({ postStatus: postStatusCollection })
         .where(({ postStatus }) =>
           eq(postStatus.id, data.statusUpdateId ?? "")
         ),
-
-    [data.statusUpdateId]
-  );
+  });
   const statusUpdate = statusUpdateRows?.[0];
   const statusUpdateType = statusUpdate?.type ?? null;
   const statusUpdateLabel = statusUpdate?.label ?? null;

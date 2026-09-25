@@ -89,32 +89,29 @@ function CompanyPage() {
   const createDialogStore = useCompanyCreateDialogContext();
   const editDialogStore = useCompanyEditDialogContext();
   const deleteDialogStore = useCompanyDeleteDialogContext();
-  const companiesQuery = useLiveQuery(
-    (q) =>
+  const companiesQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ company: companyCollection })
         .where(({ company }) => eq(company.organizationId, organizationId))
         .orderBy(({ company }) => company.updatedAt, "desc"),
-    [organizationId]
-  );
+  });
   const companies = companiesQuery.data ?? [];
-  const { data: contacts = [] } = useLiveQuery(
-    (q) =>
+  const { data: contacts = [] } = useLiveQuery({
+    query: (q) =>
       q
         .from({ contact: contactCollection })
         .where(({ contact }) => eq(contact.organizationId, organizationId)),
-    [organizationId]
-  );
-  const definitionsQuery = useLiveQuery(
-    (q) =>
+  });
+  const definitionsQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ definition: companyAttributeDefinitionCollection })
         .where(({ definition }) =>
           eq(definition.organizationId, organizationId)
         )
         .orderBy(({ definition }) => definition.createdAt, "asc"),
-    [organizationId]
-  );
+  });
   const definitions = definitionsQuery.data ?? [];
 
   const { entitlements } = useEntitlements();
@@ -344,13 +341,12 @@ function CompanyAttributeCells({
   definitions: CustomAttributeDefinition[];
 }) {
   const { companyAttributeValueCollection } = useDashboardCollections();
-  const valuesQuery = useLiveQuery(
-    (q) =>
+  const valuesQuery = useLiveQuery({
+    query: (q) =>
       q
         .from({ value: companyAttributeValueCollection })
         .where(({ value }) => eq(value.companyId, companyId)),
-    [companyId]
-  );
+  });
   const valuesByAttributeId = new Map(
     (valuesQuery.data ?? []).map((value) => [value.attributeId, value])
   );

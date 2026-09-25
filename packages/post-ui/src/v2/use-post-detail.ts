@@ -19,8 +19,8 @@ export function usePostDetail() {
     organizationId,
   } = usePostCollections();
 
-  const query = useLiveQuery(
-    (q) =>
+  const query = useLiveQuery({
+    query: (q) =>
       q
         .from({ detail: postDetailCollection })
         .where(({ detail }) =>
@@ -30,8 +30,7 @@ export function usePostDetail() {
           )
         )
         .findOne(),
-    [organizationId, post.slug]
-  );
+  });
 
   return {
     assetIds: query.data?.assetIds,
