@@ -70,6 +70,25 @@ function ChangelogCategoryRenameForm() {
 
   const category = data[0];
 
+  if (!category) {
+    return null;
+  }
+
+  return <ChangelogCategoryRenameFormFields category={category} />;
+}
+
+function ChangelogCategoryRenameFormFields({
+  category,
+}: {
+  category: { icon: string; name: string };
+}) {
+  const { changelogCategoryCollection } = useDashboardCollections();
+  const store = useChangelogCategoryEditDialogContext();
+  const categoryId = useSelector(
+    store,
+    (state) => state.context.data.categoryId
+  );
+
   const defaultValues: ChangelogCategoryFormValues = {
     name: category.name,
     color:

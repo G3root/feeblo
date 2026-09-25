@@ -57,6 +57,18 @@ function TagRenameForm() {
 
   const tag = data[0];
 
+  if (!tag) {
+    return null;
+  }
+
+  return <TagRenameFormFields tag={tag} />;
+}
+
+function TagRenameFormFields({ tag }: { tag: { name: string } }) {
+  const { tagCollection } = useDashboardCollections();
+  const store = useTagEditDialogContext();
+  const tagId = useSelector(store, (state) => state.context.data.tagId);
+
   const form = useAppForm({
     defaultValues: {
       name: tag.name,

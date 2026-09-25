@@ -1039,6 +1039,10 @@ publicRoadmapColumnCollection.createIndex((row) => row.statusId, {
 publicRoadmapColumnCollection.createIndex((row) => row.roadmapId, {
   indexType: BasicIndex,
 });
+// Upvote rows are joined back to posts by post id.
+publicUpvoteCollection.createIndex((row) => row.postId, {
+  indexType: BasicIndex,
+});
 
 export const publicCollections = {
   publicBoardCollection,

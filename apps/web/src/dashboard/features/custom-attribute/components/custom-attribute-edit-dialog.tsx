@@ -102,6 +102,36 @@ function CustomAttributeEditForm() {
 
   const attribute = data[0];
 
+  if (!attribute) {
+    return null;
+  }
+
+  return <CustomAttributeEditFormFields attribute={attribute} />;
+}
+
+function CustomAttributeEditFormFields({
+  attribute,
+}: {
+  attribute: {
+    description: string | null;
+    isRequired: boolean;
+    name: string;
+    type: "TEXT" | "INTEGER" | "DECIMAL" | "BOOLEAN" | "DATE";
+  };
+}) {
+  const collections = useDashboardCollections();
+  const store = useCustomAttributeEditDialogContext();
+  const attributeId = useSelector(
+    store,
+    (state) => state.context.data.attributeId
+  );
+  const entityType = useSelector(
+    store,
+    (state) => state.context.data.entityType
+  );
+
+  const collection = getCollection(entityType, collections);
+
   const form = useAppForm({
     defaultValues: {
       description: attribute.description ?? "",

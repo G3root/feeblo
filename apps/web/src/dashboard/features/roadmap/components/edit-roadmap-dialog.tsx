@@ -69,15 +69,48 @@ function EditRoadmapForm() {
         .orderBy(({ column }) => column.position, "asc"),
   });
 
+  if (roadmapQuery.isLoading || columnsQuery.isLoading) {
+    return null;
+  }
+
   if (!(roadmapQuery.data && columnsQuery.data)) {
     throw new Error("not found");
   }
 
-  const persistedColumns = columnsQuery.data;
+  return (
+    <EditRoadmapFormFields
+      columns={columnsQuery.data}
+      roadmap={roadmapQuery.data}
+      roadmapId={data.roadmapId}
+    />
+  );
+}
+
+function EditRoadmapFormFields({
+  columns,
+  roadmap,
+  roadmapId,
+}: {
+  columns: Array<{
+    id: string;
+    name: string;
+    position: number;
+    statusId: string;
+  }>;
+  roadmap: {
+    description: string | null;
+    name: string;
+    slug: string;
+    visibility: "public" | "private";
+  };
+  roadmapId: string;
+}) {
+  const organizationId = useOrganizationId();
+  const store = useEditRoadmapDialogContext();
 
   const defaultValues: RoadmapFormValues = {
-    ...roadmapQuery.data,
-    columns: persistedColumns.map((column) => ({
+    ...roadmap,
+    columns: columns.map((column) => ({
       id: column.id,
       name: column.name,
       statusId: column.statusId,
@@ -88,10 +121,10 @@ function EditRoadmapForm() {
     ...roadmapFormOpts,
     defaultValues,
     onSubmit: async ({ value }) => {
-      const oldSlug = roadmapQuery.data?.slug;
+      const oldSlug = roadmap.slug;
       const newSlugifiedValue = slugify(value.name);
       try {
-        const tx = roadmapCollection.update(data.roadmapId, (draft) => {
+        const tx = roadmapCollection.update(roadmapId, (draft) => {
           draft.name = value.name;
           draft.slug = newSlugifiedValue;
           draft.description = value.description ?? null;
@@ -110,13 +143,13 @@ function EditRoadmapForm() {
         await tx.isPersisted.promise;
 
         const persistedById = new Map(
-          persistedColumns.map((column) => [column.id, column])
+          columns.map((column) => [column.id, column])
         );
         const nextIds = new Set(value.columns.map((column) => column.id));
 
         const mutations: Promise<unknown>[] = [];
 
-        for (const column of persistedColumns) {
+        for (const column of columns) {
           if (!nextIds.has(column.id)) {
             mutations.push(
               roadmapColumnCollection.delete(column.id).isPersisted.promise
@@ -133,7 +166,7 @@ function EditRoadmapForm() {
             mutations.push(
               roadmapColumnCollection.insert({
                 id: column.id,
-                roadmapId: data.roadmapId,
+                roadmapId,
                 name: column.name,
                 position: index,
                 statusId: column.statusId,
