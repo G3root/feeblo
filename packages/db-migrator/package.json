@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "migrate": "node ./src/migrator.mjs",
-    "build": "rolldown -c"
+    "build": "rolldown -c",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",

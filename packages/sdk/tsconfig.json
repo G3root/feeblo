@@ -1,13 +1,11 @@
 {
-  "$schema": "https://raw.githubusercontent.com/Effect-TS/language-service/refs/heads/main/schema.json",
   "extends": "@feeblo/config/tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ESNext", "DOM"],
     "types": [],
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "dist",
+    // This config is for typechecking and the editor. `tsconfig.build.json`
+    // owns `rootDir`/`outDir`/`declaration` for the real emit.
+    "noEmit": true,
     "strictNullChecks": true
   },
   "include": ["src/**/*"]

@@ -219,7 +219,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
         model: string,
         builder: any,
         data: Record<string, any>,
-        where?: Where[] | undefined
+        where?: Where[]
       ) => {
         if (config.provider !== "mysql") {
           const c = await builder.returning();

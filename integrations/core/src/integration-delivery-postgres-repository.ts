@@ -67,7 +67,7 @@ const mapPersistenceError = <A, E, R>(
 ): Effect.Effect<A, IntegrationDeliveryWorkerPersistenceError, R> =>
   effect.pipe(
     Effect.mapError((error) =>
-      error instanceof IntegrationDeliveryWorkerPersistenceError
+      Schema.is(IntegrationDeliveryWorkerPersistenceError)(error)
         ? error
         : persistenceError(operation)
     )

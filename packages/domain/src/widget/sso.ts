@@ -218,7 +218,7 @@ export const createSsoSession = ({
       .canUseWidgetSso(organizationId)
       .pipe(
         Effect.mapError((error) =>
-          error instanceof PolicyDeniedError
+          S.is(PolicyDeniedError)(error)
             ? new SsoError({ code: "WIDGET_SSO_NOT_ENTITLED" })
             : error
         )
@@ -344,7 +344,7 @@ export const createSsoSession = ({
     // Normalize any remaining (unexpected) failures into a generic SSO error
     // so the plugin always receives a SsoError.
     Effect.catch((error) =>
-      error instanceof SsoError
+      S.is(SsoError)(error)
         ? Effect.fail(error)
         : Effect.fail(new SsoError({ code: "FAILED_TO_CREATE_SSO_USER" }))
     )
@@ -432,7 +432,7 @@ export const linkAnonymousAccount = ({
       deleteShadowUser: false,
     }).pipe(
       Effect.mapError((error) =>
-        error instanceof LinkAnonymousAccountError
+        S.is(LinkAnonymousAccountError)(error)
           ? error
           : new LinkAnonymousAccountError({
               code: "LINK_FAILED",
@@ -446,7 +446,7 @@ export const linkAnonymousAccount = ({
     // typed error while preserving link-specific rejections byte-for-byte, so
     // the caller sees a single error channel it can log and retry safely.
     Effect.catch((error) =>
-      error instanceof LinkAnonymousAccountError
+      S.is(LinkAnonymousAccountError)(error)
         ? Effect.fail(error)
         : Effect.fail(
             new LinkAnonymousAccountError({

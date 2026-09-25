@@ -164,9 +164,7 @@ const KNOWN_COMPANY_FIELDS = new Set([
   "customFields",
 ]);
 
-type AttributeDefinition =
-  | TContactAttributeDefinition
-  | TCompanyAttributeDefinition;
+type AttributeDefinition = TContactAttributeDefinition;
 
 const valueSchemaForDefinition = (
   definition: AttributeDefinition

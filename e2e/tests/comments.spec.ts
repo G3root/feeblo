@@ -128,10 +128,8 @@ function activityItem(page: Page, text: string | RegExp) {
  */
 async function expectToBeAbove(above: Locator, below: Locator) {
   await expect(async () => {
-    const [aboveY, belowY] = await Promise.all([
-      (await above.boundingBox())?.y ?? Number.POSITIVE_INFINITY,
-      (await below.boundingBox())?.y ?? Number.NEGATIVE_INFINITY,
-    ]);
+    const aboveY = (await above.boundingBox())?.y ?? Number.POSITIVE_INFINITY;
+    const belowY = (await below.boundingBox())?.y ?? Number.NEGATIVE_INFINITY;
     expect(aboveY).toBeLessThan(belowY);
   }).toPass();
 }

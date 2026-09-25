@@ -2,6 +2,17 @@
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
   "tasks": {
+    "typecheck": {
+      "dependsOn": ["^typecheck", "build:paraglide"],
+      "outputs": []
+    },
+    "//#lint": {
+      "outputs": []
+    },
+    "check": {
+      "dependsOn": ["typecheck", "//#lint"],
+      "outputs": []
+    },
     "build": {
       "dependsOn": ["^build", "^build:paraglide", "^build:iframe"],
       "env": ["APP_ROOT_DOMAIN", "APP_URL", "API_URL", "CLOUDFLARE_ADAPTER"],

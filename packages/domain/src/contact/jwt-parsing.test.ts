@@ -109,26 +109,40 @@ describe("JWT payload parsing", () => {
     })
   );
 
-  it("fails when only the legacy userId claim is present (sub is required)", async () => {
-    const verified = await signAndVerify({
-      userId: "legacy_user",
-      email: "test@example.com",
-      name: "Alice",
-    });
+  it.effect(
+    "fails when only the legacy userId claim is present (sub is required)",
+    () =>
+      Effect.gen(function* () {
+        const verified = yield* Effect.promise(() =>
+          signAndVerify({
+            userId: "legacy_user",
+            email: "test@example.com",
+            name: "Alice",
+          })
+        );
 
-    await expect(
-      Effect.runPromise(parsePersonAttributes(verified, [], []))
-    ).rejects.toBeInstanceOf(DataValidationError);
-  });
+        const error = yield* Effect.flip(
+          parsePersonAttributes(verified, [], [])
+        );
+        expect(error).toBeInstanceOf(DataValidationError);
+      })
+  );
 
-  it("fails when required fields (userId/sub, email, name) are missing", async () => {
-    const verified = await signAndVerify({
-      sub: "some-sub",
-      iss: "feeblo",
-    });
+  it.effect(
+    "fails when required fields (userId/sub, email, name) are missing",
+    () =>
+      Effect.gen(function* () {
+        const verified = yield* Effect.promise(() =>
+          signAndVerify({
+            sub: "some-sub",
+            iss: "feeblo",
+          })
+        );
 
-    await expect(
-      Effect.runPromise(parsePersonAttributes(verified, [], []))
-    ).rejects.toBeInstanceOf(DataValidationError);
-  });
+        const error = yield* Effect.flip(
+          parsePersonAttributes(verified, [], [])
+        );
+        expect(error).toBeInstanceOf(DataValidationError);
+      })
+  );
 });

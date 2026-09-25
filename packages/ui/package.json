@@ -16,6 +16,9 @@
     "./hooks/*": "./src/hooks/*.tsx",
     "./*": "./src/*.tsx"
   },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@base-ui/react": "catalog:",
     "@feeblo/utils": "workspace:*",

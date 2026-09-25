@@ -15,7 +15,8 @@
     "./worker-defaults": "./src/delivery-worker-defaults.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@feeblo/db": "workspace:*",

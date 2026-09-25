@@ -1,11 +1,11 @@
 {
   "extends": "@feeblo/config/tsconfig.base.json",
   "compilerOptions": {
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "dist",
-    "composite": true,
+    // This package is consumed as source: every `exports` entry resolves to
+    // `./src/**/*.ts` and there is no build step. `composite`/`declaration`
+    // would only ask tsc to serialize declaration files nothing reads, which
+    // is what produced TS7056 on the inferred `makeRpcRoute` type.
+    "noEmit": true,
     "strictNullChecks": true
   }
 }

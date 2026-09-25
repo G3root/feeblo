@@ -28,6 +28,7 @@ import {
 } from "@feeblo/integration-discord/manifest";
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -94,13 +95,14 @@ export const makeDiscordConnectionServiceLive = (
 ): Layer.Layer<
   DiscordConnectionService,
   never,
-  Database.Database | DiscordIntegrationConfig
+  Database.Database | DiscordIntegrationConfig | Crypto.Crypto
 > =>
   Layer.effect(
     DiscordConnectionService,
     Effect.gen(function* () {
       const db = yield* currentDb;
       const config = yield* DiscordIntegrationConfig;
+      const crypto = yield* Crypto.Crypto;
 
       const connectStart = Effect.fn("DiscordConnection.connectStart")(
         function* ({ organizationId }: S.TDiscordConnectStart) {
@@ -109,7 +111,17 @@ export const makeDiscordConnectionServiceLive = (
               message: "Discord integration is not configured",
             });
           }
-          const nonce = crypto.randomUUID();
+          // Through the `Crypto` service, not the global: the OAuth state must
+          // be reproducible under `TestCrypto` in tests, and Workers forbid
+          // random value generation in global scope.
+          const nonce = yield* crypto.randomUUIDv4.pipe(
+            Effect.mapError(
+              () =>
+                new InternalServerError({
+                  message: "Could not generate a Discord OAuth state.",
+                })
+            )
+          );
           const connectionId = yield* IntegrationConnectionId.generate;
           const ciphertext = yield* encryptDiscordCredentialMaterial(
             config.encryptionKey,

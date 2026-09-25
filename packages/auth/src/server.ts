@@ -47,6 +47,7 @@ import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
 import type * as Redis from "effect/unstable/persistence/Redis";
 import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 
@@ -214,7 +215,9 @@ export const initAuthHandler = (
             createSsoSession({ clientIp, organizationId, token })
           );
         } catch (error) {
-          if (error instanceof SsoError) {
+          // The plugin may hand back an error that crossed a request
+          // boundary, so match on the tag rather than the prototype.
+          if (Schema.is(SsoError)(error)) {
             return { code: error.code, message: error.message };
           }
           return { code: "FAILED_TO_CREATE_SSO_USER" };

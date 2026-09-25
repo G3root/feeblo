@@ -1,6 +1,16 @@
+import { recommended } from "@effect/tsgo/oxlint-presets";
 import { defineConfig } from "oxlint";
 
+/**
+ * Effect diagnostics live here, not in `tsc`.
+ *
+ * `@effect/tsgo` patches both `tsc` and Oxlint. Running the Effect rules in
+ * both places reports every finding twice, so `packages/config/tsconfig.base.json`
+ * sets `diagnostics: false` and Oxlint owns them: one surface, one severity
+ * per rule, cached, and fast enough to run on every commit.
+ */
 export default defineConfig({
+  extends: [recommended],
   plugins: ["eslint", "oxc", "unicorn", "typescript", "vitest"],
   categories: {
     correctness: "warn",
@@ -58,11 +68,12 @@ export default defineConfig({
     ".roo/**",
     ".windsurf/**",
     ".fallow/**",
-    "tools/oxlint/anti-slop/**",
+    "tools/oxlint/**",
   ],
 
   jsPlugins: [
     { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
+    { name: "effect-tests", specifier: "./tools/oxlint/effect-tests/index.ts" },
     { name: "react-doctor", specifier: "oxlint-plugin-react-doctor" },
   ],
 
@@ -75,29 +86,51 @@ export default defineConfig({
     "eslint/no-shadow": "off",
     "eslint/no-await-in-loop": "off",
     "eslint/no-underscore-dangle": "off",
-    "typescript/consistent-return": "off",
-    "typescript/no-base-to-string": "off",
-    "typescript/no-duplicate-type-constituents": "off",
-    "typescript/no-floating-promises": "off",
-    "typescript/no-implied-eval": "off",
-    "typescript/no-meaningless-void-operator": "off",
-    "typescript/no-redundant-type-constituents": "off",
-    "typescript/no-unnecessary-boolean-literal-compare": "off",
-    "typescript/no-unnecessary-type-conversion": "off",
-    "typescript/no-unnecessary-type-arguments": "off",
-    "typescript/no-unnecessary-type-assertion": "off",
-    "typescript/no-unnecessary-type-parameters": "off",
-    "typescript/no-unsafe-type-assertion": "off",
-    "typescript/await-thenable": "off",
-    "typescript/require-array-sort-compare": "off",
-    "typescript/restrict-template-expressions": "off",
-    "typescript/unbound-method": "off",
     "react/no-children-prop": "off",
+
+    // The rules below were disabled while `options.typeAware` was false, so they
+    // could not run at all. Type-aware linting is on now; these three stay off,
+    // each for a stated reason.
+    "typescript/no-unsafe-type-assertion": "off",
+    // 131 findings that are all the same non-defect: an explicit type argument
+    // that matches the parameter's default. Pure style, no signal.
+    "typescript/no-unnecessary-type-arguments": "off",
+    // Off for an unsafe `--fix`, not for the rule's intent. In
+    // `packages/permissions/src/permissions.ts` it judged the assertion on
+    // `${resource}.${action}` unnecessary and removed it, which widened the
+    // result to `string[]` and broke `tsc` — the autofix workflow then committed
+    // that break. It also reported 92 sites repo-wide, so the fix/break cycle
+    // was not going to end on its own. Re-enable only if the fixer is fixed.
+    "typescript/no-unnecessary-type-assertion": "off",
 
     // Tests place assertions inside vi.waitFor / Promise callbacks, which the
     // plugin reports as standalone expects even though they run within a test.
     "vitest/no-standalone-expect": "off",
     "vitest/require-mock-type-parameters": "off",
+
+    // ---------------------------------------------------------------------
+    // Effect diagnostics that do not describe a defect in this codebase.
+    //
+    // Each `-in-effect` sibling stays on: they cover the same hazard inside
+    // Effect code, which is where it actually costs testability. The plain
+    // rule fires on the boundaries this repo deliberately keeps outside
+    // Effect (Playwright specs, TanStack Start server functions, better-auth
+    // plugins, the standalone widget/SDK, Node scripts).
+    // ---------------------------------------------------------------------
+
+    // 829 findings, almost all in client components, browser-side React, and
+    // Playwright specs where `async` is the platform's own API.
+    "effecttsgo/async-function": "off",
+    // `new Date()` outside Effect is ordinary work (Drizzle schema defaults,
+    // client formatting). The defect is `new Date()` *inside* Effect, which
+    // `global-date-in-effect` reports.
+    "effecttsgo/global-date": "off",
+    // Environment is read once at composition roots, migrations, and scripts.
+    // Reading it inside an Effect service is the defect, and is reported.
+    "effecttsgo/process-env": "off",
+    // The widget, the SDK, and CLI entry points log to the console on purpose;
+    // they have no logger to route through.
+    "effecttsgo/global-console": "off",
 
     // anti-slop
     "anti-slop/no-chained-type-assertions": "error",
@@ -121,6 +154,13 @@ export default defineConfig({
   // DB internals. Server-side code (apps/server, packages/auth, integrations)
   // is exempt because it legitimately talks to Postgres.
   overrides: [
+    {
+      // Tests run Effects through `@effect/vitest`, never by hand.
+      files: ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
+      rules: {
+        "effect-tests/no-manual-effect-runtime-in-tests": "error",
+      },
+    },
     {
       files: [
         "apps/web/src/**",
@@ -179,9 +219,12 @@ export default defineConfig({
       },
     },
   ],
+
   options: {
-    // Revisit once Oxlint's tsgolint path can integrate with @effect/tsgo diagnostics.
-    typeAware: false,
+    // Type-aware rules run through `oxlint-tsgolint`, which `@effect/tsgo`
+    // patches so the `effecttsgo/*` rules resolve. tsc still owns plain type
+    // checking; `typeCheck` stays off so diagnostics are not reported twice.
+    typeAware: true,
     typeCheck: false,
   },
 });

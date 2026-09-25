@@ -46,16 +46,20 @@ describe("verifyJwt hex secret handling", () => {
       })
   );
 
-  it("rejects token signed with utf8-encoded hex when verifier expects hex decode (mismatch)", async () => {
-    // Signing with UTF-8 bytes of the hex string is different from raw hex bytes.
-    const tokenUtf8 = await signWithUtf8(
-      { aud: ORGANIZATION_ID, exp: futureExp },
-      HEX_SECRET
-    );
-    await expect(
-      Effect.runPromise(verifyJwt(tokenUtf8, [HEX_SECRET], ORGANIZATION_ID))
-    ).rejects.toBeDefined();
-  });
+  it.effect(
+    "rejects token signed with utf8-encoded hex when verifier expects hex decode (mismatch)",
+    () =>
+      Effect.gen(function* () {
+        // Signing with UTF-8 bytes of the hex string is different from raw hex bytes.
+        const tokenUtf8 = yield* Effect.promise(() =>
+          signWithUtf8({ aud: ORGANIZATION_ID, exp: futureExp }, HEX_SECRET)
+        );
+        const error = yield* Effect.flip(
+          verifyJwt(tokenUtf8, [HEX_SECRET], ORGANIZATION_ID)
+        );
+        expect(error).toBeDefined();
+      })
+  );
 
   it.effect("succeeds when one of multiple hex secrets matches", () =>
     Effect.gen(function* () {
@@ -74,10 +78,13 @@ describe("verifyJwt hex secret handling", () => {
     })
   );
 
-  it("rejects oversized token (>16KiB)", async () => {
-    const big = "a".repeat(17 * 1024);
-    await expect(
-      Effect.runPromise(verifyJwt(big, [HEX_SECRET], ORGANIZATION_ID))
-    ).rejects.toBeDefined();
-  });
+  it.effect("rejects oversized token (>16KiB)", () =>
+    Effect.gen(function* () {
+      const big = "a".repeat(17 * 1024);
+      const error = yield* Effect.flip(
+        verifyJwt(big, [HEX_SECRET], ORGANIZATION_ID)
+      );
+      expect(error).toBeDefined();
+    })
+  );
 });

@@ -237,7 +237,7 @@ export const makeDiscordChannelServiceLive = (
                       createdAt: now,
                       updatedAt: now,
                     });
-                  } else if (route.enabled !== true) {
+                  } else if (!route.enabled) {
                     yield* db
                       .update(schema.integrationRouteTable)
                       .set({

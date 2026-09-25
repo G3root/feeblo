@@ -2,6 +2,7 @@ import { currentDb, schema } from "@feeblo/db";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import type { PostActivityMetadata } from "../post-activity/repository";
@@ -48,8 +49,8 @@ export const resolveOnBehalfSubject = (args: {
             | SubjectNotFoundError
             | InvalidSubjectError
             | InternalServerError =>
-            error instanceof SubjectNotFoundError ||
-            error instanceof InvalidSubjectError
+            Schema.is(SubjectNotFoundError)(error) ||
+            Schema.is(InvalidSubjectError)(error)
               ? error
               : new InternalServerError({
                   message: `Could not resolve the ${args.action}.`,

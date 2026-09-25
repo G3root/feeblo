@@ -29,6 +29,7 @@ import {
 } from "@feeblo/integration-slack/manifest";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -94,13 +95,14 @@ export const makeSlackConnectionServiceLive = (
 ): Layer.Layer<
   SlackConnectionService,
   never,
-  Database.Database | SlackIntegrationConfig
+  Database.Database | SlackIntegrationConfig | Crypto.Crypto
 > =>
   Layer.effect(
     SlackConnectionService,
     Effect.gen(function* () {
       const db = yield* currentDb;
       const config = yield* SlackIntegrationConfig;
+      const crypto = yield* Crypto.Crypto;
 
       const connectStart = Effect.fn("SlackConnection.connectStart")(
         function* ({ organizationId }: S.TSlackConnectStart) {
@@ -109,7 +111,17 @@ export const makeSlackConnectionServiceLive = (
               message: "Slack integration is not configured",
             });
           }
-          const nonce = crypto.randomUUID();
+          // Through the `Crypto` service, not the global: the OAuth state must
+          // be reproducible under `TestCrypto` in tests, and Workers forbid
+          // random value generation in global scope.
+          const nonce = yield* crypto.randomUUIDv4.pipe(
+            Effect.mapError(
+              () =>
+                new InternalServerError({
+                  message: "Could not generate a Slack OAuth state.",
+                })
+            )
+          );
           const connectionId = yield* IntegrationConnectionId.generate;
           const ciphertext = yield* encryptSlackCredentialMaterial(
             config.encryptionKey,

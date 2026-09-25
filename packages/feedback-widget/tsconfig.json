@@ -1,15 +1,13 @@
 {
-  "$schema": "https://raw.githubusercontent.com/Effect-TS/language-service/refs/heads/main/schema.json",
   "extends": "@feeblo/config/tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ESNext", "DOM"],
     "types": [],
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "dist",
+    // Vite owns the build output; this config is for typechecking and the
+    // editor, so it must not declare `outDir`/`declaration` without `rootDir`.
+    "noEmit": true,
     "strictNullChecks": true
   },
   "include": ["src/**/*"]

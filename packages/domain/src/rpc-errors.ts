@@ -54,8 +54,11 @@ const getDatabaseErrorField = (
     onSome: (error) => error[field],
   });
 
+// `Schema.is`, not `instanceof`: these errors cross the RPC and serialization
+// boundaries, where a decoded error is a plain object carrying `_tag` and no
+// prototype, and `instanceof` would answer `false` for a real one.
 export const isUniqueViolation = <T>(error: T): boolean =>
-  error instanceof EffectDrizzleQueryError &&
+  Schema.is(EffectDrizzleQueryError)(error) &&
   getDatabaseErrorField(error.cause, "code") === "23505";
 
 /**
@@ -67,7 +70,7 @@ export const isUniqueViolation = <T>(error: T): boolean =>
 export const getUniqueViolationConstraint = <T>(
   error: T
 ): string | undefined =>
-  error instanceof EffectDrizzleQueryError
+  Schema.is(EffectDrizzleQueryError)(error)
     ? getDatabaseErrorField(error.cause, "constraint")
     : undefined;
 
@@ -198,7 +201,7 @@ export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
           | { _tag: "SchemaError" }
           | { _tag: "LegidError" }
         > =>
-          e instanceof EffectDrizzleQueryError ||
+          Schema.is(EffectDrizzleQueryError)(e) ||
           Predicate.isTagged(e, "SqlError") ||
           Predicate.isTagged(e, "SchemaError") ||
           Predicate.isTagged(e, "LegidError"),

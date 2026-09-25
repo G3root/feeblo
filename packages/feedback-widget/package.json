@@ -17,7 +17,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "build:iframe": "vite build --config vite.config.iframe.ts"
+    "build:iframe": "vite build --config vite.config.iframe.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@feeblo/domain": "workspace:*",

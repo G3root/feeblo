@@ -5,6 +5,7 @@ import {
   makeSlackApiClient,
   type SlackApiClient,
 } from "@feeblo/integration-slack";
+import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -27,7 +28,7 @@ export const makeSlackManagementServiceLive = (
 ): Layer.Layer<
   SlackManagementService,
   never,
-  Database.Database | SlackIntegrationConfig
+  Database.Database | SlackIntegrationConfig | Crypto.Crypto
 > =>
   Layer.effect(
     SlackManagementService,

@@ -24,7 +24,8 @@
     "./discord-user-service": "./src/discord-user-service.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@feeblo/db": "workspace:*",
@@ -37,6 +38,7 @@
     "effect": "catalog:"
   },
   "devDependencies": {
+    "@effect/platform-node": "catalog:",
     "@effect/vitest": "catalog:",
     "@feeblo/config": "workspace:*",
     "@types/node": "catalog:",

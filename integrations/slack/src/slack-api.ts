@@ -5,7 +5,7 @@ import {
   IntegrationProviderRateLimitedError,
   IntegrationProviderTemporaryFailure,
 } from "@feeblo/integration-core";
-import { isObject } from "@feeblo/utils/runtime-kind";
+import { isObject, isPlainObject } from "@feeblo/utils/runtime-kind";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
@@ -145,6 +145,31 @@ export const SlackOAuthAccessResponse = Schema.Struct({
 export type SlackOAuthAccessResponse = Schema.Schema.Type<
   typeof SlackOAuthAccessResponse
 >;
+
+/**
+ * The fields `classifySlackApiError` reads, lifted off a decoded Slack body.
+ *
+ * `classifySlackApiError` decodes its input against `SlackApiErrorEnvelope`,
+ * which requires `ok: false` and a string `error`. Drop either one and the
+ * decode fails silently, so every `error`-based classification — `invalid_auth`,
+ * `missing_scope`, the channel errors — falls through to a permanent rejection,
+ * and a 429 loses its `retry_after`. That failure is invisible at the call site,
+ * which is why this is a named, tested function rather than an inline spread.
+ *
+ * The fields are lifted rather than spread because the decoded body is
+ * untrusted JSON: an array spreads to indexed keys instead of an envelope.
+ */
+export const slackErrorResponse = (body: Schema.Json, status: number) =>
+  isPlainObject(body)
+    ? {
+        ...("ok" in body && { ok: body.ok }),
+        ...("error" in body && { error: body.error }),
+        ...("response_metadata" in body && {
+          response_metadata: body.response_metadata,
+        }),
+        status,
+      }
+    : { status };
 
 /**
  * Classifies a failed Slack API response into the typed provider failure
@@ -324,10 +349,7 @@ export const makeSlackApiClient = (): SlackApiClient => {
       return body;
     }
     return yield* classifySlackApiError(
-      {
-        ...(isObject(body) && body),
-        status,
-      },
+      slackErrorResponse(body, status),
       input.context
     );
   });

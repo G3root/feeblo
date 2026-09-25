@@ -1,3 +1,4 @@
+import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
@@ -125,11 +126,16 @@ const makeTestLayer = (
   const apiClient = makeFakeDiscordApiClient(channels, guildId);
   const serviceLayer = makeDiscordManagementServiceLive(apiClient).pipe(
     Layer.provide(testConfig(configured)),
-    Layer.provide(Database.PgliteDatabaseLive)
+    Layer.provide(Database.PgliteDatabaseLive),
+    Layer.provide(NodeCrypto.layer)
   );
   return {
     apiClient,
-    layer: Layer.mergeAll(serviceLayer, Database.PgliteDatabaseLive),
+    layer: Layer.mergeAll(
+      serviceLayer,
+      Database.PgliteDatabaseLive,
+      NodeCrypto.layer
+    ),
   };
 };
 

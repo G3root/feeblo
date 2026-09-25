@@ -43,8 +43,15 @@ export type CommentComposerState = {
 };
 
 export type CommentComposerActions = {
-  /** Stages a freshly named subject as the on-behalf author. */
-  onAuthorCreate?: (values: { email: string; name: string }) => void;
+  /**
+   * Stages a freshly named subject as the on-behalf author. A host that
+   * persists the subject before it can be selected returns a promise; the
+   * create-subject dialog waits on it before closing.
+   */
+  onAuthorCreate?: (values: {
+    email: string;
+    name: string;
+  }) => void | Promise<void>;
   onCancel?: () => void;
   onContentChange: (content: string) => void;
   onSubmit?: () => void;

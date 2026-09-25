@@ -6,6 +6,9 @@
   "exports": {
     "./*": "./src/*.ts"
   },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "effect": "catalog:"
   },

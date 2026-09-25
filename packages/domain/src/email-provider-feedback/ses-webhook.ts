@@ -101,8 +101,8 @@ const mapIngestError = (
   cause: unknown
 ): EmailProviderFeedbackInputError | EmailProviderFeedbackDataError => {
   if (
-    cause instanceof EmailProviderFeedbackInputError ||
-    cause instanceof EmailProviderFeedbackDataError
+    Schema.is(EmailProviderFeedbackInputError)(cause) ||
+    Schema.is(EmailProviderFeedbackDataError)(cause)
   ) {
     return cause;
   }

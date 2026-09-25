@@ -1,5 +1,6 @@
 import { PolicyDeniedError } from "@feeblo/domain/policy";
 import { APIError } from "better-auth/api";
+import * as Schema from "effect/Schema";
 
 /**
  * Maps Feeblo's `PolicyDeniedError` to the better-auth `APIError` its hooks
@@ -10,7 +11,10 @@ import { APIError } from "better-auth/api";
  * reason (never internal detail) reaches the response body.
  */
 export const mapPolicyDeniedToApiError = <T>(error: T): T | APIError => {
-  if (error instanceof PolicyDeniedError) {
+  // `Schema.is`, not `instanceof`: better-auth hooks receive errors that may
+  // have crossed a serialization boundary, where a decoded `PolicyDeniedError`
+  // is a plain object carrying `_tag` and no prototype.
+  if (Schema.is(PolicyDeniedError)(error)) {
     return new APIError("FORBIDDEN", {
       message: error.reason ?? "Forbidden",
     });

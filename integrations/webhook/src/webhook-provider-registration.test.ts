@@ -128,34 +128,34 @@ const makeDeliveryFixture = () =>
   });
 
 describe("webhook provider registration", () => {
-  it("is accepted by the real core startup registry", () => {
-    const registration = makeWebhookProviderRegistration({
-      endpointSecurityPolicy: {
-        environment: "test",
-        allowPrivateNetworkInDevelopment: false,
-      },
-      credentialResolver: {
-        loadWebhookCredentials: () =>
-          Effect.succeed({
-            endpointUrl: Redacted.make("https://example.com/hook"),
-            signingKeyring: {
-              current: Redacted.make(
-                "whsec_MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI="
-              ),
-            },
-          }),
-      },
-    });
-    const registry = Effect.runSync(
-      makeIntegrationProviderRegistry([registration])
-    );
-    expect(
-      registry.getHandler({
-        provider: webhookProviderKey,
-        capabilityKey: webhookEventsPostCapabilityKey,
-      })
-    ).toBeDefined();
-  });
+  it.effect("is accepted by the real core startup registry", () =>
+    Effect.gen(function* () {
+      const registration = makeWebhookProviderRegistration({
+        endpointSecurityPolicy: {
+          environment: "test",
+          allowPrivateNetworkInDevelopment: false,
+        },
+        credentialResolver: {
+          loadWebhookCredentials: () =>
+            Effect.succeed({
+              endpointUrl: Redacted.make("https://example.com/hook"),
+              signingKeyring: {
+                current: Redacted.make(
+                  "whsec_MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI="
+                ),
+              },
+            }),
+        },
+      });
+      const registry = yield* makeIntegrationProviderRegistry([registration]);
+      expect(
+        registry.getHandler({
+          provider: webhookProviderKey,
+          capabilityKey: webhookEventsPostCapabilityKey,
+        })
+      ).toBeDefined();
+    })
+  );
 
   it.live(
     "delivers canonical post data and signs the exact external wire payload",
