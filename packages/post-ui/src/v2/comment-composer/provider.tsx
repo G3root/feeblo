@@ -35,8 +35,14 @@ export type CommentComposerProviderProps = {
    */
   content?: string;
   disabled?: boolean;
-  /** Stages a freshly named subject as the on-behalf author. */
-  onAuthorCreate?: (values: { email: string; name: string }) => void;
+  /**
+   * Stages a freshly named subject as the on-behalf author. Return a promise
+   * to keep the create-subject dialog open until the subject is persisted.
+   */
+  onAuthorCreate?: (values: {
+    email: string;
+    name: string;
+  }) => void | Promise<void>;
   /** Controlled visibility; when omitted the composer keeps its own copy. */
   isPrivate?: boolean;
   /**

@@ -551,8 +551,11 @@ describe("webhook management service", () => {
           expect(pageTwo.items).toHaveLength(1);
           expect(pageTwo.nextCursor).toBeNull();
 
-          const seenIds = [pageOne.items[0]?.id, pageTwo.items[0]?.id].sort();
-          expect(seenIds).toEqual([first.deliveryId, second.deliveryId].sort());
+          // Order-independent, and length-checked: `toEqual` requires the
+          // received array to hold exactly these ids, in any order.
+          expect([pageOne.items[0]?.id, pageTwo.items[0]?.id]).toEqual(
+            expect.arrayContaining([first.deliveryId, second.deliveryId])
+          );
 
           const malformed = yield* Effect.flip(
             service.getDeliveryHistory({

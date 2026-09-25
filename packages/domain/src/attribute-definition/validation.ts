@@ -1,6 +1,7 @@
 import type { schema } from "@feeblo/db";
 import { isBoolean, isNumber, isString } from "@feeblo/utils/runtime-kind";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as S from "effect/Schema";
 
 import { BadRequestError } from "../rpc-errors";
@@ -54,9 +55,23 @@ const validateConfig = (
     return { valid: true };
   }
 
-  const config = S.decodeUnknownSync(AttributeConfig)(definition.config ?? {}, {
-    onExcessProperty: "ignore",
-  });
+  // `decodeUnknownOption`, not `decodeUnknownSync`: the stored configuration
+  // comes from the database, and a row that no longer matches `AttributeConfig`
+  // is a misconfiguration, not a caller error. Throwing here would surface as
+  // an Effect defect — bypassing the `BadRequestError` channel
+  // `validateAttributeValueEffect` declares — instead of the validation failure
+  // the other misconfiguration branches already return.
+  const decodedConfig = S.decodeUnknownOption(AttributeConfig)(
+    definition.config ?? {},
+    { onExcessProperty: "ignore" }
+  );
+  if (Option.isNone(decodedConfig)) {
+    return {
+      valid: false,
+      error: `Configured validation rules for "${definition.name}" are invalid`,
+    };
+  }
+  const config = decodedConfig.value;
 
   switch (definition.type) {
     case "TEXT": {

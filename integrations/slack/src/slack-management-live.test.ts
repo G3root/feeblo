@@ -1,3 +1,4 @@
+import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
@@ -149,11 +150,16 @@ const makeTestLayer = (
   const apiClient = makeFakeSlackApiClient(channelPages);
   const serviceLayer = makeSlackManagementServiceLive(apiClient).pipe(
     Layer.provide(testConfig(configured)),
-    Layer.provide(Database.PgliteDatabaseLive)
+    Layer.provide(Database.PgliteDatabaseLive),
+    Layer.provide(NodeCrypto.layer)
   );
   return {
     apiClient,
-    layer: Layer.mergeAll(serviceLayer, Database.PgliteDatabaseLive),
+    layer: Layer.mergeAll(
+      serviceLayer,
+      Database.PgliteDatabaseLive,
+      NodeCrypto.layer
+    ),
   };
 };
 

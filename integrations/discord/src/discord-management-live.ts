@@ -5,6 +5,7 @@ import {
   type DiscordApiClient,
   makeDiscordApiClient,
 } from "@feeblo/integration-discord";
+import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -27,7 +28,7 @@ export const makeDiscordManagementServiceLive = (
 ): Layer.Layer<
   DiscordManagementService,
   never,
-  Database.Database | DiscordIntegrationConfig
+  Database.Database | DiscordIntegrationConfig | Crypto.Crypto
 > =>
   Layer.effect(
     DiscordManagementService,

@@ -3,6 +3,7 @@ import * as NodeCrypto from "node:crypto";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
+import { isString } from "@feeblo/utils/runtime-kind";
 import { eq } from "drizzle-orm";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
@@ -200,8 +201,24 @@ const asFetch = (
   impl: (input: RequestInfo | URL) => Promise<Response>
 ): typeof fetch => impl as typeof fetch;
 
+/**
+ * The URL a `fetch` stub was asked for.
+ *
+ * `RequestInfo | URL` reaches these stubs as a string or a `URL`, but a
+ * `Request` is also legal and stringifies to `"[object Request]"` — which would
+ * silently miss every comparison against the signing-certificate URL and turn a
+ * real assertion failure into a confusing one. Read the URL off whichever shape
+ * arrived instead of stringifying the union.
+ */
+const requestUrl = (input: RequestInfo | URL): string => {
+  if (isString(input)) {
+    return input;
+  }
+  return input instanceof URL ? input.href : input.url;
+};
+
 const fetchStub = asFetch((input: RequestInfo | URL): Promise<Response> => {
-  const url = String(input);
+  const url = requestUrl(input);
   if (url === SIGNING_CERT_URL) {
     return Promise.resolve(new Response(SIGNING_CERT_PEM, { status: 200 }));
   }
@@ -219,8 +236,8 @@ const fetchStub = asFetch((input: RequestInfo | URL): Promise<Response> => {
 const subscriptionConfirmationRequests: string[] = [];
 const SubscriptionConfirmationFetch = asFetch(
   (input: RequestInfo | URL): Promise<Response> => {
-    subscriptionConfirmationRequests.push(String(input));
-    return String(input) === SIGNING_CERT_URL
+    subscriptionConfirmationRequests.push(requestUrl(input));
+    return requestUrl(input) === SIGNING_CERT_URL
       ? Promise.resolve(new Response(SIGNING_CERT_PEM, { status: 200 }))
       : Promise.resolve(
           new Response("Subscription Confirmed", { status: 200 })
@@ -466,7 +483,7 @@ describe("SesEmailFeedbackWebhook", () => {
       makeWebhookLayer(
         TestConfig,
         asFetch((input: RequestInfo | URL): Promise<Response> => {
-          return String(input) === SIGNING_CERT_URL
+          return requestUrl(input) === SIGNING_CERT_URL
             ? Promise.resolve(new Response(SIGNING_CERT_PEM, { status: 200 }))
             : Promise.resolve(
                 new Response("service unavailable", { status: 503 })
@@ -542,7 +559,7 @@ describe("SesEmailFeedbackWebhook", () => {
       makeWebhookLayer(
         TestConfig,
         asFetch((input: RequestInfo | URL): Promise<Response> => {
-          if (String(input) === SIGNING_CERT_URL) {
+          if (requestUrl(input) === SIGNING_CERT_URL) {
             return Promise.resolve(
               new Response(SIGNING_CERT_PEM, { status: 200 })
             );

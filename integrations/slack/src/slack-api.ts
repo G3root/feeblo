@@ -5,7 +5,7 @@ import {
   IntegrationProviderRateLimitedError,
   IntegrationProviderTemporaryFailure,
 } from "@feeblo/integration-core";
-import { isObject } from "@feeblo/utils/runtime-kind";
+import { isObject, isPlainObject } from "@feeblo/utils/runtime-kind";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
@@ -323,9 +323,21 @@ export const makeSlackApiClient = (): SlackApiClient => {
     if (isObject(body) && body !== null && "ok" in body && body.ok === true) {
       return body;
     }
+    // Only `error` and `response_metadata` are read off a failed response, so
+    // lift them out explicitly rather than spreading the decoded body: the body
+    // is untrusted JSON, and a non-plain object — an array, most plausibly —
+    // spreads to indexed keys instead of the envelope the classifier reads.
+    const errorEnvelope = isPlainObject(body)
+      ? {
+          ...("error" in body && { error: body.error }),
+          ...("response_metadata" in body && {
+            response_metadata: body.response_metadata,
+          }),
+        }
+      : {};
     return yield* classifySlackApiError(
       {
-        ...(isObject(body) && body),
+        ...errorEnvelope,
         status,
       },
       input.context

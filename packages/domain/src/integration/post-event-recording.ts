@@ -160,7 +160,7 @@ export const recordPostIntegrationEvent = Effect.fn(
   (effect) =>
     effect.pipe(
       Effect.mapError((error) =>
-        error instanceof PostIntegrationEventRecordingError
+        Schema.is(PostIntegrationEventRecordingError)(error)
           ? error
           : new PostIntegrationEventRecordingError({
               kind: "infrastructure",
