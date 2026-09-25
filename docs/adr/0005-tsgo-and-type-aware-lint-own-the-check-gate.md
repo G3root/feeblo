@@ -16,10 +16,19 @@ Splitting responsibility between the two tools keeps each one honest. `tsc` owns
 
 ## Consequences
 
-Every Effect rule now lives in `oxlint.config.ts`, and `docs`-level changes to a diagnostic severity are config edits rather than tsconfig edits. Four `effecttsgo/*` rules are `off` with written reasons — `async-function`, `global-date`, `process-env`, `global-console` — because this repo deliberately keeps those behaviors outside Effect at its boundaries (Playwright specs, TanStack Start server functions, better-auth plugins, the standalone widget, Node scripts); their `-in-effect` siblings stay on, which is where the hazard actually costs testability.
+Every Effect rule now lives in `oxlint.config.ts`, and changing a diagnostic severity is a config edit rather than a tsconfig edit. The `effecttsgo` rules that fire on usage anywhere in a file — `async-function`, `global-date`, `process-env`, `global-console` — are `off` with written reasons, because this repo deliberately keeps those behaviors outside Effect at its boundaries (Playwright specs, TanStack Start server functions, better-auth plugins, the standalone widget, Node scripts). Their `-in-effect` siblings stay on, and those are the ones that describe a defect.
 
-Two gates are now red on tracked code until ratcheted, both advisory rather than blocking: `typescript/no-floating-promises` (47 findings, mostly React event handlers) and `effecttsgo/global-date-in-effect` (421, concentrated in `email-outbox`, `post`, `workspace`, `db`). Both should be fixed and flipped to `error`; neither should be silenced.
+That distinction is the thing to know when reading the warning count. The bare variants fire in files with no Effect context at all, so their totals overstate the problem badly: `new-promise` (21) is Storybook mocks, a framework-agnostic editor, and Playwright specs; `global-timers` (12) is Storybook, the embeddable SDK, a PostHog provider, and a clipboard hook; `schema-sync` (26) is almost entirely `decodeUnknownSync` in test files, where a throw is what you want; `any-unknown-in-error-context` (43) is 30 test files plus HTTP router plumbing where the `unknown` is inference, not a decision. None of those should be churned to satisfy a rule whose advice does not apply. What is genuinely actionable, in order:
+
+1. `global-date-in-effect` (433, concentrated in `email-outbox`, `post`, `workspace`, `db`). `new Date()` inside Effect bypasses `Clock`, so those services cannot be tested against `TestClock`. This is the largest real defect in the codebase.
+2. `typescript/no-floating-promises` (48, mostly React event handlers) — a floating promise in a handler is an unhandled rejection.
+3. `strict-effect-provide` (50) and `any-unknown-in-error-context` (the 7 production sites).
+4. `global-console-in-effect` (26) is 24/26 in `packages/db/seed.ts`, a human-facing CLI where `console.log` prints the output an operator expects; `Effect.log` would add fiber and timestamp noise. Leave it unless that script becomes machine-read.
+
+Each should be fixed and then flipped to `error`. None should be silenced.
 
 Tests keep one documented exception to the manual-runtime ban: `packages/auth/src/api-key.test.ts` builds `ManagedRuntime` values at module scope, because it shares one PGlite database across the file and passes it to the better-auth adapter as a plain value rather than inside an Effect. Its `oxlint-disable` carries the reason inline. Every other test file uses `it.effect`/`it.layer`, enforced by `tools/oxlint/effect-tests`.
+
+`extends-native-error` stays on as a warning rather than being fixed: `RpcError` in `packages/web-shared` and `EmbedError` in `packages/sdk` are deliberately plain `Error` subclasses that never enter an Effect failure channel, and the SDK one must not pull `effect/Schema` into the embeddable bundle.
 
 A dependency bump now has a version contract. `@effect/tsgo` names the TypeScript, Oxlint, and `oxlint-tsgolint` versions it supports; `effect-tsgo patch` validates them and refuses to patch a mismatch, so these four pins move together or not at all.
