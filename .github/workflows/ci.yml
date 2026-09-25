@@ -23,6 +23,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# Every job here checks out the repo and nothing more: no releases, no packages,
+# no issues. Declare that for all of them rather than inheriting the repository
+# default, which is read-write unless the org narrows it.
+permissions:
+  contents: read
+
 jobs:
   checks:
     name: Typecheck, Lint, Format
