@@ -164,9 +164,7 @@ const KNOWN_COMPANY_FIELDS = new Set([
   "customFields",
 ]);
 
-type AttributeDefinition =
-  | TContactAttributeDefinition
-  | TCompanyAttributeDefinition;
+type AttributeDefinition = TContactAttributeDefinition;
 
 const valueSchemaForDefinition = (
   definition: AttributeDefinition
@@ -197,7 +195,7 @@ const valueSchemaForDefinition = (
             );
             // SAFETY: the checked schema still decodes to `string`, which is a
             // member of AttributeValue, so the widening is lossless.
-            return schema as S.Codec<AttributeValue>;
+            return schema;
           }
           schema = schema.check(
             S.isPattern(expression, {
@@ -208,7 +206,7 @@ const valueSchemaForDefinition = (
       }
       // SAFETY: the checked schema still decodes to `string`, which is a
       // member of AttributeValue, so the widening is lossless.
-      return schema as S.Codec<AttributeValue>;
+      return schema;
     }
     case "INTEGER": {
       let schema: S.Codec<number> = S.Number.check(
@@ -231,7 +229,7 @@ const valueSchemaForDefinition = (
         );
       }
       // SAFETY: the result decodes to `number`, a member of AttributeValue.
-      return schema as S.Codec<AttributeValue>;
+      return schema;
     }
     case "DECIMAL": {
       let schema: S.Codec<number> = S.Number.check(
@@ -254,22 +252,22 @@ const valueSchemaForDefinition = (
         );
       }
       // SAFETY: the result decodes to `number`, a member of AttributeValue.
-      return schema as S.Codec<AttributeValue>;
+      return schema;
     }
     case "BOOLEAN": {
       // SAFETY: the result decodes to `boolean`, a member of AttributeValue.
-      return S.Boolean as S.Codec<AttributeValue>;
+      return S.Boolean;
     }
     case "DATE": {
       // S.Date already rejects NaN/invalid Date instances, and S.DateFromString
       // fails to decode garbage strings into a valid date, so no extra
       // validity filter is needed.
       // SAFETY: both members decode to `Date`, a member of AttributeValue.
-      return S.Union([S.Date, S.DateFromString]) as S.Codec<AttributeValue>;
+      return S.Union([S.Date, S.DateFromString]);
     }
     default: {
       // SAFETY: Never rejects every value, so any target type is sound.
-      return S.Never as S.Codec<AttributeValue>;
+      return S.Never;
     }
   }
 };

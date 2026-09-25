@@ -293,9 +293,7 @@ function PostEditorComponent({
   const isContentControlled = externalContent !== undefined;
 
   // SAFETY: the content is controlled only when the host passes a string.
-  const content = isContentControlled
-    ? (externalContent as string)
-    : internalContent;
+  const content = isContentControlled ? externalContent : internalContent;
 
   // Sync the latest content into the ref after render; the ref is only ever
   // read from event handlers, which run after effects have flushed.

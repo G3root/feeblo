@@ -24,7 +24,7 @@ export const changelogCategoryFormOpts = formOptions({
   defaultValues: {
     name: "",
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    color: CHANGELOG_CATEGORY_COLORS[0] as TColor,
+    color: CHANGELOG_CATEGORY_COLORS[0],
   },
   validators: {
     onSubmit: changelogCategoryFormSchema,

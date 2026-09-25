@@ -110,7 +110,7 @@ describe("AuthProvider session revalidation", () => {
       .element(screen.getByText("authenticated:cached@example.com"))
       .toBeVisible();
 
-    release!();
+    release();
     await vi.waitFor(() => {
       screen.getByText("authenticated:fresh@example.com");
     });

@@ -46,7 +46,7 @@ export const policy = <E, R>(
       ),
       (result) => (result ? Effect.void : Effect.fail(new PolicyDeniedError()))
     )
-  ) as Policy<E, R>;
+  );
 
 /**
  * Creates a policy from a predicate function that may evaluate the current user,

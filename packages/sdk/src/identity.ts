@@ -54,5 +54,5 @@ export function normalizeUserIdentity(
     id,
     ...base,
     ...(companies && { companies }),
-  } as NormalizedUserIdentity;
+  };
 }

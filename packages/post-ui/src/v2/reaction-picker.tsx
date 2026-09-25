@@ -378,7 +378,7 @@ export function PostReactionPicker() {
   const reactionList = new Map(
     (reactionCounts ?? []).map((r) => [
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      r.emoji as ReactionEmoji,
+      r.emoji,
       { count: r.count },
     ])
   );
@@ -535,10 +535,7 @@ export function CommentReactionPicker({
 
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const reactionList = new Map(
-    (reactionCounts ?? []).map((r) => [
-      r.emoji as ReactionEmoji,
-      { count: r.count },
-    ])
+    (reactionCounts ?? []).map((r) => [r.emoji, { count: r.count }])
   );
 
   return (

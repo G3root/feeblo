@@ -68,7 +68,7 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
       bulkDeleteOpen: false,
       displayMode: defaultValue?.displayMode ?? "list",
       selectedPosts: [],
-    } as BoardStoreContext,
+    },
     on: {
       clearSelection: (context) => ({
         ...context,

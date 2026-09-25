@@ -994,9 +994,7 @@ export const commentReactionCollection = createCollection(
     },
     queryClient,
     // SAFETY: The endpoint/API contract guarantees this response shape.
-    getKey: getCommentReactionCollectionKey as (
-      item: CommentReactionRow
-    ) => string,
+    getKey: getCommentReactionCollectionKey,
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: newCommentReaction } = mutation;
@@ -1047,7 +1045,7 @@ export const upvoteCollection = createCollection(
     // SAFETY: The endpoint/API contract guarantees this response shape.
     queryClient,
     // SAFETY: The endpoint/API contract guarantees this response shape.
-    getKey: getUpvoteCollectionKey as (item: UpvoteRow) => string,
+    getKey: getUpvoteCollectionKey,
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: newUpvote } = mutation;
@@ -1161,7 +1159,7 @@ export const postReactionCollection = createCollection(
     // SAFETY: The endpoint/API contract guarantees this response shape.
     queryClient,
     // SAFETY: The endpoint/API contract guarantees this response shape.
-    getKey: getPostReactionCollectionKey as (item: PostReactionRow) => string,
+    getKey: getPostReactionCollectionKey,
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: newPostReaction } = mutation;
@@ -1283,9 +1281,7 @@ export const postSubscriptionCollection = createCollection(
     // SAFETY: The endpoint/API contract guarantees this response shape.
     queryClient,
     // SAFETY: The endpoint/API contract guarantees this response shape.
-    getKey: getPostSubscriptionCollectionKey as (
-      item: PostSubscriptionRow
-    ) => string,
+    getKey: getPostSubscriptionCollectionKey,
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: newSubscription } = mutation;

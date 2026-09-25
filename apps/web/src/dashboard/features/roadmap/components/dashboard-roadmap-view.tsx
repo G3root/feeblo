@@ -119,8 +119,7 @@ function DashboardRoadmapIndexProvider({
       state: {
         allRoadmaps,
         // SAFETY: displayedRoadmap derives from roadmaps[0] via useRoadmapData; its shape matches RoadmapDashboardState['displayedRoadmap'] (id/name/slug/visibility/description).
-        displayedRoadmap:
-          displayedRoadmap as RoadmapDashboardState["displayedRoadmap"],
+        displayedRoadmap: displayedRoadmap,
         isError,
         isLoading,
         lanes,
@@ -196,8 +195,7 @@ function DashboardRoadmapDetailProvider({
       state: {
         allRoadmaps,
         // SAFETY: displayedRoadmap derives from roadmaps[0] via useRoadmapData; its shape matches RoadmapDashboardState['displayedRoadmap'] (id/name/slug/visibility/description).
-        displayedRoadmap:
-          displayedRoadmap as RoadmapDashboardState["displayedRoadmap"],
+        displayedRoadmap: displayedRoadmap,
         isError,
         isLoading,
         lanes,

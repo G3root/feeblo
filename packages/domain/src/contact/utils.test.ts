@@ -22,7 +22,7 @@ function makeContactDef(
 ): TContactAttributeDefinition {
   return {
     // SAFETY: Test fixture seam: `any` deliberately bridges the fixture to the API at the test boundary.
-    id: "cad_def1" as any,
+    id: "cad_def1",
     name: "Test Attr",
     key: "customField",
     description: "A test attribute",
@@ -41,7 +41,7 @@ function makeCompanyDef(
 ): TCompanyAttributeDefinition {
   return {
     // SAFETY: Test fixture seam: `any` deliberately bridges the fixture to the API at the test boundary.
-    id: "cmp_def1" as any,
+    id: "cmp_def1",
     name: "Test Company Attr",
     key: "companyCustom",
     description: "A test company attribute",

@@ -129,9 +129,7 @@ export const PostTitleField = withForm({
 export const PostContentField = withForm({
   ...postCreateFormOpts,
   // SAFETY: Empty-state placeholder for the generic container until real data is set.
-  props: {} as EditorProps & {
-    assetOwner?: "organization" | "user";
-  },
+  props: {},
   render: function PostContentFieldRender({
     assetOwner = "organization",
     form,

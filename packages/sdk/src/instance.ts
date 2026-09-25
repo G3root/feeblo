@@ -201,7 +201,7 @@ export function init(
     const { organizationId: id, ...rest } = orgIdOrConfig;
     // SAFETY: the union branch above established that orgIdOrConfig is the
     // InitConfig shape, whose organizationId is a string.
-    organizationId = id as string;
+    organizationId = id;
     resolvedOptions = rest;
   }
 

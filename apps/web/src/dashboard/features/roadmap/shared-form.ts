@@ -25,7 +25,7 @@ export const roadmapFormOpts = formOptions({
     description: null as string | null,
     // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
     // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
-    visibility: "public" as "public" | "private",
+    visibility: "public",
     // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
     columns: [] as RoadmapColumnFormValues[],
   },

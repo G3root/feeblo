@@ -68,7 +68,7 @@ async function resolvePageContent(
           .PostGetPublic({
             organizationId: site.organizationId,
             // SAFETY: The capture group matched, so the index is present.
-            slug: postMatch[1]!,
+            slug: postMatch[1],
           })
           .pipe(
             Effect.catchTag("PostNotFoundError", () => Effect.succeed(null))
@@ -81,7 +81,7 @@ async function resolvePageContent(
           rpc.PostResolveMergedPublic({
             organizationId: site.organizationId,
             // SAFETY: The capture group matched, so the index is present.
-            slug: postMatch[1]!,
+            slug: postMatch[1],
           })
         );
         return mergedTargetSlug === null
@@ -97,7 +97,7 @@ async function resolvePageContent(
     }
 
     // SAFETY: `postMatch` is null here, so `changelogMatch` matched.
-    const changelogSlug = changelogMatch![1]!;
+    const changelogSlug = changelogMatch![1];
     // Resolve the single entry directly: pulling the whole published list
     // (up to `PUBLIC_CHANGELOG_LIMIT` full bodies) per detail hit wastes
     // that entire payload for one row.

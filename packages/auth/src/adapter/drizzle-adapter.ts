@@ -61,7 +61,7 @@ function getAffectedRowCount(
   let count: unknown = 0;
   if (result && typeof result === "object" && "rowCount" in result) {
     // node-postgres / neon expose `rowCount`.
-    count = (result as { rowCount: unknown }).rowCount;
+    count = result.rowCount;
   } else if (
     result &&
     typeof result === "object" &&
@@ -240,7 +240,7 @@ export const drizzleAdapter = (
         model: string,
         builder: any,
         data: Record<string, any>,
-        where?: Where[] | undefined
+        where?: Where[]
       ) => {
         if (config.provider !== "mysql") {
           const c: any[] = await runQuery(builder.returning());
@@ -728,7 +728,7 @@ export const drizzleAdapter = (
         );
 
         if (andGroup.length && orGroup.length) {
-          return [and(andClause!, orClause!)!];
+          return [and(andClause, orClause)!];
         }
         if (andGroup.length) {
           return [andClause!];
@@ -1084,7 +1084,7 @@ export const drizzleAdapter = (
               if (!target) {
                 return null;
               }
-              const targetId = target[idField] ?? (target as any).id;
+              const targetId = target[idField] ?? target.id;
               if (targetId === undefined || targetId === null || !idColumn) {
                 return null;
               }
@@ -1095,7 +1095,7 @@ export const drizzleAdapter = (
                 model,
                 where,
               });
-              return countRows > 0 ? (target as any) : null;
+              return countRows > 0 ? target : null;
             };
             if (inTransaction) {
               return claimFromTransaction(dbt);
@@ -1121,7 +1121,7 @@ export const drizzleAdapter = (
               .where(inArray(idColumn, targetIds))
               .returning()
           );
-          return (deleted[0] as any) ?? null;
+          return deleted[0] ?? null;
         },
         async incrementOne({ model, where, increment, set }) {
           const schemaModel = getSchema(model);
@@ -1173,7 +1173,7 @@ export const drizzleAdapter = (
               if (!target) {
                 return null;
               }
-              const targetId = target[idField] ?? (target as any).id;
+              const targetId = target[idField] ?? target.id;
               if (targetId === undefined || targetId === null || !idColumn) {
                 return null;
               }
@@ -1190,7 +1190,7 @@ export const drizzleAdapter = (
                   .where(eq(idColumn, targetId))
                   .limit(1)
               );
-              return (updated[0] as any) ?? null;
+              return updated[0] ?? null;
             };
             if (inTransaction) {
               return mutateInTransaction(dbt);
@@ -1219,7 +1219,7 @@ export const drizzleAdapter = (
               .where(inArray(idColumn, targetIds))
               .returning()
           );
-          return (updated[0] as any) ?? null;
+          return updated[0] ?? null;
         },
         options: config,
       };
