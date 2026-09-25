@@ -38,7 +38,7 @@ export function ComboboxChipsInput({
   ref?: React.Ref<HTMLInputElement>;
 }): React.ReactElement {
   // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
-  const sizeValue = size ?? "default";
+  const sizeValue = (size ?? "default") as "sm" | "default" | "lg" | number;
 
   return (
     <ComboboxPrimitive.Input
@@ -74,7 +74,7 @@ export function ComboboxInput({
   clearProps?: ComboboxPrimitive.Clear.Props;
 }): React.ReactElement {
   // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
-  const sizeValue = size ?? "default";
+  const sizeValue = (size ?? "default") as "sm" | "default" | "lg" | number;
 
   return (
     <ComboboxPrimitive.InputGroup

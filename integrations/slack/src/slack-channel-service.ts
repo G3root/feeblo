@@ -227,7 +227,7 @@ export const makeSlackChannelServiceLive = (
                     createdAt: now,
                     updatedAt: now,
                   });
-                } else if (!route.enabled) {
+                } else if (route.enabled !== true) {
                   yield* db
                     .update(schema.integrationRouteTable)
                     .set({

@@ -29,7 +29,7 @@ export function createLogger(enabled: boolean): Logger {
     console.log(`%c[feeblo:${category}]`, LABEL_STYLE, ...args);
   };
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-  return Object.assign(log, { enabled });
+  return Object.assign(log, { enabled }) as Logger;
 }
 
 /**

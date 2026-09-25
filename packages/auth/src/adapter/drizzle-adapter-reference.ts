@@ -64,7 +64,7 @@ function getAffectedRowCount(
   let count: unknown = 0;
   if (result && typeof result === "object" && "rowCount" in result) {
     // node-postgres / neon expose `rowCount`.
-    count = result.rowCount;
+    count = (result as { rowCount: unknown }).rowCount;
   } else if (
     result &&
     typeof result === "object" &&
@@ -219,7 +219,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
         model: string,
         builder: any,
         data: Record<string, any>,
-        where?: Where[]
+        where?: Where[] | undefined
       ) => {
         if (config.provider !== "mysql") {
           const c = await builder.returning();
@@ -697,7 +697,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
         );
 
         if (andGroup.length && orGroup.length) {
-          return [and(andClause, orClause)!];
+          return [and(andClause!, orClause!)!];
         }
         if (andGroup.length) {
           return [andClause!];
@@ -1042,7 +1042,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
               if (!target) {
                 return null;
               }
-              const targetId = target[idField] ?? target.id;
+              const targetId = target[idField] ?? (target as any).id;
               if (targetId === undefined || targetId === null || !idColumn) {
                 return null;
               }
@@ -1054,7 +1054,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
                 model,
                 where,
               });
-              return count > 0 ? target : null;
+              return count > 0 ? (target as any) : null;
             };
             return inTransaction
               ? claimFromTransaction(db)
@@ -1073,7 +1073,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
             .delete(schemaModel)
             .where(inArray(idColumn, targetIds))
             .returning();
-          return deleted[0] ?? null;
+          return (deleted[0] as any) ?? null;
         },
         async incrementOne({ model, where, increment, set }) {
           const schemaModel = getSchema(model);
@@ -1123,7 +1123,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
               if (!target) {
                 return null;
               }
-              const targetId = target[idField] ?? target.id;
+              const targetId = target[idField] ?? (target as any).id;
               if (targetId === undefined || targetId === null || !idColumn) {
                 return null;
               }
@@ -1138,7 +1138,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
                 .where(eq(idColumn, targetId))
                 .limit(1)
                 .execute();
-              return updated[0] ?? null;
+              return (updated[0] as any) ?? null;
             };
             return inTransaction
               ? mutateInTransaction(db)
@@ -1160,7 +1160,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
             .set(assignments)
             .where(inArray(idColumn, targetIds))
             .returning();
-          return updated[0] ?? null;
+          return (updated[0] as any) ?? null;
         },
         options: config,
       };

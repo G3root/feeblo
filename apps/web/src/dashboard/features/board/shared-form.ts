@@ -12,7 +12,7 @@ export const boardFormOpts = formOptions({
   defaultValues: {
     name: "",
     // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
-    visibility: "PUBLIC",
+    visibility: "PUBLIC" as "PUBLIC" | "PRIVATE",
   },
   validators: {
     onSubmit: boardFormSchema,

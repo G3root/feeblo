@@ -85,7 +85,7 @@ export function StatusField({
                 id: value.value,
                 label: value.label,
                 // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-                type: value.type,
+                type: value.type as BoardPostStatus,
               }
             : null
         )

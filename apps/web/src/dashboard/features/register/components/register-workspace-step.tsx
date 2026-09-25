@@ -85,7 +85,7 @@ export const RegisterWorkspaceStep = withForm({
     const workspaceName = useStore(
       form.store,
       // SAFETY: The upstream contract guarantees a string here.
-      (state) => state.values.workspaceName || ""
+      (state) => (state.values.workspaceName as string) || ""
     );
 
     const slug = toWorkspaceSlug(workspaceName);

@@ -19,7 +19,7 @@ export const createPermissions = <
   [...actions, "*"].map(
     (action) =>
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      `${resource}.${action}`
+      `${resource}.${action}` as `${Resource}.${Actions[number] | "*"}`
   );
 
 const PERMISSION_ACTIONS = {

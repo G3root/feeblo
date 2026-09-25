@@ -66,7 +66,7 @@ export const commentCreateFormOpts = formOptions({
     author: emptyOnBehalfAuthor,
     content: "",
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    visibility: defaultVisibility,
+    visibility: defaultVisibility as TVisibilitySchema,
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     statusUpdateId: null as string | null,
   },
@@ -278,7 +278,7 @@ export const CommentComposerField = withForm({
   // SAFETY: Empty-state placeholder for the generic container until real data is set.
   ...commentCreateFormOpts,
   // SAFETY: Empty-state placeholder for the generic container until real data is set.
-  props: {},
+  props: {} as CommentComposerProviderProps & { showStatusUpdate?: boolean },
   render: ({ form, disabled, ...rest }) => {
     const { organizationId } = usePostCollections();
     // Mirrors the backend's CommentPolicy gate for CommentCreate.author.

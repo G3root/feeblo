@@ -38,7 +38,7 @@ interface FeedbackFormData extends FormData {
 function getApiBaseUrl(): string {
   //@ts-expect-error
   // SAFETY: The upstream contract guarantees a string here.
-  return `${window.global.__ENV.API_URL}//api/widget/v1`;
+  return `${window.global.__ENV.API_URL}//api/widget/v1` as string;
 }
 
 export function getOrganizationId(): string {

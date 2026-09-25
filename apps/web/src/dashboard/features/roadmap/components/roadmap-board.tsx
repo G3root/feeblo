@@ -139,7 +139,7 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
 
       // SAFETY: The upstream contract guarantees a string here.
       const tx = postCollection.update(
-        dragState?.sourceId ?? source.id,
+        dragState?.sourceId ?? (source.id as string),
         (draft) => {
           draft.statusId = targetStatusId;
         }

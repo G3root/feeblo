@@ -735,7 +735,7 @@ describe("jwtAutoLogin", async () => {
 
       // SAFETY: the injected session internals ignore the context object, so a
       // bare value satisfies the middleware's context parameter.
-      await handler?.({});
+      await handler?.({} as any);
 
       expect(addOAuthServerContext).toHaveBeenCalledWith({
         autoLoginUserId: "anon-user",
@@ -758,7 +758,7 @@ describe("jwtAutoLogin", async () => {
 
       // SAFETY: the injected session internals ignore the context object, so a
       // bare value satisfies the middleware's context parameter.
-      await handler?.({});
+      await handler?.({} as any);
 
       expect(addOAuthServerContext).not.toHaveBeenCalled();
     });
@@ -776,7 +776,7 @@ describe("jwtAutoLogin", async () => {
 
       // SAFETY: the injected session internals ignore the context object, so a
       // bare value satisfies the middleware's context parameter.
-      await handler?.({});
+      await handler?.({} as any);
 
       expect(addOAuthServerContext).not.toHaveBeenCalled();
     });

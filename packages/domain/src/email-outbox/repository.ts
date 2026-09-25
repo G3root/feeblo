@@ -159,7 +159,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       const payload = yield* decodeIntentPayload(
         // SAFETY: the write payload is the encoded intent shape; the decoder
         // re-validates the tag union before it is used.
-        input.payload,
+        input.payload as Schema.Codec.Encoded<typeof EmailIntentPayload>,
         "recordIntent.decodePayload"
       );
       if (payload.kind !== input.kind) {
@@ -216,7 +216,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     const payload = yield* decodeIntentPayload(
       // SAFETY: the write payload is the encoded intent shape; the decoder
       // re-validates the tag union before it is used.
-      input.payload,
+      input.payload as Schema.Codec.Encoded<typeof EmailIntentPayload>,
       "upsertPendingStatusChange.decodePayload"
     );
     if (payload.kind !== "post.status_changed") {
@@ -411,7 +411,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
         ? yield* decodeEmailDelivery(
             // SAFETY: the stored row is the encoded delivery record; the decoder
             // re-validates it before it is used.
-            row,
+            row as Schema.Codec.Encoded<typeof EmailDeliveryRecord>,
             "findDeliveryById.decodeDelivery"
           )
         : undefined;

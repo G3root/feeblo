@@ -93,7 +93,7 @@ export function postSlugFromPath(
 
   try {
     // SAFETY: The index bounds are checked by the surrounding condition.
-    return decodeURIComponent(segments[markerIndex + slugOffset]);
+    return decodeURIComponent(segments[markerIndex + slugOffset] as string);
   } catch {
     return undefined;
   }

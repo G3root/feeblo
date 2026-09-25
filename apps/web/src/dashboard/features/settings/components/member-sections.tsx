@@ -474,7 +474,7 @@ function MemberListItem({
                   () =>
                     membersCollection.update(id, (draft) => {
                       // SAFETY: The upstream contract guarantees this value here.
-                      draft.role = value;
+                      draft.role = value as Role;
                     }),
                   () => {
                     trackEvent("org_member_role_changed", {

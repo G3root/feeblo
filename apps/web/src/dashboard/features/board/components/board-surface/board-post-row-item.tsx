@@ -39,7 +39,7 @@ export function BoardPostRowItem({
           store.send({
             boardId: post.boardId,
             type: "togglePostSelection",
-            checked: nextChecked,
+            checked: nextChecked === true,
             postId: post.id,
           });
         }}

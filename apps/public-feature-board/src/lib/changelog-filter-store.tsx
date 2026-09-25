@@ -19,7 +19,7 @@ const createChangelogFilterStore = (
     context: {
       search: defaultValue?.search ?? "",
       selectedCategoryIds: defaultValue?.selectedCategoryIds ?? [],
-    },
+    } as ChangelogFilterContext,
     on: {
       setSearch: (context, event: { value: string }) => ({
         ...context,

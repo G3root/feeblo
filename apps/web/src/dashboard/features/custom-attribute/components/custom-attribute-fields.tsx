@@ -42,7 +42,9 @@ export type CustomAttributeInputValues = Record<
   CustomAttributeInputValue | undefined
 >;
 
-type AttributeValueUpsert = TCompanyAttributeValueUpsert["value"];
+type AttributeValueUpsert =
+  | TCompanyAttributeValueUpsert["value"]
+  | TContactAttributeValueUpsert["value"];
 
 export function CustomAttributeFields({
   definitions,
@@ -75,7 +77,9 @@ export function CustomAttributeFields({
                 checked={value === true}
                 disabled={disabled}
                 id={id}
-                onCheckedChange={(checked) => onChange(definition.id, checked)}
+                onCheckedChange={(checked) =>
+                  onChange(definition.id, checked === true)
+                }
               />
               <Label htmlFor={id}>
                 {definition.name}

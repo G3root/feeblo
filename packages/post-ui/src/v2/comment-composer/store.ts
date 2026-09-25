@@ -29,7 +29,7 @@ const createCommentComposerStore = (
       isSubmitting: false,
       resetKey: 0,
       statusUpdateId: null,
-    },
+    } as CommentComposerStoreContext,
     on: {
       contentChanged: (context, event: { content: string }) => ({
         ...context,

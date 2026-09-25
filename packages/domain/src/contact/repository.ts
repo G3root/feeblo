@@ -191,11 +191,11 @@ const makeContactRepository = Effect.gen(function* () {
         } else if (externalId) {
           conditions.push(
             // SAFETY: The upstream contract guarantees a string here.
-            eq(schema.contactTable.externalId, externalId)
+            eq(schema.contactTable.externalId, externalId as string)
           );
         } else if (email) {
           // SAFETY: The upstream contract guarantees a string here.
-          conditions.push(eq(schema.contactTable.email, email));
+          conditions.push(eq(schema.contactTable.email, email as string));
         }
 
         const existing = yield* db

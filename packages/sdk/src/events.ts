@@ -37,7 +37,7 @@ export function subscribe<E extends FeebloEventName | "*">(
   }
 
   // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
-  const target = event;
+  const target = event as FeebloEventName | "*";
   // SAFETY: The upstream contract guarantees this value here.
   const listener = callback as EventListener;
 
@@ -68,7 +68,7 @@ export function unsubscribe<E extends FeebloEventName | "*">(
 
   // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
   // SAFETY: The upstream contract guarantees this value here.
-  const target = event;
+  const target = event as FeebloEventName | "*";
   // SAFETY: The upstream contract guarantees this value here.
   const listener = callback as EventListener;
 

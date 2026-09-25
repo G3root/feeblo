@@ -201,7 +201,7 @@ export function BoardGridView({
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 
       const tx = postCollection.update(
-        dragState?.sourceId ?? source.id,
+        dragState?.sourceId ?? (source.id as string),
         (draft) => {
           draft.statusId = targetStatusId;
         }

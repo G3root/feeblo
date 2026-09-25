@@ -227,9 +227,12 @@ export function PostCreateForm() {
 
   const initialStatus =
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    store.get().context.data.status ?? "PLANNED";
+    (store.get().context.data.status as BoardPostStatus | undefined) ??
+    "PLANNED";
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-  const initialStatusId = store.get().context.data.statusId;
+  const initialStatusId = store.get().context.data.statusId as
+    | string
+    | undefined;
   const initialPostStatus =
     postStatuses.find((postStatus) => postStatus.id === initialStatusId) ??
     postStatuses.find((postStatus) => postStatus.type === initialStatus) ??

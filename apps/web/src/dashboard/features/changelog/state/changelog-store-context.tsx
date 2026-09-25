@@ -25,7 +25,7 @@ const createChangelogStore = (defaultValue?: ChangelogStoreDefaultValue) =>
         search: defaultValue?.filters?.search ?? "",
         statuses: defaultValue?.filters?.statuses ?? [],
       },
-    },
+    } as ChangelogStoreContext,
     on: {
       clearFilters: (context) => ({
         ...context,

@@ -72,7 +72,7 @@ export function Calendar({
       // SAFETY: The upstream contract guarantees this value here.
     },
     // SAFETY: The upstream contract guarantees this value here.
-    { ...defaultClassNames }
+    { ...defaultClassNames } as typeof defaultClassNames
   );
 
   const defaultComponents = {

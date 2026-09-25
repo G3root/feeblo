@@ -199,7 +199,7 @@ const expectFailed = <E>(exit: Exit.Exit<unknown, E>): E => {
 // this is the single noted cast at the test boundary.
 const asFetch = (
   impl: (input: RequestInfo | URL) => Promise<Response>
-): typeof fetch => impl;
+): typeof fetch => impl as typeof fetch;
 
 /**
  * The URL a `fetch` stub was asked for.
