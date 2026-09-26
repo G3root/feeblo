@@ -8,22 +8,22 @@ const trailingSlashPattern = /\/$/;
 
 const AppUrl = Config.schema(Schema.URLFromString, "APP_URL");
 const ApiUrl = Config.schema(Schema.URLFromString, "API_URL");
-const GlobalDeliveryPaused = Config.boolean(
+const GlobalDeliveryPaused = Config.Boolean(
   "EMAIL_OUTBOX_GLOBAL_DELIVERY_PAUSED"
 ).pipe(Config.withDefault(false));
-const MaxConcurrentSends = Config.number(
+const MaxConcurrentSends = Config.Number(
   "EMAIL_OUTBOX_MAX_CONCURRENT_SENDS"
 ).pipe(Config.withDefault(10));
-const MonthlySendLimit = Config.number("EMAIL_OUTBOX_MONTHLY_SEND_LIMIT").pipe(
+const MonthlySendLimit = Config.Number("EMAIL_OUTBOX_MONTHLY_SEND_LIMIT").pipe(
   Config.withDefault(100_000)
 );
-const EstimatedSendCostMicros = Config.number(
+const EstimatedSendCostMicros = Config.Number(
   "EMAIL_OUTBOX_ESTIMATED_SEND_COST_MICROS"
 ).pipe(Config.withDefault(100));
-const PausedWorkspaceIds = Config.string(
+const PausedWorkspaceIds = Config.String(
   "EMAIL_OUTBOX_PAUSED_WORKSPACE_IDS"
 ).pipe(Config.withDefault(""));
-const AppRootDomain = Config.string("APP_ROOT_DOMAIN").pipe(
+const AppRootDomain = Config.String("APP_ROOT_DOMAIN").pipe(
   Config.withDefault("")
 );
 
