@@ -17,6 +17,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
+import * as Ref from "effect/Ref";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 import * as PersistedQueue from "effect/unstable/persistence/PersistedQueue";
@@ -492,7 +493,10 @@ export const materializeEmailIntent = (outboxId: string) =>
     );
   });
 
-const sendDeliveryAttempt = (deliveryId: string) =>
+const sendDeliveryAttempt = (
+  deliveryId: string,
+  observedVersionRef: Ref.Ref<Option.Option<number>>
+) =>
   Effect.gen(function* () {
     const repository = yield* EmailOutboxRepository;
     const subscriptions = yield* EmailSubscriptionRepository;
@@ -528,6 +532,9 @@ const sendDeliveryAttempt = (deliveryId: string) =>
     ) {
       return { _tag: "terminal" as const };
     }
+    // Remember the version this attempt observed so the infrastructure catch
+    // can prove the row still belongs to it before deferring.
+    yield* Ref.set(observedVersionRef, Option.some(delivery.transitionVersion));
     // A prior activity may have claimed this row and then lost its worker
     // before persisting the result. Do not complete the deterministic workflow
     // in that state: reconciliation will release the lease, after which this
@@ -792,13 +799,14 @@ const sendDeliveryAttempt = (deliveryId: string) =>
         }
       }
     }
-    const claimed = yield* repository.claimDeliveryForSending({
+    const claimedVersion = yield* repository.claimDeliveryForSending({
       id: delivery.id,
       now: DateTime.toDateUtc(now),
     });
-    if (!claimed) {
+    if (claimedVersion === undefined) {
       return { _tag: "terminal" as const };
     }
+    yield* Ref.set(observedVersionRef, Option.some(claimedVersion));
     // Resolves the unsubscribe target into a rendered mail message: settings
     // targets use their stored URL directly, subscription targets derive a
     // purpose-bound bearer token and add List-Unsubscribe one-click headers.
@@ -932,21 +940,25 @@ const sendDeliveryAttempt = (deliveryId: string) =>
           .pipe(Effect.as<DeliveryAttemptOutcome>({ _tag: "terminal" }));
       }
       const delay = retryDelay(delivery.id, attempt);
-      const retryMetric = recordEmailDeliveryRetry(error._tag);
-      return repository
-        .deferSendingDelivery({
+      return Effect.gen(function* () {
+        const deferred = yield* repository.deferSendingDelivery({
           id: delivery.id,
+          expectedTransitionVersion: claimedVersion,
           nextAttemptAt: DateTime.toDateUtc(DateTime.addDuration(now, delay)),
           lastError: { tag: error._tag },
-        })
-        .pipe(
-          Effect.tap(() => retryMetric),
-          Effect.as<DeliveryAttemptOutcome>({
-            _tag: "retry",
-            delay,
-            infrastructureFailure: false,
-          })
-        );
+        });
+        // Zero rows means a newer attempt owns the row; this one must not
+        // record a retry it did not schedule.
+        if (!deferred) {
+          return { _tag: "terminal" as const };
+        }
+        yield* recordEmailDeliveryRetry(error._tag);
+        return {
+          _tag: "retry" as const,
+          delay,
+          infrastructureFailure: false,
+        };
+      });
     };
     // Queued deliveries may wait out throttles and retries; re-check the
     // changelog read boundary as the last step before provider submission so
@@ -1186,7 +1198,14 @@ export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
       ? retryState.value.consecutiveInfrastructureFailures
       : 0;
 
-    const outcome = yield* sendDeliveryAttempt(deliveryId).pipe(
+    // `sendDeliveryAttempt` records the row version it observed here, so a
+    // failure can defer against the version this attempt actually holds
+    // rather than clobbering a newer claim.
+    const observedVersionRef = yield* Ref.make(Option.none<number>());
+    const outcome = yield* sendDeliveryAttempt(
+      deliveryId,
+      observedVersionRef
+    ).pipe(
       // Preserve repository-level typed failures; only the residual
       // infrastructure channel (SqlError and other untyped drivers)
       // collapses into a deferral that advances the infrastructure budget.
@@ -1194,6 +1213,11 @@ export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
         const delay = retryDelay(deliveryId, delivery.attemptCount + 1);
         const nextInfrastructureFailures = infrastructureFailures + 1;
         return Effect.gen(function* () {
+          const observedVersion = yield* Ref.get(observedVersionRef);
+          const expectedTransitionVersion = Option.getOrElse(
+            observedVersion,
+            () => delivery.transitionVersion
+          );
           yield* Effect.logWarning(
             "Email delivery infrastructure failure, deferring"
           ).pipe(
@@ -1205,24 +1229,27 @@ export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
             })
           );
           const now = yield* DateTime.now;
-          yield* repository.deferSendingDelivery({
+          const deferred = yield* repository.deferSendingDelivery({
             id: deliveryId,
+            expectedTransitionVersion,
             nextAttemptAt: DateTime.toDateUtc(DateTime.addDuration(now, delay)),
             lastError: {
               consecutiveInfrastructureFailures: nextInfrastructureFailures,
               tag: "EmailDeliveryActivityError",
             },
           });
-          return {
-            _tag: "retry" as const,
-            delay,
-            infrastructureFailure: true,
-          };
+          // Zero rows means a newer attempt owns the row, so this one is a
+          // stale no-op. A deferral that throws still fails the element so
+          // the queue retries it under the same id rather than completing
+          // without a row transition.
+          return deferred
+            ? {
+                _tag: "retry" as const,
+                delay,
+                infrastructureFailure: true,
+              }
+            : { _tag: "terminal" as const };
         });
-        // If the deferral cannot be persisted, fail the element so the queue
-        // retries it under the same id. Returning would complete the element
-        // without bumping the row version, and the completed id would swallow
-        // the reconciliation re-offer.
       })
     );
     if (outcome._tag === "terminal") {

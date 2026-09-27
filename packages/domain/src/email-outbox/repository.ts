@@ -671,11 +671,15 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
           )
         )
       )
-      .returning({ id: schema.emailDeliveryTable.id });
+      .returning({
+        transitionVersion: schema.emailDeliveryTable.transitionVersion,
+      });
 
     yield* recordEmailDeliveryTransition("sending", claimed.length);
 
-    return claimed.length === 1;
+    // The caller needs the version this claim wrote so a later deferral can
+    // prove the row still belongs to this attempt.
+    return claimed[0]?.transitionVersion;
   });
 
   const recoverStaleSendingDeliveries = Effect.fn(
@@ -706,10 +710,12 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     "EmailOutboxRepository.deferSendingDelivery"
   )(function* ({
     id,
+    expectedTransitionVersion,
     nextAttemptAt,
     lastError,
   }: {
     readonly id: string;
+    readonly expectedTransitionVersion: number;
     readonly nextAttemptAt: Date;
     readonly lastError: unknown;
   }) {
@@ -726,6 +732,13 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       .where(
         and(
           eq(schema.emailDeliveryTable.id, id),
+          // Only the attempt that observed this version may schedule the
+          // retry; a stale attempt must not overwrite a newer claim or
+          // deferral.
+          eq(
+            schema.emailDeliveryTable.transitionVersion,
+            expectedTransitionVersion
+          ),
           // A deferral can arrive before the claim (an untyped read failure),
           // so accept every due state rather than only `sending`.
           inArray(schema.emailDeliveryTable.state, [
@@ -737,6 +750,9 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       )
       .returning({ id: schema.emailDeliveryTable.id });
     yield* recordEmailDeliveryTransition("deferred", rows.length);
+    // Zero rows means another transition owns the row now; the caller must
+    // treat this attempt as stale rather than as the one that scheduled the
+    // retry.
     return rows.length === 1;
   });
 
