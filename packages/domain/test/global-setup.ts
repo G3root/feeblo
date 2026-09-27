@@ -84,6 +84,43 @@ const lockAbandonedAfterMs = 10 * 60 * 1000;
 /** The suffix that separates a lock in the cache from a cached template. */
 const lockSuffix = ".lock";
 
+/** Every per-file clone in `$TMPDIR` is named with this prefix. */
+const clonePrefix = "feeblo-domain-";
+
+/**
+ * The process that owns a per-file clone, read from the name `setup.ts` gives it.
+ * `null` for a clone created before the name carried a pid.
+ */
+const cloneOwnerPid = (name: string): number | null => {
+  const owner = /^feeblo-domain-(\d+)-/.exec(name);
+  return owner === null ? null : Number(owner[1]);
+};
+
+/**
+ * Whether the process that created a clone has exited.
+ *
+ * `process.kill(pid, 0)` sends no signal - it only asks whether the pid exists.
+ * A pid that an unrelated process has since reused reads as alive, which skips
+ * the removal, and skipping is the safe direction. The only other way this can
+ * fail is `EPERM` for a pid owned by another user, which cannot happen for a
+ * clone in our own `$TMPDIR`, so treating every failure as "gone" is correct
+ * here.
+ *
+ * This exists because a clone directory's `mtime` is not a liveness signal.
+ * PGlite rewrites files that already exist without creating or removing entries,
+ * so the directory keeps the `mtime` it was born with for the whole run, and
+ * only the run's own `afterAll` - which a killed process never reaches - can
+ * distinguish an in-flight test file from a leaked one.
+ */
+const ownerHasExited = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch {
+    return true;
+  }
+};
+
 /**
  * How old an abandoned per-file database must be before it is pruned.
  *
@@ -269,16 +306,17 @@ const ensureTemplate = async (templateDirectory: string): Promise<string> => {
  * that died, a `*.lock` from a holder that died, or a whole template from a
  * migration set that has since changed.
  *
- * The age cutoff is what makes both sweeps safe, and it is generous for a
- * reason: see `staleDatabaseAgeMs`. A live database or staging directory is
- * minutes old in the worst case, so only an abandoned one can be past a
- * two-hour cutoff - including one belonging to a test run in a sibling
- * worktree, which shares this `$TMPDIR`. Locks get `lockAbandonedAfterMs`
- * instead, because they are abandoned after a build rather than after a run.
+ * How old a file must be before it is removed.
  *
- * The stat-then-remove below is check-then-act, but the gap between a live
- * file's lifetime and the cutoff it is measured against is what keeps it from
- * hitting something in use.
+ * Clones whose process has exited are the exception and are reclaimed
+ * immediately - see below - so `staleDatabaseAgeMs` only has to cover a live
+ * clone from before this naming scheme, a live `staging-` directory, a
+ * superseded template, or a lock whose holder is still working. The gap between
+ * a live file's lifetime and the cutoff it is measured against is what keeps the
+ * stat-then-remove below from hitting something in use.
+ *
+ * Locks get `lockAbandonedAfterMs` instead, because they are abandoned after a
+ * build rather than after a test run.
  *
  * Best effort on purpose: this is deferred hygiene, so a permissions problem or
  * a directory that a concurrent package removed first must not turn into a test
@@ -287,39 +325,60 @@ const ensureTemplate = async (templateDirectory: string): Promise<string> => {
 const pruneAbandonedDatabases = async (
   currentTemplateDirectory: string
 ): Promise<void> => {
-  const abandoned = await readdir(tmpdir(), { withFileTypes: true }).then(
+  const now = Date.now();
+  const candidates: { path: string; removableBefore: number }[] = [];
+
+  const cloneEntries = await readdir(tmpdir(), { withFileTypes: true }).then(
     (entries) =>
-      entries
-        .filter(
-          (entry) =>
-            entry.isDirectory() && entry.name.startsWith("feeblo-domain-")
-        )
-        .map((entry) => join(tmpdir(), entry.name)),
+      entries.filter(
+        (entry) => entry.isDirectory() && entry.name.startsWith(clonePrefix)
+      ),
     () => []
   );
 
-  const superseded = await readdir(templateCacheRoot, {
+  for (const entry of cloneEntries) {
+    const owner = cloneOwnerPid(entry.name);
+
+    // A clone whose run is still alive is not a candidate at all, however old
+    // its directory looks - see `ownerHasExited`.
+    if (owner !== null && !ownerHasExited(owner)) {
+      continue;
+    }
+
+    candidates.push({
+      path: join(tmpdir(), entry.name),
+      // An orphaned clone is reclaimable now rather than in two hours: the
+      // `afterAll` that removes it belonged to a process that has exited, so
+      // nothing is coming for it. A clone from before the name carried a pid has
+      // no owner to check and falls back to the age cutoff.
+      removableBefore: owner === null ? now - staleDatabaseAgeMs : now,
+    });
+  }
+
+  const cacheEntries = await readdir(templateCacheRoot, {
     withFileTypes: true,
   }).then(
-    (entries) =>
-      entries
-        .map((entry) => join(templateCacheRoot, entry.name))
-        .filter((path) => path !== currentTemplateDirectory),
+    (entries) => entries.map((entry) => join(templateCacheRoot, entry.name)),
     () => []
   );
 
+  for (const path of cacheEntries) {
+    if (path === currentTemplateDirectory) {
+      continue;
+    }
+
+    candidates.push({
+      path,
+      removableBefore:
+        now -
+        (path.endsWith(lockSuffix) ? lockAbandonedAfterMs : staleDatabaseAgeMs),
+    });
+  }
+
   await Promise.all(
-    [...abandoned, ...superseded].map(async (path) => {
+    candidates.map(async ({ path, removableBefore }) => {
       const info = await stat(path).catch(() => null);
-      if (info === null) {
-        return;
-      }
-
-      const cutoff =
-        Date.now() -
-        (path.endsWith(lockSuffix) ? lockAbandonedAfterMs : staleDatabaseAgeMs);
-
-      if (info.mtimeMs < cutoff) {
+      if (info !== null && info.mtimeMs < removableBefore) {
         await rm(path, { force: true, recursive: true }).catch(() => undefined);
       }
     })

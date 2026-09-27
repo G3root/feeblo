@@ -31,8 +31,16 @@ if (!databaseTemplateDirectory) {
  * the same disk - which is why `vitest-preset.ts` raises the timeout rather than
  * letting a busy machine look like a broken test. Anything that adds 200 tables
  * adds that cost to all 70 of these.
+ *
+ * The pid is part of the name so `global-setup.ts` can tell a clone that is
+ * still in use from one a killed run abandoned. It cannot use the directory's
+ * `mtime` for that: PGlite rewrites files in place, so the directory keeps the
+ * timestamp it was born with, and an in-flight clone would look exactly like a
+ * leaked one.
  */
-const databaseDirectory = await mkdtemp(join(tmpdir(), "feeblo-domain-"));
+const databaseDirectory = await mkdtemp(
+  join(tmpdir(), `feeblo-domain-${process.pid}-`)
+);
 
 await cp(databaseTemplateDirectory, databaseDirectory, {
   mode: constants.COPYFILE_FICLONE,
