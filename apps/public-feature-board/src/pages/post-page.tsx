@@ -32,6 +32,7 @@ import { BoardNavLink } from "../components/feedback/board-list-card";
 import { PostPageActions } from "../components/feedback/post-page-actions";
 import { PostVoterDialog } from "../components/feedback/post-voter-dialog";
 // import { useUpvote } from "../hooks/use-upvote";
+import { boardPaths } from "../lib/board-links";
 import { mergedPostTargetAtom } from "../lib/merged-post-atoms";
 import { formatPostStatus } from "../lib/utils";
 import { m } from "../paraglide/messages.js";
@@ -470,7 +471,7 @@ function PostMetaSidebarBoard() {
   return (
     <PostMetaSidebarSection title={m.full_new_vulture()}>
       <BoardNavLink
-        href={`/b/${board.slug ?? ""}`}
+        href={boardPaths.board(board.slug ?? "")}
         label={board.name}
         showActiveIndicator
       />

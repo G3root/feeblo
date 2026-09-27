@@ -11,6 +11,8 @@ export {
   BOARD_SCOPE_DEPENDENCY,
   type BoardScope,
   createBoardScope,
+  isBoardPreloadDegraded,
+  markBoardPreloadDegraded,
   requireMutationOrganizationId,
   setBoardOrganizationId,
 } from "./lib/board-scope";

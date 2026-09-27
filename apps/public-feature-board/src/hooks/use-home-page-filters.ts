@@ -1,6 +1,8 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useCallback } from "react";
 
+import { boardPaths } from "../lib/board-links";
+
 export type HomePageSortOption = "upvotes" | "newest" | "oldest";
 type FilterValue = "all" | string;
 
@@ -79,7 +81,11 @@ export function useHomePageFilters({
       }
 
       navigate({
-        to: "/",
+        // Board navigation uses the host router's internal `/s` spelling
+        // everywhere (`lib/board-links.ts`); the host rewrite hides it from
+        // visitors, and it stays correct on a host that also serves the board
+        // under `/s/...`.
+        to: boardPaths.home,
         search: nextSearch,
         replace: true,
       });

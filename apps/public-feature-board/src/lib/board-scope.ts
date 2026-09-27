@@ -24,6 +24,12 @@ export interface BoardScope {
   setOrganizationId(organizationId: string | undefined): void;
   getPostSlug(): string | undefined;
   getChangelogSlug(): string | undefined;
+  /**
+   * Records that a server preload for this request timed out or failed, so the
+   * document it produces is incomplete and must not be cached or indexed.
+   */
+  markPreloadDegraded(): void;
+  isPreloadDegraded(): boolean;
 }
 
 /** `DbClient` dependency key holding the board's {@link BoardScope}. */
@@ -46,6 +52,7 @@ export function createBoardScope(options: {
   pathname: () => string | undefined;
 }): BoardScope {
   let organizationId = options.organizationId;
+  let preloadDegraded = false;
   const { pathname } = options;
 
   return {
@@ -56,6 +63,10 @@ export function createBoardScope(options: {
         : postSlugFromPath(currentPathname, "changelog", 1);
     },
     getOrganizationId: () => organizationId,
+    isPreloadDegraded: () => preloadDegraded,
+    markPreloadDegraded: () => {
+      preloadDegraded = true;
+    },
     getPostSlug: () => {
       const currentPathname = pathname();
       return currentPathname === undefined
@@ -83,6 +94,32 @@ export function setBoardOrganizationId(
   client
     .requireDependency<BoardScope>(BOARD_SCOPE_DEPENDENCY)
     .setOrganizationId(organizationId);
+}
+
+/**
+ * Records that a server preload for this request degraded.
+ *
+ * Called by the board's preload helpers when `settlePreloads` reports a
+ * timeout or failure, so the layout can refuse to cache or index a page that
+ * rendered without the data it asked for.
+ */
+export function markBoardPreloadDegraded(client: DbClient): void {
+  client
+    .requireDependency<BoardScope>(BOARD_SCOPE_DEPENDENCY)
+    .markPreloadDegraded();
+}
+
+/**
+ * Whether this request's render lost content to a slow or failing preload.
+ *
+ * Read by the board layout when it decides the document's cache and index
+ * policy: a page whose own preload degraded must not be cached or indexed,
+ * even when the shell's preload succeeded.
+ */
+export function isBoardPreloadDegraded(client: DbClient): boolean {
+  return client
+    .requireDependency<BoardScope>(BOARD_SCOPE_DEPENDENCY)
+    .isPreloadDegraded();
 }
 
 /**

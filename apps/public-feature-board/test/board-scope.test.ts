@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   BOARD_SCOPE_DEPENDENCY,
   createBoardScope,
+  isBoardPreloadDegraded,
+  markBoardPreloadDegraded,
   setBoardOrganizationId,
 } from "../src/lib/board-scope";
 
@@ -60,5 +62,19 @@ describe("setBoardOrganizationId", () => {
 
     expect(first.getOrganizationId()).toBe("org_a");
     expect(second.getOrganizationId()).toBe("org_b");
+  });
+});
+
+describe("preload degradation", () => {
+  it("records it per request scope, not globally", () => {
+    const degradedScope = createBoardScope({ pathname: () => "/" });
+    const healthyScope = createBoardScope({ pathname: () => "/" });
+
+    expect(isBoardPreloadDegraded(clientWith(healthyScope))).toBe(false);
+
+    markBoardPreloadDegraded(clientWith(degradedScope));
+
+    expect(isBoardPreloadDegraded(clientWith(degradedScope))).toBe(true);
+    expect(isBoardPreloadDegraded(clientWith(healthyScope))).toBe(false);
   });
 });

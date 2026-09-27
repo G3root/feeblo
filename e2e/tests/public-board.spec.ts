@@ -407,3 +407,49 @@ test("the board document language follows the locale cookie before hydration", a
     await visitorContext.close();
   }
 });
+
+test(
+  "board navigation stays on the board",
+  { tag: "@critical" },
+  async ({ browser, page }) => {
+    const user = createTestUser();
+    await createAuthenticatedWorkspace(page, user);
+
+    const title = `Navigation post ${randomUUID().slice(0, 8)}`;
+    await createPost(page, title, "Navigation body.");
+
+    const visitorContext = await browser.newContext();
+    const visitorPage = await visitorContext.newPage();
+    trackPageErrors(visitorPage);
+
+    try {
+      const boardUrl = publicBoardUrl(user.workspaceName);
+      await visitorPage.goto(boardUrl);
+      await waitForHydration(visitorPage);
+
+      // The home filters are the board's own search params: updating one must
+      // keep the visitor on the board home.
+      await visitorPage.getByRole("button", { name: /^Pending/ }).click();
+      await expect(visitorPage).toHaveURL(/\?status=/);
+      await expect(
+        visitorPage.getByRole("button", { name: "Give Feedback" })
+      ).toBeVisible();
+
+      // A post's sidebar board link lands on the board page, whatever the
+      // host serves the board under.
+      await visitorPage.getByRole("link", { name: title }).click();
+      await expect(
+        visitorPage.getByRole("link", { name: "Features 💡" })
+      ).toBeVisible();
+      await visitorPage.getByRole("link", { name: "Features 💡" }).click();
+      await expect(visitorPage).toHaveURL(`${boardUrl}/b/features`);
+      await expect(
+        visitorPage.getByRole("heading", { name: "Features 💡" })
+      ).toBeVisible();
+
+      await assertNoPageErrors(visitorPage);
+    } finally {
+      await visitorContext.close();
+    }
+  }
+);

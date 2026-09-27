@@ -49,6 +49,10 @@ export function ChangelogDetailPage({
         )
         .findOne(),
   });
+  // Resolved before the dependent query below: its callback runs during the
+  // hook call, so `changelog` has to be initialized by then.
+  const changelog = changelogQuery.data;
+  const isError = changelogQuery.isError;
 
   const { data: categoryLinks = [] } = useLiveQuery({
     query: (q) => {
@@ -72,8 +76,6 @@ export function ChangelogDetailPage({
   // Linked posts ship inside the single-entry response (`ChangelogDetail`),
   // so the page never syncs every post, status, or changelog link in the
   // organization just to render this section.
-  const changelog = changelogQuery.data;
-  const isError = changelogQuery.isError;
   const linkedPosts = changelog?.posts ?? [];
   // Hydration lands the entry before the first client render (see
   // `isLiveQueryPending`).

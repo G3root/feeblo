@@ -2,7 +2,9 @@ import { AuthDialogProvider } from "@feeblo/post-ui/dialog-stores";
 import { initPostUiI18n, isPostUiI18nInitialized } from "@feeblo/post-ui/i18n";
 import {
   initPublicBoardI18n,
+  isBoardPreloadDegraded,
   isPublicBoardI18nInitialized,
+  markBoardPreloadDegraded,
   preloadBoardShell,
   setBoardOrganizationId,
 } from "@feeblo/public-feature-board";
@@ -120,17 +122,23 @@ export const Route = createFileRoute("/s")({
 
     if (page.kind === "rpc-unavailable") {
       // A downstream RPC failure must not 500 a public page: the shell renders
-      // a noindex "Content unavailable" document and the client can retry.
-      return { boardPage: page, preloadDegraded: true };
+      // a noindex, uncacheable "Content unavailable" document and the client
+      // can retry.
+      markBoardPreloadDegraded(context.dbClient);
+
+      return { boardPage: page };
     }
 
     // The scope must be filled before any collection materializes, and this
     // runs before every child route's `beforeLoad`/`loader`.
     setBoardOrganizationId(context.dbClient, page.site.organizationId);
 
-    const outcome = await preloadBoardShell(context.dbClient);
+    // The outcome reaches `headers`/`head` through the request scope rather
+    // than this route's context: a *child* route's preload can degrade after
+    // this hook has returned, and the document policy must account for it.
+    await preloadBoardShell(context.dbClient);
 
-    return { boardPage: page, preloadDegraded: outcome.degraded };
+    return { boardPage: page };
   },
   headers: ({ match }) => {
     const cacheControl = getDocumentCacheControl();
@@ -142,7 +150,7 @@ export const Route = createFileRoute("/s")({
     return {
       "Cache-Control":
         match.context.boardPage.kind === "found" &&
-        !match.context.preloadDegraded
+        !isBoardPreloadDegraded(match.context.dbClient)
           ? cacheControl
           : "no-store",
     };
@@ -199,7 +207,7 @@ export const Route = createFileRoute("/s")({
       meta: [
         { title: pageTitle },
         { name: "description", content: pageDescription },
-        ...(boardPage.noIndex || match.context.preloadDegraded
+        ...(boardPage.noIndex || isBoardPreloadDegraded(match.context.dbClient)
           ? [{ name: "robots", content: "noindex, nofollow" }]
           : []),
         { property: "og:title", content: pageTitle },

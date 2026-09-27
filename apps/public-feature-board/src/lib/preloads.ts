@@ -2,6 +2,7 @@ import { and, eq } from "@tanstack/react-db";
 import type { DbClient } from "@tanstack/react-db";
 import { createIsomorphicFn } from "@tanstack/react-start";
 
+import { markBoardPreloadDegraded } from "./board-scope";
 import {
   publicBoardDescriptor,
   publicChangelogCategoryDescriptor,
@@ -85,6 +86,29 @@ export async function settlePreloads(
 }
 
 /**
+ * Runs a route's preloads and records server-side degradation on the request's
+ * scope.
+ *
+ * The layout decides the document's cache and index policy after every match
+ * has loaded, so a route's own outcome has to reach it: a page that renders
+ * from a timed-out preload is incomplete even when the shell loaded fine.
+ * Client-side degradation cannot happen (there the same failure rejects the
+ * navigation), so this only ever marks a server render.
+ */
+async function preloadsFor(
+  client: DbClient,
+  preloads: ReadonlyArray<Promise<unknown>>
+): Promise<PreloadOutcome> {
+  const outcome = await settlePreloads(preloads);
+
+  if (outcome.degraded) {
+    markBoardPreloadDegraded(client);
+  }
+
+  return outcome;
+}
+
+/**
  * The board shell's data.
  *
  * Every board route renders the sidebar's boards, the status filters, the post
@@ -93,7 +117,7 @@ export async function settlePreloads(
  * (counts, group-bys, filtered lists).
  */
 export function preloadBoardShell(client: DbClient) {
-  return settlePreloads([
+  return preloadsFor(client, [
     client.collection(publicBoardDescriptor).preload(),
     client.collection(publicPostDescriptor).preload(),
     client.collection(publicPostStatusDescriptor).preload(),
@@ -102,7 +126,7 @@ export function preloadBoardShell(client: DbClient) {
 }
 
 export function preloadBoardRoadmap(client: DbClient) {
-  return settlePreloads([
+  return preloadsFor(client, [
     client.collection(publicBoardDescriptor).preload(),
     client.collection(publicPostDescriptor).preload(),
     client.collection(publicPostStatusDescriptor).preload(),
@@ -113,7 +137,7 @@ export function preloadBoardRoadmap(client: DbClient) {
 }
 
 export function preloadBoardChangelog(client: DbClient) {
-  return settlePreloads([
+  return preloadsFor(client, [
     client.collection(publicChangelogDescriptor).preload(),
     client.collection(publicChangelogCategoryDescriptor).preload(),
     client.collection(publicChangelogCategoryLinkDescriptor).preload(),
@@ -133,7 +157,7 @@ export function preloadChangelogDetail(
 ) {
   const { organizationId, slug } = options;
 
-  return settlePreloads([
+  return preloadsFor(client, [
     client.collection(publicChangelogCategoryDescriptor).preload(),
     client.collection(publicChangelogCategoryLinkDescriptor).preload(),
     // Mirror the detail page's query exactly: a live-query snapshot is keyed
@@ -168,7 +192,7 @@ export function preloadPostUserState(
 ) {
   const { organizationId } = options;
 
-  return settlePreloads([
+  return preloadsFor(client, [
     client.collection(publicDeleteEligibilityDescriptor).preload(),
     client.preloadLiveQuery({
       query: (query) =>
@@ -196,7 +220,7 @@ export function preloadPostDetail(
 ) {
   const { organizationId, slug } = options;
 
-  return settlePreloads([
+  return preloadsFor(client, [
     client.collection(publicBoardDescriptor).preload(),
     client.collection(publicPostStatusDescriptor).preload(),
     client.collection(publicTagDescriptor).preload(),
