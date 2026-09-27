@@ -25,7 +25,7 @@ import { PostActivityRepository } from "../post-activity/repository";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import { postTagChangeActivities } from "../tag/post-tag-activities";
 import type { Cursor } from "./cursor";
-import { conflictError } from "./errors";
+import { conflictError, invalidRequestError } from "./errors";
 
 /** An author reduced to a classification and display fields — never an id. */
 export type PublicApiPostAuthor = {
@@ -139,11 +139,6 @@ interface TUpdateTag {
 interface TDeleteTag {
   organizationId: string;
   tagId: string;
-}
-
-interface TCountExistingTags {
-  organizationId: string;
-  tagIds: readonly string[];
 }
 
 interface TSetPostTags {
@@ -704,40 +699,21 @@ const makePublicApiRepository = Effect.gen(function* () {
         .pipe(Effect.asVoid, withRemapDbErrors("PublicApiTag", "delete")),
 
     /**
-     * How many of `tagIds` exist in the workspace.
-     *
-     * The caller compares the count with the number of ids it sent. A count
-     * rather than the missing ids on purpose: naming which id is unknown would
-     * let a caller use this endpoint to test whether a tag id exists in a
-     * workspace it cannot read.
-     */
-    countExistingTags: ({ organizationId, tagIds }: TCountExistingTags) =>
-      Effect.gen(function* () {
-        if (tagIds.length === 0) {
-          return 0;
-        }
-
-        const rows = yield* db
-          .select({ id: schema.tagTable.id })
-          .from(schema.tagTable)
-          .where(
-            and(
-              eq(schema.tagTable.organizationId, organizationId),
-              inArray(schema.tagTable.id, tagIds)
-            )
-          );
-
-        return rows.length;
-      }).pipe(withRemapDbErrors("PublicApiTag", "select")),
-
-    /**
      * Replaces a post's tags and returns the tags it carries afterwards.
      *
      * A replacement rather than add and remove calls, so a caller that states
      * the final set cannot leave a tag behind by forgetting to remove it. The
-     * write, the timeline entries, and the read-back share one transaction: the
-     * response is then exactly what a later read returns, and a post cannot end
-     * up tagged with no record of the change in its history.
+     * check, the write, the timeline entries, and the read-back share one
+     * transaction: a tag that disappears mid-request is answered as the invalid
+     * request it is rather than as a foreign-key failure, the response is
+     * exactly what a later read returns, and a post cannot end up tagged with
+     * no record of the change in its history.
+     *
+     * Only the rows that actually change are written. `post_tag` carries
+     * `merged_from_post_id` on the rows a merge moved onto this post, and the
+     * unmerge path restores exactly those rows to their source; deleting and
+     * re-inserting an unchanged tag would clear that provenance and strand the
+     * tag on the survivor for good.
      *
      * The recorded actor is null because a machine key is not a member. The
      * `post_activity` columns allow that and the dashboard renders those
@@ -749,6 +725,35 @@ const makePublicApiRepository = Effect.gen(function* () {
         .transaction((tx) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
+            // Deduplicated here rather than by the caller: the check below
+            // compares distinct rows, so the same id twice would otherwise look
+            // like a tag the workspace does not have.
+            const wanted = [...new Set(tagIds)];
+
+            if (wanted.length > 0) {
+              // `for("key share")` is the lock the foreign-key check itself
+              // takes: a tag deleted concurrently either loses the race and is
+              // missing from this read, or waits here until these rows exist
+              // and then cascades them away with it.
+              const known = yield* tx
+                .select({ id: schema.tagTable.id })
+                .from(schema.tagTable)
+                .where(
+                  and(
+                    eq(schema.tagTable.organizationId, organizationId),
+                    inArray(schema.tagTable.id, wanted)
+                  )
+                )
+                .for("key share");
+
+              if (known.length !== wanted.length) {
+                return yield* Effect.fail(
+                  invalidRequestError(
+                    "One or more tagIds do not exist in this workspace."
+                  )
+                );
+              }
+            }
 
             const previous = yield* tx
               .select({ tagId: schema.postTagTable.tagId })
@@ -759,19 +764,29 @@ const makePublicApiRepository = Effect.gen(function* () {
                   eq(schema.postTagTable.organizationId, organizationId)
                 )
               );
+            const previousTagIds = previous.map((row) => row.tagId);
+            const previousSet = new Set(previousTagIds);
+            const nextSet = new Set(wanted);
 
-            yield* tx
-              .delete(schema.postTagTable)
-              .where(
-                and(
-                  eq(schema.postTagTable.postId, postId),
-                  eq(schema.postTagTable.organizationId, organizationId)
+            const removed = previousTagIds.filter(
+              (tagId) => !nextSet.has(tagId)
+            );
+            if (removed.length > 0) {
+              yield* tx
+                .delete(schema.postTagTable)
+                .where(
+                  and(
+                    eq(schema.postTagTable.postId, postId),
+                    eq(schema.postTagTable.organizationId, organizationId),
+                    inArray(schema.postTagTable.tagId, removed)
+                  )
                 )
-              )
-              .pipe(Effect.asVoid);
+                .pipe(Effect.asVoid);
+            }
 
-            if (tagIds.length > 0) {
-              const rows = yield* Effect.forEach(tagIds, (tagId) =>
+            const added = wanted.filter((tagId) => !previousSet.has(tagId));
+            if (added.length > 0) {
+              const rows = yield* Effect.forEach(added, (tagId) =>
                 PostTagId.generate.pipe(
                   Effect.map((id) => ({
                     id,
@@ -785,8 +800,9 @@ const makePublicApiRepository = Effect.gen(function* () {
               );
 
               // `post_tag_postId_tagId_uidx` would abort the transaction if a
-              // caller sent the same id twice; the handler deduplicates too, so
-              // this is the backstop rather than the rule.
+              // concurrent request inserted the same tag first; the ids are
+              // deduplicated above, so this is the backstop rather than the
+              // rule.
               yield* tx
                 .insert(schema.postTagTable)
                 .values(rows)
@@ -800,8 +816,8 @@ const makePublicApiRepository = Effect.gen(function* () {
             // above rather than in a second one that could fail alone.
             yield* activities.createMany(
               postTagChangeActivities({
-                previousTagIds: previous.map((row) => row.tagId),
-                nextTagIds: tagIds,
+                previousTagIds,
+                nextTagIds: wanted,
                 actor: {
                   actorId: null,
                   actorMemberId: null,

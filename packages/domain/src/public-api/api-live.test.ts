@@ -1186,6 +1186,66 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect("keeps the merge provenance of a tag it does not change", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace({ postCount: 2 });
+      const db = yield* currentDb;
+      // The second seeded post stands in for the post that was merged into
+      // this one, which `merged_from_post_id` references.
+      const sourcePostId = `${workspace.postId}_1`;
+      yield* seedTag(workspace.organizationId, "tag_kept", "Kept");
+      yield* seedTag(workspace.organizationId, "tag_added", "Added");
+      yield* db.insert(schema.postTagTable).values({
+        id: "ptg_merged",
+        postId: workspace.postId,
+        tagId: "tag_kept",
+        organizationId: workspace.organizationId,
+        mergedFromPostId: sourcePostId,
+      });
+      registerKey(
+        "fbk_tags_provenance",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const response = yield* executeWrite(
+        "PUT",
+        `/api/v1/posts/${workspace.postId}/tags`,
+        {
+          apiKey: "fbk_tags_provenance",
+          body: { tagIds: ["tag_kept", "tag_added"] },
+        }
+      );
+      expect(response.status).toBe(200);
+
+      const rows = yield* db
+        .select({
+          id: schema.postTagTable.id,
+          mergedFromPostId: schema.postTagTable.mergedFromPostId,
+          tagId: schema.postTagTable.tagId,
+        })
+        .from(schema.postTagTable)
+        .where(eq(schema.postTagTable.postId, workspace.postId));
+
+      // The unchanged tag keeps its own row and the source it came from, so an
+      // unmerge can still return it to that post. Replacing the set wholesale
+      // would have cleared the provenance and stranded the tag here for good.
+      const sorted = rows.sort((left, right) =>
+        left.tagId.localeCompare(right.tagId)
+      );
+      expect(sorted).toHaveLength(2);
+      expect(sorted.at(1)).toEqual({
+        id: "ptg_merged",
+        mergedFromPostId: sourcePostId,
+        tagId: "tag_kept",
+      });
+
+      // The added tag is a new row, so it has no merge origin to keep.
+      expect(sorted.at(0)?.tagId).toBe("tag_added");
+      expect(sorted.at(0)?.mergedFromPostId).toBeNull();
+    })
+  );
+
   it.effect("never emits a tag's internal identifiers", () =>
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace();

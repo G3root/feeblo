@@ -142,34 +142,6 @@ const failIfTagNameIsTaken = (args: {
     }
   });
 
-/**
- * Rejects a tag set that names a tag the workspace does not have.
- *
- * Ignoring an unknown id would tag the post with the ids that happen to exist
- * and answer 200, so a caller that mistyped one id would see a success and a
- * post that is not tagged the way it asked. The count is compared rather than
- * the ids reported, so the endpoint cannot be used to test whether a tag id
- * exists in a workspace the key cannot read.
- */
-const failIfTagsAreUnknown = (args: {
-  readonly organizationId: string;
-  readonly tagIds: readonly string[];
-}) =>
-  Effect.gen(function* () {
-    const repository = yield* currentPublicApiRepository;
-    const found = yield* repository
-      .countExistingTags(args)
-      .pipe(Effect.catchTag("InternalServerError", onInternalError));
-
-    if (found !== args.tagIds.length) {
-      return yield* Effect.fail(
-        invalidRequestError(
-          "One or more tagIds do not exist in this workspace."
-        )
-      );
-    }
-  });
-
 export const PublicApiLive = HttpApiBuilder.group(
   PublicApi,
   "PublicApiV1",
@@ -273,20 +245,14 @@ export const PublicApiLive = HttpApiBuilder.group(
             return yield* Effect.fail(notFoundError("Post not found."));
           }
 
-          // Deduplicated before the check: the count compares distinct rows,
-          // so the same id twice would otherwise look like a tag the workspace
-          // does not have.
-          const tagIds = [...new Set(payload.tagIds)];
-          yield* failIfTagsAreUnknown({
-            organizationId: caller.organizationId,
-            tagIds,
-          });
-
+          // The tag ids are checked inside the write's own transaction, so a
+          // tag that does not exist is the documented `INVALID_REQUEST` rather
+          // than a foreign-key failure reported as a server error.
           const tags = yield* repository
             .setPostTags({
               organizationId: caller.organizationId,
               postId: params.postId,
-              tagIds,
+              tagIds: payload.tagIds,
             })
             .pipe(Effect.catchTag("InternalServerError", onInternalError));
 

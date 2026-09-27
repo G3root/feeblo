@@ -31,7 +31,7 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 | Scope | Grants |
 | --- | --- |
 | `posts.read` | Read posts, their status, tags, and vote and comment counts. Required by both post endpoints. |
-| `tags.read` | Read the workspace's tags, and the tags embedded in a post. |
+| `tags.read` | Read the workspace's tags through the `/tags` endpoints. A post's embedded tags come with the post, under `posts.read`. |
 | `tags.create` | Create a tag. |
 | `tags.update` | Rename a tag. |
 | `tags.delete` | Delete a tag, which removes it from every post that carried it. |
