@@ -68,7 +68,10 @@ catalog:
   vite: ^8.0.16
   "vite-plugin-icons-spritesheet": ^3.1.0
   vite-plugin-solid: ^2.11.12
-  vitest: ^4.1.11
+  # `@effect/vitest` 4.0.0-rc.117 peers on vitest >=5.0.0 <6.0.0; keep the
+  # two on the same major so the helper package is not running against an
+  # unsupported vitest API.
+  vitest: ^5.0.2
   zod: ^4.4.3
 nodeLinker: hoisted
 overrides:

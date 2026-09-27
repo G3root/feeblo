@@ -18,6 +18,9 @@ export default defineConfig({
       enabled: true,
       headless: true,
       instances: [{ browser: "chromium" }],
+      // Vitest 5 defaults `locators.exact` to true; these tests were written
+      // against the pre-5 substring default, so keep that behaviour.
+      locators: { exact: false },
       provider: playwright(),
     },
     include: ["src/**/*.browser.test.{ts,tsx}"],
