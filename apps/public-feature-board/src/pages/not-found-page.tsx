@@ -17,7 +17,7 @@ export function NotFoundPage() {
           <EmptyTitle>{m.salty_empty_shrike()}</EmptyTitle>
           <EmptyDescription>{m.true_upper_antelope()}</EmptyDescription>
         </EmptyHeader>
-        <Link className={buttonVariants({ variant: "outline" })} to="/">
+        <Link className={buttonVariants({ variant: "outline" })} to="/s">
           {m.orange_male_bumblebee()}
         </Link>
       </Empty>

@@ -21,8 +21,8 @@ const tanstackPackageRegex = /\/@tanstack\/([^/]+)/;
  * server-only route that serves a hand-written HTML shell; its Solid bundle is
  * built separately (`packages/feedback-widget/vite.config.iframe.ts`) into
  * `public/widget`, because Start's client environment allows exactly one
- * entry. The public board is a normal route that renders on the server for
- * crawlers and hands off to its own client-only SPA after hydration.
+ * entry. The public board's pages are ordinary SSR routes under `/s/...`,
+ * rendered from components in `@feeblo/public-feature-board`.
  *
  * Cloudflare and Node builds share this config; `CLOUDFLARE_ADAPTER` picks the
  * hosting plugin (the Node path is served by `server.mjs`, which pairs srvx
@@ -31,14 +31,6 @@ const tanstackPackageRegex = /\/@tanstack\/([^/]+)/;
 export default defineConfig({
   resolve: {
     tsconfigPaths: true,
-    alias: {
-      // The tsconfig maps this specifier to a boundary declaration for
-      // typechecking (see `types/public-feature-board.d.ts`); the real
-      // package is what must be bundled.
-      "@feeblo/public-feature-board": fileURLToPath(
-        new URL("../../apps/public-feature-board/src/index.ts", import.meta.url)
-      ),
-    },
   },
   server: {
     proxy: {

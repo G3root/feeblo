@@ -10,8 +10,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useRef } from "react";
 
-import { publicChangelogSubscriptionCollection } from "../../lib/collections";
 import { m } from "../../paraglide/messages.js";
+import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
 
 const ANCHORED_SUBSCRIBE_TOAST_ID = "changelog-subscribe";
@@ -27,6 +27,7 @@ export function ChangelogSubscribeButton() {
   const site = useSite();
   const authDialogStore = useAuthDialogContext();
   const { data: session, isPending: isAuthPending } = useAuthState();
+  const { publicChangelogSubscriptionCollection } = usePublicCollections();
   const organizationId = site.organizationId;
 
   // Re-entrancy guard: blocks a second toggle while the previous mutation is

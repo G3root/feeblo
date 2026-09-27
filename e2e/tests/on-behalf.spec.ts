@@ -13,6 +13,7 @@ import {
   createWorkspace,
   signUpProgrammatically,
 } from "../helpers/auth";
+import { waitForHydration } from "../helpers/hydration";
 import { assertNoPageErrors, trackPageErrors } from "../helpers/page-errors";
 import { createPost, fillEditor, openPost } from "../helpers/posts";
 import { waitForRpc } from "../helpers/rpc";
@@ -1060,6 +1061,7 @@ test.describe("post author reassignment", () => {
     trackPageErrors(visitorPage);
     try {
       await visitorPage.goto(publicBoardUrl(owner.workspaceName));
+      await waitForHydration(visitorPage);
       await expect(
         visitorPage.getByRole("link", { name: title })
       ).toBeVisible();
@@ -1175,6 +1177,7 @@ test.describe("public board", () => {
       trackPageErrors(visitorPage);
       try {
         await visitorPage.goto(publicBoardUrl(owner.workspaceName));
+        await waitForHydration(visitorPage);
         await visitorPage.getByRole("link", { name: title }).click();
         await expect(visitorPage.getByText(commentText)).toBeVisible();
         await expect(visitorPage.getByText(customerName).first()).toBeVisible();

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 
 import { createAuthenticatedWorkspace } from "../helpers/auth";
+import { waitForHydration } from "../helpers/hydration";
 import { assertNoPageErrors, trackPageErrors } from "../helpers/page-errors";
 import { createPost, fillEditor } from "../helpers/posts";
 import {
@@ -144,6 +145,7 @@ test(
 
     try {
       await visitorPage.goto(boardUrl);
+      await waitForHydration(visitorPage);
       await signInThroughPublicBoard(visitorPage, user.email, user.password);
 
       await visitorPage.getByRole("button", { name: "Give Feedback" }).click();
@@ -182,6 +184,7 @@ test(
 
     try {
       await visitorPage.goto(publicBoardUrl(user.workspaceName));
+      await waitForHydration(visitorPage);
       await signInThroughPublicBoard(visitorPage, user.email, user.password);
 
       await visitorPage.getByRole("button", { name: "Give Feedback" }).click();
@@ -216,6 +219,7 @@ test(
     try {
       const boardUrl = publicBoardUrl(owner.workspaceName);
       await visitorPage.goto(boardUrl);
+      await waitForHydration(visitorPage);
       await visitorPage.getByRole("button", { name: authButtonName }).click();
 
       const chooserDialog = visitorPage.getByRole("dialog", {
@@ -289,6 +293,7 @@ test(
 
     try {
       await visitorPage.goto(publicBoardUrl(user.workspaceName));
+      await waitForHydration(visitorPage);
 
       await visitorPage.getByRole("button", { name: "Give Feedback" }).click();
       const authDialog = visitorPage.getByRole("dialog", {
@@ -340,6 +345,7 @@ test(
 
     try {
       await visitorPage.goto(publicBoardUrl(user.workspaceName));
+      await waitForHydration(visitorPage);
 
       const feedbackLink = visitorPage.getByRole("link", { name: title });
       await expect(feedbackLink).toBeVisible();

@@ -1,12 +1,12 @@
 import { getClientHintCheckScript } from "@feeblo/web-shared/client-hints";
 import {
-  createRootRoute,
+  createRootRouteWithContext,
   HeadContent,
   ScriptOnce,
   Scripts,
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import {
   envScript,
@@ -19,6 +19,8 @@ import {
   getBrowserPublicEnv,
   getPublicEnvServer,
 } from "~/lib/server-runtime-public-env";
+
+import type { RouterContext } from "../router";
 
 import "../styles/global.css";
 
@@ -46,7 +48,7 @@ const getRootDocumentData = createServerFn({ method: "GET" }).handler(() => ({
   preconnectOrigins: apiPreconnectOrigins(),
 }));
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<RouterContext>()({
   loader: () => getRootDocumentData(),
   head: ({ loaderData }) => ({
     meta: [
@@ -83,8 +85,24 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
       </head>
       <body>
         {children}
+        <HydrationMarker />
         <Scripts />
       </body>
     </html>
   );
+}
+
+/**
+ * Marks the document as hydrated.
+ *
+ * React runs effects only after its hydration pass, so this attribute flips
+ * exactly when the server-rendered tree became interactive. The e2e suite
+ * waits on it instead of racing the first click; nothing in the app reads it.
+ */
+function HydrationMarker() {
+  useEffect(() => {
+    document.documentElement.dataset.hydrated = "true";
+  }, []);
+
+  return null;
 }

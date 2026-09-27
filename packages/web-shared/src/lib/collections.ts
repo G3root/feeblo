@@ -202,3 +202,40 @@ export function settleOptimisticMutation(
 
   void transaction.isPersisted.promise.then(onSuccess, onError);
 }
+
+/** Minimal structural view of a live query result's readiness. */
+export interface LiveQueryResultState {
+  readonly data?: unknown;
+  readonly isEnabled?: boolean;
+  readonly isIdle?: boolean;
+  readonly isLoading?: boolean;
+}
+
+/**
+ * Whether a live query has nothing to show *yet*.
+ *
+ * `isLoading` alone tracks a query's *sync phase*, not whether it has a
+ * result: hydration installs rows (or an empty set) before the first browser
+ * render, but the collection only reports ready once its adapter's first sync
+ * resolves. A skeleton gated on `isLoading` therefore replaces server-rendered
+ * content with a placeholder on that first render — a hydration mismatch, and
+ * a flash of the wrong UI after React regenerates the tree.
+ *
+ * "Nothing yet" is therefore `data === undefined` *while the query is still
+ * starting*, which is exactly the condition the server render saw before its
+ * preloads resolved. A query that has produced a result is content even when
+ * that result is empty, and a `findOne()` that matched nothing resolves to
+ * `undefined` with the query no longer starting — so the row is genuinely
+ * absent, not pending.
+ */
+export function isLiveQueryPending(result: LiveQueryResultState): boolean {
+  if (result.isEnabled === false) {
+    // A disabled query asked for nothing; waiting on it would wait forever.
+    return false;
+  }
+
+  return (
+    result.data === undefined &&
+    (result.isLoading === true || result.isIdle === true)
+  );
+}

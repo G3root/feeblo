@@ -1,4 +1,4 @@
-import { getRouteApi, useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useCallback } from "react";
 
 export type HomePageSortOption = "upvotes" | "newest" | "oldest";
@@ -10,7 +10,13 @@ const SORT_OPTIONS: Set<HomePageSortOption> = new Set([
   "oldest",
 ]);
 
-const homeRouteApi = getRouteApi("/");
+/**
+ * The board's home route owns the search-param schema; this hook only reads it,
+ * so it stays untyped here rather than depending on the host's route ids.
+ */
+function useHomeSearch(): { board?: string; sort?: string; status?: string } {
+  return useSearch({ strict: false });
+}
 
 function normalizeFilterValue(value: string | undefined): FilterValue {
   return value?.trim() || "all";
@@ -30,7 +36,7 @@ export function useHomePageFilters({
   boardSlugs: string[];
   statusIds: string[];
 }) {
-  const search = homeRouteApi.useSearch();
+  const search = useHomeSearch();
   const navigate = useNavigate();
   const selectedStatusFromUrl = normalizeFilterValue(search.status);
   const selectedBoardFromUrl = normalizeFilterValue(search.board);

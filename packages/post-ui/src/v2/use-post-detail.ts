@@ -1,3 +1,4 @@
+import { isLiveQueryPending } from "@feeblo/web-shared/collections";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 
 import { usePostCollectionData } from "./post-page-context";
@@ -36,6 +37,8 @@ export function usePostDetail() {
     assetIds: query.data?.assetIds,
     content: query.data?.content,
     isError: query.isError,
-    isLoading: query.isLoading,
+    // Hydration lands the detail row before the first client render, so
+    // `isLoading` would flash the body skeleton over server-rendered content.
+    isLoading: isLiveQueryPending(query),
   };
 }

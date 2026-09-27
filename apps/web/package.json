@@ -46,6 +46,7 @@
     "@tanstack/react-form": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-router": "catalog:",
+    "@tanstack/react-router-with-db": "catalog:",
     "@tanstack/react-start": "catalog:",
     "@tanstack/react-store": "^0.11.0",
     "@tanstack/react-virtual": "catalog:",

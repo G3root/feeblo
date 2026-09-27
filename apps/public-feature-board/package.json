@@ -7,6 +7,62 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./board-scope": {
+      "types": "./src/lib/board-scope.ts",
+      "default": "./src/lib/board-scope.ts"
+    },
+    "./collections": {
+      "types": "./src/lib/collections.ts",
+      "default": "./src/lib/collections.ts"
+    },
+    "./components/pending": {
+      "types": "./src/components/layout/public-board-pending.tsx",
+      "default": "./src/components/layout/public-board-pending.tsx"
+    },
+    "./components/shell": {
+      "types": "./src/components/layout/public-board-shell.tsx",
+      "default": "./src/components/layout/public-board-shell.tsx"
+    },
+    "./i18n": {
+      "types": "./src/i18n.ts",
+      "default": "./src/i18n.ts"
+    },
+    "./pages/board": {
+      "types": "./src/pages/board-page.tsx",
+      "default": "./src/pages/board-page.tsx"
+    },
+    "./pages/changelog": {
+      "types": "./src/pages/change-log-page.tsx",
+      "default": "./src/pages/change-log-page.tsx"
+    },
+    "./pages/changelog-detail": {
+      "types": "./src/pages/change-log-detail-page.tsx",
+      "default": "./src/pages/change-log-detail-page.tsx"
+    },
+    "./pages/home": {
+      "types": "./src/pages/home-page.tsx",
+      "default": "./src/pages/home-page.tsx"
+    },
+    "./pages/not-found": {
+      "types": "./src/pages/not-found-page.tsx",
+      "default": "./src/pages/not-found-page.tsx"
+    },
+    "./pages/post": {
+      "types": "./src/pages/post-page.tsx",
+      "default": "./src/pages/post-page.tsx"
+    },
+    "./pages/roadmap": {
+      "types": "./src/pages/roadmap-page.tsx",
+      "default": "./src/pages/roadmap-page.tsx"
+    },
+    "./providers/site-provider": {
+      "types": "./src/providers/site-provider.tsx",
+      "default": "./src/providers/site-provider.tsx"
+    },
+    "./sso-token": {
+      "types": "./src/lib/sso-token.ts",
+      "default": "./src/lib/sso-token.ts"
     }
   },
   "scripts": {
@@ -31,6 +87,7 @@
     "@tanstack/react-db": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-router": "catalog:",
+    "@tanstack/react-start": "catalog:",
     "effect": "catalog:",
     "react": "catalog:"
   },

@@ -8,6 +8,7 @@ import {
   openChangelogEntry,
   publishOpenChangelogEntry,
 } from "../helpers/changelog";
+import { waitForHydration } from "../helpers/hydration";
 import { createPost } from "../helpers/posts";
 import { createTestUser } from "../helpers/test-users";
 import { publicBoardUrl } from "../helpers/urls";
@@ -143,6 +144,7 @@ test.describe("public board SEO", () => {
 
     // The home page canonical is the site root, not the rewrite target.
     await page.goto(`${boardUrl}/`);
+    await waitForHydration(page);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
       "href",
       `${boardUrl}/`

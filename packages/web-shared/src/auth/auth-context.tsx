@@ -5,7 +5,7 @@ import * as Option from "effect/Option";
 import * as Result from "effect/unstable/reactivity/AsyncResult";
 import * as AtomRegistry from "effect/unstable/reactivity/AtomRegistry";
 import type React from "react";
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import { authAtomRegistry, meAtom } from "./atoms";
 import { readAuthHintFromCookie } from "./hint-cookie";
@@ -90,13 +90,28 @@ const hintState = (hint: AuthUser | null): AuthState | null =>
 
 function AuthProviderClient({
   children,
+  hydrationSafe,
 }: {
   readonly children: React.ReactNode;
+  readonly hydrationSafe: boolean;
 }) {
   const resolved = useResolvedAuth();
   // Read once per mount: the cookie only changes through the atom itself, so
   // a re-render can never observe a fresher hint than the in-flight request.
-  const [initialHint] = useState(() => readAuthHintFromCookie());
+  //
+  // In hydration-safe mode the hint is read *after* mount instead: a server
+  // render has no session and therefore renders the anonymous variant, and the
+  // first client render has to agree with that HTML before the hint can take
+  // over. The flip costs one frame, not a request.
+  const [initialHint, setInitialHint] = useState<AuthUser | null>(() =>
+    hydrationSafe ? null : readAuthHintFromCookie()
+  );
+
+  useEffect(() => {
+    if (hydrationSafe) {
+      setInitialHint(readAuthHintFromCookie());
+    }
+  }, [hydrationSafe]);
 
   const state = useMemo<AuthState>(
     () =>
@@ -112,10 +127,17 @@ function AuthProviderClient({
 export function AuthProvider({
   children,
   registry = authAtomRegistry,
+  hydrationSafe = false,
 }: {
   readonly children: React.ReactNode;
   /** Test seam: defaults to the shared app-wide registry. */
   readonly registry?: AtomRegistry.AtomRegistry;
+  /**
+   * Defers the display-only hint cookie to after hydration so a server-rendered
+   * document and its first client render agree. Set by hosts that server-render
+   * surfaces containing auth-dependent UI (the public board).
+   */
+  readonly hydrationSafe?: boolean;
 }) {
   if (!hasWindow()) {
     return (
@@ -127,7 +149,9 @@ export function AuthProvider({
 
   return (
     <RegistryContext.Provider value={registry}>
-      <AuthProviderClient>{children}</AuthProviderClient>
+      <AuthProviderClient hydrationSafe={hydrationSafe}>
+        {children}
+      </AuthProviderClient>
     </RegistryContext.Provider>
   );
 }

@@ -3,12 +3,10 @@ import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { PostSubscription } from "@feeblo/domain/post-subscription/schema";
 import type { Upvote } from "@feeblo/domain/upvote/schema";
-import { hasWindow } from "@feeblo/utils/runtime-kind";
 import { getCachedAuthSession } from "@feeblo/web-shared/auth-session";
 import {
   createRpcCollectionHelpers,
   eqFilterValue,
-  postSlugFromPath,
   refetchInBackground,
 } from "@feeblo/web-shared/collections";
 import {
@@ -23,13 +21,21 @@ import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import {
   BasicIndex,
-  createCollection,
+  collectionOptions,
   parseLoadSubsetOptions,
 } from "@tanstack/react-db";
+import type { DbClient } from "@tanstack/react-db";
+import type { QueryClient } from "@tanstack/react-query";
+import { createIsomorphicFn } from "@tanstack/react-start";
 import * as Duration from "effect/Duration";
 import type * as Schema from "effect/Schema";
 
-import { getContext } from "../integrations/tanstack-query/root-provider";
+import {
+  BOARD_QUERY_CLIENT_DEPENDENCY,
+  BOARD_SCOPE_DEPENDENCY,
+  type BoardScope,
+  requireMutationOrganizationId,
+} from "./board-scope";
 
 type CommentReactionRow = Schema.Schema.Type<typeof CommentReaction>;
 type ChangelogSubscriptionRow = Schema.Schema.Type<
@@ -39,89 +45,44 @@ type PostReactionRow = Schema.Schema.Type<typeof PostReaction>;
 type PostSubscriptionRow = Schema.Schema.Type<typeof PostSubscription>;
 type UpvoteRow = Schema.Schema.Type<typeof Upvote>;
 
-const queryClient = getContext().queryClient;
-
-export function getCurrentOrganizationId() {
-  if (!hasWindow()) {
-    return undefined;
-  }
-
-  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-  const runtimeWindow = window as Window & {
-    global?: { __ENV?: { organizationId?: string } };
-  };
-
-  return runtimeWindow.global?.__ENV?.organizationId;
-}
-
-/**
- * Post detail pages are served at `/p/:slug`; parse the slug from the current
- * URL so the comment/reaction collections can be keyed and fetched when the
- * query is created without an explicit filter (e.g. from a route loader).
- */
-function getCurrentPostSlug() {
-  if (!hasWindow()) {
-    return undefined;
-  }
-
-  return postSlugFromPath(window.location.pathname, "p", 1);
-}
-
-/**
- * Changelog detail pages are served at `/changelog/:slug`; same route-slug
- * fallback as post pages so the single-entry collection self-keys when it is
- * preloaded from a route loader.
- */
-function getCurrentChangelogSlug() {
-  if (!hasWindow()) {
-    return undefined;
-  }
-
-  return postSlugFromPath(window.location.pathname, "changelog", 1);
-}
-
 /**
  * Session user id, or undefined while signed out / during SSR. Subscription
  * RPCs scope their results to this user, so it keys their query caches.
  */
-function getCurrentUserId() {
-  if (!hasWindow()) {
-    return undefined;
-  }
-
-  return getCachedAuthSession()?.user.id;
-}
+const getCurrentUserId = createIsomorphicFn()
+  .client(() => getCachedAuthSession()?.user.id)
+  .server(() => undefined);
 
 /**
- * Mutations are always scoped to the organization hosting this public board.
- * A restricted SSO session must never use a client-supplied entity organization
- * id to act on a different board.
+ * The dependencies every board collection reads, resolved from the `DbClient`
+ * that materializes it.
+ *
+ * Descriptors are module-level (components import them by identity), but the
+ * values that scope them — the hosting organization, the viewed slug, the
+ * Query client — are per request/document, so they arrive through the client
+ * that owns the collection instead of through `window`. `scope` is the
+ * mutable-by-design seam: the board layout fills it from the site it resolved
+ * before any collection materializes, and slug lookups read the current
+ * location so a browser client stays correct across navigations.
  */
-export function getMutationOrganizationId() {
-  const organizationId = getCurrentOrganizationId();
-
-  if (!organizationId) {
-    throw new Error("Missing public board organization id");
-  }
-
-  const restrictedToOrganizationId =
-    getCachedAuthSession()?.user.restrictedToOrganizationId;
-
-  if (
-    restrictedToOrganizationId &&
-    restrictedToOrganizationId !== organizationId
-  ) {
-    throw new Error("Session is not authorized for this organization");
-  }
-
-  return organizationId;
-}
-
-const { organizationScopedQueryKey, resolvePostSlug, slugScopedQueryKey } =
-  createRpcCollectionHelpers({
-    getOrganizationId: getCurrentOrganizationId,
-    getPostSlug: getCurrentPostSlug,
+function boardCollectionDeps(client: DbClient) {
+  const scope = client.requireDependency<BoardScope>(BOARD_SCOPE_DEPENDENCY);
+  const queryClient = client.requireDependency<QueryClient>(
+    BOARD_QUERY_CLIENT_DEPENDENCY
+  );
+  const rpcHelpers = createRpcCollectionHelpers({
+    getOrganizationId: () => scope.getOrganizationId(),
+    getPostSlug: () => scope.getPostSlug(),
   });
+
+  return {
+    ...rpcHelpers,
+    getChangelogSlug: () => scope.getChangelogSlug(),
+    getMutationOrganizationId: () => requireMutationOrganizationId(scope),
+    getOrganizationId: () => scope.getOrganizationId(),
+    queryClient,
+  };
+}
 
 /**
  * Every collection carries an explicit `id`: `createCollection` generates a
@@ -129,942 +90,1068 @@ const { organizationScopedQueryKey, resolvePostSlug, slugScopedQueryKey } =
  * values in global scope. An unnamed collection in the SSR bundle takes every
  * request down with it, so treat the ids as required, not optional.
  */
-export const publicPostCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicPostCollection",
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => organizationScopedQueryKey("public-post"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
+export const publicPostDescriptor = collectionOptions(
+  "publicPostCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
 
-      if (!organizationId) {
-        return [];
-      }
+    return queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: () => deps.organizationScopedQueryKey("public-post"),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
 
-      const data = await fetchRpc(
-        (rpc) =>
-          rpc.PostListPublic({
-            organizationId,
-            boardId: null,
-          }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    // No `onInsert`: creation persists through the surface's `persistPost`
-    // inside the shared form's optimistic action, so a bare insert fails
-    // fast with `MissingInsertHandlerError` instead of persisting without
-    // a body. Updates and deletes sync here as before.
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedPost } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.PostUpdatePublic({
-          id: updatedPost.id,
-          statusId: updatedPost.statusId,
-          boardId: updatedPost.boardId,
-          organizationId: getMutationOrganizationId(),
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: deletedPost } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.PostDeletePublic({
-          organizationId: getMutationOrganizationId(),
-          boardId: deletedPost.boardId,
-          id: deletedPost.id,
-        })
-      );
-      // Same as the dashboard: a survivor delete reverts merged children
-      // server-side, so refresh the synced rows that still point at it. This
-      // collection is the mutation target, so the read-back is awaited.
-      await publicPostCollection.utils.refetch();
-      // The delete-hint set is derived from the write, not part of it: it
-      // refreshes in the background so the delete settles without waiting on
-      // a second round trip.
-      refetchInBackground(publicDeleteEligibilityCollection.utils.refetch());
-    },
-  })
-);
-
-export const publicPostStatusCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicPostStatusCollection",
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => organizationScopedQueryKey("public-post-status"),
-
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.PostStatusListPublic({ organizationId }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const publicRoadmapCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicRoadmapCollection",
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => organizationScopedQueryKey("public-roadmap"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.RoadmapListPublic({ organizationId }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const publicRoadmapColumnCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicRoadmapColumnCollection",
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => organizationScopedQueryKey("public-roadmap-column"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.RoadmapColumnListPublic({ organizationId }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const publicChangelogCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicChangelogCollection",
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => organizationScopedQueryKey("public-changelog"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.ChangelogListPublic({ organizationId }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const publicChangelogCategoryCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicChangelogCategoryCollection",
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => organizationScopedQueryKey("public-changelog-category"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.ChangelogCategoryListPublic({ organizationId }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const publicChangelogCategoryLinkCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicChangelogCategoryLinkCollection",
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () =>
-      organizationScopedQueryKey("public-changelog-category-link"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.ChangelogCategoryListLinksPublic({ organizationId }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-/**
- * Single-entry changelog detail, used by `/changelog/:slug`. On-demand and
- * slug-scoped: the visit resolves one body (plus its linked posts) through
- * `ChangelogGetPublic` instead of syncing the list's up-to-100 full bodies.
- */
-export const publicChangelogDetailCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicChangelogDetailCollection",
-    queryKey: (opts) =>
-      organizationScopedQueryKey(
-        "public-changelog-detail",
-        eqFilterValue(parseLoadSubsetOptions(opts).filters, "slug") ??
-          getCurrentChangelogSlug()
-      ),
-    syncMode: "on-demand",
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      const filters = parseLoadSubsetOptions(
-        ctx.meta?.loadSubsetOptions
-      ).filters;
-      const slug = eqFilterValue(filters, "slug") ?? getCurrentChangelogSlug();
-
-      if (!(slug && organizationId)) {
-        return [];
-      }
-
-      try {
-        const entry = await fetchRpc(
-          (rpc) => rpc.ChangelogGetPublic({ organizationId, slug }),
-          { signal: ctx.signal }
-        );
-        return [entry];
-      } catch (error) {
-        // A missing or hidden entry resolves to an empty collection so the
-        // page renders its not-found state; transport failures still surface
-        // through the query error state.
-        if (isRpcErrorTag(error, "ChangelogNotFoundError")) {
+        if (!organizationId) {
           return [];
         }
-        throw error;
-      }
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
 
-export const publicBoardCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicBoardCollection",
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => organizationScopedQueryKey("public-board"),
-
-    refetchInterval: Duration.toMillis(Duration.minutes(5)),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.BoardListPublic({ organizationId }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const publicTagCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicTagCollection",
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: () => organizationScopedQueryKey("public-tag"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.TagListPublic({ organizationId }),
-        {
-          signal: ctx.signal,
-        }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const publicPostTagCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicPostTagCollection",
-    // Slug-scoped and on-demand: only the viewed post's tag assignments are
-    // fetched, not every assignment in the organization. The query key
-    // resolves the route slug, so the preloaded subset and the component's
-    // postId-filtered subscription share one cache entry.
-    queryKey: (opts) =>
-      slugScopedQueryKey(
-        "public-post-tag",
-        parseLoadSubsetOptions(opts).filters
-      ),
-    syncMode: "on-demand",
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      const slug = resolvePostSlug(
-        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
-      );
-
-      if (!(slug && organizationId)) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.PostTagListPublic({ organizationId, slug }),
-        {
-          signal: ctx.signal,
-        }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const publicCommentCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicCommentCollection",
-    queryKey: (opts) =>
-      slugScopedQueryKey(
-        "public-comment",
-        parseLoadSubsetOptions(opts).filters
-      ),
-    syncMode: "on-demand",
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      const slug = resolvePostSlug(
-        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
-      );
-
-      if (!(slug && organizationId)) {
-        return [];
-      }
-
-      try {
         const data = await fetchRpc(
           (rpc) =>
-            rpc.CommentListPublic({
+            rpc.PostListPublic({
               organizationId,
-              slug,
+              boardId: null,
             }),
           { signal: ctx.signal }
         );
 
         return [...data];
-      } catch {
-        return [];
-      }
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newComment } = mutation;
+      },
+      queryClient: deps.queryClient,
+      getKey: (item) => item.id,
+      // No `onInsert`: creation persists through the surface's `persistPost`
+      // inside the shared form's optimistic action, so a bare insert fails
+      // fast with `MissingInsertHandlerError` instead of persisting without
+      // a body. Updates and deletes sync here as before.
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedPost } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.CommentCreatePublic({
-          organizationId: getMutationOrganizationId(),
-          visibility: newComment.visibility,
-          content: newComment.content,
-          postId: newComment.postId,
-          parentCommentId: newComment.parentCommentId,
-          id: newComment.id,
-          statusUpdateId: newComment.statusUpdateId ?? null,
-        })
-      );
-      // The comment is already reconciled optimistically; the post rows'
-      // comment counts and the delete-hint set are derived, so both refresh
-      // detached instead of holding the insert open for two round trips.
-      refetchInBackground(
-        publicPostCollection.utils.refetch(),
-        publicDeleteEligibilityCollection.utils.refetch()
-      );
-    },
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedComment } = mutation;
+        await fetchRpc((rpc) =>
+          rpc.PostUpdatePublic({
+            id: updatedPost.id,
+            statusId: updatedPost.statusId,
+            boardId: updatedPost.boardId,
+            organizationId: deps.getMutationOrganizationId(),
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: deletedPost } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.CommentUpdatePublic({
-          id: updatedComment.id,
-          organizationId: getMutationOrganizationId(),
-          postId: updatedComment.postId,
-          content: updatedComment.content,
-          visibility: updatedComment.visibility,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedComment } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.CommentDeletePublic({
-          id: deletedComment.id,
-          organizationId: getMutationOrganizationId(),
-          postId: deletedComment.postId,
-        })
-      );
-      // Same as the create path: the optimistic delete already removed the
-      // row, so the derived post counts and delete hints refresh detached.
-      refetchInBackground(
-        publicPostCollection.utils.refetch(),
-        publicDeleteEligibilityCollection.utils.refetch()
-      );
-    },
-  })
+        await fetchRpc((rpc) =>
+          rpc.PostDeletePublic({
+            organizationId: deps.getMutationOrganizationId(),
+            boardId: deletedPost.boardId,
+            id: deletedPost.id,
+          })
+        );
+        // Same as the dashboard: a survivor delete reverts merged children
+        // server-side, so refresh the synced rows that still point at it. This
+        // collection is the mutation target, so the read-back is awaited.
+        await client.collection(publicPostDescriptor).utils.refetch();
+        // The delete-hint set is derived from the write, not part of it: it
+        // refreshes in the background so the delete settles without waiting on
+        // a second round trip.
+        refetchInBackground(
+          client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
+        );
+      },
+    });
+  }
 );
 
-export const publicCommentReactionCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicCommentReactionCollection",
-    queryKey: (opts) =>
-      slugScopedQueryKey(
-        "public-comment-reaction",
-        parseLoadSubsetOptions(opts).filters
-      ),
-    syncMode: "on-demand",
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      const slug = resolvePostSlug(
-        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
-      );
+export const publicPostStatusDescriptor = collectionOptions(
+  "publicPostStatusCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
 
-      if (!(slug && organizationId)) {
-        return [];
-      }
+    return queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: () => deps.organizationScopedQueryKey("public-post-status"),
 
-      try {
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+
+        if (!organizationId) {
+          return [];
+        }
+
         const data = await fetchRpc(
-          (rpc) => rpc.CommentReactionListPublic({ organizationId, slug }),
+          (rpc) => rpc.PostStatusListPublic({ organizationId }),
           { signal: ctx.signal }
         );
 
         return [...data];
-      } catch {
-        return [];
-      }
-    },
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    queryClient,
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    getKey: getCommentReactionCollectionKey as (
-      item: CommentReactionRow
-    ) => string,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newCommentReaction } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.CommentReactionTogglePublic({
-          organizationId: getMutationOrganizationId(),
-          postId: newCommentReaction.postId,
-          commentId: newCommentReaction.commentId,
-          emoji: newCommentReaction.emoji,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedCommentReaction } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.CommentReactionTogglePublic({
-          organizationId: getMutationOrganizationId(),
-          postId: deletedCommentReaction.postId,
-          commentId: deletedCommentReaction.commentId,
-          emoji: deletedCommentReaction.emoji,
-        })
-      );
-    },
-  })
+      },
+      queryClient: deps.queryClient,
+      getKey: (item) => item.id,
+    });
+  }
 );
 
-export const publicUpvoteCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicUpvoteCollection",
-    queryKey: organizationScopedQueryKey("public-upvote"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
+export const publicRoadmapDescriptor = collectionOptions(
+  "publicRoadmapCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
 
-      if (!organizationId) {
-        return [];
-      }
+    return queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: () => deps.organizationScopedQueryKey("public-roadmap"),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
 
-      const data = await fetchRpc(
-        (rpc) => rpc.UpvoteListPublic({ organizationId }),
-        {
-          signal: ctx.signal,
-        }
-      );
-
-      return [...data];
-      // SAFETY: The endpoint/API contract guarantees this response shape.
-    },
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    queryClient,
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    getKey: getUpvoteCollectionKey as (item: UpvoteRow) => string,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newUpvote } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.UpvoteTogglePublic({
-          organizationId: getMutationOrganizationId(),
-          postId: newUpvote.postId,
-        })
-      );
-      // The upvote collection holds the toggle optimistically; the
-      // delete-hint set is derived, so it refreshes detached.
-      refetchInBackground(publicDeleteEligibilityCollection.utils.refetch());
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedUpvote } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.UpvoteTogglePublic({
-          organizationId: getMutationOrganizationId(),
-          postId: deletedUpvote.postId,
-        })
-      );
-      // Same as the insert path: the derived hint set refreshes detached.
-      refetchInBackground(publicDeleteEligibilityCollection.utils.refetch());
-    },
-  })
-);
-
-/**
- * Slug-scoped counterpart of `publicUpvoteCollection`, used by post detail
- * pages. On-demand: the route loader preloads the subset while the upvote
- * button and voter dialog subscribe by `postId`; both resolve the same
- * route-slug query key, so only this post's votes are fetched instead of
- * every vote in the organization.
- */
-export const publicPostUpvoteCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicPostUpvoteCollection",
-    queryKey: (opts) =>
-      slugScopedQueryKey(
-        "public-post-upvote",
-        parseLoadSubsetOptions(opts).filters,
-        getCurrentUserId()
-      ),
-    syncMode: "on-demand",
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      const slug = resolvePostSlug(
-        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
-      );
-
-      if (!(slug && organizationId)) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.UpvoteListPublic({ organizationId, slug }),
-        {
-          signal: ctx.signal,
-        }
-      );
-
-      return [...data];
-    },
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    queryClient,
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    getKey: getUpvoteCollectionKey as (item: UpvoteRow) => string,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newUpvote } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.UpvoteTogglePublic({
-          organizationId: getMutationOrganizationId(),
-          postId: newUpvote.postId,
-        })
-      );
-      // Same derived-refresh contract as the org-wide collection.
-      refetchInBackground(publicDeleteEligibilityCollection.utils.refetch());
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedUpvote } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.UpvoteTogglePublic({
-          organizationId: getMutationOrganizationId(),
-          postId: deletedUpvote.postId,
-        })
-      );
-      refetchInBackground(publicDeleteEligibilityCollection.utils.refetch());
-    },
-  })
-);
-
-export const publicPostReactionCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicPostReactionCollection",
-    queryKey: (opts) =>
-      slugScopedQueryKey(
-        "public-post-reaction",
-        parseLoadSubsetOptions(opts).filters
-      ),
-    syncMode: "on-demand",
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      const slug = resolvePostSlug(
-        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
-      );
-
-      if (!(slug && organizationId)) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.PostReactionListPublic({ organizationId, slug }),
-        {
-          signal: ctx.signal,
-        }
-      );
-
-      // SAFETY: The endpoint/API contract guarantees this response shape.
-      return [...data];
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    },
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    queryClient,
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    getKey: getPostReactionCollectionKey as (item: PostReactionRow) => string,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newPostReaction } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.PostReactionTogglePublic({
-          organizationId: getMutationOrganizationId(),
-          postId: newPostReaction.postId,
-          emoji: newPostReaction.emoji,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedPostReaction } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.PostReactionTogglePublic({
-          organizationId: getMutationOrganizationId(),
-          postId: deletedPostReaction.postId,
-          emoji: deletedPostReaction.emoji,
-        })
-      );
-    },
-  })
-);
-
-export const publicPostSubscriptionCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicPostSubscriptionCollection",
-    queryKey: (opts) =>
-      slugScopedQueryKey(
-        "public-post-subscription",
-        parseLoadSubsetOptions(opts).filters,
-        getCurrentUserId()
-      ),
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      const slug = resolvePostSlug(
-        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
-      );
-
-      if (!(slug && organizationId)) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.PostSubscriptionListPublic({ organizationId, slug }),
-        {
-          signal: ctx.signal,
-        }
-        // SAFETY: The endpoint/API contract guarantees this response shape.
-      );
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      return [...data];
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    },
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    queryClient,
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    getKey: getPostSubscriptionCollectionKey as (
-      item: PostSubscriptionRow
-    ) => string,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newSubscription } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.PostSubscriptionCreatePublic({
-          organizationId: getMutationOrganizationId(),
-          postId: newSubscription.postId,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedSubscription } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.PostSubscriptionDeletePublic({
-          organizationId: getMutationOrganizationId(),
-          postId: deletedSubscription.postId,
-        })
-      );
-    },
-  })
-);
-
-export const publicChangelogSubscriptionCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicChangelogSubscriptionCollection",
-    queryKey: () =>
-      organizationScopedQueryKey(
-        "public-changelog-subscription",
-        getCurrentUserId()
-      ),
-    syncMode: "on-demand",
-    queryFn: async () => {
-      const organizationId = getCurrentOrganizationId();
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc((rpc) =>
-        rpc.ChangelogSubscriptionListPublic({ organizationId })
-      );
-      // SAFETY: The endpoint/API contract guarantees this response shape.
-      return [...data];
-    },
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    queryClient,
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    getKey: getChangelogSubscriptionCollectionKey as (
-      item: ChangelogSubscriptionRow
-    ) => string,
-    onInsert: async () => {
-      await fetchRpc((rpc) =>
-        rpc.ChangelogSubscriptionCreatePublic({
-          organizationId: getMutationOrganizationId(),
-        })
-      );
-    },
-    onDelete: async () => {
-      await fetchRpc((rpc) =>
-        rpc.ChangelogSubscriptionDeletePublic({
-          organizationId: getMutationOrganizationId(),
-        })
-      );
-    },
-  })
-);
-
-export const publicPostDetailCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicPostDetailCollection",
-    // Keyed by the explicit `slug` filter with a fallback to the route
-    // slug, so detail subscribers (routes, content views) share one cache
-    // entry per post regardless of where they subscribe from.
-    queryKey: (opts) => {
-      const filters = parseLoadSubsetOptions(opts).filters;
-      const slug = eqFilterValue(filters, "slug") ?? resolvePostSlug(filters);
-      return organizationScopedQueryKey("public-post-detail", slug);
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      const filters = parseLoadSubsetOptions(
-        ctx.meta?.loadSubsetOptions
-      ).filters;
-      const slug = eqFilterValue(filters, "slug") ?? resolvePostSlug(filters);
-
-      if (!(organizationId && slug)) {
-        return [];
-      }
-
-      try {
-        const post = await fetchRpc(
-          (rpc) => rpc.PostGetPublic({ organizationId, slug }),
-          { signal: ctx.signal }
-        );
-        return [post];
-      } catch (error) {
-        // A missing or merged-away slug resolves to an empty collection so
-        // the detail page renders its not-found/merge-resolver state instead
-        // of an error; transport failures still surface through the query.
-        if (isRpcErrorTag(error, "PostNotFoundError")) {
+        if (!organizationId) {
           return [];
         }
-        throw error;
-      }
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
+
+        const data = await fetchRpc(
+          (rpc) => rpc.RoadmapListPublic({ organizationId }),
+          { signal: ctx.signal }
+        );
+
+        return [...data];
+      },
+      queryClient: deps.queryClient,
+      getKey: (item) => item.id,
+    });
+  }
+);
+
+export const publicRoadmapColumnDescriptor = collectionOptions(
+  "publicRoadmapColumnCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: () => deps.organizationScopedQueryKey("public-roadmap-column"),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.RoadmapColumnListPublic({ organizationId }),
+          { signal: ctx.signal }
+        );
+
+        return [...data];
+      },
+      queryClient: deps.queryClient,
+      getKey: (item) => item.id,
+    });
+  }
+);
+
+export const publicChangelogDescriptor = collectionOptions(
+  "publicChangelogCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: () => deps.organizationScopedQueryKey("public-changelog"),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.ChangelogListPublic({ organizationId }),
+          { signal: ctx.signal }
+        );
+
+        return [...data];
+      },
+      queryClient: deps.queryClient,
+      getKey: (item) => item.id,
+    });
+  }
+);
+
+export const publicChangelogCategoryDescriptor = collectionOptions(
+  "publicChangelogCategoryCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: () =>
+        deps.organizationScopedQueryKey("public-changelog-category"),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.ChangelogCategoryListPublic({ organizationId }),
+          { signal: ctx.signal }
+        );
+
+        return [...data];
+      },
+      queryClient: deps.queryClient,
+      getKey: (item) => item.id,
+    });
+  }
+);
+
+export const publicChangelogCategoryLinkDescriptor = collectionOptions(
+  "publicChangelogCategoryLinkCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: () =>
+        deps.organizationScopedQueryKey("public-changelog-category-link"),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.ChangelogCategoryListLinksPublic({ organizationId }),
+          { signal: ctx.signal }
+        );
+
+        return [...data];
+      },
+      queryClient: deps.queryClient,
+      getKey: (item) => item.id,
+    });
+  }
+);
+
+export const publicChangelogDetailDescriptor = collectionOptions(
+  "publicChangelogDetailCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      queryKey: (opts) =>
+        deps.organizationScopedQueryKey(
+          "public-changelog-detail",
+          eqFilterValue(parseLoadSubsetOptions(opts).filters, "slug") ??
+            deps.getChangelogSlug()
+        ),
+      syncMode: "on-demand",
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+        const filters = parseLoadSubsetOptions(
+          ctx.meta?.loadSubsetOptions
+        ).filters;
+        const slug = eqFilterValue(filters, "slug") ?? deps.getChangelogSlug();
+
+        if (!(slug && organizationId)) {
+          return [];
+        }
+
+        try {
+          const entry = await fetchRpc(
+            (rpc) => rpc.ChangelogGetPublic({ organizationId, slug }),
+            { signal: ctx.signal }
+          );
+          return [entry];
+        } catch (error) {
+          // A missing or hidden entry resolves to an empty collection so the
+          // page renders its not-found state; transport failures still surface
+          // through the query error state.
+          if (isRpcErrorTag(error, "ChangelogNotFoundError")) {
+            return [];
+          }
+          throw error;
+        }
+      },
+      queryClient: deps.queryClient,
+      getKey: (item) => item.id,
+    });
+  }
+);
+
+export const publicBoardDescriptor = collectionOptions(
+  "publicBoardCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: () => deps.organizationScopedQueryKey("public-board"),
+
+      refetchInterval: Duration.toMillis(Duration.minutes(5)),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.BoardListPublic({ organizationId }),
+          { signal: ctx.signal }
+        );
+
+        return [...data];
+      },
+      queryClient: deps.queryClient,
+      getKey: (item) => item.id,
+    });
+  }
+);
+
+export const publicTagDescriptor = collectionOptions(
+  "publicTagCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: () => deps.organizationScopedQueryKey("public-tag"),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.TagListPublic({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+
+        return [...data];
+      },
+      queryClient: deps.queryClient,
+      getKey: (item) => item.id,
+    });
+  }
+);
+
+export const publicPostTagDescriptor = collectionOptions(
+  "publicPostTagCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      // Slug-scoped and on-demand: only the viewed post's tag assignments are
+      // fetched, not every assignment in the organization. The query key
+      // resolves the route slug, so the preloaded subset and the component's
+      // postId-filtered subscription share one cache entry.
+      queryKey: (opts) =>
+        deps.slugScopedQueryKey(
+          "public-post-tag",
+          parseLoadSubsetOptions(opts).filters
+        ),
+      syncMode: "on-demand",
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+        const slug = deps.resolvePostSlug(
+          parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+        );
+
+        if (!(slug && organizationId)) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.PostTagListPublic({ organizationId, slug }),
+          {
+            signal: ctx.signal,
+          }
+        );
+
+        return [...data];
+      },
+      queryClient: deps.queryClient,
+      getKey: (item) => item.id,
+    });
+  }
+);
+
+export const publicCommentDescriptor = collectionOptions(
+  "publicCommentCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      queryKey: (opts) =>
+        deps.slugScopedQueryKey(
+          "public-comment",
+          parseLoadSubsetOptions(opts).filters
+        ),
+      syncMode: "on-demand",
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+        const slug = deps.resolvePostSlug(
+          parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+        );
+
+        if (!(slug && organizationId)) {
+          return [];
+        }
+
+        try {
+          const data = await fetchRpc(
+            (rpc) =>
+              rpc.CommentListPublic({
+                organizationId,
+                slug,
+              }),
+            { signal: ctx.signal }
+          );
+
+          return [...data];
+        } catch {
+          return [];
+        }
+      },
+      queryClient: deps.queryClient,
+      getKey: (item) => item.id,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newComment } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.CommentCreatePublic({
+            organizationId: deps.getMutationOrganizationId(),
+            visibility: newComment.visibility,
+            content: newComment.content,
+            postId: newComment.postId,
+            parentCommentId: newComment.parentCommentId,
+            id: newComment.id,
+            statusUpdateId: newComment.statusUpdateId ?? null,
+          })
+        );
+        // The comment is already reconciled optimistically; the post rows'
+        // comment counts and the delete-hint set are derived, so both refresh
+        // detached instead of holding the insert open for two round trips.
+        refetchInBackground(
+          client.collection(publicPostDescriptor).utils.refetch(),
+          client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
+        );
+      },
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedComment } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.CommentUpdatePublic({
+            id: updatedComment.id,
+            organizationId: deps.getMutationOrganizationId(),
+            postId: updatedComment.postId,
+            content: updatedComment.content,
+            visibility: updatedComment.visibility,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedComment } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.CommentDeletePublic({
+            id: deletedComment.id,
+            organizationId: deps.getMutationOrganizationId(),
+            postId: deletedComment.postId,
+          })
+        );
+        // Same as the create path: the optimistic delete already removed the
+        // row, so the derived post counts and delete hints refresh detached.
+        refetchInBackground(
+          client.collection(publicPostDescriptor).utils.refetch(),
+          client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
+        );
+      },
+    });
+  }
+);
+
+export const publicCommentReactionDescriptor = collectionOptions(
+  "publicCommentReactionCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      queryKey: (opts) =>
+        deps.slugScopedQueryKey(
+          "public-comment-reaction",
+          parseLoadSubsetOptions(opts).filters
+        ),
+      syncMode: "on-demand",
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+        const slug = deps.resolvePostSlug(
+          parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+        );
+
+        if (!(slug && organizationId)) {
+          return [];
+        }
+
+        try {
+          const data = await fetchRpc(
+            (rpc) => rpc.CommentReactionListPublic({ organizationId, slug }),
+            { signal: ctx.signal }
+          );
+
+          return [...data];
+        } catch {
+          return [];
+        }
+      },
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      queryClient: deps.queryClient,
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      getKey: getCommentReactionCollectionKey as (
+        item: CommentReactionRow
+      ) => string,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newCommentReaction } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.CommentReactionTogglePublic({
+            organizationId: deps.getMutationOrganizationId(),
+            postId: newCommentReaction.postId,
+            commentId: newCommentReaction.commentId,
+            emoji: newCommentReaction.emoji,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedCommentReaction } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.CommentReactionTogglePublic({
+            organizationId: deps.getMutationOrganizationId(),
+            postId: deletedCommentReaction.postId,
+            commentId: deletedCommentReaction.commentId,
+            emoji: deletedCommentReaction.emoji,
+          })
+        );
+      },
+    });
+  }
+);
+
+export const publicUpvoteDescriptor = collectionOptions(
+  "publicUpvoteCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      queryKey: deps.organizationScopedQueryKey("public-upvote"),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.UpvoteListPublic({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+
+        return [...data];
+        // SAFETY: The endpoint/API contract guarantees this response shape.
+      },
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      queryClient: deps.queryClient,
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      getKey: getUpvoteCollectionKey as (item: UpvoteRow) => string,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newUpvote } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.UpvoteTogglePublic({
+            organizationId: deps.getMutationOrganizationId(),
+            postId: newUpvote.postId,
+          })
+        );
+        // The upvote collection holds the toggle optimistically; the
+        // delete-hint set is derived, so it refreshes detached.
+        refetchInBackground(
+          client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedUpvote } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.UpvoteTogglePublic({
+            organizationId: deps.getMutationOrganizationId(),
+            postId: deletedUpvote.postId,
+          })
+        );
+        // Same as the insert path: the derived hint set refreshes detached.
+        refetchInBackground(
+          client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
+        );
+      },
+    });
+  }
+);
+
+export const publicPostUpvoteDescriptor = collectionOptions(
+  "publicPostUpvoteCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      queryKey: (opts) =>
+        deps.slugScopedQueryKey(
+          "public-post-upvote",
+          parseLoadSubsetOptions(opts).filters,
+          getCurrentUserId()
+        ),
+      syncMode: "on-demand",
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+        const slug = deps.resolvePostSlug(
+          parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+        );
+
+        if (!(slug && organizationId)) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.UpvoteListPublic({ organizationId, slug }),
+          {
+            signal: ctx.signal,
+          }
+        );
+
+        return [...data];
+      },
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      queryClient: deps.queryClient,
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      getKey: getUpvoteCollectionKey as (item: UpvoteRow) => string,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newUpvote } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.UpvoteTogglePublic({
+            organizationId: deps.getMutationOrganizationId(),
+            postId: newUpvote.postId,
+          })
+        );
+        // Same derived-refresh contract as the org-wide collection.
+        refetchInBackground(
+          client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedUpvote } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.UpvoteTogglePublic({
+            organizationId: deps.getMutationOrganizationId(),
+            postId: deletedUpvote.postId,
+          })
+        );
+        refetchInBackground(
+          client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
+        );
+      },
+    });
+  }
+);
+
+export const publicPostReactionDescriptor = collectionOptions(
+  "publicPostReactionCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      queryKey: (opts) =>
+        deps.slugScopedQueryKey(
+          "public-post-reaction",
+          parseLoadSubsetOptions(opts).filters
+        ),
+      syncMode: "on-demand",
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+        const slug = deps.resolvePostSlug(
+          parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+        );
+
+        if (!(slug && organizationId)) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.PostReactionListPublic({ organizationId, slug }),
+          {
+            signal: ctx.signal,
+          }
+        );
+
+        // SAFETY: The endpoint/API contract guarantees this response shape.
+        return [...data];
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      },
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      queryClient: deps.queryClient,
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      getKey: getPostReactionCollectionKey as (item: PostReactionRow) => string,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newPostReaction } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.PostReactionTogglePublic({
+            organizationId: deps.getMutationOrganizationId(),
+            postId: newPostReaction.postId,
+            emoji: newPostReaction.emoji,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedPostReaction } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.PostReactionTogglePublic({
+            organizationId: deps.getMutationOrganizationId(),
+            postId: deletedPostReaction.postId,
+            emoji: deletedPostReaction.emoji,
+          })
+        );
+      },
+    });
+  }
+);
+
+export const publicPostSubscriptionDescriptor = collectionOptions(
+  "publicPostSubscriptionCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      queryKey: (opts) =>
+        deps.slugScopedQueryKey(
+          "public-post-subscription",
+          parseLoadSubsetOptions(opts).filters,
+          getCurrentUserId()
+        ),
+      syncMode: "on-demand",
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+        const slug = deps.resolvePostSlug(
+          parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+        );
+
+        if (!(slug && organizationId)) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.PostSubscriptionListPublic({ organizationId, slug }),
+          {
+            signal: ctx.signal,
+          }
+          // SAFETY: The endpoint/API contract guarantees this response shape.
+        );
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+        return [...data];
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      },
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      queryClient: deps.queryClient,
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      getKey: getPostSubscriptionCollectionKey as (
+        item: PostSubscriptionRow
+      ) => string,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newSubscription } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.PostSubscriptionCreatePublic({
+            organizationId: deps.getMutationOrganizationId(),
+            postId: newSubscription.postId,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedSubscription } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.PostSubscriptionDeletePublic({
+            organizationId: deps.getMutationOrganizationId(),
+            postId: deletedSubscription.postId,
+          })
+        );
+      },
+    });
+  }
+);
+
+export const publicChangelogSubscriptionDescriptor = collectionOptions(
+  "publicChangelogSubscriptionCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      queryKey: () =>
+        deps.organizationScopedQueryKey(
+          "public-changelog-subscription",
+          getCurrentUserId()
+        ),
+      syncMode: "on-demand",
+      queryFn: async () => {
+        const organizationId = deps.getOrganizationId();
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc((rpc) =>
+          rpc.ChangelogSubscriptionListPublic({ organizationId })
+        );
+        // SAFETY: The endpoint/API contract guarantees this response shape.
+        return [...data];
+      },
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      queryClient: deps.queryClient,
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      getKey: getChangelogSubscriptionCollectionKey as (
+        item: ChangelogSubscriptionRow
+      ) => string,
+      onInsert: async () => {
+        await fetchRpc((rpc) =>
+          rpc.ChangelogSubscriptionCreatePublic({
+            organizationId: deps.getMutationOrganizationId(),
+          })
+        );
+      },
+      onDelete: async () => {
+        await fetchRpc((rpc) =>
+          rpc.ChangelogSubscriptionDeletePublic({
+            organizationId: deps.getMutationOrganizationId(),
+          })
+        );
+      },
+    });
+  }
+);
+
+export const publicPostDetailDescriptor = collectionOptions(
+  "publicPostDetailCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      // Keyed by the explicit `slug` filter with a fallback to the route
+      // slug, so detail subscribers (routes, content views) share one cache
+      // entry per post regardless of where they subscribe from.
+      queryKey: (opts) => {
+        const filters = parseLoadSubsetOptions(opts).filters;
+        const slug =
+          eqFilterValue(filters, "slug") ?? deps.resolvePostSlug(filters);
+        return deps.organizationScopedQueryKey("public-post-detail", slug);
+      },
+      syncMode: "on-demand",
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+        const filters = parseLoadSubsetOptions(
+          ctx.meta?.loadSubsetOptions
+        ).filters;
+        const slug =
+          eqFilterValue(filters, "slug") ?? deps.resolvePostSlug(filters);
+
+        if (!(organizationId && slug)) {
+          return [];
+        }
+
+        try {
+          const post = await fetchRpc(
+            (rpc) => rpc.PostGetPublic({ organizationId, slug }),
+            { signal: ctx.signal }
+          );
+          return [post];
+        } catch (error) {
+          // A missing or merged-away slug resolves to an empty collection so
+          // the detail page renders its not-found/merge-resolver state instead
+          // of an error; transport failures still surface through the query.
+          if (isRpcErrorTag(error, "PostNotFoundError")) {
+            return [];
+          }
+          throw error;
+        }
+      },
+      queryClient: deps.queryClient,
+      getKey: (item) => item.id,
+    });
+  }
+);
+
+export const publicDeleteEligibilityDescriptor = collectionOptions(
+  "publicDeleteEligibilityCollection",
+  (client) => {
+    const deps = boardCollectionDeps(client);
+
+    return queryCollectionOptions({
+      queryKey: () =>
+        deps.organizationScopedQueryKey("public-delete-eligibility"),
+      queryFn: async (ctx) => {
+        const organizationId = deps.getOrganizationId();
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const result = await fetchRpc(
+          (rpc) => rpc.PostDeleteEligibilityListPublic({ organizationId }),
+          { signal: ctx.signal }
+        );
+        return result.eligibleIds.map((postId) => ({
+          organizationId,
+          postId,
+        }));
+      },
+      queryClient: deps.queryClient,
+      getKey: (item) => item.postId,
+    });
+  }
 );
 
 /**
- * Creator delete hints for the whole organization, synced once. Public
- * list rows carry no delete hint; the public detail affordance derives
- * from this small set client-side instead. Presence means eligible.
- * Refetch after engagement mutations (see the call sites below).
+ * The board's collections for one `DbClient`.
+ *
+ * Materializing through the client (rather than exporting module-level
+ * instances) is what makes the board request-scoped: a server render and a
+ * browser document each own their collections, and a mutation always targets
+ * the instance the surrounding surface reads from.
  */
-export const publicDeleteEligibilityCollection = createCollection(
-  queryCollectionOptions({
-    id: "publicDeleteEligibilityCollection",
-    queryKey: () => organizationScopedQueryKey("public-delete-eligibility"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
+export function createPublicCollections(client: DbClient) {
+  applyPublicCollectionIndexes(client);
 
-      if (!organizationId) {
-        return [];
-      }
+  return {
+    publicBoardCollection: client.collection(publicBoardDescriptor),
+    publicChangelogCategoryCollection: client.collection(
+      publicChangelogCategoryDescriptor
+    ),
+    publicChangelogCategoryLinkCollection: client.collection(
+      publicChangelogCategoryLinkDescriptor
+    ),
+    publicChangelogCollection: client.collection(publicChangelogDescriptor),
+    publicChangelogDetailCollection: client.collection(
+      publicChangelogDetailDescriptor
+    ),
+    publicCommentCollection: client.collection(publicCommentDescriptor),
+    publicCommentReactionCollection: client.collection(
+      publicCommentReactionDescriptor
+    ),
+    publicDeleteEligibilityCollection: client.collection(
+      publicDeleteEligibilityDescriptor
+    ),
+    publicPostCollection: client.collection(publicPostDescriptor),
+    publicPostDetailCollection: client.collection(publicPostDetailDescriptor),
+    publicPostReactionCollection: client.collection(
+      publicPostReactionDescriptor
+    ),
+    publicPostStatusCollection: client.collection(publicPostStatusDescriptor),
+    publicPostSubscriptionCollection: client.collection(
+      publicPostSubscriptionDescriptor
+    ),
+    publicPostUpvoteCollection: client.collection(publicPostUpvoteDescriptor),
+    publicChangelogSubscriptionCollection: client.collection(
+      publicChangelogSubscriptionDescriptor
+    ),
+    publicPostTagCollection: client.collection(publicPostTagDescriptor),
+    publicRoadmapCollection: client.collection(publicRoadmapDescriptor),
+    publicRoadmapColumnCollection: client.collection(
+      publicRoadmapColumnDescriptor
+    ),
+    publicTagCollection: client.collection(publicTagDescriptor),
+    publicUpvoteCollection: client.collection(publicUpvoteDescriptor),
+  };
+}
 
-      const result = await fetchRpc(
-        (rpc) => rpc.PostDeleteEligibilityListPublic({ organizationId }),
-        { signal: ctx.signal }
-      );
-      return result.eligibleIds.map((postId) => ({
-        organizationId,
-        postId,
-      }));
-    },
-    queryClient,
-    getKey: (item) => item.postId,
-  })
-);
+export type PublicCollections = ReturnType<typeof createPublicCollections>;
 
-publicDeleteEligibilityCollection.createIndex((row) => row.postId, {
-  indexType: BasicIndex,
-});
+/** Clients whose collections already carry their join indexes. */
+const indexedClients = new WeakSet<DbClient>();
 
-// Live-query joins: posts to board/status, post tags to tags, roadmap
-// columns to roadmap/status. Indexes keep joins off the scan path.
-publicPostCollection.createIndex((row) => row.boardId, {
-  indexType: BasicIndex,
-});
-publicPostCollection.createIndex((row) => row.statusId, {
-  indexType: BasicIndex,
-});
-publicPostStatusCollection.createIndex((row) => row.id, {
-  indexType: BasicIndex,
-});
-publicBoardCollection.createIndex((row) => row.id, {
-  indexType: BasicIndex,
-});
-publicTagCollection.createIndex((row) => row.id, {
-  indexType: BasicIndex,
-});
-publicPostTagCollection.createIndex((row) => row.tagId, {
-  indexType: BasicIndex,
-});
-publicRoadmapCollection.createIndex((row) => row.id, {
-  indexType: BasicIndex,
-});
-publicRoadmapColumnCollection.createIndex((row) => row.statusId, {
-  indexType: BasicIndex,
-});
-publicRoadmapColumnCollection.createIndex((row) => row.roadmapId, {
-  indexType: BasicIndex,
-});
-// Upvote rows are joined back to posts by post id.
-publicUpvoteCollection.createIndex((row) => row.postId, {
-  indexType: BasicIndex,
-});
+/**
+ * Applies the live-query join indexes to this client's collections.
+ *
+ * Descriptors carry no index definitions — `createIndex` is a collection
+ * method — so the indexes are applied once per client, when its collections
+ * are first materialized. Live-query joins (posts to board/status, post tags
+ * to tags, roadmap columns to roadmap/status) stay off the scan path.
+ */
+export function applyPublicCollectionIndexes(client: DbClient) {
+  if (indexedClients.has(client)) {
+    return;
+  }
 
-export const publicCollections = {
-  publicBoardCollection,
-  publicChangelogCategoryCollection,
-  publicChangelogCategoryLinkCollection,
-  publicChangelogCollection,
-  publicChangelogDetailCollection,
-  publicCommentCollection,
-  publicCommentReactionCollection,
-  publicDeleteEligibilityCollection,
-  publicPostCollection,
-  publicPostDetailCollection,
-  publicPostReactionCollection,
-  publicPostStatusCollection,
-  publicPostSubscriptionCollection,
-  publicPostUpvoteCollection,
-  publicChangelogSubscriptionCollection,
-  publicPostTagCollection,
-  publicRoadmapCollection,
-  publicRoadmapColumnCollection,
-  publicTagCollection,
-  publicUpvoteCollection,
-};
+  indexedClients.add(client);
 
-export type PublicCollections = typeof publicCollections;
+  client
+    .collection(publicDeleteEligibilityDescriptor)
+    .createIndex((row) => row.postId, { indexType: BasicIndex });
+  client.collection(publicPostDescriptor).createIndex((row) => row.boardId, {
+    indexType: BasicIndex,
+  });
+  client.collection(publicPostDescriptor).createIndex((row) => row.statusId, {
+    indexType: BasicIndex,
+  });
+  client.collection(publicPostStatusDescriptor).createIndex((row) => row.id, {
+    indexType: BasicIndex,
+  });
+  client.collection(publicBoardDescriptor).createIndex((row) => row.id, {
+    indexType: BasicIndex,
+  });
+  client.collection(publicTagDescriptor).createIndex((row) => row.id, {
+    indexType: BasicIndex,
+  });
+  client.collection(publicPostTagDescriptor).createIndex((row) => row.tagId, {
+    indexType: BasicIndex,
+  });
+  client.collection(publicRoadmapDescriptor).createIndex((row) => row.id, {
+    indexType: BasicIndex,
+  });
+  client
+    .collection(publicRoadmapColumnDescriptor)
+    .createIndex((row) => row.statusId, {
+      indexType: BasicIndex,
+    });
+  client
+    .collection(publicRoadmapColumnDescriptor)
+    .createIndex((row) => row.roadmapId, {
+      indexType: BasicIndex,
+    });
+  // Upvote rows are joined back to posts by post id.
+  client.collection(publicUpvoteDescriptor).createIndex((row) => row.postId, {
+    indexType: BasicIndex,
+  });
+}

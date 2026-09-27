@@ -3,6 +3,7 @@ import { UpvoteId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { cn } from "@feeblo/ui/utils";
+import { isLiveQueryPending } from "@feeblo/web-shared/collections";
 import { getUpvoteCollectionKey } from "@feeblo/web-shared/reaction-keys";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
@@ -39,7 +40,7 @@ function useUpvote({
 }: UseUpvoteParams) {
   const { data: session } = useAuthState();
 
-  const { data: upvotes, isLoading: isUpvotesLoading } = useLiveQuery({
+  const upvotesQuery = useLiveQuery({
     query: (q) =>
       q
         .from({ upvote: upvoteCollection })
@@ -51,28 +52,32 @@ function useUpvote({
         )
         .select(({ upvote }) => ({ id: upvote.id })),
   });
+  const upvotes = upvotesQuery.data;
 
-  const { data: hasUserUpvoted, isLoading: isUserUpvotedLoading } =
-    useLiveQuery({
-      query: (q) => {
-        if (!session) return undefined;
-        return q
-          .from({ upvote: upvoteCollection })
-          .where(({ upvote }) =>
-            and(
-              eq(upvote.organizationId, organizationId),
-              eq(upvote.postId, postId),
-              eq(upvote.userId, session.user.id)
-            )
+  const userUpvoteQuery = useLiveQuery({
+    query: (q) => {
+      if (!session) return undefined;
+      return q
+        .from({ upvote: upvoteCollection })
+        .where(({ upvote }) =>
+          and(
+            eq(upvote.organizationId, organizationId),
+            eq(upvote.postId, postId),
+            eq(upvote.userId, session.user.id)
           )
-          .select(({ upvote }) => ({ id: upvote.id }))
-          .findOne();
-      },
-    });
+        )
+        .select(({ upvote }) => ({ id: upvote.id }))
+        .findOne();
+    },
+  });
 
-  const isLoading = isUpvotesLoading || isUserUpvotedLoading;
+  // A query with a result is content, not a loading state (see
+  // `isLiveQueryPending`): the count renders from the hydrated rows while the
+  // signed-in visitor's own vote resolves.
+  const isLoading =
+    isLiveQueryPending(upvotesQuery) || isLiveQueryPending(userUpvoteQuery);
   const upvoteCount = upvotes?.length ?? 0;
-  const isUpvoted = !!hasUserUpvoted;
+  const isUpvoted = !!userUpvoteQuery.data;
 
   const onToggle = async () => {
     if (disabled) return;
