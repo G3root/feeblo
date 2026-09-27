@@ -100,17 +100,53 @@ const runOxlint = (): OxlintRun => {
   return { failed: result.status !== 0, report };
 };
 
-const readBudget = (): Map<string, number> => {
+type BudgetResult =
+  | { readonly ok: true; readonly budget: Map<string, number> }
+  | { readonly ok: false; readonly reason: string };
+
+const budgetLabel = "tools/lint-budget/budget.json";
+
+/**
+ * A recorded count is a non-negative integer, and nothing else.
+ *
+ * `JSON.parse` will happily hand back `{"some(rule)": "oops"}`. Comparing a
+ * count against that string yields `NaN`, which is neither greater nor less than
+ * zero, so the rule would match neither the over-budget nor the improved branch
+ * and the gate would report success for it. A malformed budget has to fail.
+ *
+ * The check is inline rather than a `(value: unknown) => value is number` guard:
+ * `anti-slop/no-unknown-parameters` bans the annotation, and its advice — parse
+ * at the I/O boundary — would mean pulling `effect/Schema` into a tool that has
+ * no declared dependency on it. `Object.entries` types each value as `any`,
+ * which is what gets validated here.
+ */
+const readBudget = (): BudgetResult => {
+  let contents: string;
   try {
-    const contents = readFileSync(budgetPath, "utf8");
-    // SAFETY: budget.json is written by this script from a Map of rule names to
-    // counts, so every value is a number. A hand-edited file that breaks that
-    // fails the comparison below rather than silently passing.
-    const parsed = JSON.parse(contents) as Record<string, number>;
-    return new Map(Object.entries(parsed));
+    contents = readFileSync(budgetPath, "utf8");
   } catch {
-    return new Map();
+    return { ok: false, reason: "the file is missing" };
   }
+
+  const budget = new Map<string, number>();
+  try {
+    const parsed = JSON.parse(contents);
+    for (const [rule, value] of Object.entries(parsed)) {
+      if (!Number.isInteger(value) || value < 0) {
+        return {
+          ok: false,
+          reason: `the count for ${rule} is not a non-negative integer`,
+        };
+      }
+      budget.set(rule, value);
+    }
+  } catch {
+    return { ok: false, reason: "it is not an object of rule names to counts" };
+  }
+
+  return budget.size > 0
+    ? { ok: true, budget }
+    : { ok: false, reason: "it holds no rules" };
 };
 
 const writeBudget = (counts: Map<string, number>): void => {
@@ -143,7 +179,17 @@ const main = (): number => {
     return 0;
   }
 
-  const budget = readBudget();
+  const budgetResult = readBudget();
+  if (!budgetResult.ok) {
+    console.error(
+      `lint-budget: ${budgetLabel} could not be used — ${budgetResult.reason}.`
+    );
+    console.error(
+      "Regenerate it with `node tools/lint-budget/check.ts --update`."
+    );
+    return 1;
+  }
+  const budget = budgetResult.budget;
   const over: Diagnostic[] = [];
   const overRules: string[] = [];
   const under: string[] = [];
