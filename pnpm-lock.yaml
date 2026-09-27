@@ -654,8 +654,8 @@ importers:
   integrations/github:
     dependencies:
       '@distilled.cloud/github':
-        specifier: 1.0.0-rc.4
-        version: 1.0.0-rc.4(effect@4.0.0-rc.117)
+        specifier: 1.0.0-rc.12
+        version: 1.0.0-rc.12(effect@4.0.0-rc.117)
       '@feeblo/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -2058,15 +2058,15 @@ packages:
   '@date-fns/tz@1.5.0':
     resolution: {integrity: sha512-lwYN/vDPeNRULcepoE/LO2Pgx+7/RV+S9ARfbc9lr2DtGkOD7pAiruHvbR1RX3Qyf6ja47EWJDMsNK5vK08DJg==}
 
-  '@distilled.cloud/core@1.0.0-rc.4':
-    resolution: {integrity: sha512-g/5THnVZoBKO31hhdU1JJxqcI5aXAmMIJQpv2WUmutYeedbdX/kknnvwY5a75rc7MGSWsHnB4EAA/07FtdSSKg==}
+  '@distilled.cloud/core@1.0.0-rc.12':
+    resolution: {integrity: sha512-YeH/uPohGXp2qIctbqVzBtQV+bUs+K5Zdac8qIid7/t6VlwY964SALme5znRdFu/rQgrloXnaej8iTSK9RIQdA==}
     peerDependencies:
-      effect: '>=4.0.0-beta.104 || >=4.0.0'
+      effect: '>=4.0.0-rc.115 || >=4.0.0'
 
-  '@distilled.cloud/github@1.0.0-rc.4':
-    resolution: {integrity: sha512-tLPbetotFD90i69LWzshI035wkAYQumfYo8QjcTASXROiW4CE8ogVzpJIrddFDIkOFbXLvamuH6Y62jXiuMu4Q==}
+  '@distilled.cloud/github@1.0.0-rc.12':
+    resolution: {integrity: sha512-7kMw+JDf7/dNfiiJNwBZX0pBDC73k2vp3xAubaa+30QlmJjRUsSd4vRW22wwsfssFLesABhrwr+4ebiDsO2jxg==}
     peerDependencies:
-      effect: '>=4.0.0-beta.104 || >=4.0.0'
+      effect: '>=4.0.0-rc.115 || >=4.0.0'
 
   '@dnd-kit/abstract@0.3.2':
     resolution: {integrity: sha512-uvPVK+SZYD6Viddn9M0K0JQdXknuVSxA/EbMlFRanve3P/XTc18oLa5zGftKSGjfQGmuzkZ34E26DSbly1zi3Q==}
@@ -6805,6 +6805,10 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
+  graphql@16.11.0:
+    resolution: {integrity: sha512-mS1lbMsxgQj6hge1XZ6p7GPhbrtFwUFYi3wRzXAC/FmYnyXMTvvI3td3rjmQ2u8ewXueaSvRPWaEcgVVOT9Jnw==}
+    engines: {node: ^12.22.0 || ^14.16.0 || ^16.0.0 || >=17.0.0}
+
   graphql@16.14.2:
     resolution: {integrity: sha512-Chq1s4CY7jmh8gO2qvLIJyfCDIN+EHLFW/9iShnp1z8FjBQMoodWP1kDC36VAMXXIvAjj4ARa7ntfAV2BrjsbA==}
     engines: {node: ^12.22.0 || ^14.16.0 || ^16.0.0 || >=17.0.0}
@@ -10064,13 +10068,14 @@ snapshots:
 
   '@date-fns/tz@1.5.0': {}
 
-  '@distilled.cloud/core@1.0.0-rc.4(effect@4.0.0-rc.117)':
+  '@distilled.cloud/core@1.0.0-rc.12(effect@4.0.0-rc.117)':
     dependencies:
       effect: 4.0.0-rc.117
+      graphql: 16.11.0
 
-  '@distilled.cloud/github@1.0.0-rc.4(effect@4.0.0-rc.117)':
+  '@distilled.cloud/github@1.0.0-rc.12(effect@4.0.0-rc.117)':
     dependencies:
-      '@distilled.cloud/core': 1.0.0-rc.4(effect@4.0.0-rc.117)
+      '@distilled.cloud/core': 1.0.0-rc.12(effect@4.0.0-rc.117)
       effect: 4.0.0-rc.117
 
   '@dnd-kit/abstract@0.3.2':
@@ -14225,6 +14230,8 @@ snapshots:
   gopd@1.2.0: {}
 
   graceful-fs@4.2.11: {}
+
+  graphql@16.11.0: {}
 
   graphql@16.14.2: {}
 
