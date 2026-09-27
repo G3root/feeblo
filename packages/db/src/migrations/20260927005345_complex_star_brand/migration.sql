@@ -1,0 +1,1 @@
+ALTER TABLE "email_delivery" ADD COLUMN "transition_version" integer DEFAULT 0 NOT NULL;

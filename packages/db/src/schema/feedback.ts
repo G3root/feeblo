@@ -1253,6 +1253,13 @@ export const emailDeliveryTable = pgTable(
     messageId: text("message_id").notNull(),
     state: text("state").$type<TEmailDeliveryState>().notNull(),
     attemptCount: integer("attempt_count").default(0).notNull(),
+    /**
+     * Monotonic counter bumped by every state transition, so a queue element
+     * id derived from it is unique per due transition. `attempt_count` cannot
+     * serve: throttle and plan-resume deferrals do not consume an attempt, yet
+     * a re-offer after them must not collide with the completed element.
+     */
+    transitionVersion: integer("transition_version").default(0).notNull(),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
     deliveredAt: timestamp("delivered_at", { withTimezone: true }),
