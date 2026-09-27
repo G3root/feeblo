@@ -46,30 +46,39 @@ import { EmailOutboxRepository } from "./repository";
 // it depends on the take loops progressing concurrently, exactly as the
 // in-memory workflow engine did before. `deliverEmailDelivery` is still called
 // directly where a test wants one deterministic attempt.
-const TestLayer = EmailOutboxWorkerLayer.pipe(
-  Layer.provideMerge(EmailOutboxQueues.layer),
-  Layer.provideMerge(
-    EmailOutboxConfig.layerTest(new URL("https://test.feeblo.example"))
-  ),
-  Layer.provideMerge(MailerTestLayer),
-  Layer.provideMerge(EmailOutboxRepository.layer),
-  Layer.provideMerge(
-    EmailSubscriptionRepository.layerWithoutDependencies.pipe(
-      Layer.provide(
-        EmailSubscriptionTokenService.layerTest(
-          "email-outbox-workflow-test-signing-secret"
+const makeTestLayer = (
+  controls: Parameters<typeof EmailOutboxConfig.layerTest>[2] = {}
+) =>
+  EmailOutboxWorkerLayer.pipe(
+    Layer.provideMerge(EmailOutboxQueues.layer),
+    Layer.provideMerge(
+      EmailOutboxConfig.layerTest(
+        new URL("https://test.feeblo.example"),
+        undefined,
+        controls
+      )
+    ),
+    Layer.provideMerge(MailerTestLayer),
+    Layer.provideMerge(EmailOutboxRepository.layer),
+    Layer.provideMerge(
+      EmailSubscriptionRepository.layerWithoutDependencies.pipe(
+        Layer.provide(
+          EmailSubscriptionTokenService.layerTest(
+            "email-outbox-workflow-test-signing-secret"
+          )
         )
       )
-    )
-  ),
-  Layer.provideMerge(
-    EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
-  ),
-  Layer.provideMerge(
-    PersistedQueue.layer.pipe(Layer.provide(PersistedQueue.layerStoreMemory))
-  ),
-  Layer.provideMerge(Database.PgliteDatabaseLive)
-);
+    ),
+    Layer.provideMerge(
+      EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
+    ),
+    Layer.provideMerge(
+      PersistedQueue.layer.pipe(Layer.provide(PersistedQueue.layerStoreMemory))
+    ),
+    Layer.provideMerge(Database.PgliteDatabaseLive)
+  );
+
+const TestLayer = makeTestLayer();
 
 /**
  * The instant every test pins `TestClock` to.
@@ -390,6 +399,48 @@ const waitForIntentState = (outboxId: string, state: string) =>
     return yield* Effect.die(
       `Email intent did not reach ${state}; last observed ${lastObserved}`
     );
+  });
+
+/**
+ * Waits until an intent has left the pending states and every delivery it
+ * produced has stopped moving through the outbox.
+ *
+ * `accepted` still accepts provider feedback, but the outbox will not send it
+ * again, so it counts as settled here. The suite shares one worker layer, so a
+ * test that leaves sends in flight leaks them into the next test's mailer
+ * outcomes.
+ */
+const waitForOutboxToSettle = (outboxId: string) =>
+  Effect.gen(function* () {
+    const repository = yield* EmailOutboxRepository;
+    const db = yield* Database.Database;
+    for (let poll = 0; poll < 100_000; poll += 1) {
+      const intent = yield* repository.findById(outboxId);
+      if (
+        intent !== undefined &&
+        (intent.state === "pending" || intent.state === "paused_by_plan")
+      ) {
+        yield* Effect.yieldNow;
+        continue;
+      }
+      const rows = yield* db
+        .select({ state: schema.emailDeliveryTable.state })
+        .from(schema.emailDeliveryTable)
+        .where(eq(schema.emailDeliveryTable.outboxId, outboxId));
+      if (
+        rows.every(
+          (row) =>
+            row.state !== "queued" &&
+            row.state !== "deferred" &&
+            row.state !== "sending" &&
+            row.state !== "paused_by_plan"
+        )
+      ) {
+        return;
+      }
+      yield* Effect.yieldNow;
+    }
+    return yield* Effect.die(`Outbox ${outboxId} did not settle`);
   });
 
 describe("EmailOutbox workflows", () => {
@@ -1214,7 +1265,7 @@ describe("EmailOutbox workflows", () => {
       () =>
         Effect.gen(function* () {
           yield* resetTestMailer();
-          const { organizationId } = yield* fixture;
+          const { intentId, organizationId } = yield* fixture;
           const db = yield* Database.Database;
           const changelogId = `resume_changelog_${organizationId}`;
           const now = yield* DateTime.nowAsDate;
@@ -1259,6 +1310,8 @@ describe("EmailOutbox workflows", () => {
             (yield* (yield* EmailOutboxRepository).findById(intent.intent.id))
               ?.state
           ).toBe("materialized");
+          yield* waitForOutboxToSettle(intent.intent.id);
+          yield* waitForOutboxToSettle(intentId);
         })
     );
 
@@ -1267,7 +1320,7 @@ describe("EmailOutbox workflows", () => {
       () =>
         Effect.gen(function* () {
           yield* resetTestMailer();
-          const { organizationId } = yield* fixture;
+          const { intentId, organizationId } = yield* fixture;
           const db = yield* Database.Database;
           yield* enableSubscriberEmails(organizationId);
           const changelogId = `delivery_resume_${organizationId}`;
@@ -1342,88 +1395,8 @@ describe("EmailOutbox workflows", () => {
                 `resume-delivery-${organizationId}@example.test`.toLowerCase()
             )
           ).toHaveLength(1);
-        })
-    );
-
-    it.effect(
-      "re-offers a partially materialized intent after a plan resume",
-      () =>
-        Effect.gen(function* () {
-          yield* resetTestMailer();
-          const { organizationId } = yield* fixture;
-          const db = yield* Database.Database;
-          const changelogId = `resume_batch_${organizationId}`;
-          const now = yield* DateTime.nowAsDate;
-          yield* db.insert(schema.changelogTable).values({
-            id: changelogId,
-            organizationId,
-            title: "Batched resume",
-            slug: "batched-resume",
-            content: "x",
-            excerpt: "x",
-            status: "published",
-            publishedAt: now,
-            creatorId: null,
-            creatorMemberId: null,
-            createdAt: now,
-            updatedAt: now,
-          });
-          // Exactly one materialization batch, so the resumed intent stays
-          // pending after the first batch and needs a second dispatch.
-          yield* addChangelogSubscribers(organizationId, 100);
-          const intent = yield* (yield* EmailOutboxRepository).recordIntent({
-            aggregateId: changelogId,
-            aggregateType: "changelog",
-            deduplicationKey: `changelog.resume-batch:${organizationId}:${changelogId}`,
-            expiresAt: shiftDate(fixtureNow, Duration.days(1)),
-            kind: "changelog.published",
-            organizationId,
-            payload: { kind: "changelog.published", changelogId },
-            scheduledAt: fixtureNow,
-          });
-          if (intent._tag !== "Inserted") {
-            return yield* Effect.die("Expected resumable batch intent");
-          }
-
-          // The first dispatch parks the intent on the plan and consumes its
-          // element id.
-          yield* reconcileEmailOutbox();
-          yield* waitForIntentState(intent.intent.id, "paused_by_plan");
-
-          // Upgrade: the resume materializes one batch and leaves the intent
-          // pending under a new `updatedAt`. The next sweep has to offer that
-          // revision rather than hit the consumed element id.
-          yield* TestClock.adjust("1 minute");
-          yield* enableSubscriberEmails(organizationId);
-          yield* reconcileEmailOutbox();
-          yield* TestClock.adjust("1 minute");
-          yield* reconcileEmailOutbox();
-          yield* waitForIntentState(intent.intent.id, "materialized");
-
-          const deliveries = yield* db
-            .select({ id: schema.emailDeliveryTable.id })
-            .from(schema.emailDeliveryTable)
-            .where(eq(schema.emailDeliveryTable.outboxId, intent.intent.id));
-          expect(deliveries).toHaveLength(100);
-
-          // The suite shares one worker layer, so the batch has to finish
-          // before this test ends or its sends consume the next test's mailer
-          // outcomes.
-          yield* Effect.gen(function* () {
-            for (let poll = 0; poll < 1000; poll += 1) {
-              const rows = yield* db
-                .select({ state: schema.emailDeliveryTable.state })
-                .from(schema.emailDeliveryTable)
-                .where(
-                  eq(schema.emailDeliveryTable.outboxId, intent.intent.id)
-                );
-              if (rows.every((row) => row.state === "accepted")) {
-                return;
-              }
-              yield* Effect.yieldNow;
-            }
-            return yield* Effect.die("Batch deliveries did not drain");
-          });
+          yield* waitForOutboxToSettle(intent.intent.id);
+          yield* waitForOutboxToSettle(intentId);
         })
     );
 
@@ -2192,4 +2165,79 @@ describe("EmailOutbox queues with plain-HTTP API_URL", () => {
         })
     );
   });
+});
+
+describe("EmailOutbox queues with delivery paused", () => {
+  // The batch test needs one hundred recipients to hit the materialization
+  // batch size, and the shared worker layer must not spend the suite's mailer
+  // budget on them. Pausing delivery keeps the workers off the renderer; the
+  // test only needs the dispatcher, and no later test can see the deferred
+  // rows because this suite runs last.
+  layer(makeTestLayer({ globalDeliveryPaused: true }))(
+    "in-memory persisted queue",
+    (it) => {
+      it.effect(
+        "re-offers a partially materialized intent after a plan resume",
+        () =>
+          Effect.gen(function* () {
+            yield* resetTestMailer();
+            const { organizationId } = yield* fixture;
+            const db = yield* Database.Database;
+            const changelogId = `resume_batch_${organizationId}`;
+            const now = yield* DateTime.nowAsDate;
+            yield* db.insert(schema.changelogTable).values({
+              id: changelogId,
+              organizationId,
+              title: "Batched resume",
+              slug: "batched-resume",
+              content: "x",
+              excerpt: "x",
+              status: "published",
+              publishedAt: now,
+              creatorId: null,
+              creatorMemberId: null,
+              createdAt: now,
+              updatedAt: now,
+            });
+            // Exactly one materialization batch, so the resumed intent stays
+            // pending after the first batch and needs a second dispatch.
+            yield* addChangelogSubscribers(organizationId, 100);
+            const intent = yield* (yield* EmailOutboxRepository).recordIntent({
+              aggregateId: changelogId,
+              aggregateType: "changelog",
+              deduplicationKey: `changelog.resume-batch:${organizationId}:${changelogId}`,
+              expiresAt: shiftDate(fixtureNow, Duration.days(1)),
+              kind: "changelog.published",
+              organizationId,
+              payload: { kind: "changelog.published", changelogId },
+              scheduledAt: fixtureNow,
+            });
+            if (intent._tag !== "Inserted") {
+              return yield* Effect.die("Expected resumable batch intent");
+            }
+
+            // The first dispatch parks the intent on the plan and consumes its
+            // element id.
+            yield* reconcileEmailOutbox();
+            yield* waitForIntentState(intent.intent.id, "paused_by_plan");
+
+            // Upgrade: the resume materializes one batch and leaves the intent
+            // pending under a new `updatedAt`. The next sweep has to offer that
+            // revision rather than hit the consumed element id.
+            yield* TestClock.adjust("1 minute");
+            yield* enableSubscriberEmails(organizationId);
+            yield* reconcileEmailOutbox();
+            yield* TestClock.adjust("1 minute");
+            yield* reconcileEmailOutbox();
+            yield* waitForIntentState(intent.intent.id, "materialized");
+
+            const deliveries = yield* db
+              .select({ id: schema.emailDeliveryTable.id })
+              .from(schema.emailDeliveryTable)
+              .where(eq(schema.emailDeliveryTable.outboxId, intent.intent.id));
+            expect(deliveries).toHaveLength(100);
+          })
+      );
+    }
+  );
 });
