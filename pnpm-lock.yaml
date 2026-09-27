@@ -176,8 +176,11 @@ catalogs:
       version: 4.6.5
 
 overrides:
-  prosemirror-model: ^1.25.9
   '@effect/platform-node-shared': 4.0.0-rc.117
+  prosemirror-model: ^1.25.9
+
+patchedDependencies:
+  '@effect-aws/s3@1.0.0-beta.5': 7d06ef7a561d78d1fe2e7ffbbae659ec705b7806795881284dc673a3a8be923b
 
 importers:
 
@@ -962,7 +965,7 @@ importers:
         version: 2.0.0-beta.6(effect@4.0.0-rc.117)
       '@effect-aws/s3':
         specifier: 'catalog:'
-        version: 1.0.0-beta.5(@effect-aws/client-s3@2.0.0-beta.6(effect@4.0.0-rc.117))(effect@4.0.0-rc.117)
+        version: 1.0.0-beta.5(patch_hash=7d06ef7a561d78d1fe2e7ffbbae659ec705b7806795881284dc673a3a8be923b)(@effect-aws/client-s3@2.0.0-beta.6(effect@4.0.0-rc.117))(effect@4.0.0-rc.117)
       '@effect/ai-openai':
         specifier: 'catalog:'
         version: 4.0.0-rc.117(effect@4.0.0-rc.117)
@@ -10141,7 +10144,7 @@ snapshots:
       '@smithy/types': 4.17.0
       effect: 4.0.0-rc.117
 
-  '@effect-aws/s3@1.0.0-beta.5(@effect-aws/client-s3@2.0.0-beta.6(effect@4.0.0-rc.117))(effect@4.0.0-rc.117)':
+  '@effect-aws/s3@1.0.0-beta.5(patch_hash=7d06ef7a561d78d1fe2e7ffbbae659ec705b7806795881284dc673a3a8be923b)(@effect-aws/client-s3@2.0.0-beta.6(effect@4.0.0-rc.117))(effect@4.0.0-rc.117)':
     dependencies:
       '@effect-aws/client-s3': 2.0.0-beta.6(effect@4.0.0-rc.117)
       effect: 4.0.0-rc.117
