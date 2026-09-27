@@ -11,7 +11,18 @@ import { defineConfig } from "oxlint";
  */
 export default defineConfig({
   extends: [recommended],
-  plugins: ["eslint", "oxc", "unicorn", "typescript", "vitest"],
+  // `plugins` overwrites Oxlint's default set, and Oxlint's `react` plugin is
+  // off by default. Omitting it meant no React rule ran anywhere: no
+  // `react/hooks` (a conditional hook call is a runtime crash), no
+  // `react/exhaustive-effect-dependencies`, no `react/refs`. It is listed here
+  // because this workspace is mostly React — `apps/web` alone is ~540 files.
+  //
+  // Dependency checking now runs twice, on purpose, because the two rules are not
+  // the same rule: `react-hooks/exhaustive-deps` is the classic ESLint
+  // implementation and `react/exhaustive-effect-dependencies` is Oxc's, which
+  // also reports *extra* dependencies. Neither is a superset of the other, so
+  // turning either off would drop sites the other misses.
+  plugins: ["eslint", "oxc", "unicorn", "typescript", "vitest", "react"],
   categories: {
     correctness: "warn",
     suspicious: "warn",
@@ -81,12 +92,26 @@ export default defineConfig({
     "unicorn/no-array-sort": "off",
     "unicorn/consistent-function-scoping": "off",
     "oxc/no-map-spread": "off",
-    "react-in-jsx-scope": "off",
-    "react-hooks/exhaustive-deps": "off",
     "eslint/no-shadow": "off",
     "eslint/no-await-in-loop": "off",
     "eslint/no-underscore-dangle": "off",
+
+    // Three React disables used to sit here and none of them ever took effect,
+    // because the `react` plugin was missing from `plugins` and Oxlint only
+    // resolves `react/*` and `react-hooks/*` while it is on (see the note on
+    // `plugins` above). `react-in-jsx-scope` was additionally misspelled — no
+    // plugin prefix. `react-hooks/exhaustive-deps` is real and now runs, so its
+    // disable is gone rather than restored: a stale dependency array is a
+    // defect, not a style choice. `react/no-children-prop` is the one that keeps
+    // its intent.
+    // `apps/web/src/routes/__root.tsx` passes `children` as an explicit prop to
+    // `ScriptOnce` so a script string can be handed over without JSX children.
     "react/no-children-prop": "off",
+    // Every package compiles with the automatic JSX runtime (`jsx: "react-jsx"`
+    // in `packages/config/tsconfig.base.json`), so no file needs `React` in
+    // scope to write JSX. The rule assumes the classic runtime and reported 4952
+    // sites that are all correct as written.
+    "react/react-in-jsx-scope": "off",
 
     // The rules below were disabled while `options.typeAware` was false, so they
     // could not run at all. Type-aware linting is on now; these three stay off,
