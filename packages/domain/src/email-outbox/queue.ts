@@ -71,6 +71,13 @@ const sendingLeaseRecoveryDelay = Duration.minutes(5);
 const circuitBreakerRetryDelay = Duration.minutes(5);
 /** Retry delay while the provider's monthly send limit is spent. */
 const monthlyVolumeRetryDelay = Duration.hours(1);
+/**
+ * Backoff before a worker re-enters `take` after a failure.
+ *
+ * `take` fails fast while the queue store is unavailable, so without this the
+ * `forever` loop would hot-spin and flood the log until the store recovers.
+ */
+const queueTakeRetryDelay = Duration.seconds(1);
 
 // Tokenized unsubscribe/verification links carry a bearer token in the query
 // string, so they must never be rendered against a plain-HTTP origin. Loopback
@@ -1288,13 +1295,18 @@ export const EmailOutboxWorkerLayer = Layer.effectDiscard(
       .take(dispatchEmailOutboxIntent)
       .pipe(
         Effect.catchCause((cause) =>
-          Effect.logWarning("Email outbox dispatcher element failed", cause)
+          Effect.logWarning(
+            "Email outbox dispatcher element failed",
+            cause
+          ).pipe(Effect.andThen(Effect.sleep(queueTakeRetryDelay)))
         ),
         Effect.forever
       );
     const deliveryWorker = queues.delivery.take(deliverEmailDelivery).pipe(
       Effect.catchCause((cause) =>
-        Effect.logWarning("Email delivery element failed", cause)
+        Effect.logWarning("Email delivery element failed", cause).pipe(
+          Effect.andThen(Effect.sleep(queueTakeRetryDelay))
+        )
       ),
       Effect.forever
     );
