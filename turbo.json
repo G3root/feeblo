@@ -6,6 +6,15 @@
       "dependsOn": ["^typecheck", "build:paraglide"],
       "outputs": []
     },
+    // A single whole-repo task, and deliberately so. Splitting it into one task
+    // per package was tried and measured at ~30 minutes of wall time against
+    // ~130s here: `typeAware` builds a TypeScript program per invocation, and
+    // the programs overlap, so twenty of them resident at once (10 concurrent,
+    // each pulling its dependency graph) spent 48 minutes of system time
+    // thrashing a 16 GB machine to do less work than this one process does with
+    // a single 2.3 GB program. The caching granularity is not worth 6x the
+    // runtime; if this ever needs to get faster, the lever is the type-aware
+    // pass itself, not the task layout. See `docs/adr/0005`.
     "//#lint": {
       "outputs": []
     },
@@ -35,6 +44,16 @@
       "dependsOn": ["build:paraglide"],
       "outputs": [],
       "cache": false
+    },
+    // `@feeblo/post-ui` and `@feeblo/public-feature-board` both have a test that
+    // asserts on translated copy, and their tests resolve `src/paraglide` at
+    // import time, so they keep the dependency above. `@feeblo/web` does not:
+    // its tests are two files that never touch paraglide, and its own
+    // `vitest.config.ts` deliberately does not load the app config that would
+    // pull it in. Leaving the dependency in place made a two-second test suite
+    // wait ~30s for a compile whose output it never reads.
+    "@feeblo/web#test": {
+      "dependsOn": []
     },
     "dev": {
       "cache": false,
