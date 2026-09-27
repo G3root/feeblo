@@ -30,7 +30,7 @@
     "db:stop": "turbo -F @feeblo/db db:stop",
     "db:down": "turbo -F @feeblo/db db:down",
     "db:configure-embeddings": "pnpm --filter @feeblo/db db:configure-embeddings",
-    "lint": "oxlint && oxfmt --check .",
+    "lint": "node tools/lint-budget/check.ts && oxfmt --check .",
     "lint:fix": "oxlint --fix && oxfmt",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
