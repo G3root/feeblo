@@ -14,12 +14,14 @@ import {
   testMailerState,
 } from "@feeblo/transactional/mailer/test";
 import { and, eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import { TestClock } from "effect/testing";
-import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
+import * as PersistedQueue from "effect/unstable/persistence/PersistedQueue";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
@@ -30,16 +32,22 @@ import {
   emailSubscriptionTopicForIntent,
   resolveSubscriptionNotificationContent,
 } from "./content";
-import { EmailOutboxRepository } from "./repository";
 import {
-  EmailDeliveryWorkflow,
-  EmailOutboxDispatcherWorkflow,
-  EmailOutboxWorkflowLayer,
+  EmailOutboxQueues,
+  EmailOutboxWorkerLayer,
+  deliverEmailDelivery,
+  dispatchEmailOutboxIntent,
   materializeEmailIntent,
   reconcileEmailOutbox,
-} from "./workflow";
+} from "./queue";
+import { EmailOutboxRepository } from "./repository";
 
-const TestLayer = EmailOutboxWorkflowLayer.pipe(
+// The worker layer runs for real: `waitForDelivery` polls with `yieldNow`, so
+// it depends on the take loops progressing concurrently, exactly as the
+// in-memory workflow engine did before. `deliverEmailDelivery` is still called
+// directly where a test wants one deterministic attempt.
+const TestLayer = EmailOutboxWorkerLayer.pipe(
+  Layer.provideMerge(EmailOutboxQueues.layer),
   Layer.provideMerge(
     EmailOutboxConfig.layerTest(new URL("https://test.feeblo.example"))
   ),
@@ -57,13 +65,31 @@ const TestLayer = EmailOutboxWorkflowLayer.pipe(
   Layer.provideMerge(
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   ),
-  Layer.provideMerge(WorkflowEngine.layerMemory),
+  Layer.provideMerge(
+    PersistedQueue.layer.pipe(Layer.provide(PersistedQueue.layerStoreMemory))
+  ),
   Layer.provideMerge(Database.PgliteDatabaseLive)
 );
 
+/**
+ * The instant every test pins `TestClock` to.
+ *
+ * Fixtures read "now" through `DateTime.nowAsDate`, so row timestamps and the
+ * clock the code under test reads are the same instant. Constants that must
+ * stay fixed regardless of a test adjusting the clock (an expiry, a consent
+ * instant) use this value directly.
+ */
+const fixtureNow = new Date("2026-08-11T00:00:00.000Z");
+
+/** `date` moved by `duration`, shaped as the `Date` Drizzle columns expect. */
+const shiftDate = (date: Date, duration: Duration.Input): Date =>
+  DateTime.toDateUtc(
+    DateTime.addDuration(DateTime.fromDateUnsafe(date), duration)
+  );
+
 const fixture = Effect.gen(function* () {
   const db = yield* currentDb;
-  const now = new Date("2026-08-11T00:00:00.000Z");
+  const now = fixtureNow;
   yield* TestClock.setTime(now.getTime());
   const organizationId = yield* WorkspaceId.generate;
   const userId = `usr_${organizationId}`;
@@ -150,7 +176,7 @@ const fixture = Effect.gen(function* () {
 const enableSubscriberEmails = (organizationId: string) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
-    const now = new Date();
+    const now = yield* DateTime.nowAsDate;
     const productId = `product_${organizationId}`;
     yield* db.insert(schema.productTable).values({
       id: productId,
@@ -174,7 +200,7 @@ const enableSubscriberEmails = (organizationId: string) =>
       recurringIntervalCount: 1,
       status: "active",
       currentPeriodStart: now,
-      currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+      currentPeriodEnd: shiftDate(now, Duration.days(1)),
       customerId: `customer_${organizationId}`,
       productId,
       createdAt: now,
@@ -193,7 +219,7 @@ const addSubscriptionContact = (args: {
 }) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
-    const now = new Date();
+    const now = yield* DateTime.nowAsDate;
     const contactId = yield* EmailContactId.generate;
     const subscriptionId = yield* EmailSubscriptionId.generate;
     yield* db
@@ -241,7 +267,7 @@ const addSubscriptionContact = (args: {
       if (existingContact.userId === null) {
         yield* db
           .update(schema.emailContactTable)
-          .set({ userId: args.userId, updatedAt: new Date() })
+          .set({ userId: args.userId, updatedAt: yield* DateTime.nowAsDate })
           .where(eq(schema.emailContactTable.id, effectiveContactId));
       } else if (existingContact.userId !== args.userId) {
         return yield* Effect.die(
@@ -309,7 +335,7 @@ const waitForIntentState = (outboxId: string, state: string) =>
   });
 
 describe("EmailOutbox workflows", () => {
-  layer(TestLayer)("memory workflow engine", (it) => {
+  layer(TestLayer)("in-memory persisted queue", (it) => {
     it.effect(
       "reconciliation recovers a missed submission wake and sends only the free owner",
       () =>
@@ -386,7 +412,7 @@ describe("EmailOutbox workflows", () => {
           });
           yield* db.insert(schema.memberTable).values({
             id: adminMemberId,
-            createdAt: new Date("2026-08-11T00:00:00.000Z"),
+            createdAt: fixtureNow,
             organizationId,
             role: "admin",
             userId: adminUserId,
@@ -394,7 +420,7 @@ describe("EmailOutbox workflows", () => {
           yield* (yield* EmailSubscriptionRepository).requestSubscription({
             alreadyVerifiedUser: { userId: adminUserId },
             email: adminEmail,
-            now: new Date("2026-08-11T00:00:00.000Z"),
+            now: fixtureNow,
             organizationId,
             source: "explicit",
             topic: { topicId: null, topicType: "submission" },
@@ -403,7 +429,7 @@ describe("EmailOutbox workflows", () => {
 
           const deliveryIds = yield* materializeEmailIntent(intentId);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            deliverEmailDelivery({ deliveryId })
           );
           const mailbox = yield* testMailerState;
           expect(mailbox.sentMessages.map((message) => message.to)).toEqual([
@@ -423,10 +449,7 @@ describe("EmailOutbox workflows", () => {
             outcomes: [{ _tag: "temporaryFailure" }, { _tag: "accepted" }],
           });
           const { intentId } = yield* fixture;
-          yield* EmailOutboxDispatcherWorkflow.execute(
-            { outboxId: intentId },
-            { discard: true }
-          );
+          yield* dispatchEmailOutboxIntent({ outboxId: intentId });
           yield* waitForDelivery(
             intentId,
             (delivery) =>
@@ -464,14 +487,14 @@ describe("EmailOutbox workflows", () => {
           yield* enableSubscriberEmails(organizationId);
           const changelogId = `changelog_${organizationId}`;
           const subscriptions = yield* EmailSubscriptionRepository;
-          const consentNow = new Date("2026-08-11T00:00:00.000Z");
+          const consentNow = fixtureNow;
           const subscriber = yield* subscriptions.requestSubscription({
             email: `changelog-${organizationId}@example.test`,
             now: consentNow,
             organizationId,
             source: "explicit",
             topic: { topicId: null, topicType: "changelog" },
-            verificationExpiresAt: new Date(consentNow.getTime() + 86_400_000),
+            verificationExpiresAt: shiftDate(consentNow, Duration.days(1)),
           });
           if (Option.isNone(subscriber.verificationToken)) {
             return yield* Effect.die("Expected a verification token");
@@ -482,6 +505,7 @@ describe("EmailOutbox workflows", () => {
               subscriber.verificationToken.value
             ),
           });
+          const now = yield* DateTime.nowAsDate;
           yield* db.insert(schema.changelogTable).values({
             id: changelogId,
             organizationId,
@@ -490,11 +514,11 @@ describe("EmailOutbox workflows", () => {
             content: "Release notes",
             excerpt: "Release notes",
             status: "published",
-            publishedAt: new Date(),
+            publishedAt: now,
             creatorId: null,
             creatorMemberId: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: now,
+            updatedAt: now,
           });
           const intent = yield* (yield* EmailOutboxRepository).recordIntent({
             aggregateId: changelogId,
@@ -504,14 +528,14 @@ describe("EmailOutbox workflows", () => {
             kind: "changelog.published",
             organizationId,
             payload: { kind: "changelog.published", changelogId },
-            scheduledAt: new Date(),
+            scheduledAt: now,
           });
           if (intent._tag !== "Inserted") {
             return yield* Effect.die("Expected changelog intent");
           }
           const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            deliverEmailDelivery({ deliveryId })
           );
           yield* waitForDelivery(
             intent.intent.id,
@@ -589,14 +613,14 @@ describe("EmailOutbox workflows", () => {
           yield* enableSubscriberEmails(organizationId);
           const changelogId = `changelog_${organizationId}`;
           const subscriptions = yield* EmailSubscriptionRepository;
-          const consentNow = new Date("2026-08-11T00:00:00.000Z");
+          const consentNow = fixtureNow;
           const subscriber = yield* subscriptions.requestSubscription({
             email: `hidden-${organizationId}@example.test`,
             now: consentNow,
             organizationId,
             source: "explicit",
             topic: { topicId: null, topicType: "changelog" },
-            verificationExpiresAt: new Date(consentNow.getTime() + 86_400_000),
+            verificationExpiresAt: shiftDate(consentNow, Duration.days(1)),
           });
           if (Option.isNone(subscriber.verificationToken)) {
             return yield* Effect.die("Expected a verification token");
@@ -607,6 +631,7 @@ describe("EmailOutbox workflows", () => {
               subscriber.verificationToken.value
             ),
           });
+          const now = yield* DateTime.nowAsDate;
           yield* db.insert(schema.changelogTable).values({
             id: changelogId,
             organizationId,
@@ -615,17 +640,20 @@ describe("EmailOutbox workflows", () => {
             content: "Release notes",
             excerpt: "Release notes",
             status: "published",
-            publishedAt: new Date(),
+            publishedAt: now,
             creatorId: null,
             creatorMemberId: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: now,
+            updatedAt: now,
           });
           // The subscriber consented while public; the workspace has since
           // hidden its changelog.
           yield* db
             .update(schema.siteTable)
-            .set({ changelogVisibility: "HIDDEN", updatedAt: new Date() })
+            .set({
+              changelogVisibility: "HIDDEN",
+              updatedAt: now,
+            })
             .where(eq(schema.siteTable.organizationId, organizationId));
           const intent = yield* (yield* EmailOutboxRepository).recordIntent({
             aggregateId: changelogId,
@@ -635,7 +663,7 @@ describe("EmailOutbox workflows", () => {
             kind: "changelog.published",
             organizationId,
             payload: { kind: "changelog.published", changelogId },
-            scheduledAt: new Date(),
+            scheduledAt: now,
           });
           if (intent._tag !== "Inserted") {
             return yield* Effect.die("Expected changelog intent");
@@ -662,14 +690,14 @@ describe("EmailOutbox workflows", () => {
           yield* enableSubscriberEmails(organizationId);
           const changelogId = `changelog_${organizationId}`;
           const subscriptions = yield* EmailSubscriptionRepository;
-          const consentNow = new Date("2026-08-11T00:00:00.000Z");
+          const consentNow = fixtureNow;
           const subscriber = yield* subscriptions.requestSubscription({
             email: `queued-${organizationId}@example.test`,
             now: consentNow,
             organizationId,
             source: "explicit",
             topic: { topicId: null, topicType: "changelog" },
-            verificationExpiresAt: new Date(consentNow.getTime() + 86_400_000),
+            verificationExpiresAt: shiftDate(consentNow, Duration.days(1)),
           });
           if (Option.isNone(subscriber.verificationToken)) {
             return yield* Effect.die("Expected a verification token");
@@ -680,6 +708,7 @@ describe("EmailOutbox workflows", () => {
               subscriber.verificationToken.value
             ),
           });
+          const now = yield* DateTime.nowAsDate;
           yield* db.insert(schema.changelogTable).values({
             id: changelogId,
             organizationId,
@@ -688,11 +717,11 @@ describe("EmailOutbox workflows", () => {
             content: "Release notes",
             excerpt: "Release notes",
             status: "published",
-            publishedAt: new Date(),
+            publishedAt: now,
             creatorId: null,
             creatorMemberId: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: now,
+            updatedAt: now,
           });
           // Materialize while public: a delivery is queued for the send path.
           const intent = yield* (yield* EmailOutboxRepository).recordIntent({
@@ -703,7 +732,7 @@ describe("EmailOutbox workflows", () => {
             kind: "changelog.published",
             organizationId,
             payload: { kind: "changelog.published", changelogId },
-            scheduledAt: new Date(),
+            scheduledAt: now,
           });
           if (intent._tag !== "Inserted") {
             return yield* Effect.die("Expected changelog intent");
@@ -717,9 +746,12 @@ describe("EmailOutbox workflows", () => {
           // before the queued delivery is sent.
           yield* db
             .update(schema.siteTable)
-            .set({ changelogVisibility: "HIDDEN", updatedAt: new Date() })
+            .set({
+              changelogVisibility: "HIDDEN",
+              updatedAt: yield* DateTime.nowAsDate,
+            })
             .where(eq(schema.siteTable.organizationId, organizationId));
-          yield* EmailDeliveryWorkflow.execute({ deliveryId });
+          yield* deliverEmailDelivery({ deliveryId });
           const [delivery] = yield* db
             .select({ state: schema.emailDeliveryTable.state })
             .from(schema.emailDeliveryTable)
@@ -742,14 +774,14 @@ describe("EmailOutbox workflows", () => {
           yield* enableSubscriberEmails(organizationId);
           const changelogId = `changelog_${organizationId}`;
           const subscriptions = yield* EmailSubscriptionRepository;
-          const consentNow = new Date("2026-08-11T00:00:00.000Z");
+          const consentNow = fixtureNow;
           const subscriber = yield* subscriptions.requestSubscription({
             email: `deferred-${organizationId}@example.test`,
             now: consentNow,
             organizationId,
             source: "explicit",
             topic: { topicId: null, topicType: "changelog" },
-            verificationExpiresAt: new Date(consentNow.getTime() + 86_400_000),
+            verificationExpiresAt: shiftDate(consentNow, Duration.days(1)),
           });
           if (Option.isNone(subscriber.verificationToken)) {
             return yield* Effect.die("Expected a verification token");
@@ -760,6 +792,7 @@ describe("EmailOutbox workflows", () => {
               subscriber.verificationToken.value
             ),
           });
+          const now = yield* DateTime.nowAsDate;
           yield* db.insert(schema.changelogTable).values({
             id: changelogId,
             organizationId,
@@ -768,11 +801,11 @@ describe("EmailOutbox workflows", () => {
             content: "Release notes",
             excerpt: "Release notes",
             status: "published",
-            publishedAt: new Date(),
+            publishedAt: now,
             creatorId: null,
             creatorMemberId: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: now,
+            updatedAt: now,
           });
           const intent = yield* (yield* EmailOutboxRepository).recordIntent({
             aggregateId: changelogId,
@@ -782,7 +815,7 @@ describe("EmailOutbox workflows", () => {
             kind: "changelog.published",
             organizationId,
             payload: { kind: "changelog.published", changelogId },
-            scheduledAt: new Date(),
+            scheduledAt: now,
           });
           if (intent._tag !== "Inserted") {
             return yield* Effect.die("Expected changelog intent");
@@ -793,11 +826,10 @@ describe("EmailOutbox workflows", () => {
             return yield* Effect.die("Expected a queued delivery");
           }
           // The first attempt claims the delivery, renders it, and the
-          // provider fails temporarily, deferring the retry.
-          yield* EmailDeliveryWorkflow.execute(
-            { deliveryId },
-            { discard: true }
-          );
+          // provider fails temporarily, deferring the retry. Forked because the
+          // handler sleeps out the retry delay, which the test releases by
+          // advancing the clock.
+          yield* deliverEmailDelivery({ deliveryId }).pipe(Effect.forkScoped);
           yield* waitForDelivery(
             intent.intent.id,
             (delivery) =>
@@ -806,7 +838,10 @@ describe("EmailOutbox workflows", () => {
           // The workspace hides its changelog while the retry waits.
           yield* db
             .update(schema.siteTable)
-            .set({ changelogVisibility: "HIDDEN", updatedAt: new Date() })
+            .set({
+              changelogVisibility: "HIDDEN",
+              updatedAt: yield* DateTime.nowAsDate,
+            })
             .where(eq(schema.siteTable.organizationId, organizationId));
           yield* TestClock.adjust("10 seconds");
           yield* waitForDelivery(
@@ -827,7 +862,7 @@ describe("EmailOutbox workflows", () => {
           yield* resetTestMailer();
           const { organizationId } = yield* fixture;
           yield* enableSubscriberEmails(organizationId);
-          const now = new Date("2026-08-11T00:00:00.000Z");
+          const now = fixtureNow;
           const requested =
             yield* (yield* EmailSubscriptionRepository).requestSubscription({
               email: `verify-${organizationId}@example.test`,
@@ -835,13 +870,13 @@ describe("EmailOutbox workflows", () => {
               organizationId,
               source: "explicit",
               topic: { topicId: null, topicType: "changelog" },
-              verificationExpiresAt: new Date(now.getTime() + 86_400_000),
+              verificationExpiresAt: shiftDate(now, Duration.days(1)),
             });
           const intent = yield* (yield* EmailOutboxRepository).recordIntent({
             aggregateId: requested.subscription.id,
             aggregateType: "email_subscription",
             deduplicationKey: `subscription.verification_requested:${requested.subscription.id}`,
-            expiresAt: new Date(now.getTime() + 86_400_000),
+            expiresAt: shiftDate(now, Duration.days(1)),
             kind: "subscription.verification_requested",
             organizationId,
             payload: {
@@ -855,7 +890,7 @@ describe("EmailOutbox workflows", () => {
           }
           const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            deliverEmailDelivery({ deliveryId })
           );
           yield* waitForDelivery(
             intent.intent.id,
@@ -949,14 +984,14 @@ describe("EmailOutbox workflows", () => {
                 postId: post.id,
                 statusId: `pst_${organizationId}`,
               },
-              scheduledAt: new Date(),
+              scheduledAt: yield* DateTime.nowAsDate,
             });
           if (intent._tag !== "Written") {
             return yield* Effect.die("Expected post intent");
           }
           const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            deliverEmailDelivery({ deliveryId })
           );
           yield* waitForDelivery(
             intent.intent.id,
@@ -1012,11 +1047,11 @@ describe("EmailOutbox workflows", () => {
             aggregateId: postId,
             aggregateType: "post",
             deduplicationKey: `post.closed:${organizationId}:${postId}:consent-race`,
-            expiresAt: new Date("2026-08-12T00:00:00.000Z"),
+            expiresAt: shiftDate(fixtureNow, Duration.days(1)),
             kind: "post.closed",
             organizationId,
             payload: { kind: "post.closed", postId },
-            scheduledAt: new Date("2026-08-11T00:00:00.000Z"),
+            scheduledAt: fixtureNow,
           });
           if (intent._tag !== "Inserted") {
             return yield* Effect.die("Expected consent-race intent");
@@ -1056,9 +1091,7 @@ describe("EmailOutbox workflows", () => {
               eq(schema.emailSubscriptionTable.id, subscriber.subscriptionId)
             );
 
-          yield* EmailDeliveryWorkflow.execute({
-            deliveryId: delivery.delivery.id,
-          });
+          yield* deliverEmailDelivery({ deliveryId: delivery.delivery.id });
 
           expect((yield* testMailerState).attempts).toBe(0);
           expect(
@@ -1088,7 +1121,7 @@ describe("EmailOutbox workflows", () => {
             aggregateId: postId,
             aggregateType: "post",
             deduplicationKey: `post.official_update_published:${postId}:test`,
-            expiresAt: new Date("2026-08-12T00:00:00.000Z"),
+            expiresAt: shiftDate(fixtureNow, Duration.days(1)),
             kind: "post.official_update_published",
             organizationId,
             payload: {
@@ -1097,14 +1130,14 @@ describe("EmailOutbox workflows", () => {
               postId,
               updateId: `update_${organizationId}`,
             },
-            scheduledAt: new Date("2026-08-11T00:00:00.000Z"),
+            scheduledAt: fixtureNow,
           });
           if (intent._tag !== "Inserted") {
             return yield* Effect.die("Expected official-update intent");
           }
           const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            deliverEmailDelivery({ deliveryId })
           );
           const mailbox = yield* testMailerState;
           expect(mailbox.sentMessages).toHaveLength(1);
@@ -1122,6 +1155,7 @@ describe("EmailOutbox workflows", () => {
           const { organizationId } = yield* fixture;
           const db = yield* Database.Database;
           const changelogId = `resume_changelog_${organizationId}`;
+          const now = yield* DateTime.nowAsDate;
           yield* db.insert(schema.changelogTable).values({
             id: changelogId,
             organizationId,
@@ -1130,21 +1164,21 @@ describe("EmailOutbox workflows", () => {
             content: "x",
             excerpt: "x",
             status: "published",
-            publishedAt: new Date(),
+            publishedAt: now,
             creatorId: null,
             creatorMemberId: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: now,
+            updatedAt: now,
           });
           const intent = yield* (yield* EmailOutboxRepository).recordIntent({
             aggregateId: changelogId,
             aggregateType: "changelog",
             deduplicationKey: `changelog.resume:${organizationId}:${changelogId}`,
-            expiresAt: new Date("2026-08-12T00:00:00.000Z"),
+            expiresAt: shiftDate(fixtureNow, Duration.days(1)),
             kind: "changelog.published",
             organizationId,
             payload: { kind: "changelog.published", changelogId },
-            scheduledAt: new Date("2026-08-11T00:00:00.000Z"),
+            scheduledAt: fixtureNow,
           });
           if (intent._tag !== "Inserted") {
             return yield* Effect.die("Expected resumable intent");
@@ -1177,7 +1211,7 @@ describe("EmailOutbox workflows", () => {
             })),
           });
           const { intentId } = yield* fixture;
-          yield* EmailOutboxDispatcherWorkflow.execute({ outboxId: intentId });
+          yield* dispatchEmailOutboxIntent({ outboxId: intentId });
           yield* waitForDelivery(
             intentId,
             (delivery) => delivery.state === "failed"
@@ -1200,7 +1234,7 @@ describe("EmailOutbox workflows", () => {
             outcomes: [{ _tag: "accepted", accepted: false }],
           });
           const { intentId } = yield* fixture;
-          yield* EmailOutboxDispatcherWorkflow.execute({ outboxId: intentId });
+          yield* dispatchEmailOutboxIntent({ outboxId: intentId });
           yield* waitForDelivery(
             intentId,
             (delivery) => delivery.state === "failed"
@@ -1233,10 +1267,7 @@ describe("EmailOutbox workflows", () => {
             ],
           });
           const { intentId } = yield* fixture;
-          yield* EmailOutboxDispatcherWorkflow.execute(
-            { outboxId: intentId },
-            { discard: true }
-          );
+          yield* dispatchEmailOutboxIntent({ outboxId: intentId });
           for (const _attempt of [1, 2, 3, 4]) {
             const delivery = yield* waitForDelivery(
               intentId,
@@ -1295,12 +1326,12 @@ describe("EmailOutbox workflows", () => {
             return yield* Effect.die("Expected queued orphan delivery");
           }
           yield* reconcileEmailOutbox();
-          yield* EmailDeliveryWorkflow.execute({
-            deliveryId: delivery.delivery.id,
-          });
-          expect(
-            (yield* repository.findDeliveryById(delivery.delivery.id))?.state
-          ).toBe("accepted");
+          // Reconciliation offers the orphan row and a delivery worker takes it;
+          // the attempt is asynchronous, so poll rather than assert once.
+          yield* waitForDelivery(
+            intentId,
+            (stored) => stored.state === "accepted"
+          );
         })
     );
 
@@ -1341,16 +1372,16 @@ describe("EmailOutbox workflows", () => {
             .update(schema.emailDeliveryTable)
             .set({
               state: "sending",
-              updatedAt: new Date(
-                new Date("2026-08-11T00:00:00.000Z").getTime() - 10 * 60 * 1000
-              ),
+              updatedAt: shiftDate(fixtureNow, Duration.minutes(-10)),
             })
             .where(eq(schema.emailDeliveryTable.id, delivery.delivery.id));
 
-          yield* EmailDeliveryWorkflow.execute(
-            { deliveryId: delivery.delivery.id },
-            { discard: true }
-          );
+          // The stale `sending` lease makes this attempt wait out
+          // `sendingLeaseRecoveryDelayMs`, so fork it; reconciliation releases
+          // the lease from the row independently.
+          yield* deliverEmailDelivery({
+            deliveryId: delivery.delivery.id,
+          }).pipe(Effect.forkScoped);
           yield* reconcileEmailOutbox();
           yield* waitForDelivery(
             intentId,
@@ -1376,7 +1407,7 @@ describe("EmailOutbox workflows", () => {
         Effect.gen(function* () {
           yield* resetTestMailer({ outcomes: [{ _tag: "permanentFailure" }] });
           const { intentId } = yield* fixture;
-          yield* EmailOutboxDispatcherWorkflow.execute({ outboxId: intentId });
+          yield* dispatchEmailOutboxIntent({ outboxId: intentId });
           yield* waitForDelivery(
             intentId,
             (delivery) => delivery.state === "failed"
@@ -1390,7 +1421,7 @@ describe("EmailOutbox workflows", () => {
             return yield* Effect.die("Expected delivery");
           }
           const attemptsBeforeReplay = (yield* testMailerState).attempts;
-          yield* EmailDeliveryWorkflow.execute({ deliveryId: delivery.id });
+          yield* deliverEmailDelivery({ deliveryId: delivery.id });
           expect((yield* testMailerState).attempts).toBe(attemptsBeforeReplay);
         })
     );
@@ -1398,7 +1429,7 @@ describe("EmailOutbox workflows", () => {
     const insertPrivateBoardPost = (organizationId: string) =>
       Effect.gen(function* () {
         const db = yield* currentDb;
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
         const boardId = `brd_private_${organizationId}`;
         const statusId = `pst_private_${organizationId}`;
         const postId = `post_private_${organizationId}`;
@@ -1446,7 +1477,7 @@ describe("EmailOutbox workflows", () => {
               postId,
               statusId: `pst_${organizationId}`,
             },
-            scheduledAt: new Date(),
+            scheduledAt: yield* DateTime.nowAsDate,
           });
         if (intent._tag !== "Written") {
           return yield* Effect.die("Expected post intent");
@@ -1487,11 +1518,11 @@ describe("EmailOutbox workflows", () => {
           const deliveryIds = yield* materializeEmailIntent(intentId);
           expect(deliveryIds).toHaveLength(1);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            deliverEmailDelivery({ deliveryId })
           );
           // Terminal: replaying the workflow must not retry the send.
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            deliverEmailDelivery({ deliveryId })
           );
 
           const [delivery] = yield* db
@@ -1536,7 +1567,7 @@ describe("EmailOutbox workflows", () => {
           const publicDeliveryIds =
             yield* materializeEmailIntent(publicIntentId);
           yield* Effect.forEach(publicDeliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            deliverEmailDelivery({ deliveryId })
           );
           const [publicDelivery] = yield* db
             .select()
@@ -1561,7 +1592,7 @@ describe("EmailOutbox workflows", () => {
           const privateDeliveryIds =
             yield* materializeEmailIntent(privateIntentId);
           yield* Effect.forEach(privateDeliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            deliverEmailDelivery({ deliveryId })
           );
           const [privateDelivery] = yield* db
             .select()
@@ -1593,7 +1624,7 @@ describe("EmailOutbox workflows", () => {
             organizationId,
             userId: memberUserId,
             role: "manager",
-            createdAt: new Date(),
+            createdAt: yield* DateTime.nowAsDate,
           });
           yield* addSubscriptionContact({
             email: `member-${organizationId}@example.test`,
@@ -1627,7 +1658,7 @@ describe("EmailOutbox workflows", () => {
           );
           const deliveryIds = yield* materializeEmailIntent(intentId);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            deliverEmailDelivery({ deliveryId })
           );
           const mailbox = yield* testMailerState;
           expect(
@@ -1660,7 +1691,7 @@ describe("EmailOutbox workflows", () => {
           );
           const deliveryIds = yield* materializeEmailIntent(intentId);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            deliverEmailDelivery({ deliveryId })
           );
           const mailbox = yield* testMailerState;
           expect(mailbox.sentMessages.map((message) => message.to)).toEqual([
@@ -1673,7 +1704,7 @@ describe("EmailOutbox workflows", () => {
       Effect.gen(function* () {
         const db = yield* currentDb;
         const { organizationId } = yield* fixture;
-        const now = new Date("2026-08-11T00:00:00.000Z");
+        const now = fixtureNow;
         const sourcePostId = yield* PostId.generate;
         const targetPostId = yield* PostId.generate;
         yield* db.insert(schema.postTable).values([
@@ -1741,7 +1772,7 @@ describe("EmailOutbox workflows", () => {
       Effect.gen(function* () {
         const db = yield* currentDb;
         const { organizationId } = yield* fixture;
-        const now = new Date("2026-08-11T00:00:00.000Z");
+        const now = fixtureNow;
         const sourcePostId = yield* PostId.generate;
         const targetPostId = yield* PostId.generate;
         yield* db.insert(schema.postTable).values([
@@ -1805,9 +1836,10 @@ describe("EmailOutbox workflows", () => {
   });
 });
 
-describe("EmailOutbox workflows with plain-HTTP API_URL", () => {
+describe("EmailOutbox queues with plain-HTTP API_URL", () => {
   layer(
-    EmailOutboxWorkflowLayer.pipe(
+    EmailOutboxWorkerLayer.pipe(
+      Layer.provideMerge(EmailOutboxQueues.layer),
       Layer.provideMerge(
         EmailOutboxConfig.layerTest(
           new URL("https://test.feeblo.example"),
@@ -1828,17 +1860,22 @@ describe("EmailOutbox workflows with plain-HTTP API_URL", () => {
       Layer.provideMerge(
         EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
       ),
-      Layer.provideMerge(WorkflowEngine.layerMemory),
+      Layer.provideMerge(
+        PersistedQueue.layer.pipe(
+          Layer.provide(PersistedQueue.layerStoreMemory)
+        )
+      ),
       Layer.provideMerge(Database.PgliteDatabaseLive)
     )
-  )("memory workflow engine", (it) => {
+  )("in-memory persisted queue", (it) => {
     it.effect(
       "fails changelog deliveries terminally instead of emailing an HTTP tokenized link",
       () =>
         Effect.gen(function* () {
           yield* resetTestMailer();
           const db = yield* Database.Database;
-          const now = new Date("2026-08-11T00:00:00.000Z");
+          const now = fixtureNow;
+          yield* TestClock.setTime(now.getTime());
           const organizationId = yield* WorkspaceId.generate;
           yield* db.insert(schema.organizationTable).values({
             id: organizationId,
@@ -1861,14 +1898,14 @@ describe("EmailOutbox workflows with plain-HTTP API_URL", () => {
           yield* enableSubscriberEmails(organizationId);
           const changelogId = `changelog_${organizationId}`;
           const subscriptions = yield* EmailSubscriptionRepository;
-          const consentNow = new Date("2026-08-11T00:00:00.000Z");
+          const consentNow = fixtureNow;
           const subscriber = yield* subscriptions.requestSubscription({
             email: `changelog-${organizationId}@example.test`,
             now: consentNow,
             organizationId,
             source: "explicit",
             topic: { topicId: null, topicType: "changelog" },
-            verificationExpiresAt: new Date(consentNow.getTime() + 86_400_000),
+            verificationExpiresAt: shiftDate(consentNow, Duration.days(1)),
           });
           if (Option.isNone(subscriber.verificationToken)) {
             return yield* Effect.die("Expected a verification token");
@@ -1887,11 +1924,11 @@ describe("EmailOutbox workflows with plain-HTTP API_URL", () => {
             content: "Release notes",
             excerpt: "Release notes",
             status: "published",
-            publishedAt: new Date(),
+            publishedAt: now,
             creatorId: null,
             creatorMemberId: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: now,
+            updatedAt: now,
           });
           const intent = yield* (yield* EmailOutboxRepository).recordIntent({
             aggregateId: changelogId,
@@ -1901,14 +1938,14 @@ describe("EmailOutbox workflows with plain-HTTP API_URL", () => {
             kind: "changelog.published",
             organizationId,
             payload: { kind: "changelog.published", changelogId },
-            scheduledAt: new Date(),
+            scheduledAt: now,
           });
           if (intent._tag !== "Inserted") {
             return yield* Effect.die("Expected changelog intent");
           }
           const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
           yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId })
+            deliverEmailDelivery({ deliveryId })
           );
           yield* waitForDelivery(
             intent.intent.id,
