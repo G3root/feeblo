@@ -91,7 +91,7 @@ Feeblo.identify(user);
 
 `id` is required; all other fields are optional.
 
-- Use `name` for the user's full name. `firstName` and `lastName` are still accepted but deprecated; they are normalized into `name` when provided.
+- Use `name` for the user's full name. There is no `firstName`/`lastName` alias: identity fields are copied from a fixed allow-list (`email`, `name`, `avatar`, `token`, `customFields`, `companies`), so any other key is dropped before the widget sees it.
 - `token` is **required** for submitting feedback. It must be a JWT signed by your organization's Feeblo secret (see [Server-side JWT](#server-side-jwt)).
 
 ### Typed organization IDs

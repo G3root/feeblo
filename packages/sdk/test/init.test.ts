@@ -3,10 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EmbedError } from "../src/errors";
 import { Feeblo } from "../src/index";
 import { getCurrentEmbed, init } from "../src/instance";
-import type { FeebloWidget } from "../src/types";
+import type { FeebloWidget, OutgoingMessage } from "../src/types";
 
 const MOCK_ORIGIN = "http://localhost:3001";
-const fakePostMessage = vi.fn();
+// Typed with the real outbound contract rather than left as `vi.fn()`. A bare
+// `vi.fn()` makes `mock.calls` an `any[][]`, which is why every assertion in
+// this file used to destructure `[msg]: [any]` — a shape `any[]` cannot promise.
+// With the signature, `calls[0]` is the tuple the widget actually posts.
+const fakePostMessage =
+  vi.fn<(message: OutgoingMessage, targetOrigin: string) => void>();
 
 function createMockIframe(): HTMLIFrameElement {
   const iframe = document.createElement("iframe");
@@ -42,6 +47,20 @@ function postWidgetMessage<T>(data: T): void {
       data,
     })
   );
+}
+
+/**
+ * The last outbound message for one event, narrowed to that member of the union
+ * so `data` is reachable. `find` alone cannot do this: its predicate filters the
+ * array but does not narrow the value it returns.
+ */
+function outboundFor<E extends OutgoingMessage["event"]>(event: E) {
+  return fakePostMessage.mock.calls
+    .map(([message]) => message)
+    .find(
+      (message): message is Extract<OutgoingMessage, { event: E }> =>
+        message.event === event
+    );
 }
 
 describe("init", () => {
@@ -125,7 +144,7 @@ describe("init", () => {
     postWidgetMessage({ event: "READY" });
 
     const identifyCall = fakePostMessage.mock.calls.find(
-      ([msg]: [any]) => msg?.event === "IDENTIFY"
+      ([msg]) => msg.event === "IDENTIFY"
     );
     expect(identifyCall).toBeDefined();
   });
@@ -150,7 +169,7 @@ describe("FeebloWidget methods", () => {
 
     expect(fakePostMessage).toHaveBeenCalled();
     const showMsg = fakePostMessage.mock.calls.find(
-      ([msg]: [any]) => msg?.event === "SHOW"
+      ([msg]) => msg.event === "SHOW"
     );
     expect(showMsg).toBeDefined();
   });
@@ -162,7 +181,7 @@ describe("FeebloWidget methods", () => {
     widget.close();
 
     const hideMsg = fakePostMessage.mock.calls.find(
-      ([msg]: [any]) => msg?.event === "HIDE"
+      ([msg]) => msg.event === "HIDE"
     );
     expect(hideMsg).toBeDefined();
   });
@@ -174,11 +193,9 @@ describe("FeebloWidget methods", () => {
 
     widget.setBoard("roadmap");
 
-    const boardMsg = fakePostMessage.mock.calls.find(
-      ([msg]: [any]) => msg?.event === "SET_BOARD"
-    );
+    const boardMsg = outboundFor("SET_BOARD");
     expect(boardMsg).toBeDefined();
-    expect(boardMsg?.[0].data.board).toBe("roadmap");
+    expect(boardMsg?.data.board).toBe("roadmap");
   });
 
   it("setBoard is ignored when feedback is not the landing module", () => {
@@ -200,10 +217,10 @@ describe("FeebloWidget methods", () => {
     postWidgetMessage({ event: "READY" });
     fakePostMessage.mockClear();
 
-    widget.identify({ id: "user_x", firstName: "Jane" });
+    widget.identify({ id: "user_x", name: "Jane" });
 
     const identifyMsg = fakePostMessage.mock.calls.find(
-      ([msg]: [any]) => msg?.event === "IDENTIFY"
+      ([msg]) => msg.event === "IDENTIFY"
     );
     expect(identifyMsg).toBeDefined();
   });
@@ -295,7 +312,7 @@ describe("FeebloWidget methods", () => {
     widget.open();
 
     const showMessages = fakePostMessage.mock.calls.filter(
-      ([msg]: [any]) => msg?.event === "SHOW"
+      ([msg]) => msg.event === "SHOW"
     );
     expect(showMessages.length).toBe(0);
   });
@@ -308,7 +325,7 @@ describe("FeebloWidget methods", () => {
     widget.close();
 
     const hideMessages = fakePostMessage.mock.calls.filter(
-      ([msg]: [any]) => msg?.event === "HIDE"
+      ([msg]) => msg.event === "HIDE"
     );
     expect(hideMessages.length).toBe(0);
   });
@@ -399,17 +416,15 @@ describe("defaultBoard handling", () => {
     init("org_db", { defaultBoard: "roadmap" });
 
     const boardBeforeReady = fakePostMessage.mock.calls.find(
-      ([msg]: [any]) => msg?.event === "SET_BOARD"
+      ([msg]) => msg.event === "SET_BOARD"
     );
     expect(boardBeforeReady).toBeUndefined();
 
     postWidgetMessage({ event: "READY" });
 
-    const boardMsg = fakePostMessage.mock.calls.find(
-      ([msg]: [any]) => msg?.event === "SET_BOARD"
-    );
+    const boardMsg = outboundFor("SET_BOARD");
     expect(boardMsg).toBeDefined();
-    expect(boardMsg?.[0].data.board).toBe("roadmap");
+    expect(boardMsg?.data.board).toBe("roadmap");
   });
 
   it("sends defaultBoard for hub whose first module is feedback", () => {
@@ -420,11 +435,9 @@ describe("defaultBoard handling", () => {
     });
     postWidgetMessage({ event: "READY" });
 
-    const boardMsg = fakePostMessage.mock.calls.find(
-      ([msg]: [any]) => msg?.event === "SET_BOARD"
-    );
+    const boardMsg = outboundFor("SET_BOARD");
     expect(boardMsg).toBeDefined();
-    expect(boardMsg?.[0].data.board).toBe("roadmap");
+    expect(boardMsg?.data.board).toBe("roadmap");
   });
 
   it("sends a queued feedback module before its queued board", () => {
@@ -439,7 +452,7 @@ describe("defaultBoard handling", () => {
     postWidgetMessage({ event: "READY" });
 
     const navigationEvents = fakePostMessage.mock.calls
-      .map(([message]: [any]) => message?.event)
+      .map(([message]) => message.event)
       .filter((event) => event === "SET_MODULE" || event === "SET_BOARD");
     expect(navigationEvents).toEqual(["SET_MODULE", "SET_BOARD"]);
   });
@@ -452,7 +465,7 @@ describe("defaultBoard handling", () => {
     postWidgetMessage({ event: "READY" });
 
     const boardMsg = fakePostMessage.mock.calls.find(
-      ([msg]: [any]) => msg?.event === "SET_BOARD"
+      ([msg]) => msg.event === "SET_BOARD"
     );
     expect(boardMsg).toBeUndefined();
   });
@@ -466,7 +479,7 @@ describe("defaultBoard handling", () => {
     postWidgetMessage({ event: "READY" });
 
     const boardMsg = fakePostMessage.mock.calls.find(
-      ([msg]: [any]) => msg?.event === "SET_BOARD"
+      ([msg]) => msg.event === "SET_BOARD"
     );
     expect(boardMsg).toBeUndefined();
   });
@@ -481,7 +494,7 @@ describe("navigation sync ordering", () => {
 
   function navigationAndShowEvents(): string[] {
     return fakePostMessage.mock.calls
-      .map(([message]: [any]) => message?.event)
+      .map(([message]) => message.event)
       .filter(
         (event) =>
           event === "SET_MODULE" || event === "SET_BOARD" || event === "SHOW"
@@ -489,10 +502,7 @@ describe("navigation sync ordering", () => {
   }
 
   function boardMessage(): { board: string } | undefined {
-    const call = fakePostMessage.mock.calls.find(
-      ([msg]: [any]) => msg?.event === "SET_BOARD"
-    );
-    return call?.[0].data;
+    return outboundFor("SET_BOARD")?.data;
   }
 
   it("re-asserts the configured board when openModule('feedback') reopens a ready, closed widget", () => {
@@ -599,7 +609,7 @@ describe("navigation sync ordering", () => {
 
     widget.openModule("updates");
 
-    const events = fakePostMessage.mock.calls.map(([msg]: [any]) => msg?.event);
+    const events = fakePostMessage.mock.calls.map(([msg]) => msg.event);
     expect(events).toContain("SET_MODULE");
     expect(events).not.toContain("SET_BOARD");
     expect(events).toContain("SHOW");
@@ -615,7 +625,7 @@ describe("ready handshake", () => {
 
   function showMessages(): number {
     return fakePostMessage.mock.calls.filter(
-      ([message]: [any]) => message?.event === "SHOW"
+      ([message]) => message.event === "SHOW"
     ).length;
   }
 
@@ -652,7 +662,7 @@ describe("ready handshake", () => {
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     expect(listener).toHaveBeenCalledTimes(1);
     // SAFETY: The upstream contract guarantees this value here.
-    const detail = (listener.mock.calls[0][0] as CustomEvent).detail;
+    const detail = (listener.mock.calls[0]![0] as CustomEvent).detail;
     expect(detail.data).toEqual({ module: "feedback" });
     window.removeEventListener("widgetOpened", listener);
   });
@@ -816,7 +826,7 @@ describe("Feeblo namespace", () => {
     Feeblo.close();
 
     const hideMsg = fakePostMessage.mock.calls.find(
-      ([msg]: [any]) => msg?.event === "HIDE"
+      ([msg]) => msg.event === "HIDE"
     );
     expect(hideMsg).toBeDefined();
   });
@@ -829,7 +839,7 @@ describe("Feeblo namespace", () => {
     Feeblo.identify({ id: "user_z" });
 
     const identifyMsg = fakePostMessage.mock.calls.find(
-      ([msg]: [any]) => msg?.event === "IDENTIFY"
+      ([msg]) => msg.event === "IDENTIFY"
     );
     expect(identifyMsg).toBeDefined();
   });
@@ -865,7 +875,7 @@ describe("Feeblo namespace", () => {
     Feeblo.setBoard("changelog");
 
     const boardMsg = fakePostMessage.mock.calls.find(
-      ([msg]: [any]) => msg?.event === "SET_BOARD"
+      ([msg]) => msg.event === "SET_BOARD"
     );
     expect(boardMsg).toBeDefined();
   });
