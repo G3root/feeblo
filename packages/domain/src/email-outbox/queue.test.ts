@@ -456,6 +456,9 @@ describe("EmailOutbox workflows", () => {
               delivery.state === "deferred" && delivery.attemptCount === 1
           );
           yield* TestClock.adjust("2 seconds");
+          // The worker returns after writing `next_attempt_at`; reconciliation
+          // is what re-offers the row once it is due.
+          yield* reconcileEmailOutbox();
           yield* waitForDelivery(
             intentId,
             (delivery) => delivery.state === "accepted"
@@ -826,10 +829,10 @@ describe("EmailOutbox workflows", () => {
             return yield* Effect.die("Expected a queued delivery");
           }
           // The first attempt claims the delivery, renders it, and the
-          // provider fails temporarily, deferring the retry. Forked because the
-          // handler sleeps out the retry delay, which the test releases by
-          // advancing the clock.
-          yield* deliverEmailDelivery({ deliveryId }).pipe(Effect.forkScoped);
+          // provider fails temporarily, deferring the retry. The handler
+          // returns without sleeping; reconciliation re-offers it once the
+          // row's `next_attempt_at` is due.
+          yield* deliverEmailDelivery({ deliveryId });
           yield* waitForDelivery(
             intent.intent.id,
             (delivery) =>
@@ -844,6 +847,7 @@ describe("EmailOutbox workflows", () => {
             })
             .where(eq(schema.siteTable.organizationId, organizationId));
           yield* TestClock.adjust("10 seconds");
+          yield* reconcileEmailOutbox();
           yield* waitForDelivery(
             intent.intent.id,
             (delivery) => delivery.state === "suppressed"
@@ -1201,6 +1205,89 @@ describe("EmailOutbox workflows", () => {
     );
 
     it.effect(
+      "re-offers a delivery resumed from a plan pause with a fresh element id",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { organizationId } = yield* fixture;
+          const db = yield* Database.Database;
+          yield* enableSubscriberEmails(organizationId);
+          const changelogId = `delivery_resume_${organizationId}`;
+          const now = yield* DateTime.nowAsDate;
+          yield* db.insert(schema.changelogTable).values({
+            id: changelogId,
+            organizationId,
+            title: "Delivery resume",
+            slug: "delivery-resume",
+            content: "x",
+            excerpt: "x",
+            status: "published",
+            publishedAt: now,
+            creatorId: null,
+            creatorMemberId: null,
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* addSubscriptionContact({
+            email: `resume-delivery-${organizationId}@example.test`,
+            organizationId,
+            state: "active",
+            topicId: null,
+            topicType: "changelog",
+          });
+          const intent = yield* (yield* EmailOutboxRepository).recordIntent({
+            aggregateId: changelogId,
+            aggregateType: "changelog",
+            deduplicationKey: `changelog.delivery-resume:${organizationId}:${changelogId}`,
+            expiresAt: shiftDate(fixtureNow, Duration.days(1)),
+            kind: "changelog.published",
+            organizationId,
+            payload: { kind: "changelog.published", changelogId },
+            scheduledAt: fixtureNow,
+          });
+          if (intent._tag !== "Inserted") {
+            return yield* Effect.die("Expected resumable delivery intent");
+          }
+          const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
+          const deliveryId = deliveryIds[0];
+          if (deliveryId === undefined) {
+            return yield* Effect.die("Expected a queued delivery");
+          }
+
+          // Downgrade: the queued delivery's first attempt parks it on the
+          // plan and completes the queue element that carries attempt 0/version 0.
+          yield* db
+            .update(schema.subscriptionTable)
+            .set({ status: "canceled", updatedAt: now })
+            .where(eq(schema.subscriptionTable.organizationId, organizationId));
+          yield* reconcileEmailOutbox();
+          yield* waitForDelivery(
+            intent.intent.id,
+            (delivery) => delivery.state === "paused_by_plan"
+          );
+
+          // Upgrade: reconciliation resumes it. The re-offer must not reuse the
+          // completed element id, or the queue would swallow it as a duplicate.
+          yield* db
+            .update(schema.subscriptionTable)
+            .set({ status: "active", updatedAt: now })
+            .where(eq(schema.subscriptionTable.organizationId, organizationId));
+          yield* reconcileEmailOutbox();
+          yield* waitForDelivery(
+            intent.intent.id,
+            (delivery) => delivery.state === "accepted"
+          );
+          expect(
+            (yield* testMailerState).sentMessages.filter(
+              (message) =>
+                message.to ===
+                `resume-delivery-${organizationId}@example.test`.toLowerCase()
+            )
+          ).toHaveLength(1);
+        })
+    );
+
+    it.effect(
       "marks a permanent provider failure terminal without retrying",
       () =>
         Effect.gen(function* () {
@@ -1271,12 +1358,15 @@ describe("EmailOutbox workflows", () => {
           for (const _attempt of [1, 2, 3, 4]) {
             const delivery = yield* waitForDelivery(
               intentId,
-              (candidate) => candidate.attemptCount >= _attempt
+              (candidate) =>
+                candidate.attemptCount >= _attempt &&
+                (candidate.state === "deferred" || candidate.state === "failed")
             );
             if (delivery.state === "failed") {
               break;
             }
             yield* TestClock.adjust("2 hours");
+            yield* reconcileEmailOutbox();
           }
           yield* waitForDelivery(
             intentId,

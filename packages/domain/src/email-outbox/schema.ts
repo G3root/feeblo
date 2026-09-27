@@ -182,6 +182,7 @@ export const EmailDeliveryRecord = Schema.Struct({
   template: Schema.String,
   templatePayload: Schema.Unknown,
   templateVersion: Schema.Number,
+  transitionVersion: Schema.Number,
   updatedAt: PersistedDate,
 });
 

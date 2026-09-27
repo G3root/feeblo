@@ -31,7 +31,7 @@ import {
   makeSubmissionNotificationPayload,
   resolveSubscriptionNotificationContent,
 } from "./content";
-import { EmailOutboxRepository } from "./repository";
+import { EmailOutboxRepository, type ResumedEmailDelivery } from "./repository";
 import {
   ChangelogTemplatePayload,
   EmailUnsubscribeTarget,
@@ -163,13 +163,18 @@ const isIntentExpired = (expiresAt: Date | null, now: DateTime.Utc): boolean =>
   DateTime.isLessThanOrEqualTo(DateTime.fromDateUnsafe(expiresAt), now);
 
 /**
- * Delivery element id, bucketed by the attempt the row is due for.
+ * Delivery element id, bucketed by the row's attempt and transition version.
  *
- * Bucketing by attempt keeps a completed element from blocking the next
- * attempt, while the row keeps owning the retry budget (`attempt_count`).
+ * Both parts move when the row becomes due again: the attempt on a claim, the
+ * version on any transition. A completed element must never block the next
+ * offer, and throttle or plan-resume deferrals do not consume an attempt, so
+ * `attempt_count` alone cannot distinguish them.
  */
-const deliveryElementId = (deliveryId: string, attemptCount: number): string =>
-  `${deliveryId}:${attemptCount + 1}`;
+const deliveryElementId = (
+  deliveryId: string,
+  attemptCount: number,
+  transitionVersion: number
+): string => `${deliveryId}:${attemptCount + 1}:${transitionVersion}`;
 
 /** Materializes one durable intent into immutable per-recipient deliveries. */
 export const materializeEmailIntent = (outboxId: string) =>
@@ -1133,7 +1138,7 @@ export const dispatchEmailOutboxIntent = Effect.fn("dispatchEmailOutboxIntent")(
         const deliveryIds = yield* materializeEmailIntent(outboxId);
         yield* Effect.forEach(
           deliveryIds,
-          (deliveryId) => enqueueEmailDelivery(deliveryId, 0),
+          (deliveryId) => enqueueEmailDelivery(deliveryId, 0, 0),
           { concurrency: maxConcurrentSends, discard: true }
         );
         hasMoreRecipients = deliveryIds.length > 0;
@@ -1152,14 +1157,15 @@ export const dispatchEmailOutboxIntent = Effect.fn("dispatchEmailOutboxIntent")(
 );
 
 /**
- * Attempts one delivery, retrying it on the schedule the row records.
+ * Attempts one delivery, deferring it on the schedule the row records.
  *
- * The loop keeps the exact `retryDelay` curve (`next_attempt_at` is written
- * from the same value that drives the sleep, so the two cannot disagree) and
- * `Effect.sleep` is TestClock-driven, so tests still advance time rather than
- * wait. The queue's own `retrySchedule` only covers a worker that dies with the
- * element claimed; the loop starts from the row so a redelivery resumes the
- * persisted attempt count and consecutive-infrastructure budget.
+ * Each element is a single attempt. A retry outcome writes `next_attempt_at`
+ * (and, for infrastructure failures, the consecutive-failure count) onto the
+ * row and returns; reconciliation re-offers the row when it is due, with a
+ * fresh element id from the bumped `transition_version`. That keeps the retry
+ * delay off a worker slot, which a `retryDelay` of up to an hour would
+ * otherwise hold. The queue's own `retrySchedule` still covers a worker that
+ * dies with the element claimed.
  */
 export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
   function* ({ deliveryId }: { readonly deliveryId: string }) {
@@ -1169,96 +1175,6 @@ export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
       return;
     }
 
-    let run: (
-      attempt: number,
-      infrastructureFailures: number
-    ) => Effect.Effect<
-      void,
-      never,
-      | EmailOutboxRepository
-      | EntitlementPolicy
-      | DatabaseService
-      | Mailer
-      | EmailOutboxConfig
-      | EmailSubscriptionRepository
-    >;
-    run = Effect.fnUntraced(function* (
-      attempt: number,
-      infrastructureFailures: number
-    ) {
-      const outcome = yield* sendDeliveryAttempt(deliveryId).pipe(
-        // Preserve repository-level typed failures; only the residual
-        // infrastructure channel (SqlError and other untyped drivers)
-        // collapses into a deferral that advances the infrastructure budget.
-        Effect.catch((error) => {
-          const delay = retryDelay(deliveryId, attempt);
-          const nextInfrastructureFailures = infrastructureFailures + 1;
-          return Effect.gen(function* () {
-            yield* Effect.logWarning(
-              "Email delivery infrastructure failure, deferring"
-            ).pipe(Effect.annotateLogs({ attempt, delay, deliveryId, error }));
-            const now = yield* DateTime.now;
-            yield* repository.deferSendingDelivery({
-              id: deliveryId,
-              nextAttemptAt: DateTime.toDateUtc(
-                DateTime.addDuration(now, delay)
-              ),
-              lastError: {
-                consecutiveInfrastructureFailures: nextInfrastructureFailures,
-                tag: "EmailDeliveryActivityError",
-              },
-            });
-            return {
-              _tag: "retry" as const,
-              delay,
-              infrastructureFailure: true,
-            };
-          }).pipe(
-            Effect.catch((deferError) =>
-              Effect.logError(
-                "Could not persist the deferred delivery",
-                deferError
-              ).pipe(
-                Effect.as({
-                  _tag: "retry" as const,
-                  delay,
-                  infrastructureFailure: true,
-                })
-              )
-            )
-          );
-        })
-      );
-      if (outcome._tag === "terminal") {
-        return;
-      }
-      const nextInfrastructureFailures = outcome.infrastructureFailure
-        ? infrastructureFailures + 1
-        : 0;
-      if (nextInfrastructureFailures >= maximumInfrastructureFailures) {
-        yield* repository
-          .markDeliveryOutcome({
-            id: deliveryId,
-            state: "failed",
-            lastError: {
-              tag: "EmailDeliveryInfrastructureFailure",
-              reason: "retry_exhausted",
-            },
-          })
-          .pipe(
-            Effect.catch((error) =>
-              Effect.logError(
-                "Could not persist exhausted email delivery",
-                error
-              )
-            )
-          );
-        return;
-      }
-      yield* Effect.sleep(outcome.delay);
-      yield* run(attempt + 1, nextInfrastructureFailures);
-    });
-
     // `last_error` is untyped JSON on the row, so parse the retry bookkeeping at
     // this boundary rather than trusting a shape the column cannot express. A
     // deferral written by a provider or throttle path carries no counter, and
@@ -1266,12 +1182,73 @@ export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
     const retryState = Schema.decodeUnknownOption(EmailDeliveryRetryState)(
       delivery.lastError
     );
-    yield* run(
-      delivery.attemptCount + 1,
-      Option.isSome(retryState)
-        ? retryState.value.consecutiveInfrastructureFailures
-        : 0
+    const infrastructureFailures = Option.isSome(retryState)
+      ? retryState.value.consecutiveInfrastructureFailures
+      : 0;
+
+    const outcome = yield* sendDeliveryAttempt(deliveryId).pipe(
+      // Preserve repository-level typed failures; only the residual
+      // infrastructure channel (SqlError and other untyped drivers)
+      // collapses into a deferral that advances the infrastructure budget.
+      Effect.catch((error) => {
+        const delay = retryDelay(deliveryId, delivery.attemptCount + 1);
+        const nextInfrastructureFailures = infrastructureFailures + 1;
+        return Effect.gen(function* () {
+          yield* Effect.logWarning(
+            "Email delivery infrastructure failure, deferring"
+          ).pipe(
+            Effect.annotateLogs({
+              attempt: delivery.attemptCount + 1,
+              delay,
+              deliveryId,
+              error,
+            })
+          );
+          const now = yield* DateTime.now;
+          yield* repository.deferSendingDelivery({
+            id: deliveryId,
+            nextAttemptAt: DateTime.toDateUtc(DateTime.addDuration(now, delay)),
+            lastError: {
+              consecutiveInfrastructureFailures: nextInfrastructureFailures,
+              tag: "EmailDeliveryActivityError",
+            },
+          });
+          return {
+            _tag: "retry" as const,
+            delay,
+            infrastructureFailure: true,
+          };
+        });
+        // If the deferral cannot be persisted, fail the element so the queue
+        // retries it under the same id. Returning would complete the element
+        // without bumping the row version, and the completed id would swallow
+        // the reconciliation re-offer.
+      })
     );
+    if (outcome._tag === "terminal") {
+      return;
+    }
+    const nextInfrastructureFailures = outcome.infrastructureFailure
+      ? infrastructureFailures + 1
+      : 0;
+    if (nextInfrastructureFailures >= maximumInfrastructureFailures) {
+      yield* repository
+        .markDeliveryOutcome({
+          id: deliveryId,
+          state: "failed",
+          lastError: {
+            tag: "EmailDeliveryInfrastructureFailure",
+            reason: "retry_exhausted",
+          },
+        })
+        .pipe(
+          Effect.catch((error) =>
+            Effect.logError("Could not persist exhausted email delivery", error)
+          )
+        );
+      return;
+    }
+    // The deferral is on the row; reconciliation is the only scheduler.
   }
 );
 
@@ -1307,10 +1284,14 @@ export const EmailOutboxWorkerLayer = Layer.effectDiscard(
   })
 );
 
-/** Enqueues one delivery attempt, keyed by the attempt the row is due for. */
+/**
+ * Enqueues one delivery attempt for the row's persisted attempt and transition
+ * version, so a completed element never blocks a later due transition.
+ */
 export const enqueueEmailDelivery = (
   deliveryId: string,
-  attemptCount: number
+  attemptCount: number,
+  transitionVersion: number
 ): Effect.Effect<
   string,
   PersistedQueue.PersistedQueueError | Schema.SchemaError,
@@ -1319,7 +1300,7 @@ export const enqueueEmailDelivery = (
   Effect.flatMap(EmailOutboxQueues, (queues) =>
     queues.delivery.offer(
       { deliveryId },
-      { id: deliveryElementId(deliveryId, attemptCount) }
+      { id: deliveryElementId(deliveryId, attemptCount, transitionVersion) }
     )
   );
 
@@ -1435,7 +1416,7 @@ export const reconcileEmailOutbox = ({
                 now: reconciliationNowDate,
                 organizationId,
               })
-            : ([] as readonly string[]);
+            : ([] as readonly ResumedEmailDelivery[]);
         }),
       { concurrency: maxConcurrentSends }
     );
@@ -1478,17 +1459,29 @@ export const reconcileEmailOutbox = ({
     });
     yield* Effect.forEach(
       deliveries,
-      (delivery) => enqueueEmailDelivery(delivery.id, delivery.attemptCount),
+      (delivery) =>
+        enqueueEmailDelivery(
+          delivery.id,
+          delivery.attemptCount,
+          delivery.transitionVersion
+        ),
       { concurrency: maxConcurrentSends, discard: true }
     );
     yield* Effect.forEach(
       resumedDeliveryIds.flat(),
-      (deliveryId) => enqueueEmailDelivery(deliveryId, 0),
+      (deliveryId) => enqueueEmailDelivery(deliveryId, 0, 0),
       { concurrency: maxConcurrentSends, discard: true }
     );
     yield* Effect.forEach(
       resumedPausedDeliveryIds.flat(),
-      (deliveryId) => enqueueEmailDelivery(deliveryId, 0),
+      // `resumePausedDeliveries` returns the version its update just persisted,
+      // so the re-offer cannot collide with the completed pause element.
+      (delivery) =>
+        enqueueEmailDelivery(
+          delivery.id,
+          delivery.attemptCount,
+          delivery.transitionVersion
+        ),
       { concurrency: maxConcurrentSends, discard: true }
     );
   }).pipe(

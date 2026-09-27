@@ -107,7 +107,10 @@ export const makeWorkflowsLive = (
   makeMailerLayer: MakeMailerLayer = () => Mailer.layer
 ) =>
   makeWorkflowLayers(makeMailerLayer).pipe(
-    Layer.provide(EmailOutboxQueues.layer),
+    // `provideMerge` keeps `EmailOutboxQueues` in the layer output so the
+    // request handlers merged beside this layer can offer a wake immediately;
+    // a plain `provide` consumed it and made `wakeEmailOutbox` a silent no-op.
+    Layer.provideMerge(EmailOutboxQueues.layer),
     Layer.provide(PersistedQueueLive),
     Layer.provideMerge(WorkflowClusterEngineLive)
   );
@@ -118,7 +121,7 @@ export const makeWorkflowsTest = (
   makeMailerLayer: MakeMailerLayer = () => Mailer.layer
 ) =>
   makeWorkflowLayers(makeMailerLayer).pipe(
-    Layer.provide(EmailOutboxQueues.layer),
+    Layer.provideMerge(EmailOutboxQueues.layer),
     Layer.provide(PersistedQueueTest),
     Layer.provideMerge(WorkflowClusterEngineTest)
   );
