@@ -62,6 +62,19 @@ describe("extractTriggerMetadata", () => {
 
     expect(metadata).toEqual({ board: "roadmap" });
   });
+
+  it("excludes the internal binding marker", () => {
+    // `bindTriggers` writes `data-feeblo-bound` before the first click, so the
+    // marker is present in the dataset by the time metadata is extracted.
+    const el = document.createElement("button");
+    el.setAttribute("data-feeblo-feedback", "");
+    el.setAttribute("data-feeblo-bound", "true");
+    el.setAttribute("data-feeblo-board", "roadmap");
+
+    const metadata = extractTriggerMetadata(el);
+
+    expect(metadata).toEqual({ board: "roadmap" });
+  });
 });
 
 describe("bindTriggers", () => {
@@ -79,8 +92,9 @@ describe("bindTriggers", () => {
     button.setAttribute("data-feeblo-feedback", "");
     document.body.appendChild(button);
 
+    const open = vi.fn<TriggerTarget["open"]>();
     const target: TriggerTarget = {
-      open: vi.fn(),
+      open,
       setBoard: vi.fn(),
     };
 
@@ -89,7 +103,7 @@ describe("bindTriggers", () => {
     button.click();
 
     expect(target.open).toHaveBeenCalledTimes(1);
-    const [triggerArg] = target.open.mock.calls[0]!;
+    const [triggerArg] = open.mock.calls[0]!;
     expect(triggerArg).toBe(button);
   });
 
@@ -138,8 +152,9 @@ describe("bindTriggers", () => {
     button.setAttribute("data-feeblo-custom-field", "abc");
     document.body.appendChild(button);
 
+    const open = vi.fn<TriggerTarget["open"]>();
     const target: TriggerTarget = {
-      open: vi.fn(),
+      open,
       setBoard: vi.fn(),
     };
 
@@ -147,9 +162,8 @@ describe("bindTriggers", () => {
 
     button.click();
 
-    const [, metadata] = target.open.mock.calls[0]!;
-    expect(metadata.board).toBe("changelog");
-    expect(metadata.customField).toBe("abc");
+    const [, metadata] = open.mock.calls[0]!;
+    expect(metadata).toEqual({ board: "changelog", customField: "abc" });
   });
 });
 

@@ -9,6 +9,16 @@ const FEEDBACK_DATASET_KEY = FEEDBACK_ATTRIBUTE.replace(/^data-/, "").replace(
 );
 
 /**
+ * `bindTriggers` marks an element it has already bound so the scan is
+ * idempotent. The marker lives in the same `data-feeblo-*` namespace as
+ * integrator metadata, so `METADATA_KEY_REGEX` matches it: without an explicit
+ * skip every trigger click forwarded `bound: "true"` to the widget as though a
+ * customer had written it. One constant is shared with `bindTriggers` so the
+ * write, the read, and the skip cannot drift apart.
+ */
+const BOUND_DATASET_KEY = "feebloBound";
+
+/**
  * The subset of an embed the trigger scanner needs. Mirrors the void-returning
  * methods on {@link Embed} so the scanner stays decoupled from the widget proxy.
  */
@@ -26,7 +36,7 @@ function findTriggers(): HTMLElement[] {
 export function extractTriggerMetadata(element: HTMLElement) {
   const metadata: Record<string, string> = {};
   for (const key of Object.keys(element.dataset)) {
-    if (key === FEEDBACK_DATASET_KEY) {
+    if (key === FEEDBACK_DATASET_KEY || key === BOUND_DATASET_KEY) {
       continue;
     }
     const match = key.match(METADATA_KEY_REGEX);
@@ -43,10 +53,10 @@ export function extractTriggerMetadata(element: HTMLElement) {
 
 export function bindTriggers(target: TriggerTarget, logger?: Logger): void {
   for (const trigger of findTriggers()) {
-    if (trigger.dataset.feebloBound === "true") {
+    if (trigger.dataset[BOUND_DATASET_KEY] === "true") {
       continue;
     }
-    trigger.dataset.feebloBound = "true";
+    trigger.dataset[BOUND_DATASET_KEY] = "true";
     if (logger?.enabled) {
       logger("trigger", "bound", trigger);
     }
