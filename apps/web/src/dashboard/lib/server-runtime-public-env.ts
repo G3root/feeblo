@@ -10,15 +10,34 @@ import { z } from "zod";
  * server function, server route, or the custom server entry — the browser
  * gets the public subset through the root env script instead.
  */
+/**
+ * An optional setting in which a blank value means unset.
+ *
+ * `z.string().optional()` accepts `""`, and a container environment is full of
+ * empty strings: `VAR=` in a `.env` file, a Kubernetes key with no value, a
+ * Compose entry written as `${VAR:-}` so the stack still starts when the
+ * operator never set it. Downstream code reads "absent" as "use the default",
+ * so an empty string has to arrive as `undefined` — `posthog-provider.tsx` falls
+ * back to the PostHog cloud host with `??`, which an empty string defeats,
+ * leaving `api_host: ""`. Whitespace counts as blank for the same reason.
+ */
+const optionalEnvString = z
+  .string()
+  .optional()
+  .transform((value) => {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : undefined;
+  });
+
 const serverEnvSchema = z.object({
   API_URL: z.string().min(1),
   APP_URL: z.string().min(1),
   APP_ROOT_DOMAIN: z.string().min(1),
-  APP_RELEASE: z.string().optional(),
-  TURNSTILE_SITE_KEY: z.string().optional(),
-  NO_INDEX: z.string().optional(),
-  POSTHOG_KEY: z.string().optional(),
-  POSTHOG_HOST: z.string().optional(),
+  APP_RELEASE: optionalEnvString,
+  TURNSTILE_SITE_KEY: optionalEnvString,
+  NO_INDEX: optionalEnvString,
+  POSTHOG_KEY: optionalEnvString,
+  POSTHOG_HOST: optionalEnvString,
 });
 
 export type ServerPublicEnv = z.infer<typeof serverEnvSchema>;
