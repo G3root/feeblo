@@ -27,7 +27,13 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 
 import { apiKeyReactivityKeys, createApiKeyAtom } from "../atoms";
 import { useApiKeyCreateDialogContext } from "../dialog-stores";
-import { API_KEY_EXPIRATION_ITEMS, apiKeyFormOpts } from "../shared-form";
+import {
+  API_KEY_ACCESS_LEVEL_DESCRIPTIONS,
+  API_KEY_ACCESS_LEVEL_ITEMS,
+  API_KEY_ACCESS_LEVEL_SCOPES,
+  API_KEY_EXPIRATION_ITEMS,
+  apiKeyFormOpts,
+} from "../shared-form";
 
 export type CreatedApiKey = {
   /** Plaintext key, returned by the server exactly once. */
@@ -85,6 +91,7 @@ function ApiKeyCreateForm({
             name: value.name.trim(),
             organizationId,
             expiration: value.expiration,
+            scopes: [...API_KEY_ACCESS_LEVEL_SCOPES[value.access]],
           },
           reactivityKeys: apiKeyReactivityKeys(organizationId),
         });
@@ -143,6 +150,36 @@ function ApiKeyCreateForm({
               <FieldDescription>
                 The key stops working after this. You can revoke it sooner at
                 any time.
+              </FieldDescription>
+            </Field>
+          )}
+        </form.AppField>
+        <form.AppField name="access">
+          {(field) => (
+            <Field name={field.name}>
+              <FieldLabel>Access</FieldLabel>
+              <Select
+                items={API_KEY_ACCESS_LEVEL_ITEMS}
+                onValueChange={(value) =>
+                  // Base UI can report a cleared selection as null; the form
+                  // has no empty state, so fall back to the narrower grant.
+                  field.handleChange(value ?? "read_only")
+                }
+                value={field.state.value}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectPopup>
+                  {API_KEY_ACCESS_LEVEL_ITEMS.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectPopup>
+              </Select>
+              <FieldDescription>
+                {API_KEY_ACCESS_LEVEL_DESCRIPTIONS[field.state.value]}
               </FieldDescription>
             </Field>
           )}

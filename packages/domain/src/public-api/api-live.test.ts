@@ -1,6 +1,8 @@
 import { NodeHttpPlatform, NodeServices } from "@effect/platform-node";
 import { expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
+import { slugify } from "@feeblo/utils/url";
+import { eq } from "drizzle-orm";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -13,6 +15,7 @@ import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 import type { ApiKeyAuthRecord } from "../api-key/schema";
 import { Auth } from "../auth-handler";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { PostActivityRepository } from "../post-activity/repository";
 import { RateLimitService } from "../rate-limit/service";
 import { WorkspaceRepository } from "../workspace/repository";
 import { PublicApiConfig } from "./config";
@@ -22,7 +25,13 @@ import {
 } from "./middleware";
 import { PublicApiRepository } from "./repository";
 import { makePublicApiRoute } from "./router";
-import { PublicApiPost, PublicApiPostPage } from "./schema";
+import {
+  PublicApiPost,
+  PublicApiPostPage,
+  PublicApiPostTags,
+  PublicApiTagDetail,
+  PublicApiTagPage,
+} from "./schema";
 
 /**
  * HTTP-level tests for `/api/v1`.
@@ -78,13 +87,24 @@ const decodePage = Schema.decodeUnknownSync(
 const decodePost = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiPost)
 );
+const decodePostTags = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiPostTags)
+);
+const decodeTag = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiTagDetail)
+);
+const decodeTagPage = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiTagPage)
+);
 const decodeDocument = Schema.decodeUnknownSync(
   Schema.fromJsonString(OpenApiDocument)
 );
 
 /** Handler dependencies, supplied from outside the route layer. */
 const PublicApiDependencies = Layer.mergeAll(
-  PublicApiRepository.layer,
+  // The Public API records tag changes in a post's timeline, so its repository
+  // needs the activity repository at construction time.
+  PublicApiRepository.layer.pipe(Layer.provide(PostActivityRepository.layer)),
   PublicApiConfig.layerTest(new URL("https://app.feeblo.test")),
   EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
   WorkspaceRepository.layer,
@@ -113,16 +133,49 @@ const makeTestApp = (
     Layer.provideMerge(HttpRouter.layer)
   );
 
-const executeRequest = (path: string, apiKey?: string) => {
+/**
+ * Builds and runs one request through the real router.
+ *
+ * The method and body are parameters rather than separate helpers per verb so
+ * a read and a write differ only in what the caller passes, and a new endpoint
+ * cannot arrive with its own slightly different request construction.
+ */
+const execute = (
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+  path: string,
+  options: { readonly apiKey?: string; readonly body?: unknown } = {}
+) => {
+  const headers: Record<string, string> = {};
+  if (options.apiKey !== undefined) {
+    headers["x-api-key"] = options.apiKey;
+  }
+  if (options.body !== undefined) {
+    headers["content-type"] = "application/json";
+  }
+
+  const init: RequestInit = { method, headers };
+  if (options.body !== undefined) {
+    init.body = JSON.stringify(options.body);
+  }
+
   const request = HttpServerRequest.fromWeb(
-    new Request(`http://localhost${path}`, {
-      headers: apiKey === undefined ? {} : { "x-api-key": apiKey },
-    })
+    new Request(`http://localhost${path}`, init)
   );
   return Effect.flatMap(HttpRouter.HttpRouter, (router) =>
     router.asHttpEffect()
   ).pipe(Effect.provideService(HttpServerRequest.HttpServerRequest, request));
 };
+
+/** A GET: every read endpoint. */
+const executeRequest = (path: string, apiKey?: string) =>
+  execute("GET", path, apiKey === undefined ? {} : { apiKey });
+
+/** A write, with the JSON body the contract declares. */
+const executeWrite = (
+  method: "POST" | "PUT" | "PATCH" | "DELETE",
+  path: string,
+  options: { readonly apiKey: string; readonly body?: unknown }
+) => execute(method, path, options);
 
 const responseBody = (response: HttpServerResponse.HttpServerResponse) => {
   const body = response.body;
@@ -135,6 +188,31 @@ type SeededWorkspace = {
   postId: string;
   statusId: string;
 };
+
+/**
+ * Inserts a tag directly, so a test controls its name and its age.
+ *
+ * Goes through the same `slugify` the repository uses, so a fixture cannot
+ * disagree with the API about what a tag's slug is.
+ */
+const seedTag = (
+  organizationId: string,
+  id: string,
+  name: string,
+  createdAt: Date = new Date()
+) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    yield* db.insert(schema.tagTable).values({
+      id,
+      name,
+      slug: slugify(name),
+      organizationId,
+      createdAt,
+      updatedAt: createdAt,
+    });
+    return id;
+  });
 
 const seedWorkspace = (
   options: {
@@ -284,12 +362,29 @@ const seedWorkspace = (
     } satisfies SeededWorkspace;
   });
 
+/**
+ * The scopes a key is created with today, plus the tag writes the dashboard
+ * grants explicitly. Written out rather than imported so the tests pin the
+ * vocabulary instead of tracking it.
+ */
+const READ_KEY_SCOPES = {
+  boards: ["read"],
+  posts: ["read"],
+  tags: ["read"],
+};
+
+const TAG_MANAGEMENT_KEY_SCOPES = {
+  boards: ["read"],
+  posts: ["read"],
+  tags: ["read", "create", "update", "delete", "assign"],
+};
+
 const registerKey = (
   secret: string,
   organizationId: string,
   permissions: {
     readonly [resource: string]: readonly string[];
-  } | null = { boards: ["read"], posts: ["read"] }
+  } | null = READ_KEY_SCOPES
 ) => {
   acceptedKeys.set(secret, {
     id: `apikey_${secret}`,
@@ -572,6 +667,548 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect(
+    "lists a workspace's tags newest first, and pages with a cursor",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const now = Date.now();
+        // Oldest first, so the expected page order is deterministic.
+        yield* seedTag(
+          workspace.organizationId,
+          "tag_old",
+          "Old",
+          new Date(now - 60_000)
+        );
+        yield* seedTag(
+          workspace.organizationId,
+          "tag_new",
+          "New",
+          new Date(now)
+        );
+        registerKey("fbk_tags_read", workspace.organizationId);
+
+        const first = yield* executeRequest(
+          "/api/v1/tags?limit=1",
+          "fbk_tags_read"
+        );
+        expect(first.status).toBe(200);
+        const firstPage = decodeTagPage(responseBody(first));
+        expect(firstPage.data).toHaveLength(1);
+        expect(firstPage.data.at(0)?.name).toBe("New");
+        expect(firstPage.nextCursor).toBeTypeOf("string");
+
+        const second = yield* executeRequest(
+          `/api/v1/tags?limit=1&cursor=${encodeURIComponent(firstPage.nextCursor ?? "")}`,
+          "fbk_tags_read"
+        );
+        const secondPage = decodeTagPage(responseBody(second));
+        expect(secondPage.data).toHaveLength(1);
+        expect(secondPage.data.at(0)?.name).toBe("Old");
+        expect(secondPage.nextCursor).toBeNull();
+      })
+  );
+
+  it.effect("creates a tag, trims its name, and derives its slug", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_tags_write",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const created = yield* executeWrite("POST", "/api/v1/tags", {
+        apiKey: "fbk_tags_write",
+        body: { name: "  UI Kit  " },
+      });
+
+      expect(created.status).toBe(201);
+      const tag = decodeTag(responseBody(created));
+      expect(tag.name).toBe("UI Kit");
+      expect(tag.slug).toBe("ui-kit");
+      // The id is minted server-side; a caller does not choose identifiers.
+      expect(tag.id).toMatch(/^tag_/);
+
+      const fetched = yield* executeRequest(
+        `/api/v1/tags/${tag.id}`,
+        "fbk_tags_write"
+      );
+      expect(fetched.status).toBe(200);
+      expect(decodeTag(responseBody(fetched)).id).toBe(tag.id);
+    })
+  );
+
+  it.effect("refuses a tag write without the write scope", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedTag(workspace.organizationId, "tag_scoped", "Scoped");
+      registerKey("fbk_tags_readonly", workspace.organizationId);
+
+      const cases = [
+        { method: "POST" as const, scope: "tags.create" },
+        { method: "PATCH" as const, scope: "tags.update" },
+        { method: "DELETE" as const, scope: "tags.delete" },
+      ];
+
+      for (const entry of cases) {
+        const response = yield* executeWrite(
+          entry.method,
+          entry.method === "POST" ? "/api/v1/tags" : "/api/v1/tags/tag_scoped",
+          { apiKey: "fbk_tags_readonly", body: { name: "Renamed" } }
+        );
+
+        expect(response.status).toBe(403);
+        const body = decodeError(responseBody(response));
+        expect(body._tag).toBe("FORBIDDEN_SCOPE");
+        expect(body.message).toContain(entry.scope);
+      }
+
+      // A read key still reads: the write scope is the only thing missing.
+      const read = yield* executeRequest(
+        "/api/v1/tags/tag_scoped",
+        "fbk_tags_readonly"
+      );
+      expect(read.status).toBe(200);
+    })
+  );
+
+  it.effect("reports a duplicate tag name as a conflict", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_tags_conflict",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const first = yield* executeWrite("POST", "/api/v1/tags", {
+        apiKey: "fbk_tags_conflict",
+        body: { name: "Bug" },
+      });
+      expect(first.status).toBe(201);
+
+      const duplicate = yield* executeWrite("POST", "/api/v1/tags", {
+        apiKey: "fbk_tags_conflict",
+        body: { name: "Bug" },
+      });
+      expect(duplicate.status).toBe(409);
+      expect(decodeError(responseBody(duplicate))._tag).toBe("CONFLICT");
+
+      // A different name that slugifies to the same slug is the same
+      // collision: the second index would reject it, so the first must too.
+      const sameSlug = yield* executeWrite("POST", "/api/v1/tags", {
+        apiKey: "fbk_tags_conflict",
+        body: { name: "bug" },
+      });
+      expect(sameSlug.status).toBe(409);
+      expect(decodeError(responseBody(sameSlug))._tag).toBe("CONFLICT");
+    })
+  );
+
+  it.effect("rejects a tag name that is only whitespace", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_tags_empty",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const response = yield* executeWrite("POST", "/api/v1/tags", {
+        apiKey: "fbk_tags_empty",
+        body: { name: "   " },
+      });
+
+      expect(response.status).toBe(400);
+      expect(decodeError(responseBody(response))._tag).toBe("INVALID_REQUEST");
+    })
+  );
+
+  it.effect("renames a tag, and lets a tag keep its own name", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedTag(workspace.organizationId, "tag_rename", "Bug");
+      yield* seedTag(workspace.organizationId, "tag_taken", "Feature");
+      registerKey(
+        "fbk_tags_rename",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      // Renaming to the name it already has is not a conflict with itself.
+      const unchanged = yield* executeWrite(
+        "PATCH",
+        "/api/v1/tags/tag_rename",
+        { apiKey: "fbk_tags_rename", body: { name: "Bug" } }
+      );
+      expect(unchanged.status).toBe(200);
+
+      const renamed = yield* executeWrite("PATCH", "/api/v1/tags/tag_rename", {
+        apiKey: "fbk_tags_rename",
+        body: { name: "Defect" },
+      });
+      expect(renamed.status).toBe(200);
+      const tag = decodeTag(responseBody(renamed));
+      expect(tag.name).toBe("Defect");
+      expect(tag.slug).toBe("defect");
+
+      const taken = yield* executeWrite("PATCH", "/api/v1/tags/tag_rename", {
+        apiKey: "fbk_tags_rename",
+        body: { name: "Feature" },
+      });
+      expect(taken.status).toBe(409);
+      expect(decodeError(responseBody(taken))._tag).toBe("CONFLICT");
+    })
+  );
+
+  it.effect("reports another workspace's tag as not found", () =>
+    Effect.gen(function* () {
+      const mine = yield* seedWorkspace();
+      const theirs = yield* seedWorkspace();
+      yield* seedTag(theirs.organizationId, "tag_theirs", "Theirs");
+      registerKey(
+        "fbk_tags_mine",
+        mine.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+      registerKey(
+        "fbk_tags_theirs",
+        theirs.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const read = yield* executeRequest(
+        "/api/v1/tags/tag_theirs",
+        "fbk_tags_mine"
+      );
+      expect(read.status).toBe(404);
+      expect(decodeError(responseBody(read))._tag).toBe("NOT_FOUND");
+
+      const rename = yield* executeWrite("PATCH", "/api/v1/tags/tag_theirs", {
+        apiKey: "fbk_tags_mine",
+        body: { name: "Mine now" },
+      });
+      expect(rename.status).toBe(404);
+
+      const remove = yield* executeWrite("DELETE", "/api/v1/tags/tag_theirs", {
+        apiKey: "fbk_tags_mine",
+      });
+      expect(remove.status).toBe(404);
+
+      // The tag is untouched: the 404 is a refusal, not a report of what
+      // happened, and its owner still sees it under its original name.
+      const owned = yield* executeRequest(
+        "/api/v1/tags/tag_theirs",
+        "fbk_tags_theirs"
+      );
+      expect(owned.status).toBe(200);
+      expect(decodeTag(responseBody(owned)).name).toBe("Theirs");
+    })
+  );
+
+  it.effect("deletes a tag and removes it from every post", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      yield* seedTag(workspace.organizationId, "tag_delete", "Remove me");
+      yield* db.insert(schema.postTagTable).values({
+        id: "ptg_delete",
+        postId: workspace.postId,
+        tagId: "tag_delete",
+        organizationId: workspace.organizationId,
+      });
+      registerKey(
+        "fbk_tags_delete",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const before = yield* executeRequest(
+        `/api/v1/posts/${workspace.postId}`,
+        "fbk_tags_delete"
+      );
+      expect(decodePost(responseBody(before)).tags).toHaveLength(1);
+
+      const removed = yield* executeWrite("DELETE", "/api/v1/tags/tag_delete", {
+        apiKey: "fbk_tags_delete",
+      });
+      expect(removed.status).toBe(204);
+      expect(responseBody(removed)).toBe("");
+
+      const gone = yield* executeRequest(
+        "/api/v1/tags/tag_delete",
+        "fbk_tags_delete"
+      );
+      expect(gone.status).toBe(404);
+
+      // `post_tag.tag_id` cascades, so the post stops carrying the tag and
+      // the post itself is untouched.
+      const after = yield* executeRequest(
+        `/api/v1/posts/${workspace.postId}`,
+        "fbk_tags_delete"
+      );
+      expect(after.status).toBe(200);
+      expect(decodePost(responseBody(after)).tags).toHaveLength(0);
+      expect(yield* db.select().from(schema.postTagTable)).toHaveLength(0);
+    })
+  );
+
+  it.effect("sets a post's tags and answers with the tags it carries", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedTag(workspace.organizationId, "tag_alpha", "Alpha");
+      yield* seedTag(workspace.organizationId, "tag_beta", "Beta");
+      registerKey(
+        "fbk_tags_assign",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      // Sent out of order: the response is the post's own tag array, so it
+      // comes back ordered by name rather than in the order it was sent.
+      const set = yield* executeWrite(
+        "PUT",
+        `/api/v1/posts/${workspace.postId}/tags`,
+        {
+          apiKey: "fbk_tags_assign",
+          body: { tagIds: ["tag_beta", "tag_alpha"] },
+        }
+      );
+
+      expect(set.status).toBe(200);
+      const assigned = decodePostTags(responseBody(set));
+      expect(assigned.data).toEqual([
+        { id: "tag_alpha", name: "Alpha" },
+        { id: "tag_beta", name: "Beta" },
+      ]);
+
+      // The post reports the same set, in the same order.
+      const post = yield* executeRequest(
+        `/api/v1/posts/${workspace.postId}`,
+        "fbk_tags_assign"
+      );
+      expect(decodePost(responseBody(post)).tags).toEqual(assigned.data);
+
+      // A second call replaces rather than adds.
+      const replaced = yield* executeWrite(
+        "PUT",
+        `/api/v1/posts/${workspace.postId}/tags`,
+        { apiKey: "fbk_tags_assign", body: { tagIds: ["tag_beta"] } }
+      );
+      expect(decodePostTags(responseBody(replaced)).data).toEqual([
+        { id: "tag_beta", name: "Beta" },
+      ]);
+
+      // An empty list clears the post rather than being rejected.
+      const cleared = yield* executeWrite(
+        "PUT",
+        `/api/v1/posts/${workspace.postId}/tags`,
+        { apiKey: "fbk_tags_assign", body: { tagIds: [] } }
+      );
+      expect(cleared.status).toBe(200);
+      expect(decodePostTags(responseBody(cleared)).data).toEqual([]);
+    })
+  );
+
+  it.effect("treats a repeated tag id as one tag", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedTag(workspace.organizationId, "tag_twice", "Twice");
+      registerKey(
+        "fbk_tags_twice",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      // The ids are deduplicated before they are checked, so sending one twice
+      // is one tag rather than a set that names a tag the workspace lacks.
+      const response = yield* executeWrite(
+        "PUT",
+        `/api/v1/posts/${workspace.postId}/tags`,
+        {
+          apiKey: "fbk_tags_twice",
+          body: { tagIds: ["tag_twice", "tag_twice"] },
+        }
+      );
+
+      expect(response.status).toBe(200);
+      expect(decodePostTags(responseBody(response)).data).toEqual([
+        { id: "tag_twice", name: "Twice" },
+      ]);
+    })
+  );
+
+  it.effect("records the tag change in the post's timeline", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      yield* seedTag(workspace.organizationId, "tag_timeline", "Timeline");
+      registerKey(
+        "fbk_tags_timeline",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const activities = () =>
+        db
+          .select({
+            actorId: schema.postActivityTable.actorId,
+            kind: schema.postActivityTable.kind,
+            nextValue: schema.postActivityTable.nextValue,
+          })
+          .from(schema.postActivityTable)
+          .where(eq(schema.postActivityTable.postId, workspace.postId));
+
+      yield* executeWrite("PUT", `/api/v1/posts/${workspace.postId}/tags`, {
+        apiKey: "fbk_tags_timeline",
+        body: { tagIds: ["tag_timeline"] },
+      });
+
+      // The actor is null: a machine key is not a member. The dashboard renders
+      // those as "Someone", which is better than a post whose tags change with
+      // no entry in its history at all.
+      expect(yield* activities()).toEqual([
+        { actorId: null, kind: "TAG_ADDED", nextValue: "tag_timeline" },
+      ]);
+
+      yield* executeWrite("PUT", `/api/v1/posts/${workspace.postId}/tags`, {
+        apiKey: "fbk_tags_timeline",
+        body: { tagIds: [] },
+      });
+
+      expect((yield* activities()).map((row) => row.kind).sort()).toEqual([
+        "TAG_ADDED",
+        "TAG_REMOVED",
+      ]);
+
+      // A set that changes nothing records nothing.
+      yield* executeWrite("PUT", `/api/v1/posts/${workspace.postId}/tags`, {
+        apiKey: "fbk_tags_timeline",
+        body: { tagIds: [] },
+      });
+      expect(yield* activities()).toHaveLength(2);
+    })
+  );
+
+  it.effect("refuses a tag assignment without the tags.assign scope", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedTag(workspace.organizationId, "tag_noassign", "No assign");
+      registerKey("fbk_tags_noassign", workspace.organizationId);
+
+      const response = yield* executeWrite(
+        "PUT",
+        `/api/v1/posts/${workspace.postId}/tags`,
+        { apiKey: "fbk_tags_noassign", body: { tagIds: ["tag_noassign"] } }
+      );
+
+      expect(response.status).toBe(403);
+      const body = decodeError(responseBody(response));
+      expect(body._tag).toBe("FORBIDDEN_SCOPE");
+      expect(body.message).toContain("tags.assign");
+    })
+  );
+
+  it.effect("rejects a tag the workspace does not have", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const theirs = yield* seedWorkspace();
+      yield* seedTag(workspace.organizationId, "tag_known", "Known");
+      yield* seedTag(theirs.organizationId, "tag_foreign", "Foreign");
+      registerKey(
+        "fbk_tags_unknown",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      for (const tagIds of [
+        ["tag_missing"],
+        ["tag_known", "tag_missing"],
+        // Another workspace's tag is unknown here, not forbidden: a distinct
+        // answer would confirm that the id exists somewhere.
+        ["tag_foreign"],
+      ]) {
+        const response = yield* executeWrite(
+          "PUT",
+          `/api/v1/posts/${workspace.postId}/tags`,
+          { apiKey: "fbk_tags_unknown", body: { tagIds } }
+        );
+
+        expect(response.status).toBe(400);
+        expect(decodeError(responseBody(response))._tag).toBe(
+          "INVALID_REQUEST"
+        );
+      }
+
+      // A rejected set does not partially apply: the known tag was not written.
+      const post = yield* executeRequest(
+        `/api/v1/posts/${workspace.postId}`,
+        "fbk_tags_unknown"
+      );
+      expect(decodePost(responseBody(post)).tags).toEqual([]);
+    })
+  );
+
+  it.effect("reports another workspace's post as not found", () =>
+    Effect.gen(function* () {
+      const mine = yield* seedWorkspace();
+      const theirs = yield* seedWorkspace();
+      yield* seedTag(mine.organizationId, "tag_mine", "Mine");
+      registerKey(
+        "fbk_tags_other",
+        mine.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+      registerKey(
+        "fbk_tags_owner",
+        theirs.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const response = yield* executeWrite(
+        "PUT",
+        `/api/v1/posts/${theirs.postId}/tags`,
+        { apiKey: "fbk_tags_other", body: { tagIds: ["tag_mine"] } }
+      );
+
+      expect(response.status).toBe(404);
+      expect(decodeError(responseBody(response))._tag).toBe("NOT_FOUND");
+
+      // The 404 is a refusal, not a report of what happened: the post is
+      // untouched and its own workspace still sees it.
+      const owned = yield* executeRequest(
+        `/api/v1/posts/${theirs.postId}`,
+        "fbk_tags_owner"
+      );
+      expect(owned.status).toBe(200);
+      expect(decodePost(responseBody(owned)).tags).toEqual([]);
+    })
+  );
+
+  it.effect("never emits a tag's internal identifiers", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedTag(workspace.organizationId, "tag_private", "Private");
+      registerKey("fbk_tags_private", workspace.organizationId);
+
+      const response = yield* executeRequest(
+        "/api/v1/tags",
+        "fbk_tags_private"
+      );
+      const raw = responseBody(response);
+
+      expect(decodeTagPage(raw).data).toHaveLength(1);
+      for (const forbidden of [
+        "creatorId",
+        "creatorMemberId",
+        "organizationId",
+      ]) {
+        expect(raw).not.toContain(forbidden);
+      }
+    })
+  );
+
   it.effect("serves its own OpenAPI document without a key", () =>
     Effect.gen(function* () {
       const response = yield* executeRequest("/api/v1/openapi.json");
@@ -583,6 +1220,9 @@ layer(makeTestApp())("public api v1", (it) => {
       expect(Object.keys(document.paths).sort()).toEqual([
         "/api/v1/boards/{boardId}/posts",
         "/api/v1/posts/{postId}",
+        "/api/v1/posts/{postId}/tags",
+        "/api/v1/tags",
+        "/api/v1/tags/{tagId}",
       ]);
     })
   );

@@ -1,3 +1,5 @@
+import * as Schema from "effect/Schema";
+
 /**
  * Public API scope vocabulary.
  *
@@ -9,7 +11,9 @@
  * scope; a scope decides what a key may do. Those are separate axes.
  *
  * Scopes are part of the versioned public contract: adding one is additive,
- * narrowing or renaming one is a breaking change.
+ * narrowing or renaming one is a breaking change. A write is its own scope
+ * rather than an action implied by a read, so a key that only reads a
+ * workspace's feedback can never be talked into writing it by a later release.
  */
 
 /** Scope statements in the shape the api-key plugin stores and returns. */
@@ -18,36 +22,90 @@ export type PublicApiScopeStatements = {
 };
 
 /**
- * The scopes every new key receives. v1 exposes only reads, so a key is
- * created with exactly these and never gains more afterwards; write scopes
- * will be introduced as explicit, separately granted scopes when writes ship.
+ * Every scope a key can hold: the closed vocabulary that the scope type, the
+ * scope schema, and the grant lists below are all checked against. The api-key
+ * plugin stores a nested statement shape; that shape is a storage detail
+ * derived from this list by `toPublicApiScopeStatements`.
  */
-export const PUBLIC_API_DEFAULT_SCOPES = {
-  boards: ["read"],
-  posts: ["read"],
-} as const satisfies PublicApiScopeStatements;
+export const PUBLIC_API_SCOPES = [
+  "boards.read",
+  "posts.read",
+  "tags.read",
+  "tags.create",
+  "tags.update",
+  "tags.delete",
+  "tags.assign",
+] as const;
 
-export type PublicApiScope = "boards.read" | "posts.read";
+export type PublicApiScope = (typeof PUBLIC_API_SCOPES)[number];
 
 /**
- * Mutable copy of the default scopes, for APIs typed as
- * `Record<string, string[]>` (the api-key plugin's statement shape).
+ * The vocabulary as a schema, so a key cannot be created holding a scope that
+ * does not exist. A scope typo would otherwise be stored verbatim and only
+ * show up as an unexplained `FORBIDDEN_SCOPE` at request time.
  */
-export const toPublicApiScopeStatements = (
-  statements: PublicApiScopeStatements
-): Record<string, string[]> =>
-  Object.fromEntries(
-    Object.entries(statements).map(([resource, actions]) => [
-      resource,
-      [...actions],
-    ])
-  );
+export const PublicApiScopeSchema = Schema.Literals(PUBLIC_API_SCOPES);
+
+/**
+ * The scopes every new key receives: reads only.
+ *
+ * `boards.read` is granted although no v1 endpoint requires it yet, so the
+ * board-metadata endpoint is additive when it ships.
+ */
+export const PUBLIC_API_DEFAULT_SCOPES = [
+  "boards.read",
+  "posts.read",
+  "tags.read",
+] as const satisfies readonly PublicApiScope[];
+
+/**
+ * Tag writes, granted explicitly at key creation and never by default.
+ *
+ * Deleting a tag cascades to every post assignment that carried it, and an
+ * integration that only reads feedback has no business holding that. The
+ * dashboard offers the grant as one choice, so a customer cannot end up with
+ * `tags.update` and no way to create the tag it renames, or with
+ * `tags.assign` and no way to name the tag it applies.
+ *
+ * `tags.assign` is separate from `tags.update`: renaming a tag changes what it
+ * is called everywhere, while assigning it changes which posts carry it. A key
+ * that keeps a workspace's vocabulary tidy is not automatically one that may
+ * relabel its feedback.
+ */
+export const PUBLIC_API_TAG_MANAGEMENT_SCOPES = [
+  "tags.create",
+  "tags.update",
+  "tags.delete",
+  "tags.assign",
+] as const satisfies readonly PublicApiScope[];
 
 const SCOPE_SEPARATOR = ".";
 
 const splitScope = (scope: PublicApiScope): [string, string] => {
   const separator = scope.indexOf(SCOPE_SEPARATOR);
   return [scope.slice(0, separator), scope.slice(separator + 1)];
+};
+
+/**
+ * The plugin's statement shape, grouped from a flat scope list.
+ *
+ * Takes the flat list rather than the nested shape so that the vocabulary
+ * above is the only place a scope name is written down; callers that already
+ * hold stored statements (`hasPublicApiScope`) still read the nested form.
+ */
+export const toPublicApiScopeStatements = (
+  scopes: readonly PublicApiScope[]
+): Record<string, string[]> => {
+  const grouped = new Map<string, string[]>();
+  for (const scope of scopes) {
+    const [resource, action] = splitScope(scope);
+    const actions = grouped.get(resource) ?? [];
+    if (!actions.includes(action)) {
+      actions.push(action);
+    }
+    grouped.set(resource, actions);
+  }
+  return Object.fromEntries(grouped);
 };
 
 /** True when `statements` grant `scope`, directly or through a `*` action. */

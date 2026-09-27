@@ -160,7 +160,9 @@ describe("ApiKeyRpcHandlers", () => {
 
   /**
    * Seeds a key the way the plugin stores one: the hash of the plaintext in
-   * `key`, the identifying characters in `start`, scopes as a JSON string.
+   * `key`, the identifying characters in `start`, scopes as a JSON string. The
+   * stored scopes are deliberately narrower than today's default set — this is
+   * a key that predates the tag scopes.
    */
   const seedKey = (
     fixture: Fixture,
@@ -248,13 +250,71 @@ describe("ApiKeyRpcHandlers", () => {
             start: "fbk_ab",
             prefix: "fbk_",
             enabled: true,
-            scopes: ["boards.read", "posts.read"],
+            scopes: ["boards.read", "posts.read", "tags.read"],
             creatorId: fixture.userId,
             createdAt: new Date("2026-09-18T00:00:00.000Z"),
             lastRequest: null,
             // 30 days after the double's creation date.
             expiresAt: new Date("2026-10-18T00:00:00.000Z"),
           });
+        })
+    );
+
+    it.effect(
+      "grants exactly the scopes the caller asks for, and no write by default",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* ApiKeyRpcHandlersEffect;
+          const fixture = yield* makeFixture("starter");
+
+          // A create that names no scopes gets the read-only default set: the
+          // write scopes are never implied by asking for a key.
+          const byDefault = yield* handlers
+            .ApiKeyCreate({
+              name: "Reader",
+              organizationId: fixture.organizationId,
+              expiration: "30d",
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "owner")
+              )
+            );
+          expect(byDefault.summary.scopes).toEqual([
+            "boards.read",
+            "posts.read",
+            "tags.read",
+          ]);
+
+          // A caller that asks for the tag writes gets them, deduplicated: the
+          // plugin stores the list verbatim and would otherwise report the
+          // same action twice.
+          const withWrites = yield* handlers
+            .ApiKeyCreate({
+              name: "Tag manager",
+              organizationId: fixture.organizationId,
+              expiration: "30d",
+              scopes: [
+                "tags.read",
+                "tags.create",
+                "tags.update",
+                "tags.create",
+                "tags.delete",
+              ],
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "owner")
+              )
+            );
+          expect(withWrites.summary.scopes).toEqual([
+            "tags.read",
+            "tags.create",
+            "tags.update",
+            "tags.delete",
+          ]);
         })
     );
 
@@ -357,6 +417,9 @@ describe("ApiKeyRpcHandlers", () => {
         expect(keys).toHaveLength(1);
         expect(keys[0]).toMatchObject({
           id: "apikey_downgraded",
+          // The key's stored scopes are the ones it was created with. A key
+          // minted before the tag scopes existed keeps its narrower grant: a
+          // release never widens a key that already exists.
           scopes: ["boards.read", "posts.read"],
         });
 

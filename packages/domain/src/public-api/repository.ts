@@ -1,28 +1,43 @@
 import { currentDb, schema } from "@feeblo/db";
 import type { TPostStatusType } from "@feeblo/domain-contracts/post-status-type";
+import { PostTagId, TagId } from "@feeblo/id";
+import { slugify } from "@feeblo/utils/url";
 import {
   and,
+  asc,
   count,
   desc,
   eq,
   inArray,
   isNull,
+  ne,
+  or,
   sql,
   type SQL,
 } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { withRemapDbErrors } from "../rpc-errors";
+import { PostActivityRepository } from "../post-activity/repository";
+import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
+import { postTagChangeActivities } from "../tag/post-tag-activities";
 import type { Cursor } from "./cursor";
+import { conflictError } from "./errors";
 
 /** An author reduced to a classification and display fields — never an id. */
 export type PublicApiPostAuthor = {
   readonly type: "member" | "end_user";
   readonly displayName: string | null;
   readonly avatarUrl: string | null;
+};
+
+/** A tag reference: identity and label, and nothing else. */
+export type PublicApiPostTag = {
+  readonly id: string;
+  readonly name: string;
 };
 
 /**
@@ -53,7 +68,7 @@ export type PublicApiPostSource = {
   readonly author: PublicApiPostAuthor;
   readonly voteCount: number;
   readonly commentCount: number;
-  readonly tags: readonly { readonly id: string; readonly name: string }[];
+  readonly tags: readonly PublicApiPostTag[];
 };
 
 export type PublicApiListedPost = PublicApiPostSource & {
@@ -69,6 +84,73 @@ export type PublicApiPostPage = {
   readonly posts: readonly PublicApiListedPost[];
   readonly nextCursor: Cursor | null;
 };
+
+/**
+ * What the tag mapper is allowed to read.
+ *
+ * Narrow for the same reason as `PublicApiPostSource`: `tag` also carries
+ * `creatorId` and `creatorMemberId`, and a column that is not named here has
+ * no way into a public response. A machine key has no member behind it, so
+ * those columns would be null for every tag the API creates — an empty field
+ * that says nothing and still has to be kept out of the payload.
+ */
+export type PublicApiTagSource = {
+  readonly id: string;
+  readonly name: string;
+  readonly slug: string;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+};
+
+export type PublicApiTagPage = {
+  readonly tags: readonly PublicApiTagSource[];
+  readonly nextCursor: Cursor | null;
+};
+
+interface TListTags {
+  cursor: Cursor | null;
+  limit: number;
+  organizationId: string;
+}
+
+interface TFindTag {
+  organizationId: string;
+  tagId: string;
+}
+
+interface TFindTagNameConflict {
+  /** The tag being renamed, excluded from its own conflict check. */
+  excludeTagId: string | null;
+  name: string;
+  organizationId: string;
+}
+
+interface TCreateTag {
+  name: string;
+  organizationId: string;
+}
+
+interface TUpdateTag {
+  name: string;
+  organizationId: string;
+  tagId: string;
+}
+
+interface TDeleteTag {
+  organizationId: string;
+  tagId: string;
+}
+
+interface TCountExistingTags {
+  organizationId: string;
+  tagIds: readonly string[];
+}
+
+interface TSetPostTags {
+  organizationId: string;
+  postId: string;
+  tagIds: readonly string[];
+}
 
 interface TListBoardPosts {
   boardId: string;
@@ -146,10 +228,25 @@ type PostRow = {
   authorAvatarUrl: string | null;
 };
 
+/**
+ * The tag column list, and the only place a tag field is selected from.
+ *
+ * `creatorId` and `creatorMemberId` are deliberately absent: a tag the API
+ * creates has no member behind it, and the dashboard's own actor columns have
+ * no business in a public payload even when they are populated.
+ */
+const TAG_COLUMNS = {
+  id: schema.tagTable.id,
+  name: schema.tagTable.name,
+  slug: schema.tagTable.slug,
+  createdAt: schema.tagTable.createdAt,
+  updatedAt: schema.tagTable.updatedAt,
+} as const;
+
 const toSource = (
   row: PostRow,
   counts: { voteCount: number; commentCount: number },
-  tags: readonly { id: string; name: string }[]
+  tags: readonly PublicApiPostTag[]
 ): PublicApiPostSource => ({
   id: row.id,
   boardId: row.boardId,
@@ -174,15 +271,15 @@ const toSource = (
 });
 
 /**
- * Read-only projections for the Public API.
- *
- * Its own queries rather than `PostRepository`'s: the rules differ (a private
+ * The Public API's own queries, rather than the dashboard repositories': the
+ * rules differ (a private
  * board is readable with a key, archived and merged posts are handled per
  * request, and vote and comment counts have no dashboard equivalent), and the
  * column list is the first line of defence against exposing actor identities.
  */
 const makePublicApiRepository = Effect.gen(function* () {
   const db = yield* currentDb;
+  const activities = yield* PostActivityRepository;
 
   const countByPostIds = (postIds: readonly string[]) =>
     Effect.gen(function* () {
@@ -234,7 +331,11 @@ const makePublicApiRepository = Effect.gen(function* () {
         schema.tagTable,
         eq(schema.tagTable.id, schema.postTagTable.tagId)
       )
-      .where(inArray(schema.postTagTable.postId, postIds));
+      .where(inArray(schema.postTagTable.postId, postIds))
+      // Ordered so a post's tag array is stable across requests. The contract
+      // does not promise an order, but a caller diffing two responses of the
+      // same post should not see it shuffle.
+      .orderBy(asc(schema.tagTable.name));
 
   return {
     /**
@@ -406,6 +507,329 @@ const makePublicApiRepository = Effect.gen(function* () {
           content: row.content,
         });
       }).pipe(withRemapDbErrors("PublicApiPost", "select")),
+
+    /**
+     * One page of the workspace's tags, newest first.
+     *
+     * Ordered and paged exactly like a board's posts — the same `(createdAt,
+     * id)` tuple and the same cursor — so a caller learns one paging rule for
+     * the whole API. Fetches `limit + 1` rows to learn whether another page
+     * exists without a second query.
+     */
+    listTags: ({ cursor, limit, organizationId }: TListTags) =>
+      Effect.gen(function* () {
+        const conditions: SQL[] = [
+          eq(schema.tagTable.organizationId, organizationId),
+        ];
+        if (cursor !== null) {
+          conditions.push(
+            sql`(${schema.tagTable.createdAt}, ${schema.tagTable.id}) < (${cursor.createdAt}, ${cursor.id})`
+          );
+        }
+
+        const rows = yield* db
+          .select(TAG_COLUMNS)
+          .from(schema.tagTable)
+          .where(and(...conditions))
+          .orderBy(desc(schema.tagTable.createdAt), desc(schema.tagTable.id))
+          .limit(limit + 1);
+
+        const hasMore = rows.length > limit;
+        const pageRows = hasMore ? rows.slice(0, limit) : rows;
+        const lastRow = pageRows.at(-1);
+
+        return {
+          tags: pageRows,
+          nextCursor:
+            hasMore && lastRow !== undefined
+              ? { createdAt: lastRow.createdAt, id: lastRow.id }
+              : null,
+        } satisfies PublicApiTagPage;
+      }).pipe(withRemapDbErrors("PublicApiTag", "select")),
+
+    /** One tag of the calling workspace, or nothing. */
+    findTag: ({ organizationId, tagId }: TFindTag) =>
+      Effect.gen(function* () {
+        const rows = yield* db
+          .select(TAG_COLUMNS)
+          .from(schema.tagTable)
+          .where(
+            and(
+              eq(schema.tagTable.id, tagId),
+              eq(schema.tagTable.organizationId, organizationId)
+            )
+          )
+          .limit(1);
+
+        return Option.fromNullishOr(rows.at(0));
+      }).pipe(withRemapDbErrors("PublicApiTag", "select")),
+
+    /**
+     * The tag that already holds this name or slug, if any.
+     *
+     * Takes the name rather than a slug so that the slug rule lives in exactly
+     * one place: a pre-check that derived the slug differently from the insert
+     * would let a caller through to an index violation it could not explain.
+     * Both indexes are checked together because they are two spellings of the
+     * same collision — `UI Kit` and `ui-kit` slugify alike — and a caller told
+     * only about the name would retry and hit the other index instead.
+     */
+    findTagNameConflict: ({
+      excludeTagId,
+      name,
+      organizationId,
+    }: TFindTagNameConflict) =>
+      Effect.gen(function* () {
+        const rows = yield* db
+          .select({ id: schema.tagTable.id })
+          .from(schema.tagTable)
+          .where(
+            and(
+              eq(schema.tagTable.organizationId, organizationId),
+              or(
+                eq(schema.tagTable.name, name),
+                eq(schema.tagTable.slug, slugify(name))
+              ),
+              ...(excludeTagId === null
+                ? []
+                : [ne(schema.tagTable.id, excludeTagId)])
+            )
+          )
+          .limit(1);
+
+        return Option.fromNullishOr(rows.at(0));
+      }).pipe(withRemapDbErrors("PublicApiTag", "select")),
+
+    /**
+     * Creates a tag and returns the row the database stored.
+     *
+     * The id is minted here rather than accepted from the caller: the
+     * dashboard generates ids client-side because a member acts on records
+     * they can already see, but a machine key is not a member, and a
+     * caller-chosen id would make the primary key part of the request surface.
+     *
+     * The unique violation is mapped as well as pre-checked, because two
+     * concurrent creates of the same name both pass the check and one of them
+     * then loses the race at the index.
+     */
+    createTag: ({ name, organizationId }: TCreateTag) =>
+      Effect.gen(function* () {
+        const id = yield* TagId.generate;
+        const now = yield* DateTime.nowAsDate;
+
+        const [created] = yield* db
+          .insert(schema.tagTable)
+          .values({
+            id,
+            name,
+            slug: slugify(name),
+            organizationId,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning(TAG_COLUMNS);
+
+        // An insert either stores a row or fails; an empty `returning` is a
+        // broken invariant, not something the caller did, so it must not be
+        // reported as a conflict with a name nobody holds.
+        if (created === undefined) {
+          return yield* Effect.fail(
+            new InternalServerError({
+              message: "Error creating PublicApiTag",
+            })
+          );
+        }
+
+        return created satisfies PublicApiTagSource;
+      }).pipe(
+        withRemapDbErrors({
+          action: "create",
+          entity: "PublicApiTag",
+          onUniqueViolation: () =>
+            conflictError("A tag with this name already exists."),
+        })
+      ),
+
+    /** Renames a tag and returns the row the database stored. */
+    updateTag: ({ name, organizationId, tagId }: TUpdateTag) =>
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+
+        const [updated] = yield* db
+          .update(schema.tagTable)
+          .set({ name, slug: slugify(name), updatedAt: now })
+          .where(
+            and(
+              eq(schema.tagTable.id, tagId),
+              eq(schema.tagTable.organizationId, organizationId)
+            )
+          )
+          .returning(TAG_COLUMNS);
+
+        // The handler reads the tag before renaming it, so a row that is gone
+        // by the time the update runs is a race, not a caller mistake.
+        if (updated === undefined) {
+          return yield* Effect.fail(
+            new InternalServerError({
+              message: "Error updating PublicApiTag",
+            })
+          );
+        }
+
+        return updated satisfies PublicApiTagSource;
+      }).pipe(
+        withRemapDbErrors({
+          action: "update",
+          entity: "PublicApiTag",
+          onUniqueViolation: () =>
+            conflictError("A tag with this name already exists."),
+        })
+      ),
+
+    /**
+     * Deletes a tag and its post assignments.
+     *
+     * `post_tag.tag_id` cascades, so a deleted tag stops labelling every post
+     * it was on — the same behaviour as deleting it in the dashboard.
+     */
+    deleteTag: ({ organizationId, tagId }: TDeleteTag) =>
+      db
+        .delete(schema.tagTable)
+        .where(
+          and(
+            eq(schema.tagTable.id, tagId),
+            eq(schema.tagTable.organizationId, organizationId)
+          )
+        )
+        .pipe(Effect.asVoid, withRemapDbErrors("PublicApiTag", "delete")),
+
+    /**
+     * How many of `tagIds` exist in the workspace.
+     *
+     * The caller compares the count with the number of ids it sent. A count
+     * rather than the missing ids on purpose: naming which id is unknown would
+     * let a caller use this endpoint to test whether a tag id exists in a
+     * workspace it cannot read.
+     */
+    countExistingTags: ({ organizationId, tagIds }: TCountExistingTags) =>
+      Effect.gen(function* () {
+        if (tagIds.length === 0) {
+          return 0;
+        }
+
+        const rows = yield* db
+          .select({ id: schema.tagTable.id })
+          .from(schema.tagTable)
+          .where(
+            and(
+              eq(schema.tagTable.organizationId, organizationId),
+              inArray(schema.tagTable.id, tagIds)
+            )
+          );
+
+        return rows.length;
+      }).pipe(withRemapDbErrors("PublicApiTag", "select")),
+
+    /**
+     * Replaces a post's tags and returns the tags it carries afterwards.
+     *
+     * A replacement rather than add and remove calls, so a caller that states
+     * the final set cannot leave a tag behind by forgetting to remove it. The
+     * write, the timeline entries, and the read-back share one transaction: the
+     * response is then exactly what a later read returns, and a post cannot end
+     * up tagged with no record of the change in its history.
+     *
+     * The recorded actor is null because a machine key is not a member. The
+     * `post_activity` columns allow that and the dashboard renders those
+     * entries as "Someone" — which is true, and better than a post whose tags
+     * change with no entry in its history at all.
+     */
+    setPostTags: ({ organizationId, postId, tagIds }: TSetPostTags) =>
+      db
+        .transaction((tx) =>
+          Effect.gen(function* () {
+            const now = yield* DateTime.nowAsDate;
+
+            const previous = yield* tx
+              .select({ tagId: schema.postTagTable.tagId })
+              .from(schema.postTagTable)
+              .where(
+                and(
+                  eq(schema.postTagTable.postId, postId),
+                  eq(schema.postTagTable.organizationId, organizationId)
+                )
+              );
+
+            yield* tx
+              .delete(schema.postTagTable)
+              .where(
+                and(
+                  eq(schema.postTagTable.postId, postId),
+                  eq(schema.postTagTable.organizationId, organizationId)
+                )
+              )
+              .pipe(Effect.asVoid);
+
+            if (tagIds.length > 0) {
+              const rows = yield* Effect.forEach(tagIds, (tagId) =>
+                PostTagId.generate.pipe(
+                  Effect.map((id) => ({
+                    id,
+                    postId,
+                    tagId,
+                    organizationId,
+                    createdAt: now,
+                    updatedAt: now,
+                  }))
+                )
+              );
+
+              // `post_tag_postId_tagId_uidx` would abort the transaction if a
+              // caller sent the same id twice; the handler deduplicates too, so
+              // this is the backstop rather than the rule.
+              yield* tx
+                .insert(schema.postTagTable)
+                .values(rows)
+                .onConflictDoNothing()
+                .pipe(Effect.asVoid);
+            }
+
+            // The activity repository holds its own database handle, and
+            // `withTransaction` keeps the connection in fiber-local context,
+            // so these rows are written in the same transaction as the tags
+            // above rather than in a second one that could fail alone.
+            yield* activities.createMany(
+              postTagChangeActivities({
+                previousTagIds: previous.map((row) => row.tagId),
+                nextTagIds: tagIds,
+                actor: {
+                  actorId: null,
+                  actorMemberId: null,
+                  organizationId,
+                  postId,
+                },
+              })
+            );
+
+            const tags = yield* tx
+              .select({ id: schema.tagTable.id, name: schema.tagTable.name })
+              .from(schema.postTagTable)
+              .innerJoin(
+                schema.tagTable,
+                eq(schema.tagTable.id, schema.postTagTable.tagId)
+              )
+              .where(
+                and(
+                  eq(schema.postTagTable.postId, postId),
+                  eq(schema.postTagTable.organizationId, organizationId)
+                )
+              )
+              .orderBy(asc(schema.tagTable.name));
+
+            return tags satisfies readonly PublicApiPostTag[];
+          })
+        )
+        .pipe(withRemapDbErrors("PublicApiTag", "update")),
   };
 });
 

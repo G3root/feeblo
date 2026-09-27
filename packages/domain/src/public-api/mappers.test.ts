@@ -1,9 +1,23 @@
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 
-import { toPublicApiPost, toPublicApiPostSummary } from "./mappers";
-import type { PublicApiDetailedPost, PublicApiListedPost } from "./repository";
-import { PublicApiPost, PublicApiPostSummary } from "./schema";
+import {
+  toPublicApiPost,
+  toPublicApiPostSummary,
+  toPublicApiTag,
+  toPublicApiTagDetail,
+} from "./mappers";
+import type {
+  PublicApiDetailedPost,
+  PublicApiListedPost,
+  PublicApiTagSource,
+} from "./repository";
+import {
+  PublicApiPost,
+  PublicApiPostSummary,
+  PublicApiTag,
+  PublicApiTagDetail,
+} from "./schema";
 
 /**
  * Mapper tests.
@@ -43,6 +57,14 @@ const source: PublicApiListedPost = {
 const detailed: PublicApiDetailedPost = {
   ...source,
   content: "<p>Sanitized body</p>",
+};
+
+const tagSource: PublicApiTagSource = {
+  id: "tag_ui",
+  name: "UI",
+  slug: "ui",
+  createdAt: new Date("2026-08-11T00:00:00.000Z"),
+  updatedAt: new Date("2026-08-12T09:30:00.000Z"),
 };
 
 const LIST_KEYS = [
@@ -104,6 +126,54 @@ describe("public API mappers", () => {
       "userId",
       "memberId",
       "email",
+    ]) {
+      expect(encoded).not.toContain(forbidden);
+    }
+  });
+
+  it("emits exactly the documented tag fields", () => {
+    const encoded = Schema.encodeSync(PublicApiTagDetail)(
+      toPublicApiTagDetail(tagSource)
+    );
+
+    expect(Object.keys(encoded).sort()).toEqual([
+      "createdAt",
+      "id",
+      "name",
+      "slug",
+      "updatedAt",
+    ]);
+  });
+
+  it("emits exactly the documented tag reference fields", () => {
+    // The reference is the same mapper behind a post's `tags` array and behind
+    // the response of setting a post's tags, so one shape lock covers both.
+    const encoded = Schema.encodeSync(PublicApiTag)(
+      toPublicApiTag({ id: "tag_ui", name: "UI" })
+    );
+
+    expect(Object.keys(encoded).sort()).toEqual(["id", "name"]);
+  });
+
+  it("keeps a post's embedded tag to its identity", () => {
+    // The embedded tag and the tag resource are separate schemas so that
+    // widening one does not silently widen every post payload that carries it.
+    const encoded = Schema.encodeSync(PublicApiPostSummary)(
+      toPublicApiPostSummary(source, CONTEXT)
+    );
+
+    expect(Object.keys(encoded.tags[0] ?? {}).sort()).toEqual(["id", "name"]);
+  });
+
+  it("never emits a tag's internal identifiers", () => {
+    const encoded = JSON.stringify(
+      Schema.encodeSync(PublicApiTagDetail)(toPublicApiTagDetail(tagSource))
+    );
+
+    for (const forbidden of [
+      "creatorId",
+      "creatorMemberId",
+      "organizationId",
     ]) {
       expect(encoded).not.toContain(forbidden);
     }
