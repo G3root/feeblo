@@ -59,18 +59,30 @@ const fingerprintInputs = [
 ];
 
 /**
- * How long a lock holder gets to publish before a waiter reaps the lock and
- * builds the template itself.
+ * How long a waiter waits for a peer's build before trying again.
  *
- * A cold build is ~7s idle, so this is generous on purpose. It is also the
- * recovery time from a holder that was killed before it published, which is why
- * it is not larger - and why `ensureTemplate` reaps a lock that is older than
- * this rather than waiting on it forever.
+ * A cold build is ~7s with the machine to itself, but this is not a deadline:
+ * when the budget runs out `ensureTemplate` builds the template itself. It only
+ * decides how much duplicate work happens, never whether a suite can run.
  */
 const templateWaitTimeoutMs = 60 * 1000;
 
-/** How many times a waiter will wait out the timeout before reaping and building. */
+/** How many times a waiter yields to a peer before building the template itself. */
 const templateBuildAttempts = 2;
+
+/**
+ * How old a lock must be before the sweep may remove it.
+ *
+ * Far longer than any build, and that gap is the point: it is what makes the
+ * sweep unable to remove a lock someone is still holding, and therefore what
+ * makes the holder's own release safe. It sits between a lock's real lifetime
+ * (seconds) and `staleDatabaseAgeMs` (hours) because a lock is abandoned after
+ * a build, not after a test run.
+ */
+const lockAbandonedAfterMs = 10 * 60 * 1000;
+
+/** The suffix that separates a lock in the cache from a cached template. */
+const lockSuffix = ".lock";
 
 /**
  * How old an abandoned per-file database must be before it is pruned.
@@ -166,56 +178,81 @@ const waitForPath = async (
   return false;
 };
 
+/**
+ * Claims the lock, returning the inode that identifies it, or `null` when a peer
+ * already holds it. Nothing distinguishes the reasons `open` can fail, because
+ * every one of them already means "use whatever is at `templateDirectory`".
+ */
+const tryClaimLock = async (lockPath: string): Promise<number | null> =>
+  open(lockPath, "wx").then(
+    async (handle) => {
+      const claimed = await handle.stat();
+      await handle.close();
+      return claimed.ino;
+    },
+    () => null
+  );
+
+/**
+ * Removes the lock only if it is still the file this process created.
+ *
+ * A successor can only take this lock's place if something removed it first, and
+ * the only thing that removes a lock is the sweep, which needs a build longer
+ * than `lockAbandonedAfterMs`. Comparing inodes means that even then this cannot
+ * delete a lock it does not own - which is the mistake that would let two
+ * builders run at once.
+ */
+const releaseLock = async (
+  lockPath: string,
+  lockInode: number
+): Promise<void> => {
+  const current = await stat(lockPath).catch(() => null);
+
+  if (current === null || current.ino !== lockInode) {
+    return;
+  }
+
+  await rm(lockPath, { force: true });
+};
+
 const ensureTemplate = async (templateDirectory: string): Promise<string> => {
   await mkdir(templateCacheRoot, { recursive: true });
 
   // The lock is an optimisation, not a correctness requirement: it stops five
   // packages from migrating the same schema at once. The publish `rename` is
-  // what actually arbitrates, so the worst case for getting this wrong is a
-  // duplicate migration rather than a corrupt template.
-  const lockPath = `${templateDirectory}.lock`;
+  // what actually arbitrates, so a duplicate migration is possible but a corrupt
+  // template is not. Nothing here deletes a peer's lock, and nothing waits
+  // forever: a lock that outlives its holder costs waiters one timeout, and then
+  // they build the template themselves.
+  const lockPath = `${templateDirectory}${lockSuffix}`;
 
   for (let attempt = 0; attempt < templateBuildAttempts; attempt += 1) {
     if (await pathExists(templateDirectory)) {
       return templateDirectory;
     }
 
-    // A holder that was killed before publishing leaves a lock behind, and
-    // nothing else removes it. Without this, every later run would wait out the
-    // timeout before building, which turns one interrupted run into a slow one
-    // for the rest of the day.
-    const lock = await stat(lockPath).catch(() => null);
-    if (lock !== null && Date.now() - lock.mtimeMs > templateWaitTimeoutMs) {
-      await rm(lockPath, { force: true });
-    }
-
-    const claimedLock = await open(lockPath, "wx").then(
-      async (handle) => {
-        await handle.close();
-        return true;
-      },
-      () => false
-    );
-
-    if (claimedLock) {
+    const lockInode = await tryClaimLock(lockPath);
+    if (lockInode !== null) {
       try {
         await buildTemplate(templateDirectory);
       } finally {
-        await rm(lockPath, { force: true });
+        await releaseLock(lockPath, lockInode);
       }
-      break;
+      return templateDirectory;
     }
 
-    // Someone else is building it. Wait for the publish, and if it never comes,
-    // go around again and reap what is now a stale lock.
-    await waitForPath(templateDirectory, templateWaitTimeoutMs);
+    if (await waitForPath(templateDirectory, templateWaitTimeoutMs)) {
+      return templateDirectory;
+    }
   }
 
-  if (!(await pathExists(templateDirectory))) {
-    throw new Error(
-      `Failed to build the PGlite test template at ${templateDirectory}`
-    );
-  }
+  // A peer held the lock for the whole budget and never published. Build it here
+  // rather than failing: the holder may be alive and merely starved, and then the
+  // publish `rename` decides which of us wins. Failing instead would take down
+  // this package's entire suite over a template another process is still
+  // writing, and report it as "the template was not built", which is the least
+  // useful thing to say about it.
+  await buildTemplate(templateDirectory);
 
   return templateDirectory;
 };
@@ -233,11 +270,15 @@ const ensureTemplate = async (templateDirectory: string): Promise<string> => {
  * migration set that has since changed.
  *
  * The age cutoff is what makes both sweeps safe, and it is generous for a
- * reason: see `staleDatabaseAgeMs`. A live database, staging directory, or lock
- * is minutes old in the worst case, so only an abandoned one can be past a
+ * reason: see `staleDatabaseAgeMs`. A live database or staging directory is
+ * minutes old in the worst case, so only an abandoned one can be past a
  * two-hour cutoff - including one belonging to a test run in a sibling
- * worktree, which shares this `$TMPDIR`. Locks are also reaped directly by
- * `ensureTemplate`, which cannot wait for this sweep to run.
+ * worktree, which shares this `$TMPDIR`. Locks get `lockAbandonedAfterMs`
+ * instead, because they are abandoned after a build rather than after a run.
+ *
+ * The stat-then-remove below is check-then-act, but the gap between a live
+ * file's lifetime and the cutoff it is measured against is what keeps it from
+ * hitting something in use.
  *
  * Best effort on purpose: this is deferred hygiene, so a permissions problem or
  * a directory that a concurrent package removed first must not turn into a test
@@ -246,8 +287,6 @@ const ensureTemplate = async (templateDirectory: string): Promise<string> => {
 const pruneAbandonedDatabases = async (
   currentTemplateDirectory: string
 ): Promise<void> => {
-  const cutoff = Date.now() - staleDatabaseAgeMs;
-
   const abandoned = await readdir(tmpdir(), { withFileTypes: true }).then(
     (entries) =>
       entries
@@ -272,7 +311,15 @@ const pruneAbandonedDatabases = async (
   await Promise.all(
     [...abandoned, ...superseded].map(async (path) => {
       const info = await stat(path).catch(() => null);
-      if (info !== null && info.mtimeMs < cutoff) {
+      if (info === null) {
+        return;
+      }
+
+      const cutoff =
+        Date.now() -
+        (path.endsWith(lockSuffix) ? lockAbandonedAfterMs : staleDatabaseAgeMs);
+
+      if (info.mtimeMs < cutoff) {
         await rm(path, { force: true, recursive: true }).catch(() => undefined);
       }
     })
