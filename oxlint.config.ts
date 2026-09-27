@@ -113,6 +113,24 @@ export default defineConfig({
     // sites that are all correct as written.
     "react/react-in-jsx-scope": "off",
 
+    // Off because it misreads the two shapes this codebase uses most.
+    //
+    // In `Effect.gen`, an early exit is `return yield* new SomeError({...})` and
+    // the success path is a bare `yield*` that falls off the end. Both produce
+    // `Effect<void, SomeError>`, and the rule reads the first as "returns a
+    // value" and the second as "does not". `roadmap-column/repository.ts` is the
+    // clearest case: a policy check that returns early, then an insert. 72 of its
+    // 96 findings are production sites of exactly this shape — Effect code that
+    // is already correct — and the rest are exhaustive `switch` statements whose
+    // union the rule cannot see is closed (`post-ui/src/v2/dialogs/auth-dialog.tsx`).
+    //
+    // It is not off because the rule is wrong in general: a plain async function
+    // that returns on one path and not another is a real defect. Nothing here
+    // writes that shape, so the noise outweighs the signal. Re-enable if a
+    // non-Effect async surface appears, or if the rule learns to read generator
+    // bodies and `never`-narrowing.
+    "typescript/consistent-return": "off",
+
     // The rules below were disabled while `options.typeAware` was false, so they
     // could not run at all. Type-aware linting is on now; these three stay off,
     // each for a stated reason.
