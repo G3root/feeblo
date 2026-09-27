@@ -42,6 +42,22 @@ services:
       args:
         APP_RELEASE: ${APP_RELEASE:-dev}
     restart: always
+    # `.env` is the documented place to configure this stack, but Compose only
+    # forwards the keys listed under `environment:` below — everything else in
+    # that file is used for interpolation and then dropped. That silently
+    # excluded SMTP_*, POLAR_*, the GitHub/Slack/Discord credentials,
+    # EMBEDDING_*, INTEGRATION_ENCRYPTION_KEY, MEDIA_PUBLIC_BASE_URL and
+    # SENTRY_*, so a self-hoster's mail and billing settings never reached the
+    # container. `env_file` closes the gap; `environment:` still wins for the
+    # keys it lists, which is why DATABASE_URL and REDIS_URL keep pointing at the
+    # compose network rather than at whatever `.env` holds.
+    #
+    # `required: false` because `.env` is optional: a deployment that supplies
+    # its configuration through the process environment (as the CI smoke test
+    # does) must still start.
+    env_file:
+      - path: .env
+        required: false
     depends_on:
       pg:
         condition: service_healthy
@@ -58,6 +74,11 @@ services:
       # Public board subdomains require a wildcard for their root domain.
       AUTH_TRUSTED_ORIGINS: ${AUTH_TRUSTED_ORIGINS:-${APP_URL:-http://localhost:3001},${API_URL:-http://localhost:3000},*.${APP_ROOT_DOMAIN:-localhost}}
       DATABASE_URL: ${DATABASE_URL:-postgres://feeblo:password@pg:5432/feeblo}
+      # NOTE: the line above interpolates `${DATABASE_URL}` from `.env`, and the
+      # value in `.env.example` points at the *dev* stack (127.0.0.1:54323), which
+      # is unreachable from inside this container. Unset DATABASE_URL in `.env`
+      # to take the `pg:5432` default, or set it to the address the container can
+      # actually reach. An external database is configured the same way.
       # REQUIRED: at-rest encryption key for auth and integration secrets.
       # Compose fails fast instead of silently starting with a known key.
       # Generate one with: openssl rand -hex 32
@@ -88,6 +109,14 @@ services:
         APP_URL: ${APP_URL:-http://localhost:3001}
         APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
     restart: always
+    # The Node entry reads API_URL, APP_URL, APP_ROOT_DOMAIN, APP_RELEASE,
+    # TURNSTILE_SITE_KEY, NO_INDEX, POSTHOG_KEY and POSTHOG_HOST from the process
+    # environment on every request, so the last four have to arrive from `.env`
+    # — `environment:` below does not list them. See the note on the server
+    # service for why `required: false`.
+    env_file:
+      - path: .env
+        required: false
     depends_on:
       - server
     environment:
