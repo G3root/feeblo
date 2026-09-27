@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
@@ -78,6 +79,56 @@ describe("S3Config optional values", () => {
       const config = yield* loadS3Config();
 
       expect(Option.isNone(config.publicBaseUrl)).toBe(true);
+      expect(Option.isNone(config.accessKeyId)).toBe(true);
+      expect(Option.isNone(config.secretAccessKey)).toBe(true);
+    })
+  );
+});
+
+describe("S3Config upload credentials", () => {
+  // Both halves or neither. `S3Layer` only builds explicit credentials when both
+  // are present and otherwise leaves the client to the AWS default credential
+  // chain, so a half-configured pair silently authenticates as something else
+  // rather than failing.
+  it.effect("fails when only the access key id is set", () =>
+    Effect.gen(function* () {
+      const exit = yield* Effect.exit(
+        loadS3Config({ MEDIA_UPLOAD_ACCESS_KEY_ID: "feeblo" })
+      );
+
+      expect(Exit.isFailure(exit)).toBe(true);
+    })
+  );
+
+  it.effect("fails when only the secret access key is set", () =>
+    Effect.gen(function* () {
+      const exit = yield* Effect.exit(
+        loadS3Config({ MEDIA_UPLOAD_SECRET_ACCESS_KEY: "password" })
+      );
+
+      expect(Exit.isFailure(exit)).toBe(true);
+    })
+  );
+
+  it.effect("accepts a complete pair", () =>
+    Effect.gen(function* () {
+      const config = yield* loadS3Config({
+        MEDIA_UPLOAD_ACCESS_KEY_ID: "feeblo",
+        MEDIA_UPLOAD_SECRET_ACCESS_KEY: "password",
+      });
+
+      expect(Option.getOrNull(config.accessKeyId)).toBe("feeblo");
+      expect(Option.getOrNull(config.secretAccessKey)).toBe("password");
+    })
+  );
+
+  it.effect("accepts a pair that is blank on both sides", () =>
+    Effect.gen(function* () {
+      const config = yield* loadS3Config({
+        MEDIA_UPLOAD_ACCESS_KEY_ID: "",
+        MEDIA_UPLOAD_SECRET_ACCESS_KEY: "",
+      });
+
       expect(Option.isNone(config.accessKeyId)).toBe(true);
       expect(Option.isNone(config.secretAccessKey)).toBe(true);
     })
