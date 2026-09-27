@@ -295,6 +295,60 @@ const addSubscriptionContact = (args: {
     return { contactId: effectiveContactId, subscriptionId };
   });
 
+/** Inserts `count` active verified changelog subscribers in two bulk writes. */
+const addChangelogSubscribers = (organizationId: string, count: number) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const now = yield* DateTime.nowAsDate;
+    const rows = yield* Effect.forEach(
+      Array.from({ length: count }, (_, index) => index),
+      (index) =>
+        Effect.gen(function* () {
+          const contactId = yield* EmailContactId.generate;
+          const subscriptionId = yield* EmailSubscriptionId.generate;
+          return {
+            contactId,
+            // Deliveries normalize recipient emails, so the contact must be
+            // stored lowercased or the materialization join cannot see the
+            // deliveries it already created.
+            email:
+              `batch-${index}-${organizationId}@example.test`.toLowerCase(),
+            subscriptionId,
+          };
+        })
+    );
+    yield* db.insert(schema.emailContactTable).values(
+      rows.map(({ contactId, email }) => ({
+        id: contactId,
+        organizationId,
+        userId: null,
+        email,
+        verificationState: "verified" as const,
+        verifiedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      }))
+    );
+    yield* db.insert(schema.emailSubscriptionTable).values(
+      rows.map(({ contactId, subscriptionId }) => ({
+        id: subscriptionId,
+        organizationId,
+        contactId,
+        topicType: "changelog" as const,
+        topicId: null,
+        source: "explicit" as const,
+        state: "active" as const,
+        verificationTokenHash: null,
+        verificationExpiresAt: null,
+        unsubscribeTokenHash: "previous-token-hash",
+        verifiedAt: now,
+        unsubscribedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      }))
+    );
+  });
+
 const waitForDelivery = (
   outboxId: string,
   predicate: (
@@ -325,13 +379,17 @@ const waitForDelivery = (
 const waitForIntentState = (outboxId: string, state: string) =>
   Effect.gen(function* () {
     const repository = yield* EmailOutboxRepository;
+    let lastObserved = "missing";
     for (let poll = 0; poll < 100; poll += 1) {
-      if ((yield* repository.findById(outboxId))?.state === state) {
+      lastObserved = (yield* repository.findById(outboxId))?.state ?? "missing";
+      if (lastObserved === state) {
         return;
       }
       yield* Effect.yieldNow;
     }
-    return yield* Effect.die("Email intent did not reach the expected state");
+    return yield* Effect.die(
+      `Email intent did not reach ${state}; last observed ${lastObserved}`
+    );
   });
 
 describe("EmailOutbox workflows", () => {
@@ -1284,6 +1342,88 @@ describe("EmailOutbox workflows", () => {
                 `resume-delivery-${organizationId}@example.test`.toLowerCase()
             )
           ).toHaveLength(1);
+        })
+    );
+
+    it.effect(
+      "re-offers a partially materialized intent after a plan resume",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { organizationId } = yield* fixture;
+          const db = yield* Database.Database;
+          const changelogId = `resume_batch_${organizationId}`;
+          const now = yield* DateTime.nowAsDate;
+          yield* db.insert(schema.changelogTable).values({
+            id: changelogId,
+            organizationId,
+            title: "Batched resume",
+            slug: "batched-resume",
+            content: "x",
+            excerpt: "x",
+            status: "published",
+            publishedAt: now,
+            creatorId: null,
+            creatorMemberId: null,
+            createdAt: now,
+            updatedAt: now,
+          });
+          // Exactly one materialization batch, so the resumed intent stays
+          // pending after the first batch and needs a second dispatch.
+          yield* addChangelogSubscribers(organizationId, 100);
+          const intent = yield* (yield* EmailOutboxRepository).recordIntent({
+            aggregateId: changelogId,
+            aggregateType: "changelog",
+            deduplicationKey: `changelog.resume-batch:${organizationId}:${changelogId}`,
+            expiresAt: shiftDate(fixtureNow, Duration.days(1)),
+            kind: "changelog.published",
+            organizationId,
+            payload: { kind: "changelog.published", changelogId },
+            scheduledAt: fixtureNow,
+          });
+          if (intent._tag !== "Inserted") {
+            return yield* Effect.die("Expected resumable batch intent");
+          }
+
+          // The first dispatch parks the intent on the plan and consumes its
+          // element id.
+          yield* reconcileEmailOutbox();
+          yield* waitForIntentState(intent.intent.id, "paused_by_plan");
+
+          // Upgrade: the resume materializes one batch and leaves the intent
+          // pending under a new `updatedAt`. The next sweep has to offer that
+          // revision rather than hit the consumed element id.
+          yield* TestClock.adjust("1 minute");
+          yield* enableSubscriberEmails(organizationId);
+          yield* reconcileEmailOutbox();
+          yield* TestClock.adjust("1 minute");
+          yield* reconcileEmailOutbox();
+          yield* waitForIntentState(intent.intent.id, "materialized");
+
+          const deliveries = yield* db
+            .select({ id: schema.emailDeliveryTable.id })
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, intent.intent.id));
+          expect(deliveries).toHaveLength(100);
+
+          // The suite shares one worker layer, so the batch has to finish
+          // before this test ends or its sends consume the next test's mailer
+          // outcomes.
+          yield* Effect.gen(function* () {
+            for (let poll = 0; poll < 1000; poll += 1) {
+              const rows = yield* db
+                .select({ state: schema.emailDeliveryTable.state })
+                .from(schema.emailDeliveryTable)
+                .where(
+                  eq(schema.emailDeliveryTable.outboxId, intent.intent.id)
+                );
+              if (rows.every((row) => row.state === "accepted")) {
+                return;
+              }
+              yield* Effect.yieldNow;
+            }
+            return yield* Effect.die("Batch deliveries did not drain");
+          });
         })
     );
 

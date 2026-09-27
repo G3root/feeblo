@@ -146,19 +146,25 @@ export class EmailOutboxQueues extends Context.Service<EmailOutboxQueues>()(
 }
 
 /**
- * Dispatcher element id, bucketed by the intent's `scheduledAt`.
+ * Dispatcher element id, bucketed by the intent's `scheduledAt` and
+ * `updatedAt`.
  *
  * A coalescing window can move `scheduledAt` later, so a later bucket has to be
- * offerable again; duplicate offers for one bucket stay de-duplicated by the
- * queue, which is what keeps a lost wake from double-materializing an intent.
+ * offerable again. A resume (or another update) can leave `scheduledAt` alone
+ * while making the row due again, so `updatedAt` joins the bucket. Duplicate
+ * offers for one revision stay de-duplicated by the queue, which is what keeps
+ * a lost wake from double-materializing an intent.
  */
 const dispatcherElementId = ({
   id,
   scheduledAt,
+  updatedAt,
 }: {
   readonly id: string;
   readonly scheduledAt: DateTime.Utc;
-}): string => `${id}:${DateTime.toEpochMillis(scheduledAt)}`;
+  readonly updatedAt: DateTime.Utc;
+}): string =>
+  `${id}:${DateTime.toEpochMillis(scheduledAt)}:${DateTime.toEpochMillis(updatedAt)}`;
 
 /**
  * Whether an intent row's expiry instant has passed.
@@ -1348,8 +1354,9 @@ export const enqueueEmailDelivery = (
  *
  * An intent whose coalescing window has not elapsed is deliberately left alone:
  * reconciliation offers it once the row comes due, so a worker is never handed
- * an element it cannot act on. The element id is bucketed by `scheduledAt`, so
- * a later window is a distinct element rather than a de-duplicated no-op.
+ * an element it cannot act on. The element id is bucketed by `scheduledAt` and
+ * `updatedAt`, so a later window or a resumed row is a distinct element rather
+ * than a de-duplicated no-op.
  */
 export const wakeEmailOutbox = (outboxId: string) =>
   Effect.gen(function* () {
@@ -1371,6 +1378,7 @@ export const wakeEmailOutbox = (outboxId: string) =>
         id: dispatcherElementId({
           id: intent.id,
           scheduledAt: DateTime.fromDateUnsafe(intent.scheduledAt),
+          updatedAt: DateTime.fromDateUnsafe(intent.updatedAt),
         }),
       }
     );
