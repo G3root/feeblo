@@ -1,5 +1,20 @@
 # Code Review — `email-durable-outbox`
 
+> **Status:** point-in-time review. This is the record of one review of one branch at one commit; it is not a current defect list. Re-check a finding against `main` before acting on it.
+>
+> Several have since been fixed, so acting on this document as written means re-fixing them:
+>
+> - **Double opt-in is not end-to-end** — fixed. `packages/domain/src/email-subscription/handlers.ts` records a `subscription.verification_requested` intent in the same transaction as the subscription.
+> - **One-click unsubscribe absent, `List-Unsubscribe` asserted undefined** — fixed. `packages/domain/src/email-outbox/workflow.ts` sets `List-Unsubscribe` and `List-Unsubscribe-Post: One-Click`.
+> - **Non-atomic dual writes in `post-subscription/handlers.ts`** — fixed. Both writes are inside one `transaction`.
+> - **Dead code from the migration (`post/workflow.ts`)** — fixed. The file is gone.
+> - **`alreadyVerifiedUser` plus an overlapping `userId?`** — fixed. It is a single `alreadyVerifiedUser?: { userId }`.
+> - **`post.official_update_published` intents deliberately failed at materialization** — fixed. The kind no longer appears in the outbox workflow.
+> - **Cloudflare event ingestion is dead code** — fixed. `makeSesEmailFeedbackRouter()` is mounted in `apps/server/src/app/router.ts`.
+> - **Cost controls absent** — partly fixed. `EMAIL_OUTBOX_MAX_CONCURRENT_SENDS`, `EMAIL_OUTBOX_MONTHLY_SEND_LIMIT`, `EMAIL_OUTBOX_GLOBAL_DELIVERY_PAUSED` and `EMAIL_OUTBOX_ESTIMATED_SEND_COST_MICROS` exist; per-workspace circuit breakers and alerts do not.
+>
+> Still open at the time of writing: `EmailSubscriptionInputError` reaching the client as a 500 (`email-subscription/handlers.ts` maps it to `internalConsentFailure`), and the status-coalescing dedup key.
+
 - **Fixed point:** `main` (merge-base `6012f2c`)
 - **Branch:** `email-durable-outbox` (5 commits: `a8c49d8`, `eefc8d4`, `669bbfc`, `f118bc5`, `7ba88e3`)
 - **Diff:** `git diff main...HEAD` — 53 files, ~19.6k insertions

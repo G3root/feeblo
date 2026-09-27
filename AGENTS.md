@@ -46,9 +46,9 @@ Dependencies are declared in the `catalog` block of `pnpm-workspace.yaml` and re
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm check` | **The gate.** `turbo run check` = every package's `tsc --noEmit`, then type-aware Oxlint plus the formatter check. |
+| `pnpm check` | **The gate.** `turbo run check` = every package's `tsc --noEmit`, then the lint gate (type-aware Oxlint with a per-rule warning budget) plus the formatter check. |
 | `pnpm typecheck` | Types only. Cached per package. |
-| `pnpm lint` | `oxlint && oxfmt --check .` |
+| `pnpm lint` | The lint gate: `node tools/lint-budget/check.ts` (Oxlint plus the warning budget) and the formatter check. |
 | `pnpm lint:fix` | The writer: `oxlint --fix && oxfmt`. |
 | `pnpm fmt` / `pnpm fmt:check` | Formatting only. |
 | `pnpm test` | Unit tests, `@feeblo/e2e` excluded. |
@@ -78,9 +78,11 @@ If a check fails, fix the failure. Do not loosen the rule to get green. If a rul
 
 Effect diagnostics live in Oxlint (`effecttsgo/*`), not in `tsc`. `packages/config/tsconfig.base.json` sets `diagnostics: false` on the language service so a finding is reported once, by the tool that can act on it. Put severity changes in `oxlint.config.ts`.
 
-Four `effecttsgo/*` rules are `off` with reasons in that file: `async-function`, `global-date`, `process-env`, and `global-console`. Each names the code that legitimately does the thing outside Effect. Their `-in-effect` siblings are on, and those are the ones that describe a defect — `new Date()` inside Effect bypasses `Clock`, which is why services that do it cannot be tested against `TestClock`. `typescript/no-unnecessary-type-arguments` is off for the same kind of reason: 131 findings that are all the same non-defect.
+Four `effecttsgo/*` rules are `off` with reasons in that file: `async-function`, `global-date`, `process-env`, and `global-console`. Each names the code that legitimately does the thing outside Effect. Their `-in-effect` siblings are on, and those are the ones that describe a defect — `new Date()` inside Effect bypasses `Clock`, which is why services that do it cannot be tested against `TestClock`. `typescript/no-unnecessary-type-arguments` is off for the same kind of reason: 131 findings that are all the same non-defect. `typescript/consistent-return` is off for a different one, written up beside it: it reads an `Effect.gen` early exit (`return yield* new SomeError(...)`) as "returns a value" and the success path as "does not", which is 72 of its 96 findings.
 
-`docs/adr/0005` records the ratchet order for what is still a warning.
+Oxlint's `react` plugin is **off by default** and `plugins` overwrites the default set, so it has to be listed explicitly. It was not, which meant no React rule ran anywhere until it was added: no `react/hooks` (a conditional hook call is a runtime crash), no `react/exhaustive-effect-dependencies`, no `react/refs`. Adding a plugin or a rule is a two-line change; assuming one is running because it is named in the `rules` block is how the gap happened, since a rule whose plugin is absent never resolves and never reports.
+
+`docs/adr/0005` records the ratchet order for what is still a warning. `pnpm lint` enforces it: `tools/lint-budget/check.ts` runs Oxlint once, fails on its errors, and compares the warnings against the per-rule counts in `tools/lint-budget/budget.json`, printing only the rules that moved. A rule that goes over fails the gate; a rule that comes down is reported and wants `node tools/lint-budget/check.ts --update` to tighten the budget. A bare `oxlint` cannot do this — it exits 0 with a thousand warnings, so before the budget a pull request could add fifty findings and stay green.
 
 Before writing, reviewing, or refactoring Effect code, read the installed package's own guide first: `node_modules/effect/AGENTS.md`. It ships with the version in the lockfile, so it is never stale, and it is a better reference than anything written down here.
 
@@ -98,12 +100,14 @@ Dependency direction: apps → `packages/domain` → `{db, id, permissions, util
 
 A domain module is `packages/domain/src/<entity>/` with a consistent shape: `schema.ts` (Effect Schema), `errors.ts` (tagged errors), `repository.ts` (Drizzle access), `rpcs.ts` (the RPC contract), `handlers.ts` (the layers), and `policies.ts` where authorization applies. Follow the shape of a neighbouring module rather than inventing one.
 
-Two files are hand-maintained lists that must stay in sync, and today nothing checks them:
+Two files are hand-maintained lists that must stay in sync:
 
 - `packages/domain/src/rpc-group.ts` composes every `*Rpcs` group into `AllRpcs`.
 - `packages/domain/src/rpc-router.ts` provides every `*RpcHandlers` layer.
 
-Adding an RPC means editing both. `rpc-group.ts` currently lists 34 groups and `rpc-router.ts` 30, the difference being the four provider-owned management groups that `apps/server` supplies (see `docs/adr/0002`) plus the `Core` merge. A group with no handler layer compiles cleanly and fails at runtime.
+Adding an RPC means editing both. `rpc-group.ts` lists 34 groups and `rpc-router.ts` 30, the difference being the four provider-owned management groups that `apps/server` supplies (see `docs/adr/0002`) plus the `Core` merge.
+
+Nothing checks the two files against each other, but a group in `AllRpcs` with no handler layer is no longer a silent runtime failure: `RpcServer.layerHttp` puts `Rpc.ToHandler<Rpcs>` in the layer's requirement channel, so the missing handler surfaces as a `tsc` error in `apps/server/src/app/program.ts` at `Layer.launch`. Removing one `Layer.provide(...)` from `rpc-router.ts` fails `pnpm check` with `Type 'Handler<"PostTagList">' is not assignable to type 'never'`. What still has no check is the reverse case — a `handlers.ts` wired into neither file — which is dead code rather than a defect, since a layer that is never provided is never required.
 
 The four surfaces, deliberately not sharing one contract:
 

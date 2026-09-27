@@ -32,3 +32,9 @@ Tests keep one documented exception to the manual-runtime ban: `packages/auth/sr
 `extends-native-error` stays on as a warning rather than being fixed: `RpcError` in `packages/web-shared` and `EmbedError` in `packages/sdk` are deliberately plain `Error` subclasses that never enter an Effect failure channel, and the SDK one must not pull `effect/Schema` into the embeddable bundle.
 
 A dependency bump now has a version contract. `@effect/tsgo` names the TypeScript, Oxlint, and `oxlint-tsgolint` versions it supports; `effect-tsgo patch` validates them and refuses to patch a mismatch, so these four pins move together or not at all.
+
+## Amendments
+
+**The ratchet is enforced.** "Each should be fixed and then flipped to `error`. None should be silenced" was a plan with nothing behind it: `oxlint` exits 0 with a thousand warnings, so the count could grow in any pull request and CI stayed green. `pnpm lint` now runs `tools/lint-budget/check.ts`, which lints once, fails on errors, and compares the warnings against the per-rule counts in `tools/lint-budget/budget.json`. A rule that exceeds its recorded count fails the gate; a rule that comes down is reported and the budget is tightened with `--update`. The budget, not the list above, is now the source of truth for what each rule currently costs — the list is the state at the time of this decision, and two entries had already drifted by a finding or two when the budget was seeded.
+
+**Two rules changed state.** `typescript/consistent-return` is `off`, with the reason beside it in `oxlint.config.ts`: it reads an `Effect.gen` early exit as "returns a value" and the success path as "does not", which is 72 of its 96 findings. Oxlint's `react` plugin is now enabled — it is off by default and `plugins` overwrites the default set, so until it was listed no React rule ran anywhere: no `react/hooks`, no dependency checking, no `react/refs`.

@@ -1,5 +1,7 @@
 # Migrating `apps/web` to TanStack Start — and keeping the widget Solid-only
 
+> **Status:** research for a migration that has since shipped (`08313ae4 feat(web): migrate apps/web from Astro to TanStack Start`). Kept for the measurements and the version survey, not as a plan. `apps/web` no longer depends on Astro and `pnpm-workspace.yaml` no longer lists it; the Astro entries below describe the "status quo" that was replaced.
+
 Researched 2026-09-22. All TanStack Start facts are pinned to the versions below; source line references point at the TanStack/router commit checked out for this research.
 
 ## Verified against
