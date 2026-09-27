@@ -8,5 +8,9 @@
     "noEmit": true,
     "strictNullChecks": true
   },
-  "include": ["src/**/*"]
+  // `test/**/*` is included on purpose. Without it the 10 spec files under
+  // `test/` were compiled by nothing: `pnpm check` runs `tsc --noEmit` per
+  // package, and a test file outside `include` is invisible to it. The package
+  // ships to npm, so its tests should not be the one thing tsc never reads.
+  "include": ["src/**/*", "test/**/*"]
 }

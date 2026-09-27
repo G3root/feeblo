@@ -9,5 +9,8 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["src/**/*"]
+  // `test/**/*` is included on purpose. Without it the specs under `test/` were
+  // compiled by nothing: `pnpm check` runs `tsc --noEmit` per package, and a
+  // file outside `include` is invisible to it.
+  "include": ["src/**/*", "test/**/*"]
 }
