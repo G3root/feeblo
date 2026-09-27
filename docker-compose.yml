@@ -55,6 +55,10 @@ services:
     # `required: false` because `.env` is optional: a deployment that supplies
     # its configuration through the process environment (as the CI smoke test
     # does) must still start.
+    #
+    # Only this service gets the file. The web container serves the public and
+    # has no use for the encryption keys or the database URL, so it names the
+    # four variables it needs instead.
     env_file:
       - path: .env
         required: false
@@ -109,14 +113,6 @@ services:
         APP_URL: ${APP_URL:-http://localhost:3001}
         APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
     restart: always
-    # The Node entry reads API_URL, APP_URL, APP_ROOT_DOMAIN, APP_RELEASE,
-    # TURNSTILE_SITE_KEY, NO_INDEX, POSTHOG_KEY and POSTHOG_HOST from the process
-    # environment on every request, so the last four have to arrive from `.env`
-    # — `environment:` below does not list them. See the note on the server
-    # service for why `required: false`.
-    env_file:
-      - path: .env
-        required: false
     depends_on:
       - server
     environment:
@@ -126,6 +122,17 @@ services:
       API_URL: ${API_URL:-http://localhost:3000}
       APP_URL: ${APP_URL:-http://localhost:3001}
       APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
+      # The rest of what the Node entry reads from the process environment, on
+      # every request (see `apps/web/src/dashboard/lib/server-runtime-public-env.ts`).
+      # Listed one by one rather than pulled in with `env_file` like the server:
+      # this container serves the public web, and the whole of `.env` includes
+      # AUTH_ENCRYPTION_KEY, INTEGRATION_ENCRYPTION_KEY, DATABASE_URL and the
+      # provider credentials, none of which the web process may read. Compose
+      # interpolates each value from `.env` without handing over the file.
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+      NO_INDEX: ${NO_INDEX:-}
+      POSTHOG_KEY: ${POSTHOG_KEY:-}
+      POSTHOG_HOST: ${POSTHOG_HOST:-}
     ports:
       - "${WEB_PORT:-4321}:4321"
 
