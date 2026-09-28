@@ -19,7 +19,6 @@ import { Auth } from "../auth-handler";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { PolicyDeniedError } from "../policy";
-import { PostActivityRepository } from "../post-activity/repository";
 import { RateLimitService } from "../rate-limit/service";
 import { S3Test } from "../services/s3-test";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -164,23 +163,18 @@ const makePublicApiDependencies = (
         );
 
   return Layer.mergeAll(
-    // The Public API records tag changes in a post's timeline, so its repository
-    // needs the activity repository at construction time. A changelog write is
-    // also a publish when it says so, which records a durable email intent and
-    // notifies subscribers through the same helper the dashboard uses. A delete
-    // sweeps the editor assets it orphaned, which needs media storage.
-    PublicApiRepository.layer.pipe(
-      Layer.provide(PostActivityRepository.layer),
-      Layer.provide(EmailOutboxRepository.layer),
-      Layer.provide(entitlements),
-      Layer.provide(S3Test)
-    ),
+    // The route owns the layers only it reads (`PublicApiInternals` in
+    // `router.ts`). What is listed here is the shared layers it requires, with
+    // the substitutes standing in for the production ones: the plan decision,
+    // media storage, the session seam, the rate-limit budget, and the
+    // application URL.
     PublicApiConfig.layerTest(new URL("https://app.feeblo.test")),
     entitlements,
     // Merged, not only provided: a test asserts the email intent a publish
     // records, and the layer is the only way a test body reaches the outbox.
     EmailOutboxRepository.layer,
     WorkspaceRepository.layer,
+    S3Test,
     AuthTest,
     RateLimitService.layerMemory,
     Etag.layer,
