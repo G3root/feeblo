@@ -232,22 +232,10 @@ export const PublicApiLive = HttpApiBuilder.group(
 
           yield* requirePublicApiScope("tags.assign");
 
-          // The post is read before the write so another workspace's post is a
-          // 404 rather than a set that tags nothing and answers 200.
-          const post = yield* repository
-            .findPost({
-              organizationId: caller.organizationId,
-              postId: params.postId,
-            })
-            .pipe(Effect.catchTag("InternalServerError", onInternalError));
-
-          if (Option.isNone(post)) {
-            return yield* Effect.fail(notFoundError("Post not found."));
-          }
-
-          // The tag ids are checked inside the write's own transaction, so a
-          // tag that does not exist is the documented `INVALID_REQUEST` rather
-          // than a foreign-key failure reported as a server error.
+          // The post is read and locked inside the write's own transaction, so
+          // another workspace's post is a 404, a post deleted mid-request is a
+          // 404 rather than a foreign-key failure, and two replacements of one
+          // post's tags cannot interleave into a set neither caller asked for.
           const tags = yield* repository
             .setPostTags({
               organizationId: caller.organizationId,

@@ -25,7 +25,7 @@ import { PostActivityRepository } from "../post-activity/repository";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import { postTagChangeActivities } from "../tag/post-tag-activities";
 import type { Cursor } from "./cursor";
-import { conflictError, invalidRequestError } from "./errors";
+import { conflictError, invalidRequestError, notFoundError } from "./errors";
 
 /** An author reduced to a classification and display fields — never an id. */
 export type PublicApiPostAuthor = {
@@ -703,9 +703,11 @@ const makePublicApiRepository = Effect.gen(function* () {
      *
      * A replacement rather than add and remove calls, so a caller that states
      * the final set cannot leave a tag behind by forgetting to remove it. The
-     * check, the write, the timeline entries, and the read-back share one
-     * transaction: a tag that disappears mid-request is answered as the invalid
-     * request it is rather than as a foreign-key failure, the response is
+     * post is locked first, then the check, the write, the timeline entries,
+     * and the read-back all run in that one transaction: two replacements of
+     * the same post cannot interleave into a set neither caller asked for, a
+     * tag or post that disappears mid-request is answered as the missing
+     * resource it is rather than as a foreign-key failure, the response is
      * exactly what a later read returns, and a post cannot end up tagged with
      * no record of the change in its history.
      *
@@ -729,6 +731,32 @@ const makePublicApiRepository = Effect.gen(function* () {
             // compares distinct rows, so the same id twice would otherwise look
             // like a tag the workspace does not have.
             const wanted = [...new Set(tagIds)];
+
+            // The post is read before anything else, and locked. Without the
+            // lock, two replacements of one post both read the same previous
+            // set and each inserts only its own additions, leaving the post
+            // with a union of the two requests — `[A, B]` and `[A, C]` would
+            // end as `[A, B, C]`. The lock makes the second wait here, and the
+            // reads below then happen in a snapshot that includes the first
+            // one's rows, so the last writer's set is the set that survives.
+            //
+            // `no key update` rather than `update`: this row is pointed at by
+            // foreign keys across the workspace, and the stronger lock would
+            // block unrelated inserts that merely reference this post.
+            const post = yield* tx
+              .select({ id: schema.postTable.id })
+              .from(schema.postTable)
+              .where(
+                and(
+                  eq(schema.postTable.id, postId),
+                  eq(schema.postTable.organizationId, organizationId)
+                )
+              )
+              .for("no key update");
+
+            if (post.length === 0) {
+              return yield* Effect.fail(notFoundError("Post not found."));
+            }
 
             if (wanted.length > 0) {
               // `for("key share")` is the lock the foreign-key check itself
