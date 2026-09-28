@@ -19,6 +19,7 @@ import {
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import { NotificationService } from "@feeblo/domain/notification/service";
+import { PostActivityRepository } from "@feeblo/domain/post-activity/repository";
 import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
 import { PostSubscriptionRepository } from "@feeblo/domain/post-subscription/repository";
 import { PostRepository } from "@feeblo/domain/post/repository";
@@ -303,7 +304,10 @@ export const makeServiceLayers = ({
     ),
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
     WorkspaceRepository.layer,
-    PublicApiRepository.layer,
+    // The Public API records tag changes in a post's timeline, so its
+    // repository needs the activity repository at construction time rather
+    // than reading it per request.
+    PublicApiRepository.layer.pipe(Layer.provide(PostActivityRepository.layer)),
     PublicApiConfig.layer
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
 };

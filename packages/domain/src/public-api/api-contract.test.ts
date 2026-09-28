@@ -27,13 +27,20 @@ const ResponseEntry = Schema.Struct({
 });
 
 const Operation = Schema.Struct({
+  requestBody: Schema.optional(Schema.Json),
   responses: Schema.Record(Schema.String, ResponseEntry),
 });
 
 const OpenApiDocument = Schema.Struct({
   paths: Schema.Record(
     Schema.String,
-    Schema.Struct({ get: Schema.optional(Operation) })
+    Schema.Struct({
+      get: Schema.optional(Operation),
+      post: Schema.optional(Operation),
+      put: Schema.optional(Operation),
+      patch: Schema.optional(Operation),
+      delete: Schema.optional(Operation),
+    })
   ),
 });
 
@@ -45,12 +52,30 @@ const document = decodeDocument(JSON.stringify(OpenApi.fromApi(PublicApi)));
 
 const LIST_PATH = "/api/v1/boards/{boardId}/posts";
 const DETAIL_PATH = "/api/v1/posts/{postId}";
+const SET_POST_TAGS_PATH = "/api/v1/posts/{postId}/tags";
+const TAGS_PATH = "/api/v1/tags";
+const TAG_PATH = "/api/v1/tags/{tagId}";
+
+/** The statuses every endpoint of the API can answer with, as the base set. */
+const READ_RESPONSE_CODES = [
+  "200",
+  "400",
+  "401",
+  "403",
+  "404",
+  "429",
+  "500",
+  "503",
+];
 
 describe("PublicApi contract", () => {
-  it("publishes exactly the two documented endpoints", () => {
+  it("publishes exactly the documented endpoints", () => {
     expect(Object.keys(document.paths).sort()).toEqual([
       LIST_PATH,
       DETAIL_PATH,
+      SET_POST_TAGS_PATH,
+      TAGS_PATH,
+      TAG_PATH,
     ]);
   });
 
@@ -61,16 +86,7 @@ describe("PublicApi contract", () => {
     // vocabulary is declared as an array of schemas rather than one union: a
     // union is a single entry whose AST carries no status, and the HTTP layer
     // then answers every error as 500.
-    expect(Object.keys(responses).sort()).toEqual([
-      "200",
-      "400",
-      "401",
-      "403",
-      "404",
-      "429",
-      "500",
-      "503",
-    ]);
+    expect(Object.keys(responses).sort()).toEqual(READ_RESPONSE_CODES);
 
     expect(JSON.stringify(responses["401"])).toContain("MISSING_API_KEY");
     expect(JSON.stringify(responses["401"])).toContain("INVALID_API_KEY");
@@ -87,5 +103,81 @@ describe("PublicApi contract", () => {
     // response are not reflected in the generated document, so it is not
     // asserted here.
     expect(JSON.stringify(responses["429"])).toContain("RATE_LIMITED");
+  });
+
+  it("promises a conflict only from the endpoints that write", () => {
+    const createResponses = document.paths[TAGS_PATH]?.post?.responses ?? {};
+    const renameResponses = document.paths[TAG_PATH]?.patch?.responses ?? {};
+    const deleteResponses = document.paths[TAG_PATH]?.delete?.responses ?? {};
+
+    // 201 for a create that returns the resource it made; 204 for a delete
+    // that has nothing left to return.
+    expect(Object.keys(createResponses).sort()).toEqual([
+      "201",
+      "400",
+      "401",
+      "403",
+      "409",
+      "429",
+      "500",
+      "503",
+    ]);
+    expect(JSON.stringify(createResponses["409"])).toContain("CONFLICT");
+    expect(Object.keys(renameResponses).sort()).toEqual([
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "429",
+      "500",
+      "503",
+    ]);
+    expect(Object.keys(deleteResponses).sort()).toEqual([
+      "204",
+      ...READ_RESPONSE_CODES.filter((code) => code !== "200"),
+    ]);
+
+    // A read endpoint must not promise a status it can never answer with: a
+    // generated client would handle a conflict that never arrives.
+    const readResponses = document.paths[TAG_PATH]?.get?.responses ?? {};
+    expect(Object.keys(readResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(JSON.stringify(readResponses)).not.toContain("CONFLICT");
+  });
+
+  it("documents the tag-assignment request and response", () => {
+    const operation = document.paths[SET_POST_TAGS_PATH]?.put;
+    const responses = operation?.responses ?? {};
+
+    // Assigning tags cannot collide — the write is a replacement and the pair
+    // is unique — so a 409 here would promise a status it never returns.
+    expect(Object.keys(responses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(JSON.stringify(operation?.requestBody)).toContain("tagIds");
+
+    // The response is the post's tag references, not the tag resource: no slug
+    // and no timestamps, which a caller reads from the tag itself.
+    const body = JSON.stringify(responses["200"]);
+    expect(body).toContain("data");
+    expect(body).toContain("name");
+    expect(body).not.toContain("slug");
+    expect(body).not.toContain("createdAt");
+  });
+
+  it("documents the tag resource without an internal identifier", () => {
+    const createResponses = document.paths[TAGS_PATH]?.post?.responses ?? {};
+    const body = JSON.stringify(createResponses["201"]);
+
+    for (const field of ["id", "name", "slug", "createdAt", "updatedAt"]) {
+      expect(body).toContain(field);
+    }
+
+    for (const forbidden of [
+      "creatorId",
+      "creatorMemberId",
+      "organizationId",
+    ]) {
+      expect(body).not.toContain(forbidden);
+    }
   });
 });

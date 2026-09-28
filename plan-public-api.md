@@ -225,7 +225,7 @@ Each slice is independently shippable and leaves the system consistent.
 
 ## Non-goals for the First Version
 
-Writes of any kind. User-owned or personal keys. OAuth applications and delegated access. A generated typed client or SDK. `end_users.read` and any endpoint returning contact data. Per-key IP allowlists. Audit-log export. Sorting, tag filters, or search on the list endpoint. Offset pagination. Keys visible to non-admin members. Rate-limit data exposed per key beyond `Retry-After`.
+Writes of any kind — lifted for tags by the tag CRUD slice, which added `tags.create`, `tags.update`, `tags.delete`, and `tags.assign` as scopes granted explicitly at key creation. User-owned or personal keys. OAuth applications and delegated access. A generated typed client or SDK. `end_users.read` and any endpoint returning contact data. Per-key IP allowlists. Audit-log export. Sorting, tag filters, or search on the list endpoint. Offset pagination. Keys visible to non-admin members. Rate-limit data exposed per key beyond `Retry-After`.
 
 ## Completion Criteria
 

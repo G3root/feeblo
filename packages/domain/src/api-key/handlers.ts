@@ -5,8 +5,9 @@ import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import {
   PUBLIC_API_DEFAULT_SCOPES,
-  toPublicApiScopeStatements,
   listPublicApiScopes,
+  toPublicApiScopeStatements,
+  type PublicApiScope,
 } from "../public-api/scopes";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import { Auth, CurrentSession } from "../session-middleware";
@@ -52,9 +53,21 @@ export const ApiKeyRpcHandlersEffect = Effect.gen(function* () {
   const auth = yield* Auth;
 
   return {
-    ApiKeyCreate: ({ name, organizationId, expiration }: TApiKeyCreate) =>
+    ApiKeyCreate: ({
+      name,
+      organizationId,
+      expiration,
+      scopes,
+    }: TApiKeyCreate) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
+
+        // The caller states the whole grant, or nothing for the read-only
+        // default set. Deduplicated because the plugin stores the list
+        // verbatim and a repeated action would show up twice in the dashboard.
+        const granted: readonly PublicApiScope[] = [
+          ...new Set(scopes ?? PUBLIC_API_DEFAULT_SCOPES),
+        ];
 
         // Server-side call, deliberately without request headers: a call that
         // carries a request is treated as a client call, and the plugin then
@@ -69,9 +82,7 @@ export const ApiKeyRpcHandlersEffect = Effect.gen(function* () {
                 userId: session.user.id,
                 name,
                 expiresIn: API_KEY_EXPIRATION_SECONDS[expiration],
-                permissions: toPublicApiScopeStatements(
-                  PUBLIC_API_DEFAULT_SCOPES
-                ),
+                permissions: toPublicApiScopeStatements(granted),
               },
             }),
           catch: (cause) =>

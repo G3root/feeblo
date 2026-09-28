@@ -1,7 +1,17 @@
 import type { TPostStatusType } from "@feeblo/domain-contracts/post-status-type";
 
-import type { PublicApiDetailedPost, PublicApiListedPost } from "./repository";
-import type { TPublicApiPost, TPublicApiPostSummary } from "./schema";
+import type {
+  PublicApiDetailedPost,
+  PublicApiListedPost,
+  PublicApiPostTag,
+  PublicApiTagSource,
+} from "./repository";
+import type {
+  TPublicApiPost,
+  TPublicApiPostSummary,
+  TPublicApiTag,
+  TPublicApiTagDetail,
+} from "./schema";
 
 export type PublicApiMapperContext = {
   /** Application base URL, without a trailing slash. */
@@ -69,7 +79,7 @@ export const toPublicApiPostSummary = (
     type: post.status.type,
   },
   etaQuarter: post.etaQuarter,
-  tags: post.tags.map((tag) => ({ id: tag.id, name: tag.name })),
+  tags: post.tags.map(toPublicApiTag),
   voteCount: post.voteCount,
   commentCount: post.commentCount,
   author: {
@@ -91,4 +101,33 @@ export const toPublicApiPost = (
 ): TPublicApiPost => ({
   ...toPublicApiPostSummary(post, context),
   content: post.content,
+});
+
+/**
+ * A tag reference, as a post payload embeds it.
+ *
+ * One mapper for both places a reference appears — the `tags` array of a post
+ * and the response of setting a post's tags — so the two cannot drift apart.
+ */
+export const toPublicApiTag = (tag: PublicApiPostTag): TPublicApiTag => ({
+  id: tag.id,
+  name: tag.name,
+});
+
+/**
+ * A tag as the tag endpoints return it.
+ *
+ * No context argument: nothing in a tag is derived from the workspace or the
+ * application URL, and taking a context that is never read would invite the
+ * next field to be composed from it without thinking about what a machine key
+ * is allowed to see.
+ */
+export const toPublicApiTagDetail = (
+  tag: PublicApiTagSource
+): TPublicApiTagDetail => ({
+  id: tag.id,
+  name: tag.name,
+  slug: tag.slug,
+  createdAt: tag.createdAt,
+  updatedAt: tag.updatedAt,
 });

@@ -1,6 +1,6 @@
 # Public API (v1)
 
-The Public API lets a workspace read its own Feeblo data programmatically. It is versioned, authenticated with an API key, and available on paid plans.
+The Public API lets a workspace read and manage its own Feeblo data programmatically. It is versioned, authenticated with an API key, and available on paid plans.
 
 It is **not** the public portal — the feedback board and widget that anyone can read — and **not** the dashboard transport, which is session-authenticated.
 
@@ -30,10 +30,17 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 
 | Scope | Grants |
 | --- | --- |
-| `posts.read` | Read posts, their status, tags, and vote and comment counts. Required by both v1 endpoints. |
+| `posts.read` | Read posts, their status, tags, and vote and comment counts. Required by both post endpoints. |
+| `tags.read` | Read the workspace's tags through the `/tags` endpoints. A post's embedded tags come with the post, under `posts.read`. |
+| `tags.create` | Create a tag. |
+| `tags.update` | Rename a tag. |
+| `tags.delete` | Delete a tag, which removes it from every post that carried it. |
+| `tags.assign` | Set which tags a post carries. |
 | `boards.read` | Reserved for a future board-metadata endpoint. No v1 endpoint requires it, and every key receives it so that endpoint is additive when it ships. |
 
-A key is created with a fixed set of scopes and never gains one afterwards. `end_users.read` is reserved for a future release.
+A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above; the `tags` write scopes are granted only when the key is created with them, so a key that was minted to read feedback cannot delete a workspace's tags. A key created before a scope existed does not gain it later — rotate the key if an integration needs more than it was issued.
+
+`end_users.read` is reserved for a future release.
 
 ## Endpoints
 
@@ -89,9 +96,109 @@ GET /api/v1/posts/{postId}
 
 Returns the same object plus `content`.
 
+### List tags
+
+```http
+GET /api/v1/tags
+```
+
+| Query parameter | Default | Notes |
+| --- | --- | --- |
+| `limit` | `25` | 1–100. |
+| `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
+
+```json
+{
+  "data": [
+    {
+      "id": "tag_ui",
+      "name": "UI",
+      "slug": "ui",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-12T09:30:00.000Z"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+Requires `tags.read`. Every tag in the workspace is returned, whether or not a post carries it, and tags used only on private boards are included — the key is the workspace's own credential, not a public visitor.
+
+### Get a tag
+
+```http
+GET /api/v1/tags/{tagId}
+```
+
+Returns one tag in the shape above. Requires `tags.read`.
+
+### Create a tag
+
+```http
+POST /api/v1/tags
+Content-Type: application/json
+
+{ "name": "UI" }
+```
+
+Responds `201` with the created tag. Requires `tags.create`.
+
+The `id` is assigned by the server, and `slug` is derived from the name. The name is trimmed, so `"  UI  "` is stored as `"UI"`. A name already used in the workspace — or a name that produces the same slug, such as `UI` and `ui` — is answered with `409 CONFLICT` rather than creating a near-duplicate.
+
+### Rename a tag
+
+```http
+PATCH /api/v1/tags/{tagId}
+Content-Type: application/json
+
+{ "name": "Interface" }
+```
+
+Responds `200` with the updated tag. Requires `tags.update`.
+
+`name` is the only writable field and the `slug` is re-derived from it; the tag's `id` never changes, and neither does the set of posts that carry it. A name already used by another tag is answered with `409 CONFLICT`.
+
+### Delete a tag
+
+```http
+DELETE /api/v1/tags/{tagId}
+```
+
+Responds `204` with no body. Requires `tags.delete`.
+
+The tag is removed from every post that carried it. The posts themselves are not modified, and the deletion cannot be undone.
+
+### Set a post's tags
+
+```http
+PUT /api/v1/posts/{postId}/tags
+Content-Type: application/json
+
+{ "tagIds": ["tag_ui", "tag_performance"] }
+```
+
+Responds `200` with the tags the post carries afterwards:
+
+```json
+{
+  "data": [
+    { "id": "tag_performance", "name": "Performance" },
+    { "id": "tag_ui", "name": "UI" }
+  ]
+}
+```
+
+Requires `tags.assign`.
+
+The list **replaces** the post's tags rather than adding to them, so a caller that knows the final set cannot leave a tag behind by forgetting to remove it. An empty list clears the post. Tags are ordered by name, so repeated reads of the same post return the same order, and the same array appears in the post's own `tags` field.
+
+Every id must exist in the workspace: an unknown id — including one belonging to another workspace — is answered with `400 INVALID_REQUEST` and nothing is written, rather than silently tagging the post with whatever happened to exist. Sending the same id twice is one tag, not an error.
+
+The change is recorded in the post's timeline as the tags that were added and removed. A key is not a member, so those entries have no actor and the dashboard shows them as "Someone".
+
 ## Pagination
 
-Pagination is cursor-based. A response carries `nextCursor`; `null` means the last page. Cursors are opaque — do not construct or parse them — and are invalidated by the API without notice if they are malformed, in which case the API returns `400 INVALID_REQUEST`. Do not poll with offsets: posts are inserted continuously and offset paging skips and repeats rows.
+Pagination is cursor-based. A response carries `nextCursor`; `null` means the last page. Cursors are opaque — do not construct or parse them — and are invalidated by the API without notice if they are malformed, in which case the API returns `400 INVALID_REQUEST`. Do not poll with offsets: posts and tags are inserted continuously and offset paging skips and repeats rows.
 
 ## Errors
 
@@ -112,6 +219,7 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 | 403 | `FORBIDDEN_SCOPE` | The key lacks the scope the endpoint requires. |
 | 403 | `PLAN_REQUIRES_UPGRADE` | The workspace plan does not include the Public API. |
 | 404 | `NOT_FOUND` | The resource does not exist in this workspace. |
+| 409 | `CONFLICT` | A write collided with something that already exists, such as a tag name already in use. |
 | 429 | `RATE_LIMITED` | Per-key rate limit exceeded. Carries `Retry-After` in seconds. |
 | 500 | `INTERNAL_ERROR` | Unexpected server failure. |
 | 503 | `SERVICE_UNAVAILABLE` | A required dependency is unavailable; requests fail closed. |
@@ -120,7 +228,7 @@ Switch on `_tag`. Codes are append-only within v1 — a new one may appear, an e
 
 ## Rate limits
 
-Limits are per key, not per IP, and are shared across server instances: **300 requests per minute** for reads. Limits may increase without notice; decreases are announced in advance.
+Limits are per key, not per IP, and are shared across server instances: **300 requests per minute**, shared by reads and writes. Limits may increase without notice; decreases are announced in advance.
 
 The per-key bucket means a customer behind a shared NAT is not throttled by their neighbours, and a leaked key cannot escape its limit by rotating source IPs. When the limit is exceeded the API returns `429 RATE_LIMITED` with `Retry-After`. If the rate limiter itself is unavailable, requests fail closed with `503 SERVICE_UNAVAILABLE` rather than being admitted unlimited.
 
@@ -140,7 +248,7 @@ The Public API never returns:
 
 `author` is always `{ type, displayName, avatarUrl }`: `type` is `member` or `end_user` and distinguishes workspace staff from end users. Display names are included because the workspace already sees them on public boards and the dashboard; they are the workspace's own data. Emails are deliberately excluded — a key travels into third-party infrastructure (an integration platform, a partner's backend, a CI log), and that is a different blast radius from a signed-in session.
 
-Post `content` is sanitized before it is stored, so the body the API returns is the same sanitized content the dashboard and the public portal render.
+Post `content` is sanitized before it is stored, so the body the API returns is the same sanitized content the dashboard and the public portal render. Tags carry a name and a slug, nothing else — a tag's creator is an internal identifier and is never returned.
 
 ## Which posts are visible
 
@@ -160,5 +268,7 @@ Anything that cannot respect those rules ships as `/api/v2`. When a v2 exists, v
 ## Managing keys
 
 Keys are managed in the dashboard under **Settings → Developers**, restricted to workspace admins and owners. The list shows a key's name and its first characters — `fbk_ab…` — which is enough to identify a key without exposing it. The plaintext value is displayed once, at creation. Revocation takes effect immediately and is not reversible.
+
+When a key is created you choose its access: **Read only**, or **Read and manage tags**. The choice fixes the key's scopes for its whole life, so pick the narrower one unless the integration needs to change tags.
 
 Use one key per integration so that revoking one does not interrupt the others.

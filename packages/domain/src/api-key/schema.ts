@@ -1,6 +1,8 @@
 import { WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
+import { PublicApiScopeSchema } from "../public-api/scopes";
+
 /**
  * Key metadata as the dashboard shows it. It never carries the key itself —
  * only `start`, the characters stored for identification.
@@ -57,6 +59,15 @@ export const ApiKeyCreate = S.Struct({
   name: S.String.check(S.isLengthBetween(1, 32)),
   /** How long the key stays valid; `never` is the plugin's null expiry. */
   expiration: ApiKeyExpiration,
+  /**
+   * The scopes the key carries. Omitted means the read-only default set.
+   *
+   * The Public API's write scopes are never granted implicitly, so a key is
+   * created with exactly what the caller asked for and can never gain a
+   * capability a later release introduces. The vocabulary is a closed literal
+   * union, so a scope that does not exist cannot be stored.
+   */
+  scopes: S.optional(S.Array(PublicApiScopeSchema)),
 });
 
 export type TApiKeyCreate = S.Schema.Type<typeof ApiKeyCreate>;

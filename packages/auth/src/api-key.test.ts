@@ -504,6 +504,7 @@ describe("api-key plugin wiring", () => {
       expect(created.permissions).toEqual({
         boards: ["read"],
         posts: ["read"],
+        tags: ["read"],
       });
     },
     perTestTimeout

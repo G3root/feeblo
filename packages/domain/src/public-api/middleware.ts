@@ -17,7 +17,7 @@ import {
   invalidApiKeyError,
   missingApiKeyError,
   planRequiresUpgradeError,
-  PUBLIC_API_ERROR_SCHEMAS,
+  PUBLIC_API_MIDDLEWARE_ERROR_SCHEMAS,
   rateLimitedError,
   serviceUnavailableError,
 } from "./errors";
@@ -62,7 +62,7 @@ export class ApiKeyAuthMiddleware extends HttpApiMiddleware.Service<
   ApiKeyAuthMiddleware,
   { provides: PublicApiCaller }
 >()("@feeblo/domain/PublicApi/ApiKeyAuthMiddleware", {
-  error: PUBLIC_API_ERROR_SCHEMAS,
+  error: PUBLIC_API_MIDDLEWARE_ERROR_SCHEMAS,
 }) {}
 
 /**
