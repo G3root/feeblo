@@ -3,6 +3,7 @@ import { expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { slugify } from "@feeblo/utils/url";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -18,6 +19,7 @@ import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { PostActivityRepository } from "../post-activity/repository";
 import { RateLimitService } from "../rate-limit/service";
+import { S3Test } from "../services/s3-test";
 import { WorkspaceRepository } from "../workspace/repository";
 import { PublicApiConfig } from "./config";
 import {
@@ -117,11 +119,13 @@ const PublicApiDependencies = Layer.mergeAll(
   // The Public API records tag changes in a post's timeline, so its repository
   // needs the activity repository at construction time. A changelog write is
   // also a publish when it says so, which records a durable email intent and
-  // notifies subscribers through the same helper the dashboard uses.
+  // notifies subscribers through the same helper the dashboard uses. A delete
+  // sweeps the editor assets it orphaned, which needs media storage.
   PublicApiRepository.layer.pipe(
     Layer.provide(PostActivityRepository.layer),
     Layer.provide(EmailOutboxRepository.layer),
-    Layer.provide(Entitlements)
+    Layer.provide(Entitlements),
+    Layer.provide(S3Test)
   ),
   PublicApiConfig.layerTest(new URL("https://app.feeblo.test")),
   Entitlements,
@@ -1735,6 +1739,50 @@ layer(makeTestApp())("public api v1", (it) => {
         )
       );
       expect(list.data).toHaveLength(0);
+    })
+  );
+
+  it.effect("sweeps the editor assets a deleted entry orphaned", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const id = yield* seedChangelog(workspace.organizationId);
+      const db = yield* currentDb;
+
+      // An editor asset only this entry referenced, old enough to be past the
+      // cleanup's grace period. Its `changelog_asset` reference cascades with
+      // the entry, which is what makes it an orphan after the delete. Dated
+      // from the Effect clock, which the cleanup reads through `DateTime.now`;
+      // the wall clock would put it in the future of the test's clock.
+      const now = yield* DateTime.nowAsDate;
+      yield* db.insert(schema.assetTable).values({
+        id: "ast_changelog_orphan",
+        bucket: "media",
+        key: "editor-media/changelog-orphan.png",
+        url: "https://media.test/editor-media/changelog-orphan.png",
+        kind: "editor_image",
+        organizationId: workspace.organizationId,
+        createdAt: new Date(now.getTime() - 2 * 60 * 60 * 1000),
+      });
+      yield* db.insert(schema.changelogAssetTable).values({
+        changelogId: id,
+        assetId: "ast_changelog_orphan",
+      });
+      registerKey(
+        "fbk_changelog_sweeper",
+        workspace.organizationId,
+        CHANGELOG_EDITOR_KEY_SCOPES
+      );
+
+      const deleted = yield* executeWrite("DELETE", `/api/v1/changelog/${id}`, {
+        apiKey: "fbk_changelog_sweeper",
+      });
+      expect(deleted.status).toBe(204);
+
+      const remaining = yield* db
+        .select({ id: schema.assetTable.id })
+        .from(schema.assetTable)
+        .where(eq(schema.assetTable.id, "ast_changelog_orphan"));
+      expect(remaining).toHaveLength(0);
     })
   );
 

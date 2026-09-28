@@ -37,7 +37,7 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 | `tags.delete` | Delete a tag, which removes it from every post that carried it. |
 | `tags.assign` | Set which tags a post carries. |
 | `changelog.read` | Read changelog entries, drafts and scheduled entries included, through the `/changelog` endpoints. Every key receives it. |
-| `changelog.create` | Create a changelog entry. A create is a draft unless it also holds `changelog.publish`. |
+| `changelog.create` | Create a changelog entry. Omitting `status` creates a draft, and sending `published` additionally requires `changelog.publish`. |
 | `changelog.update` | Replace a changelog entry's title, slug, body, cover image, status, and timestamps. |
 | `changelog.delete` | Delete a changelog entry and its links to the posts it announced. |
 | `changelog.publish` | Publish an entry: a create that starts published, or an update that moves one into `published`. Publishing emails everyone subscribed to the changelog. |

@@ -26,6 +26,7 @@ import { PostRepository } from "@feeblo/domain/post/repository";
 import { PublicApiConfig } from "@feeblo/domain/public-api/config";
 import { PublicApiRepository } from "@feeblo/domain/public-api/repository";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
+import { S3UploadServiceLive } from "@feeblo/domain/services/s3";
 import { Auth } from "@feeblo/domain/session-middleware";
 import { SiteRepository } from "@feeblo/domain/site/repository";
 import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
@@ -316,12 +317,14 @@ export const makeServiceLayers = ({
     // than reading it per request. Publishing a changelog entry also records a
     // durable email intent and notifies subscribers, so the write path needs
     // the outbox, the entitlement decision, and the notification fan-out —
-    // the same side effects the dashboard's write path performs.
+    // the same side effects the dashboard's write path performs. Deleting an
+    // entry sweeps the editor assets it orphaned, which needs media storage.
     PublicApiRepository.layer.pipe(
       Layer.provide(PostActivityRepository.layer),
       Layer.provide(EmailOutboxRepository.layer),
       Layer.provide(EntitlementPolicies),
-      Layer.provide(NotificationService.layer)
+      Layer.provide(NotificationService.layer),
+      Layer.provide(S3UploadServiceLive)
     ),
     PublicApiConfig.layer
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));

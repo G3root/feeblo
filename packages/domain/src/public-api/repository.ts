@@ -21,10 +21,14 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { syncChangelogAssetReferences } from "../asset/service";
+import {
+  cleanupOrphanedEditorAssets,
+  syncChangelogAssetReferences,
+} from "../asset/service";
 import { makeChangelogPublication } from "../changelog/publication";
 import { PostActivityRepository } from "../post-activity/repository";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
+import { S3UploadService } from "../services/s3";
 import { postTagChangeActivities } from "../tag/post-tag-activities";
 import type { Cursor } from "./cursor";
 import {
@@ -372,6 +376,7 @@ const toSource = (
  */
 const makePublicApiRepository = Effect.gen(function* () {
   const db = yield* currentDb;
+  const s3 = yield* S3UploadService;
   const activities = yield* PostActivityRepository;
   // Publishing an entry has the same side effects whichever surface wrote it:
   // a durable email intent and an in-app notification for subscribers. The
@@ -399,6 +404,30 @@ const makePublicApiRepository = Effect.gen(function* () {
   }) =>
     syncChangelogAssetReferences(args).pipe(
       Effect.provideService(Database.Database, db)
+    );
+
+  /**
+   * The dashboard's best-effort orphan sweep, after a delete commits.
+   *
+   * The asset service reads the database and media storage from the fiber
+   * context, which would put both on the calling handler and therefore on the
+   * route layer; providing the handles this repository already holds keeps the
+   * route's requirements at the repository itself. The database service is the
+   * same one the delete used, and the transaction connection is fiber-local,
+   * so nothing about the sweep changes. A sweep that fails is logged, never
+   * raised: the entry is already gone, and a leaked asset row is not the
+   * caller's problem to retry.
+   */
+  const cleanupOrphanedAssets = (organizationId: string) =>
+    cleanupOrphanedEditorAssets({ organizationId }).pipe(
+      Effect.provideService(Database.Database, db),
+      Effect.provideService(S3UploadService, s3),
+      Effect.catch((cause) =>
+        Effect.logWarning(
+          "Failed to clean up orphaned editor assets",
+          cause
+        ).pipe(Effect.annotateLogs({ organizationId }))
+      )
     );
 
   const countByPostIds = (postIds: readonly string[]) =>
@@ -1310,19 +1339,22 @@ const makePublicApiRepository = Effect.gen(function* () {
         ),
 
     /**
-     * Deletes an entry, reporting whether one was there to delete.
+     * Deletes an entry, reports whether one was there to delete, and sweeps
+     * what it left behind.
      *
      * `returning` rather than a read followed by a delete: the two would race,
      * and a caller told `204` for an entry that had already been removed by
      * someone else would have no way to know its id was wrong. The linked post
      * rows cascade with the entry.
      *
-     * The dashboard also sweeps orphaned editor assets after a delete. This
-     * does not, because the Public API never uploads assets, and pulling
-     * `S3UploadService` into the route would make every endpoint depend on
-     * media-storage configuration for a best-effort cleanup of rows this API
-     * did not create. The workspace's next dashboard-side delete collects
-     * whatever this one leaves.
+     * The orphan sweep is the same best-effort one the dashboard runs after
+     * its own delete, and it runs only when a row was actually removed. It
+     * deletes the asset rows and stored objects no post or changelog
+     * references any more — an API caller cannot upload editor assets, but it
+     * can delete a dashboard-created entry that referenced them, and leaving
+     * them for an unrelated dashboard delete that may never come is a leak.
+     * A failed sweep is logged rather than failing the delete that already
+     * committed.
      */
     deleteChangelog: ({ changelogId, organizationId }: TDeleteChangelog) =>
       db
@@ -1335,6 +1367,11 @@ const makePublicApiRepository = Effect.gen(function* () {
         )
         .returning({ id: schema.changelogTable.id })
         .pipe(
+          Effect.tap((rows) =>
+            rows.length === 0
+              ? Effect.void
+              : cleanupOrphanedAssets(organizationId)
+          ),
           Effect.map((rows) => rows.length > 0),
           withRemapDbErrors("PublicApiChangelog", "delete")
         ),
