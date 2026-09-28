@@ -503,6 +503,7 @@ describe("api-key plugin wiring", () => {
       expect(created.referenceId).toBe(organizationId);
       expect(created.permissions).toEqual({
         boards: ["read"],
+        changelog: ["read"],
         posts: ["read"],
         tags: ["read"],
       });
