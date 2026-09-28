@@ -2309,6 +2309,38 @@ layer(makeTestApp())("public api v1", (it) => {
       })
   );
 
+  it.effect("reports a delete that matched no row, and the one that did", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const repository = yield* PublicApiRepository;
+
+      // The window the handler cannot close: it reads the company, another
+      // request deletes it, and this delete then matches no row. That is the
+      // documented "not found" and not a success, so the repository reports
+      // it instead of a 204 that hides which workspace it deleted from.
+      const raced = yield* repository.deleteCompany({
+        companyId: "cmp_vanished",
+        organizationId: workspace.organizationId,
+      });
+      expect(raced).toBe(false);
+
+      yield* seedCompany(workspace.organizationId, "cmp_present", "Present");
+      const deleted = yield* repository.deleteCompany({
+        companyId: "cmp_present",
+        organizationId: workspace.organizationId,
+      });
+      expect(deleted).toBe(true);
+      expect(
+        Option.isNone(
+          yield* repository.findCompany({
+            companyId: "cmp_present",
+            organizationId: workspace.organizationId,
+          })
+        )
+      ).toBe(true);
+    })
+  );
+
   it.effect("deletes a company and detaches its contacts", () =>
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace();

@@ -1418,7 +1418,13 @@ const makePublicApiRepository = Effect.gen(function* () {
       ),
 
     /**
-     * Deletes a company.
+     * Deletes a company and reports whether there was one to delete.
+     *
+     * `false` rather than a silent success: the handler reads the company
+     * before calling this, so a delete that matched no row was raced by someone
+     * else's delete, and a caller who named the wrong workspace is owed the
+     * documented "not found" rather than a success that hides it. The changelog
+     * delete answers the same way.
      *
      * `contact.companyId` is `set null`, so the people who belonged to the
      * company survive it and keep their own records — the same behaviour as
@@ -1433,7 +1439,11 @@ const makePublicApiRepository = Effect.gen(function* () {
             eq(schema.companyTable.organizationId, organizationId)
           )
         )
-        .pipe(Effect.asVoid, withRemapDbErrors("PublicApiCompany", "delete")),
+        .returning({ id: schema.companyTable.id })
+        .pipe(
+          Effect.map((rows) => rows.length > 0),
+          withRemapDbErrors("PublicApiCompany", "delete")
+        ),
 
     /**
      * How many CRM entries the workspace holds, for the plan's entry limit.

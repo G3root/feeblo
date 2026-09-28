@@ -723,12 +723,19 @@ export const PublicApiLive = HttpApiBuilder.group(
             return yield* Effect.fail(notFoundError("Company not found."));
           }
 
-          yield* repository
+          const deleted = yield* repository
             .deleteCompany({
               companyId: params.companyId,
               organizationId: caller.organizationId,
             })
             .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          // The read above cannot hold the row still, so a company deleted
+          // between the two is answered as the missing company it is rather
+          // than as a success that deleted nothing.
+          if (!deleted) {
+            return yield* Effect.fail(notFoundError("Company not found."));
+          }
         })
       )
       .handle("listChangelog", ({ query }) =>
