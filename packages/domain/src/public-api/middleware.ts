@@ -1,3 +1,8 @@
+import {
+  hasPublicApiScope,
+  type PublicApiScope,
+  type PublicApiScopeStatements,
+} from "@feeblo/domain-contracts/public-api-scope";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -24,11 +29,6 @@ import {
   rateLimitedError,
   serviceUnavailableError,
 } from "./errors";
-import {
-  hasPublicApiScope,
-  type PublicApiScope,
-  type PublicApiScopeStatements,
-} from "./scopes";
 
 /** The header a caller presents its key in. */
 export const PUBLIC_API_KEY_HEADER = "x-api-key";

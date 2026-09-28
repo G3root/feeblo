@@ -19,12 +19,10 @@ import {
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import { NotificationService } from "@feeblo/domain/notification/service";
-import { PostActivityRepository } from "@feeblo/domain/post-activity/repository";
 import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
 import { PostSubscriptionRepository } from "@feeblo/domain/post-subscription/repository";
 import { PostRepository } from "@feeblo/domain/post/repository";
 import { PublicApiConfig } from "@feeblo/domain/public-api/config";
-import { PublicApiRepository } from "@feeblo/domain/public-api/repository";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
 import { S3UploadServiceLive } from "@feeblo/domain/services/s3";
 import { Auth } from "@feeblo/domain/session-middleware";
@@ -235,7 +233,7 @@ export const makeServiceLayers = ({
   // The entitlement decision is built from the workspace's billing state and is
   // read both by the Public API's key middleware and by its changelog writes
   // (publishing emails subscribers only on a plan that includes them). One
-  // value, provided twice, so the two cannot disagree about a workspace.
+  // value, provided once, so the two cannot disagree about a workspace.
   const EntitlementPolicies = EntitlementPolicy.layer.pipe(
     Layer.provide(WorkspaceRepository.layer)
   );
@@ -312,20 +310,16 @@ export const makeServiceLayers = ({
     ),
     EntitlementPolicies,
     WorkspaceRepository.layer,
-    // The Public API records tag changes in a post's timeline, so its
-    // repository needs the activity repository at construction time rather
-    // than reading it per request. Publishing a changelog entry also records a
-    // durable email intent and notifies subscribers, so the write path needs
-    // the outbox, the entitlement decision, and the notification fan-out —
-    // the same side effects the dashboard's write path performs. Deleting an
-    // entry sweeps the editor assets it orphaned, which needs media storage.
-    PublicApiRepository.layer.pipe(
-      Layer.provide(PostActivityRepository.layer),
-      Layer.provide(EmailOutboxRepository.layer),
-      Layer.provide(EntitlementPolicies),
-      Layer.provide(NotificationService.layer),
-      Layer.provide(S3UploadServiceLive)
-    ),
+    // Media storage is shared rather than the Public API's own: its repository
+    // sweeps the editor assets a deleted changelog entry orphaned, and the
+    // dashboard's routes upload through the same service. The Public API's
+    // private dependencies live in its route layer (`public-api/router.ts`),
+    // so what is assembled here is what more than one surface reads.
+    S3UploadServiceLive,
+    // Read through the ambient context rather than as a layer requirement
+    // (`currentPublicApiConfig`), so no type catches its absence and the
+    // Public API's own tests supply their own. Dropping this line compiles and
+    // fails only when a request asks for a paging link.
     PublicApiConfig.layer
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
 };

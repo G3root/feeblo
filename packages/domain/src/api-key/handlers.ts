@@ -1,14 +1,14 @@
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-
-import { EntitlementPolicy } from "../entitlement/policies";
-import * as Policy from "../policy";
 import {
   PUBLIC_API_DEFAULT_SCOPES,
   listPublicApiScopes,
   toPublicApiScopeStatements,
   type PublicApiScope,
-} from "../public-api/scopes";
+} from "@feeblo/domain-contracts/public-api-scope";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+
+import { EntitlementPolicy } from "../entitlement/policies";
+import * as Policy from "../policy";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import { Auth, CurrentSession } from "../session-middleware";
 import { WorkspaceRepository } from "../workspace/repository";
