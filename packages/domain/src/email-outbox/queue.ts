@@ -1115,7 +1115,10 @@ const failIntentAfterInfrastructureExhaustion = (outboxId: string) =>
       yield* recordEmailIntentTransition(intent.kind, "failed");
     }
   }).pipe(
-    Effect.catch((error) =>
+    // The write is the only record that the intent's budget is spent, so a
+    // failure must fail the element. `take` then re-offers it under the same
+    // id instead of acknowledging work whose row never moved.
+    Effect.tapError((error) =>
       Effect.logError("Could not persist exhausted email outbox intent", error)
     )
   );
@@ -1282,7 +1285,10 @@ export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
           },
         })
         .pipe(
-          Effect.catch((error) =>
+          // As above: swallowing this would complete the queue element with
+          // the delivery still mid-retry on the row. Fail so the element is
+          // retried and the terminal write is attempted again.
+          Effect.tapError((error) =>
             Effect.logError("Could not persist exhausted email delivery", error)
           )
         );
@@ -1292,7 +1298,14 @@ export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
   }
 );
 
-/** Forks the concurrent take loops that drain the outbox queues. */
+/**
+ * Forks the concurrent take loops that drain the outbox queues.
+ *
+ * Each `take` error channel carries the handler's failures — including a
+ * persistence error propagated from a terminal write — plus the queue's own
+ * `PersistedQueueError`. The take scope has already re-offered the element, so
+ * the loops log the cause and continue instead of taking the layer down.
+ */
 export const EmailOutboxWorkerLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const { maxConcurrentSends } = yield* EmailOutboxConfig;

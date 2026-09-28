@@ -14,9 +14,11 @@ import {
   testMailerState,
 } from "@feeblo/transactional/mailer/test";
 import { and, eq } from "drizzle-orm";
+import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
@@ -1601,6 +1603,117 @@ describe("EmailOutbox workflows", () => {
             (yield* repository.findDeliveryById(delivery.delivery.id))?.state
           ).toBe("accepted");
           expect((yield* testMailerState).attempts).toBeGreaterThanOrEqual(1);
+        })
+    );
+
+    it.effect(
+      "fails the element when the exhausted-delivery write cannot be persisted",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { intentId } = yield* fixture;
+          const repository = yield* EmailOutboxRepository;
+          const db = yield* Database.Database;
+          yield* db
+            .update(schema.emailOutboxTable)
+            .set({ state: "materialized" })
+            .where(eq(schema.emailOutboxTable.id, intentId));
+          const delivery = yield* repository.createDelivery({
+            outboxId: intentId,
+            recipientEmail: `unpersistable-${intentId}@example.test`,
+            template: "submission-notification",
+            templateVersion: 1,
+            templatePayload: {
+              actionLabel: "View dashboard",
+              actionUrl: "https://app.feeblo.com",
+              body: "A new post has been submitted.",
+              eyebrow: "Feedback",
+              posts: [],
+              title: "New submission in your workspace",
+              unsubscribe: {
+                kind: "settings",
+                url: "https://app.feeblo.com/settings/notifications",
+              },
+            },
+          });
+          if (delivery._tag !== "Inserted") {
+            return yield* Effect.die("Expected a queued delivery");
+          }
+          // One recovery attempt short of the ten-failure budget, so this run
+          // reaches the terminal `markDeliveryOutcome` write instead of
+          // deferring the delivery again.
+          yield* db
+            .update(schema.emailDeliveryTable)
+            .set({
+              state: "sending",
+              lastError: {
+                consecutiveInfrastructureFailures: 9,
+                tag: "EmailDeliveryActivityError",
+              },
+            })
+            .where(eq(schema.emailDeliveryTable.id, delivery.delivery.id));
+
+          const persistenceError = new EffectDrizzleQueryError({
+            query: "update email_delivery set state = 'failed'",
+            params: [],
+            cause: { code: "08006" },
+          });
+          const error = yield* Effect.flip(
+            deliverEmailDelivery({ deliveryId: delivery.delivery.id }).pipe(
+              Effect.provideService(
+                EmailOutboxRepository,
+                EmailOutboxRepository.of({
+                  ...repository,
+                  markDeliveryOutcome: () => Effect.fail(persistenceError),
+                })
+              )
+            )
+          );
+
+          expect(error).toBe(persistenceError);
+          // A swallowed write would report success while the row is still
+          // stuck mid-retry; the queue element must instead fail so `take`
+          // re-offers it and the terminal write is attempted again.
+          expect(
+            (yield* repository.findDeliveryById(delivery.delivery.id))?.state
+          ).toBe("sending");
+        })
+    );
+
+    it.effect(
+      "fails the dispatcher element when the exhausted-intent write cannot be persisted",
+      () =>
+        Effect.gen(function* () {
+          const { intentId } = yield* fixture;
+          const repository = yield* EmailOutboxRepository;
+          const persistenceError = new EffectDrizzleQueryError({
+            query: "update email_outbox set state = 'failed'",
+            params: [],
+            cause: { code: "08006" },
+          });
+          // Materialization fails every attempt, so the dispatcher spends its
+          // whole budget and reaches the terminal write; that write is what
+          // fails here.
+          const failingRepository = EmailOutboxRepository.of({
+            ...repository,
+            createDelivery: () => Effect.fail(persistenceError),
+            markIntentState: (input) =>
+              input.state === "failed"
+                ? Effect.fail(persistenceError)
+                : repository.markIntentState(input),
+          });
+
+          const fiber = yield* dispatchEmailOutboxIntent({
+            outboxId: intentId,
+          }).pipe(
+            Effect.provideService(EmailOutboxRepository, failingRepository),
+            Effect.forkScoped
+          );
+          // Let the whole dispatcher retry budget elapse.
+          yield* TestClock.adjust("1 hour");
+          const error = yield* Effect.flip(Fiber.join(fiber));
+
+          expect(error).toBe(persistenceError);
         })
     );
 
