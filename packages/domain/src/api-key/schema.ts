@@ -1,7 +1,6 @@
+import { PublicApiScopeSchema } from "@feeblo/domain-contracts/public-api-scope";
 import { WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
-
-import { PublicApiScopeSchema } from "../public-api/scopes";
 
 /**
  * Key metadata as the dashboard shows it. It never carries the key itself —

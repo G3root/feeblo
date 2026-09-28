@@ -10,6 +10,12 @@ import * as Schema from "effect/Schema";
  * credential rather than a member. `apiKeys.manage` decides who may grant a
  * scope; a scope decides what a key may do. Those are separate axes.
  *
+ * It lives in `@feeblo/domain-contracts` rather than beside the endpoints it
+ * guards because the dashboard's key form and the auth plugin's key
+ * configuration both read the vocabulary: the browser and the credential layer
+ * need the scope names and must not reach into the Public API's server module
+ * to get them (see `docs/adr/0006`).
+ *
  * Scopes are part of the versioned public contract: adding one is additive,
  * narrowing or renaming one is a breaking change. A write is its own scope
  * rather than an action implied by a read, so a key that only reads a

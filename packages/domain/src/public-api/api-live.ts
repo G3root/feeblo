@@ -1,3 +1,4 @@
+import { hasPublicApiScope } from "@feeblo/domain-contracts/public-api-scope";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { slugify } from "@feeblo/utils/url";
@@ -41,7 +42,6 @@ import {
   type TPublicApiPostTags,
   type TPublicApiTagPage,
 } from "./schema";
-import { hasPublicApiScope } from "./scopes";
 
 const parseLimit = (raw: string | undefined) =>
   Effect.gen(function* () {

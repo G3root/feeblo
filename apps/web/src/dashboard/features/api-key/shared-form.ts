@@ -1,14 +1,14 @@
 import {
-  API_KEY_EXPIRATIONS,
-  type TApiKeyExpiration,
-} from "@feeblo/domain/api-key/schema";
-import {
   PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
   PUBLIC_API_COMPANY_MANAGEMENT_SCOPES,
   PUBLIC_API_DEFAULT_SCOPES,
   PUBLIC_API_TAG_MANAGEMENT_SCOPES,
   type PublicApiScope,
-} from "@feeblo/domain/public-api/scopes";
+} from "@feeblo/domain-contracts/public-api-scope";
+import {
+  API_KEY_EXPIRATIONS,
+  type TApiKeyExpiration,
+} from "@feeblo/domain/api-key/schema";
 import { formOptions } from "@tanstack/react-form";
 import { z } from "zod";
 

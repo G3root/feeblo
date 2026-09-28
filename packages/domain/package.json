@@ -403,9 +403,6 @@
     "./public-api/schema": {
       "default": "./src/public-api/schema.ts"
     },
-    "./public-api/scopes": {
-      "default": "./src/public-api/scopes.ts"
-    },
     "./rate-limit": {
       "default": "./src/rate-limit.ts"
     },
