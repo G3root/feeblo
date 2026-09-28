@@ -181,8 +181,12 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
+      # `--continue` so one failing package cannot hide the others. Turbo stops
+      # scheduling new tasks after the first failure, and with nineteen suites
+      # behind a ten-slot scheduler that meant a single failure reported as
+      # "1 failed" while nine suites had never run at all.
       - name: Unit tests
-        run: pnpm exec turbo run test --filter=!@feeblo/e2e --concurrency=4
+        run: pnpm exec turbo run test --continue --filter=!@feeblo/e2e --concurrency=4
 
   docker_smoke_test:
     name: Docker Smoke Test
