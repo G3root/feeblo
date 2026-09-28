@@ -382,6 +382,9 @@
     "./public-api/cursor": {
       "default": "./src/public-api/cursor.ts"
     },
+    "./public-api/entitlement": {
+      "default": "./src/public-api/entitlement.ts"
+    },
     "./public-api/errors": {
       "default": "./src/public-api/errors.ts"
     },

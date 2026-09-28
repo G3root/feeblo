@@ -35,6 +35,10 @@ export const PUBLIC_API_SCOPES = [
   "tags.update",
   "tags.delete",
   "tags.assign",
+  "companies.read",
+  "companies.create",
+  "companies.update",
+  "companies.delete",
 ] as const;
 
 export type PublicApiScope = (typeof PUBLIC_API_SCOPES)[number];
@@ -77,6 +81,29 @@ export const PUBLIC_API_TAG_MANAGEMENT_SCOPES = [
   "tags.update",
   "tags.delete",
   "tags.assign",
+] as const satisfies readonly PublicApiScope[];
+
+/**
+ * The company grant, made explicitly at key creation and never by default.
+ *
+ * Deleting a company dissolves the account record its contacts point at and
+ * cascades away its attribute values, so a key that only reads feedback has no
+ * business holding that. The dashboard offers the grant as one choice, so a
+ * customer cannot end up with `companies.update` and no way to create the
+ * company it renames, or with `companies.delete` and no way to fix a mistake
+ * it made.
+ *
+ * Companies are a different class of data from posts and tags: a company is a
+ * customer's own account, not the workspace's content. A key minted to read
+ * feedback therefore never learns the customer roster by default either —
+ * `companies.read` is part of this group rather than of
+ * `PUBLIC_API_DEFAULT_SCOPES` — which is why the group is all four actions.
+ */
+export const PUBLIC_API_COMPANY_MANAGEMENT_SCOPES = [
+  "companies.read",
+  "companies.create",
+  "companies.update",
+  "companies.delete",
 ] as const satisfies readonly PublicApiScope[];
 
 const SCOPE_SEPARATOR = ".";

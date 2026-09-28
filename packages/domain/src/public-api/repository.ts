@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import type { TPostStatusType } from "@feeblo/domain-contracts/post-status-type";
-import { PostTagId, TagId } from "@feeblo/id";
+import { CompanyId, PostTagId, TagId } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
 import {
   and,
@@ -26,6 +26,7 @@ import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import { postTagChangeActivities } from "../tag/post-tag-activities";
 import type { Cursor } from "./cursor";
 import { conflictError, invalidRequestError, notFoundError } from "./errors";
+import type { TPublicApiCompanySourceType } from "./schema";
 
 /** An author reduced to a classification and display fields — never an id. */
 export type PublicApiPostAuthor = {
@@ -107,6 +108,36 @@ export type PublicApiTagPage = {
   readonly nextCursor: Cursor | null;
 };
 
+/**
+ * What the company mapper is allowed to read.
+ *
+ * Narrow for the same reason as `PublicApiTagSource`: the `company` table also
+ * carries `organizationId`, and a key is workspace-scoped, so the column would
+ * be the same string on every response while giving a future filter parameter
+ * something to be validated against. The attribute-value table is a join away
+ * and is not selected either: the public company resource has no custom
+ * fields.
+ *
+ * `source` is typed with the contract's own closed union rather than the
+ * internal `EntitySource`, so a new internal source is a compile error here
+ * until the public vocabulary names it.
+ */
+export type PublicApiCompanySource = {
+  readonly id: string;
+  readonly name: string;
+  readonly externalId: string | null;
+  readonly avatar: string | null;
+  readonly externalCreatedAt: Date | null;
+  readonly source: TPublicApiCompanySourceType;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+};
+
+export type PublicApiCompanyPage = {
+  readonly companies: readonly PublicApiCompanySource[];
+  readonly nextCursor: Cursor | null;
+};
+
 interface TListTags {
   cursor: Cursor | null;
   limit: number;
@@ -145,6 +176,53 @@ interface TSetPostTags {
   organizationId: string;
   postId: string;
   tagIds: readonly string[];
+}
+
+interface TListCompanies {
+  cursor: Cursor | null;
+  limit: number;
+  organizationId: string;
+}
+
+interface TFindCompany {
+  organizationId: string;
+  companyId: string;
+}
+
+interface TFindCompanyNameConflict {
+  /** The company being renamed, excluded from its own conflict check. */
+  excludeCompanyId: string | null;
+  name: string;
+  organizationId: string;
+}
+
+interface TFindCompanyExternalIdConflict {
+  /** The company being renamed, excluded from its own conflict check. */
+  excludeCompanyId: string | null;
+  externalId: string;
+  organizationId: string;
+}
+
+interface TCreateCompany {
+  externalId: string | null;
+  externalCreatedAt: Date | null;
+  avatar: string | null;
+  name: string;
+  organizationId: string;
+}
+
+interface TUpdateCompany {
+  externalId: string | null | undefined;
+  externalCreatedAt: Date | null | undefined;
+  avatar: string | null | undefined;
+  name: string | undefined;
+  organizationId: string;
+  companyId: string;
+}
+
+interface TDeleteCompany {
+  organizationId: string;
+  companyId: string;
 }
 
 interface TListBoardPosts {
@@ -237,6 +315,36 @@ const TAG_COLUMNS = {
   createdAt: schema.tagTable.createdAt,
   updatedAt: schema.tagTable.updatedAt,
 } as const;
+
+/**
+ * The company column list, and the only place a company field is selected.
+ *
+ * `organizationId` is deliberately absent: the key is workspace-scoped, so
+ * selecting it would put the same identifier on every response and invite a
+ * filter parameter that then has to be validated against the caller's key.
+ * The contact and attribute-value tables are not joined at all.
+ */
+const COMPANY_COLUMNS = {
+  id: schema.companyTable.id,
+  name: schema.companyTable.name,
+  externalId: schema.companyTable.externalId,
+  avatar: schema.companyTable.avatar,
+  externalCreatedAt: schema.companyTable.externalCreatedAt,
+  source: schema.companyTable.source,
+  createdAt: schema.companyTable.createdAt,
+  updatedAt: schema.companyTable.updatedAt,
+} as const;
+
+/**
+ * The conflict a unique-index race reports.
+ *
+ * The driver names the constraint it violated, not a field, so a collision
+ * that beats the handler's pre-check can only be reported as "one of these two
+ * already exists". The pre-check answers the ordinary duplicate with the field
+ * it actually found, which is the case a caller can act on.
+ */
+const COMPANY_UNIQUE_VIOLATION_MESSAGE =
+  "A company with this name or externalId already exists.";
 
 const toSource = (
   row: PostRow,
@@ -874,6 +982,298 @@ const makePublicApiRepository = Effect.gen(function* () {
           })
         )
         .pipe(withRemapDbErrors("PublicApiTag", "update")),
+
+    /**
+     * One page of the workspace's companies, newest first.
+     *
+     * Ordered and paged exactly like a board's posts and the workspace's tags —
+     * the same `(createdAt, id)` tuple and the same cursor — so a caller learns
+     * one paging rule for the whole API. Fetches `limit + 1` rows to learn
+     * whether another page exists without a second query.
+     */
+    listCompanies: ({ cursor, limit, organizationId }: TListCompanies) =>
+      Effect.gen(function* () {
+        const conditions: SQL[] = [
+          eq(schema.companyTable.organizationId, organizationId),
+        ];
+        if (cursor !== null) {
+          conditions.push(
+            sql`(${schema.companyTable.createdAt}, ${schema.companyTable.id}) < (${cursor.createdAt}, ${cursor.id})`
+          );
+        }
+
+        const rows = yield* db
+          .select(COMPANY_COLUMNS)
+          .from(schema.companyTable)
+          .where(and(...conditions))
+          .orderBy(
+            desc(schema.companyTable.createdAt),
+            desc(schema.companyTable.id)
+          )
+          .limit(limit + 1);
+
+        const hasMore = rows.length > limit;
+        const pageRows = hasMore ? rows.slice(0, limit) : rows;
+        const lastRow = pageRows.at(-1);
+
+        return {
+          companies: pageRows,
+          nextCursor:
+            hasMore && lastRow !== undefined
+              ? { createdAt: lastRow.createdAt, id: lastRow.id }
+              : null,
+        } satisfies PublicApiCompanyPage;
+      }).pipe(withRemapDbErrors("PublicApiCompany", "select")),
+
+    /** One company of the calling workspace, or nothing. */
+    findCompany: ({ organizationId, companyId }: TFindCompany) =>
+      Effect.gen(function* () {
+        const rows = yield* db
+          .select(COMPANY_COLUMNS)
+          .from(schema.companyTable)
+          .where(
+            and(
+              eq(schema.companyTable.id, companyId),
+              eq(schema.companyTable.organizationId, organizationId)
+            )
+          )
+          .limit(1);
+
+        return Option.fromNullishOr(rows.at(0));
+      }).pipe(withRemapDbErrors("PublicApiCompany", "select")),
+
+    /**
+     * The company that already holds this name, if any.
+     *
+     * `company_organizationId_name_uidx` is the authority; this is the courtesy
+     * check that lets an ordinary duplicate be answered with a message about
+     * the name instead of a driver error the caller cannot act on.
+     */
+    findCompanyNameConflict: ({
+      excludeCompanyId,
+      name,
+      organizationId,
+    }: TFindCompanyNameConflict) =>
+      Effect.gen(function* () {
+        const rows = yield* db
+          .select({ id: schema.companyTable.id })
+          .from(schema.companyTable)
+          .where(
+            and(
+              eq(schema.companyTable.organizationId, organizationId),
+              eq(schema.companyTable.name, name),
+              ...(excludeCompanyId === null
+                ? []
+                : [ne(schema.companyTable.id, excludeCompanyId)])
+            )
+          )
+          .limit(1);
+
+        return Option.fromNullishOr(rows.at(0));
+      }).pipe(withRemapDbErrors("PublicApiCompany", "select")),
+
+    /**
+     * The company that already holds this external id, if any.
+     *
+     * Looked up separately from the name so the message can say which field
+     * collided: `externalId` is the caller's own identifier, and being told
+     * that a *name* is taken when the caller reused a sync key would send them
+     * looking in the wrong place. Postgres treats `NULL` as distinct in a
+     * unique index, so an unset external id never conflicts with another unset
+     * one and is never passed here.
+     */
+    findCompanyExternalIdConflict: ({
+      excludeCompanyId,
+      externalId,
+      organizationId,
+    }: TFindCompanyExternalIdConflict) =>
+      Effect.gen(function* () {
+        const rows = yield* db
+          .select({ id: schema.companyTable.id })
+          .from(schema.companyTable)
+          .where(
+            and(
+              eq(schema.companyTable.organizationId, organizationId),
+              eq(schema.companyTable.externalId, externalId),
+              ...(excludeCompanyId === null
+                ? []
+                : [ne(schema.companyTable.id, excludeCompanyId)])
+            )
+          )
+          .limit(1);
+
+        return Option.fromNullishOr(rows.at(0));
+      }).pipe(withRemapDbErrors("PublicApiCompany", "select")),
+
+    /**
+     * Creates a company and returns the row the database stored.
+     *
+     * The id is minted here rather than accepted from the caller, for the same
+     * reason as a tag's: a machine key is not a member acting on records it can
+     * already see, and a caller-chosen id would make the primary key part of
+     * the request surface. The caller's own identifier belongs in `externalId`.
+     *
+     * `source` is written as `API` rather than taken from the request: it is
+     * this API's record of where the row came from, and a caller that could
+     * claim `DASHBOARD` would make the dashboard's own provenance column
+     * lie. A company the widget provisions stays `WIDGET`.
+     *
+     * Both unique indexes are mapped as well as pre-checked, because two
+     * concurrent creates collide after both checks pass and one of them then
+     * loses the race at an index. That fallback cannot say which of the two
+     * collided — the driver reports a constraint, not a field — so it names
+     * both rather than guessing; the pre-check has already answered the
+     * ordinary case with the precise field.
+     */
+    createCompany: ({
+      externalId,
+      externalCreatedAt,
+      avatar,
+      name,
+      organizationId,
+    }: TCreateCompany) =>
+      Effect.gen(function* () {
+        const id = yield* CompanyId.generate;
+        const now = yield* DateTime.nowAsDate;
+
+        const [created] = yield* db
+          .insert(schema.companyTable)
+          .values({
+            id,
+            name,
+            externalId,
+            avatar,
+            externalCreatedAt,
+            organizationId,
+            source: "API",
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning(COMPANY_COLUMNS);
+
+        // An insert either stores a row or fails; an empty `returning` is a
+        // broken invariant, not something the caller did, so it must not be
+        // reported as a conflict with a name nobody holds.
+        if (created === undefined) {
+          return yield* Effect.fail(
+            new InternalServerError({
+              message: "Error creating PublicApiCompany",
+            })
+          );
+        }
+
+        return created satisfies PublicApiCompanySource;
+      }).pipe(
+        withRemapDbErrors({
+          action: "create",
+          entity: "PublicApiCompany",
+          onUniqueViolation: () =>
+            conflictError(COMPANY_UNIQUE_VIOLATION_MESSAGE),
+        })
+      ),
+
+    /**
+     * Applies the fields the request named and returns the row the database
+     * stored.
+     *
+     * An absent field is not in the `set` at all, which is what makes `null`
+     * and `undefined` mean different things: `null` clears a nullable column,
+     * while an absent key leaves it as it was. `updatedAt` moves on every call
+     * that reaches here, because the handler has already refused a body that
+     * named no field.
+     */
+    updateCompany: ({
+      avatar,
+      companyId,
+      externalCreatedAt,
+      externalId,
+      name,
+      organizationId,
+    }: TUpdateCompany) =>
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+
+        const [updated] = yield* db
+          .update(schema.companyTable)
+          .set({
+            ...(name !== undefined && { name }),
+            ...(externalId !== undefined && { externalId }),
+            ...(avatar !== undefined && { avatar }),
+            ...(externalCreatedAt !== undefined && { externalCreatedAt }),
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(schema.companyTable.id, companyId),
+              eq(schema.companyTable.organizationId, organizationId)
+            )
+          )
+          .returning(COMPANY_COLUMNS);
+
+        // The handler reads the company before updating it, so a row that is
+        // gone by the time the update runs is a race, not a caller mistake.
+        if (updated === undefined) {
+          return yield* Effect.fail(
+            new InternalServerError({
+              message: "Error updating PublicApiCompany",
+            })
+          );
+        }
+
+        return updated satisfies PublicApiCompanySource;
+      }).pipe(
+        withRemapDbErrors({
+          action: "update",
+          entity: "PublicApiCompany",
+          onUniqueViolation: () =>
+            conflictError(COMPANY_UNIQUE_VIOLATION_MESSAGE),
+        })
+      ),
+
+    /**
+     * Deletes a company.
+     *
+     * `contact.companyId` is `set null`, so the people who belonged to the
+     * company survive it and keep their own records — the same behaviour as
+     * deleting it in the dashboard. The company's attribute values cascade.
+     */
+    deleteCompany: ({ organizationId, companyId }: TDeleteCompany) =>
+      db
+        .delete(schema.companyTable)
+        .where(
+          and(
+            eq(schema.companyTable.id, companyId),
+            eq(schema.companyTable.organizationId, organizationId)
+          )
+        )
+        .pipe(Effect.asVoid, withRemapDbErrors("PublicApiCompany", "delete")),
+
+    /**
+     * How many CRM entries the workspace holds, for the plan's entry limit.
+     *
+     * Counts rows and selects nothing: this API does not return contacts, but
+     * the plan limit that gates creating a company counts them, and the
+     * dashboard's own create is gated on the same number. Two queries rather
+     * than one union, because each then uses its own `organizationId` index.
+     */
+    countCrmEntries: (organizationId: string) =>
+      Effect.gen(function* () {
+        const [companyRows, contactRows] = yield* Effect.all([
+          db
+            .select({ total: count(schema.companyTable.id) })
+            .from(schema.companyTable)
+            .where(eq(schema.companyTable.organizationId, organizationId)),
+          db
+            .select({ total: count(schema.contactTable.id) })
+            .from(schema.contactTable)
+            .where(eq(schema.contactTable.organizationId, organizationId)),
+        ]);
+
+        return (
+          Number(companyRows.at(0)?.total ?? 0) +
+          Number(contactRows.at(0)?.total ?? 0)
+        );
+      }).pipe(withRemapDbErrors("PublicApiCompany", "select")),
   };
 });
 

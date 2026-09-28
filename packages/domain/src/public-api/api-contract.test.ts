@@ -55,6 +55,8 @@ const DETAIL_PATH = "/api/v1/posts/{postId}";
 const SET_POST_TAGS_PATH = "/api/v1/posts/{postId}/tags";
 const TAGS_PATH = "/api/v1/tags";
 const TAG_PATH = "/api/v1/tags/{tagId}";
+const COMPANIES_PATH = "/api/v1/companies";
+const COMPANY_PATH = "/api/v1/companies/{companyId}";
 
 /** The statuses every endpoint of the API can answer with, as the base set. */
 const READ_RESPONSE_CODES = [
@@ -70,13 +72,17 @@ const READ_RESPONSE_CODES = [
 
 describe("PublicApi contract", () => {
   it("publishes exactly the documented endpoints", () => {
-    expect(Object.keys(document.paths).sort()).toEqual([
-      LIST_PATH,
-      DETAIL_PATH,
-      SET_POST_TAGS_PATH,
-      TAGS_PATH,
-      TAG_PATH,
-    ]);
+    expect(Object.keys(document.paths).sort()).toEqual(
+      [
+        LIST_PATH,
+        DETAIL_PATH,
+        SET_POST_TAGS_PATH,
+        TAGS_PATH,
+        TAG_PATH,
+        COMPANIES_PATH,
+        COMPANY_PATH,
+      ].sort()
+    );
   });
 
   it("documents one response per error status", () => {
@@ -179,5 +185,82 @@ describe("PublicApi contract", () => {
     ]) {
       expect(body).not.toContain(forbidden);
     }
+  });
+
+  it("documents the company resource without an internal identifier", () => {
+    const createResponses =
+      document.paths[COMPANIES_PATH]?.post?.responses ?? {};
+    const body = JSON.stringify(createResponses["201"]);
+
+    for (const field of [
+      "id",
+      "name",
+      "externalId",
+      "avatar",
+      "externalCreatedAt",
+      "source",
+      "createdAt",
+      "updatedAt",
+    ]) {
+      expect(body).toContain(field);
+    }
+
+    // A company is an account record: the workspace, the member who entered
+    // it, and the contacts that belong to it are all deliberately absent.
+    for (const forbidden of [
+      "organizationId",
+      "creatorId",
+      "contactId",
+      "email",
+      "phone",
+    ]) {
+      expect(body).not.toContain(forbidden);
+    }
+  });
+
+  it("documents the company endpoints' statuses, and no conflict on a read", () => {
+    const listResponses = document.paths[COMPANIES_PATH]?.get?.responses ?? {};
+    const getResponses = document.paths[COMPANY_PATH]?.get?.responses ?? {};
+    const createResponses =
+      document.paths[COMPANIES_PATH]?.post?.responses ?? {};
+    const updateResponses =
+      document.paths[COMPANY_PATH]?.patch?.responses ?? {};
+    const deleteResponses =
+      document.paths[COMPANY_PATH]?.delete?.responses ?? {};
+
+    expect(Object.keys(listResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(Object.keys(getResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(Object.keys(createResponses).sort()).toEqual([
+      "201",
+      "400",
+      "401",
+      "403",
+      "409",
+      "429",
+      "500",
+      "503",
+    ]);
+    // An update can answer 404 as well as 409: the company has to exist to be
+    // renamed, and the name it is given has to be free.
+    expect(Object.keys(updateResponses).sort()).toEqual([
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "429",
+      "500",
+      "503",
+    ]);
+    expect(Object.keys(deleteResponses).sort()).toEqual([
+      "204",
+      ...READ_RESPONSE_CODES.filter((code) => code !== "200"),
+    ]);
+
+    expect(JSON.stringify(createResponses["409"])).toContain("CONFLICT");
+    expect(JSON.stringify(updateResponses["409"])).toContain("CONFLICT");
+    expect(JSON.stringify(listResponses)).not.toContain("CONFLICT");
+    expect(JSON.stringify(getResponses)).not.toContain("CONFLICT");
   });
 });

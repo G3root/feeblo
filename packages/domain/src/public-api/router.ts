@@ -3,7 +3,11 @@ import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { PublicApi } from "./api-contract";
 import { PublicApiLive } from "./api-live";
-import { ApiKeyAuthMiddleware, ApiKeyAuthMiddlewareLive } from "./middleware";
+import {
+  ApiKeyAuthMiddleware,
+  ApiKeyAuthMiddlewareLive,
+  PublicApiSchemaErrorHandlerLive,
+} from "./middleware";
 
 /**
  * The `/api/v1` route tree.
@@ -30,7 +34,14 @@ export const makePublicApiRoute = <E, R>(
 ) =>
   HttpApiBuilder.layer(PublicApi, {
     openapiPath: "/api/v1/openapi.json",
-  }).pipe(Layer.provide(PublicApiLive), Layer.provide(middleware));
+  }).pipe(
+    Layer.provide(PublicApiLive),
+    Layer.provide(middleware),
+    // Declares no requirements of its own: answering a request the schema
+    // rejected is part of this API's contract, not something the composition
+    // root supplies.
+    Layer.provide(PublicApiSchemaErrorHandlerLive)
+  );
 
 /** The route as production composes it. */
 export const PublicApiRoute = makePublicApiRoute(ApiKeyAuthMiddlewareLive);

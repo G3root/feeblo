@@ -5,6 +5,7 @@ import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { PublicApi } from "./api-contract";
 import { currentPublicApiConfig } from "./config";
 import { decodeCursor, encodeCursor } from "./cursor";
+import { requireCrmEntryAllowance } from "./entitlement";
 import {
   conflictError,
   internalError,
@@ -12,6 +13,7 @@ import {
   notFoundError,
 } from "./errors";
 import {
+  toPublicApiCompany,
   toPublicApiPost,
   toPublicApiPostSummary,
   toPublicApiTag,
@@ -22,6 +24,7 @@ import { currentPublicApiRepository } from "./repository";
 import {
   PUBLIC_API_PAGE_DEFAULT_LIMIT,
   PUBLIC_API_PAGE_MAX_LIMIT,
+  type TPublicApiCompanyPage,
   type TPublicApiPost,
   type TPublicApiPostPage,
   type TPublicApiPostTags,
@@ -87,13 +90,14 @@ const parseCursor = (raw: string | undefined) =>
   });
 
 /**
- * Tag names are trimmed before they are stored or compared.
+ * Tag and company names are trimmed before they are stored or compared.
  *
  * Without this, `" UI "` and `"UI"` are two different names that produce the
- * same slug, so the second one is rejected by an index the caller cannot see.
- * An all-whitespace name is not a name at all.
+ * same tag slug, so the second one is rejected by an index the caller cannot
+ * see; and a company named `" Acme "` would sit beside `"Acme"` until someone
+ * looked. An all-whitespace name is not a name at all.
  */
-const parseTagName = (raw: string) =>
+const parseName = (raw: string) =>
   Effect.gen(function* () {
     const name = raw.trim();
     if (name.length === 0) {
@@ -104,6 +108,18 @@ const parseTagName = (raw: string) =>
 
 /** The same message for both the pre-check and the index race that beats it. */
 const TAG_NAME_CONFLICT = "A tag with this name already exists.";
+
+/**
+ * The pre-check's messages, one per colliding field.
+ *
+ * The index race that beats the pre-check is reported by the repository
+ * instead, which cannot say which of the two indexes was violated — see
+ * `COMPANY_UNIQUE_VIOLATION_MESSAGE`.
+ */
+const COMPANY_NAME_CONFLICT = "A company with this name already exists.";
+
+const COMPANY_EXTERNAL_ID_CONFLICT =
+  "A company with this externalId already exists.";
 
 /**
  * The repository's driver failure, answered on the published vocabulary.
@@ -139,6 +155,63 @@ const failIfTagNameIsTaken = (args: {
 
     if (Option.isSome(existing)) {
       return yield* Effect.fail(conflictError(TAG_NAME_CONFLICT));
+    }
+  });
+
+/**
+ * Rejects a name, or an external id, another company in the workspace holds.
+ *
+ * A courtesy to the caller, not the authority: the two unique indexes are, and
+ * the repository maps their violation to the same conflict. Checking first
+ * means an ordinary duplicate is answered with a message about the field that
+ * actually collided, which is the difference between "rename it" and "that
+ * sync id is already in use" for a caller that has to decide what to do next.
+ *
+ * `excludeCompanyId` is what lets a company keep its own name and its own
+ * external id through an update. A name or external id that is not being
+ * written is `null` and is never checked; `externalId` is nullable, and
+ * Postgres treats `NULL` as distinct in a unique index, so two companies may
+ * both leave it unset.
+ */
+const failIfCompanyIsTaken = (args: {
+  readonly excludeCompanyId: string | null;
+  /** The external id the write would store, or null when it is not changing. */
+  readonly externalId: string | null;
+  /** The name the write would store, or null when it is not changing. */
+  readonly name: string | null;
+  readonly organizationId: string;
+}) =>
+  Effect.gen(function* () {
+    const repository = yield* currentPublicApiRepository;
+
+    if (args.name !== null) {
+      const nameTaken = yield* repository
+        .findCompanyNameConflict({
+          excludeCompanyId: args.excludeCompanyId,
+          name: args.name,
+          organizationId: args.organizationId,
+        })
+        .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+      if (Option.isSome(nameTaken)) {
+        return yield* Effect.fail(conflictError(COMPANY_NAME_CONFLICT));
+      }
+    }
+
+    if (args.externalId === null) {
+      return;
+    }
+
+    const externalIdTaken = yield* repository
+      .findCompanyExternalIdConflict({
+        excludeCompanyId: args.excludeCompanyId,
+        externalId: args.externalId,
+        organizationId: args.organizationId,
+      })
+      .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+    if (Option.isSome(externalIdTaken)) {
+      return yield* Effect.fail(conflictError(COMPANY_EXTERNAL_ID_CONFLICT));
     }
   });
 
@@ -283,7 +356,7 @@ export const PublicApiLive = HttpApiBuilder.group(
 
           yield* requirePublicApiScope("tags.create");
 
-          const name = yield* parseTagName(payload.name);
+          const name = yield* parseName(payload.name);
 
           yield* failIfTagNameIsTaken({
             excludeTagId: null,
@@ -325,7 +398,7 @@ export const PublicApiLive = HttpApiBuilder.group(
 
           yield* requirePublicApiScope("tags.update");
 
-          const name = yield* parseTagName(payload.name);
+          const name = yield* parseName(payload.name);
 
           // The tag is read before the rename so another workspace's tag is a
           // 404 rather than an update that matches no row and answers 200.
@@ -382,6 +455,180 @@ export const PublicApiLive = HttpApiBuilder.group(
             .deleteTag({
               organizationId: caller.organizationId,
               tagId: params.tagId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+        })
+      )
+      .handle("listCompanies", ({ query }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+
+          yield* requirePublicApiScope("companies.read");
+
+          const limit = yield* parseLimit(query.limit);
+          const cursor = yield* parseCursor(query.cursor);
+
+          // No existence check: the key proves the workspace exists, and a
+          // workspace with no companies is an empty page rather than a 404.
+          const page = yield* repository
+            .listCompanies({
+              cursor,
+              limit,
+              organizationId: caller.organizationId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          return {
+            data: page.companies.map(toPublicApiCompany),
+            nextCursor:
+              page.nextCursor === null ? null : encodeCursor(page.nextCursor),
+          } satisfies TPublicApiCompanyPage;
+        })
+      )
+      .handle("createCompany", ({ payload }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+
+          yield* requirePublicApiScope("companies.create");
+
+          const name = yield* parseName(payload.name);
+
+          yield* failIfCompanyIsTaken({
+            excludeCompanyId: null,
+            externalId: payload.externalId ?? null,
+            name,
+            organizationId: caller.organizationId,
+          });
+
+          // After the conflict checks, so a duplicate create is answered as the
+          // conflict it is rather than as a plan problem the caller cannot act
+          // on, and before the insert, so the workspace never holds one more
+          // CRM entry than its plan allows.
+          yield* requireCrmEntryAllowance(caller.organizationId);
+
+          const created = yield* repository
+            .createCompany({
+              avatar: payload.avatar ?? null,
+              externalCreatedAt: payload.externalCreatedAt ?? null,
+              externalId: payload.externalId ?? null,
+              name,
+              organizationId: caller.organizationId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          return toPublicApiCompany(created);
+        })
+      )
+      .handle("getCompany", ({ params }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+
+          yield* requirePublicApiScope("companies.read");
+
+          const company = yield* repository
+            .findCompany({
+              companyId: params.companyId,
+              organizationId: caller.organizationId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          return yield* Option.match(company, {
+            onNone: () => Effect.fail(notFoundError("Company not found.")),
+            onSome: (found) => Effect.succeed(toPublicApiCompany(found)),
+          });
+        })
+      )
+      .handle("updateCompany", ({ params, payload }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+
+          yield* requirePublicApiScope("companies.update");
+
+          // A body that names no field would otherwise be answered as a
+          // successful write that changed nothing but `updatedAt`, which tells
+          // the caller their request did something it did not. `null` is a
+          // field being named, so a body that only clears an avatar is fine.
+          const namesAField =
+            payload.name !== undefined ||
+            payload.externalId !== undefined ||
+            payload.avatar !== undefined ||
+            payload.externalCreatedAt !== undefined;
+
+          if (!namesAField) {
+            return yield* Effect.fail(
+              invalidRequestError("Provide at least one field to update.")
+            );
+          }
+
+          const name =
+            payload.name === undefined ? null : yield* parseName(payload.name);
+
+          // The company is read before the write so another workspace's
+          // company is a 404 rather than an update that matches no row and
+          // answers 200.
+          const company = yield* repository
+            .findCompany({
+              companyId: params.companyId,
+              organizationId: caller.organizationId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          if (Option.isNone(company)) {
+            return yield* Effect.fail(notFoundError("Company not found."));
+          }
+
+          yield* failIfCompanyIsTaken({
+            excludeCompanyId: params.companyId,
+            externalId: payload.externalId ?? null,
+            name,
+            organizationId: caller.organizationId,
+          });
+
+          const updated = yield* repository
+            .updateCompany({
+              avatar: payload.avatar,
+              companyId: params.companyId,
+              externalCreatedAt: payload.externalCreatedAt,
+              externalId: payload.externalId,
+              // `null` means "not being written"; the repository's `undefined`
+              // is what leaves the column alone.
+              name: name ?? undefined,
+              organizationId: caller.organizationId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          return toPublicApiCompany(updated);
+        })
+      )
+      .handle("deleteCompany", ({ params }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+
+          yield* requirePublicApiScope("companies.delete");
+
+          // A company that is already gone is a 404 rather than a success, for
+          // the same reason as a tag: the caller cannot tell a delete that
+          // worked from one that named the wrong workspace.
+          const company = yield* repository
+            .findCompany({
+              companyId: params.companyId,
+              organizationId: caller.organizationId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          if (Option.isNone(company)) {
+            return yield* Effect.fail(notFoundError("Company not found."));
+          }
+
+          yield* repository
+            .deleteCompany({
+              companyId: params.companyId,
+              organizationId: caller.organizationId,
             })
             .pipe(Effect.catchTag("InternalServerError", onInternalError));
         })

@@ -1,7 +1,10 @@
 import { useAtomSet } from "@effect/atom-react";
 import { Button } from "@feeblo/ui/button";
+import { Checkbox } from "@feeblo/ui/checkbox";
+import { CheckboxGroup } from "@feeblo/ui/checkbox-group";
 import { Field, FieldDescription, FieldLabel } from "@feeblo/ui/field";
 import { useAppForm } from "@feeblo/ui/hooks/form";
+import { Label } from "@feeblo/ui/label";
 import {
   Select,
   SelectItem,
@@ -28,11 +31,12 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 import { apiKeyReactivityKeys, createApiKeyAtom } from "../atoms";
 import { useApiKeyCreateDialogContext } from "../dialog-stores";
 import {
-  API_KEY_ACCESS_LEVEL_DESCRIPTIONS,
-  API_KEY_ACCESS_LEVEL_ITEMS,
-  API_KEY_ACCESS_LEVEL_SCOPES,
+  API_KEY_CAPABILITY_GROUP_ITEMS,
   API_KEY_EXPIRATION_ITEMS,
+  API_KEY_READ_ONLY_DESCRIPTION,
   apiKeyFormOpts,
+  apiKeyScopes,
+  toApiKeyCapabilityGroups,
 } from "../shared-form";
 
 export type CreatedApiKey = {
@@ -91,7 +95,7 @@ function ApiKeyCreateForm({
             name: value.name.trim(),
             organizationId,
             expiration: value.expiration,
-            scopes: [...API_KEY_ACCESS_LEVEL_SCOPES[value.access]],
+            scopes: apiKeyScopes(value.capabilities),
           },
           reactivityKeys: apiKeyReactivityKeys(organizationId),
         });
@@ -154,32 +158,44 @@ function ApiKeyCreateForm({
             </Field>
           )}
         </form.AppField>
-        <form.AppField name="access">
+        <form.AppField name="capabilities">
           {(field) => (
             <Field name={field.name}>
               <FieldLabel>Access</FieldLabel>
-              <Select
-                items={API_KEY_ACCESS_LEVEL_ITEMS}
-                onValueChange={(value) =>
-                  // Base UI can report a cleared selection as null; the form
-                  // has no empty state, so fall back to the narrower grant.
-                  field.handleChange(value ?? "read_only")
+              <CheckboxGroup
+                onValueChange={(values) =>
+                  field.handleChange(toApiKeyCapabilityGroups(values))
                 }
                 value={field.state.value}
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectPopup>
-                  {API_KEY_ACCESS_LEVEL_ITEMS.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectPopup>
-              </Select>
+                {API_KEY_CAPABILITY_GROUP_ITEMS.map((item) => {
+                  // The label is the checkbox's next sibling, which is how Base
+                  // UI's non-native control finds the label that names it; the
+                  // description is referenced separately so it describes the
+                  // checkbox instead of becoming part of its name.
+                  const id = `api-key-${item.value}`;
+                  return (
+                    <div className="grid gap-0.5" key={item.value}>
+                      <div className="flex items-center gap-2.5">
+                        <Checkbox
+                          aria-describedby={`${id}-description`}
+                          id={id}
+                          value={item.value}
+                        />
+                        <Label htmlFor={id}>{item.label}</Label>
+                      </div>
+                      <span
+                        className="text-muted-foreground ps-7 text-xs/4.5"
+                        id={`${id}-description`}
+                      >
+                        {item.description}
+                      </span>
+                    </div>
+                  );
+                })}
+              </CheckboxGroup>
               <FieldDescription>
-                {API_KEY_ACCESS_LEVEL_DESCRIPTIONS[field.state.value]}
+                {API_KEY_READ_ONLY_DESCRIPTION}
               </FieldDescription>
             </Field>
           )}

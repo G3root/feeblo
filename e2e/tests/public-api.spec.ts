@@ -55,6 +55,9 @@ test.describe("public API keys", () => {
       await test.step("create a key and read the one-time value", async () => {
         await newKeyButton.click();
         await page.getByLabel("Name").fill("Production sync");
+        // A capability, not an access level: the CRM grant is never implied by
+        // asking for a key, so the sheet has to be told to include it.
+        await page.getByRole("checkbox", { name: "Manage companies" }).check();
         await page.getByRole("button", { name: "Create key" }).click();
 
         const oneTimePanel = page.getByRole("region", { name: "New API key" });
@@ -81,6 +84,30 @@ test.describe("public API keys", () => {
         expect(anonymous.status()).toBe(401);
         expect(await anonymous.json()).toMatchObject({
           _tag: "MISSING_API_KEY",
+        });
+      });
+
+      await test.step("the CRM grant reaches the company endpoints", async () => {
+        const created = await request.post(`${apiURL}/api/v1/companies`, {
+          headers: { "x-api-key": apiKey },
+          data: { name: "Acme", externalId: "e2e-crm-1" },
+        });
+
+        expect(created.status()).toBe(201);
+        expect(await created.json()).toMatchObject({
+          name: "Acme",
+          externalId: "e2e-crm-1",
+          source: "API",
+        });
+
+        // The list is the assertion rather than a read by id: the id is minted
+        // by the server, and this keeps the spec free of a cast to reach it.
+        const listed = await request.get(`${apiURL}/api/v1/companies`, {
+          headers: { "x-api-key": apiKey },
+        });
+        expect(listed.status()).toBe(200);
+        expect(await listed.json()).toMatchObject({
+          data: [{ name: "Acme", externalId: "e2e-crm-1", source: "API" }],
         });
       });
 
