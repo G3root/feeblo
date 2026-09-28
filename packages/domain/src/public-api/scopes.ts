@@ -35,6 +35,11 @@ export const PUBLIC_API_SCOPES = [
   "tags.update",
   "tags.delete",
   "tags.assign",
+  "changelog.read",
+  "changelog.create",
+  "changelog.update",
+  "changelog.delete",
+  "changelog.publish",
 ] as const;
 
 export type PublicApiScope = (typeof PUBLIC_API_SCOPES)[number];
@@ -56,6 +61,7 @@ export const PUBLIC_API_DEFAULT_SCOPES = [
   "boards.read",
   "posts.read",
   "tags.read",
+  "changelog.read",
 ] as const satisfies readonly PublicApiScope[];
 
 /**
@@ -77,6 +83,23 @@ export const PUBLIC_API_TAG_MANAGEMENT_SCOPES = [
   "tags.update",
   "tags.delete",
   "tags.assign",
+] as const satisfies readonly PublicApiScope[];
+
+/**
+ * Changelog writes, granted explicitly at key creation and never by default.
+ *
+ * `changelog.publish` is separate from `changelog.update`: editing an entry is
+ * reversible, while publishing it emails everyone subscribed to the workspace
+ * changelog and shows up in their inbox. A key created to sync drafts from a
+ * CMS must not be able to broadcast a release note by setting `status`, so a
+ * publish — a create that starts published, or an update that moves an entry
+ * into `published` — needs the scope on its own.
+ */
+export const PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES = [
+  "changelog.create",
+  "changelog.update",
+  "changelog.delete",
+  "changelog.publish",
 ] as const satisfies readonly PublicApiScope[];
 
 const SCOPE_SEPARATOR = ".";

@@ -3,6 +3,7 @@ import {
   type TApiKeyExpiration,
 } from "@feeblo/domain/api-key/schema";
 import {
+  PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
   PUBLIC_API_DEFAULT_SCOPES,
   PUBLIC_API_TAG_MANAGEMENT_SCOPES,
   type PublicApiScope,
@@ -36,12 +37,21 @@ export const API_KEY_EXPIRATION_ITEMS = API_KEY_EXPIRATIONS.map((value) => ({
 /**
  * The access levels the create sheet offers.
  *
- * `read_only` is the scopes the server grants on its own; `tag_management`
- * adds the Public API's write scopes, which the server never grants without
- * being asked. The names are UI vocabulary — the wire carries the scope list
- * in `API_KEY_ACCESS_LEVEL_SCOPES`, so the two cannot drift.
+ * `read_only` is the scopes the server grants on its own; the other levels add
+ * the Public API's write scopes, which the server never grants without being
+ * asked. The names are UI vocabulary — the wire carries the scope list in
+ * `API_KEY_ACCESS_LEVEL_SCOPES`, so the two cannot drift. Changelog and tag
+ * management are separate choices rather than one, because a key that keeps a
+ * workspace's vocabulary tidy has no business broadcasting release notes, and
+ * `content_management` is the deliberate "both" for an integration that does
+ * need the whole surface.
  */
-export const API_KEY_ACCESS_LEVELS = ["read_only", "tag_management"] as const;
+export const API_KEY_ACCESS_LEVELS = [
+  "read_only",
+  "tag_management",
+  "changelog_management",
+  "content_management",
+] as const;
 
 export type ApiKeyAccessLevel = (typeof API_KEY_ACCESS_LEVELS)[number];
 
@@ -56,17 +66,32 @@ export const API_KEY_ACCESS_LEVEL_SCOPES = {
     ...PUBLIC_API_DEFAULT_SCOPES,
     ...PUBLIC_API_TAG_MANAGEMENT_SCOPES,
   ],
+  changelog_management: [
+    ...PUBLIC_API_DEFAULT_SCOPES,
+    ...PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
+  ],
+  content_management: [
+    ...PUBLIC_API_DEFAULT_SCOPES,
+    ...PUBLIC_API_TAG_MANAGEMENT_SCOPES,
+    ...PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
+  ],
 } satisfies Record<ApiKeyAccessLevel, readonly PublicApiScope[]>;
 
 export const API_KEY_ACCESS_LEVEL_LABELS = {
   read_only: "Read only",
   tag_management: "Read and manage tags",
+  changelog_management: "Read and manage changelog",
+  content_management: "Read and manage tags and changelog",
 } satisfies Record<ApiKeyAccessLevel, string>;
 
 export const API_KEY_ACCESS_LEVEL_DESCRIPTIONS = {
-  read_only: "Can read this workspace's posts and tags.",
+  read_only: "Can read this workspace's posts, tags, and changelog entries.",
   tag_management:
     "Can also create, rename, and delete tags, and set which tags a post carries. Deleting a tag removes it from every post that carries it.",
+  changelog_management:
+    "Can also create, edit, and delete changelog entries, and publish them. Publishing emails everyone subscribed to the changelog.",
+  content_management:
+    "Tag management plus changelog management: create, edit, and delete tags and changelog entries, assign tags, and publish release notes.",
 } satisfies Record<ApiKeyAccessLevel, string>;
 
 export const API_KEY_ACCESS_LEVEL_ITEMS = API_KEY_ACCESS_LEVELS.map(

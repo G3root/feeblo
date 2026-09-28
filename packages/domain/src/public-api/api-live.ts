@@ -1,7 +1,12 @@
+import { htmlToExcerpt } from "@feeblo/utils/html";
+import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import { slugify } from "@feeblo/utils/url";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
+import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { PublicApi } from "./api-contract";
 import { currentPublicApiConfig } from "./config";
 import { decodeCursor, encodeCursor } from "./cursor";
@@ -12,6 +17,8 @@ import {
   notFoundError,
 } from "./errors";
 import {
+  toPublicApiChangelog,
+  toPublicApiChangelogSummary,
   toPublicApiPost,
   toPublicApiPostSummary,
   toPublicApiTag,
@@ -22,11 +29,16 @@ import { currentPublicApiRepository } from "./repository";
 import {
   PUBLIC_API_PAGE_DEFAULT_LIMIT,
   PUBLIC_API_PAGE_MAX_LIMIT,
+  PublicApiChangelogStatus,
+  type TPublicApiChangelog,
+  type TPublicApiChangelogPage,
+  type TPublicApiChangelogStatus,
   type TPublicApiPost,
   type TPublicApiPostPage,
   type TPublicApiPostTags,
   type TPublicApiTagPage,
 } from "./schema";
+import { hasPublicApiScope } from "./scopes";
 
 const parseLimit = (raw: string | undefined) =>
   Effect.gen(function* () {
@@ -104,6 +116,87 @@ const parseTagName = (raw: string) =>
 
 /** The same message for both the pre-check and the index race that beats it. */
 const TAG_NAME_CONFLICT = "A tag with this name already exists.";
+
+/**
+ * The `status` filter on the changelog list, or nothing for every status.
+ *
+ * Declared as a string in the query schema and decoded here, so a typo is the
+ * documented `INVALID_REQUEST` rather than a page that silently looks empty.
+ */
+const parseChangelogStatusFilter = (raw: string | undefined) =>
+  Effect.gen(function* () {
+    if (raw === undefined || raw.length === 0) {
+      return null;
+    }
+
+    const decoded = Schema.decodeUnknownOption(PublicApiChangelogStatus)(raw);
+    if (Option.isNone(decoded)) {
+      return yield* Effect.fail(
+        invalidRequestError("status must be draft, scheduled, or published.")
+      );
+    }
+
+    return decoded.value;
+  });
+
+/**
+ * The write fields both the create and the update share, normalized.
+ *
+ * The title is trimmed because it is stored and slugified, and a trailing
+ * space that survives into a slug is a URL a reader cannot type back. The slug
+ * is always the one `slugify` produced, from the supplied value or the title,
+ * so `UI Kit` and `ui-kit` cannot become two entries that look identical in a
+ * feed. The timestamps are only validated against the status that selects
+ * them: a publish that carried no `publishedAt` would have the server invent a
+ * date that decides an ordering readers see, and a schedule with no
+ * `scheduledAt` says nothing at all.
+ */
+const parseChangelogWrite = (write: {
+  readonly content: string;
+  readonly coverImage?: string | null | undefined;
+  readonly publishedAt?: Date | null | undefined;
+  readonly scheduledAt?: Date | null | undefined;
+  readonly slug?: string | undefined;
+  readonly status: TPublicApiChangelogStatus;
+  readonly title: string;
+}) =>
+  Effect.gen(function* () {
+    const title = write.title.trim();
+    if (title.length === 0) {
+      return yield* Effect.fail(
+        invalidRequestError("title must not be empty.")
+      );
+    }
+
+    const slug = slugify((write.slug ?? "").trim() || title);
+    if (slug.length === 0) {
+      return yield* Effect.fail(
+        invalidRequestError("slug must contain at least one letter or number.")
+      );
+    }
+
+    if (write.status === "published" && write.publishedAt == null) {
+      return yield* Effect.fail(
+        invalidRequestError("publishedAt is required when status is published.")
+      );
+    }
+
+    if (write.status === "scheduled" && write.scheduledAt == null) {
+      return yield* Effect.fail(
+        invalidRequestError("scheduledAt is required when status is scheduled.")
+      );
+    }
+
+    return {
+      content: write.content,
+      coverImage: write.coverImage ?? null,
+      publishedAt: write.publishedAt ?? null,
+      scheduledAt: write.scheduledAt ?? null,
+      slug,
+      status: write.status,
+      title,
+    };
+  });
 
 /**
  * The repository's driver failure, answered on the published vocabulary.
@@ -384,6 +477,163 @@ export const PublicApiLive = HttpApiBuilder.group(
               tagId: params.tagId,
             })
             .pipe(Effect.catchTag("InternalServerError", onInternalError));
+        })
+      )
+      .handle("listChangelog", ({ query }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+
+          yield* requirePublicApiScope("changelog.read");
+
+          const limit = yield* parseLimit(query.limit);
+          const cursor = yield* parseCursor(query.cursor);
+          const status = yield* parseChangelogStatusFilter(query.status);
+
+          const page = yield* repository
+            .listChangelog({
+              cursor,
+              limit,
+              organizationId: caller.organizationId,
+              status,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          return {
+            data: page.entries.map(toPublicApiChangelogSummary),
+            nextCursor:
+              page.nextCursor === null ? null : encodeCursor(page.nextCursor),
+          } satisfies TPublicApiChangelogPage;
+        })
+      )
+      .handle("getChangelog", ({ params }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+
+          yield* requirePublicApiScope("changelog.read");
+
+          const entry = yield* repository
+            .findChangelog({
+              changelogId: params.changelogId,
+              organizationId: caller.organizationId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          return yield* Option.match(entry, {
+            // Not found rather than forbidden for another workspace's entry: a
+            // 403 would confirm that the id exists somewhere.
+            onNone: () =>
+              Effect.fail(notFoundError("Changelog entry not found.")),
+            onSome: (found) =>
+              Effect.succeed(
+                toPublicApiChangelog(found) satisfies TPublicApiChangelog
+              ),
+          });
+        })
+      )
+      .handle("createChangelog", ({ payload }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+
+          yield* requirePublicApiScope("changelog.create");
+
+          const write = yield* parseChangelogWrite({
+            ...payload,
+            status: payload.status ?? "draft",
+          });
+          const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
+            write.content
+          );
+
+          // The publish scope travels into the write rather than being
+          // required here: a create that starts as a draft does not need it,
+          // and only the write knows whether the request publishes.
+          const created = yield* repository
+            .createChangelog({
+              ...write,
+              allowPublish: hasPublicApiScope(
+                caller.scopes,
+                "changelog.publish"
+              ),
+              content: sanitizedMarkdown,
+              excerpt: htmlToExcerpt(sanitizedHtml),
+              organizationId: caller.organizationId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          // After the commit, best-effort: the intent is already durable, so a
+          // wake that fails costs latency, not the email, and reconciliation
+          // picks it up.
+          yield* wakeEmailOutboxBestEffort(
+            created.outboxId,
+            caller.organizationId
+          );
+
+          return toPublicApiChangelog(created.entry);
+        })
+      )
+      .handle("updateChangelog", ({ params, payload }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+
+          yield* requirePublicApiScope("changelog.update");
+
+          const write = yield* parseChangelogWrite(payload);
+          const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
+            write.content
+          );
+
+          // A `published` update that is not a transition is an ordinary edit
+          // of an already-published entry and does not need `changelog.publish`;
+          // the write decides from the locked status, so a race cannot turn a
+          // draft into a broadcast for a key that never held the scope.
+          const updated = yield* repository
+            .updateChangelog({
+              ...write,
+              allowPublish: hasPublicApiScope(
+                caller.scopes,
+                "changelog.publish"
+              ),
+              changelogId: params.changelogId,
+              content: sanitizedMarkdown,
+              excerpt: htmlToExcerpt(sanitizedHtml),
+              organizationId: caller.organizationId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          yield* wakeEmailOutboxBestEffort(
+            updated.outboxId,
+            caller.organizationId
+          );
+
+          return toPublicApiChangelog(updated.entry);
+        })
+      )
+      .handle("deleteChangelog", ({ params }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+
+          yield* requirePublicApiScope("changelog.delete");
+
+          // A delete that matches no row is a 404 rather than a success: the
+          // caller cannot tell a delete that worked from one that named the
+          // wrong workspace, and the second is worth knowing.
+          const deleted = yield* repository
+            .deleteChangelog({
+              changelogId: params.changelogId,
+              organizationId: caller.organizationId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          if (!deleted) {
+            return yield* Effect.fail(
+              notFoundError("Changelog entry not found.")
+            );
+          }
         })
       )
 );

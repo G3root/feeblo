@@ -250,7 +250,12 @@ describe("ApiKeyRpcHandlers", () => {
             start: "fbk_ab",
             prefix: "fbk_",
             enabled: true,
-            scopes: ["boards.read", "posts.read", "tags.read"],
+            scopes: [
+              "boards.read",
+              "posts.read",
+              "tags.read",
+              "changelog.read",
+            ],
             creatorId: fixture.userId,
             createdAt: new Date("2026-09-18T00:00:00.000Z"),
             lastRequest: null,
@@ -285,6 +290,7 @@ describe("ApiKeyRpcHandlers", () => {
             "boards.read",
             "posts.read",
             "tags.read",
+            "changelog.read",
           ]);
 
           // A caller that asks for the tag writes gets them, deduplicated: the
