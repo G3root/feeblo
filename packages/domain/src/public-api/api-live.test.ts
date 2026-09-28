@@ -3,6 +3,7 @@ import { expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { slugify } from "@feeblo/utils/url";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -15,10 +16,12 @@ import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 import type { ApiKeyAuthRecord } from "../api-key/schema";
 import { Auth } from "../auth-handler";
+import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { PolicyDeniedError } from "../policy";
 import { PostActivityRepository } from "../post-activity/repository";
 import { RateLimitService } from "../rate-limit/service";
+import { S3Test } from "../services/s3-test";
 import { WorkspaceRepository } from "../workspace/repository";
 import { PublicApiConfig } from "./config";
 import {
@@ -28,6 +31,8 @@ import {
 import { PublicApiRepository } from "./repository";
 import { makePublicApiRoute } from "./router";
 import {
+  PublicApiChangelog,
+  PublicApiChangelogPage,
   PublicApiCompany,
   PublicApiCompanyPage,
   PublicApiPost,
@@ -100,6 +105,12 @@ const decodeTag = Schema.decodeUnknownSync(
 const decodeTagPage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiTagPage)
 );
+const decodeChangelog = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiChangelog)
+);
+const decodeChangelogPage = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiChangelogPage)
+);
 const decodeCompany = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiCompany)
 );
@@ -117,7 +128,8 @@ const decodeDocument = Schema.decodeUnknownSync(
  * the workspace holds that many CRM entries: no plan both allows the Public API
  * and carries a cap today, so that branch is unreachable through the real
  * entitlements. Wrapping rather than restating the policy keeps every other
- * decision the real one — the key still has to pass the real `canUsePublicApi`.
+ * decision the real one — the key still has to pass the real `canUsePublicApi`,
+ * and a changelog publish still passes the real publish gate.
  */
 const makePublicApiDependencies = (
   options: { readonly crmEntryLimit?: number } = {}
@@ -126,11 +138,7 @@ const makePublicApiDependencies = (
   // re-reading an optional property.
   const { crmEntryLimit } = options;
 
-  return Layer.mergeAll(
-    // The Public API records tag changes in a post's timeline, so its repository
-    // needs the activity repository at construction time.
-    PublicApiRepository.layer.pipe(Layer.provide(PostActivityRepository.layer)),
-    PublicApiConfig.layerTest(new URL("https://app.feeblo.test")),
+  const entitlements =
     crmEntryLimit === undefined
       ? EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
       : Layer.effect(
@@ -153,7 +161,25 @@ const makePublicApiDependencies = (
               Layer.provide(WorkspaceRepository.layer)
             )
           )
-        ),
+        );
+
+  return Layer.mergeAll(
+    // The Public API records tag changes in a post's timeline, so its repository
+    // needs the activity repository at construction time. A changelog write is
+    // also a publish when it says so, which records a durable email intent and
+    // notifies subscribers through the same helper the dashboard uses. A delete
+    // sweeps the editor assets it orphaned, which needs media storage.
+    PublicApiRepository.layer.pipe(
+      Layer.provide(PostActivityRepository.layer),
+      Layer.provide(EmailOutboxRepository.layer),
+      Layer.provide(entitlements),
+      Layer.provide(S3Test)
+    ),
+    PublicApiConfig.layerTest(new URL("https://app.feeblo.test")),
+    entitlements,
+    // Merged, not only provided: a test asserts the email intent a publish
+    // records, and the layer is the only way a test body reaches the outbox.
+    EmailOutboxRepository.layer,
     WorkspaceRepository.layer,
     AuthTest,
     RateLimitService.layerMemory,
@@ -270,6 +296,42 @@ const seedTag = (
       organizationId,
       createdAt,
       updatedAt: createdAt,
+    });
+    return id;
+  });
+
+/**
+ * Inserts a changelog entry directly, so a test controls its status and age.
+ *
+ * Goes through the same `slugify` the repository uses, so a fixture cannot
+ * disagree with the API about what an entry's slug is.
+ */
+const seedChangelog = (
+  organizationId: string,
+  options: {
+    readonly content?: string;
+    readonly createdAt?: Date;
+    readonly id?: string;
+    readonly slug?: string;
+    readonly status?: "draft" | "scheduled" | "published";
+    readonly title?: string;
+  } = {}
+) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const id = options.id ?? `chg_${Math.random().toString(36).slice(2, 10)}`;
+    const title = options.title ?? "Release notes";
+    const now = options.createdAt ?? new Date();
+    yield* db.insert(schema.changelogTable).values({
+      id,
+      title,
+      slug: options.slug ?? slugify(title),
+      content: options.content ?? "Release body",
+      excerpt: "Release excerpt",
+      status: options.status ?? "draft",
+      organizationId,
+      createdAt: now,
+      updatedAt: now,
     });
     return id;
   });
@@ -461,12 +523,29 @@ const READ_KEY_SCOPES = {
   boards: ["read"],
   posts: ["read"],
   tags: ["read"],
+  changelog: ["read"],
 };
 
 const TAG_MANAGEMENT_KEY_SCOPES = {
   boards: ["read"],
   posts: ["read"],
   tags: ["read", "create", "update", "delete", "assign"],
+};
+
+/** The changelog reads plus every changelog write, publish included. */
+const CHANGELOG_MANAGEMENT_KEY_SCOPES = {
+  boards: ["read"],
+  posts: ["read"],
+  tags: ["read"],
+  changelog: ["read", "create", "update", "delete", "publish"],
+};
+
+/** The changelog writes without the publish scope. */
+const CHANGELOG_EDITOR_KEY_SCOPES = {
+  boards: ["read"],
+  posts: ["read"],
+  tags: ["read"],
+  changelog: ["read", "create", "update", "delete"],
 };
 
 /**
@@ -1370,6 +1449,470 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect("lists changelog entries newest first and filters by status", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_changelog_read", workspace.organizationId);
+      const now = new Date();
+      yield* seedChangelog(workspace.organizationId, {
+        createdAt: new Date(now.getTime() - 60_000),
+        id: "chg_old",
+        status: "draft",
+        title: "Older draft",
+      });
+      yield* seedChangelog(workspace.organizationId, {
+        createdAt: now,
+        id: "chg_new",
+        status: "published",
+        title: "Newer release",
+      });
+
+      const page = decodeChangelogPage(
+        responseBody(
+          yield* executeRequest("/api/v1/changelog", "fbk_changelog_read")
+        )
+      );
+      // Drafts are listed: the key belongs to the workspace, so it sees what
+      // has not shipped yet.
+      expect(page.data.map((entry) => entry.id)).toEqual([
+        "chg_new",
+        "chg_old",
+      ]);
+      expect(page.nextCursor).toBeNull();
+
+      const drafts = decodeChangelogPage(
+        responseBody(
+          yield* executeRequest(
+            "/api/v1/changelog?status=draft",
+            "fbk_changelog_read"
+          )
+        )
+      );
+      expect(drafts.data.map((entry) => entry.id)).toEqual(["chg_old"]);
+
+      const malformed = yield* executeRequest(
+        "/api/v1/changelog?status=nope",
+        "fbk_changelog_read"
+      );
+      expect(malformed.status).toBe(400);
+      expect(decodeError(responseBody(malformed))._tag).toBe("INVALID_REQUEST");
+    })
+  );
+
+  it.effect("refuses the changelog without the changelog.read scope", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_posts_only", workspace.organizationId, {
+        posts: ["read"],
+      });
+
+      const response = yield* executeRequest(
+        "/api/v1/changelog",
+        "fbk_posts_only"
+      );
+
+      expect(response.status).toBe(403);
+      const body = decodeError(responseBody(response));
+      expect(body._tag).toBe("FORBIDDEN_SCOPE");
+      expect(body.message).toContain("changelog.read");
+    })
+  );
+
+  it.effect(
+    "returns an entry's body on the detail endpoint only, and hides another workspace's entry",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const other = yield* seedWorkspace();
+        const id = yield* seedChangelog(workspace.organizationId, {
+          content: "Dark mode is live. Enable it in **Settings**.",
+        });
+        registerKey("fbk_changelog_detail", workspace.organizationId);
+        registerKey("fbk_changelog_foreign", other.organizationId);
+
+        const listed = decodeChangelogPage(
+          responseBody(
+            yield* executeRequest("/api/v1/changelog", "fbk_changelog_detail")
+          )
+        );
+        expect(listed.data[0]).not.toHaveProperty("content");
+
+        const detail = decodeChangelog(
+          responseBody(
+            yield* executeRequest(
+              `/api/v1/changelog/${id}`,
+              "fbk_changelog_detail"
+            )
+          )
+        );
+        expect(detail.content).toBe(
+          "Dark mode is live. Enable it in **Settings**."
+        );
+
+        // A key for another workspace is told the entry does not exist, so the
+        // id cannot be used to probe for it.
+        const foreign = yield* executeRequest(
+          `/api/v1/changelog/${id}`,
+          "fbk_changelog_foreign"
+        );
+        expect(foreign.status).toBe(404);
+        expect(decodeError(responseBody(foreign))._tag).toBe("NOT_FOUND");
+      })
+  );
+
+  it.effect("creates a draft, trimming its title and sanitizing its body", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_changelog_editor",
+        workspace.organizationId,
+        CHANGELOG_EDITOR_KEY_SCOPES
+      );
+
+      const created = yield* executeWrite("POST", "/api/v1/changelog", {
+        apiKey: "fbk_changelog_editor",
+        body: {
+          title: "  Dark mode  ",
+          content: "Dark mode is live\n\n<script>alert(1)</script>",
+        },
+      });
+
+      expect(created.status).toBe(201);
+      const entry = decodeChangelog(responseBody(created));
+      // The id is minted server-side; a caller does not choose identifiers.
+      expect(entry.id).toMatch(/^chg_/);
+      expect(entry.title).toBe("Dark mode");
+      expect(entry.slug).toBe("dark-mode");
+      expect(entry.status).toBe("draft");
+      expect(entry.content).not.toContain("<script>");
+      expect(entry.excerpt.length).toBeGreaterThan(0);
+    })
+  );
+
+  it.effect("rejects a published entry with no published date", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_changelog_publisher",
+        workspace.organizationId,
+        CHANGELOG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const response = yield* executeWrite("POST", "/api/v1/changelog", {
+        apiKey: "fbk_changelog_publisher",
+        body: { title: "Release", content: "Body", status: "published" },
+      });
+
+      // The server must not invent a date that decides a reader's ordering.
+      expect(response.status).toBe(400);
+      expect(decodeError(responseBody(response))._tag).toBe("INVALID_REQUEST");
+    })
+  );
+
+  it.effect("reports a duplicate slug as a conflict", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_changelog_conflict",
+        workspace.organizationId,
+        CHANGELOG_EDITOR_KEY_SCOPES
+      );
+
+      const first = yield* executeWrite("POST", "/api/v1/changelog", {
+        apiKey: "fbk_changelog_conflict",
+        body: { title: "UI Kit", content: "Body" },
+      });
+      expect(first.status).toBe(201);
+
+      // A different title that slugifies to the same slug is the same
+      // collision, so the second create must not make a near-duplicate.
+      const sameSlug = yield* executeWrite("POST", "/api/v1/changelog", {
+        apiKey: "fbk_changelog_conflict",
+        body: { title: "ui-kit", content: "Body" },
+      });
+      expect(sameSlug.status).toBe(409);
+      expect(decodeError(responseBody(sameSlug))._tag).toBe("CONFLICT");
+    })
+  );
+
+  it.effect("refuses to publish without the changelog.publish scope", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_changelog_editor",
+        workspace.organizationId,
+        CHANGELOG_EDITOR_KEY_SCOPES
+      );
+
+      const response = yield* executeWrite("POST", "/api/v1/changelog", {
+        apiKey: "fbk_changelog_editor",
+        body: {
+          title: "Release",
+          content: "Body",
+          publishedAt: "2026-09-01T00:00:00.000Z",
+          status: "published",
+        },
+      });
+
+      expect(response.status).toBe(403);
+      const body = decodeError(responseBody(response));
+      expect(body._tag).toBe("FORBIDDEN_SCOPE");
+      expect(body.message).toContain("changelog.publish");
+
+      // Nothing was written: a refused publish is not a draft.
+      const listed = decodeChangelogPage(
+        responseBody(
+          yield* executeRequest("/api/v1/changelog", "fbk_changelog_editor")
+        )
+      );
+      expect(listed.data).toHaveLength(0);
+    })
+  );
+
+  it.effect(
+    "publishes with the scope and records exactly one email intent",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        registerKey(
+          "fbk_changelog_publisher",
+          workspace.organizationId,
+          CHANGELOG_MANAGEMENT_KEY_SCOPES
+        );
+        const outbox = yield* EmailOutboxRepository;
+
+        const created = yield* executeWrite("POST", "/api/v1/changelog", {
+          apiKey: "fbk_changelog_publisher",
+          body: {
+            title: "Release",
+            content: "Body",
+            publishedAt: "2026-09-01T00:00:00.000Z",
+            status: "published",
+          },
+        });
+
+        expect(created.status).toBe(201);
+        const entry = decodeChangelog(responseBody(created));
+        expect(entry.status).toBe("published");
+        expect(entry.publishedAt).toEqual(new Date("2026-09-01T00:00:00.000Z"));
+
+        const intents = yield* outbox.findPending({
+          before: new Date(Date.now() + 60_000),
+          organizationId: workspace.organizationId,
+        });
+        expect(intents.map((intent) => intent.kind)).toEqual([
+          "changelog.published",
+        ]);
+      })
+  );
+
+  it.effect(
+    "publishes a draft with the scope and does not notify twice when it is edited",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const id = yield* seedChangelog(workspace.organizationId, {
+          status: "draft",
+        });
+        registerKey(
+          "fbk_changelog_editor",
+          workspace.organizationId,
+          CHANGELOG_EDITOR_KEY_SCOPES
+        );
+        registerKey(
+          "fbk_changelog_publisher",
+          workspace.organizationId,
+          CHANGELOG_MANAGEMENT_KEY_SCOPES
+        );
+        const outbox = yield* EmailOutboxRepository;
+        const publishedAt = "2026-09-01T00:00:00.000Z";
+
+        const denied = yield* executeWrite("PATCH", `/api/v1/changelog/${id}`, {
+          apiKey: "fbk_changelog_editor",
+          body: {
+            title: "Release",
+            content: "Body",
+            publishedAt,
+            status: "published",
+          },
+        });
+        expect(denied.status).toBe(403);
+        expect(decodeError(responseBody(denied))._tag).toBe("FORBIDDEN_SCOPE");
+
+        const published = yield* executeWrite(
+          "PATCH",
+          `/api/v1/changelog/${id}`,
+          {
+            apiKey: "fbk_changelog_publisher",
+            body: {
+              title: "Release",
+              content: "Body",
+              publishedAt,
+              status: "published",
+            },
+          }
+        );
+        expect(published.status).toBe(200);
+        expect(decodeChangelog(responseBody(published)).status).toBe(
+          "published"
+        );
+
+        // Editing an entry that is already published is an ordinary update:
+        // no transition, so no second email and no publish scope required.
+        const edited = yield* executeWrite("PATCH", `/api/v1/changelog/${id}`, {
+          apiKey: "fbk_changelog_editor",
+          body: {
+            title: "Release (edited)",
+            content: "Edited body",
+            publishedAt,
+            status: "published",
+          },
+        });
+        expect(edited.status).toBe(200);
+        expect(decodeChangelog(responseBody(edited)).title).toBe(
+          "Release (edited)"
+        );
+
+        const intents = yield* outbox.findPending({
+          before: new Date(Date.now() + 60_000),
+          organizationId: workspace.organizationId,
+        });
+        expect(intents.map((intent) => intent.kind)).toEqual([
+          "changelog.published",
+        ]);
+      })
+  );
+
+  it.effect("deletes an entry and reports it gone afterwards", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const id = yield* seedChangelog(workspace.organizationId);
+      registerKey(
+        "fbk_changelog_deleter",
+        workspace.organizationId,
+        CHANGELOG_EDITOR_KEY_SCOPES
+      );
+
+      const deleted = yield* executeWrite("DELETE", `/api/v1/changelog/${id}`, {
+        apiKey: "fbk_changelog_deleter",
+      });
+      expect(deleted.status).toBe(204);
+
+      // Deleting an entry that is already gone is a 404 rather than a
+      // success: the caller cannot tell a delete that worked from one that
+      // named the wrong workspace, and the second is worth knowing.
+      const again = yield* executeWrite("DELETE", `/api/v1/changelog/${id}`, {
+        apiKey: "fbk_changelog_deleter",
+      });
+      expect(again.status).toBe(404);
+      expect(decodeError(responseBody(again))._tag).toBe("NOT_FOUND");
+    })
+  );
+
+  it.effect("reports another workspace's entry as not found on a write", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const other = yield* seedWorkspace();
+      const id = yield* seedChangelog(other.organizationId, {
+        status: "draft",
+      });
+      registerKey(
+        "fbk_changelog_writer",
+        workspace.organizationId,
+        CHANGELOG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const updated = yield* executeWrite("PATCH", `/api/v1/changelog/${id}`, {
+        apiKey: "fbk_changelog_writer",
+        body: { title: "Hijacked", content: "Body", status: "draft" },
+      });
+      expect(updated.status).toBe(404);
+      expect(decodeError(responseBody(updated))._tag).toBe("NOT_FOUND");
+
+      const deleted = yield* executeWrite("DELETE", `/api/v1/changelog/${id}`, {
+        apiKey: "fbk_changelog_writer",
+      });
+      expect(deleted.status).toBe(404);
+
+      // The other workspace's list is untouched.
+      const list = decodeChangelogPage(
+        responseBody(
+          yield* executeRequest("/api/v1/changelog", "fbk_changelog_writer")
+        )
+      );
+      expect(list.data).toHaveLength(0);
+    })
+  );
+
+  it.effect("sweeps the editor assets a deleted entry orphaned", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const id = yield* seedChangelog(workspace.organizationId);
+      const db = yield* currentDb;
+
+      // An editor asset only this entry referenced, old enough to be past the
+      // cleanup's grace period. Its `changelog_asset` reference cascades with
+      // the entry, which is what makes it an orphan after the delete. Dated
+      // from the Effect clock, which the cleanup reads through `DateTime.now`;
+      // the wall clock would put it in the future of the test's clock.
+      const now = yield* DateTime.nowAsDate;
+      yield* db.insert(schema.assetTable).values({
+        id: "ast_changelog_orphan",
+        bucket: "media",
+        key: "editor-media/changelog-orphan.png",
+        url: "https://media.test/editor-media/changelog-orphan.png",
+        kind: "editor_image",
+        organizationId: workspace.organizationId,
+        createdAt: new Date(now.getTime() - 2 * 60 * 60 * 1000),
+      });
+      yield* db.insert(schema.changelogAssetTable).values({
+        changelogId: id,
+        assetId: "ast_changelog_orphan",
+      });
+      registerKey(
+        "fbk_changelog_sweeper",
+        workspace.organizationId,
+        CHANGELOG_EDITOR_KEY_SCOPES
+      );
+
+      const deleted = yield* executeWrite("DELETE", `/api/v1/changelog/${id}`, {
+        apiKey: "fbk_changelog_sweeper",
+      });
+      expect(deleted.status).toBe(204);
+
+      const remaining = yield* db
+        .select({ id: schema.assetTable.id })
+        .from(schema.assetTable)
+        .where(eq(schema.assetTable.id, "ast_changelog_orphan"));
+      expect(remaining).toHaveLength(0);
+    })
+  );
+
+  it.effect("never emits a changelog entry's internal identifiers", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedChangelog(workspace.organizationId, {
+        status: "published",
+      });
+      registerKey("fbk_changelog_private", workspace.organizationId);
+
+      const response = yield* executeRequest(
+        "/api/v1/changelog",
+        "fbk_changelog_private"
+      );
+      const raw = responseBody(response);
+
+      expect(decodeChangelogPage(raw).data).toHaveLength(1);
+      for (const forbidden of [
+        "creatorId",
+        "creatorMemberId",
+        "organizationId",
+      ]) {
+        expect(raw).not.toContain(forbidden);
+      }
+    })
+  );
+
   it.effect("never emits a company's internal identifiers", () =>
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace();
@@ -1883,6 +2426,8 @@ layer(makeTestApp())("public api v1", (it) => {
       const document = decodeDocument(responseBody(response));
       expect(Object.keys(document.paths).sort()).toEqual([
         "/api/v1/boards/{boardId}/posts",
+        "/api/v1/changelog",
+        "/api/v1/changelog/{changelogId}",
         "/api/v1/companies",
         "/api/v1/companies/{companyId}",
         "/api/v1/posts/{postId}",
@@ -1985,7 +2530,6 @@ layer(makeTestApp({ limit: 1, window: Duration.minutes(1) }))(
     );
   }
 );
-
 /**
  * The CRM entry limit, with a plan that denies one.
  *

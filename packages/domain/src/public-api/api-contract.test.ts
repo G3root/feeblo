@@ -57,6 +57,8 @@ const TAGS_PATH = "/api/v1/tags";
 const TAG_PATH = "/api/v1/tags/{tagId}";
 const COMPANIES_PATH = "/api/v1/companies";
 const COMPANY_PATH = "/api/v1/companies/{companyId}";
+const CHANGELOG_PATH = "/api/v1/changelog";
+const CHANGELOG_ENTRY_PATH = "/api/v1/changelog/{changelogId}";
 
 /** The statuses every endpoint of the API can answer with, as the base set. */
 const READ_RESPONSE_CODES = [
@@ -75,6 +77,8 @@ describe("PublicApi contract", () => {
     expect(Object.keys(document.paths).sort()).toEqual(
       [
         LIST_PATH,
+        CHANGELOG_PATH,
+        CHANGELOG_ENTRY_PATH,
         DETAIL_PATH,
         SET_POST_TAGS_PATH,
         TAGS_PATH,
@@ -150,6 +154,49 @@ describe("PublicApi contract", () => {
     const readResponses = document.paths[TAG_PATH]?.get?.responses ?? {};
     expect(Object.keys(readResponses).sort()).toEqual(READ_RESPONSE_CODES);
     expect(JSON.stringify(readResponses)).not.toContain("CONFLICT");
+
+    // The changelog write pair carries the same promise: a create and an
+    // update can both collide on the workspace's slug index.
+    const changelogCreateResponses =
+      document.paths[CHANGELOG_PATH]?.post?.responses ?? {};
+    const changelogUpdateResponses =
+      document.paths[CHANGELOG_ENTRY_PATH]?.patch?.responses ?? {};
+    const changelogDeleteResponses =
+      document.paths[CHANGELOG_ENTRY_PATH]?.delete?.responses ?? {};
+    const changelogReadResponses =
+      document.paths[CHANGELOG_ENTRY_PATH]?.get?.responses ?? {};
+
+    expect(Object.keys(changelogCreateResponses).sort()).toEqual([
+      "201",
+      "400",
+      "401",
+      "403",
+      "409",
+      "429",
+      "500",
+      "503",
+    ]);
+    expect(JSON.stringify(changelogCreateResponses["409"])).toContain(
+      "CONFLICT"
+    );
+    expect(Object.keys(changelogUpdateResponses).sort()).toEqual([
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "429",
+      "500",
+      "503",
+    ]);
+    expect(Object.keys(changelogDeleteResponses).sort()).toEqual([
+      "204",
+      ...READ_RESPONSE_CODES.filter((code) => code !== "200"),
+    ]);
+    expect(Object.keys(changelogReadResponses).sort()).toEqual(
+      READ_RESPONSE_CODES
+    );
   });
 
   it("documents the tag-assignment request and response", () => {
@@ -262,5 +309,55 @@ describe("PublicApi contract", () => {
     expect(JSON.stringify(updateResponses["409"])).toContain("CONFLICT");
     expect(JSON.stringify(listResponses)).not.toContain("CONFLICT");
     expect(JSON.stringify(getResponses)).not.toContain("CONFLICT");
+  });
+
+  it("documents the changelog resource and its writable fields", () => {
+    const createOperation = document.paths[CHANGELOG_PATH]?.post;
+    const createBody = JSON.stringify(createOperation?.responses["201"]);
+
+    for (const field of [
+      "id",
+      "title",
+      "slug",
+      "excerpt",
+      "coverImage",
+      "status",
+      "scheduledAt",
+      "publishedAt",
+      "createdAt",
+      "updatedAt",
+      "content",
+    ]) {
+      expect(createBody).toContain(field);
+    }
+
+    // The dashboard's `Changelog` carries actor identifiers and the workspace
+    // id; none of them has a name in this contract.
+    for (const forbidden of [
+      "creatorId",
+      "creatorMemberId",
+      "organizationId",
+      "userId",
+    ]) {
+      expect(createBody).not.toContain(forbidden);
+    }
+
+    // `status` is required on an update but optional on a create: omitting it
+    // from a create makes a draft, while an update that omitted it would move
+    // an entry by leaving a field out.
+    expect(JSON.stringify(createOperation?.requestBody)).toContain("title");
+    expect(JSON.stringify(createOperation?.requestBody)).toContain("content");
+
+    const updateOperation = document.paths[CHANGELOG_ENTRY_PATH]?.patch;
+    const updateBody = JSON.stringify(updateOperation?.requestBody);
+    expect(updateBody).toContain("status");
+    expect(updateBody).toContain("title");
+    expect(updateBody).toContain("content");
+
+    // The list projection omits the body; the detail endpoint adds it.
+    const listBody = JSON.stringify(
+      document.paths[CHANGELOG_PATH]?.get?.responses["200"]
+    );
+    expect(listBody).toContain("excerpt");
   });
 });

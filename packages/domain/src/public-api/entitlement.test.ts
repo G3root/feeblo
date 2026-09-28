@@ -3,8 +3,10 @@ import { currentDb, Database, schema } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { PostActivityRepository } from "../post-activity/repository";
+import { S3Test } from "../services/s3-test";
 import { WorkspaceRepository } from "../workspace/repository";
 import { requireCrmEntryAllowance } from "./entitlement";
 import { PublicApiRepository } from "./repository";
@@ -21,9 +23,23 @@ import { PublicApiRepository } from "./repository";
  * day a plan gains a cap.
  */
 
+const Entitlements = EntitlementPolicy.layer.pipe(
+  Layer.provide(WorkspaceRepository.layer)
+);
+
 const TestLayer = Layer.mergeAll(
-  PublicApiRepository.layer.pipe(Layer.provide(PostActivityRepository.layer)),
-  EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
+  // The repository publishes changelog entries and sweeps the assets a deleted
+  // one orphaned, so it needs the plan policy, the email outbox, and media
+  // storage at construction time — even though this suite only exercises the
+  // CRM entry count.
+  PublicApiRepository.layer.pipe(
+    Layer.provide(PostActivityRepository.layer),
+    Layer.provide(EmailOutboxRepository.layer),
+    Layer.provide(Entitlements),
+    Layer.provide(S3Test)
+  ),
+  Entitlements,
+  EmailOutboxRepository.layer,
   WorkspaceRepository.layer
 ).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
 

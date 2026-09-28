@@ -1,6 +1,6 @@
-import { currentDb, schema } from "@feeblo/db";
+import { currentDb, Database, schema } from "@feeblo/db";
 import type { TPostStatusType } from "@feeblo/domain-contracts/post-status-type";
-import { CompanyId, PostTagId, TagId } from "@feeblo/id";
+import { ChangelogId, CompanyId, PostTagId, TagId } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
 import {
   and,
@@ -21,13 +21,27 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import {
+  cleanupOrphanedEditorAssets,
+  syncChangelogAssetReferences,
+} from "../asset/service";
+import { makeChangelogPublication } from "../changelog/publication";
 import { PostActivityRepository } from "../post-activity/repository";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
+import { S3UploadService } from "../services/s3";
 import { postTagChangeActivities } from "../tag/post-tag-activities";
 import type { Cursor } from "./cursor";
 import type { CrmEntryAllowanceError } from "./entitlement";
-import { conflictError, invalidRequestError, notFoundError } from "./errors";
-import type { TPublicApiCompanySourceType } from "./schema";
+import {
+  conflictError,
+  forbiddenScopeError,
+  invalidRequestError,
+  notFoundError,
+} from "./errors";
+import type {
+  TPublicApiChangelogStatus,
+  TPublicApiCompanySourceType,
+} from "./schema";
 
 /** An author reduced to a classification and display fields — never an id. */
 export type PublicApiPostAuthor = {
@@ -134,10 +148,75 @@ export type PublicApiCompanySource = {
   readonly updatedAt: Date;
 };
 
+/**
+ * What a changelog mapper is allowed to read.
+ *
+ * Narrow for the same reason as the post and tag sources: `changelog` also
+ * carries `creatorId` and `creatorMemberId`, and a column that is not named
+ * here has no way into a public response. The status vocabulary is the closed
+ * literal union from `./schema`, not the dashboard's schema module.
+ */
+export type PublicApiChangelogSource = {
+  readonly id: string;
+  readonly title: string;
+  readonly slug: string;
+  readonly excerpt: string;
+  readonly coverImage: string | null;
+  readonly status: TPublicApiChangelogStatus;
+  readonly scheduledAt: Date | null;
+  readonly publishedAt: Date | null;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+};
+
 export type PublicApiCompanyPage = {
   readonly companies: readonly PublicApiCompanySource[];
   readonly nextCursor: Cursor | null;
 };
+
+export type PublicApiChangelogDetail = PublicApiChangelogSource & {
+  readonly content: string;
+};
+
+export type PublicApiChangelogPage = {
+  readonly entries: readonly PublicApiChangelogSource[];
+  readonly nextCursor: Cursor | null;
+};
+
+interface TListChangelog {
+  cursor: Cursor | null;
+  limit: number;
+  organizationId: string;
+  status: TPublicApiChangelogStatus | null;
+}
+
+interface TFindChangelog {
+  changelogId: string;
+  organizationId: string;
+}
+
+interface TCreateChangelog {
+  /** Whether the key holds `changelog.publish`. */
+  allowPublish: boolean;
+  content: string;
+  coverImage: string | null;
+  excerpt: string;
+  organizationId: string;
+  publishedAt: Date | null;
+  scheduledAt: Date | null;
+  slug: string;
+  status: TPublicApiChangelogStatus;
+  title: string;
+}
+
+interface TUpdateChangelog extends TCreateChangelog {
+  changelogId: string;
+}
+
+interface TDeleteChangelog {
+  changelogId: string;
+  organizationId: string;
+}
 
 interface TListTags {
   cursor: Cursor | null;
@@ -357,6 +436,31 @@ const COMPANY_COLUMNS = {
 const COMPANY_UNIQUE_VIOLATION_MESSAGE =
   "A company with this name or externalId already exists.";
 
+/**
+ * The changelog column list, and the only place an entry field is selected
+ * from. `creatorId` and `creatorMemberId` are deliberately absent: a machine
+ * key is not a member, and the dashboard's actor columns have no business in a
+ * public payload even when they are populated.
+ */
+const CHANGELOG_COLUMNS = {
+  id: schema.changelogTable.id,
+  title: schema.changelogTable.title,
+  slug: schema.changelogTable.slug,
+  excerpt: schema.changelogTable.excerpt,
+  coverImage: schema.changelogTable.coverImage,
+  status: schema.changelogTable.status,
+  scheduledAt: schema.changelogTable.scheduledAt,
+  publishedAt: schema.changelogTable.publishedAt,
+  createdAt: schema.changelogTable.createdAt,
+  updatedAt: schema.changelogTable.updatedAt,
+} as const;
+
+/** The detail columns: what the list selects plus the stored body. */
+const CHANGELOG_DETAIL_COLUMNS = {
+  ...CHANGELOG_COLUMNS,
+  content: schema.changelogTable.content,
+} as const;
+
 const toSource = (
   row: PostRow,
   counts: { voteCount: number; commentCount: number },
@@ -393,7 +497,59 @@ const toSource = (
  */
 const makePublicApiRepository = Effect.gen(function* () {
   const db = yield* currentDb;
+  const s3 = yield* S3UploadService;
   const activities = yield* PostActivityRepository;
+  // Publishing an entry has the same side effects whichever surface wrote it:
+  // a durable email intent and an in-app notification for subscribers. The
+  // dashboard's write path uses this same constructor, so the two cannot
+  // diverge into "the release note nobody received".
+  const publication = yield* makeChangelogPublication;
+
+  /**
+   * Keeps an entry's editor-asset references in step with its content.
+   *
+   * The asset service reads the database from the fiber context, which would
+   * put a raw `Database` requirement on every handler that calls a write —
+   * and `HttpApiBuilder` threads a handler effect's requirements into the
+   * route layer, where the composition root cannot satisfy a request it has
+   * already fulfilled. Providing the handle this repository already holds
+   * removes it. The open transaction is fiber-local, not a service, so the
+   * write still lands in the transaction that is running when this is called.
+   */
+  const syncAssets = (args: {
+    readonly assetIds: readonly string[];
+    readonly changelogId: string;
+    readonly content: string;
+    readonly coverImageUrl: string | null;
+    readonly organizationId: string;
+  }) =>
+    syncChangelogAssetReferences(args).pipe(
+      Effect.provideService(Database.Database, db)
+    );
+
+  /**
+   * The dashboard's best-effort orphan sweep, after a delete commits.
+   *
+   * The asset service reads the database and media storage from the fiber
+   * context, which would put both on the calling handler and therefore on the
+   * route layer; providing the handles this repository already holds keeps the
+   * route's requirements at the repository itself. The database service is the
+   * same one the delete used, and the transaction connection is fiber-local,
+   * so nothing about the sweep changes. A sweep that fails is logged, never
+   * raised: the entry is already gone, and a leaked asset row is not the
+   * caller's problem to retry.
+   */
+  const cleanupOrphanedAssets = (organizationId: string) =>
+    cleanupOrphanedEditorAssets({ organizationId }).pipe(
+      Effect.provideService(Database.Database, db),
+      Effect.provideService(S3UploadService, s3),
+      Effect.catch((cause) =>
+        Effect.logWarning(
+          "Failed to clean up orphaned editor assets",
+          cause
+        ).pipe(Effect.annotateLogs({ organizationId }))
+      )
+    );
 
   const countByPostIds = (postIds: readonly string[]) =>
     Effect.gen(function* () {
@@ -1309,6 +1465,352 @@ const makePublicApiRepository = Effect.gen(function* () {
           Number(contactRows.at(0)?.total ?? 0)
         );
       }).pipe(withRemapDbErrors("PublicApiCompany", "select")),
+    /**
+     * One page of the workspace's changelog, newest first.
+     *
+     * Ordered and paged exactly like a board's posts and the tag list — the
+     * same `(createdAt, id)` tuple and the same cursor — so a caller learns
+     * one paging rule for the whole API. Drafts are included: the key is the
+     * workspace's own credential, and an integration that syncs release notes
+     * has to see what has not shipped yet. `status` narrows the page when the
+     * caller asks for one.
+     */
+    listChangelog: ({
+      cursor,
+      limit,
+      organizationId,
+      status,
+    }: TListChangelog) =>
+      Effect.gen(function* () {
+        const conditions: SQL[] = [
+          eq(schema.changelogTable.organizationId, organizationId),
+        ];
+        if (status !== null) {
+          conditions.push(eq(schema.changelogTable.status, status));
+        }
+        if (cursor !== null) {
+          conditions.push(
+            sql`(${schema.changelogTable.createdAt}, ${schema.changelogTable.id}) < (${cursor.createdAt}, ${cursor.id})`
+          );
+        }
+
+        const rows = yield* db
+          .select(CHANGELOG_COLUMNS)
+          .from(schema.changelogTable)
+          .where(and(...conditions))
+          .orderBy(
+            desc(schema.changelogTable.createdAt),
+            desc(schema.changelogTable.id)
+          )
+          .limit(limit + 1);
+
+        const hasMore = rows.length > limit;
+        const pageRows = hasMore ? rows.slice(0, limit) : rows;
+        const lastRow = pageRows.at(-1);
+
+        return {
+          entries: pageRows,
+          nextCursor:
+            hasMore && lastRow !== undefined
+              ? { createdAt: lastRow.createdAt, id: lastRow.id }
+              : null,
+        } satisfies PublicApiChangelogPage;
+      }).pipe(withRemapDbErrors("PublicApiChangelog", "select")),
+
+    /** One entry of the calling workspace, body included, or nothing. */
+    findChangelog: ({ changelogId, organizationId }: TFindChangelog) =>
+      Effect.gen(function* () {
+        const rows = yield* db
+          .select({
+            ...CHANGELOG_COLUMNS,
+            content: schema.changelogTable.content,
+          })
+          .from(schema.changelogTable)
+          .where(
+            and(
+              eq(schema.changelogTable.id, changelogId),
+              eq(schema.changelogTable.organizationId, organizationId)
+            )
+          )
+          .limit(1);
+
+        return Option.fromNullishOr(rows.at(0));
+      }).pipe(withRemapDbErrors("PublicApiChangelog", "select")),
+
+    /**
+     * Creates an entry and records what publishing it means.
+     *
+     * The id is minted here rather than accepted from the caller, for the same
+     * reason a tag's is: a machine key is not a member acting on records it
+     * can already see, and a caller-chosen id would make the primary key part
+     * of the request surface. The slug is always the one `slugify` produced,
+     * so `UI Kit` and `ui-kit` are one entry rather than two, and the unique
+     * index answers the loser with `CONFLICT` instead of a driver error.
+     *
+     * The whole write is one transaction that also keeps the entry's editor
+     * asset references in step, records the publication email intent, and
+     * notifies subscribers. The intent must commit with the status it belongs
+     * to: a published entry whose intent rolled back is a release note nobody
+     * was told about, and nothing would ever retry it.
+     *
+     * `allowPublish` is the caller's `changelog.publish` scope. The check
+     * lives here rather than in the middleware because a create has no
+     * previous status to compare against: the request itself says `published`,
+     * so the request is what decides whether the scope is needed.
+     */
+    createChangelog: ({
+      allowPublish,
+      content,
+      coverImage,
+      excerpt,
+      organizationId,
+      publishedAt,
+      scheduledAt,
+      slug,
+      status,
+      title,
+    }: TCreateChangelog) =>
+      db
+        .transaction((tx) =>
+          Effect.gen(function* () {
+            if (status === "published" && !allowPublish) {
+              return yield* Effect.fail(
+                forbiddenScopeError("changelog.publish")
+              );
+            }
+
+            const id = yield* ChangelogId.generate;
+            const now = yield* DateTime.nowAsDate;
+
+            const [created] = yield* tx
+              .insert(schema.changelogTable)
+              .values({
+                id,
+                title,
+                slug,
+                content,
+                excerpt,
+                coverImage,
+                status,
+                scheduledAt,
+                publishedAt,
+                organizationId,
+                createdAt: now,
+                updatedAt: now,
+              })
+              .returning(CHANGELOG_DETAIL_COLUMNS);
+
+            // An insert either stores a row or fails; an empty `returning` is
+            // a broken invariant, not something the caller did.
+            if (created === undefined) {
+              return yield* Effect.fail(
+                new InternalServerError({
+                  message: "Error creating PublicApiChangelog",
+                })
+              );
+            }
+
+            yield* syncAssets({
+              assetIds: [],
+              changelogId: id,
+              content,
+              coverImageUrl: coverImage,
+              organizationId,
+            });
+
+            const outboxId =
+              status === "published"
+                ? yield* publication.recordPublishedIntent({
+                    changelogId: id,
+                    organizationId,
+                  })
+                : undefined;
+
+            if (status === "published") {
+              yield* publication.notifyPublished({
+                // A machine key is not a member, so there is no actor to
+                // exclude from the fan-out and no name to attribute it to.
+                actorUserId: null,
+                changelogId: id,
+                changelogSlug: slug,
+                organizationId,
+                title,
+              });
+            }
+
+            return { entry: created, outboxId };
+          })
+        )
+        .pipe(
+          withRemapDbErrors({
+            action: "create",
+            entity: "PublicApiChangelog",
+            onUniqueViolation: () =>
+              conflictError("A changelog entry with this slug already exists."),
+          })
+        ),
+
+    /**
+     * Replaces an entry's writable fields and records a publish transition.
+     *
+     * The row is read with `for("update")` before anything is written, so two
+     * concurrent requests cannot both see a draft and both record a publish
+     * intent; the one that loses waits and then reads the committed status. A
+     * missing row is answered as `NOT_FOUND` from inside the transaction
+     * rather than as an update that matched nothing and reported success.
+     *
+     * The publish scope is decided from the locked status: an entry that was
+     * unpublished by a request that raced this one must not be republished by
+     * a key that never held `changelog.publish`, even if the handler read a
+     * published row a moment earlier.
+     */
+    updateChangelog: ({
+      allowPublish,
+      changelogId,
+      content,
+      coverImage,
+      excerpt,
+      organizationId,
+      publishedAt,
+      scheduledAt,
+      slug,
+      status,
+      title,
+    }: TUpdateChangelog) =>
+      db
+        .transaction((tx) =>
+          Effect.gen(function* () {
+            const previous = yield* tx
+              .select({ status: schema.changelogTable.status })
+              .from(schema.changelogTable)
+              .where(
+                and(
+                  eq(schema.changelogTable.id, changelogId),
+                  eq(schema.changelogTable.organizationId, organizationId)
+                )
+              )
+              .limit(1)
+              .for("update");
+
+            const previousStatus = previous.at(0)?.status;
+            if (previousStatus === undefined) {
+              return yield* Effect.fail(
+                notFoundError("Changelog entry not found.")
+              );
+            }
+
+            const publishedNow =
+              previousStatus !== "published" && status === "published";
+            if (publishedNow && !allowPublish) {
+              return yield* Effect.fail(
+                forbiddenScopeError("changelog.publish")
+              );
+            }
+
+            const now = yield* DateTime.nowAsDate;
+            const [updated] = yield* tx
+              .update(schema.changelogTable)
+              .set({
+                title,
+                slug,
+                content,
+                excerpt,
+                coverImage,
+                status,
+                scheduledAt,
+                publishedAt,
+                updatedAt: now,
+              })
+              .where(
+                and(
+                  eq(schema.changelogTable.id, changelogId),
+                  eq(schema.changelogTable.organizationId, organizationId)
+                )
+              )
+              .returning(CHANGELOG_DETAIL_COLUMNS);
+
+            if (updated === undefined) {
+              return yield* Effect.fail(
+                new InternalServerError({
+                  message: "Error updating PublicApiChangelog",
+                })
+              );
+            }
+
+            yield* syncAssets({
+              assetIds: [],
+              changelogId,
+              content,
+              coverImageUrl: coverImage,
+              organizationId,
+            });
+
+            const outboxId = publishedNow
+              ? yield* publication.recordPublishedIntent({
+                  changelogId,
+                  organizationId,
+                })
+              : undefined;
+
+            if (publishedNow) {
+              yield* publication.notifyPublished({
+                actorUserId: null,
+                changelogId,
+                changelogSlug: slug,
+                organizationId,
+                title,
+              });
+            }
+
+            return { entry: updated, outboxId };
+          })
+        )
+        .pipe(
+          withRemapDbErrors({
+            action: "update",
+            entity: "PublicApiChangelog",
+            onUniqueViolation: () =>
+              conflictError("A changelog entry with this slug already exists."),
+          })
+        ),
+
+    /**
+     * Deletes an entry, reports whether one was there to delete, and sweeps
+     * what it left behind.
+     *
+     * `returning` rather than a read followed by a delete: the two would race,
+     * and a caller told `204` for an entry that had already been removed by
+     * someone else would have no way to know its id was wrong. The linked post
+     * rows cascade with the entry.
+     *
+     * The orphan sweep is the same best-effort one the dashboard runs after
+     * its own delete, and it runs only when a row was actually removed. It
+     * deletes the asset rows and stored objects no post or changelog
+     * references any more — an API caller cannot upload editor assets, but it
+     * can delete a dashboard-created entry that referenced them, and leaving
+     * them for an unrelated dashboard delete that may never come is a leak.
+     * A failed sweep is logged rather than failing the delete that already
+     * committed.
+     */
+    deleteChangelog: ({ changelogId, organizationId }: TDeleteChangelog) =>
+      db
+        .delete(schema.changelogTable)
+        .where(
+          and(
+            eq(schema.changelogTable.id, changelogId),
+            eq(schema.changelogTable.organizationId, organizationId)
+          )
+        )
+        .returning({ id: schema.changelogTable.id })
+        .pipe(
+          Effect.tap((rows) =>
+            rows.length === 0
+              ? Effect.void
+              : cleanupOrphanedAssets(organizationId)
+          ),
+          Effect.map((rows) => rows.length > 0),
+          withRemapDbErrors("PublicApiChangelog", "delete")
+        ),
   };
 });
 

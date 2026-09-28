@@ -28,6 +28,7 @@ import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { ChangelogNotFoundError } from "./errors";
 import { ChangelogPolicy } from "./policies";
+import { makeChangelogPublication } from "./publication";
 import { ChangelogRepository } from "./repository";
 import { ChangelogRpcs } from "./rpcs";
 import type {
@@ -47,70 +48,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
   const changelogPolicy = yield* ChangelogPolicy;
   const sitePolicy = yield* SitePolicy;
   const notifications = yield* Effect.serviceOption(NotificationService);
-
-  /** In-app notification for subscribed members; email stays outbox-driven. */
-  const notifyChangelogPublished = (args: {
-    readonly actorUserId?: string | null;
-    readonly changelogId: string;
-    readonly changelogSlug: string;
-    readonly organizationId: string;
-    readonly title: string;
-  }) =>
-    Option.match(notifications, {
-      onNone: () => Effect.void,
-      onSome: (service) => service.notifyChangelogPublished(args),
-    });
-
-  const recordChangelogPublishedIntent = Effect.fn(
-    "Changelog.recordPublishedEmailIntent"
-  )(function* (args: {
-    readonly changelogId: string;
-    readonly organizationId: string;
-  }) {
-    const mayMaterialize = yield* entitlementPolicy.mayMaterializeEmailIntent({
-      organizationId: args.organizationId,
-      kind: "changelog.published",
-    });
-    if (!mayMaterialize) {
-      return;
-    }
-
-    const now = yield* DateTime.nowAsDate;
-    const result = yield* emailOutbox
-      .recordIntent({
-        aggregateId: args.changelogId,
-        aggregateType: "changelog",
-        deduplicationKey: `changelog.published:${args.changelogId}`,
-        expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
-        kind: "changelog.published",
-        organizationId: args.organizationId,
-        payload: {
-          kind: "changelog.published",
-          changelogId: args.changelogId,
-        },
-        scheduledAt: now,
-      })
-      .pipe(
-        Effect.tapError((error) =>
-          Effect.logError(
-            "Failed to record changelog publication email intent",
-            error
-          ).pipe(
-            Effect.annotateLogs({
-              changelogId: args.changelogId,
-              organizationId: args.organizationId,
-            })
-          )
-        ),
-        Effect.mapError(
-          () =>
-            new InternalServerError({
-              message: "Failed to record changelog publication email intent",
-            })
-        )
-      );
-    return result._tag === "Inserted" ? result.intent.id : undefined;
-  });
+  const publication = yield* makeChangelogPublication;
 
   return {
     ChangelogList: (args: TChangelogList) =>
@@ -187,13 +125,13 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             });
             const createdOutboxId =
               args.status === "published"
-                ? yield* recordChangelogPublishedIntent({
+                ? yield* publication.recordPublishedIntent({
                     changelogId: args.id,
                     organizationId: args.organizationId,
                   })
                 : undefined;
             if (args.status === "published") {
-              yield* notifyChangelogPublished({
+              yield* publication.notifyPublished({
                 ...(isMember && { actorUserId: session.session.userId }),
                 changelogId: args.id,
                 changelogSlug: args.slug,
@@ -280,13 +218,13 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             const publishedNow =
               previousStatus !== "published" && args.status === "published";
             const createdOutboxId = publishedNow
-              ? yield* recordChangelogPublishedIntent({
+              ? yield* publication.recordPublishedIntent({
                   changelogId: args.id,
                   organizationId: args.organizationId,
                 })
               : undefined;
             if (publishedNow) {
-              yield* notifyChangelogPublished({
+              yield* publication.notifyPublished({
                 ...(membership && { actorUserId: session.session.userId }),
                 changelogId: args.id,
                 changelogSlug: args.slug,

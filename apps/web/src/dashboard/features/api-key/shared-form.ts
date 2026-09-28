@@ -3,6 +3,7 @@ import {
   type TApiKeyExpiration,
 } from "@feeblo/domain/api-key/schema";
 import {
+  PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
   PUBLIC_API_COMPANY_MANAGEMENT_SCOPES,
   PUBLIC_API_DEFAULT_SCOPES,
   PUBLIC_API_TAG_MANAGEMENT_SCOPES,
@@ -40,14 +41,19 @@ export const API_KEY_EXPIRATION_ITEMS = API_KEY_EXPIRATIONS.map((value) => ({
  * One toggle per capability rather than one "access level": the server's
  * grants are per resource, and a single select would have to enumerate every
  * combination of them — including the one the next integration needs, which is
- * the one nobody wrote down. Tags are a group of writes on top of a read scope
- * every key already has; companies are all four actions, because a key minted
- * to read feedback does not learn the workspace's customers by default either.
+ * the one nobody wrote down. Tags and changelog are groups of writes on top of
+ * a read scope every key already has; companies are all four actions, because
+ * a key minted to read feedback does not learn the workspace's customers by
+ * default either.
  *
  * The names are UI vocabulary; the wire carries the scope list in
  * `API_KEY_CAPABILITY_GROUP_SCOPES`, so the two cannot drift.
  */
-export const API_KEY_CAPABILITY_GROUPS = ["tags", "companies"] as const;
+export const API_KEY_CAPABILITY_GROUPS = [
+  "tags",
+  "changelog",
+  "companies",
+] as const;
 
 export type ApiKeyCapabilityGroup = (typeof API_KEY_CAPABILITY_GROUPS)[number];
 
@@ -58,16 +64,20 @@ export type ApiKeyCapabilityGroup = (typeof API_KEY_CAPABILITY_GROUPS)[number];
  */
 export const API_KEY_CAPABILITY_GROUP_SCOPES = {
   tags: PUBLIC_API_TAG_MANAGEMENT_SCOPES,
+  changelog: PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
   companies: PUBLIC_API_COMPANY_MANAGEMENT_SCOPES,
 } satisfies Record<ApiKeyCapabilityGroup, readonly PublicApiScope[]>;
 
 export const API_KEY_CAPABILITY_GROUP_LABELS = {
   tags: "Manage tags",
+  changelog: "Manage changelog",
   companies: "Manage companies",
 } satisfies Record<ApiKeyCapabilityGroup, string>;
 
 export const API_KEY_CAPABILITY_GROUP_DESCRIPTIONS = {
   tags: "Create, rename, and delete tags, and set which tags a post carries. Deleting a tag removes it from every post that carries it.",
+  changelog:
+    "Create, edit, and delete changelog entries, and publish them. Publishing emails everyone subscribed to the changelog.",
   companies:
     "Read, create, update, and delete this workspace's companies. The contacts who belong to a company are not exposed, and deleting one leaves those contacts in place.",
 } satisfies Record<ApiKeyCapabilityGroup, string>;
@@ -116,7 +126,7 @@ export const apiKeyScopes = (
  * group the caller may not select.
  */
 export const API_KEY_READ_ONLY_DESCRIPTION =
-  "Every key reads posts and tags. Select a capability to grant more.";
+  "Every key reads posts, tags, and changelog entries. Select a capability to grant more.";
 
 /**
  * Mirrors the server's `ApiKeyCreate` payload: a name between 1 and 32
@@ -150,8 +160,8 @@ export const apiKeyFormOpts = formOptions({
     // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
     expiration: "never" as TApiKeyExpiration,
     // No capability is the default: a key that only needs to read should not
-    // be able to delete a workspace's tags, or learn its customers, because
-    // the sheet opened here.
+    // be able to delete a workspace's tags, broadcast a release note, or learn
+    // its customers, because the sheet opened here.
     capabilities: API_KEY_DEFAULT_CAPABILITIES,
   },
   validators: {

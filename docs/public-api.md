@@ -36,13 +36,20 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 | `tags.update` | Rename a tag. |
 | `tags.delete` | Delete a tag, which removes it from every post that carried it. |
 | `tags.assign` | Set which tags a post carries. |
+| `changelog.read` | Read changelog entries, drafts and scheduled entries included, through the `/changelog` endpoints. Every key receives it. |
+| `changelog.create` | Create a changelog entry. Omitting `status` creates a draft, and sending `published` additionally requires `changelog.publish`. |
+| `changelog.update` | Replace a changelog entry's title, slug, body, cover image, status, and timestamps. |
+| `changelog.delete` | Delete a changelog entry and its links to the posts it announced. |
+| `changelog.publish` | Publish an entry: a create that starts published, or an update that moves one into `published`. Publishing emails everyone subscribed to the changelog. |
 | `companies.read` | Read the workspace's companies through the `/companies` endpoints. |
 | `companies.create` | Create a company. |
 | `companies.update` | Update a company's name, external id, avatar, or external creation date. |
 | `companies.delete` | Delete a company, which detaches it from the contacts that belonged to it. |
 | `boards.read` | Reserved for a future board-metadata endpoint. No v1 endpoint requires it, and every key receives it so that endpoint is additive when it ships. |
 
-A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above except the `companies` ones; the `tags` write scopes and all four `companies` scopes are granted only when the key is created with them. The CRM grant is opt-in as a whole — read included — because a company is a record about the workspace's own customers rather than the workspace's content, so a key minted to read feedback does not learn the customer roster by default. That is also why a key created before these scopes existed keeps its narrower grant: rotate the key if an integration needs more than it was issued.
+A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above except the `companies` ones; the `tags` and `changelog` write scopes, and all four `companies` scopes, are granted only when the key is created with them — so a key that was minted to read feedback cannot delete a workspace's tags, broadcast a release note, or learn the customer roster. The CRM grant is opt-in as a whole, read included, because a company is a record about the workspace's own customers rather than the workspace's content. That is also why a key created before a scope existed keeps its narrower grant: rotate the key if an integration needs more than it was issued.
+
+`changelog.publish` is separate from `changelog.update` because publishing is not reversible in the way an edit is: it emails every subscriber. A key that syncs drafts from a CMS can hold `changelog.create` and `changelog.update` and still be unable to broadcast.
 
 `end_users.read` is reserved for a future release.
 
@@ -200,6 +207,104 @@ Every id must exist in the workspace: an unknown id — including one belonging 
 
 The change is recorded in the post's timeline as the tags that were added and removed. A key is not a member, so those entries have no actor and the dashboard shows them as "Someone".
 
+### List changelog entries
+
+```http
+GET /api/v1/changelog
+```
+
+| Query parameter | Default | Notes |
+| --- | --- | --- |
+| `limit` | `25` | 1–100. |
+| `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
+| `status` | — | `draft`, `scheduled`, or `published`. |
+
+```json
+{
+  "data": [
+    {
+      "id": "chg_dark_mode",
+      "title": "Dark mode shipped",
+      "slug": "dark-mode-shipped",
+      "excerpt": "Dark mode is live for every workspace.",
+      "coverImage": null,
+      "status": "published",
+      "scheduledAt": null,
+      "publishedAt": "2026-09-01T00:00:00.000Z",
+      "createdAt": "2026-08-30T10:00:00.000Z",
+      "updatedAt": "2026-09-01T00:00:00.000Z"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+Requires `changelog.read`. Entries of every status are returned, newest first — the key is the workspace's own credential, so an integration that syncs release notes sees what has not shipped yet. Pass `status=published` to list only what readers can already see.
+
+### Get a changelog entry
+
+```http
+GET /api/v1/changelog/{changelogId}
+```
+
+Returns the same object plus `content`, the entry's stored, sanitized Markdown. Requires `changelog.read`. Entries of other workspaces are reported as not found rather than forbidden, so an id cannot be used to probe another workspace.
+
+### Create a changelog entry
+
+```http
+POST /api/v1/changelog
+Content-Type: application/json
+
+{
+  "title": "Dark mode shipped",
+  "content": "Dark mode is live. Enable it in **Settings**."
+}
+```
+
+Responds `201` with the created entry. Requires `changelog.create`, and additionally `changelog.publish` when `status` is `published`.
+
+The `id` is assigned by the server. The `slug` is derived from the title unless one is sent, and a sent slug is normalized the same way, so `UI Kit` and `ui-kit` are one entry rather than two. `excerpt` is derived from the body, and the body is sanitized before it is stored, exactly as the dashboard sanitizes it. A slug already used in the workspace is answered with `409 CONFLICT`.
+
+| Field | Default | Notes |
+| --- | --- | --- |
+| `title` | — | Required. Trimmed; must not be empty. |
+| `content` | — | Required. Markdown; sanitized before it is stored. |
+| `slug` | derived from `title` | Normalized to a URL-safe form. |
+| `coverImage` | `null` | An `http(s)` URL. |
+| `status` | `draft` | `draft`, `scheduled`, or `published`. |
+| `scheduledAt` | `null` | Required when `status` is `scheduled`. |
+| `publishedAt` | `null` | Required when `status` is `published`. |
+
+### Update a changelog entry
+
+```http
+PATCH /api/v1/changelog/{changelogId}
+Content-Type: application/json
+
+{
+  "title": "Dark mode shipped",
+  "content": "Dark mode is live for everyone.",
+  "status": "published",
+  "publishedAt": "2026-09-01T00:00:00.000Z"
+}
+```
+
+Responds `200` with the updated entry. Requires `changelog.update`.
+
+The fields sent are the entry's new state — the update replaces them rather than merging. `status` is required here, unlike on a create: an update that left it out would move an entry by omission. The same field rules as a create apply to `title`, `slug`, `content`, `coverImage`, `scheduledAt`, and `publishedAt`.
+
+Moving an entry **into** `published` — from `draft` or `scheduled` — also requires `changelog.publish`, and records the publication email intent. Editing an entry that is already published does not: it is an ordinary edit, and subscribers are not emailed again. Use the dashboard's "Send update" action when an edit should be announced.
+
+### Delete a changelog entry
+
+```http
+DELETE /api/v1/changelog/{changelogId}
+```
+
+Responds `204` with no body. Requires `changelog.delete`.
+
+The entry's links to the posts it announced are removed with it. The posts themselves are not modified, and the deletion cannot be undone.
+
 ### List companies
 
 ```http
@@ -283,7 +388,7 @@ The company's contacts are **not** deleted: they keep their own records and simp
 
 ## Pagination
 
-Pagination is cursor-based. A response carries `nextCursor`; `null` means the last page. Cursors are opaque — do not construct or parse them — and are invalidated by the API without notice if they are malformed, in which case the API returns `400 INVALID_REQUEST`. Do not poll with offsets: posts, tags, and companies are inserted continuously and offset paging skips and repeats rows.
+Pagination is cursor-based. A response carries `nextCursor`; `null` means the last page. Cursors are opaque — do not construct or parse them — and are invalidated by the API without notice if they are malformed, in which case the API returns `400 INVALID_REQUEST`. Do not poll with offsets: posts, tags, changelog entries, and companies are inserted continuously and offset paging skips and repeats rows.
 
 ## Errors
 
@@ -304,7 +409,7 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 | 403 | `FORBIDDEN_SCOPE` | The key lacks the scope the endpoint requires. |
 | 403 | `PLAN_REQUIRES_UPGRADE` | The workspace plan does not include the Public API, or has no room left in a limit it sets — such as CRM entries. |
 | 404 | `NOT_FOUND` | The resource does not exist in this workspace. |
-| 409 | `CONFLICT` | A write collided with something that already exists, such as a tag name, or a company name or external id, already in use. |
+| 409 | `CONFLICT` | A write collided with something that already exists, such as a tag name or a company name or external id, already in use. |
 | 429 | `RATE_LIMITED` | Per-key rate limit exceeded. Carries `Retry-After` in seconds. |
 | 500 | `INTERNAL_ERROR` | Unexpected server failure. |
 | 503 | `SERVICE_UNAVAILABLE` | A required dependency is unavailable; requests fail closed. |
@@ -333,6 +438,8 @@ The Public API never returns:
 
 `author` is always `{ type, displayName, avatarUrl }`: `type` is `member` or `end_user` and distinguishes workspace staff from end users. Display names are included because the workspace already sees them on public boards and the dashboard; they are the workspace's own data. Emails are deliberately excluded — a key travels into third-party infrastructure (an integration platform, a partner's backend, a CI log), and that is a different blast radius from a signed-in session.
 
+Changelog entries carry no author at all: the dashboard's entry rows hold `creatorId` and `creatorMemberId`, and neither has a field in this API. Publishing through the API records the email intent and the in-app notification with no actor, exactly as a key's tag changes have no actor in a post's timeline.
+
 Post `content` is sanitized before it is stored, so the body the API returns is the same sanitized content the dashboard and the public portal render. Tags carry a name and a slug, nothing else — a tag's creator is an internal identifier and is never returned.
 
 A company carries its name, avatar, your `externalId`, and `source`. Its contacts are not exposed and neither are the custom attribute values a workspace may have defined for companies: those definitions are a workspace-specific vocabulary, so they would need their own contract rather than a field on this one. The workspace is never named in a payload either — a key reads exactly one workspace, so an `organizationId` would be the same string on every response and would invite a filter parameter that would then have to be validated against the key. `source` is the exception that proves the rule: it is bookkeeping about where the row came from, not about who it belongs to, and it is what lets a sync tell its own records from the dashboard's.
@@ -356,6 +463,6 @@ Anything that cannot respect those rules ships as `/api/v2`. When a v2 exists, v
 
 Keys are managed in the dashboard under **Settings → Developers**, restricted to workspace admins and owners. The list shows a key's name and its first characters — `fbk_ab…` — which is enough to identify a key without exposing it. The plaintext value is displayed once, at creation. Revocation takes effect immediately and is not reversible.
 
-When a key is created you choose its access: **Read only**, or **Read and manage tags**. The choice fixes the key's scopes for its whole life, so pick the narrower one unless the integration needs to change tags.
+When a key is created you choose its access: **Read only**, **Read and manage tags**, **Read and manage changelog**, or **Read and manage tags and changelog**. The choice fixes the key's scopes for its whole life, so pick the narrowest one the integration needs. Publishing is part of the changelog choice because it emails subscribers, so a key that only syncs drafts is not granted it.
 
 Use one key per integration so that revoking one does not interrupt the others.

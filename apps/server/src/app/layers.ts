@@ -26,6 +26,7 @@ import { PostRepository } from "@feeblo/domain/post/repository";
 import { PublicApiConfig } from "@feeblo/domain/public-api/config";
 import { PublicApiRepository } from "@feeblo/domain/public-api/repository";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
+import { S3UploadServiceLive } from "@feeblo/domain/services/s3";
 import { Auth } from "@feeblo/domain/session-middleware";
 import { SiteRepository } from "@feeblo/domain/site/repository";
 import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
@@ -231,6 +232,13 @@ export const makeServiceLayers = ({
     ExternalResourceService,
     externalResourceService
   );
+  // The entitlement decision is built from the workspace's billing state and is
+  // read both by the Public API's key middleware and by its changelog writes
+  // (publishing emails subscribers only on a plan that includes them). One
+  // value, provided twice, so the two cannot disagree about a workspace.
+  const EntitlementPolicies = EntitlementPolicy.layer.pipe(
+    Layer.provide(WorkspaceRepository.layer)
+  );
   return Layer.mergeAll(
     workflowLayer,
     SiteRepository.layer,
@@ -302,12 +310,22 @@ export const makeServiceLayers = ({
       Layer.provide(EmailOutboxConfig.layer),
       Layer.provide(Database.DatabaseContextLive)
     ),
-    EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
+    EntitlementPolicies,
     WorkspaceRepository.layer,
     // The Public API records tag changes in a post's timeline, so its
     // repository needs the activity repository at construction time rather
-    // than reading it per request.
-    PublicApiRepository.layer.pipe(Layer.provide(PostActivityRepository.layer)),
+    // than reading it per request. Publishing a changelog entry also records a
+    // durable email intent and notifies subscribers, so the write path needs
+    // the outbox, the entitlement decision, and the notification fan-out —
+    // the same side effects the dashboard's write path performs. Deleting an
+    // entry sweeps the editor assets it orphaned, which needs media storage.
+    PublicApiRepository.layer.pipe(
+      Layer.provide(PostActivityRepository.layer),
+      Layer.provide(EmailOutboxRepository.layer),
+      Layer.provide(EntitlementPolicies),
+      Layer.provide(NotificationService.layer),
+      Layer.provide(S3UploadServiceLive)
+    ),
     PublicApiConfig.layer
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
 };

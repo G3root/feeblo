@@ -14,17 +14,23 @@ import {
   PublicApiSchemaErrorHandler,
 } from "./middleware";
 import {
+  CreateChangelogPayload,
   CreateCompanyPayload,
   CreateTagPayload,
+  DeleteChangelogParams,
   DeleteCompanyParams,
   DeleteTagParams,
+  GetChangelogParams,
   GetCompanyParams,
   GetPostParams,
   GetTagParams,
   ListBoardPostsParams,
   ListBoardPostsQuery,
+  ListChangelogQuery,
   ListCompaniesQuery,
   ListTagsQuery,
+  PublicApiChangelog,
+  PublicApiChangelogPage,
   PublicApiCompany,
   PublicApiCompanyPage,
   PublicApiPost,
@@ -34,6 +40,8 @@ import {
   PublicApiTagPage,
   SetPostTagsParams,
   SetPostTagsPayload,
+  UpdateChangelogParams,
+  UpdateChangelogPayload,
   UpdateCompanyParams,
   UpdateCompanyPayload,
   UpdateTagParams,
@@ -220,6 +228,73 @@ export class PublicApiV1Group extends HttpApiGroup.make("PublicApiV1")
       .annotate(
         OpenApi.Description,
         "Deletes a company and detaches it from the contacts that belonged to it. The contacts themselves are untouched and keep their own records; the company cannot be restored."
+      )
+  )
+  .middleware(PublicApiSchemaErrorHandler)
+  .add(
+    HttpApiEndpoint.get("listChangelog", "/changelog", {
+      query: ListChangelogQuery,
+      success: PublicApiChangelogPage,
+      error: PUBLIC_API_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "List Changelog Entries")
+      .annotate(OpenApi.Summary, "List the workspace's changelog entries")
+      .annotate(
+        OpenApi.Description,
+        "Returns the changelog entries of the calling workspace, newest first, as a cursor-paginated page. Drafts and scheduled entries are included; pass status=published to list only what readers can already see."
+      )
+  )
+  .add(
+    HttpApiEndpoint.get("getChangelog", "/changelog/:changelogId", {
+      params: GetChangelogParams,
+      success: PublicApiChangelog,
+      error: PUBLIC_API_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "Get Changelog Entry")
+      .annotate(OpenApi.Summary, "Get a changelog entry")
+      .annotate(
+        OpenApi.Description,
+        "Returns one changelog entry with its sanitized body. Entries of other workspaces are reported as not found rather than forbidden, so an id cannot be used to probe another workspace."
+      )
+  )
+  .add(
+    HttpApiEndpoint.post("createChangelog", "/changelog", {
+      payload: CreateChangelogPayload,
+      success: PublicApiChangelog.pipe(HttpApiSchema.status(201)),
+      error: PUBLIC_API_CREATE_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "Create Changelog Entry")
+      .annotate(OpenApi.Summary, "Create a changelog entry")
+      .annotate(
+        OpenApi.Description,
+        "Creates a changelog entry in the calling workspace and returns it. The entry is a draft unless the request says otherwise. Publishing it — status=published — additionally requires the changelog.publish scope, because it emails everyone subscribed to the workspace changelog."
+      )
+  )
+  .add(
+    HttpApiEndpoint.patch("updateChangelog", "/changelog/:changelogId", {
+      params: UpdateChangelogParams,
+      payload: UpdateChangelogPayload,
+      success: PublicApiChangelog,
+      error: PUBLIC_API_WRITE_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "Update Changelog Entry")
+      .annotate(OpenApi.Summary, "Replace a changelog entry's writable fields")
+      .annotate(
+        OpenApi.Description,
+        "Replaces the entry's title, slug, body, cover image, status, and timestamps, and returns the entry afterwards. The fields sent are the entry's new state. Moving an entry into published requires the changelog.publish scope, because it emails subscribers; editing an already-published entry does not."
+      )
+  )
+  .add(
+    HttpApiEndpoint.delete("deleteChangelog", "/changelog/:changelogId", {
+      params: DeleteChangelogParams,
+      success: HttpApiSchema.NoContent,
+      error: PUBLIC_API_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "Delete Changelog Entry")
+      .annotate(OpenApi.Summary, "Delete a changelog entry")
+      .annotate(
+        OpenApi.Description,
+        "Deletes a changelog entry and its links to the posts it announced. The entry is gone immediately and cannot be restored; the posts themselves are untouched."
       )
   )
   .middleware(PublicApiSchemaErrorHandler)

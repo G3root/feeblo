@@ -2,6 +2,8 @@ import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 
 import {
+  toPublicApiChangelog,
+  toPublicApiChangelogSummary,
   toPublicApiCompany,
   toPublicApiPost,
   toPublicApiPostSummary,
@@ -9,12 +11,16 @@ import {
   toPublicApiTagDetail,
 } from "./mappers";
 import type {
+  PublicApiChangelogDetail,
+  PublicApiChangelogSource,
   PublicApiCompanySource,
   PublicApiDetailedPost,
   PublicApiListedPost,
   PublicApiTagSource,
 } from "./repository";
 import {
+  PublicApiChangelog,
+  PublicApiChangelogSummary,
   PublicApiCompany,
   PublicApiPost,
   PublicApiPostSummary,
@@ -80,6 +86,37 @@ const companySource: PublicApiCompanySource = {
   createdAt: new Date("2026-08-11T00:00:00.000Z"),
   updatedAt: new Date("2026-08-12T09:30:00.000Z"),
 };
+
+const changelogSource: PublicApiChangelogSource = {
+  id: "chg_example",
+  title: "Dark mode shipped",
+  slug: "dark-mode-shipped",
+  excerpt: "Dark mode is live for every workspace.",
+  coverImage: null,
+  status: "published",
+  scheduledAt: null,
+  publishedAt: new Date("2026-08-12T00:00:00.000Z"),
+  createdAt: new Date("2026-08-11T00:00:00.000Z"),
+  updatedAt: new Date("2026-08-12T09:30:00.000Z"),
+};
+
+const changelogDetail: PublicApiChangelogDetail = {
+  ...changelogSource,
+  content: "Dark mode is live. Enable it in **Settings**.",
+};
+
+const CHANGELOG_LIST_KEYS = [
+  "coverImage",
+  "createdAt",
+  "excerpt",
+  "id",
+  "publishedAt",
+  "scheduledAt",
+  "slug",
+  "status",
+  "title",
+  "updatedAt",
+];
 
 const LIST_KEYS = [
   "archivedAt",
@@ -230,6 +267,43 @@ describe("public API mappers", () => {
       "creatorId",
       "org_example",
       "enterprise",
+    ]) {
+      expect(encoded).not.toContain(forbidden);
+    }
+  });
+
+  it("emits exactly the documented changelog fields", () => {
+    const encoded = Schema.encodeSync(PublicApiChangelogSummary)(
+      toPublicApiChangelogSummary(changelogSource)
+    );
+
+    expect(Object.keys(encoded).sort()).toEqual(CHANGELOG_LIST_KEYS);
+  });
+
+  it("adds only the body on the changelog detail projection", () => {
+    const encoded = Schema.encodeSync(PublicApiChangelog)(
+      toPublicApiChangelog(changelogDetail)
+    );
+
+    expect(Object.keys(encoded).sort()).toEqual(
+      [...CHANGELOG_LIST_KEYS, "content"].sort()
+    );
+    expect(encoded.content).toBe(changelogDetail.content);
+  });
+
+  it("never emits a changelog entry's internal identifiers", () => {
+    const encoded = JSON.stringify(
+      Schema.encodeSync(PublicApiChangelog)(
+        toPublicApiChangelog(changelogDetail)
+      )
+    );
+
+    for (const forbidden of [
+      "creatorId",
+      "creatorMemberId",
+      "organizationId",
+      "userId",
+      "email",
     ]) {
       expect(encoded).not.toContain(forbidden);
     }
