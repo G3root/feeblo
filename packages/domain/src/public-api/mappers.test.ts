@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   toPublicApiChangelog,
   toPublicApiChangelogSummary,
+  toPublicApiCompany,
   toPublicApiPost,
   toPublicApiPostSummary,
   toPublicApiTag,
@@ -12,6 +13,7 @@ import {
 import type {
   PublicApiChangelogDetail,
   PublicApiChangelogSource,
+  PublicApiCompanySource,
   PublicApiDetailedPost,
   PublicApiListedPost,
   PublicApiTagSource,
@@ -19,6 +21,7 @@ import type {
 import {
   PublicApiChangelog,
   PublicApiChangelogSummary,
+  PublicApiCompany,
   PublicApiPost,
   PublicApiPostSummary,
   PublicApiTag,
@@ -69,6 +72,17 @@ const tagSource: PublicApiTagSource = {
   id: "tag_ui",
   name: "UI",
   slug: "ui",
+  createdAt: new Date("2026-08-11T00:00:00.000Z"),
+  updatedAt: new Date("2026-08-12T09:30:00.000Z"),
+};
+
+const companySource: PublicApiCompanySource = {
+  id: "cmp_acme",
+  name: "Acme",
+  externalId: "crm-1",
+  avatar: null,
+  externalCreatedAt: new Date("2026-01-02T00:00:00.000Z"),
+  source: "API",
   createdAt: new Date("2026-08-11T00:00:00.000Z"),
   updatedAt: new Date("2026-08-12T09:30:00.000Z"),
 };
@@ -211,6 +225,48 @@ describe("public API mappers", () => {
       "creatorId",
       "creatorMemberId",
       "organizationId",
+    ]) {
+      expect(encoded).not.toContain(forbidden);
+    }
+  });
+
+  it("emits exactly the documented company fields", () => {
+    const encoded = Schema.encodeSync(PublicApiCompany)(
+      toPublicApiCompany(companySource)
+    );
+
+    expect(Object.keys(encoded).sort()).toEqual([
+      "avatar",
+      "createdAt",
+      "externalCreatedAt",
+      "externalId",
+      "id",
+      "name",
+      "source",
+      "updatedAt",
+    ]);
+  });
+
+  it("drops anything a company row carries beyond the contract", () => {
+    // Deliberately a variable rather than an inline literal, so the extra
+    // fields survive the type checker: the point is that the closed struct,
+    // not the source type, is what keeps them out of the payload.
+    const withExtraColumns = {
+      ...companySource,
+      organizationId: "org_example",
+      attributeValues: [{ attributeId: "cad_size", value: "enterprise" }],
+    };
+
+    const encoded = JSON.stringify(
+      Schema.encodeSync(PublicApiCompany)(toPublicApiCompany(withExtraColumns))
+    );
+
+    for (const forbidden of [
+      "organizationId",
+      "attributeValues",
+      "creatorId",
+      "org_example",
+      "enterprise",
     ]) {
       expect(encoded).not.toContain(forbidden);
     }

@@ -41,9 +41,13 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 | `changelog.update` | Replace a changelog entry's title, slug, body, cover image, status, and timestamps. |
 | `changelog.delete` | Delete a changelog entry and its links to the posts it announced. |
 | `changelog.publish` | Publish an entry: a create that starts published, or an update that moves one into `published`. Publishing emails everyone subscribed to the changelog. |
+| `companies.read` | Read the workspace's companies through the `/companies` endpoints. |
+| `companies.create` | Create a company. |
+| `companies.update` | Update a company's name, external id, avatar, or external creation date. |
+| `companies.delete` | Delete a company, which detaches it from the contacts that belonged to it. |
 | `boards.read` | Reserved for a future board-metadata endpoint. No v1 endpoint requires it, and every key receives it so that endpoint is additive when it ships. |
 
-A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above; the `tags` and `changelog` write scopes are granted only when the key is created with them, so a key that was minted to read feedback cannot delete a workspace's tags or publish a release note. A key created before a scope existed does not gain it later — rotate the key if an integration needs more than it was issued.
+A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above except the `companies` ones; the `tags` and `changelog` write scopes, and all four `companies` scopes, are granted only when the key is created with them — so a key that was minted to read feedback cannot delete a workspace's tags, broadcast a release note, or learn the customer roster. The CRM grant is opt-in as a whole, read included, because a company is a record about the workspace's own customers rather than the workspace's content. That is also why a key created before a scope existed keeps its narrower grant: rotate the key if an integration needs more than it was issued.
 
 `changelog.publish` is separate from `changelog.update` because publishing is not reversible in the way an edit is: it emails every subscriber. A key that syncs drafts from a CMS can hold `changelog.create` and `changelog.update` and still be unable to broadcast.
 
@@ -301,9 +305,90 @@ Responds `204` with no body. Requires `changelog.delete`.
 
 The entry's links to the posts it announced are removed with it. The posts themselves are not modified, and the deletion cannot be undone.
 
+### List companies
+
+```http
+GET /api/v1/companies
+```
+
+| Query parameter | Default | Notes |
+| --- | --- | --- |
+| `limit` | `25` | 1–100. |
+| `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
+
+```json
+{
+  "data": [
+    {
+      "id": "cmp_acme",
+      "name": "Acme",
+      "externalId": "crm-4711",
+      "avatar": "https://cdn.example.com/acme.png",
+      "externalCreatedAt": "2026-01-02T00:00:00.000Z",
+      "source": "API",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-12T09:30:00.000Z"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+Requires `companies.read`. Every company in the workspace is returned, whatever `source` it has, so a caller that syncs its CRM can also see the records the dashboard and the widget created.
+
+A company is an **account record and nothing more**. The contacts who belong to it are not returned, and neither are the workspace's custom attribute values; see [Data exposure](#data-exposure).
+
+### Get a company
+
+```http
+GET /api/v1/companies/{companyId}
+```
+
+Returns one company in the shape above. Requires `companies.read`.
+
+### Create a company
+
+```http
+POST /api/v1/companies
+Content-Type: application/json
+
+{ "name": "Acme", "externalId": "crm-4711" }
+```
+
+Responds `201` with the created company. Requires `companies.create`.
+
+The `id` is assigned by the server. `externalId` is your own identifier for the company — the one to send, rather than trying to make the primary key agree with a system this workspace does not control. It is unique within the workspace, and `null` may be left unset on any number of companies. `externalCreatedAt` records when the company was created in your system; the API's own `createdAt` is kept beside it.
+
+The name is trimmed, so `"  Acme  "` is stored as `"Acme"`. A name, or an `externalId`, already used in the workspace is answered with `409 CONFLICT` rather than creating a second record for the same account. A company created here carries `source: "API"`.
+
+A create is also refused with `403 PLAN_REQUIRES_UPGRADE` when the workspace's plan has no room for another CRM entry. Companies and contacts count together towards that limit, exactly as they do in the dashboard, so the API is never a way around a plan's own cap. The count is taken inside the same transaction that writes the company, against a lock on the workspace, so two such creates arriving at the cap together cannot both fit.
+
+### Update a company
+
+```http
+PATCH /api/v1/companies/{companyId}
+Content-Type: application/json
+
+{ "name": "Acme Corporation", "avatar": null }
+```
+
+Responds `200` with the company afterwards. Requires `companies.update`.
+
+An omitted field is left as it is; an explicit `null` clears a nullable one, so `"avatar": null` removes the avatar and the example above renames the company in the same request. A body that names no field at all is answered with `400 INVALID_REQUEST` rather than as a write that changed nothing. `id`, `source`, and the timestamps are not writable. A name or `externalId` another company already holds is answered with `409 CONFLICT`, and a company deleted while the request was in flight is answered with `404 NOT_FOUND` — never with a server error.
+
+### Delete a company
+
+```http
+DELETE /api/v1/companies/{companyId}
+```
+
+Responds `204` with no body. Requires `companies.delete`.
+
+The company's contacts are **not** deleted: they keep their own records and simply stop naming a company, exactly as when a company is deleted in the dashboard. The company's custom attribute values are removed with it, and the deletion cannot be undone.
+
 ## Pagination
 
-Pagination is cursor-based. A response carries `nextCursor`; `null` means the last page. Cursors are opaque — do not construct or parse them — and are invalidated by the API without notice if they are malformed, in which case the API returns `400 INVALID_REQUEST`. Do not poll with offsets: posts and tags are inserted continuously and offset paging skips and repeats rows.
+Pagination is cursor-based. A response carries `nextCursor`; `null` means the last page. Cursors are opaque — do not construct or parse them — and are invalidated by the API without notice if they are malformed, in which case the API returns `400 INVALID_REQUEST`. Do not poll with offsets: posts, tags, changelog entries, and companies are inserted continuously and offset paging skips and repeats rows.
 
 ## Errors
 
@@ -318,13 +403,13 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 
 | Status | `_tag` | Meaning |
 | --- | --- | --- |
-| 400 | `INVALID_REQUEST` | Malformed parameter, cursor, or limit. |
+| 400 | `INVALID_REQUEST` | Malformed parameter, cursor, or limit; a body the endpoint cannot decode; a name that is only whitespace; an update that names no field. |
 | 401 | `MISSING_API_KEY` | No `x-api-key` header was sent. |
 | 401 | `INVALID_API_KEY` | The key is unknown, revoked, expired, or disabled. |
 | 403 | `FORBIDDEN_SCOPE` | The key lacks the scope the endpoint requires. |
-| 403 | `PLAN_REQUIRES_UPGRADE` | The workspace plan does not include the Public API. |
+| 403 | `PLAN_REQUIRES_UPGRADE` | The workspace plan does not include the Public API, or has no room left in a limit it sets — such as CRM entries. |
 | 404 | `NOT_FOUND` | The resource does not exist in this workspace. |
-| 409 | `CONFLICT` | A write collided with something that already exists, such as a tag name already in use. |
+| 409 | `CONFLICT` | A write collided with something that already exists, such as a tag name or a company name or external id, already in use. |
 | 429 | `RATE_LIMITED` | Per-key rate limit exceeded. Carries `Retry-After` in seconds. |
 | 500 | `INTERNAL_ERROR` | Unexpected server failure. |
 | 503 | `SERVICE_UNAVAILABLE` | A required dependency is unavailable; requests fail closed. |
@@ -347,7 +432,7 @@ On downgrade, keys are **kept and not disabled**. They start working again when 
 
 The Public API never returns:
 
-- end-user email addresses or contact records;
+- end-user email addresses, phone numbers, or contact records;
 - internal actor identifiers — `usr_*`, `mem_*`, `cnt_*`;
 - IP addresses, credentials, webhook secrets, or API keys.
 
@@ -356,6 +441,8 @@ The Public API never returns:
 Changelog entries carry no author at all: the dashboard's entry rows hold `creatorId` and `creatorMemberId`, and neither has a field in this API. Publishing through the API records the email intent and the in-app notification with no actor, exactly as a key's tag changes have no actor in a post's timeline.
 
 Post `content` is sanitized before it is stored, so the body the API returns is the same sanitized content the dashboard and the public portal render. Tags carry a name and a slug, nothing else — a tag's creator is an internal identifier and is never returned.
+
+A company carries its name, avatar, your `externalId`, and `source`. Its contacts are not exposed and neither are the custom attribute values a workspace may have defined for companies: those definitions are a workspace-specific vocabulary, so they would need their own contract rather than a field on this one. The workspace is never named in a payload either — a key reads exactly one workspace, so an `organizationId` would be the same string on every response and would invite a filter parameter that would then have to be validated against the key. `source` is the exception that proves the rule: it is bookkeeping about where the row came from, not about who it belongs to, and it is what lets a sync tell its own records from the dashboard's.
 
 ## Which posts are visible
 

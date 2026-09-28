@@ -4,6 +4,7 @@ import {
 } from "@feeblo/domain/api-key/schema";
 import {
   PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
+  PUBLIC_API_COMPANY_MANAGEMENT_SCOPES,
   PUBLIC_API_DEFAULT_SCOPES,
   PUBLIC_API_TAG_MANAGEMENT_SCOPES,
   type PublicApiScope,
@@ -35,77 +36,103 @@ export const API_KEY_EXPIRATION_ITEMS = API_KEY_EXPIRATIONS.map((value) => ({
 }));
 
 /**
- * The access levels the create sheet offers.
+ * The capabilities the create sheet offers on top of the read scopes.
  *
- * `read_only` is the scopes the server grants on its own; the other levels add
- * the Public API's write scopes, which the server never grants without being
- * asked. The names are UI vocabulary — the wire carries the scope list in
- * `API_KEY_ACCESS_LEVEL_SCOPES`, so the two cannot drift. Changelog and tag
- * management are separate choices rather than one, because a key that keeps a
- * workspace's vocabulary tidy has no business broadcasting release notes, and
- * `content_management` is the deliberate "both" for an integration that does
- * need the whole surface.
+ * One toggle per capability rather than one "access level": the server's
+ * grants are per resource, and a single select would have to enumerate every
+ * combination of them — including the one the next integration needs, which is
+ * the one nobody wrote down. Tags and changelog are groups of writes on top of
+ * a read scope every key already has; companies are all four actions, because
+ * a key minted to read feedback does not learn the workspace's customers by
+ * default either.
+ *
+ * The names are UI vocabulary; the wire carries the scope list in
+ * `API_KEY_CAPABILITY_GROUP_SCOPES`, so the two cannot drift.
  */
-export const API_KEY_ACCESS_LEVELS = [
-  "read_only",
-  "tag_management",
-  "changelog_management",
-  "content_management",
+export const API_KEY_CAPABILITY_GROUPS = [
+  "tags",
+  "changelog",
+  "companies",
 ] as const;
 
-export type ApiKeyAccessLevel = (typeof API_KEY_ACCESS_LEVELS)[number];
+export type ApiKeyCapabilityGroup = (typeof API_KEY_CAPABILITY_GROUPS)[number];
 
 /**
- * The scopes behind each level, built from the domain vocabulary rather than
- * restated, so a level cannot offer a scope the server does not know or miss
- * one it now grants by default.
+ * The scopes behind each capability, built from the domain vocabulary rather
+ * than restated, so a capability cannot offer a scope the server does not know
+ * or miss one it now grants by default.
  */
-export const API_KEY_ACCESS_LEVEL_SCOPES = {
-  read_only: PUBLIC_API_DEFAULT_SCOPES,
-  tag_management: [
-    ...PUBLIC_API_DEFAULT_SCOPES,
-    ...PUBLIC_API_TAG_MANAGEMENT_SCOPES,
-  ],
-  changelog_management: [
-    ...PUBLIC_API_DEFAULT_SCOPES,
-    ...PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
-  ],
-  content_management: [
-    ...PUBLIC_API_DEFAULT_SCOPES,
-    ...PUBLIC_API_TAG_MANAGEMENT_SCOPES,
-    ...PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
-  ],
-} satisfies Record<ApiKeyAccessLevel, readonly PublicApiScope[]>;
+export const API_KEY_CAPABILITY_GROUP_SCOPES = {
+  tags: PUBLIC_API_TAG_MANAGEMENT_SCOPES,
+  changelog: PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
+  companies: PUBLIC_API_COMPANY_MANAGEMENT_SCOPES,
+} satisfies Record<ApiKeyCapabilityGroup, readonly PublicApiScope[]>;
 
-export const API_KEY_ACCESS_LEVEL_LABELS = {
-  read_only: "Read only",
-  tag_management: "Read and manage tags",
-  changelog_management: "Read and manage changelog",
-  content_management: "Read and manage tags and changelog",
-} satisfies Record<ApiKeyAccessLevel, string>;
+export const API_KEY_CAPABILITY_GROUP_LABELS = {
+  tags: "Manage tags",
+  changelog: "Manage changelog",
+  companies: "Manage companies",
+} satisfies Record<ApiKeyCapabilityGroup, string>;
 
-export const API_KEY_ACCESS_LEVEL_DESCRIPTIONS = {
-  read_only: "Can read this workspace's posts, tags, and changelog entries.",
-  tag_management:
-    "Can also create, rename, and delete tags, and set which tags a post carries. Deleting a tag removes it from every post that carries it.",
-  changelog_management:
-    "Can also create, edit, and delete changelog entries, and publish them. Publishing emails everyone subscribed to the changelog.",
-  content_management:
-    "Tag management plus changelog management: create, edit, and delete tags and changelog entries, assign tags, and publish release notes.",
-} satisfies Record<ApiKeyAccessLevel, string>;
+export const API_KEY_CAPABILITY_GROUP_DESCRIPTIONS = {
+  tags: "Create, rename, and delete tags, and set which tags a post carries. Deleting a tag removes it from every post that carries it.",
+  changelog:
+    "Create, edit, and delete changelog entries, and publish them. Publishing emails everyone subscribed to the changelog.",
+  companies:
+    "Read, create, update, and delete this workspace's companies. The contacts who belong to a company are not exposed, and deleting one leaves those contacts in place.",
+} satisfies Record<ApiKeyCapabilityGroup, string>;
 
-export const API_KEY_ACCESS_LEVEL_ITEMS = API_KEY_ACCESS_LEVELS.map(
+export const API_KEY_CAPABILITY_GROUP_ITEMS = API_KEY_CAPABILITY_GROUPS.map(
   (value) => ({
-    label: API_KEY_ACCESS_LEVEL_LABELS[value],
     value,
+    label: API_KEY_CAPABILITY_GROUP_LABELS[value],
+    description: API_KEY_CAPABILITY_GROUP_DESCRIPTIONS[value],
   })
 );
 
 /**
+ * The checkbox group's values, narrowed back to the vocabulary above.
+ *
+ * Filters rather than casts: the group reports `string[]` because it is
+ * value-agnostic, and the only options rendered come from
+ * `API_KEY_CAPABILITY_GROUPS`, so this both checks that and gives the form its
+ * own type without a SAFETY comment to maintain.
+ */
+export const toApiKeyCapabilityGroups = (
+  values: readonly string[]
+): ApiKeyCapabilityGroup[] =>
+  API_KEY_CAPABILITY_GROUPS.filter((group) => values.includes(group));
+
+/**
+ * The scopes a key is created with: the read default plus whatever the sheet
+ * was asked for. Deduplicated because the plugin stores the list verbatim and
+ * a repeated action would show up twice in the dashboard — the server
+ * deduplicates for the same reason.
+ */
+export const apiKeyScopes = (
+  capabilities: readonly ApiKeyCapabilityGroup[]
+): PublicApiScope[] => [
+  ...new Set([
+    ...PUBLIC_API_DEFAULT_SCOPES,
+    ...capabilities.flatMap(
+      (capability) => API_KEY_CAPABILITY_GROUP_SCOPES[capability]
+    ),
+  ]),
+];
+
+/**
+ * What every key can do before a capability is chosen, so the field can say
+ * what the empty state means instead of leaving it to the description of a
+ * group the caller may not select.
+ */
+export const API_KEY_READ_ONLY_DESCRIPTION =
+  "Every key reads posts, tags, and changelog entries. Select a capability to grant more.";
+
+/**
  * Mirrors the server's `ApiKeyCreate` payload: a name between 1 and 32
- * characters, one of the lifetimes from the domain vocabulary, and one of the
- * access levels above. The server keeps the same bounds, so this is a courtesy
- * check rather than the enforcement point.
+ * characters, one of the lifetimes from the domain vocabulary, and any subset
+ * of the capabilities above. The server keeps the same bounds, so this is a
+ * courtesy check rather than the enforcement point.
  */
 export const apiKeyFormSchema = z.object({
   name: z
@@ -114,20 +141,28 @@ export const apiKeyFormSchema = z.object({
     .min(1, "Enter a name for the key")
     .max(32, "Use 32 characters or fewer"),
   expiration: z.enum(API_KEY_EXPIRATIONS),
-  access: z.enum(API_KEY_ACCESS_LEVELS),
+  capabilities: z.array(z.enum(API_KEY_CAPABILITY_GROUPS)),
 });
 
 export type ApiKeyFormValues = z.infer<typeof apiKeyFormSchema>;
+
+/**
+ * No capability chosen, typed as the vocabulary rather than as an empty array.
+ *
+ * A bare `[]` infers `never[]`, which then narrows the form's own value type
+ * and rejects the validator above it.
+ */
+const API_KEY_DEFAULT_CAPABILITIES: ApiKeyCapabilityGroup[] = [];
 
 export const apiKeyFormOpts = formOptions({
   defaultValues: {
     name: "",
     // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
     expiration: "never" as TApiKeyExpiration,
-    // The narrower grant is the default: a key that only needs to read should
-    // not be able to delete a workspace's tags because the sheet opened here.
-    // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
-    access: "read_only" as ApiKeyAccessLevel,
+    // No capability is the default: a key that only needs to read should not
+    // be able to delete a workspace's tags, broadcast a release note, or learn
+    // its customers, because the sheet opened here.
+    capabilities: API_KEY_DEFAULT_CAPABILITIES,
   },
   validators: {
     onSubmit: apiKeyFormSchema,

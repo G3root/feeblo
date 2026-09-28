@@ -7,6 +7,7 @@ import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Etag from "effect/unstable/http/Etag";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
@@ -17,6 +18,7 @@ import type { ApiKeyAuthRecord } from "../api-key/schema";
 import { Auth } from "../auth-handler";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { PolicyDeniedError } from "../policy";
 import { PostActivityRepository } from "../post-activity/repository";
 import { RateLimitService } from "../rate-limit/service";
 import { S3Test } from "../services/s3-test";
@@ -31,6 +33,8 @@ import { makePublicApiRoute } from "./router";
 import {
   PublicApiChangelog,
   PublicApiChangelogPage,
+  PublicApiCompany,
+  PublicApiCompanyPage,
   PublicApiPost,
   PublicApiPostPage,
   PublicApiPostTags,
@@ -107,39 +111,96 @@ const decodeChangelog = Schema.decodeUnknownSync(
 const decodeChangelogPage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiChangelogPage)
 );
+const decodeCompany = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiCompany)
+);
+const decodeCompanyPage = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiCompanyPage)
+);
 const decodeDocument = Schema.decodeUnknownSync(
   Schema.fromJsonString(OpenApiDocument)
 );
 
-/** Handler dependencies, supplied from outside the route layer. */
-const Entitlements = EntitlementPolicy.layer.pipe(
-  Layer.provide(WorkspaceRepository.layer)
-);
-const PublicApiDependencies = Layer.mergeAll(
-  // The Public API records tag changes in a post's timeline, so its repository
-  // needs the activity repository at construction time. A changelog write is
-  // also a publish when it says so, which records a durable email intent and
-  // notifies subscribers through the same helper the dashboard uses. A delete
-  // sweeps the editor assets it orphaned, which needs media storage.
-  PublicApiRepository.layer.pipe(
-    Layer.provide(PostActivityRepository.layer),
-    Layer.provide(EmailOutboxRepository.layer),
-    Layer.provide(Entitlements),
-    Layer.provide(S3Test)
-  ),
-  PublicApiConfig.layerTest(new URL("https://app.feeblo.test")),
-  Entitlements,
-  // Merged, not only provided: a test asserts the email intent a publish
-  // records, and the layer is the only way a test body reaches the outbox.
-  EmailOutboxRepository.layer,
-  WorkspaceRepository.layer,
-  AuthTest,
-  RateLimitService.layerMemory,
-  Etag.layer,
-  NodeHttpPlatform.layer,
-  NodeServices.layer
-  // Merged so test bodies can seed fixtures through `currentDb`.
-).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
+/**
+ * Handler dependencies, supplied from outside the route layer.
+ *
+ * `crmEntryLimit` wraps the real plan policy in one that refuses a create once
+ * the workspace holds that many CRM entries: no plan both allows the Public API
+ * and carries a cap today, so that branch is unreachable through the real
+ * entitlements. Wrapping rather than restating the policy keeps every other
+ * decision the real one — the key still has to pass the real `canUsePublicApi`,
+ * and a changelog publish still passes the real publish gate.
+ */
+const makePublicApiDependencies = (
+  options: { readonly crmEntryLimit?: number } = {}
+) => {
+  // Destructured so the closure below captures a narrowed `const` rather than
+  // re-reading an optional property.
+  const { crmEntryLimit } = options;
+
+  const entitlements =
+    crmEntryLimit === undefined
+      ? EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
+      : Layer.effect(
+          EntitlementPolicy,
+          Effect.map(EntitlementPolicy, (policy) => ({
+            ...policy,
+            canCreateCrmEntry: ({ crmEntryCount }) =>
+              Effect.gen(function* () {
+                const count = yield* crmEntryCount;
+                if (count >= crmEntryLimit) {
+                  return yield* Effect.fail(
+                    new PolicyDeniedError({ reason: "The plan has no room." })
+                  );
+                }
+              }),
+          }))
+        ).pipe(
+          Layer.provide(
+            EntitlementPolicy.layer.pipe(
+              Layer.provide(WorkspaceRepository.layer)
+            )
+          )
+        );
+
+  return Layer.mergeAll(
+    // The Public API records tag changes in a post's timeline, so its repository
+    // needs the activity repository at construction time. A changelog write is
+    // also a publish when it says so, which records a durable email intent and
+    // notifies subscribers through the same helper the dashboard uses. A delete
+    // sweeps the editor assets it orphaned, which needs media storage.
+    PublicApiRepository.layer.pipe(
+      Layer.provide(PostActivityRepository.layer),
+      Layer.provide(EmailOutboxRepository.layer),
+      Layer.provide(entitlements),
+      Layer.provide(S3Test)
+    ),
+    PublicApiConfig.layerTest(new URL("https://app.feeblo.test")),
+    entitlements,
+    // Merged, not only provided: a test asserts the email intent a publish
+    // records, and the layer is the only way a test body reaches the outbox.
+    EmailOutboxRepository.layer,
+    WorkspaceRepository.layer,
+    AuthTest,
+    RateLimitService.layerMemory,
+    Etag.layer,
+    NodeHttpPlatform.layer,
+    NodeServices.layer
+    // Merged so test bodies can seed fixtures through `currentDb`.
+  ).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
+};
+
+const PublicApiDependencies = makePublicApiDependencies();
+
+/** Wiring whose plan refuses every create: the cap is already reached at zero. */
+const CrmEntryDeniedDependencies = makePublicApiDependencies({
+  crmEntryLimit: 0,
+});
+
+/** Wiring whose plan has room for exactly one CRM entry. */
+const CrmEntryCapOneDependencies = makePublicApiDependencies({
+  crmEntryLimit: 1,
+});
 
 /**
  * Builds the app under test.
@@ -271,6 +332,36 @@ const seedChangelog = (
       organizationId,
       createdAt: now,
       updatedAt: now,
+    });
+    return id;
+  });
+
+/**
+ * Inserts a company directly, so a test controls its name, its external id, and
+ * its age. `source` is left to the column's own default, which is what a
+ * dashboard-created row looks like.
+ */
+const seedCompany = (
+  organizationId: string,
+  id: string,
+  name: string,
+  options: {
+    readonly avatar?: string | null;
+    readonly createdAt?: Date;
+    readonly externalId?: string | null;
+  } = {}
+) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const createdAt = options.createdAt ?? new Date();
+    yield* db.insert(schema.companyTable).values({
+      id,
+      name,
+      externalId: options.externalId ?? null,
+      avatar: options.avatar ?? null,
+      organizationId,
+      createdAt,
+      updatedAt: createdAt,
     });
     return id;
   });
@@ -455,6 +546,17 @@ const CHANGELOG_EDITOR_KEY_SCOPES = {
   posts: ["read"],
   tags: ["read"],
   changelog: ["read", "create", "update", "delete"],
+};
+
+/**
+ * The CRM grant, which is not implied by the read scopes: a key minted to read
+ * feedback does not learn the workspace's customers.
+ */
+const COMPANY_MANAGEMENT_KEY_SCOPES = {
+  boards: ["read"],
+  posts: ["read"],
+  tags: ["read"],
+  companies: ["read", "create", "update", "delete"],
 };
 
 const registerKey = (
@@ -1811,6 +1913,541 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect("never emits a company's internal identifiers", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedCompany(workspace.organizationId, "cmp_private", "Private");
+      registerKey(
+        "fbk_companies_private",
+        workspace.organizationId,
+        COMPANY_MANAGEMENT_KEY_SCOPES
+      );
+
+      const response = yield* executeRequest(
+        "/api/v1/companies",
+        "fbk_companies_private"
+      );
+      const raw = responseBody(response);
+
+      expect(decodeCompanyPage(raw).data).toHaveLength(1);
+      for (const forbidden of [
+        "organizationId",
+        "creatorId",
+        "contactId",
+        // The value, not only the field name: the workspace id must not be
+        // anywhere in the payload.
+        workspace.organizationId,
+      ]) {
+        expect(raw).not.toContain(forbidden);
+      }
+    })
+  );
+
+  it.effect(
+    "lists the workspace's companies newest first, and pages them",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const other = yield* seedWorkspace();
+        const base = Date.now();
+        yield* seedCompany(workspace.organizationId, "cmp_old", "Old", {
+          createdAt: new Date(base - 120_000),
+        });
+        yield* seedCompany(workspace.organizationId, "cmp_middle", "Middle", {
+          createdAt: new Date(base - 60_000),
+        });
+        yield* seedCompany(workspace.organizationId, "cmp_new", "New", {
+          createdAt: new Date(base),
+        });
+        // Another workspace's company must not appear in this workspace's page.
+        yield* seedCompany(other.organizationId, "cmp_unlisted", "Unlisted");
+        registerKey(
+          "fbk_companies_list",
+          workspace.organizationId,
+          COMPANY_MANAGEMENT_KEY_SCOPES
+        );
+
+        const first = yield* executeRequest(
+          "/api/v1/companies?limit=2",
+          "fbk_companies_list"
+        );
+        expect(first.status).toBe(200);
+        const firstPage = decodeCompanyPage(responseBody(first));
+        expect(firstPage.data.map((company) => company.id)).toEqual([
+          "cmp_new",
+          "cmp_middle",
+        ]);
+        expect(firstPage.nextCursor).not.toBeNull();
+
+        const second = yield* executeRequest(
+          `/api/v1/companies?limit=2&cursor=${encodeURIComponent(firstPage.nextCursor ?? "")}`,
+          "fbk_companies_list"
+        );
+        const secondPage = decodeCompanyPage(responseBody(second));
+        expect(secondPage.data.map((company) => company.id)).toEqual([
+          "cmp_old",
+        ]);
+        expect(secondPage.nextCursor).toBeNull();
+      })
+  );
+
+  it.effect(
+    "creates a company, trims its name, and records the API as its source",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        registerKey(
+          "fbk_companies_write",
+          workspace.organizationId,
+          COMPANY_MANAGEMENT_KEY_SCOPES
+        );
+
+        const created = yield* executeWrite("POST", "/api/v1/companies", {
+          apiKey: "fbk_companies_write",
+          body: {
+            name: "  Acme  ",
+            externalId: "crm-1",
+            avatar: "https://cdn.test/acme.png",
+            externalCreatedAt: "2026-01-02T00:00:00.000Z",
+          },
+        });
+
+        expect(created.status).toBe(201);
+        const company = decodeCompany(responseBody(created));
+        expect(company.name).toBe("Acme");
+        expect(company.externalId).toBe("crm-1");
+        expect(company.avatar).toBe("https://cdn.test/acme.png");
+        expect(company.externalCreatedAt).toEqual(
+          new Date("2026-01-02T00:00:00.000Z")
+        );
+        // The id is minted server-side; the caller's own key for the row is
+        // `externalId`, not the primary key.
+        expect(company.id).toMatch(/^cmp_/);
+        expect(company.source).toBe("API");
+
+        const fetched = yield* executeRequest(
+          `/api/v1/companies/${company.id}`,
+          "fbk_companies_write"
+        );
+        expect(fetched.status).toBe(200);
+        expect(decodeCompany(responseBody(fetched))).toEqual(company);
+      })
+  );
+
+  it.effect("rejects a company name that is only whitespace", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_companies_empty",
+        workspace.organizationId,
+        COMPANY_MANAGEMENT_KEY_SCOPES
+      );
+
+      const response = yield* executeWrite("POST", "/api/v1/companies", {
+        apiKey: "fbk_companies_empty",
+        body: { name: "   " },
+      });
+
+      expect(response.status).toBe(400);
+      expect(decodeError(responseBody(response))._tag).toBe("INVALID_REQUEST");
+    })
+  );
+
+  it.effect(
+    "refuses a company read or write the key was not granted, and changes nothing",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const db = yield* currentDb;
+        yield* seedCompany(workspace.organizationId, "cmp_scoped", "Scoped");
+        // The default grant: posts and tags, not the CRM.
+        registerKey("fbk_companies_readonly", workspace.organizationId);
+
+        const list = yield* executeRequest(
+          "/api/v1/companies",
+          "fbk_companies_readonly"
+        );
+        expect(list.status).toBe(403);
+        const listError = decodeError(responseBody(list));
+        expect(listError._tag).toBe("FORBIDDEN_SCOPE");
+        expect(listError.message).toContain("companies.read");
+
+        const cases = [
+          {
+            method: "POST" as const,
+            path: "/api/v1/companies",
+            scope: "companies.create",
+          },
+          {
+            method: "PATCH" as const,
+            path: "/api/v1/companies/cmp_scoped",
+            scope: "companies.update",
+          },
+          {
+            method: "DELETE" as const,
+            path: "/api/v1/companies/cmp_scoped",
+            scope: "companies.delete",
+          },
+        ];
+
+        for (const entry of cases) {
+          const response = yield* executeWrite(entry.method, entry.path, {
+            apiKey: "fbk_companies_readonly",
+            body: entry.method === "DELETE" ? undefined : { name: "Renamed" },
+          });
+
+          expect(response.status).toBe(403);
+          const body = decodeError(responseBody(response));
+          expect(body._tag).toBe("FORBIDDEN_SCOPE");
+          expect(body.message).toContain(entry.scope);
+        }
+
+        // The refusals are refusals: nothing was created or renamed.
+        const [row] = yield* db
+          .select()
+          .from(schema.companyTable)
+          .where(eq(schema.companyTable.id, "cmp_scoped"));
+        expect(row?.name).toBe("Scoped");
+        // Scoped to this workspace: the database is shared across the tests in
+        // this file, so a global count would count other tests' fixtures.
+        const mine = yield* db
+          .select()
+          .from(schema.companyTable)
+          .where(
+            eq(schema.companyTable.organizationId, workspace.organizationId)
+          );
+        expect(mine).toHaveLength(1);
+      })
+  );
+
+  it.effect(
+    "reports a duplicate company name and externalId as conflicts",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        registerKey(
+          "fbk_companies_conflict",
+          workspace.organizationId,
+          COMPANY_MANAGEMENT_KEY_SCOPES
+        );
+
+        const first = yield* executeWrite("POST", "/api/v1/companies", {
+          apiKey: "fbk_companies_conflict",
+          body: { name: "Acme", externalId: "crm-1" },
+        });
+        expect(first.status).toBe(201);
+
+        const duplicateName = yield* executeWrite("POST", "/api/v1/companies", {
+          apiKey: "fbk_companies_conflict",
+          body: { name: "Acme" },
+        });
+        expect(duplicateName.status).toBe(409);
+        const nameError = decodeError(responseBody(duplicateName));
+        expect(nameError._tag).toBe("CONFLICT");
+        expect(nameError.message).toContain("name");
+
+        // The caller's own identifier is a key of its own: reusing it for a
+        // differently named company is the same collision.
+        const duplicateExternalId = yield* executeWrite(
+          "POST",
+          "/api/v1/companies",
+          {
+            apiKey: "fbk_companies_conflict",
+            body: { name: "Acme Ltd", externalId: "crm-1" },
+          }
+        );
+        expect(duplicateExternalId.status).toBe(409);
+        expect(
+          decodeError(responseBody(duplicateExternalId)).message
+        ).toContain("externalId");
+
+        // Two companies may both leave it unset: `NULL` is distinct in the
+        // unique index, so an unset external id is not a collision.
+        for (const name of ["No Id", "Also No Id"]) {
+          const unset = yield* executeWrite("POST", "/api/v1/companies", {
+            apiKey: "fbk_companies_conflict",
+            body: { name },
+          });
+          expect(unset.status).toBe(201);
+        }
+      })
+  );
+
+  it.effect(
+    "updates a company, clears a nullable field, and rejects an empty patch",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        yield* seedCompany(workspace.organizationId, "cmp_update", "Old", {
+          avatar: "https://cdn.test/old.png",
+          externalId: "crm-old",
+        });
+        yield* seedCompany(workspace.organizationId, "cmp_taken", "Taken");
+        registerKey(
+          "fbk_companies_update",
+          workspace.organizationId,
+          COMPANY_MANAGEMENT_KEY_SCOPES
+        );
+
+        // A body that names no field is not a write, and must not be answered
+        // as one that changed nothing.
+        const empty = yield* executeWrite(
+          "PATCH",
+          "/api/v1/companies/cmp_update",
+          { apiKey: "fbk_companies_update", body: {} }
+        );
+        expect(empty.status).toBe(400);
+        expect(decodeError(responseBody(empty))._tag).toBe("INVALID_REQUEST");
+
+        // An omitted field is left alone; an explicit null clears it.
+        const renamed = yield* executeWrite(
+          "PATCH",
+          "/api/v1/companies/cmp_update",
+          {
+            apiKey: "fbk_companies_update",
+            body: { name: "  New  ", avatar: null },
+          }
+        );
+        expect(renamed.status).toBe(200);
+        const company = decodeCompany(responseBody(renamed));
+        expect(company.name).toBe("New");
+        expect(company.avatar).toBeNull();
+        expect(company.externalId).toBe("crm-old");
+        // A row the API did not create keeps the provenance it had.
+        expect(company.source).toBe("DASHBOARD");
+
+        // Renaming to the name it already has is not a conflict with itself,
+        // and neither is sending back the external id it already holds.
+        for (const body of [{ name: "New" }, { externalId: "crm-old" }]) {
+          const unchanged = yield* executeWrite(
+            "PATCH",
+            "/api/v1/companies/cmp_update",
+            { apiKey: "fbk_companies_update", body }
+          );
+          expect(unchanged.status).toBe(200);
+        }
+
+        const taken = yield* executeWrite(
+          "PATCH",
+          "/api/v1/companies/cmp_update",
+          { apiKey: "fbk_companies_update", body: { name: "Taken" } }
+        );
+        expect(taken.status).toBe(409);
+        expect(decodeError(responseBody(taken))._tag).toBe("CONFLICT");
+      })
+  );
+
+  it.effect("reports another workspace's company as not found", () =>
+    Effect.gen(function* () {
+      const mine = yield* seedWorkspace();
+      const theirs = yield* seedWorkspace();
+      yield* seedCompany(theirs.organizationId, "cmp_theirs", "Theirs");
+      registerKey(
+        "fbk_companies_mine",
+        mine.organizationId,
+        COMPANY_MANAGEMENT_KEY_SCOPES
+      );
+      registerKey(
+        "fbk_companies_theirs",
+        theirs.organizationId,
+        COMPANY_MANAGEMENT_KEY_SCOPES
+      );
+
+      const read = yield* executeRequest(
+        "/api/v1/companies/cmp_theirs",
+        "fbk_companies_mine"
+      );
+      expect(read.status).toBe(404);
+      expect(decodeError(responseBody(read))._tag).toBe("NOT_FOUND");
+
+      const rename = yield* executeWrite(
+        "PATCH",
+        "/api/v1/companies/cmp_theirs",
+        { apiKey: "fbk_companies_mine", body: { name: "Mine now" } }
+      );
+      expect(rename.status).toBe(404);
+
+      const remove = yield* executeWrite(
+        "DELETE",
+        "/api/v1/companies/cmp_theirs",
+        { apiKey: "fbk_companies_mine" }
+      );
+      expect(remove.status).toBe(404);
+
+      // The company is untouched, and its owner still sees it under its own
+      // name: a 404 is a refusal, not a report of what happened.
+      const owned = yield* executeRequest(
+        "/api/v1/companies/cmp_theirs",
+        "fbk_companies_theirs"
+      );
+      expect(owned.status).toBe(200);
+      expect(decodeCompany(responseBody(owned)).name).toBe("Theirs");
+    })
+  );
+
+  it.effect(
+    "reports an update whose row vanished as not found, not as a server error",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const repository = yield* PublicApiRepository;
+
+        // The window the handler cannot close: it reads the company, another
+        // request deletes it, and the update then matches no row. That is the
+        // documented "not found" and not a driver failure, so the repository
+        // reports it as the absence it is rather than as an internal error.
+        const updated = yield* repository.updateCompany({
+          avatar: null,
+          companyId: "cmp_vanished",
+          externalCreatedAt: null,
+          externalId: null,
+          name: "Renamed",
+          organizationId: workspace.organizationId,
+        });
+
+        expect(Option.isNone(updated)).toBe(true);
+      })
+  );
+
+  it.effect("reports a delete that matched no row, and the one that did", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const repository = yield* PublicApiRepository;
+
+      // The window the handler cannot close: it reads the company, another
+      // request deletes it, and this delete then matches no row. That is the
+      // documented "not found" and not a success, so the repository reports
+      // it instead of a 204 that hides which workspace it deleted from.
+      const raced = yield* repository.deleteCompany({
+        companyId: "cmp_vanished",
+        organizationId: workspace.organizationId,
+      });
+      expect(raced).toBe(false);
+
+      yield* seedCompany(workspace.organizationId, "cmp_present", "Present");
+      const deleted = yield* repository.deleteCompany({
+        companyId: "cmp_present",
+        organizationId: workspace.organizationId,
+      });
+      expect(deleted).toBe(true);
+      expect(
+        Option.isNone(
+          yield* repository.findCompany({
+            companyId: "cmp_present",
+            organizationId: workspace.organizationId,
+          })
+        )
+      ).toBe(true);
+    })
+  );
+
+  it.effect("deletes a company and detaches its contacts", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      yield* seedCompany(workspace.organizationId, "cmp_delete", "Delete me");
+      yield* db.insert(schema.contactTable).values({
+        id: "cnt_linked",
+        name: "Linked person",
+        organizationId: workspace.organizationId,
+        companyId: "cmp_delete",
+      });
+      registerKey(
+        "fbk_companies_delete",
+        workspace.organizationId,
+        COMPANY_MANAGEMENT_KEY_SCOPES
+      );
+
+      const removed = yield* executeWrite(
+        "DELETE",
+        "/api/v1/companies/cmp_delete",
+        { apiKey: "fbk_companies_delete" }
+      );
+      expect(removed.status).toBe(204);
+      expect(responseBody(removed)).toBe("");
+
+      const gone = yield* executeRequest(
+        "/api/v1/companies/cmp_delete",
+        "fbk_companies_delete"
+      );
+      expect(gone.status).toBe(404);
+
+      // The people who belonged to the company survive it and simply stop
+      // naming one: deleting an account record must not delete its contacts.
+      const [contact] = yield* db
+        .select()
+        .from(schema.contactTable)
+        .where(eq(schema.contactTable.id, "cnt_linked"));
+      expect(contact?.companyId).toBeNull();
+      expect(contact?.name).toBe("Linked person");
+    })
+  );
+
+  it.effect(
+    "answers a request its schema rejected on the published vocabulary",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const db = yield* currentDb;
+        registerKey(
+          "fbk_malformed",
+          workspace.organizationId,
+          COMPANY_MANAGEMENT_KEY_SCOPES
+        );
+
+        // Bodies an endpoint cannot decode: a wrong type, a missing required
+        // field, and an explicit null on a field that is not nullable. None of
+        // these reaches a handler — the framework decodes first — so it is the
+        // schema-error middleware that keeps them on the documented vocabulary
+        // instead of letting the framework answer with a defect.
+        const cases = [
+          {
+            body: { name: 123 },
+            method: "POST" as const,
+            path: "/api/v1/companies",
+          },
+          { body: {}, method: "POST" as const, path: "/api/v1/companies" },
+          {
+            body: { name: null },
+            method: "PATCH" as const,
+            path: "/api/v1/companies/cmp_any",
+          },
+          { body: { name: 5 }, method: "POST" as const, path: "/api/v1/tags" },
+        ];
+
+        for (const entry of cases) {
+          const response = yield* executeWrite(entry.method, entry.path, {
+            apiKey: "fbk_malformed",
+            body: entry.body,
+          });
+
+          expect(response.status).toBe(400);
+          expect(decodeError(responseBody(response))._tag).toBe(
+            "INVALID_REQUEST"
+          );
+        }
+
+        // Authentication runs first: a request with no key is refused before
+        // its body is looked at, so this is a 401 and not a 400.
+        const anonymous = yield* execute("POST", "/api/v1/companies", {
+          body: { name: 123 },
+        });
+        expect(anonymous.status).toBe(401);
+        expect(decodeError(responseBody(anonymous))._tag).toBe(
+          "MISSING_API_KEY"
+        );
+
+        // None of the rejected requests wrote anything.
+        const mine = yield* db
+          .select()
+          .from(schema.companyTable)
+          .where(
+            eq(schema.companyTable.organizationId, workspace.organizationId)
+          );
+        expect(mine).toHaveLength(0);
+      })
+  );
+
   it.effect("serves its own OpenAPI document without a key", () =>
     Effect.gen(function* () {
       const response = yield* executeRequest("/api/v1/openapi.json");
@@ -1823,6 +2460,8 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/boards/{boardId}/posts",
         "/api/v1/changelog",
         "/api/v1/changelog/{changelogId}",
+        "/api/v1/companies",
+        "/api/v1/companies/{companyId}",
         "/api/v1/posts/{postId}",
         "/api/v1/posts/{postId}/tags",
         "/api/v1/tags",
@@ -1923,3 +2562,108 @@ layer(makeTestApp({ limit: 1, window: Duration.minutes(1) }))(
     );
   }
 );
+/**
+ * The CRM entry limit, with a plan that denies one.
+ *
+ * No plan both allows the Public API and carries a `crmEntries` cap — the cap
+ * is on Free, which cannot create a key — so the policy is wrapped rather than
+ * the request being made against a plan that does not exist. What this covers
+ * is the wiring the unit test cannot: that a company create consults the plan
+ * at all, answers on the published vocabulary when it refuses, and writes
+ * nothing.
+ */
+layer(
+  makePublicApiRoute(makeApiKeyAuthMiddlewareLive()).pipe(
+    Layer.provideMerge(CrmEntryDeniedDependencies),
+    Layer.provideMerge(HttpRouter.layer)
+  )
+)("public api CRM entry limit", (it) => {
+  it.effect(
+    "refuses a company create the workspace's plan has no room for",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        registerKey(
+          "fbk_crm_denied",
+          workspace.organizationId,
+          COMPANY_MANAGEMENT_KEY_SCOPES
+        );
+
+        const created = yield* executeWrite("POST", "/api/v1/companies", {
+          apiKey: "fbk_crm_denied",
+          body: { name: "Acme" },
+        });
+
+        expect(created.status).toBe(403);
+        expect(decodeError(responseBody(created))._tag).toBe(
+          "PLAN_REQUIRES_UPGRADE"
+        );
+
+        // Nothing was written, and the refusal is about this write rather
+        // than about the key: reading the workspace's companies still works.
+        const db = yield* currentDb;
+        const mine = yield* db
+          .select()
+          .from(schema.companyTable)
+          .where(
+            eq(schema.companyTable.organizationId, workspace.organizationId)
+          );
+        expect(mine).toHaveLength(0);
+
+        const listed = yield* executeRequest(
+          "/api/v1/companies",
+          "fbk_crm_denied"
+        );
+        expect(listed.status).toBe(200);
+        expect(decodeCompanyPage(responseBody(listed)).data).toHaveLength(0);
+      })
+  );
+});
+
+/**
+ * The CRM entry limit with room for one entry.
+ *
+ * The suite above proves the gate refuses. This one proves it counts: the cap
+ * is read from the workspace's own rows, inside the transaction that writes the
+ * row it authorizes, so the first create fits and the second does not.
+ */
+layer(
+  makePublicApiRoute(makeApiKeyAuthMiddlewareLive()).pipe(
+    Layer.provideMerge(CrmEntryCapOneDependencies),
+    Layer.provideMerge(HttpRouter.layer)
+  )
+)("public api CRM entry limit of one", (it) => {
+  it.effect("allows the create that fits and refuses the one after it", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_crm_cap",
+        workspace.organizationId,
+        COMPANY_MANAGEMENT_KEY_SCOPES
+      );
+
+      const first = yield* executeWrite("POST", "/api/v1/companies", {
+        apiKey: "fbk_crm_cap",
+        body: { name: "Acme" },
+      });
+      expect(first.status).toBe(201);
+
+      // The count the policy reads is the workspace's committed rows, so the
+      // create above is what makes this one exceed the cap.
+      const second = yield* executeWrite("POST", "/api/v1/companies", {
+        apiKey: "fbk_crm_cap",
+        body: { name: "Acme Ltd" },
+      });
+      expect(second.status).toBe(403);
+      expect(decodeError(responseBody(second))._tag).toBe(
+        "PLAN_REQUIRES_UPGRADE"
+      );
+
+      // The refusal rolled back: the workspace holds the one company the plan
+      // allows and not the one it refused.
+      const listed = yield* executeRequest("/api/v1/companies", "fbk_crm_cap");
+      const page = decodeCompanyPage(responseBody(listed));
+      expect(page.data.map((company) => company.name)).toEqual(["Acme"]);
+    })
+  );
+});
