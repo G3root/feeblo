@@ -3,8 +3,19 @@ import * as Effect from "effect/Effect";
 
 import { EntitlementPolicy } from "../entitlement/policies";
 import { withRemapDbErrors } from "../rpc-errors";
-import { internalError, planRequiresUpgradeError } from "./errors";
+import {
+  internalError,
+  InternalError,
+  planRequiresUpgradeError,
+  PlanRequiresUpgradeError,
+} from "./errors";
 import { currentPublicApiRepository } from "./repository";
+
+/**
+ * What the room check can fail with, so a caller can name it without restating
+ * the union — the company write takes the check as a parameter.
+ */
+export type CrmEntryAllowanceError = PlanRequiresUpgradeError | InternalError;
 
 /**
  * The message for a workspace whose plan has no room left.
@@ -48,8 +59,14 @@ export const currentEntitlementPolicy = Effect.context<never>().pipe(
  * Answered as `PLAN_REQUIRES_UPGRADE` rather than a code of its own: the remedy
  * is the same one — a plan with room — and a second 403 would publish a status
  * no reachable caller could trigger.
+ *
+ * The count it reads is only meaningful inside the write transaction that holds
+ * the workspace lock, so callers run this there rather than on its own; the
+ * company create takes it as a parameter for exactly that reason.
  */
-export const requireCrmEntryAllowance = (organizationId: string) =>
+export const requireCrmEntryAllowance = (
+  organizationId: string
+): Effect.Effect<void, CrmEntryAllowanceError> =>
   Effect.gen(function* () {
     const policy = yield* currentEntitlementPolicy;
     const repository = yield* currentPublicApiRepository;

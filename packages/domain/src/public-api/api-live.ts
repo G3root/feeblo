@@ -502,15 +502,14 @@ export const PublicApiLive = HttpApiBuilder.group(
             organizationId: caller.organizationId,
           });
 
-          // After the conflict checks, so a duplicate create is answered as the
-          // conflict it is rather than as a plan problem the caller cannot act
-          // on, and before the insert, so the workspace never holds one more
-          // CRM entry than its plan allows.
-          yield* requireCrmEntryAllowance(caller.organizationId);
-
+          // The plan gate and the insert are one call, and one transaction: the
+          // repository locks the workspace, runs this check, and only then
+          // writes, so two creates arriving near a plan's cap cannot both see
+          // room. See `createCompany`.
           const created = yield* repository
             .createCompany({
               avatar: payload.avatar ?? null,
+              ensureRoom: requireCrmEntryAllowance(caller.organizationId),
               externalCreatedAt: payload.externalCreatedAt ?? null,
               externalId: payload.externalId ?? null,
               name,
@@ -601,7 +600,13 @@ export const PublicApiLive = HttpApiBuilder.group(
             })
             .pipe(Effect.catchTag("InternalServerError", onInternalError));
 
-          return toPublicApiCompany(updated);
+          // The read above cannot hold the row still, so a company deleted
+          // between the two is answered as the missing company it is rather
+          // than as a driver failure the caller cannot act on.
+          return yield* Option.match(updated, {
+            onNone: () => Effect.fail(notFoundError("Company not found.")),
+            onSome: (company) => Effect.succeed(toPublicApiCompany(company)),
+          });
         })
       )
       .handle("deleteCompany", ({ params }) =>

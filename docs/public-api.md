@@ -256,7 +256,7 @@ The `id` is assigned by the server. `externalId` is your own identifier for the 
 
 The name is trimmed, so `"  Acme  "` is stored as `"Acme"`. A name, or an `externalId`, already used in the workspace is answered with `409 CONFLICT` rather than creating a second record for the same account. A company created here carries `source: "API"`.
 
-A create is also refused with `403 PLAN_REQUIRES_UPGRADE` when the workspace's plan has no room for another CRM entry. Companies and contacts count together towards that limit, exactly as they do in the dashboard, so the API is never a way around a plan's own cap.
+A create is also refused with `403 PLAN_REQUIRES_UPGRADE` when the workspace's plan has no room for another CRM entry. Companies and contacts count together towards that limit, exactly as they do in the dashboard, so the API is never a way around a plan's own cap. The count is taken inside the same transaction that writes the company, against a lock on the workspace, so two creates arriving at the cap together cannot both fit.
 
 ### Update a company
 
@@ -269,7 +269,7 @@ Content-Type: application/json
 
 Responds `200` with the company afterwards. Requires `companies.update`.
 
-An omitted field is left as it is; an explicit `null` clears a nullable one, so `"avatar": null` removes the avatar and the example above renames the company in the same request. A body that names no field at all is answered with `400 INVALID_REQUEST` rather than as a write that changed nothing. `id`, `source`, and the timestamps are not writable. A name or `externalId` another company already holds is answered with `409 CONFLICT`.
+An omitted field is left as it is; an explicit `null` clears a nullable one, so `"avatar": null` removes the avatar and the example above renames the company in the same request. A body that names no field at all is answered with `400 INVALID_REQUEST` rather than as a write that changed nothing. `id`, `source`, and the timestamps are not writable. A name or `externalId` another company already holds is answered with `409 CONFLICT`, and a company deleted while the request was in flight is answered with `404 NOT_FOUND` — never with a server error.
 
 ### Delete a company
 

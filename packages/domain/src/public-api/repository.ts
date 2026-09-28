@@ -25,6 +25,7 @@ import { PostActivityRepository } from "../post-activity/repository";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import { postTagChangeActivities } from "../tag/post-tag-activities";
 import type { Cursor } from "./cursor";
+import type { CrmEntryAllowanceError } from "./entitlement";
 import { conflictError, invalidRequestError, notFoundError } from "./errors";
 import type { TPublicApiCompanySourceType } from "./schema";
 
@@ -204,11 +205,21 @@ interface TFindCompanyExternalIdConflict {
 }
 
 interface TCreateCompany {
-  externalId: string | null;
-  externalCreatedAt: Date | null;
   avatar: string | null;
+  externalCreatedAt: Date | null;
+  externalId: string | null;
   name: string;
   organizationId: string;
+  /**
+   * The plan's room check, run inside the same transaction as the insert, after
+   * the workspace's CRM writes are locked.
+   *
+   * Passed in rather than decided here: the limit belongs to the plan, not to
+   * the table, and the caller is where the policy is known. It is an effect
+   * rather than a boolean because the count it decides on has to be read inside
+   * this transaction — see `createCompany`.
+   */
+  ensureRoom: Effect.Effect<void, CrmEntryAllowanceError>;
 }
 
 interface TUpdateCompany {
@@ -1106,12 +1117,24 @@ const makePublicApiRepository = Effect.gen(function* () {
       }).pipe(withRemapDbErrors("PublicApiCompany", "select")),
 
     /**
-     * Creates a company and returns the row the database stored.
+     * Creates a company, in the transaction that proves the plan has room.
+     *
+     * The plan's entry limit counts rows that mostly do not exist yet, so there
+     * is no row among them to lock: two creates arriving near the cap would both
+     * count the entries committed so far and both see room. The workspace row is
+     * locked instead, which gives them one order — the second create waits here,
+     * then counts the first one's row — and `ensureRoom` runs after that lock and
+     * before the insert, so the number it reads and the row it authorizes are
+     * decided together rather than a statement apart.
+     *
+     * `no key update` rather than `update`, for the reason the tag write gives:
+     * every table in the workspace points at this row, and the stronger lock
+     * would block unrelated inserts that merely reference the workspace.
      *
      * The id is minted here rather than accepted from the caller, for the same
      * reason as a tag's: a machine key is not a member acting on records it can
-     * already see, and a caller-chosen id would make the primary key part of
-     * the request surface. The caller's own identifier belongs in `externalId`.
+     * already see, and a caller-chosen id would make the primary key part of the
+     * request surface. The caller's own identifier belongs in `externalId`.
      *
      * `source` is written as `API` rather than taken from the request: it is
      * this API's record of where the row came from, and a caller that could
@@ -1123,64 +1146,80 @@ const makePublicApiRepository = Effect.gen(function* () {
      * loses the race at an index. That fallback cannot say which of the two
      * collided — the driver reports a constraint, not a field — so it names
      * both rather than guessing; the pre-check has already answered the
-     * ordinary case with the precise field.
+     * ordinary case with the precise field. The mapping wraps the transaction
+     * rather than the statement so a failure that only surfaces on commit is
+     * answered on the same vocabulary.
      */
     createCompany: ({
-      externalId,
-      externalCreatedAt,
       avatar,
+      ensureRoom,
+      externalCreatedAt,
+      externalId,
       name,
       organizationId,
     }: TCreateCompany) =>
-      Effect.gen(function* () {
-        const id = yield* CompanyId.generate;
-        const now = yield* DateTime.nowAsDate;
+      db
+        .transaction((tx) =>
+          Effect.gen(function* () {
+            const id = yield* CompanyId.generate;
+            const now = yield* DateTime.nowAsDate;
 
-        const [created] = yield* db
-          .insert(schema.companyTable)
-          .values({
-            id,
-            name,
-            externalId,
-            avatar,
-            externalCreatedAt,
-            organizationId,
-            source: "API",
-            createdAt: now,
-            updatedAt: now,
+            yield* tx
+              .select({ id: schema.organizationTable.id })
+              .from(schema.organizationTable)
+              .where(eq(schema.organizationTable.id, organizationId))
+              .for("no key update");
+
+            yield* ensureRoom;
+
+            const [created] = yield* tx
+              .insert(schema.companyTable)
+              .values({
+                id,
+                name,
+                externalId,
+                avatar,
+                externalCreatedAt,
+                organizationId,
+                source: "API",
+                createdAt: now,
+                updatedAt: now,
+              })
+              .returning(COMPANY_COLUMNS);
+
+            // An insert either stores a row or fails; an empty `returning` is a
+            // broken invariant, not something the caller did, so it must not be
+            // reported as a conflict with a name nobody holds.
+            if (created === undefined) {
+              return yield* Effect.fail(
+                new InternalServerError({
+                  message: "Error creating PublicApiCompany",
+                })
+              );
+            }
+
+            return created satisfies PublicApiCompanySource;
           })
-          .returning(COMPANY_COLUMNS);
-
-        // An insert either stores a row or fails; an empty `returning` is a
-        // broken invariant, not something the caller did, so it must not be
-        // reported as a conflict with a name nobody holds.
-        if (created === undefined) {
-          return yield* Effect.fail(
-            new InternalServerError({
-              message: "Error creating PublicApiCompany",
-            })
-          );
-        }
-
-        return created satisfies PublicApiCompanySource;
-      }).pipe(
-        withRemapDbErrors({
-          action: "create",
-          entity: "PublicApiCompany",
-          onUniqueViolation: () =>
-            conflictError(COMPANY_UNIQUE_VIOLATION_MESSAGE),
-        })
-      ),
+        )
+        .pipe(
+          withRemapDbErrors({
+            action: "create",
+            entity: "PublicApiCompany",
+            onUniqueViolation: () =>
+              conflictError(COMPANY_UNIQUE_VIOLATION_MESSAGE),
+          })
+        ),
 
     /**
      * Applies the fields the request named and returns the row the database
-     * stored.
+     * stored, or nothing when there is no such company any more.
      *
-     * An absent field is not in the `set` at all, which is what makes `null`
-     * and `undefined` mean different things: `null` clears a nullable column,
-     * while an absent key leaves it as it was. `updatedAt` moves on every call
-     * that reaches here, because the handler has already refused a body that
-     * named no field.
+     * `None` rather than a failure: the handler reads the company before calling
+     * this, so an update that matches no row was raced by someone else's delete,
+     * and the honest answer to the caller is the documented "not found" rather
+     * than a server error for a request they made in good faith. The unique
+     * violation is still mapped, because a rename can lose the race at the index
+     * even though the pre-check passed.
      */
     updateCompany: ({
       avatar,
@@ -1193,7 +1232,7 @@ const makePublicApiRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
 
-        const [updated] = yield* db
+        const rows = yield* db
           .update(schema.companyTable)
           .set({
             ...(name !== undefined && { name }),
@@ -1210,17 +1249,9 @@ const makePublicApiRepository = Effect.gen(function* () {
           )
           .returning(COMPANY_COLUMNS);
 
-        // The handler reads the company before updating it, so a row that is
-        // gone by the time the update runs is a race, not a caller mistake.
-        if (updated === undefined) {
-          return yield* Effect.fail(
-            new InternalServerError({
-              message: "Error updating PublicApiCompany",
-            })
-          );
-        }
-
-        return updated satisfies PublicApiCompanySource;
+        return Option.fromNullishOr(
+          rows.at(0)
+        ) satisfies Option.Option<PublicApiCompanySource>;
       }).pipe(
         withRemapDbErrors({
           action: "update",
@@ -1255,6 +1286,10 @@ const makePublicApiRepository = Effect.gen(function* () {
      * the plan limit that gates creating a company counts them, and the
      * dashboard's own create is gated on the same number. Two queries rather
      * than one union, because each then uses its own `organizationId` index.
+     *
+     * Only meaningful inside the write transaction that holds the workspace
+     * lock (`createCompany`): read anywhere else, the number it returns can be
+     * stale by the time the row it authorizes is inserted.
      */
     countCrmEntries: (organizationId: string) =>
       Effect.gen(function* () {

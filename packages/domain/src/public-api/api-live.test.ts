@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Etag from "effect/unstable/http/Etag";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
@@ -112,29 +113,39 @@ const decodeDocument = Schema.decodeUnknownSync(
 /**
  * Handler dependencies, supplied from outside the route layer.
  *
- * `denyCrmEntries` wraps the real plan policy so one suite can reach the CRM
- * entry gate: no plan both allows the Public API and carries a cap today, so
- * that branch is unreachable through the real entitlements. Wrapping rather
- * than restating the policy keeps every other decision the real one — the key
- * still has to pass the real `canUsePublicApi`.
+ * `crmEntryLimit` wraps the real plan policy in one that refuses a create once
+ * the workspace holds that many CRM entries: no plan both allows the Public API
+ * and carries a cap today, so that branch is unreachable through the real
+ * entitlements. Wrapping rather than restating the policy keeps every other
+ * decision the real one — the key still has to pass the real `canUsePublicApi`.
  */
 const makePublicApiDependencies = (
-  options: { readonly denyCrmEntries?: boolean } = {}
-) =>
-  Layer.mergeAll(
+  options: { readonly crmEntryLimit?: number } = {}
+) => {
+  // Destructured so the closure below captures a narrowed `const` rather than
+  // re-reading an optional property.
+  const { crmEntryLimit } = options;
+
+  return Layer.mergeAll(
     // The Public API records tag changes in a post's timeline, so its repository
     // needs the activity repository at construction time.
     PublicApiRepository.layer.pipe(Layer.provide(PostActivityRepository.layer)),
     PublicApiConfig.layerTest(new URL("https://app.feeblo.test")),
-    options.denyCrmEntries === true
-      ? Layer.effect(
+    crmEntryLimit === undefined
+      ? EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
+      : Layer.effect(
           EntitlementPolicy,
           Effect.map(EntitlementPolicy, (policy) => ({
             ...policy,
-            canCreateCrmEntry: () =>
-              Effect.fail(
-                new PolicyDeniedError({ reason: "The plan has no room." })
-              ),
+            canCreateCrmEntry: ({ crmEntryCount }) =>
+              Effect.gen(function* () {
+                const count = yield* crmEntryCount;
+                if (count >= crmEntryLimit) {
+                  return yield* Effect.fail(
+                    new PolicyDeniedError({ reason: "The plan has no room." })
+                  );
+                }
+              }),
           }))
         ).pipe(
           Layer.provide(
@@ -142,8 +153,7 @@ const makePublicApiDependencies = (
               Layer.provide(WorkspaceRepository.layer)
             )
           )
-        )
-      : EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
+        ),
     WorkspaceRepository.layer,
     AuthTest,
     RateLimitService.layerMemory,
@@ -152,12 +162,18 @@ const makePublicApiDependencies = (
     NodeServices.layer
     // Merged so test bodies can seed fixtures through `currentDb`.
   ).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
+};
 
 const PublicApiDependencies = makePublicApiDependencies();
 
-/** The same wiring, with a plan that has no room for another CRM entry. */
+/** Wiring whose plan refuses every create: the cap is already reached at zero. */
 const CrmEntryDeniedDependencies = makePublicApiDependencies({
-  denyCrmEntries: true,
+  crmEntryLimit: 0,
+});
+
+/** Wiring whose plan has room for exactly one CRM entry. */
+const CrmEntryCapOneDependencies = makePublicApiDependencies({
+  crmEntryLimit: 1,
 });
 
 /**
@@ -1726,6 +1742,30 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect(
+    "reports an update whose row vanished as not found, not as a server error",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const repository = yield* PublicApiRepository;
+
+        // The window the handler cannot close: it reads the company, another
+        // request deletes it, and the update then matches no row. That is the
+        // documented "not found" and not a driver failure, so the repository
+        // reports it as the absence it is rather than as an internal error.
+        const updated = yield* repository.updateCompany({
+          avatar: null,
+          companyId: "cmp_vanished",
+          externalCreatedAt: null,
+          externalId: null,
+          name: "Renamed",
+          organizationId: workspace.organizationId,
+        });
+
+        expect(Option.isNone(updated)).toBe(true);
+      })
+  );
+
   it.effect("deletes a company and detaches its contacts", () =>
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace();
@@ -2001,5 +2041,53 @@ layer(
         expect(listed.status).toBe(200);
         expect(decodeCompanyPage(responseBody(listed)).data).toHaveLength(0);
       })
+  );
+});
+
+/**
+ * The CRM entry limit with room for one entry.
+ *
+ * The suite above proves the gate refuses. This one proves it counts: the cap
+ * is read from the workspace's own rows, inside the transaction that writes the
+ * row it authorizes, so the first create fits and the second does not.
+ */
+layer(
+  makePublicApiRoute(makeApiKeyAuthMiddlewareLive()).pipe(
+    Layer.provideMerge(CrmEntryCapOneDependencies),
+    Layer.provideMerge(HttpRouter.layer)
+  )
+)("public api CRM entry limit of one", (it) => {
+  it.effect("allows the create that fits and refuses the one after it", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_crm_cap",
+        workspace.organizationId,
+        COMPANY_MANAGEMENT_KEY_SCOPES
+      );
+
+      const first = yield* executeWrite("POST", "/api/v1/companies", {
+        apiKey: "fbk_crm_cap",
+        body: { name: "Acme" },
+      });
+      expect(first.status).toBe(201);
+
+      // The count the policy reads is the workspace's committed rows, so the
+      // create above is what makes this one exceed the cap.
+      const second = yield* executeWrite("POST", "/api/v1/companies", {
+        apiKey: "fbk_crm_cap",
+        body: { name: "Acme Ltd" },
+      });
+      expect(second.status).toBe(403);
+      expect(decodeError(responseBody(second))._tag).toBe(
+        "PLAN_REQUIRES_UPGRADE"
+      );
+
+      // The refusal rolled back: the workspace holds the one company the plan
+      // allows and not the one it refused.
+      const listed = yield* executeRequest("/api/v1/companies", "fbk_crm_cap");
+      const page = decodeCompanyPage(responseBody(listed));
+      expect(page.data.map((company) => company.name)).toEqual(["Acme"]);
+    })
   );
 });
