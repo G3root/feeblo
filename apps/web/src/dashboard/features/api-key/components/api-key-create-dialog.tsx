@@ -4,7 +4,6 @@ import { Checkbox } from "@feeblo/ui/checkbox";
 import { CheckboxGroup } from "@feeblo/ui/checkbox-group";
 import { Field, FieldDescription, FieldLabel } from "@feeblo/ui/field";
 import { useAppForm } from "@feeblo/ui/hooks/form";
-import { Label } from "@feeblo/ui/label";
 import {
   Select,
   SelectItem,
@@ -163,36 +162,27 @@ function ApiKeyCreateForm({
             <Field name={field.name}>
               <FieldLabel>Access</FieldLabel>
               <CheckboxGroup
+                aria-label="Access"
                 onValueChange={(values) =>
                   field.handleChange(toApiKeyCapabilityGroups(values))
                 }
                 value={field.state.value}
               >
-                {API_KEY_CAPABILITY_GROUP_ITEMS.map((item) => {
-                  // The label is the checkbox's next sibling, which is how Base
-                  // UI's non-native control finds the label that names it; the
-                  // description is referenced separately so it describes the
-                  // checkbox instead of becoming part of its name.
-                  const id = `api-key-${item.value}`;
-                  return (
-                    <div className="grid gap-0.5" key={item.value}>
-                      <div className="flex items-center gap-2.5">
-                        <Checkbox
-                          aria-describedby={`${id}-description`}
-                          id={id}
-                          value={item.value}
-                        />
-                        <Label htmlFor={id}>{item.label}</Label>
-                      </div>
-                      <span
-                        className="text-muted-foreground ps-7 text-xs/4.5"
-                        id={`${id}-description`}
-                      >
-                        {item.description}
-                      </span>
+                {API_KEY_CAPABILITY_GROUP_ITEMS.map((item) => (
+                  // A `Field` per capability: Base UI names a control from the
+                  // label of the field it sits in, so checkboxes nested directly
+                  // in the group's own field would all be named "Access" —
+                  // wrong for a screen reader, and unfindable by name in a test.
+                  // The label and description wire themselves to the checkbox
+                  // through that field, so neither needs an id here.
+                  <Field key={item.value} orientation="horizontal">
+                    <Checkbox value={item.value} />
+                    <div className="grid gap-0.5">
+                      <FieldLabel>{item.label}</FieldLabel>
+                      <FieldDescription>{item.description}</FieldDescription>
                     </div>
-                  );
-                })}
+                  </Field>
+                ))}
               </CheckboxGroup>
               <FieldDescription>
                 {API_KEY_READ_ONLY_DESCRIPTION}
