@@ -31,6 +31,7 @@ export const PUBLIC_API_ERROR_CODES = [
   "PLAN_REQUIRES_UPGRADE",
   "INVALID_REQUEST",
   "NOT_FOUND",
+  "CONFLICT",
   "RATE_LIMITED",
   "INTERNAL_ERROR",
   "SERVICE_UNAVAILABLE",
@@ -78,6 +79,19 @@ export class NotFoundError extends Schema.TaggedError<NotFoundError>()(
   "NOT_FOUND",
   { message: Schema.String },
   { httpApiStatus: 404, identifier: "NOT_FOUND" }
+) {}
+
+/**
+ * 409 — the write collides with something that already exists.
+ *
+ * Its own code rather than a 400: the request is well-formed and the caller's
+ * intent is clear, so the answer is "this name is taken", not "I could not
+ * understand you". A create that raced another create lands here too.
+ */
+export class ConflictError extends Schema.TaggedError<ConflictError>()(
+  "CONFLICT",
+  { message: Schema.String },
+  { httpApiStatus: 409, identifier: "CONFLICT" }
 ) {}
 
 /**
@@ -133,6 +147,56 @@ export const PUBLIC_API_ERROR_SCHEMAS = [
   ServiceUnavailableError,
 ] as const;
 
+/**
+ * The errors the key middleware itself raises.
+ *
+ * Narrower than the vocabulary above on purpose: the middleware runs on every
+ * endpoint, so declaring the whole vocabulary here would merge all of it into
+ * every endpoint's responses — a create would document a `404` and a read a
+ * `409`, neither of which it can answer with. Each endpoint declares the
+ * statuses it can actually return; this is only what runs before it.
+ */
+export const PUBLIC_API_MIDDLEWARE_ERROR_SCHEMAS = [
+  MissingApiKeyError,
+  InvalidApiKeyError,
+  PlanRequiresUpgradeError,
+  RateLimitedErrorWithHeaders,
+  InternalError,
+  ServiceUnavailableError,
+] as const;
+
+/**
+ * The same vocabulary plus `CONFLICT`, for the endpoints that rename.
+ *
+ * Kept apart so the published document does not promise a 409 from an endpoint
+ * that can never answer one — a customer generating a client from the spec
+ * would otherwise handle a status the read endpoints never return.
+ */
+export const PUBLIC_API_WRITE_ERROR_SCHEMAS = [
+  ...PUBLIC_API_ERROR_SCHEMAS,
+  ConflictError,
+] as const;
+
+/**
+ * The write vocabulary minus `NOT_FOUND`, for a create.
+ *
+ * A create cannot report a missing resource — the resource is what it is
+ * making — and every id it needs comes from the key, not the request. Written
+ * out rather than filtered so the list stays the thing a reader checks against
+ * the handler.
+ */
+export const PUBLIC_API_CREATE_ERROR_SCHEMAS = [
+  MissingApiKeyError,
+  InvalidApiKeyError,
+  ForbiddenScopeError,
+  PlanRequiresUpgradeError,
+  InvalidRequestError,
+  ConflictError,
+  RateLimitedErrorWithHeaders,
+  InternalError,
+  ServiceUnavailableError,
+] as const;
+
 export const missingApiKeyError = (
   message = "Provide an API key in the x-api-key header."
 ) => new MissingApiKeyError({ message });
@@ -156,6 +220,9 @@ export const invalidRequestError = (message: string) =>
 export const notFoundError = (
   message = "The requested resource does not exist in this workspace."
 ) => new NotFoundError({ message });
+
+export const conflictError = (message: string) =>
+  new ConflictError({ message });
 
 export const rateLimitedError = (retryAfterSeconds: number) =>
   HttpApiSchema.withHeaders({

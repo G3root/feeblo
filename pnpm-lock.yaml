@@ -398,6 +398,9 @@ importers:
       '@feeblo/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@feeblo/domain-contracts':
+        specifier: workspace:*
+        version: link:../../packages/domain-contracts
       '@feeblo/feedback-widget':
         specifier: workspace:*
         version: link:../../packages/feedback-widget
@@ -809,6 +812,9 @@ importers:
       '@feeblo/domain':
         specifier: workspace:*
         version: link:../domain
+      '@feeblo/domain-contracts':
+        specifier: workspace:*
+        version: link:../domain-contracts
       '@feeblo/id':
         specifier: workspace:*
         version: link:../id

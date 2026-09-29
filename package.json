@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
-    "test": "turbo run test --filter=!@feeblo/e2e",
+    "test": "turbo run test --continue --filter=!@feeblo/e2e",
     "test:e2e": "pnpm --filter @feeblo/e2e test",
     "prepare": "effect-tsgo patch --typescript --oxlint",
     "dev:native": "turbo -F native dev",

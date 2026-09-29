@@ -17,6 +17,7 @@ import * as Option from "effect/Option";
 
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { ResolvePrincipalService } from "../identity/service";
+import { NotificationService } from "../notification/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostRepository } from "../post/repository";
 import {
@@ -28,6 +29,7 @@ import { UserRepository } from "../user/repository";
 import { CommentRpcHandlersEffect } from "./handlers";
 import { CommentPolicy } from "./policies";
 import { CommentRepository } from "./repository";
+import { CommentService } from "./service";
 
 describe("CommentRpcHandlers on-behalf", () => {
   type Role = Session["memberships"][number]["role"];
@@ -181,12 +183,23 @@ describe("CommentRpcHandlers on-behalf", () => {
     PostRepository.layer,
     CommentRepository.layer,
     PostActivityRepository.layer,
+    // The shared comment write service fans out notifications, so the suite
+    // supplies the real one rather than a composition production never has.
+    NotificationService.layer,
     ResolvePrincipalService.layer,
     UserRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
-  const HandlerTest = CommentPolicy.layer.pipe(
-    Layer.provideMerge(RepositoriesTest)
+  const HandlerTest = Layer.mergeAll(
+    CommentPolicy.layer,
+    CommentService.layer
+  ).pipe(
+    Layer.provideMerge(RepositoriesTest),
+    // The shared write service captures its database handle and the crypto
+    // service at construction; both are the TestLayer's own instances, not
+    // new ones, because layer memoization is per build and keyed by identity.
+    Layer.provide(Database.PgliteDatabaseLive),
+    Layer.provide(NodeCrypto.layer)
   );
 
   const TestLayer = Layer.mergeAll(

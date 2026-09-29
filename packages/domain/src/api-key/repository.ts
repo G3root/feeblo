@@ -1,4 +1,5 @@
 import { currentDb, schema } from "@feeblo/db";
+import { listPublicApiScopes } from "@feeblo/domain-contracts/public-api-scope";
 import { and, desc, eq } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -6,7 +7,6 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { listPublicApiScopes } from "../public-api/scopes";
 import { NotFoundError, withRemapDbErrors } from "../rpc-errors";
 import type { TApiKeySummary } from "./schema";
 

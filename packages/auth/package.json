@@ -39,6 +39,7 @@
     "@feeblo/config": "workspace:*",
     "@feeblo/db": "workspace:*",
     "@feeblo/domain": "workspace:*",
+    "@feeblo/domain-contracts": "workspace:*",
     "@feeblo/id": "workspace:*",
     "@feeblo/permissions": "workspace:*",
     "@feeblo/transactional": "workspace:*",

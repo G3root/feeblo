@@ -3,7 +3,7 @@ import type { ApiKeyConfigurationOptions } from "@better-auth/api-key";
 import {
   PUBLIC_API_DEFAULT_SCOPES,
   toPublicApiScopeStatements,
-} from "@feeblo/domain/public-api/scopes";
+} from "@feeblo/domain-contracts/public-api-scope";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError, getSessionFromCtx } from "better-auth/api";
 import { hasPermission } from "better-auth/plugins/organization";

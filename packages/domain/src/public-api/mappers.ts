@@ -1,7 +1,25 @@
 import type { TPostStatusType } from "@feeblo/domain-contracts/post-status-type";
 
-import type { PublicApiDetailedPost, PublicApiListedPost } from "./repository";
-import type { TPublicApiPost, TPublicApiPostSummary } from "./schema";
+import type {
+  PublicApiChangelogDetail,
+  PublicApiChangelogSource,
+  PublicApiCommentSource,
+  PublicApiCompanySource,
+  PublicApiDetailedPost,
+  PublicApiListedPost,
+  PublicApiPostTag,
+  PublicApiTagSource,
+} from "./repository";
+import type {
+  TPublicApiChangelog,
+  TPublicApiChangelogSummary,
+  TPublicApiComment,
+  TPublicApiCompany,
+  TPublicApiPost,
+  TPublicApiPostSummary,
+  TPublicApiTag,
+  TPublicApiTagDetail,
+} from "./schema";
 
 export type PublicApiMapperContext = {
   /** Application base URL, without a trailing slash. */
@@ -69,7 +87,7 @@ export const toPublicApiPostSummary = (
     type: post.status.type,
   },
   etaQuarter: post.etaQuarter,
-  tags: post.tags.map((tag) => ({ id: tag.id, name: tag.name })),
+  tags: post.tags.map(toPublicApiTag),
   voteCount: post.voteCount,
   commentCount: post.commentCount,
   author: {
@@ -91,4 +109,115 @@ export const toPublicApiPost = (
 ): TPublicApiPost => ({
   ...toPublicApiPostSummary(post, context),
   content: post.content,
+});
+
+/**
+ * A tag reference, as a post payload embeds it.
+ *
+ * One mapper for both places a reference appears — the `tags` array of a post
+ * and the response of setting a post's tags — so the two cannot drift apart.
+ */
+export const toPublicApiTag = (tag: PublicApiPostTag): TPublicApiTag => ({
+  id: tag.id,
+  name: tag.name,
+});
+
+/**
+ * A tag as the tag endpoints return it.
+ *
+ * No context argument: nothing in a tag is derived from the workspace or the
+ * application URL, and taking a context that is never read would invite the
+ * next field to be composed from it without thinking about what a machine key
+ * is allowed to see.
+ */
+export const toPublicApiTagDetail = (
+  tag: PublicApiTagSource
+): TPublicApiTagDetail => ({
+  id: tag.id,
+  name: tag.name,
+  slug: tag.slug,
+  createdAt: tag.createdAt,
+  updatedAt: tag.updatedAt,
+});
+
+/**
+ * A comment as the comment endpoints return it.
+ *
+ * No context argument, like the tag and company mappers: nothing in a comment
+ * is derived from the application URL or the workspace, and taking a context
+ * that is never read would invite the next field to be composed from it
+ * without thinking about what a machine key is allowed to see. The author is
+ * rebuilt field by field from the source's nested shape so a column added to
+ * the row cannot flow through.
+ */
+export const toPublicApiComment = (
+  comment: PublicApiCommentSource
+): TPublicApiComment => ({
+  id: comment.id,
+  postId: comment.postId,
+  content: comment.content,
+  visibility: comment.visibility,
+  parentCommentId: comment.parentCommentId,
+  pinnedAt: comment.pinnedAt,
+  author: {
+    type: comment.author.type,
+    displayName: comment.author.displayName,
+    avatarUrl: comment.author.avatarUrl,
+  },
+  createdAt: comment.createdAt,
+  updatedAt: comment.updatedAt,
+});
+
+/**
+ * A company as the company endpoints return it.
+ *
+ * Like the tag detail mapper and unlike the post mappers, this takes no
+ * context: nothing in a company is derived from the application URL or the
+ * workspace, and taking a context that is never read would invite the next
+ * field to be composed from it without thinking about what a machine key is
+ * allowed to see. The contacts who belong to the company have no name here to
+ * be passed through.
+ */
+export const toPublicApiCompany = (
+  company: PublicApiCompanySource
+): TPublicApiCompany => ({
+  id: company.id,
+  name: company.name,
+  externalId: company.externalId,
+  avatar: company.avatar,
+  externalCreatedAt: company.externalCreatedAt,
+  source: company.source,
+  createdAt: company.createdAt,
+  updatedAt: company.updatedAt,
+});
+
+/**
+ * A changelog entry for the list projection.
+ *
+ * No context argument: nothing here is derived from the workspace or the
+ * application URL. The public permalink lives on the workspace's own site
+ * subdomain, which the Public API does not resolve, so inventing a URL from
+ * `APP_URL` would hand a caller a link that does not open the entry.
+ */
+export const toPublicApiChangelogSummary = (
+  entry: PublicApiChangelogSource
+): TPublicApiChangelogSummary => ({
+  id: entry.id,
+  title: entry.title,
+  slug: entry.slug,
+  excerpt: entry.excerpt,
+  coverImage: entry.coverImage,
+  status: entry.status,
+  scheduledAt: entry.scheduledAt,
+  publishedAt: entry.publishedAt,
+  createdAt: entry.createdAt,
+  updatedAt: entry.updatedAt,
+});
+
+/** The detail projection: the summary plus the stored, sanitized body. */
+export const toPublicApiChangelog = (
+  entry: PublicApiChangelogDetail
+): TPublicApiChangelog => ({
+  ...toPublicApiChangelogSummary(entry),
+  content: entry.content,
 });

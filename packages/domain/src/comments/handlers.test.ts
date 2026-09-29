@@ -32,6 +32,7 @@ import { UserRepository } from "../user/repository";
 import { CommentRpcHandlersEffect } from "./handlers";
 import { CommentPolicy } from "./policies";
 import { CommentRepository } from "./repository";
+import { CommentService } from "./service";
 
 describe("CommentRpcHandlers", () => {
   const recordedIntegrationEvents: Array<unknown> = [];
@@ -191,14 +192,27 @@ describe("CommentRpcHandlers", () => {
     PostActivityRepository.layer,
     PostRepository.layer,
     PostSubscriptionRepository.layer,
+    // The shared comment write service fans out notifications, so the suite
+    // supplies the real one rather than exercising a composition production
+    // never has. The reply-notification cases still assert the member-only
+    // filter, not the absence of the service.
+    NotificationService.layer,
     ResolvePrincipalService.layer,
     UserRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
   const HandlerTest = Layer.mergeAll(
     CommentPolicy.layer,
+    CommentService.layer,
     PostPolicy.layer
-  ).pipe(Layer.provideMerge(RepositoriesTest));
+  ).pipe(
+    Layer.provideMerge(RepositoriesTest),
+    // The shared write service captures its database handle and the crypto
+    // service at construction; both are the TestLayer's own instances, not
+    // new ones, because layer memoization is per build and keyed by identity.
+    Layer.provide(Database.PgliteDatabaseLive),
+    Layer.provide(NodeCrypto.layer)
+  );
 
   const TestLayer = Layer.mergeAll(
     HandlerTest,
@@ -1152,20 +1166,11 @@ describe("CommentRpcHandlers", () => {
     });
 
     describe("reply notifications", () => {
-      // CommentRpcHandlersEffect resolves the notification service via
-      // serviceOption at build time, so handlers for these tests must be
-      // built with the layer supplied (the suite-level layer omits it).
-      const WithNotificationsLayer = NotificationService.layer.pipe(
-        Layer.provide(Database.PgliteDatabaseLive)
-      );
-
       it.effect(
         "does not notify a non-member parent author of an internal reply",
         () =>
           Effect.gen(function* () {
-            const handlers = yield* CommentRpcHandlersEffect.pipe(
-              Effect.provide(WithNotificationsLayer)
-            );
+            const handlers = yield* CommentRpcHandlersEffect;
             const fixture = yield* makeFixture("PUBLIC");
             const parentCommentId = yield* CommentId.generate;
             const replyId = yield* CommentId.generate;
@@ -1229,9 +1234,7 @@ describe("CommentRpcHandlers", () => {
 
       it.effect("notifies a member parent author of an internal reply", () =>
         Effect.gen(function* () {
-          const handlers = yield* CommentRpcHandlersEffect.pipe(
-            Effect.provide(WithNotificationsLayer)
-          );
+          const handlers = yield* CommentRpcHandlersEffect;
           const fixture = yield* makeFixture("PUBLIC");
           const parentCommentId = yield* CommentId.generate;
           const replyId = yield* CommentId.generate;

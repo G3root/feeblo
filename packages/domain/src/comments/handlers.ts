@@ -1,20 +1,9 @@
-import { currentDb, schema, transaction } from "@feeblo/db";
-import { BoardId, PostStatusId } from "@feeblo/id";
-import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
-import { and, eq } from "drizzle-orm";
-import * as EffectArray from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { EmailOutboxConfig } from "../email-outbox/config";
-import { InvalidSubjectError } from "../identity/errors";
-import {
-  resolveOnBehalfSubject,
-  toOnBehalfMetadata,
-} from "../identity/on-behalf";
 import { ResolvePrincipalService } from "../identity/service";
-import { recordPostIntegrationEvent as recordPostIntegrationEventShared } from "../integration/post-event-recording";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import { PostActivityRepository } from "../post-activity/repository";
@@ -23,13 +12,6 @@ import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
-import {
-  FailedToCreateCommentError,
-  FailedToDeleteCommentError,
-  FailedToPinCommentError,
-  FailedToUnpinCommentError,
-  FailedToUpdateCommentError,
-} from "./errors";
 import { CommentPolicy } from "./policies";
 import { CommentRepository } from "./repository";
 import { CommentRpcs } from "./rpcs";
@@ -41,394 +23,27 @@ import type {
   TCommentUnpin,
   TCommentUpdate,
 } from "./schema";
+import { CommentService } from "./service";
+import { applyCommentStatusUpdate } from "./status-update";
 
 export const CommentRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CommentRepository;
-  const activityRepository = yield* PostActivityRepository;
   const commentPolicy = yield* CommentPolicy;
-  // const sitePolicy = yield* SitePolicy;
+  // The writes themselves live in the shared service so the Public API's
+  // comment endpoints land in the same timeline, notification, and transaction
+  // machinery this surface uses. What stays here is the part only a member
+  // session can decide: who is acting and whether they are allowed to.
+  const comments = yield* CommentService;
 
-  const notifications = yield* Effect.serviceOption(NotificationService);
-
-  // -- Shared effect helpers (no policy applied) --
-
-  /**
-   * Moves a post to the org-scoped status referenced by `statusUpdateId` and
-   * records the `STATUS_CHANGED` activity + integration event, mirroring the
-   * post editor path. Runs inside the caller's transaction. Returns the id to
-   * store on the comment (null when nothing actually changed, so a comment on
-   * a post that already sits in that status is not labeled a status update).
-   */
-  const applyStatusUpdateEffect = (
-    args: TCommentCreate,
-    context: { actorId: string; actorMemberId: string | null }
-  ) => {
-    const statusUpdateId = args.statusUpdateId ?? null;
-    return Effect.gen(function* () {
-      if (statusUpdateId === null || args.parentCommentId !== null) {
-        // Replies and plain comments never move the post's status.
-        return null;
-      }
-      const db = yield* currentDb;
-
-      // Resolve the org-scoped status row the request refers to.
-      const statusRow = yield* db
-        .select({ id: schema.postStatusTable.id })
-        .from(schema.postStatusTable)
-        .where(
-          and(
-            eq(schema.postStatusTable.organizationId, args.organizationId),
-            eq(schema.postStatusTable.id, statusUpdateId)
-          )
-        )
-        .limit(1)
-        .pipe(Effect.map(EffectArray.get(0)));
-      if (Option.isNone(statusRow)) {
-        // Unknown status for this organization: keep the comment but do not
-        // pretend it changed anything.
-        return null;
-      }
-
-      const postRow = yield* db
-        .select({
-          id: schema.postTable.id,
-          boardId: schema.postTable.boardId,
-          slug: schema.postTable.slug,
-          title: schema.postTable.title,
-          statusId: schema.postTable.statusId,
-        })
-        .from(schema.postTable)
-        .where(
-          and(
-            eq(schema.postTable.id, args.postId),
-            eq(schema.postTable.organizationId, args.organizationId)
-          )
-        )
-        .limit(1)
-        .pipe(Effect.map(EffectArray.get(0)));
-
-      if (
-        Option.isNone(postRow) ||
-        postRow.value.statusId === statusRow.value.id
-      ) {
-        // Post missing, or already in the requested status: nothing to apply.
-        return null;
-      }
-
-      // Compare-and-update keyed by the previously read status: only the
-      // transaction that observes the post still in that status may apply the
-      // transition, so concurrent changes cannot persist history with a stale
-      // previousStatusId.
-      const transitionedPost = yield* db
-        .update(schema.postTable)
-        .set({ statusId: statusRow.value.id })
-        .where(
-          and(
-            eq(schema.postTable.id, args.postId),
-            eq(schema.postTable.statusId, postRow.value.statusId)
-          )
-        )
-        .returning({ id: schema.postTable.id })
-        .pipe(Effect.map(EffectArray.get(0)));
-      if (Option.isNone(transitionedPost)) {
-        // A concurrent transition won the race: keep the comment but do not
-        // label it a status update or record stale history.
-        return null;
-      }
-
-      yield* activityRepository.create({
-        organizationId: args.organizationId,
-        postId: args.postId,
-        actorId: context.actorId,
-        actorMemberId: context.actorMemberId,
-        kind: "STATUS_CHANGED",
-        previousStatusId: postRow.value.statusId,
-        nextStatusId: statusRow.value.id,
-      });
-
-      yield* recordPostIntegrationEventShared({
-        actor:
-          context.actorMemberId === null
-            ? { kind: "end_user" }
-            : { kind: "member", memberId: context.actorMemberId },
-        boardId: yield* BoardId.parse(postRow.value.boardId),
-        eventType: "feedback.post.status_changed",
-        organizationId: args.organizationId,
-        postId: args.postId,
-        postSlug: postRow.value.slug,
-        previousStatusId: yield* PostStatusId.parse(postRow.value.statusId),
-        statusId: yield* PostStatusId.parse(statusRow.value.id),
-        title: postRow.value.title,
-      }).pipe(
-        Effect.mapError(
-          () =>
-            new FailedToCreateCommentError({
-              message: "Failed to apply status update to post",
-            })
-        )
-      );
-
-      return statusUpdateId;
-    }).pipe(
-      Effect.mapError(
-        () =>
-          new FailedToCreateCommentError({
-            message: "Failed to apply status update to post",
-          })
-      )
-    );
-  };
-
-  const createCommentEffect = (args: TCommentCreate) => {
-    const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
-    return Effect.gen(function* () {
-      const session = yield* CurrentSession;
-      const membership = Policy.getMembership(session, args.organizationId);
-      if (args.author !== undefined) {
-        // Per-member abuse bound for on-behalf creations (see
-        // plan-on-behalf.md); self-service comments are unaffected.
-        yield* RateLimit.consumeOnBehalfWriteLimit({
-          organizationId: args.organizationId,
-          userId: session.session.userId,
-        });
-      }
-
-      yield* transaction(
-        Effect.gen(function* () {
-          // On-behalf attribution resolves the customer inside the same
-          // transaction as the mutation (see plan-on-behalf.md). Absent
-          // `author`, everything below behaves exactly as before. Comments
-          // need a user row, so shadow users are provisioned here for
-          // email-only subjects.
-          const subject =
-            args.author === undefined
-              ? undefined
-              : yield* resolveOnBehalfSubject({
-                  organizationId: args.organizationId,
-                  needsUser: true,
-                  subject: args.author,
-                  action: "comment author",
-                });
-          // Comments need a user row: resolution with needsUser:true
-          // guarantees one, provisioning a shadow account when necessary.
-          if (subject !== undefined && subject.userId === null) {
-            return yield* new InvalidSubjectError({
-              message: "The resolved customer has no account to comment as",
-            });
-          }
-          const authorUserId =
-            subject === undefined || subject.userId === null
-              ? session.session.userId
-              : subject.userId;
-          const statusUpdateId = yield* applyStatusUpdateEffect(args, {
-            actorId: session.session.userId,
-            actorMemberId: membership?.membershipId ?? null,
-          });
-
-          yield* repository.create({
-            ...args,
-            content: sanitizedMarkdown,
-            statusUpdateId,
-            userId: authorUserId,
-            // On-behalf comments keep staff attribution out of the author fields.
-            ...(membership &&
-              !subject && { memberId: membership.membershipId }),
-          });
-
-          const onBehalfMetadata = toOnBehalfMetadata(subject);
-
-          yield* activityRepository.create({
-            organizationId: args.organizationId,
-            postId: args.postId,
-            actorId: session.session.userId,
-            actorMemberId: membership?.membershipId ?? null,
-            kind: "COMMENT_CREATED",
-            commentId: args.id,
-            visibility: args.visibility,
-            ...(onBehalfMetadata && { metadata: onBehalfMetadata }),
-          });
-
-          // Ordinary comments — including on-behalf ones — record no email
-          // intents and subscribe nobody; the in-app notification keeps its
-          // member-only recipients with the staff member as actor.
-          yield* Option.match(notifications, {
-            onNone: () => Effect.void,
-            onSome: (service) =>
-              service.notifyComment({
-                organizationId: args.organizationId,
-                postId: args.postId,
-                commentId: args.id,
-                parentCommentId: args.parentCommentId,
-                visibility: args.visibility,
-                actorUserId: session.session.userId,
-              }),
-          });
-        })
-      );
-
-      return {
-        message: "Comment created successfully",
-      };
-    });
-  };
-
-  const deleteCommentEffect = (args: TCommentDelete) =>
-    Effect.gen(function* () {
-      const session = yield* CurrentSession;
-      const membership = Policy.getMembership(session, args.organizationId);
-
-      const deletedComment = yield* transaction(
-        Effect.gen(function* () {
-          const deleted = yield* repository.delete({
-            id: args.id,
-            organizationId: args.organizationId,
-            postId: args.postId,
-          });
-          if (Option.isSome(deleted)) {
-            yield* activityRepository.create({
-              organizationId: args.organizationId,
-              postId: args.postId,
-              actorId: session.session.userId,
-              actorMemberId: membership?.membershipId ?? null,
-              kind: "COMMENT_DELETED",
-              commentId: args.id,
-            });
-          }
-          return deleted;
-        })
-      );
-
-      if (Option.isNone(deletedComment)) {
-        return yield* new FailedToDeleteCommentError({
-          message: "Failed to delete comment",
-        });
-      }
-
-      return {
-        message: "Comment deleted successfully",
-      };
-    });
-
-  const updateCommentEffect = (args: TCommentUpdate) => {
-    const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
-    return Effect.gen(function* () {
-      const session = yield* CurrentSession;
-
-      const membership = Policy.getMembership(session, args.organizationId);
-
-      //only members can update visibility
-      const updatedComment = yield* transaction(
-        Effect.gen(function* () {
-          const updated = yield* repository.update({
-            id: args.id,
-            organizationId: args.organizationId,
-            postId: args.postId,
-            content: sanitizedMarkdown,
-            userId: session.session.userId,
-            ...(membership && { visibility: args.visibility }),
-          });
-          if (Option.isSome(updated)) {
-            yield* activityRepository.create({
-              organizationId: args.organizationId,
-              postId: args.postId,
-              actorId: session.session.userId,
-              actorMemberId: membership?.membershipId ?? null,
-              kind: "COMMENT_UPDATED",
-              commentId: args.id,
-              visibility: membership ? args.visibility : null,
-            });
-          }
-          return updated;
-        })
-      );
-
-      if (Option.isNone(updatedComment)) {
-        return yield* new FailedToUpdateCommentError({
-          message: "Failed to update comment",
-        });
-      }
-
-      return {
-        message: "Comment updated successfully",
-      };
-    });
-  };
-
-  const pinCommentEffect = (args: TCommentPin) =>
-    Effect.gen(function* () {
-      const session = yield* CurrentSession;
-      const membership = Policy.getMembership(session, args.organizationId);
-
-      const pinned = yield* transaction(
-        Effect.gen(function* () {
-          const result = yield* repository.pin({
-            id: args.id,
-            organizationId: args.organizationId,
-            postId: args.postId,
-          });
-          if (Option.isSome(result)) {
-            yield* activityRepository.create({
-              organizationId: args.organizationId,
-              postId: args.postId,
-              actorId: session.session.userId,
-              actorMemberId: membership?.membershipId ?? null,
-              kind: "COMMENT_PINNED",
-              commentId: args.id,
-            });
-          }
-          return result;
-        })
-      );
-
-      if (Option.isNone(pinned)) {
-        return yield* new FailedToPinCommentError({
-          message: "Failed to pin comment",
-        });
-      }
-
-      return {
-        message: "Comment pinned successfully",
-      };
-    });
-
-  const unpinCommentEffect = (args: TCommentUnpin) =>
-    Effect.gen(function* () {
-      const session = yield* CurrentSession;
-      const membership = Policy.getMembership(session, args.organizationId);
-
-      const unpinned = yield* transaction(
-        Effect.gen(function* () {
-          const result = yield* repository.unpin({
-            id: args.id,
-            organizationId: args.organizationId,
-            postId: args.postId,
-          });
-          if (Option.isSome(result)) {
-            yield* activityRepository.create({
-              organizationId: args.organizationId,
-              postId: args.postId,
-              actorId: session.session.userId,
-              actorMemberId: membership?.membershipId ?? null,
-              kind: "COMMENT_UNPINNED",
-              commentId: args.id,
-            });
-          }
-          return result;
-        })
-      );
-
-      if (Option.isNone(unpinned)) {
-        return yield* new FailedToUnpinCommentError({
-          message: "Failed to unpin comment",
-        });
-      }
-
-      return {
-        message: "Comment unpinned successfully",
-      };
-    });
-
-  // -- RPC handlers --
+  /** The session as the post timeline records it: the acting user and membership. */
+  const actorOf = (
+    session: CurrentSession["Service"],
+    organizationId: string
+  ) => ({
+    memberId:
+      Policy.getMembership(session, organizationId)?.membershipId ?? null,
+    userId: session.session.userId,
+  });
 
   return {
     CommentList: (args: TCommentList) =>
@@ -471,7 +86,46 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     CommentCreate: (args: TCommentCreate) =>
-      createCommentEffect(args).pipe(
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
+
+        if (args.author !== undefined) {
+          // Per-member abuse bound for on-behalf creations (see
+          // plan-on-behalf.md); self-service comments are unaffected.
+          yield* RateLimit.consumeOnBehalfWriteLimit({
+            organizationId: args.organizationId,
+            userId: session.session.userId,
+          });
+        }
+
+        const actor = actorOf(session, args.organizationId);
+
+        yield* comments.create({
+          actor,
+          author:
+            args.author === undefined
+              ? {
+                  kind: "self",
+                  memberId: membership?.membershipId ?? null,
+                  userId: session.session.userId,
+                }
+              : { kind: "on_behalf", subject: args.author },
+          draft: {
+            content: args.content,
+            id: args.id,
+            organizationId: args.organizationId,
+            parentCommentId: args.parentCommentId,
+            postId: args.postId,
+            visibility: args.visibility,
+          },
+          statusUpdate: applyCommentStatusUpdate(args, actor),
+        });
+
+        return {
+          message: "Comment created successfully",
+        };
+      }).pipe(
         Policy.withPolicy(
           commentPolicy.canCreate({
             organizationId: args.organizationId,
@@ -494,7 +148,32 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
               "Comments cannot be created on behalf of another author from public boards",
           });
         }
-        return yield* createCommentEffect(args);
+
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
+        const actor = actorOf(session, args.organizationId);
+
+        yield* comments.create({
+          actor,
+          author: {
+            kind: "self",
+            memberId: membership?.membershipId ?? null,
+            userId: session.session.userId,
+          },
+          draft: {
+            content: args.content,
+            id: args.id,
+            organizationId: args.organizationId,
+            parentCommentId: args.parentCommentId,
+            postId: args.postId,
+            visibility: args.visibility,
+          },
+          statusUpdate: applyCommentStatusUpdate(args, actor),
+        });
+
+        return {
+          message: "Comment created successfully",
+        };
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "CommentCreatePublic",
@@ -514,7 +193,22 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     CommentDelete: (args: TCommentDelete) =>
-      deleteCommentEffect(args).pipe(
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+
+        yield* comments.remove({
+          actor: actorOf(session, args.organizationId),
+          target: {
+            id: args.id,
+            organizationId: args.organizationId,
+            postId: args.postId,
+          },
+        });
+
+        return {
+          message: "Comment deleted successfully",
+        };
+      }).pipe(
         Policy.withPolicy(
           commentPolicy.canDelete({
             organizationId: args.organizationId,
@@ -527,7 +221,22 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     CommentDeletePublic: (args: TCommentDelete) =>
-      deleteCommentEffect(args).pipe(
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+
+        yield* comments.remove({
+          actor: actorOf(session, args.organizationId),
+          target: {
+            id: args.id,
+            organizationId: args.organizationId,
+            postId: args.postId,
+          },
+        });
+
+        return {
+          message: "Comment deleted successfully",
+        };
+      }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "CommentDeletePublic",
           level: "write",
@@ -544,7 +253,27 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     CommentUpdate: (args: TCommentUpdate) =>
-      updateCommentEffect(args).pipe(
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
+
+        yield* comments.update({
+          actor: actorOf(session, args.organizationId),
+          edit: {
+            authorUserId: session.session.userId,
+            content: args.content,
+            id: args.id,
+            organizationId: args.organizationId,
+            postId: args.postId,
+            // Only members can update visibility.
+            visibility: membership ? args.visibility : undefined,
+          },
+        });
+
+        return {
+          message: "Comment updated successfully",
+        };
+      }).pipe(
         Policy.withPolicy(
           commentPolicy.canUpdate({
             organizationId: args.organizationId,
@@ -558,7 +287,27 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     CommentUpdatePublic: (args: TCommentUpdate) =>
-      updateCommentEffect(args).pipe(
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
+
+        yield* comments.update({
+          actor: actorOf(session, args.organizationId),
+          edit: {
+            authorUserId: session.session.userId,
+            content: args.content,
+            id: args.id,
+            organizationId: args.organizationId,
+            postId: args.postId,
+            // Only members can update visibility.
+            visibility: membership ? args.visibility : undefined,
+          },
+        });
+
+        return {
+          message: "Comment updated successfully",
+        };
+      }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "CommentUpdatePublic",
           level: "expensive",
@@ -575,7 +324,22 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     CommentPin: (args: TCommentPin) =>
-      pinCommentEffect(args).pipe(
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+
+        yield* comments.pin({
+          actor: actorOf(session, args.organizationId),
+          target: {
+            id: args.id,
+            organizationId: args.organizationId,
+            postId: args.postId,
+          },
+        });
+
+        return {
+          message: "Comment pinned successfully",
+        };
+      }).pipe(
         Policy.withPolicy(
           commentPolicy.canPin({
             organizationId: args.organizationId,
@@ -588,7 +352,22 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     CommentUnpin: (args: TCommentUnpin) =>
-      unpinCommentEffect(args).pipe(
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+
+        yield* comments.unpin({
+          actor: actorOf(session, args.organizationId),
+          target: {
+            id: args.id,
+            organizationId: args.organizationId,
+            postId: args.postId,
+          },
+        });
+
+        return {
+          message: "Comment unpinned successfully",
+        };
+      }).pipe(
         Policy.withPolicy(
           commentPolicy.canPin({
             organizationId: args.organizationId,
@@ -607,6 +386,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
 ).pipe(
   // Layer.provide(SitePolicy.layer),
   Layer.provide(CommentPolicy.layer),
+  Layer.provide(CommentService.layer),
   Layer.provide(PostRepository.layer),
   Layer.provide(CommentRepository.layer),
   Layer.provide(PostActivityRepository.layer),

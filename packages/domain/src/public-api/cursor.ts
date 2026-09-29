@@ -6,9 +6,12 @@ import * as Schema from "effect/Schema";
  *
  * A cursor is the sort key of the last row of the previous page, base64url
  * encoded so callers treat it as opaque. It is deliberately *not* signed: it
- * carries a timestamp and a post id the caller already received, and every
+ * carries a timestamp and a record id the caller already received, and every
  * query that consumes it is scoped to the calling workspace, so a forged cursor
  * can only move a caller around its own data.
+ *
+ * One cursor serves every paginated endpoint — posts and tags page on the same
+ * `(createdAt, id)` tuple — so a caller learns one paging rule for the API.
  */
 const CursorPayload = Schema.Struct({
   createdAt: Schema.DateFromString,

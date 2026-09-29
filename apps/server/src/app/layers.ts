@@ -23,8 +23,8 @@ import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
 import { PostSubscriptionRepository } from "@feeblo/domain/post-subscription/repository";
 import { PostRepository } from "@feeblo/domain/post/repository";
 import { PublicApiConfig } from "@feeblo/domain/public-api/config";
-import { PublicApiRepository } from "@feeblo/domain/public-api/repository";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
+import { S3UploadServiceLive } from "@feeblo/domain/services/s3";
 import { Auth } from "@feeblo/domain/session-middleware";
 import { SiteRepository } from "@feeblo/domain/site/repository";
 import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
@@ -230,10 +230,22 @@ export const makeServiceLayers = ({
     ExternalResourceService,
     externalResourceService
   );
+  // The entitlement decision is built from the workspace's billing state and is
+  // read both by the Public API's key middleware and by its changelog writes
+  // (publishing emails subscribers only on a plan that includes them). One
+  // value, provided once, so the two cannot disagree about a workspace.
+  const EntitlementPolicies = EntitlementPolicy.layer.pipe(
+    Layer.provide(WorkspaceRepository.layer)
+  );
   return Layer.mergeAll(
     workflowLayer,
     SiteRepository.layer,
     EmailOutboxRepository.layer,
+    // The Public API's post writes record integration events, and the recorder
+    // snapshots the post's URL into the event. Required rather than provided
+    // per-layer, so the one value is built from the server's own `APP_URL` and
+    // `API_URL` instead of a second read of the environment.
+    EmailOutboxConfig.layer,
     EmailProviderFeedbackConfig.layer,
     EmailProviderFeedbackService.layer,
     SesEmailFeedbackWebhook.layer.pipe(
@@ -301,9 +313,18 @@ export const makeServiceLayers = ({
       Layer.provide(EmailOutboxConfig.layer),
       Layer.provide(Database.DatabaseContextLive)
     ),
-    EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
+    EntitlementPolicies,
     WorkspaceRepository.layer,
-    PublicApiRepository.layer,
+    // Media storage is shared rather than the Public API's own: its repository
+    // sweeps the editor assets a deleted changelog entry orphaned, and the
+    // dashboard's routes upload through the same service. The Public API's
+    // private dependencies live in its route layer (`public-api/router.ts`),
+    // so what is assembled here is what more than one surface reads.
+    S3UploadServiceLive,
+    // Read through the ambient context rather than as a layer requirement
+    // (`currentPublicApiConfig`), so no type catches its absence and the
+    // Public API's own tests supply their own. Dropping this line compiles and
+    // fails only when a request asks for a paging link.
     PublicApiConfig.layer
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
 };
