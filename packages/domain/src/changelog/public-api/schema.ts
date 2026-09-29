@@ -1,5 +1,7 @@
 import * as Schema from "effect/Schema";
 
+import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
+
 /**
  * The changelog resource: what the changelog endpoints return, and the typed
  * input every changelog operation takes.
@@ -158,7 +160,11 @@ export const ListChangelogInput = Schema.Struct({
     Schema.String.annotate({ description: "Opaque page cursor" })
   ),
   limit: Schema.optional(
-    Schema.Finite.check(Schema.isInt(), Schema.isGreaterThan(0)).annotate({
+    Schema.Finite.check(
+      Schema.isInt(),
+      Schema.isGreaterThan(0),
+      Schema.isLessThanOrEqualTo(PUBLIC_API_PAGE_MAX_LIMIT)
+    ).annotate({
       description: "Page size, 1–100",
     })
   ),

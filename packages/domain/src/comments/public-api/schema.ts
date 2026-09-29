@@ -2,6 +2,7 @@ import * as Schema from "effect/Schema";
 import { regexes } from "zod/v4/core";
 
 import { COMMENT_CONTENT_MAX_LENGTH } from "../../content-limits";
+import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
 import { PublicApiAuthor } from "../../public-api/common";
 
 /**
@@ -185,7 +186,11 @@ export const ListPostCommentsInput = Schema.Struct({
     Schema.String.annotate({ description: "Opaque page cursor" })
   ),
   limit: Schema.optional(
-    Schema.Finite.check(Schema.isInt(), Schema.isGreaterThan(0)).annotate({
+    Schema.Finite.check(
+      Schema.isInt(),
+      Schema.isGreaterThan(0),
+      Schema.isLessThanOrEqualTo(PUBLIC_API_PAGE_MAX_LIMIT)
+    ).annotate({
       description: "Page size, 1–100",
     })
   ),
