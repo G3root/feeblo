@@ -1242,6 +1242,46 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect("measures a title's length after trimming it", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_editor",
+        workspace.organizationId,
+        POST_EDITOR_KEY_SCOPES
+      );
+
+      // The maximum, padded: the old raw-length check would have rejected
+      // this, while the dashboard accepts it and stores it trimmed.
+      const title = "a".repeat(200);
+      const padded = yield* executeWrite("POST", "/api/v1/posts", {
+        apiKey: "fbk_post_editor",
+        body: {
+          boardId: workspace.boardId,
+          title: `  ${title}  `,
+          content: "Body",
+          statusId: workspace.statusId,
+        },
+      });
+
+      expect(padded.status).toBe(201);
+      expect(decodePost(responseBody(padded)).title).toBe(title);
+
+      // Padding does not excuse a title that is too long once trimmed.
+      const tooLong = yield* executeWrite("POST", "/api/v1/posts", {
+        apiKey: "fbk_post_editor",
+        body: {
+          boardId: workspace.boardId,
+          title: `  ${"a".repeat(201)}  `,
+          content: "Body",
+          statusId: workspace.statusId,
+        },
+      });
+      expect(tooLong.status).toBe(400);
+      expect(decodeError(responseBody(tooLong))._tag).toBe("INVALID_REQUEST");
+    })
+  );
+
   it.effect("rejects a title that is only whitespace", () =>
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace();
@@ -1417,6 +1457,65 @@ layer(makeTestApp())("public api v1", (it) => {
           true
         );
       })
+  );
+
+  it.effect("keeps the assets a post's body references", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_editor",
+        workspace.organizationId,
+        POST_EDITOR_KEY_SCOPES
+      );
+
+      const db = yield* currentDb;
+      const assetId = `ast_${workspace.organizationId}`;
+      yield* db.insert(schema.assetTable).values({
+        id: assetId,
+        bucket: "test-bucket",
+        key: "editor-media/shared.png",
+        url: "https://assets.example/shared.png",
+        kind: "editor_image",
+        organizationId: workspace.organizationId,
+      });
+
+      // A key has no editor to name the assets its body carries, so the
+      // reference has to come from the body. Without it, dropping the post the
+      // image was uploaded to would let the orphan sweep collect an image this
+      // post still shows.
+      const created = yield* executeWrite("POST", "/api/v1/posts", {
+        apiKey: "fbk_post_editor",
+        body: {
+          boardId: workspace.boardId,
+          title: "With an image",
+          content: "![shared](https://assets.example/shared.png)",
+          statusId: workspace.statusId,
+        },
+      });
+      expect(created.status).toBe(201);
+      const postId = decodePost(responseBody(created)).id;
+
+      const references = yield* db
+        .select({ assetId: schema.postAssetTable.assetId })
+        .from(schema.postAssetTable)
+        .where(eq(schema.postAssetTable.postId, postId));
+      expect(references.map((reference) => reference.assetId)).toEqual([
+        assetId,
+      ]);
+
+      // And an update that stops showing it drops the reference with it.
+      const removed = yield* executeWrite("PATCH", `/api/v1/posts/${postId}`, {
+        apiKey: "fbk_post_editor",
+        body: { content: "No image any more" },
+      });
+      expect(removed.status).toBe(200);
+
+      const after = yield* db
+        .select({ assetId: schema.postAssetTable.assetId })
+        .from(schema.postAssetTable)
+        .where(eq(schema.postAssetTable.postId, postId));
+      expect(after).toEqual([]);
+    })
   );
 
   it.effect("clears a nullable field with an explicit null", () =>

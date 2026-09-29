@@ -26,6 +26,7 @@ import * as Schema from "effect/Schema";
 
 import {
   cleanupOrphanedEditorAssets,
+  findEditorAssetIdsInContent,
   syncChangelogAssetReferences,
 } from "../asset/service";
 import { makeChangelogPublication } from "../changelog/publication";
@@ -1118,9 +1119,18 @@ const makePublicApiRepository = Effect.gen(function* () {
     }: TCreatePost) =>
       Effect.gen(function* () {
         const postId = yield* PostId.generate;
+        // A machine key has no editor to name the assets its body carries, so
+        // they are resolved from the body itself. Passing an empty list used
+        // to leave a post that shows a workspace image with no reference row,
+        // which let the orphan sweep collect the image once the post it was
+        // uploaded to stopped referencing it.
+        const assetIds = yield* findEditorAssetIdsInContent({
+          content,
+          organizationId,
+        });
         yield* writes.create(
           {
-            assetIds: [],
+            assetIds,
             boardId,
             content,
             etaQuarter,
@@ -1165,8 +1175,17 @@ const makePublicApiRepository = Effect.gen(function* () {
       title,
     }: TUpdatePost) =>
       Effect.gen(function* () {
+        // Only a body can introduce or drop an asset reference, so the ids are
+        // resolved from the one the request names; an update that leaves the
+        // body alone leaves the references alone with it.
+        const assetIds =
+          content === undefined
+            ? undefined
+            : yield* findEditorAssetIdsInContent({ content, organizationId });
+
         yield* writes.update(
           {
+            assetIds,
             boardId,
             content,
             etaQuarter,

@@ -1,6 +1,6 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
 import { AssetId } from "@feeblo/id";
-import { and, eq, inArray, lt, notExists, or } from "drizzle-orm";
+import { and, eq, inArray, lt, notExists, or, sql } from "drizzle-orm";
 import type * as PgDrizzle from "drizzle-orm/effect-postgres";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -230,6 +230,45 @@ const findCurrentEditorAssetsInContent = ({
       );
 
     return assets.filter(({ url }) => content.includes(url));
+  });
+
+/**
+ * The ids of the workspace's editor assets whose URL appears in `content`.
+ *
+ * The dashboard's editor names the assets it attached, so `assetIds` is where
+ * a save's references come from. A surface without an editor — the Public API
+ * — has only the body, and a body that shows an image from the workspace is
+ * exactly the case the reference rows exist for: without one, deleting the
+ * post the image was uploaded to makes it look orphaned and the sweep
+ * collects it while this body still shows it.
+ *
+ * `post_asset` is still written from the ids a caller submits; this only
+ * resolves what a caller with no ids to submit actually references. The
+ * match runs in SQL so the workspace's whole asset library is not read into
+ * memory on every save, and it is exact — `position` has none of `LIKE`'s
+ * wildcard characters to over- or under-match on a URL.
+ */
+export const findEditorAssetIdsInContent = ({
+  organizationId,
+  content,
+}: {
+  readonly organizationId: string;
+  readonly content: string;
+}) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const rows = yield* db
+      .select({ id: schema.assetTable.id })
+      .from(schema.assetTable)
+      .where(
+        and(
+          eq(schema.assetTable.organizationId, organizationId),
+          inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
+          sql`position(${schema.assetTable.url} in ${content}) > 0`
+        )
+      );
+
+    return rows.map(({ id }) => id);
   });
 
 export const prepareEditorAssetContent = ({

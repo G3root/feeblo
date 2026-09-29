@@ -4,7 +4,6 @@ import * as Schema from "effect/Schema";
 import {
   POST_CONTENT_MAX_LENGTH,
   POST_TITLE_MAX_LENGTH,
-  POST_TITLE_MIN_LENGTH,
 } from "../content-limits";
 
 /**
@@ -152,6 +151,23 @@ export const DeletePostParams = Schema.Struct({
 });
 
 /**
+ * A post title, trimmed before its length is measured.
+ *
+ * The dashboard's own title schema trims first for the same reason: padding a
+ * title must not count against the caller, and `"  Dark mode  "` is the title
+ * `"Dark mode"` everywhere it is stored and slugified.
+ *
+ * Emptiness is deliberately not checked here. The handler reports it
+ * (`parseTitle`) so the answer names the field — the same split the tag and
+ * changelog payloads use for a required name, whose schemas carry no minimum
+ * either. Nothing between the two can be written: a title the schema accepts
+ * is trimmed, and the handler refuses it when nothing is left.
+ */
+const PostTitle = Schema.Trim.pipe(
+  Schema.check(Schema.isMaxLength(POST_TITLE_MAX_LENGTH))
+);
+
+/**
  * The writable fields of a post, as a create states them.
  *
  * `id` is assigned by the server rather than chosen by the caller, for the
@@ -169,10 +185,7 @@ export const DeletePostParams = Schema.Struct({
  */
 export const CreatePostPayload = Schema.Struct({
   boardId: Schema.String,
-  title: Schema.String.check(
-    Schema.isMinLength(POST_TITLE_MIN_LENGTH),
-    Schema.isMaxLength(POST_TITLE_MAX_LENGTH)
-  ),
+  title: PostTitle,
   content: Schema.String.check(Schema.isMaxLength(POST_CONTENT_MAX_LENGTH)),
   statusId: Schema.String,
   etaQuarter: Schema.optional(
@@ -192,12 +205,7 @@ export type TCreatePostPayload = Schema.Schema.Type<typeof CreatePostPayload>;
  * rather than answered as a write that changed only `updatedAt`.
  */
 export const UpdatePostPayload = Schema.Struct({
-  title: Schema.optional(
-    Schema.String.check(
-      Schema.isMinLength(POST_TITLE_MIN_LENGTH),
-      Schema.isMaxLength(POST_TITLE_MAX_LENGTH)
-    )
-  ),
+  title: Schema.optional(PostTitle),
   content: Schema.optional(
     Schema.String.check(Schema.isMaxLength(POST_CONTENT_MAX_LENGTH))
   ),
