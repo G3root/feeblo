@@ -142,6 +142,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
 
     TagDelete: (args: TTagDelete) =>
       repository.delete(args).pipe(
+        Effect.asVoid,
         Policy.withPolicy(
           tagPolicy.canDelete({
             organizationId: args.organizationId,

@@ -4,6 +4,7 @@ import { currentDb, Database, schema } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { PublicApiCompanyRepository } from "../company/public-api/repository";
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
@@ -12,7 +13,6 @@ import { EntitlementPolicy } from "../entitlement/policies";
 import { S3Test } from "../services/s3-test";
 import { WorkspaceRepository } from "../workspace/repository";
 import { requireCrmEntryAllowance } from "./entitlement";
-import { PublicApiRepository } from "./repository";
 import { PublicApiInternals } from "./router";
 
 /**
@@ -33,12 +33,10 @@ const Entitlements = EntitlementPolicy.layer.pipe(
 
 const TestLayer = Layer.mergeAll(
   // The surface's own private wiring, taken from the route rather than
-  // restated (see ADR 0006): the repository publishes changelog entries,
-  // sweeps orphaned assets, and writes posts through the dashboard's shared
-  // post write path, so it needs the plan policy, media storage, and the
-  // write-path side effects at construction time — even though this suite only
-  // exercises the CRM entry count.
-  PublicApiRepository.layer.pipe(
+  // restated (see ADR 0006): the company repository counts CRM entries
+  // through the database the surface's internals already hold, so the test
+  // supplies the same bundle the route does rather than a second one.
+  PublicApiCompanyRepository.layer.pipe(
     Layer.provide(PublicApiInternals),
     Layer.provide(Entitlements),
     Layer.provide(S3Test),

@@ -1,6 +1,16 @@
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 
+import type {
+  PublicApiChangelogDetail,
+  PublicApiChangelogSource,
+} from "../changelog/public-api/repository";
+import type { PublicApiCompanySource } from "../company/public-api/repository";
+import type {
+  PublicApiDetailedPost,
+  PublicApiListedPost,
+} from "../post/public-api/repository";
+import type { PublicApiTagSource } from "../tag/public-api/repository";
 import {
   toPublicApiChangelog,
   toPublicApiChangelogSummary,
@@ -10,14 +20,6 @@ import {
   toPublicApiTag,
   toPublicApiTagDetail,
 } from "./mappers";
-import type {
-  PublicApiChangelogDetail,
-  PublicApiChangelogSource,
-  PublicApiCompanySource,
-  PublicApiDetailedPost,
-  PublicApiListedPost,
-  PublicApiTagSource,
-} from "./repository";
 import {
   PublicApiChangelog,
   PublicApiChangelogSummary,

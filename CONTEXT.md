@@ -35,3 +35,5 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 **API key**: An organization-owned machine credential. It identifies the workspace that owns it, never a member, and carries its own scopes. _Avoid_: token, secret, personal access token, user key
 
 **Scope**: A capability granted to an API key, drawn from the Public API's own vocabulary. Separate from a permission, which is granted to a member. _Avoid_: permission, role, entitlement
+
+**Operation**: One Public API capability — typed input, output, failure vocabulary, scope, and MCP-style annotations, with one handler. Declared in the feature's `packages/domain/src/<feature>/public-api/operations.ts`. The HTTP endpoint and a future MCP tool are projections of the same operation, so neither surface owns the behavior. _Avoid_: endpoint, handler, route, tool

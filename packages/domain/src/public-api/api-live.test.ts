@@ -21,6 +21,7 @@ import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 import type { ApiKeyAuthRecord } from "../api-key/schema";
 import { Auth } from "../auth-handler";
+import { PublicApiCompanyRepository } from "../company/public-api/repository";
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
@@ -35,7 +36,6 @@ import {
   makeApiKeyAuthMiddlewareLive,
   PUBLIC_API_KEY_RATE_LIMIT,
 } from "./middleware";
-import { PublicApiRepository } from "./repository";
 import { makePublicApiRoute } from "./router";
 import {
   PublicApiChangelog,
@@ -3165,13 +3165,13 @@ layer(makeTestApp())("public api v1", (it) => {
     () =>
       Effect.gen(function* () {
         const workspace = yield* seedWorkspace();
-        const repository = yield* PublicApiRepository;
+        const repository = yield* PublicApiCompanyRepository;
 
         // The window the handler cannot close: it reads the company, another
         // request deletes it, and the update then matches no row. That is the
         // documented "not found" and not a driver failure, so the repository
         // reports it as the absence it is rather than as an internal error.
-        const updated = yield* repository.updateCompany({
+        const updated = yield* repository.update({
           avatar: null,
           companyId: "cmp_vanished",
           externalCreatedAt: null,
@@ -3187,27 +3187,27 @@ layer(makeTestApp())("public api v1", (it) => {
   it.effect("reports a delete that matched no row, and the one that did", () =>
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace();
-      const repository = yield* PublicApiRepository;
+      const repository = yield* PublicApiCompanyRepository;
 
       // The window the handler cannot close: it reads the company, another
       // request deletes it, and this delete then matches no row. That is the
       // documented "not found" and not a success, so the repository reports
       // it instead of a 204 that hides which workspace it deleted from.
-      const raced = yield* repository.deleteCompany({
+      const raced = yield* repository.delete({
         companyId: "cmp_vanished",
         organizationId: workspace.organizationId,
       });
       expect(raced).toBe(false);
 
       yield* seedCompany(workspace.organizationId, "cmp_present", "Present");
-      const deleted = yield* repository.deleteCompany({
+      const deleted = yield* repository.delete({
         companyId: "cmp_present",
         organizationId: workspace.organizationId,
       });
       expect(deleted).toBe(true);
       expect(
         Option.isNone(
-          yield* repository.findCompany({
+          yield* repository.find({
             companyId: "cmp_present",
             organizationId: workspace.organizationId,
           })

@@ -1,4 +1,5 @@
 import { currentDb, schema } from "@feeblo/db";
+import { ChangelogId } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, desc, eq, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
@@ -7,18 +8,38 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import type {
-  TChangelogCreate,
-  TChangelogDelete,
-  TChangelogGet,
-  TChangelogList,
-  TChangelogUpdate,
-} from "./schema";
+import type { TChangelogGet, TChangelogList } from "./schema";
 
-interface TChangelogCreateInternal extends TChangelogCreate {
-  creatorId: string;
+/**
+ * The write inputs, typed with plain identifiers rather than the RPC payload
+ * schemas' branded ones.
+ *
+ * The dashboard decodes a branded id before it reaches the repository; the
+ * Public API's key is scoped to one workspace and its ids come from the
+ * database, so it passes strings. Widening the parameter to `string` keeps one
+ * repository serving both without a decode that proves nothing the request did
+ * not already establish.
+ */
+interface TChangelogCreateInternal {
+  /** Omitted when a machine key writes; a dashboard caller mints one. */
+  id?: string;
+  organizationId: string;
+  title: string;
+  slug: string;
+  content: string;
+  status: "draft" | "scheduled" | "published";
+  scheduledAt: Date | null;
+  publishedAt: Date | null;
+  coverImage: string | null;
+  /** Omitted when the writer is a machine key rather than a member. */
+  creatorId?: string;
   creatorMemberId?: string;
   excerpt?: string;
+}
+
+interface TChangelogDeleteInternal {
+  id: string;
+  organizationId: string;
 }
 
 interface TFindByCreatorId {
@@ -32,7 +53,16 @@ interface TFindMany {
   organizationId: string;
 }
 
-interface TChangelogUpdateInternal extends TChangelogUpdate {
+interface TChangelogUpdateInternal {
+  id: string;
+  organizationId: string;
+  title: string;
+  slug: string;
+  content: string;
+  status: "draft" | "scheduled" | "published";
+  scheduledAt: Date | null;
+  publishedAt: Date | null;
+  coverImage: string | null;
   excerpt?: string;
 }
 
@@ -221,6 +251,7 @@ const makeChangelogRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows[0])),
 
+    /** Creates an entry and returns the stored row. */
     create: ({
       id,
       title,
@@ -236,11 +267,12 @@ const makeChangelogRepository = Effect.gen(function* () {
       creatorMemberId,
     }: TChangelogCreateInternal) =>
       Effect.gen(function* () {
+        const changelogId = id ?? (yield* ChangelogId.generate);
         const now = yield* DateTime.nowAsDate;
-        yield* db
+        const [created] = yield* db
           .insert(schema.changelogTable)
           .values({
-            id,
+            id: changelogId,
             title,
             slug: slug || slugify(title),
             content,
@@ -250,14 +282,17 @@ const makeChangelogRepository = Effect.gen(function* () {
             scheduledAt,
             publishedAt,
             organizationId,
-            creatorId,
-            ...(creatorMemberId && { creatorMemberId }),
+            ...(creatorId !== undefined && { creatorId }),
+            ...(creatorMemberId !== undefined && { creatorMemberId }),
             createdAt: now,
             updatedAt: now,
           })
-          .pipe(Effect.asVoid);
+          .returning();
+
+        return created;
       }),
 
+    /** Replaces an entry's writable fields and returns the stored row. */
     update: ({
       id,
       title,
@@ -272,7 +307,7 @@ const makeChangelogRepository = Effect.gen(function* () {
     }: TChangelogUpdateInternal) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
-        yield* db
+        const [updated] = yield* db
           .update(schema.changelogTable)
           .set({
             title,
@@ -291,7 +326,9 @@ const makeChangelogRepository = Effect.gen(function* () {
               eq(schema.changelogTable.organizationId, organizationId)
             )
           )
-          .pipe(Effect.asVoid);
+          .returning();
+
+        return updated;
       }),
 
     /** Notification context (title + slug) for one changelog entry. */
@@ -317,7 +354,8 @@ const makeChangelogRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows[0])),
 
-    delete: ({ id, organizationId }: TChangelogDelete) =>
+    /** Deletes an entry, reporting whether there was one to delete. */
+    delete: ({ id, organizationId }: TChangelogDeleteInternal) =>
       db
         .delete(schema.changelogTable)
         .where(
@@ -326,7 +364,8 @@ const makeChangelogRepository = Effect.gen(function* () {
             eq(schema.changelogTable.organizationId, organizationId)
           )
         )
-        .pipe(Effect.asVoid),
+        .returning({ id: schema.changelogTable.id })
+        .pipe(Effect.map((rows) => rows.length > 0)),
   };
 });
 

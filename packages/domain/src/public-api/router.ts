@@ -3,15 +3,23 @@ import * as Layer from "effect/Layer";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { BoardRepository } from "../board/repository";
+import { PublicApiChangelogRepository } from "../changelog/public-api/repository";
+import { ChangelogRepository } from "../changelog/repository";
+import { PublicApiCommentRepository } from "../comments/public-api/repository";
 import { CommentRepository } from "../comments/repository";
 import { CommentService } from "../comments/service";
+import { PublicApiCompanyRepository } from "../company/public-api/repository";
+import { CompanyRepository } from "../company/repository";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { PostEmbeddingService } from "../post/embedding-service";
+import { PublicApiPostRepository } from "../post/public-api/repository";
 import { PostRepository } from "../post/repository";
+import { PublicApiTagRepository } from "../tag/public-api/repository";
+import { TagRepository } from "../tag/repository";
 import { UserRepository } from "../user/repository";
 import { PublicApi } from "./api-contract";
 import { PublicApiLive } from "./api-live";
@@ -20,7 +28,6 @@ import {
   ApiKeyAuthMiddlewareLive,
   PublicApiSchemaErrorHandlerLive,
 } from "./middleware";
-import { PublicApiRepository } from "./repository";
 
 /**
  * The `/api/v1` route tree.
@@ -37,29 +44,33 @@ import { PublicApiRepository } from "./repository";
  */
 
 /**
- * The layers the Public API reads and no other surface does.
+ * The layers the surface's own repositories need at construction time.
  *
- * They are what its write path needs to do what the dashboard's write path
- * does: the repository records tag changes in a post's timeline, so it needs
- * the activity repository at construction time; publishing a changelog entry
- * records a durable email intent and notifies subscribers through the same
- * helper the dashboard uses; and creating, changing, or deleting a post goes
- * through the dashboard's own shared write path (`post/write.ts`), which needs
- * the board and post repositories, the creator subscription, the integration
- * event recorder, the notification fan-out, and the embedding scheduler. A new
- * private dependency is therefore one line here, not an edit in every place
- * that assembles a server or a test.
+ * They are closed over so the route does not require them, and they are what
+ * its write paths need to do what the dashboard's write paths do: a tag
+ * assignment records a change in a post's timeline, so it needs the activity
+ * repository at construction time; publishing a changelog entry records a
+ * durable email intent and notifies subscribers through the same helper the
+ * dashboard uses; and creating, changing, or deleting a post goes through the
+ * dashboard's own shared write path (`post/write.ts`), which needs the board
+ * and post repositories, the creator subscription, the integration event
+ * recorder, the notification fan-out, and the embedding scheduler. A new
+ * dependency is therefore one line here, not an edit in every place that
+ * assembles a server or a test.
  *
- * Everything the surface shares — the database, `Auth`, the rate limiter, the
- * plan decision, media storage, the email subscription repository (whose token
- * service reads `AUTH_ENCRYPTION_KEY`, a credential the server already builds
- * once), and its own `PublicApiConfig` — stays a requirement instead, so
- * whoever assembles the server supplies the real service, and a test supplies
- * the substitute it needs (`S3Test`, a smaller rate-limit budget, a
- * `PublicApiConfig.layerTest`) without restating the surface's private wiring.
+ * Everything the surface shares with the server — the database, `Auth`, the
+ * rate limiter, the plan decision, media storage, the email subscription
+ * repository (whose token service reads `AUTH_ENCRYPTION_KEY`, a credential
+ * the server already builds once), and its own `PublicApiConfig` — stays a
+ * requirement instead, so whoever assembles the server supplies the real
+ * service, and a test supplies the substitute it needs (`S3Test`, a smaller
+ * rate-limit budget, a `PublicApiConfig.layerTest`) without restating the
+ * surface's private wiring.
  */
 export const PublicApiInternals = Layer.mergeAll(
   BoardRepository.layer,
+  ChangelogRepository.layer,
+  CompanyRepository.layer,
   EmailOutboxRepository.layer,
   IntegrationEventRecorderLive,
   NotificationService.layer,
@@ -68,6 +79,7 @@ export const PublicApiInternals = Layer.mergeAll(
   PostRepository.layer,
   PostSubscriptionRepository.layer,
   ResolvePrincipalService.layer,
+  TagRepository.layer,
   UserRepository.layer,
   // The shared comment write path needs its own repository; the identity
   // resolver it attributes a comment through is already above, for the post
@@ -81,7 +93,7 @@ export const PublicApiInternals = Layer.mergeAll(
  * Merged into the route rather than only provided to it: `HttpApiBuilder`
  * does not thread a handler's requirements through the route layer, so a
  * handler reads the service from the fiber context — the same shape as
- * `currentPublicApiRepository`. The service is the dashboard comment RPC's own
+ * `currentPublicApiCaller`. The service is the dashboard comment RPC's own
  * write path, so an API-created comment lands in the same timeline, the same
  * transaction, and the same notification fan-out as one written by a member.
  */
@@ -108,11 +120,25 @@ export const makePublicApiRoute = <E, R>(
     // rejected is part of this API's contract, not something the composition
     // root supplies.
     Layer.provide(PublicApiSchemaErrorHandlerLive),
-    // Merged rather than only provided: the repository stays in this layer's
-    // output because a test drives it directly to reach the races the HTTP
-    // surface cannot produce (a row that vanishes between a read and a write).
+    // Merged rather than only provided: the repositories stay in this layer's
+    // output because tests drive them directly to reach races the HTTP surface
+    // cannot produce (a row that vanishes between a read and a write). Each
+    // resource's repository is provided with the same private bundle, so a new
+    // one is a line here and nowhere else.
     Layer.provideMerge(
-      PublicApiRepository.layer.pipe(Layer.provide(PublicApiInternals))
+      Layer.mergeAll(
+        PublicApiChangelogRepository.layer.pipe(
+          Layer.provide(PublicApiInternals)
+        ),
+        PublicApiCompanyRepository.layer.pipe(
+          Layer.provide(PublicApiInternals)
+        ),
+        PublicApiCommentRepository.layer.pipe(
+          Layer.provide(PublicApiInternals)
+        ),
+        PublicApiPostRepository.layer.pipe(Layer.provide(PublicApiInternals)),
+        PublicApiTagRepository.layer.pipe(Layer.provide(PublicApiInternals))
+      )
     ),
     Layer.provideMerge(PublicApiCommentService)
   );
