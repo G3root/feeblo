@@ -39,6 +39,11 @@ export const PUBLIC_API_SCOPES = [
   "posts.create",
   "posts.update",
   "posts.delete",
+  "comments.read",
+  "comments.create",
+  "comments.update",
+  "comments.delete",
+  "comments.pin",
   "tags.read",
   "tags.create",
   "tags.update",
@@ -73,6 +78,7 @@ export const PublicApiScopeSchema = Schema.Literals(PUBLIC_API_SCOPES);
 export const PUBLIC_API_DEFAULT_SCOPES = [
   "boards.read",
   "posts.read",
+  "comments.read",
   "tags.read",
   "changelog.read",
 ] as const satisfies readonly PublicApiScope[];
@@ -94,6 +100,23 @@ export const PUBLIC_API_POST_MANAGEMENT_SCOPES = [
   "posts.create",
   "posts.update",
   "posts.delete",
+] as const satisfies readonly PublicApiScope[];
+
+/**
+ * Comment writes, granted explicitly at key creation and never by default.
+ *
+ * An API key has no user of its own, so every comment it creates is authored
+ * on behalf of a customer the request names — the same on-behalf resolution
+ * the dashboard uses. `comments.pin` is separate from `comments.update` for the
+ * same reason the dashboard's permission model keeps moderation apart from
+ * authorship: editing a comment's words and deciding which one sits at the top
+ * of a post are different authorities.
+ */
+export const PUBLIC_API_COMMENT_MANAGEMENT_SCOPES = [
+  "comments.create",
+  "comments.update",
+  "comments.delete",
+  "comments.pin",
 ] as const satisfies readonly PublicApiScope[];
 
 /**

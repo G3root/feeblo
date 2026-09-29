@@ -3,6 +3,8 @@ import * as Layer from "effect/Layer";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { BoardRepository } from "../board/repository";
+import { CommentRepository } from "../comments/repository";
+import { CommentService } from "../comments/service";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
@@ -66,7 +68,25 @@ export const PublicApiInternals = Layer.mergeAll(
   PostRepository.layer,
   PostSubscriptionRepository.layer,
   ResolvePrincipalService.layer,
-  UserRepository.layer
+  UserRepository.layer,
+  // The shared comment write path needs its own repository; the identity
+  // resolver it attributes a comment through is already above, for the post
+  // write path.
+  CommentRepository.layer
+);
+
+/**
+ * The comment writes this route serves, composed from the internals above.
+ *
+ * Merged into the route rather than only provided to it: `HttpApiBuilder`
+ * does not thread a handler's requirements through the route layer, so a
+ * handler reads the service from the fiber context — the same shape as
+ * `currentPublicApiRepository`. The service is the dashboard comment RPC's own
+ * write path, so an API-created comment lands in the same timeline, the same
+ * transaction, and the same notification fan-out as one written by a member.
+ */
+const PublicApiCommentService = CommentService.layer.pipe(
+  Layer.provide(PublicApiInternals)
 );
 
 /**
@@ -93,7 +113,8 @@ export const makePublicApiRoute = <E, R>(
     // surface cannot produce (a row that vanishes between a read and a write).
     Layer.provideMerge(
       PublicApiRepository.layer.pipe(Layer.provide(PublicApiInternals))
-    )
+    ),
+    Layer.provideMerge(PublicApiCommentService)
   );
 
 /**

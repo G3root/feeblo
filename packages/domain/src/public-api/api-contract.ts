@@ -15,14 +15,18 @@ import {
 } from "./middleware";
 import {
   CreateChangelogPayload,
+  CreateCommentParams,
+  CreateCommentPayload,
   CreateCompanyPayload,
   CreatePostPayload,
   CreateTagPayload,
   DeleteChangelogParams,
+  DeleteCommentParams,
   DeleteCompanyParams,
   DeletePostParams,
   DeleteTagParams,
   GetChangelogParams,
+  GetCommentParams,
   GetCompanyParams,
   GetPostParams,
   GetTagParams,
@@ -30,10 +34,15 @@ import {
   ListBoardPostsQuery,
   ListChangelogQuery,
   ListCompaniesQuery,
+  ListPostCommentsParams,
+  ListPostCommentsQuery,
   ListPostsQuery,
   ListTagsQuery,
+  PinCommentParams,
   PublicApiChangelog,
   PublicApiChangelogPage,
+  PublicApiComment,
+  PublicApiCommentPage,
   PublicApiCompany,
   PublicApiCompanyPage,
   PublicApiPost,
@@ -44,8 +53,11 @@ import {
   RetrievePostQuery,
   SetPostTagsParams,
   SetPostTagsPayload,
+  UnpinCommentParams,
   UpdateChangelogParams,
   UpdateChangelogPayload,
+  UpdateCommentParams,
+  UpdateCommentPayload,
   UpdateCompanyParams,
   UpdateCompanyPayload,
   UpdatePostParams,
@@ -168,6 +180,100 @@ export class PublicApiV1Group extends HttpApiGroup.make("PublicApiV1")
       .annotate(
         OpenApi.Description,
         "Deletes a post and cannot be undone. A key holding this scope deletes without the dashboard's creator and engagement restriction: it is the workspace's own credential, not a member acting on their own posts. Deleting a post that absorbed merged duplicates restores those duplicates to the board rather than orphaning them. A merged post is refused, and a post that is already gone is reported as not found."
+      )
+  )
+  .add(
+    HttpApiEndpoint.get("listPostComments", "/posts/:postId/comments", {
+      params: ListPostCommentsParams,
+      query: ListPostCommentsQuery,
+      success: PublicApiCommentPage,
+      error: PUBLIC_API_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "List Comments")
+      .annotate(OpenApi.Summary, "List a post's comments")
+      .annotate(
+        OpenApi.Description,
+        "Returns the comments on one post of the calling workspace, newest first, as a cursor-paginated page. Internal comments are included, because the key belongs to the workspace; a pinned comment carries a pinnedAt and appears in its created position rather than first. Comments that a merge moved onto this post are listed here; a post that was merged into another reports no comments of its own, because its comments now live on the survivor."
+      )
+  )
+  .add(
+    HttpApiEndpoint.post("createComment", "/posts/:postId/comments", {
+      params: CreateCommentParams,
+      payload: CreateCommentPayload,
+      success: PublicApiComment.pipe(HttpApiSchema.status(201)),
+      error: PUBLIC_API_WRITE_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "Create Comment")
+      .annotate(OpenApi.Summary, "Comment on a post")
+      .annotate(
+        OpenApi.Description,
+        "Creates a comment on a post and returns it. The comment is attributed to the customer the author names — an API key has no user of its own — resolved by userId, contactId, externalId, or email, in that order. A post whose conversation is locked or that was merged into another post, or a parentCommentId that names a comment on another post or workspace, is refused."
+      )
+  )
+  .add(
+    HttpApiEndpoint.get("getComment", "/comments/:commentId", {
+      params: GetCommentParams,
+      success: PublicApiComment,
+      error: PUBLIC_API_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "Get Comment")
+      .annotate(OpenApi.Summary, "Get a comment")
+      .annotate(
+        OpenApi.Description,
+        "Returns one comment. Comments of other workspaces are reported as not found rather than forbidden, so an id cannot be used to probe another workspace."
+      )
+  )
+  .add(
+    HttpApiEndpoint.patch("updateComment", "/comments/:commentId", {
+      params: UpdateCommentParams,
+      payload: UpdateCommentPayload,
+      success: PublicApiComment,
+      error: PUBLIC_API_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "Update Comment")
+      .annotate(OpenApi.Summary, "Replace a comment's body and visibility")
+      .annotate(
+        OpenApi.Description,
+        "Replaces the comment's body, and its visibility when the request names one, and returns the comment afterwards. Omitting visibility leaves it as it is. The body is sanitized exactly as the dashboard sanitizes it, and the post's timeline records the edit."
+      )
+  )
+  .add(
+    HttpApiEndpoint.delete("deleteComment", "/comments/:commentId", {
+      params: DeleteCommentParams,
+      success: HttpApiSchema.NoContent,
+      error: PUBLIC_API_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "Delete Comment")
+      .annotate(OpenApi.Summary, "Delete a comment")
+      .annotate(
+        OpenApi.Description,
+        "Deletes a comment and every reply beneath it. The comment is gone immediately and cannot be restored."
+      )
+  )
+  .add(
+    HttpApiEndpoint.post("pinComment", "/comments/:commentId/pin", {
+      params: PinCommentParams,
+      success: PublicApiComment,
+      error: PUBLIC_API_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "Pin Comment")
+      .annotate(OpenApi.Summary, "Pin a comment to the top of its post")
+      .annotate(
+        OpenApi.Description,
+        "Pins a comment and returns it with its pinnedAt. A post has at most one pinned comment: pinning one unpins whatever was pinned before it. The post's timeline records the change."
+      )
+  )
+  .add(
+    HttpApiEndpoint.post("unpinComment", "/comments/:commentId/unpin", {
+      params: UnpinCommentParams,
+      success: PublicApiComment,
+      error: PUBLIC_API_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "Unpin Comment")
+      .annotate(OpenApi.Summary, "Unpin a comment")
+      .annotate(
+        OpenApi.Description,
+        "Unpins a comment and returns it with a null pinnedAt. Unpinning a comment that is not pinned changes nothing and is answered the same way, so a retried request does not have to distinguish 'already unpinned' from 'gone'."
       )
   )
   .add(

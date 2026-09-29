@@ -1,4 +1,5 @@
 import { hasPublicApiScope } from "@feeblo/domain-contracts/public-api-scope";
+import { CommentId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { slugify } from "@feeblo/utils/url";
@@ -7,7 +8,19 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
+import {
+  type FailedToCreateCommentError,
+  type FailedToDeleteCommentError,
+  type FailedToPinCommentError,
+  type FailedToUnpinCommentError,
+  type FailedToUpdateCommentError,
+  type PostDoesNotAcceptCommentsError,
+} from "../comments/errors";
+import { currentCommentService } from "../comments/service";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
+import { InvalidSubjectError, SubjectNotFoundError } from "../identity/errors";
+import type { OnBehalfSubject } from "../identity/service";
+import { BadRequestError, InternalServerError } from "../rpc-errors";
 import { PublicApi } from "./api-contract";
 import { currentPublicApiConfig } from "./config";
 import { decodeCursor, encodeCursor } from "./cursor";
@@ -21,6 +34,7 @@ import {
 import {
   toPublicApiChangelog,
   toPublicApiChangelogSummary,
+  toPublicApiComment,
   toPublicApiCompany,
   toPublicApiPost,
   toPublicApiPostSummary,
@@ -36,6 +50,9 @@ import {
   type TPublicApiChangelog,
   type TPublicApiChangelogPage,
   type TPublicApiChangelogStatus,
+  type TPublicApiComment,
+  type TPublicApiCommentAuthorSubject,
+  type TPublicApiCommentPage,
   type TPublicApiCompanyPage,
   type TPublicApiPost,
   type TPublicApiPostPage,
@@ -257,6 +274,130 @@ const parseChangelogWrite = (write: {
  */
 const onInternalError = () =>
   Effect.fail(internalError("The request could not be completed."));
+
+/**
+ * The comment write service's failures, answered on the published vocabulary.
+ *
+ * Every comment endpoint reads the comment — or the post it comments on —
+ * before it writes, so a `FailedTo*` failure means the row moved between the
+ * read and the write: the honest answer is the documented not-found, the same
+ * reasoning as a company update that matched no row. A rejected author subject
+ * is the caller's input; a create that fails has nothing the caller can retry
+ * into a different outcome, so it stays a server fault.
+ */
+type CommentWriteFailure =
+  | BadRequestError
+  | FailedToCreateCommentError
+  | FailedToDeleteCommentError
+  | FailedToPinCommentError
+  | FailedToUnpinCommentError
+  | FailedToUpdateCommentError
+  | InternalServerError
+  | InvalidSubjectError
+  | SubjectNotFoundError;
+
+const commentWriteFailureHandlers = {
+  BadRequestError: (error: BadRequestError) =>
+    Effect.fail(
+      invalidRequestError(error.message ?? "The request is not valid.")
+    ),
+  FailedToCreateCommentError: () => onInternalError(),
+  FailedToDeleteCommentError: () =>
+    Effect.fail(notFoundError("Comment not found.")),
+  FailedToPinCommentError: () =>
+    Effect.fail(notFoundError("Comment not found.")),
+  FailedToUnpinCommentError: () =>
+    Effect.fail(notFoundError("Comment not found.")),
+  FailedToUpdateCommentError: () =>
+    Effect.fail(notFoundError("Comment not found.")),
+  InternalServerError: () => onInternalError(),
+  // Fixed messages: the identity failures carry a subject id in their detail,
+  // and echoing a caller's own identifier back would make the error body an
+  // existence oracle.
+  InvalidSubjectError: () =>
+    Effect.fail(
+      invalidRequestError(
+        "The comment's author could not be resolved in this workspace."
+      )
+    ),
+  SubjectNotFoundError: () =>
+    Effect.fail(
+      invalidRequestError(
+        "The comment's author could not be found in this workspace."
+      )
+    ),
+} as const;
+
+const withCommentWriteFailures = <A, R>(
+  effect: Effect.Effect<A, CommentWriteFailure, R>
+) => effect.pipe(Effect.catchTags(commentWriteFailureHandlers));
+
+/**
+ * The create's failures: the shared vocabulary plus the post-state conflict.
+ *
+ * Only a create can raise the state error. The post is re-checked inside the
+ * write's own transaction, so a lock or a merge that lands after the handler's
+ * existence check is still refused — with the message and status the ordinary
+ * path produces.
+ */
+const withCommentCreateFailures = <A, R>(
+  effect: Effect.Effect<
+    A,
+    CommentWriteFailure | PostDoesNotAcceptCommentsError,
+    R
+  >
+) =>
+  effect.pipe(
+    Effect.catchTags({
+      ...commentWriteFailureHandlers,
+      PostDoesNotAcceptCommentsError: (error: PostDoesNotAcceptCommentsError) =>
+        Effect.fail(conflictError(error.message)),
+    })
+  );
+
+/**
+ * The DTO's author subject as identity resolution reads it.
+ *
+ * Written out rather than passed through, so a field added to the published
+ * payload is a deliberate edit here instead of something the resolver starts
+ * consulting on its own.
+ */
+const toOnBehalfSubject = (
+  author: TPublicApiCommentAuthorSubject
+): OnBehalfSubject => ({
+  userId: author.userId,
+  contactId: author.contactId,
+  externalId: author.externalId,
+  email: author.email,
+  name: author.name,
+  avatarUrl: author.avatarUrl,
+});
+
+/**
+ * The comment a write just landed, read back for the response.
+ *
+ * The write path returns nothing a payload can be built from — the author's
+ * display fields live on the `user` row — so the response is the same read a
+ * later `GET` performs. `None` after a write that reported success means the
+ * row was deleted between the two, which is the documented not-found rather
+ * than a server error the caller cannot act on.
+ */
+const readWrittenComment = (args: {
+  readonly commentId: string;
+  readonly organizationId: string;
+}) =>
+  Effect.gen(function* () {
+    const repository = yield* currentPublicApiRepository;
+    const found = yield* repository
+      .findComment(args)
+      .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+    return yield* Option.match(found, {
+      onNone: () => Effect.fail(notFoundError("Comment not found.")),
+      onSome: (comment) =>
+        Effect.succeed(toPublicApiComment(comment) satisfies TPublicApiComment),
+    });
+  });
 
 /**
  * Rejects a name another tag in the workspace already holds.
@@ -634,6 +775,283 @@ export const PublicApiLive = HttpApiBuilder.group(
           return {
             data: tags.map(toPublicApiTag),
           } satisfies TPublicApiPostTags;
+        })
+      )
+      .handle("listPostComments", ({ params, query }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+
+          yield* requirePublicApiScope("comments.read");
+
+          const limit = yield* parseLimit(query.limit);
+          const cursor = yield* parseCursor(query.cursor);
+
+          const page = yield* repository
+            .listPostComments({
+              cursor,
+              limit,
+              organizationId: caller.organizationId,
+              postId: params.postId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          return yield* Option.match(page, {
+            // Not found rather than an empty page: a post with no comments
+            // and a post that does not exist must not look the same, and
+            // another workspace's post is reported as missing so the id
+            // cannot probe at all.
+            onNone: () => Effect.fail(notFoundError("Post not found.")),
+            onSome: (found) =>
+              Effect.succeed({
+                data: found.comments.map(toPublicApiComment),
+                nextCursor:
+                  found.nextCursor === null
+                    ? null
+                    : encodeCursor(found.nextCursor),
+              } satisfies TPublicApiCommentPage),
+          });
+        })
+      )
+      .handle("getComment", ({ params }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+
+          yield* requirePublicApiScope("comments.read");
+
+          const comment = yield* repository
+            .findComment({
+              commentId: params.commentId,
+              organizationId: caller.organizationId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          return yield* Option.match(comment, {
+            onNone: () => Effect.fail(notFoundError("Comment not found.")),
+            onSome: (found) =>
+              Effect.succeed(
+                toPublicApiComment(found) satisfies TPublicApiComment
+              ),
+          });
+        })
+      )
+      .handle("createComment", ({ params, payload }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+          const comments = yield* currentCommentService;
+
+          yield* requirePublicApiScope("comments.create");
+
+          const target = yield* repository
+            .findCommentTarget({
+              organizationId: caller.organizationId,
+              postId: params.postId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          if (Option.isNone(target)) {
+            return yield* Effect.fail(notFoundError("Post not found."));
+          }
+
+          const commentId = yield* CommentId.generate.pipe(
+            Effect.catchTag("LegidError", onInternalError)
+          );
+
+          yield* comments
+            .create({
+              // A machine key is not a member: the timeline records no actor,
+              // and the comment is authored by the customer the request names
+              // because there is no session user to author it.
+              actor: { memberId: null, userId: null },
+              author: {
+                kind: "on_behalf",
+                subject: toOnBehalfSubject(payload.author),
+              },
+              draft: {
+                content: payload.content,
+                id: commentId,
+                organizationId: caller.organizationId,
+                parentCommentId: payload.parentCommentId ?? null,
+                postId: params.postId,
+                visibility: payload.visibility ?? "PUBLIC",
+              },
+              // No status update: moving a post's status is a post edit, not
+              // something the Public API does through a comment.
+            })
+            .pipe(withCommentCreateFailures);
+
+          return yield* readWrittenComment({
+            commentId,
+            organizationId: caller.organizationId,
+          });
+        })
+      )
+      .handle("updateComment", ({ params, payload }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+          const comments = yield* currentCommentService;
+
+          yield* requirePublicApiScope("comments.update");
+
+          // Read first so another workspace's comment is a 404 rather than an
+          // update that matches no row and answers 200. The post id comes from
+          // the read because the write path scopes its predicate by it.
+          const comment = yield* repository
+            .findComment({
+              commentId: params.commentId,
+              organizationId: caller.organizationId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          if (Option.isNone(comment)) {
+            return yield* Effect.fail(notFoundError("Comment not found."));
+          }
+
+          yield* comments
+            .update({
+              actor: { memberId: null, userId: null },
+              edit: {
+                content: payload.content,
+                id: params.commentId,
+                organizationId: caller.organizationId,
+                postId: comment.value.postId,
+                visibility: payload.visibility,
+              },
+            })
+            .pipe(withCommentWriteFailures);
+
+          return yield* readWrittenComment({
+            commentId: params.commentId,
+            organizationId: caller.organizationId,
+          });
+        })
+      )
+      .handle("deleteComment", ({ params }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+          const comments = yield* currentCommentService;
+
+          yield* requirePublicApiScope("comments.delete");
+
+          // A comment that is already gone is a 404 rather than a success: the
+          // caller cannot tell a delete that worked from one that named the
+          // wrong workspace, and the second is worth knowing.
+          const comment = yield* repository
+            .findComment({
+              commentId: params.commentId,
+              organizationId: caller.organizationId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          if (Option.isNone(comment)) {
+            return yield* Effect.fail(notFoundError("Comment not found."));
+          }
+
+          yield* comments
+            .remove({
+              actor: { memberId: null, userId: null },
+              target: {
+                id: params.commentId,
+                organizationId: caller.organizationId,
+                postId: comment.value.postId,
+              },
+            })
+            .pipe(withCommentWriteFailures);
+        })
+      )
+      .handle("pinComment", ({ params }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+          const comments = yield* currentCommentService;
+
+          yield* requirePublicApiScope("comments.pin");
+
+          const comment = yield* repository
+            .findComment({
+              commentId: params.commentId,
+              organizationId: caller.organizationId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          if (Option.isNone(comment)) {
+            return yield* Effect.fail(notFoundError("Comment not found."));
+          }
+
+          yield* comments
+            .pin({
+              actor: { memberId: null, userId: null },
+              target: {
+                id: params.commentId,
+                organizationId: caller.organizationId,
+                postId: comment.value.postId,
+              },
+            })
+            .pipe(withCommentWriteFailures);
+
+          return yield* readWrittenComment({
+            commentId: params.commentId,
+            organizationId: caller.organizationId,
+          });
+        })
+      )
+      .handle("unpinComment", ({ params }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+          const comments = yield* currentCommentService;
+
+          yield* requirePublicApiScope("comments.pin");
+
+          const comment = yield* repository
+            .findComment({
+              commentId: params.commentId,
+              organizationId: caller.organizationId,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          if (Option.isNone(comment)) {
+            return yield* Effect.fail(notFoundError("Comment not found."));
+          }
+
+          // Unpinning a comment that is not pinned changes nothing, so it is
+          // answered with the comment as it stands rather than the failure the
+          // write path reports for a row it did not move: a caller retrying a
+          // timeout should not have to distinguish "already unpinned" from
+          // "gone", and the second is already a 404 above.
+          if (comment.value.pinnedAt === null) {
+            return toPublicApiComment(
+              comment.value
+            ) satisfies TPublicApiComment;
+          }
+
+          yield* comments
+            .unpin({
+              actor: { memberId: null, userId: null },
+              target: {
+                id: params.commentId,
+                organizationId: caller.organizationId,
+                postId: comment.value.postId,
+              },
+            })
+            .pipe(
+              // An unpin whose row was released by someone else between the
+              // read above and the write is the state this request asks for,
+              // not a missing comment: the read below answers with the comment
+              // as it stands. A comment that is truly gone still 404s there,
+              // because that read fails the same way.
+              Effect.catchTag("FailedToUnpinCommentError", () => Effect.void),
+              withCommentWriteFailures
+            );
+
+          return yield* readWrittenComment({
+            commentId: params.commentId,
+            organizationId: caller.organizationId,
+          });
         })
       )
       .handle("listTags", ({ query }) =>

@@ -504,6 +504,7 @@ describe("api-key plugin wiring", () => {
       expect(created.permissions).toEqual({
         boards: ["read"],
         changelog: ["read"],
+        comments: ["read"],
         posts: ["read"],
         tags: ["read"],
       });
