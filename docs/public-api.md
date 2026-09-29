@@ -366,6 +366,8 @@ Responds `201` with the created entry. Requires `changelog.create`, and addition
 
 The `id` is assigned by the server. The `slug` is derived from the title unless one is sent, and a sent slug is normalized the same way, so `UI Kit` and `ui-kit` are one entry rather than two. `excerpt` is derived from the body, and the body is sanitized before it is stored, exactly as the dashboard sanitizes it. A slug already used in the workspace is answered with `409 CONFLICT`.
 
+A `coverImage` that names a workspace media URL is recorded as the entry referencing that asset, so the entry keeps it alive. An image embedded in the body is not recorded as a reference — see [Data exposure](#data-exposure).
+
 | Field | Default | Notes |
 | --- | --- | --- |
 | `title` | — | Required. Trimmed; must not be empty. |
@@ -392,7 +394,7 @@ Content-Type: application/json
 
 Responds `200` with the updated entry. Requires `changelog.update`.
 
-The fields sent are the entry's new state — the update replaces them rather than merging. `status` is required here, unlike on a create: an update that left it out would move an entry by omission. The same field rules as a create apply to `title`, `slug`, `content`, `coverImage`, `scheduledAt`, and `publishedAt`.
+The fields sent are the entry's new state — the update replaces them rather than merging. `status` is required here, unlike on a create: an update that left it out would move an entry by omission. The same field rules as a create apply to `title`, `slug`, `content`, `coverImage`, `scheduledAt`, and `publishedAt`, and so does the media rule: a `coverImage` referencing a workspace asset is recorded as a reference, a body image is not ([Data exposure](#data-exposure)).
 
 Moving an entry **into** `published` — from `draft` or `scheduled` — also requires `changelog.publish`, and records the publication email intent. Editing an entry that is already published does not: it is an ordinary edit, and subscribers are not emailed again. Use the dashboard's "Send update" action when an edit should be announced.
 
@@ -543,7 +545,7 @@ A post created, changed, or deleted with an API key has **no author and no actor
 
 Changelog entries carry no author at all: the dashboard's entry rows hold `creatorId` and `creatorMemberId`, and neither has a field in this API. Publishing through the API records the email intent and the in-app notification with no actor, exactly as a key's tag changes have no actor in a post's timeline.
 
-Post `content` is sanitized before it is stored, so the body the API returns is the same sanitized content the dashboard and the public portal render. Editor media is the one thing a body can name that the API does not manage: a dashboard editor submits the ids of the media it attached, and those ids are what record which posts reference an asset, while a machine key has none to submit. A body may still embed a workspace media URL, but the post is not recorded as referencing it, and media whose only remaining use is such a post can be removed by the workspace's own cleanup — keep the asset attached to a dashboard-authored post, or host the image yourself. Tags carry a name and a slug, nothing else — a tag's creator is an internal identifier and is never returned.
+Post and changelog `content` is sanitized before it is stored, so the body the API returns is the same sanitized content the dashboard and the public portal render. Editor media is the one thing a body can name that the API does not manage: a dashboard editor submits the ids of the media it attached, and those ids are what record which posts and entries reference an asset, while a machine key has none to submit. A body may still embed a workspace media URL, but the resource is not recorded as referencing it, so media whose only remaining use is such a body can be removed by the workspace's own cleanup — keep the asset attached to a dashboard-authored post or entry, or host the image yourself. A changelog entry's `coverImage` is the exception: it is resolved by URL and does keep its asset. Tags carry a name and a slug, nothing else — a tag's creator is an internal identifier and is never returned.
 
 A company carries its name, avatar, your `externalId`, and `source`. Its contacts are not exposed and neither are the custom attribute values a workspace may have defined for companies: those definitions are a workspace-specific vocabulary, so they would need their own contract rather than a field on this one. The workspace is never named in a payload either — a key reads exactly one workspace, so an `organizationId` would be the same string on every response and would invite a filter parameter that would then have to be validated against the key. `source` is the exception that proves the rule: it is bookkeeping about where the row came from, not about who it belongs to, and it is what lets a sync tell its own records from the dashboard's.
 
