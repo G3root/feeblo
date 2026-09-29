@@ -74,8 +74,17 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   const { env } = Route.useLoaderData();
   const clientHintCheckScript = getClientHintCheckScript();
 
+  // `suppressHydrationWarning` covers this element only: the inline
+  // pre-hydration scripts below (theme, locale) write `class`/`lang`/`dir` on
+  // `<html>` while the document parses, so React's client render — whose
+  // `<html>` carries no `className` — must not diff the server's HTML against
+  // them. The alternative (server-rendering those attributes) is impossible:
+  // `prefers-color-scheme` and the locale cookie are browser-only, and the
+  // document is CDN-cached precisely because of that. Every deeper mismatch
+  // (route content) still fails loudly; this suppresses the one element the
+  // scripts legitimately mutate before React hydrates.
   return (
-    <html lang={getLocale()} dir={getTextDirection()}>
+    <html lang={getLocale()} dir={getTextDirection()} suppressHydrationWarning>
       <head>
         <HeadContent />
         <ScriptOnce children={clientHintCheckScript} />

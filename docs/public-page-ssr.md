@@ -14,7 +14,9 @@ Implemented on `feat/public-page-ssr`. The board's pages are now routes of the h
 
 **Anonymous server render.** The server never reads a session: `getCachedAuthSession()` answers `null` outside the browser, user-scoped collections (subscriptions, delete hints) load after mount, and the SSO fragment exchange moved from the root `beforeLoad` into a client effect. The board's `AuthProvider` is mounted with `hydrationSafe`, which defers the display hint cookie to after mount so the first client render matches the server's signed-out markup.
 
-## Two things that bite
+## Three things that bite
+
+**The `<html>` element is mutated before React hydrates it.** The inline pre-hydration scripts (`pre-hydration-scripts.ts`) apply the theme classes and the cookie locale to `<html>` while the document parses — before React hydrates. The client render's `<html>` carries no `className` (the server cannot know `prefers-color-scheme`, and the document is CDN-cached because of that), so React reports an attribute hydration mismatch on `<html>` and leaves it unpatched. `RootDocument` therefore renders `<html>` with `suppressHydrationWarning`, which suppresses the comparison for that one element only — every mismatch deeper in the tree (the route content) still fails loudly. Removing the theme script's pre-paint write instead would reintroduce the wrong-theme flash the script exists to prevent.
 
 **`isLoading` is not "no content".** Hydration installs rows _before_ the first browser render, but a collection only reports `ready` once its adapter's first sync resolves — so a skeleton gated on `isLoading` replaces server-rendered content with a placeholder and React regenerates the tree (mismatch, and a flash of the wrong UI). Use `isLiveQueryPending` from `@feeblo/web-shared/collections` instead: a query with a result — including an empty list, or a `.findOne()` that matched nothing — is content. Only a query with no result that is still starting is pending, and a disabled query never is (it asked for nothing).
 
