@@ -59,6 +59,10 @@ const COMPANIES_PATH = "/api/v1/companies";
 const COMPANY_PATH = "/api/v1/companies/{companyId}";
 const CHANGELOG_PATH = "/api/v1/changelog";
 const CHANGELOG_ENTRY_PATH = "/api/v1/changelog/{changelogId}";
+const POST_COMMENTS_PATH = "/api/v1/posts/{postId}/comments";
+const COMMENT_PATH = "/api/v1/comments/{commentId}";
+const PIN_COMMENT_PATH = "/api/v1/comments/{commentId}/pin";
+const UNPIN_COMMENT_PATH = "/api/v1/comments/{commentId}/unpin";
 
 /** The statuses every endpoint of the API can answer with, as the base set. */
 const READ_RESPONSE_CODES = [
@@ -81,6 +85,10 @@ describe("PublicApi contract", () => {
         CHANGELOG_ENTRY_PATH,
         DETAIL_PATH,
         SET_POST_TAGS_PATH,
+        POST_COMMENTS_PATH,
+        COMMENT_PATH,
+        PIN_COMMENT_PATH,
+        UNPIN_COMMENT_PATH,
         TAGS_PATH,
         TAG_PATH,
         COMPANIES_PATH,
@@ -359,5 +367,91 @@ describe("PublicApi contract", () => {
       document.paths[CHANGELOG_PATH]?.get?.responses["200"]
     );
     expect(listBody).toContain("excerpt");
+  });
+
+  it("documents the comment resource without an internal identifier", () => {
+    const createOperation = document.paths[POST_COMMENTS_PATH]?.post;
+    const createResponses = createOperation?.responses ?? {};
+    const body = JSON.stringify(createResponses["201"]);
+
+    for (const field of [
+      "id",
+      "postId",
+      "content",
+      "visibility",
+      "parentCommentId",
+      "pinnedAt",
+      "author",
+      "createdAt",
+      "updatedAt",
+    ]) {
+      expect(body).toContain(field);
+    }
+
+    // `comment` also carries `userId` and `memberId`, the actor identifiers
+    // the post payloads already keep out, plus the merge and status-transition
+    // provenance a comment resource does not need.
+    for (const forbidden of [
+      "userId",
+      "memberId",
+      "organizationId",
+      "mergedFromPostId",
+      "statusUpdateId",
+    ]) {
+      expect(body).not.toContain(forbidden);
+    }
+
+    // The create names the customer the comment is attributed to; an API key
+    // has no user of its own, so the field is required rather than optional.
+    const requestBody = JSON.stringify(createOperation?.requestBody);
+    expect(requestBody).toContain("author");
+    expect(requestBody).toContain("content");
+  });
+
+  it("documents the comment endpoints' statuses, and no conflict on a read", () => {
+    const listResponses =
+      document.paths[POST_COMMENTS_PATH]?.get?.responses ?? {};
+    const createResponses =
+      document.paths[POST_COMMENTS_PATH]?.post?.responses ?? {};
+    const getResponses = document.paths[COMMENT_PATH]?.get?.responses ?? {};
+    const updateResponses =
+      document.paths[COMMENT_PATH]?.patch?.responses ?? {};
+    const deleteResponses =
+      document.paths[COMMENT_PATH]?.delete?.responses ?? {};
+    const pinResponses =
+      document.paths[PIN_COMMENT_PATH]?.post?.responses ?? {};
+    const unpinResponses =
+      document.paths[UNPIN_COMMENT_PATH]?.post?.responses ?? {};
+
+    expect(Object.keys(listResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(Object.keys(getResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(Object.keys(pinResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(Object.keys(unpinResponses).sort()).toEqual(READ_RESPONSE_CODES);
+
+    // A create answers 404 — the post it comments on has to exist — and 409
+    // when that post's conversation is locked. An update and a delete cannot
+    // collide with anything, so they promise neither.
+    expect(Object.keys(createResponses).sort()).toEqual([
+      "201",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "429",
+      "500",
+      "503",
+    ]);
+    expect(Object.keys(updateResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(Object.keys(deleteResponses).sort()).toEqual([
+      "204",
+      ...READ_RESPONSE_CODES.filter((code) => code !== "200"),
+    ]);
+
+    expect(JSON.stringify(createResponses["409"])).toContain("CONFLICT");
+    expect(JSON.stringify(listResponses)).not.toContain("CONFLICT");
+    expect(JSON.stringify(getResponses)).not.toContain("CONFLICT");
+    expect(JSON.stringify(pinResponses)).not.toContain("CONFLICT");
+    expect(JSON.stringify(updateResponses)).not.toContain("CONFLICT");
   });
 });

@@ -253,6 +253,7 @@ describe("ApiKeyRpcHandlers", () => {
             scopes: [
               "boards.read",
               "posts.read",
+              "comments.read",
               "tags.read",
               "changelog.read",
             ],
@@ -289,6 +290,7 @@ describe("ApiKeyRpcHandlers", () => {
           expect(byDefault.summary.scopes).toEqual([
             "boards.read",
             "posts.read",
+            "comments.read",
             "tags.read",
             "changelog.read",
           ]);

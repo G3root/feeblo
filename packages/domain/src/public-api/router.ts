@@ -1,7 +1,10 @@
 import * as Layer from "effect/Layer";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
+import { CommentRepository } from "../comments/repository";
+import { CommentService } from "../comments/service";
 import { EmailOutboxRepository } from "../email-outbox/repository";
+import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PublicApi } from "./api-contract";
@@ -47,7 +50,25 @@ import { PublicApiRepository } from "./repository";
 const PublicApiInternals = Layer.mergeAll(
   EmailOutboxRepository.layer,
   NotificationService.layer,
-  PostActivityRepository.layer
+  PostActivityRepository.layer,
+  // The shared comment write path needs its own repository and the identity
+  // resolver that attributes a comment to the customer a request names.
+  CommentRepository.layer,
+  ResolvePrincipalService.layer
+);
+
+/**
+ * The comment writes this route serves, composed from the internals above.
+ *
+ * Merged into the route rather than only provided to it: `HttpApiBuilder`
+ * does not thread a handler's requirements through the route layer, so a
+ * handler reads the service from the fiber context — the same shape as
+ * `currentPublicApiRepository`. The service is the dashboard comment RPC's own
+ * write path, so an API-created comment lands in the same timeline, the same
+ * transaction, and the same notification fan-out as one written by a member.
+ */
+const PublicApiCommentService = CommentService.layer.pipe(
+  Layer.provide(PublicApiInternals)
 );
 
 /**
@@ -69,12 +90,19 @@ export const makePublicApiRoute = <E, R>(
     // rejected is part of this API's contract, not something the composition
     // root supplies.
     Layer.provide(PublicApiSchemaErrorHandlerLive),
+    // The comment handlers call the shared write service, and a service
+    // method's effect carries the services it reads from the fiber context
+    // (the identity resolver above all). Providing the internals here makes
+    // them available to the handler's own fiber, not only to the sub-layers
+    // that construct the repository and the service.
+    Layer.provide(PublicApiInternals),
     // Merged rather than only provided: the repository stays in this layer's
     // output because a test drives it directly to reach the races the HTTP
     // surface cannot produce (a row that vanishes between a read and a write).
     Layer.provideMerge(
       PublicApiRepository.layer.pipe(Layer.provide(PublicApiInternals))
-    )
+    ),
+    Layer.provideMerge(PublicApiCommentService)
   );
 
 /**

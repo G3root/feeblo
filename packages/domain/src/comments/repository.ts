@@ -19,7 +19,13 @@ interface UpdateComment {
   id: string;
   organizationId: string;
   postId: string;
-  userId: string;
+  /**
+   * When set, only a comment the user wrote matches. The dashboard and the
+   * portal always set it; a workspace credential (the Public API) omits it,
+   * because it may edit any comment in its workspace and has no user of its
+   * own to match against.
+   */
+  userId?: string;
   visibility?: "PUBLIC" | "INTERNAL";
 }
 
@@ -260,7 +266,9 @@ const makeCommentRepository = Effect.gen(function* () {
               eq(schema.commentTable.id, args.id),
               eq(schema.commentTable.organizationId, args.organizationId),
               eq(schema.commentTable.postId, args.postId),
-              eq(schema.commentTable.userId, args.userId)
+              ...(args.userId
+                ? [eq(schema.commentTable.userId, args.userId)]
+                : [])
             )
           )
           .returning()

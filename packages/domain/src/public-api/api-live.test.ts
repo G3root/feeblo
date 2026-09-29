@@ -1,8 +1,12 @@
-import { NodeHttpPlatform, NodeServices } from "@effect/platform-node";
+import {
+  NodeCrypto,
+  NodeHttpPlatform,
+  NodeServices,
+} from "@effect/platform-node";
 import { expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { slugify } from "@feeblo/utils/url";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -32,6 +36,8 @@ import { makePublicApiRoute } from "./router";
 import {
   PublicApiChangelog,
   PublicApiChangelogPage,
+  PublicApiComment,
+  PublicApiCommentPage,
   PublicApiCompany,
   PublicApiCompanyPage,
   PublicApiPost,
@@ -116,6 +122,12 @@ const decodeCompany = Schema.decodeUnknownSync(
 const decodeCompanyPage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiCompanyPage)
 );
+const decodeComment = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiComment)
+);
+const decodeCommentPage = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiCommentPage)
+);
 const decodeDocument = Schema.decodeUnknownSync(
   Schema.fromJsonString(OpenApiDocument)
 );
@@ -179,6 +191,10 @@ const makePublicApiDependencies = (
     RateLimitService.layerMemory,
     Etag.layer,
     NodeHttpPlatform.layer,
+    // On-behalf resolution provisions a shadow user from the customer's email
+    // and hashes it, so a comment create needs randomness the same way the
+    // dashboard's on-behalf writes do.
+    NodeCrypto.layer,
     NodeServices.layer
     // Merged so test bodies can seed fixtures through `currentDb`.
   ).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
@@ -360,6 +376,57 @@ const seedCompany = (
     return id;
   });
 
+/**
+ * Inserts a comment directly, so a test controls its author, visibility, age,
+ * parent, and pinned state.
+ *
+ * The author row is provisioned on first use because `comment.userId` is not
+ * null; the same synthetic user is reused for every comment the helper seeds
+ * in one workspace, so two comments can be pinned and unpinned against each
+ * other without a second account.
+ */
+const seedComment = (
+  organizationId: string,
+  postId: string,
+  id: string,
+  options: {
+    readonly authorName?: string;
+    readonly createdAt?: Date;
+    readonly parentCommentId?: string | null;
+    readonly pinnedAt?: Date | null;
+    readonly visibility?: "PUBLIC" | "INTERNAL";
+  } = {}
+) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const userId = `user_comment_${organizationId}`;
+    const now = options.createdAt ?? new Date();
+
+    yield* db
+      .insert(schema.userTable)
+      .values({
+        id: userId,
+        email: `${userId}@example.com`,
+        name: options.authorName ?? "Commenter",
+      })
+      .onConflictDoNothing();
+
+    yield* db.insert(schema.commentTable).values({
+      id,
+      content: "Seeded comment",
+      organizationId,
+      postId,
+      userId,
+      visibility: options.visibility ?? "PUBLIC",
+      parentCommentId: options.parentCommentId ?? null,
+      pinnedAt: options.pinnedAt ?? null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return { id, userId };
+  });
+
 const seedWorkspace = (
   options: {
     readonly plan?: "free" | "starter";
@@ -516,6 +583,7 @@ const seedWorkspace = (
 const READ_KEY_SCOPES = {
   boards: ["read"],
   posts: ["read"],
+  comments: ["read"],
   tags: ["read"],
   changelog: ["read"],
 };
@@ -551,6 +619,18 @@ const COMPANY_MANAGEMENT_KEY_SCOPES = {
   posts: ["read"],
   tags: ["read"],
   companies: ["read", "create", "update", "delete"],
+};
+
+/**
+ * The comment grant: the reads every key now receives, plus every comment
+ * write. Written out rather than imported so the test pins the vocabulary
+ * instead of tracking it.
+ */
+const COMMENT_MANAGEMENT_KEY_SCOPES = {
+  boards: ["read"],
+  posts: ["read"],
+  comments: ["read", "create", "update", "delete", "pin"],
+  tags: ["read"],
 };
 
 const registerKey = (
@@ -2442,6 +2522,506 @@ layer(makeTestApp())("public api v1", (it) => {
       })
   );
 
+  it.effect(
+    "lists a post's comments newest first, internal included, without identifiers",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const older = new Date(Date.now() - 60_000);
+        yield* seedComment(
+          workspace.organizationId,
+          workspace.postId,
+          "cmt_older",
+          {
+            authorName: "Ada",
+            createdAt: older,
+            visibility: "INTERNAL",
+          }
+        );
+        yield* seedComment(
+          workspace.organizationId,
+          workspace.postId,
+          "cmt_newer",
+          {
+            authorName: "Grace",
+            createdAt: new Date(),
+          }
+        );
+        registerKey("fbk_comments_read", workspace.organizationId);
+
+        const response = yield* executeRequest(
+          `/api/v1/posts/${workspace.postId}/comments`,
+          "fbk_comments_read"
+        );
+
+        expect(response.status).toBe(200);
+        const body = responseBody(response);
+        const page = decodeCommentPage(body);
+
+        expect(page.data.map((comment) => comment.id)).toEqual([
+          "cmt_newer",
+          "cmt_older",
+        ]);
+        // A key reads its own workspace, internal notes included.
+        expect(page.data[1]).toMatchObject({
+          visibility: "INTERNAL",
+          author: { type: "end_user", displayName: "Ada" },
+        });
+        expect(page.data[0]?.postId).toBe(workspace.postId);
+        expect(page.nextCursor).toBeNull();
+
+        // `comment` also carries `userId` and `memberId`; neither has a name in
+        // the published payload, and neither may appear on the wire.
+        for (const forbidden of [
+          "userId",
+          "memberId",
+          "organizationId",
+          "mergedFromPostId",
+          "statusUpdateId",
+        ]) {
+          expect(body).not.toContain(forbidden);
+        }
+
+        // A post that does not exist is a 404 rather than an empty page, and
+        // another workspace's post is reported the same way.
+        const missing = yield* executeRequest(
+          "/api/v1/posts/pst_missing/comments",
+          "fbk_comments_read"
+        );
+        expect(missing.status).toBe(404);
+        expect(decodeError(responseBody(missing))._tag).toBe("NOT_FOUND");
+      })
+  );
+
+  it.effect("reports a comment of another workspace as not found", () =>
+    Effect.gen(function* () {
+      const mine = yield* seedWorkspace();
+      const theirs = yield* seedWorkspace();
+      yield* seedComment(theirs.organizationId, theirs.postId, "cmt_theirs");
+      registerKey(
+        "fbk_comments_scoped",
+        mine.organizationId,
+        COMMENT_MANAGEMENT_KEY_SCOPES
+      );
+
+      const read = yield* executeRequest(
+        "/api/v1/comments/cmt_theirs",
+        "fbk_comments_scoped"
+      );
+      expect(read.status).toBe(404);
+      expect(decodeError(responseBody(read))._tag).toBe("NOT_FOUND");
+
+      const update = yield* executeWrite(
+        "PATCH",
+        "/api/v1/comments/cmt_theirs",
+        { apiKey: "fbk_comments_scoped", body: { content: "Hijacked" } }
+      );
+      expect(update.status).toBe(404);
+
+      const remove = yield* executeWrite(
+        "DELETE",
+        "/api/v1/comments/cmt_theirs",
+        { apiKey: "fbk_comments_scoped" }
+      );
+      expect(remove.status).toBe(404);
+    })
+  );
+
+  it.effect(
+    "creates a comment on behalf of a customer and records it in the timeline",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const db = yield* currentDb;
+        registerKey(
+          "fbk_comments_write",
+          workspace.organizationId,
+          COMMENT_MANAGEMENT_KEY_SCOPES
+        );
+
+        const response = yield* executeWrite(
+          "POST",
+          `/api/v1/posts/${workspace.postId}/comments`,
+          {
+            apiKey: "fbk_comments_write",
+            body: {
+              content: "Hello from the integration",
+              author: { email: "jane@example.com", name: "Jane Doe" },
+            },
+          }
+        );
+
+        expect(response.status).toBe(201);
+        const created = decodeComment(responseBody(response));
+        expect(created.id).toMatch(/^cmt_/);
+        expect(created).toMatchObject({
+          postId: workspace.postId,
+          visibility: "PUBLIC",
+          parentCommentId: null,
+          pinnedAt: null,
+          author: { type: "end_user", displayName: "Jane Doe" },
+        });
+        expect(created.content).toContain("Hello from the integration");
+
+        // The comment is attributed to a shadow account for the resolved
+        // customer, never to the key: an API key is not a member.
+        const [comment] = yield* db
+          .select()
+          .from(schema.commentTable)
+          .where(eq(schema.commentTable.id, created.id))
+          .limit(1);
+        expect(comment?.memberId).toBeNull();
+        const [shadow] = yield* db
+          .select()
+          .from(schema.userTable)
+          .where(eq(schema.userTable.id, comment?.userId ?? ""))
+          .limit(1);
+        expect(shadow?.email).toMatch(/^behalf-[0-9a-f]+@feeblo\.com$/);
+
+        // The write lands in the post's timeline with no actor, because a
+        // machine credential has no user behind it.
+        const [activity] = yield* db
+          .select()
+          .from(schema.postActivityTable)
+          .where(
+            and(
+              eq(schema.postActivityTable.postId, workspace.postId),
+              eq(schema.postActivityTable.kind, "COMMENT_CREATED"),
+              eq(schema.postActivityTable.commentId, created.id)
+            )
+          )
+          .limit(1);
+        expect(activity).toMatchObject({ actorId: null, actorMemberId: null });
+
+        // The comment the response described is the comment a later read
+        // returns.
+        const again = yield* executeRequest(
+          `/api/v1/comments/${created.id}`,
+          "fbk_comments_write"
+        );
+        expect(again.status).toBe(200);
+        expect(decodeComment(responseBody(again)).id).toBe(created.id);
+      })
+  );
+
+  it.effect("refuses a comment write without the write scopes", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedComment(
+        workspace.organizationId,
+        workspace.postId,
+        "cmt_scoped"
+      );
+      registerKey("fbk_comments_readonly", workspace.organizationId);
+
+      const cases = [
+        {
+          method: "POST" as const,
+          path: `/api/v1/posts/${workspace.postId}/comments`,
+          scope: "comments.create",
+          body: { content: "Nope", author: { email: "jane@example.com" } },
+        },
+        {
+          method: "PATCH" as const,
+          path: "/api/v1/comments/cmt_scoped",
+          scope: "comments.update",
+          body: { content: "Nope" },
+        },
+        {
+          method: "DELETE" as const,
+          path: "/api/v1/comments/cmt_scoped",
+          scope: "comments.delete",
+        },
+        {
+          method: "POST" as const,
+          path: "/api/v1/comments/cmt_scoped/pin",
+          scope: "comments.pin",
+        },
+        {
+          method: "POST" as const,
+          path: "/api/v1/comments/cmt_scoped/unpin",
+          scope: "comments.pin",
+        },
+      ];
+
+      for (const entry of cases) {
+        const response = yield* executeWrite(entry.method, entry.path, {
+          apiKey: "fbk_comments_readonly",
+          ...("body" in entry && { body: entry.body }),
+        });
+
+        expect(response.status).toBe(403);
+        const body = decodeError(responseBody(response));
+        expect(body._tag).toBe("FORBIDDEN_SCOPE");
+        expect(body.message).toContain(entry.scope);
+      }
+
+      // A read key still reads: the write scopes are the only thing missing.
+      const read = yield* executeRequest(
+        "/api/v1/comments/cmt_scoped",
+        "fbk_comments_readonly"
+      );
+      expect(read.status).toBe(200);
+    })
+  );
+
+  it.effect("refuses to comment on a locked post", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      registerKey(
+        "fbk_comments_locked",
+        workspace.organizationId,
+        COMMENT_MANAGEMENT_KEY_SCOPES
+      );
+
+      yield* db
+        .update(schema.postTable)
+        .set({ lockedAt: new Date() })
+        .where(eq(schema.postTable.id, workspace.postId));
+
+      const response = yield* executeWrite(
+        "POST",
+        `/api/v1/posts/${workspace.postId}/comments`,
+        {
+          apiKey: "fbk_comments_locked",
+          body: {
+            content: "Should not land",
+            author: { email: "jane@example.com" },
+          },
+        }
+      );
+
+      expect(response.status).toBe(409);
+      expect(decodeError(responseBody(response))._tag).toBe("CONFLICT");
+    })
+  );
+
+  it.effect("refuses to comment on a post merged into another", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace({ postCount: 2 });
+      const db = yield* currentDb;
+      registerKey(
+        "fbk_comments_merged",
+        workspace.organizationId,
+        COMMENT_MANAGEMENT_KEY_SCOPES
+      );
+
+      // A merged post redirects to its survivor and every interaction gate
+      // treats it as read-only until it is unmerged. The check constraints
+      // require a merge timestamp and an archived source, so both are set.
+      yield* db
+        .update(schema.postTable)
+        .set({
+          archivedAt: new Date(),
+          mergedAt: new Date(),
+          mergedIntoPostId: `${workspace.postId}_1`,
+        })
+        .where(eq(schema.postTable.id, workspace.postId));
+
+      const response = yield* executeWrite(
+        "POST",
+        `/api/v1/posts/${workspace.postId}/comments`,
+        {
+          apiKey: "fbk_comments_merged",
+          body: {
+            content: "Should not land",
+            author: { email: "jane@example.com" },
+          },
+        }
+      );
+
+      expect(response.status).toBe(409);
+      expect(decodeError(responseBody(response))._tag).toBe("CONFLICT");
+    })
+  );
+
+  it.effect("rejects a parent comment from another post", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace({ postCount: 2 });
+      const otherPostId = `${workspace.postId}_1`;
+      yield* seedComment(
+        workspace.organizationId,
+        otherPostId,
+        "cmt_other_post"
+      );
+      registerKey(
+        "fbk_comments_parent",
+        workspace.organizationId,
+        COMMENT_MANAGEMENT_KEY_SCOPES
+      );
+
+      // The foreign key would accept any existing comment id, so the write
+      // path is what keeps a reply from anchoring across a post boundary.
+      const response = yield* executeWrite(
+        "POST",
+        `/api/v1/posts/${workspace.postId}/comments`,
+        {
+          apiKey: "fbk_comments_parent",
+          body: {
+            content: "Reply",
+            parentCommentId: "cmt_other_post",
+            author: { email: "jane@example.com" },
+          },
+        }
+      );
+
+      expect(response.status).toBe(400);
+      expect(decodeError(responseBody(response))._tag).toBe("INVALID_REQUEST");
+    })
+  );
+
+  it.effect("updates a comment's body and visibility", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedComment(
+        workspace.organizationId,
+        workspace.postId,
+        "cmt_edit"
+      );
+      registerKey(
+        "fbk_comments_edit",
+        workspace.organizationId,
+        COMMENT_MANAGEMENT_KEY_SCOPES
+      );
+
+      const response = yield* executeWrite(
+        "PATCH",
+        "/api/v1/comments/cmt_edit",
+        {
+          apiKey: "fbk_comments_edit",
+          body: { content: "Edited body", visibility: "INTERNAL" },
+        }
+      );
+
+      expect(response.status).toBe(200);
+      const edited = decodeComment(responseBody(response));
+      expect(edited).toMatchObject({
+        id: "cmt_edit",
+        visibility: "INTERNAL",
+      });
+      // The body is stored as sanitized markdown, which normalizes a trailing
+      // newline; compare on content rather than on an exact byte string.
+      expect(edited.content.trim()).toBe("Edited body");
+
+      // Omitting visibility leaves it alone rather than resetting it.
+      const bodyOnly = yield* executeWrite(
+        "PATCH",
+        "/api/v1/comments/cmt_edit",
+        { apiKey: "fbk_comments_edit", body: { content: "Body only" } }
+      );
+      expect(bodyOnly.status).toBe(200);
+      expect(decodeComment(responseBody(bodyOnly))).toMatchObject({
+        visibility: "INTERNAL",
+      });
+    })
+  );
+
+  it.effect("deletes a comment together with its replies", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedComment(
+        workspace.organizationId,
+        workspace.postId,
+        "cmt_parent"
+      );
+      yield* seedComment(
+        workspace.organizationId,
+        workspace.postId,
+        "cmt_reply",
+        { parentCommentId: "cmt_parent" }
+      );
+      registerKey(
+        "fbk_comments_delete",
+        workspace.organizationId,
+        COMMENT_MANAGEMENT_KEY_SCOPES
+      );
+
+      const response = yield* executeWrite(
+        "DELETE",
+        "/api/v1/comments/cmt_parent",
+        { apiKey: "fbk_comments_delete" }
+      );
+      expect(response.status).toBe(204);
+
+      const after = yield* executeRequest(
+        "/api/v1/comments/cmt_parent",
+        "fbk_comments_delete"
+      );
+      expect(after.status).toBe(404);
+
+      // `parent_comment_id` cascades, so the reply went with it.
+      const reply = yield* executeRequest(
+        "/api/v1/comments/cmt_reply",
+        "fbk_comments_delete"
+      );
+      expect(reply.status).toBe(404);
+    })
+  );
+
+  it.effect("pins one comment per post and unpins idempotently", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedComment(
+        workspace.organizationId,
+        workspace.postId,
+        "cmt_first",
+        { createdAt: new Date(Date.now() - 60_000) }
+      );
+      yield* seedComment(
+        workspace.organizationId,
+        workspace.postId,
+        "cmt_second"
+      );
+      registerKey(
+        "fbk_comments_pin",
+        workspace.organizationId,
+        COMMENT_MANAGEMENT_KEY_SCOPES
+      );
+
+      const pinned = yield* executeWrite(
+        "POST",
+        "/api/v1/comments/cmt_first/pin",
+        { apiKey: "fbk_comments_pin" }
+      );
+      expect(pinned.status).toBe(200);
+      expect(decodeComment(responseBody(pinned)).pinnedAt).not.toBeNull();
+
+      // A post has one pinned comment: pinning the second releases the first.
+      const repinned = yield* executeWrite(
+        "POST",
+        "/api/v1/comments/cmt_second/pin",
+        { apiKey: "fbk_comments_pin" }
+      );
+      expect(repinned.status).toBe(200);
+      expect(decodeComment(responseBody(repinned)).pinnedAt).not.toBeNull();
+
+      const first = yield* executeRequest(
+        "/api/v1/comments/cmt_first",
+        "fbk_comments_pin"
+      );
+      expect(decodeComment(responseBody(first)).pinnedAt).toBeNull();
+
+      const unpinned = yield* executeWrite(
+        "POST",
+        "/api/v1/comments/cmt_second/unpin",
+        { apiKey: "fbk_comments_pin" }
+      );
+      expect(unpinned.status).toBe(200);
+      expect(decodeComment(responseBody(unpinned)).pinnedAt).toBeNull();
+
+      // Unpinning a comment that is not pinned changes nothing, so a retry is
+      // answered the same way rather than failing.
+      const again = yield* executeWrite(
+        "POST",
+        "/api/v1/comments/cmt_second/unpin",
+        { apiKey: "fbk_comments_pin" }
+      );
+      expect(again.status).toBe(200);
+      expect(decodeComment(responseBody(again)).pinnedAt).toBeNull();
+    })
+  );
+
   it.effect("serves its own OpenAPI document without a key", () =>
     Effect.gen(function* () {
       const response = yield* executeRequest("/api/v1/openapi.json");
@@ -2454,9 +3034,13 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/boards/{boardId}/posts",
         "/api/v1/changelog",
         "/api/v1/changelog/{changelogId}",
+        "/api/v1/comments/{commentId}",
+        "/api/v1/comments/{commentId}/pin",
+        "/api/v1/comments/{commentId}/unpin",
         "/api/v1/companies",
         "/api/v1/companies/{companyId}",
         "/api/v1/posts/{postId}",
+        "/api/v1/posts/{postId}/comments",
         "/api/v1/posts/{postId}/tags",
         "/api/v1/tags",
         "/api/v1/tags/{tagId}",

@@ -31,6 +31,11 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 | Scope | Grants |
 | --- | --- |
 | `posts.read` | Read posts, their status, tags, and vote and comment counts. Required by both post endpoints. |
+| `comments.read` | Read a post's comments through `/posts/{postId}/comments`, internal notes included. Every key receives it. |
+| `comments.create` | Comment on a post. The comment is attributed to the customer the request names — an API key has no user of its own. |
+| `comments.update` | Replace a comment's body, and its visibility when the request names one. |
+| `comments.delete` | Delete a comment and every reply beneath it. |
+| `comments.pin` | Pin a comment to the top of its post, or unpin it. A post has at most one pinned comment. |
 | `tags.read` | Read the workspace's tags through the `/tags` endpoints. A post's embedded tags come with the post, under `posts.read`. |
 | `tags.create` | Create a tag. |
 | `tags.update` | Rename a tag. |
@@ -47,7 +52,9 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 | `companies.delete` | Delete a company, which detaches it from the contacts that belonged to it. |
 | `boards.read` | Reserved for a future board-metadata endpoint. No v1 endpoint requires it, and every key receives it so that endpoint is additive when it ships. |
 
-A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above except the `companies` ones; the `tags` and `changelog` write scopes, and all four `companies` scopes, are granted only when the key is created with them — so a key that was minted to read feedback cannot delete a workspace's tags, broadcast a release note, or learn the customer roster. The CRM grant is opt-in as a whole, read included, because a company is a record about the workspace's own customers rather than the workspace's content. That is also why a key created before a scope existed keeps its narrower grant: rotate the key if an integration needs more than it was issued.
+A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above except the `companies` ones; the `comments`, `tags`, and `changelog` write scopes, and all four `companies` scopes, are granted only when the key is created with them — so a key that was minted to read feedback cannot delete a workspace's comments or tags, broadcast a release note, or learn the customer roster. The CRM grant is opt-in as a whole, read included, because a company is a record about the workspace's own customers rather than the workspace's content. That is also why a key created before a scope existed keeps its narrower grant: rotate the key if an integration needs more than it was issued.
+
+`comments.pin` is separate from `comments.update` for the same reason the dashboard keeps moderation apart from authorship: editing a comment's words and deciding which one sits at the top of a post are different authorities.
 
 `changelog.publish` is separate from `changelog.update` because publishing is not reversible in the way an edit is: it emails every subscriber. A key that syncs drafts from a CMS can hold `changelog.create` and `changelog.update` and still be unable to broadcast.
 
@@ -206,6 +213,109 @@ The list **replaces** the post's tags rather than adding to them, so a caller th
 Every id must exist in the workspace: an unknown id — including one belonging to another workspace — is answered with `400 INVALID_REQUEST` and nothing is written, rather than silently tagging the post with whatever happened to exist. Sending the same id twice is one tag, not an error.
 
 The change is recorded in the post's timeline as the tags that were added and removed. A key is not a member, so those entries have no actor and the dashboard shows them as "Someone".
+
+### List a post's comments
+
+```http
+GET /api/v1/posts/{postId}/comments
+```
+
+| Query parameter | Default | Notes |
+| --- | --- | --- |
+| `limit` | `25` | 1–100. |
+| `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
+
+```json
+{
+  "data": [
+    {
+      "id": "cmt_example",
+      "postId": "pst_example",
+      "content": "Please add a dark theme.",
+      "visibility": "PUBLIC",
+      "parentCommentId": null,
+      "pinnedAt": null,
+      "author": {
+        "type": "end_user",
+        "displayName": "Jamie",
+        "avatarUrl": null
+      },
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+Requires `comments.read`. Comments are returned newest first, on the same cursor as every other list. A pinned comment carries a `pinnedAt` and appears in its created position rather than first: a second sort key would make this one endpoint page differently from the rest. Internal comments are included, because the key belongs to the workspace, and report `visibility: "INTERNAL"`. A post that does not exist in the workspace, or belongs to another one, is `404 NOT_FOUND`.
+
+A comment belongs to the post it currently lives on. When a post is merged into another, its comments move to the survivor, so ask the survivor for them; the source reports none of its own.
+
+### Get a comment
+
+```http
+GET /api/v1/comments/{commentId}
+```
+
+Returns one comment in the shape above. Requires `comments.read`.
+
+### Create a comment
+
+```http
+POST /api/v1/posts/{postId}/comments
+Content-Type: application/json
+
+{
+  "content": "+1, our team needs this.",
+  "author": { "email": "jamie@example.com", "name": "Jamie" }
+}
+```
+
+Responds `201` with the comment it created. Requires `comments.create`.
+
+`author` is required and names the customer the comment is attributed to. An API key is a machine credential with no user of its own, so it cannot "be" the author: the request states whose name the comment carries. Identifiers are consulted in strict priority order — `userId`, then `contactId`, then `externalId`, then `email` — and `name` and `avatarUrl` only enrich the resolved contact; an email that matches no contact creates one. A subject that resolves to no account at all is `400 INVALID_REQUEST`.
+
+`content` is sanitized exactly as the dashboard sanitizes a comment. `visibility` optionally sets `PUBLIC` (the default) or `INTERNAL`; an internal comment is a workspace note and is not shown on the public board. `parentCommentId` optionally makes the comment a reply, and must name a comment on the same post and workspace — anything else, including another workspace's comment, is `400 INVALID_REQUEST`.
+
+A post whose conversation is locked refuses the create with `409 CONFLICT`: a lock is a state a member set deliberately, and a machine key is not an exception to it. A post that was merged into another refuses it the same way, because it redirects to its survivor and is read-only until it is unmerged. The comment is recorded in the post's timeline with no actor, the same way an API tag change is.
+
+### Update a comment
+
+```http
+PATCH /api/v1/comments/{commentId}
+Content-Type: application/json
+
+{ "content": "Closing this out.", "visibility": "PUBLIC" }
+```
+
+Responds `200` with the comment afterwards. Requires `comments.update`.
+
+`content` is required and replaces the body; `visibility` is optional, and omitting it leaves the stored visibility alone. The body is sanitized exactly as on a create, and the edit is recorded in the post's timeline.
+
+### Delete a comment
+
+```http
+DELETE /api/v1/comments/{commentId}
+```
+
+Responds `204` with no body. Requires `comments.delete`. Every reply beneath the comment is deleted with it, because replies do not outlive their parent. A comment that is already gone is `404 NOT_FOUND` rather than a success.
+
+### Pin a comment
+
+```http
+POST /api/v1/comments/{commentId}/pin
+```
+
+Responds `200` with the comment and its `pinnedAt`. Requires `comments.pin`. A post has at most one pinned comment, so pinning one releases whatever was pinned before it. Pinning a comment that is already pinned is answered the same way; the change is recorded in the post's timeline either way.
+
+### Unpin a comment
+
+```http
+POST /api/v1/comments/{commentId}/unpin
+```
+
+Responds `200` with the comment and a `null` `pinnedAt`. Requires `comments.pin`. Unpinning a comment that is not pinned changes nothing and is answered the same way, so a retried request does not have to distinguish "already unpinned" from "gone".
 
 ### List changelog entries
 
@@ -388,7 +498,7 @@ The company's contacts are **not** deleted: they keep their own records and simp
 
 ## Pagination
 
-Pagination is cursor-based. A response carries `nextCursor`; `null` means the last page. Cursors are opaque — do not construct or parse them — and are invalidated by the API without notice if they are malformed, in which case the API returns `400 INVALID_REQUEST`. Do not poll with offsets: posts, tags, changelog entries, and companies are inserted continuously and offset paging skips and repeats rows.
+Pagination is cursor-based. A response carries `nextCursor`; `null` means the last page. Cursors are opaque — do not construct or parse them — and are invalidated by the API without notice if they are malformed, in which case the API returns `400 INVALID_REQUEST`. Do not poll with offsets: posts, comments, tags, changelog entries, and companies are inserted continuously and offset paging skips and repeats rows.
 
 ## Errors
 
@@ -403,13 +513,13 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 
 | Status | `_tag` | Meaning |
 | --- | --- | --- |
-| 400 | `INVALID_REQUEST` | Malformed parameter, cursor, or limit; a body the endpoint cannot decode; a name that is only whitespace; an update that names no field. |
+| 400 | `INVALID_REQUEST` | Malformed parameter, cursor, or limit; a body the endpoint cannot decode; a name that is only whitespace; an update that names no field; a reply whose parent is not a comment on the same post; an author subject that resolves to no account. |
 | 401 | `MISSING_API_KEY` | No `x-api-key` header was sent. |
 | 401 | `INVALID_API_KEY` | The key is unknown, revoked, expired, or disabled. |
 | 403 | `FORBIDDEN_SCOPE` | The key lacks the scope the endpoint requires. |
 | 403 | `PLAN_REQUIRES_UPGRADE` | The workspace plan does not include the Public API, or has no room left in a limit it sets — such as CRM entries. |
 | 404 | `NOT_FOUND` | The resource does not exist in this workspace. |
-| 409 | `CONFLICT` | A write collided with something that already exists, such as a tag name or a company name or external id, already in use. |
+| 409 | `CONFLICT` | A write collided with something that already exists, such as a tag name or a company name or external id already in use, or comments on a post whose conversation is locked. |
 | 429 | `RATE_LIMITED` | Per-key rate limit exceeded. Carries `Retry-After` in seconds. |
 | 500 | `INTERNAL_ERROR` | Unexpected server failure. |
 | 503 | `SERVICE_UNAVAILABLE` | A required dependency is unavailable; requests fail closed. |
@@ -442,6 +552,8 @@ Changelog entries carry no author at all: the dashboard's entry rows hold `creat
 
 Post `content` is sanitized before it is stored, so the body the API returns is the same sanitized content the dashboard and the public portal render. Tags carry a name and a slug, nothing else — a tag's creator is an internal identifier and is never returned.
 
+Comments follow the same rule. A comment payload carries its author as `{ type, displayName, avatarUrl }`, never the `userId` or `memberId` the dashboard's comment rows hold, and its `content` is the sanitized body the dashboard and portal render. A comment's merge and status-transition provenance (`mergedFromPostId`, `statusUpdateId`) is not part of the resource either: it describes internal bookkeeping, not the comment a caller reads. A comment created with a key is attributed to the resolved customer, so nothing in the payload points back at the key that wrote it.
+
 A company carries its name, avatar, your `externalId`, and `source`. Its contacts are not exposed and neither are the custom attribute values a workspace may have defined for companies: those definitions are a workspace-specific vocabulary, so they would need their own contract rather than a field on this one. The workspace is never named in a payload either — a key reads exactly one workspace, so an `organizationId` would be the same string on every response and would invite a filter parameter that would then have to be validated against the key. `source` is the exception that proves the rule: it is bookkeeping about where the row came from, not about who it belongs to, and it is what lets a sync tell its own records from the dashboard's.
 
 ## Which posts are visible
@@ -463,6 +575,6 @@ Anything that cannot respect those rules ships as `/api/v2`. When a v2 exists, v
 
 Keys are managed in the dashboard under **Settings → Developers**, restricted to workspace admins and owners. The list shows a key's name and its first characters — `fbk_ab…` — which is enough to identify a key without exposing it. The plaintext value is displayed once, at creation. Revocation takes effect immediately and is not reversible.
 
-When a key is created you choose its access: **Read only**, **Read and manage tags**, **Read and manage changelog**, or **Read and manage tags and changelog**. The choice fixes the key's scopes for its whole life, so pick the narrowest one the integration needs. Publishing is part of the changelog choice because it emails subscribers, so a key that only syncs drafts is not granted it.
+When a key is created you choose its access: **Read only**, or any combination of **Manage comments**, **Manage tags**, **Manage changelog**, and **Manage companies**. The read scopes every key receives are fixed; the write scopes are granted only by the capability you select, and the choice fixes the key's scopes for its whole life, so pick the narrowest one the integration needs. Publishing is part of the changelog capability because it emails subscribers, so a key that only syncs drafts is not granted it.
 
 Use one key per integration so that revoking one does not interrupt the others.

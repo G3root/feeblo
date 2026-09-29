@@ -1,5 +1,6 @@
 import {
   PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
+  PUBLIC_API_COMMENT_MANAGEMENT_SCOPES,
   PUBLIC_API_COMPANY_MANAGEMENT_SCOPES,
   PUBLIC_API_DEFAULT_SCOPES,
   PUBLIC_API_TAG_MANAGEMENT_SCOPES,
@@ -50,6 +51,7 @@ export const API_KEY_EXPIRATION_ITEMS = API_KEY_EXPIRATIONS.map((value) => ({
  * `API_KEY_CAPABILITY_GROUP_SCOPES`, so the two cannot drift.
  */
 export const API_KEY_CAPABILITY_GROUPS = [
+  "comments",
   "tags",
   "changelog",
   "companies",
@@ -63,18 +65,22 @@ export type ApiKeyCapabilityGroup = (typeof API_KEY_CAPABILITY_GROUPS)[number];
  * or miss one it now grants by default.
  */
 export const API_KEY_CAPABILITY_GROUP_SCOPES = {
+  comments: PUBLIC_API_COMMENT_MANAGEMENT_SCOPES,
   tags: PUBLIC_API_TAG_MANAGEMENT_SCOPES,
   changelog: PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
   companies: PUBLIC_API_COMPANY_MANAGEMENT_SCOPES,
 } satisfies Record<ApiKeyCapabilityGroup, readonly PublicApiScope[]>;
 
 export const API_KEY_CAPABILITY_GROUP_LABELS = {
+  comments: "Manage comments",
   tags: "Manage tags",
   changelog: "Manage changelog",
   companies: "Manage companies",
 } satisfies Record<ApiKeyCapabilityGroup, string>;
 
 export const API_KEY_CAPABILITY_GROUP_DESCRIPTIONS = {
+  comments:
+    "Create, edit, and delete comments, and pin one to the top of a post. Deleting a comment removes its replies, and a comment created with a key is attributed to the customer the request names.",
   tags: "Create, rename, and delete tags, and set which tags a post carries. Deleting a tag removes it from every post that carries it.",
   changelog:
     "Create, edit, and delete changelog entries, and publish them. Publishing emails everyone subscribed to the changelog.",
@@ -126,7 +132,7 @@ export const apiKeyScopes = (
  * group the caller may not select.
  */
 export const API_KEY_READ_ONLY_DESCRIPTION =
-  "Every key reads posts, tags, and changelog entries. Select a capability to grant more.";
+  "Every key reads posts, comments, tags, and changelog entries. Select a capability to grant more.";
 
 /**
  * Mirrors the server's `ApiKeyCreate` payload: a name between 1 and 32
