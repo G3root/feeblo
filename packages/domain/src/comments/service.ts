@@ -1,5 +1,6 @@
-import { Database, transaction } from "@feeblo/db";
+import { Database, schema, transaction } from "@feeblo/db";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import { and, eq } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -24,6 +25,7 @@ import {
   FailedToPinCommentError,
   FailedToUnpinCommentError,
   FailedToUpdateCommentError,
+  PostDoesNotAcceptCommentsError,
 } from "./errors";
 import { CommentRepository } from "./repository";
 
@@ -106,6 +108,14 @@ export type CommentTarget = {
   readonly postId: string;
 };
 
+/** The facts a reply's parent has to satisfy, on a create and on an edit. */
+type ParentCheck = {
+  readonly organizationId: string;
+  readonly parentCommentId: string | null;
+  readonly postId: string;
+  readonly visibility: "PUBLIC" | "INTERNAL";
+};
+
 const makeCommentService = Effect.gen(function* () {
   const repository = yield* CommentRepository;
   const activityRepository = yield* PostActivityRepository;
@@ -175,6 +185,56 @@ const makeCommentService = Effect.gen(function* () {
     });
 
   /**
+   * The post-state gate, re-checked inside the write's own transaction.
+   *
+   * The caller checks the state too, so an ordinary request is answered before
+   * any of this work happens — but that check cannot hold the post still, and
+   * a member can lock or merge it in between. This one takes the post row's
+   * lock, so a concurrent lock or merge either commits first and is seen here,
+   * or waits until the comment exists and then moves it with the post's other
+   * comments. A post row that is gone by now is left to the insert's foreign
+   * key, exactly as it was before this check existed.
+   */
+  const assertPostAcceptsComments = (draft: CommentDraft) =>
+    Effect.gen(function* () {
+      const rows = yield* database
+        .select({
+          lockedAt: schema.postTable.lockedAt,
+          mergedIntoPostId: schema.postTable.mergedIntoPostId,
+        })
+        .from(schema.postTable)
+        .where(
+          and(
+            eq(schema.postTable.id, draft.postId),
+            eq(schema.postTable.organizationId, draft.organizationId)
+          )
+        )
+        .limit(1)
+        // `no key update` rather than `update`: the post row is pointed at by
+        // foreign keys across the workspace, and the stronger lock would block
+        // unrelated inserts that merely reference this post.
+        .for("no key update");
+
+      const post = rows.at(0);
+      if (post === undefined) {
+        return;
+      }
+
+      if (post.lockedAt !== null) {
+        return yield* new PostDoesNotAcceptCommentsError({
+          message: "The post is locked and does not accept new comments.",
+        });
+      }
+
+      if (post.mergedIntoPostId !== null) {
+        return yield* new PostDoesNotAcceptCommentsError({
+          message:
+            "The post was merged into another post and does not accept new comments.",
+        });
+      }
+    });
+
+  /**
    * Rejects a parent that is not a comment on the same post and workspace.
    *
    * The composite check matters: `comment.parent_comment_id` is a plain
@@ -184,16 +244,16 @@ const makeCommentService = Effect.gen(function* () {
    * reply may not hang beneath it — and it is restated here because a machine
    * credential never passes through that policy.
    */
-  const assertParentBelongsToPost = (draft: CommentDraft) =>
+  const assertParentBelongsToPost = (parentCheck: ParentCheck) =>
     Effect.gen(function* () {
-      if (draft.parentCommentId === null) {
+      if (parentCheck.parentCommentId === null) {
         return;
       }
 
       const parent = yield* repository.findById({
-        id: draft.parentCommentId,
-        organizationId: draft.organizationId,
-        postId: draft.postId,
+        id: parentCheck.parentCommentId,
+        organizationId: parentCheck.organizationId,
+        postId: parentCheck.postId,
       });
 
       if (Option.isNone(parent)) {
@@ -204,12 +264,47 @@ const makeCommentService = Effect.gen(function* () {
 
       if (
         parent.value.visibility === "INTERNAL" &&
-        draft.visibility === "PUBLIC"
+        parentCheck.visibility === "PUBLIC"
       ) {
         return yield* new BadRequestError({
           message: "A public reply cannot be placed under an internal comment.",
         });
       }
+    });
+
+  /**
+   * Re-applies the reply rule to a visibility change.
+   *
+   * A PUBLIC reply may not hang beneath an INTERNAL parent — the rule a create
+   * enforces — and an edit that only flips visibility would otherwise be a way
+   * around it. The comment is read for its own parent, because an edit does
+   * not carry one, and a comment that is gone fails the way a matching update
+   * that found no row does.
+   */
+  const assertVisibilityAllowedByParent = (edit: CommentEdit) =>
+    Effect.gen(function* () {
+      if (edit.visibility !== "PUBLIC") {
+        return;
+      }
+
+      const existing = yield* repository.findById({
+        id: edit.id,
+        organizationId: edit.organizationId,
+        postId: edit.postId,
+      });
+
+      if (Option.isNone(existing)) {
+        return yield* new FailedToUpdateCommentError({
+          message: "Failed to update comment",
+        });
+      }
+
+      yield* assertParentBelongsToPost({
+        organizationId: edit.organizationId,
+        parentCommentId: existing.value.parentCommentId,
+        postId: edit.postId,
+        visibility: "PUBLIC",
+      });
     });
 
   const create = <R = never>(args: {
@@ -232,6 +327,8 @@ const makeCommentService = Effect.gen(function* () {
 
       yield* transaction(
         Effect.gen(function* () {
+          yield* assertPostAcceptsComments(args.draft);
+
           const author = yield* resolveAuthor(
             args.author,
             args.draft.organizationId
@@ -295,6 +392,8 @@ const makeCommentService = Effect.gen(function* () {
 
       const updatedComment = yield* transaction(
         Effect.gen(function* () {
+          yield* assertVisibilityAllowedByParent(args.edit);
+
           const updated = yield* repository.update({
             id: args.edit.id,
             organizationId: args.edit.organizationId,

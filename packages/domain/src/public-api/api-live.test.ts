@@ -2917,6 +2917,121 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect("refuses to widen a reply beyond its internal parent", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedComment(
+        workspace.organizationId,
+        workspace.postId,
+        "cmt_internal_parent",
+        { visibility: "INTERNAL" }
+      );
+      yield* seedComment(
+        workspace.organizationId,
+        workspace.postId,
+        "cmt_internal_reply",
+        { parentCommentId: "cmt_internal_parent", visibility: "INTERNAL" }
+      );
+      yield* seedComment(
+        workspace.organizationId,
+        workspace.postId,
+        "cmt_public_parent"
+      );
+      yield* seedComment(
+        workspace.organizationId,
+        workspace.postId,
+        "cmt_public_reply",
+        { parentCommentId: "cmt_public_parent" }
+      );
+      registerKey(
+        "fbk_comments_visibility",
+        workspace.organizationId,
+        COMMENT_MANAGEMENT_KEY_SCOPES
+      );
+
+      // A create refuses a PUBLIC reply under an INTERNAL parent, so an edit
+      // that only flips visibility must not be a way around that rule.
+      const widened = yield* executeWrite(
+        "PATCH",
+        "/api/v1/comments/cmt_internal_reply",
+        {
+          apiKey: "fbk_comments_visibility",
+          body: { content: "Now public", visibility: "PUBLIC" },
+        }
+      );
+      expect(widened.status).toBe(400);
+      expect(decodeError(responseBody(widened))._tag).toBe("INVALID_REQUEST");
+
+      // The comment is untouched: the refusal is not a partial write.
+      const after = yield* executeRequest(
+        "/api/v1/comments/cmt_internal_reply",
+        "fbk_comments_visibility"
+      );
+      expect(decodeComment(responseBody(after))).toMatchObject({
+        content: "Seeded comment",
+        visibility: "INTERNAL",
+      });
+
+      // A reply under a PUBLIC parent is free to move between visibilities.
+      const narrowed = yield* executeWrite(
+        "PATCH",
+        "/api/v1/comments/cmt_public_reply",
+        {
+          apiKey: "fbk_comments_visibility",
+          body: { content: "Note to the team", visibility: "INTERNAL" },
+        }
+      );
+      expect(narrowed.status).toBe(200);
+      expect(decodeComment(responseBody(narrowed)).visibility).toBe("INTERNAL");
+
+      const reopened = yield* executeWrite(
+        "PATCH",
+        "/api/v1/comments/cmt_public_reply",
+        {
+          apiKey: "fbk_comments_visibility",
+          body: { content: "Visible again", visibility: "PUBLIC" },
+        }
+      );
+      expect(reopened.status).toBe(200);
+      expect(decodeComment(responseBody(reopened)).visibility).toBe("PUBLIC");
+    })
+  );
+
+  it.effect("refuses an empty comment body", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedComment(
+        workspace.organizationId,
+        workspace.postId,
+        "cmt_empty"
+      );
+      registerKey(
+        "fbk_comments_empty",
+        workspace.organizationId,
+        COMMENT_MANAGEMENT_KEY_SCOPES
+      );
+
+      const created = yield* executeWrite(
+        "POST",
+        `/api/v1/posts/${workspace.postId}/comments`,
+        {
+          apiKey: "fbk_comments_empty",
+          body: { content: "", author: { email: "jane@example.com" } },
+        }
+      );
+      expect(created.status).toBe(400);
+      expect(decodeError(responseBody(created))._tag).toBe("INVALID_REQUEST");
+
+      const updated = yield* executeWrite(
+        "PATCH",
+        "/api/v1/comments/cmt_empty",
+        { apiKey: "fbk_comments_empty", body: { content: "" } }
+      );
+      expect(updated.status).toBe(400);
+      expect(decodeError(responseBody(updated))._tag).toBe("INVALID_REQUEST");
+    })
+  );
+
   it.effect("deletes a comment together with its replies", () =>
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace();

@@ -321,7 +321,10 @@ export const CreateCommentParams = Schema.Struct({
  * visible to keys but not on the public board.
  */
 export const CreateCommentPayload = Schema.Struct({
-  content: Schema.String.check(Schema.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)),
+  content: Schema.String.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)
+  ),
   visibility: Schema.optional(PublicApiCommentVisibility),
   parentCommentId: Schema.optional(Schema.NullOr(Schema.String)),
   author: PublicApiCommentAuthorSubject,
@@ -340,11 +343,15 @@ export const UpdateCommentParams = Schema.Struct({
  *
  * `content` is required because a comment is its body, and unlike a company
  * update there is no meaningful "I only renamed it" case for an omitted field
- * to express. `visibility` is optional: omitting it leaves the stored
+ * to express; an empty body is refused rather than stored as a comment that
+ * renders as nothing. `visibility` is optional: omitting it leaves the stored
  * visibility alone, which is the one field an update may leave untouched.
  */
 export const UpdateCommentPayload = Schema.Struct({
-  content: Schema.String.check(Schema.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)),
+  content: Schema.String.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)
+  ),
   visibility: Schema.optional(PublicApiCommentVisibility),
 });
 

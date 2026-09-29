@@ -977,23 +977,19 @@ const makePublicApiRepository = Effect.gen(function* () {
       }).pipe(withRemapDbErrors("PublicApiComment", "select")),
 
     /**
-     * A post as the comment paths need it: whether it exists at all and
-     * whether it still accepts comments.
+     * The post a create comments on: whether it exists in this workspace.
      *
-     * A locked post closes its conversation for every surface — the dashboard
-     * and the portal both refuse a create through the policy — so the Public
-     * API refuses one too rather than letting a machine key write into a
-     * conversation a member deliberately closed. A merged post is read-only by
-     * the same rule: it redirects to its survivor, so a comment filed against
-     * it would sit on a page nobody comments on.
+     * Only existence is answered here. Whether the post still accepts
+     * comments — it may be locked or merged into another post — is decided by
+     * `CommentService.create`, inside the write's own transaction and under
+     * the post row's lock, so the state cannot change between the check and
+     * the insert. A post that does not exist in this workspace, or belongs to
+     * another one, is reported as missing here so the id cannot probe at all.
      */
     findCommentTarget: ({ organizationId, postId }: TFindCommentTarget) =>
       Effect.gen(function* () {
         const rows = yield* db
-          .select({
-            lockedAt: schema.postTable.lockedAt,
-            mergedIntoPostId: schema.postTable.mergedIntoPostId,
-          })
+          .select({ id: schema.postTable.id })
           .from(schema.postTable)
           .where(
             and(

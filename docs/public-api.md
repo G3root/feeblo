@@ -276,7 +276,7 @@ Responds `201` with the comment it created. Requires `comments.create`.
 
 `author` is required and names the customer the comment is attributed to. An API key is a machine credential with no user of its own, so it cannot "be" the author: the request states whose name the comment carries. Identifiers are consulted in strict priority order — `userId`, then `contactId`, then `externalId`, then `email` — and `name` and `avatarUrl` only enrich the resolved contact; an email that matches no contact creates one. A subject that resolves to no account at all is `400 INVALID_REQUEST`.
 
-`content` is sanitized exactly as the dashboard sanitizes a comment. `visibility` optionally sets `PUBLIC` (the default) or `INTERNAL`; an internal comment is a workspace note and is not shown on the public board. `parentCommentId` optionally makes the comment a reply, and must name a comment on the same post and workspace — anything else, including another workspace's comment, is `400 INVALID_REQUEST`.
+`content` is sanitized exactly as the dashboard sanitizes a comment, and a body that is empty is refused rather than stored as a comment that renders as nothing. `visibility` optionally sets `PUBLIC` (the default) or `INTERNAL`; an internal comment is a workspace note and is not shown on the public board. `parentCommentId` optionally makes the comment a reply, and must name a comment on the same post and workspace — anything else, including another workspace's comment, is `400 INVALID_REQUEST`.
 
 A post whose conversation is locked refuses the create with `409 CONFLICT`: a lock is a state a member set deliberately, and a machine key is not an exception to it. A post that was merged into another refuses it the same way, because it redirects to its survivor and is read-only until it is unmerged. The comment is recorded in the post's timeline with no actor, the same way an API tag change is.
 
@@ -291,7 +291,7 @@ Content-Type: application/json
 
 Responds `200` with the comment afterwards. Requires `comments.update`.
 
-`content` is required and replaces the body; `visibility` is optional, and omitting it leaves the stored visibility alone. The body is sanitized exactly as on a create, and the edit is recorded in the post's timeline.
+`content` is required and replaces the body; `visibility` is optional, and omitting it leaves the stored visibility alone. The body is sanitized exactly as on a create, an empty body is refused, and the edit is recorded in the post's timeline. Widening a reply to `PUBLIC` is refused while its parent is `INTERNAL`, the same rule a create enforces, so an edit is not a way around it.
 
 ### Delete a comment
 
@@ -315,7 +315,7 @@ Responds `200` with the comment and its `pinnedAt`. Requires `comments.pin`. A p
 POST /api/v1/comments/{commentId}/unpin
 ```
 
-Responds `200` with the comment and a `null` `pinnedAt`. Requires `comments.pin`. Unpinning a comment that is not pinned changes nothing and is answered the same way, so a retried request does not have to distinguish "already unpinned" from "gone".
+Responds `200` with the comment and a `null` `pinnedAt`. Requires `comments.pin`. Unpinning a comment that is not pinned changes nothing and is answered with the comment as it stands, so a retried request does not fail merely because the pin was already released; a comment that has been deleted is still the documented `404 NOT_FOUND`.
 
 ### List changelog entries
 
@@ -513,7 +513,7 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 
 | Status | `_tag` | Meaning |
 | --- | --- | --- |
-| 400 | `INVALID_REQUEST` | Malformed parameter, cursor, or limit; a body the endpoint cannot decode; a name that is only whitespace; an update that names no field; a reply whose parent is not a comment on the same post; an author subject that resolves to no account. |
+| 400 | `INVALID_REQUEST` | Malformed parameter, cursor, or limit; a body the endpoint cannot decode; an empty comment body; a name that is only whitespace; an update that names no field; a reply whose parent is not a comment on the same post; a reply widened to public beneath an internal parent; an author subject that resolves to no account. |
 | 401 | `MISSING_API_KEY` | No `x-api-key` header was sent. |
 | 401 | `INVALID_API_KEY` | The key is unknown, revoked, expired, or disabled. |
 | 403 | `FORBIDDEN_SCOPE` | The key lacks the scope the endpoint requires. |

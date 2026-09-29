@@ -280,6 +280,7 @@ const makeCommentRepository = Effect.gen(function* () {
           id: schema.commentTable.id,
           visibility: schema.commentTable.visibility,
           pinnedAt: schema.commentTable.pinnedAt,
+          parentCommentId: schema.commentTable.parentCommentId,
         })
         .from(schema.commentTable)
         .where(

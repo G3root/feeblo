@@ -14,6 +14,7 @@ import {
   type FailedToPinCommentError,
   type FailedToUnpinCommentError,
   type FailedToUpdateCommentError,
+  type PostDoesNotAcceptCommentsError,
 } from "../comments/errors";
 import { currentCommentService } from "../comments/service";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
@@ -263,40 +264,62 @@ type CommentWriteFailure =
   | InvalidSubjectError
   | SubjectNotFoundError;
 
+const commentWriteFailureHandlers = {
+  BadRequestError: (error: BadRequestError) =>
+    Effect.fail(
+      invalidRequestError(error.message ?? "The request is not valid.")
+    ),
+  FailedToCreateCommentError: () => onInternalError(),
+  FailedToDeleteCommentError: () =>
+    Effect.fail(notFoundError("Comment not found.")),
+  FailedToPinCommentError: () =>
+    Effect.fail(notFoundError("Comment not found.")),
+  FailedToUnpinCommentError: () =>
+    Effect.fail(notFoundError("Comment not found.")),
+  FailedToUpdateCommentError: () =>
+    Effect.fail(notFoundError("Comment not found.")),
+  InternalServerError: () => onInternalError(),
+  // Fixed messages: the identity failures carry a subject id in their detail,
+  // and echoing a caller's own identifier back would make the error body an
+  // existence oracle.
+  InvalidSubjectError: () =>
+    Effect.fail(
+      invalidRequestError(
+        "The comment's author could not be resolved in this workspace."
+      )
+    ),
+  SubjectNotFoundError: () =>
+    Effect.fail(
+      invalidRequestError(
+        "The comment's author could not be found in this workspace."
+      )
+    ),
+} as const;
+
 const withCommentWriteFailures = <A, R>(
   effect: Effect.Effect<A, CommentWriteFailure, R>
+) => effect.pipe(Effect.catchTags(commentWriteFailureHandlers));
+
+/**
+ * The create's failures: the shared vocabulary plus the post-state conflict.
+ *
+ * Only a create can raise the state error. The post is re-checked inside the
+ * write's own transaction, so a lock or a merge that lands after the handler's
+ * existence check is still refused — with the message and status the ordinary
+ * path produces.
+ */
+const withCommentCreateFailures = <A, R>(
+  effect: Effect.Effect<
+    A,
+    CommentWriteFailure | PostDoesNotAcceptCommentsError,
+    R
+  >
 ) =>
   effect.pipe(
     Effect.catchTags({
-      BadRequestError: (error) =>
-        Effect.fail(
-          invalidRequestError(error.message ?? "The request is not valid.")
-        ),
-      FailedToCreateCommentError: onInternalError,
-      FailedToDeleteCommentError: () =>
-        Effect.fail(notFoundError("Comment not found.")),
-      FailedToPinCommentError: () =>
-        Effect.fail(notFoundError("Comment not found.")),
-      FailedToUnpinCommentError: () =>
-        Effect.fail(notFoundError("Comment not found.")),
-      FailedToUpdateCommentError: () =>
-        Effect.fail(notFoundError("Comment not found.")),
-      InternalServerError: onInternalError,
-      // Fixed messages: the identity failures carry a subject id in their
-      // detail, and echoing a caller's own identifier back would make the
-      // error body an existence oracle.
-      InvalidSubjectError: () =>
-        Effect.fail(
-          invalidRequestError(
-            "The comment's author could not be resolved in this workspace."
-          )
-        ),
-      SubjectNotFoundError: () =>
-        Effect.fail(
-          invalidRequestError(
-            "The comment's author could not be found in this workspace."
-          )
-        ),
+      ...commentWriteFailureHandlers,
+      PostDoesNotAcceptCommentsError: (error: PostDoesNotAcceptCommentsError) =>
+        Effect.fail(conflictError(error.message)),
     })
   );
 
@@ -611,27 +634,6 @@ export const PublicApiLive = HttpApiBuilder.group(
             return yield* Effect.fail(notFoundError("Post not found."));
           }
 
-          // A locked post closes its conversation on every surface. A machine
-          // key is not an exception to a state a member set deliberately.
-          if (target.value.lockedAt !== null) {
-            return yield* Effect.fail(
-              conflictError(
-                "The post is locked and does not accept new comments."
-              )
-            );
-          }
-
-          // A merged post is read-only until it is unmerged: every dashboard
-          // and portal interaction gate refuses one, and a comment filed
-          // against it would sit on a page that redirects to the survivor.
-          if (target.value.mergedIntoPostId !== null) {
-            return yield* Effect.fail(
-              conflictError(
-                "The post was merged into another post and does not accept new comments."
-              )
-            );
-          }
-
           const commentId = yield* CommentId.generate.pipe(
             Effect.catchTag("LegidError", onInternalError)
           );
@@ -657,7 +659,7 @@ export const PublicApiLive = HttpApiBuilder.group(
               // No status update: moving a post's status is a post edit, not
               // something the Public API does through a comment.
             })
-            .pipe(withCommentWriteFailures);
+            .pipe(withCommentCreateFailures);
 
           return yield* readWrittenComment({
             commentId,
@@ -815,7 +817,15 @@ export const PublicApiLive = HttpApiBuilder.group(
                 postId: comment.value.postId,
               },
             })
-            .pipe(withCommentWriteFailures);
+            .pipe(
+              // An unpin whose row was released by someone else between the
+              // read above and the write is the state this request asks for,
+              // not a missing comment: the read below answers with the comment
+              // as it stands. A comment that is truly gone still 404s there,
+              // because that read fails the same way.
+              Effect.catchTag("FailedToUnpinCommentError", () => Effect.void),
+              withCommentWriteFailures
+            );
 
           return yield* readWrittenComment({
             commentId: params.commentId,
