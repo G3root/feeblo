@@ -2,6 +2,7 @@ import { currentDb, Database, schema } from "@feeblo/db";
 import type { TPostStatusType } from "@feeblo/domain-contracts/post-status-type";
 import { ChangelogId, CompanyId, PostId, PostTagId, TagId } from "@feeblo/id";
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
+import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { slugify } from "@feeblo/utils/url";
 import {
   and,
@@ -1124,8 +1125,15 @@ const makePublicApiRepository = Effect.gen(function* () {
         // to leave a post that shows a workspace image with no reference row,
         // which let the orphan sweep collect the image once the post it was
         // uploaded to stopped referencing it.
+        //
+        // The resolution reads the sanitized body rather than the request:
+        // that is the string the shared write stores and matches references
+        // against, and a URL written with a Markdown character reference
+        // (`shared&#46;png`) only becomes the asset's URL there. Sanitizing
+        // twice is the cost of resolving against exactly that string.
+        const { sanitizedMarkdown } = sanitizeMarkdown(content);
         const assetIds = yield* findEditorAssetIdsInContent({
-          content,
+          content: sanitizedMarkdown,
           organizationId,
         });
         yield* writes.create(
@@ -1177,11 +1185,16 @@ const makePublicApiRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         // Only a body can introduce or drop an asset reference, so the ids are
         // resolved from the one the request names; an update that leaves the
-        // body alone leaves the references alone with it.
+        // body alone leaves the references alone with it. As on a create, the
+        // resolution reads the sanitized body — what is stored and what the
+        // references are matched against.
         const assetIds =
           content === undefined
             ? undefined
-            : yield* findEditorAssetIdsInContent({ content, organizationId });
+            : yield* findEditorAssetIdsInContent({
+                content: sanitizeMarkdown(content).sanitizedMarkdown,
+                organizationId,
+              });
 
         yield* writes.update(
           {
@@ -1217,30 +1230,48 @@ const makePublicApiRepository = Effect.gen(function* () {
      */
     deletePost: ({ organizationId, postId }: TDeletePost) =>
       Effect.gen(function* () {
-        const post = yield* Option.match(
-          yield* readPost({ organizationId, postId }),
-          {
-            onNone: () => Effect.fail(notFoundError("Post not found.")),
-            onSome: (post) => Effect.succeed(post),
-          }
-        );
-
-        if (post.mergedIntoPostId !== null) {
-          return yield* Effect.fail(
-            invalidRequestError(
-              "This post has been merged into another post and cannot be deleted."
-            )
+        // The board that scopes the delete, and whether the post is merged,
+        // are read here and then re-checked by the delete's own transaction,
+        // which cannot see this read. A post that moved boards in between
+        // makes the delete match nothing, and one merged in between is
+        // refused by the transaction: either would otherwise be reported as
+        // missing. One retry re-reads and answers with what the post is now —
+        // deleted on its new board, or the documented merged refusal. A
+        // second race in a row is answered as not found, which is where the
+        // read leaves it.
+        const resolveAndRemove = Effect.gen(function* () {
+          const post = yield* Option.match(
+            yield* readPost({ organizationId, postId }),
+            {
+              onNone: () => Effect.fail(notFoundError("Post not found.")),
+              onSome: (post) => Effect.succeed(post),
+            }
           );
-        }
 
-        yield* writes.remove(
-          {
-            boardId: post.boardId,
-            id: postId,
-            mayDeleteEngaged: true,
-            organizationId,
-          },
-          { kind: "api_key" }
+          if (post.mergedIntoPostId !== null) {
+            return yield* Effect.fail(
+              invalidRequestError(
+                "This post has been merged into another post and cannot be deleted."
+              )
+            );
+          }
+
+          yield* writes.remove(
+            {
+              boardId: post.boardId,
+              id: postId,
+              mayDeleteEngaged: true,
+              organizationId,
+            },
+            { kind: "api_key" }
+          );
+        });
+
+        yield* resolveAndRemove.pipe(
+          Effect.retry({
+            times: 1,
+            while: (error) => Schema.is(PostNotFoundError)(error),
+          })
         );
       }).pipe(providePostWriteEnvironment, mapPostWriteFailure),
 

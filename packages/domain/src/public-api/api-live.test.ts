@@ -1518,6 +1518,57 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect(
+    "resolves an asset a body names through a character reference",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        registerKey(
+          "fbk_post_editor",
+          workspace.organizationId,
+          POST_EDITOR_KEY_SCOPES
+        );
+
+        const db = yield* currentDb;
+        const assetId = `ast_encoded_${workspace.organizationId}`;
+        yield* db.insert(schema.assetTable).values({
+          id: assetId,
+          bucket: "test-bucket",
+          key: "editor-media/encoded.png",
+          url: "https://assets.example/encoded.png",
+          kind: "editor_image",
+          organizationId: workspace.organizationId,
+        });
+
+        // Sanitization decodes `&#46;` to `.`, so the stored body shows the
+        // asset while the request never spells its URL out. A reference resolved
+        // from the raw request would miss it.
+        const created = yield* executeWrite("POST", "/api/v1/posts", {
+          apiKey: "fbk_post_editor",
+          body: {
+            boardId: workspace.boardId,
+            title: "Encoded image",
+            content: "![encoded](https://assets.example/encoded&#46;png)",
+            statusId: workspace.statusId,
+          },
+        });
+        expect(created.status).toBe(201);
+        const post = decodePost(responseBody(created));
+
+        // The stored body renders the image...
+        expect(post.content).toContain("https://assets.example/encoded.png");
+
+        // ...so the post has to be recorded as referencing it.
+        const references = yield* db
+          .select({ assetId: schema.postAssetTable.assetId })
+          .from(schema.postAssetTable)
+          .where(eq(schema.postAssetTable.postId, post.id));
+        expect(references.map((reference) => reference.assetId)).toEqual([
+          assetId,
+        ]);
+      })
+  );
+
   it.effect("clears a nullable field with an explicit null", () =>
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace();

@@ -1,6 +1,6 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
 import { AssetId } from "@feeblo/id";
-import { and, eq, inArray, lt, notExists, or, sql } from "drizzle-orm";
+import { and, eq, inArray, lt, notExists, or } from "drizzle-orm";
 import type * as PgDrizzle from "drizzle-orm/effect-postgres";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -233,7 +233,40 @@ const findCurrentEditorAssetsInContent = ({
   });
 
 /**
- * The ids of the workspace's editor assets whose URL appears in `content`.
+ * The URLs a stored body may name.
+ *
+ * A body is prose, so the URL inside it can end at punctuation the URL does
+ * not own: markdown closes a link destination with `)`, a sentence ends with
+ * `.`, an autolink ends with `>`. The text as written and the text with a run
+ * of such trailing punctuation removed are both offered, and the lookup
+ * decides between them — it is an exact match against the workspace's asset
+ * URLs, so an extra candidate can only match an asset whose URL really ends
+ * that way, and a miss stays a miss.
+ *
+ * A URL hidden behind a Markdown character reference is not a candidate here;
+ * it becomes one in the sanitized body, which is the form callers resolve
+ * against (see `findEditorAssetIdsInContent`).
+ */
+const candidateUrlsInContent = (content: string): readonly string[] => {
+  const matches = content.match(/https?:\/\/\S+/g);
+  if (matches === null) {
+    return [];
+  }
+
+  const candidates = new Set<string>();
+  for (const match of matches) {
+    candidates.add(match);
+    const withoutTrailingPunctuation = match.replace(/[.,;:!?)\]}>"'`]+$/u, "");
+    if (withoutTrailingPunctuation.length > 0) {
+      candidates.add(withoutTrailingPunctuation);
+    }
+  }
+
+  return [...candidates];
+};
+
+/**
+ * The ids of the workspace's editor assets that `content` references by URL.
  *
  * The dashboard's editor names the assets it attached, so `assetIds` is where
  * a save's references come from. A surface without an editor — the Public API
@@ -244,9 +277,14 @@ const findCurrentEditorAssetsInContent = ({
  *
  * `post_asset` is still written from the ids a caller submits; this only
  * resolves what a caller with no ids to submit actually references. The
- * match runs in SQL so the workspace's whole asset library is not read into
- * memory on every save, and it is exact — `position` has none of `LIKE`'s
- * wildcard characters to over- or under-match on a URL.
+ * caller passes the *sanitized* body, because that is the string the write
+ * stores and the string the reference sync matches URLs against — a URL
+ * written as `shared&#46;png` is `shared.png` there and nowhere else.
+ *
+ * The URLs are extracted first and matched by equality, so the lookup is an
+ * index scan on `asset_url_idx` rather than a `position` check against every
+ * editor asset in the workspace; a body with no URL at all asks the database
+ * nothing.
  */
 export const findEditorAssetIdsInContent = ({
   organizationId,
@@ -256,6 +294,11 @@ export const findEditorAssetIdsInContent = ({
   readonly content: string;
 }) =>
   Effect.gen(function* () {
+    const urls = candidateUrlsInContent(content);
+    if (urls.length === 0) {
+      return [];
+    }
+
     const db = yield* currentDb;
     const rows = yield* db
       .select({ id: schema.assetTable.id })
@@ -264,7 +307,7 @@ export const findEditorAssetIdsInContent = ({
         and(
           eq(schema.assetTable.organizationId, organizationId),
           inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
-          sql`position(${schema.assetTable.url} in ${content}) > 0`
+          inArray(schema.assetTable.url, urls)
         )
       );
 
