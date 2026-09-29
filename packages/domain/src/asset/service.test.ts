@@ -12,7 +12,6 @@ import { S3UploadService } from "../services/s3";
 import { AssetRepository } from "./repository";
 import {
   cleanupOrphanedEditorAssets,
-  findEditorAssetIdsInContent,
   cleanupPreparedEditorAssets,
   commitPreparedEditorAssets,
   prepareEditorAssetContent,
@@ -210,59 +209,6 @@ describe("registerUploadedAsset", () => {
           .from(schema.changelogAssetTable)
           .where(eq(schema.changelogAssetTable.changelogId, changelogId));
         expect(remainingRefs).toEqual([]);
-      })
-    );
-
-    it.effect("resolves asset ids from URLs a body names", () =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        const now = new Date();
-        const organizationId = "org_asset_url_lookup";
-
-        yield* db.insert(schema.organizationTable).values({
-          id: organizationId,
-          name: "Asset URL lookup",
-          slug: organizationId,
-          createdAt: now,
-        });
-        yield* db.insert(schema.assetTable).values([
-          {
-            id: "asset_markdown_link",
-            bucket: "test-bucket",
-            key: "editor-media/markdown.png",
-            url: "https://assets.example/markdown.png",
-            kind: "editor_image",
-            organizationId,
-          },
-          {
-            id: "asset_prose_url",
-            bucket: "test-bucket",
-            key: "editor-media/prose.png",
-            url: "https://assets.example/prose.png",
-            kind: "editor_image",
-            organizationId,
-          },
-        ]);
-
-        // Markdown closes a link destination with `)` and prose can end a URL
-        // with `.`; neither is part of the address, and the lookup has to see
-        // past them or the asset looks unreferenced.
-        const ids = yield* findEditorAssetIdsInContent({
-          organizationId,
-          content:
-            "![markdown](https://assets.example/markdown.png) and see https://assets.example/prose.png.",
-        });
-        expect([...ids].sort()).toEqual([
-          "asset_markdown_link",
-          "asset_prose_url",
-        ]);
-
-        // A body with no URL asks the database nothing and answers nothing.
-        const none = yield* findEditorAssetIdsInContent({
-          organizationId,
-          content: "No links here",
-        });
-        expect(none).toEqual([]);
       })
     );
 

@@ -2,7 +2,6 @@ import { currentDb, Database, schema } from "@feeblo/db";
 import type { TPostStatusType } from "@feeblo/domain-contracts/post-status-type";
 import { ChangelogId, CompanyId, PostId, PostTagId, TagId } from "@feeblo/id";
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
-import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { slugify } from "@feeblo/utils/url";
 import {
   and,
@@ -27,7 +26,6 @@ import * as Schema from "effect/Schema";
 
 import {
   cleanupOrphanedEditorAssets,
-  findEditorAssetIdsInContent,
   syncChangelogAssetReferences,
 } from "../asset/service";
 import { makeChangelogPublication } from "../changelog/publication";
@@ -1120,25 +1118,14 @@ const makePublicApiRepository = Effect.gen(function* () {
     }: TCreatePost) =>
       Effect.gen(function* () {
         const postId = yield* PostId.generate;
-        // A machine key has no editor to name the assets its body carries, so
-        // they are resolved from the body itself. Passing an empty list used
-        // to leave a post that shows a workspace image with no reference row,
-        // which let the orphan sweep collect the image once the post it was
-        // uploaded to stopped referencing it.
-        //
-        // The resolution reads the sanitized body rather than the request:
-        // that is the string the shared write stores and matches references
-        // against, and a URL written with a Markdown character reference
-        // (`shared&#46;png`) only becomes the asset's URL there. Sanitizing
-        // twice is the cost of resolving against exactly that string.
-        const { sanitizedMarkdown } = sanitizeMarkdown(content);
-        const assetIds = yield* findEditorAssetIdsInContent({
-          content: sanitizedMarkdown,
-          organizationId,
-        });
+        // The API names no assets: editor-asset references come from the ids
+        // a dashboard editor submits with its content, and a machine key has
+        // none. A body may still embed a workspace media URL, but the post is
+        // not recorded as referencing it — see `docs/public-api.md`, and the
+        // orphan sweep's rule in `asset/service.ts`.
         yield* writes.create(
           {
-            assetIds,
+            assetIds: [],
             boardId,
             content,
             etaQuarter,
@@ -1183,22 +1170,13 @@ const makePublicApiRepository = Effect.gen(function* () {
       title,
     }: TUpdatePost) =>
       Effect.gen(function* () {
-        // Only a body can introduce or drop an asset reference, so the ids are
-        // resolved from the one the request names; an update that leaves the
-        // body alone leaves the references alone with it. As on a create, the
-        // resolution reads the sanitized body — what is stored and what the
-        // references are matched against.
-        const assetIds =
-          content === undefined
-            ? undefined
-            : yield* findEditorAssetIdsInContent({
-                content: sanitizeMarkdown(content).sanitizedMarkdown,
-                organizationId,
-              });
-
+        // No `assetIds` are named, for the same reason a create names none.
+        // An update that keeps a dashboard-attached image in the body keeps
+        // its reference (the shared path retains the post's current ones), and
+        // one that drops the URL drops the reference; a URL the API introduces
+        // is not registered — see `docs/public-api.md`.
         yield* writes.update(
           {
-            assetIds,
             boardId,
             content,
             etaQuarter,

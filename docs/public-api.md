@@ -168,7 +168,7 @@ The `id` is assigned by the server. The title is trimmed, the body is sanitized 
 | `statusId` | — | Required. A status id of the workspace, as returned inside a post's `status`. |
 | `etaQuarter` | `null` | `2026-Q3`-style, or omitted. |
 
-The post carries `source: API`, and reaches the workspace's integrations, notifications, and search exactly like a submission made in the dashboard. It has **no author**: a machine key is not a member, so `author.displayName` and `author.avatarUrl` are `null` and nobody is subscribed to it as its creator. The workspace's admins and owners are notified of the submission the same way a widget submission notifies them.
+The post carries `source: API`, and reaches the workspace's integrations, notifications, and search exactly like a submission made in the dashboard. It has **no author**: a machine key is not a member, so `author.displayName` and `author.avatarUrl` are `null` and nobody is subscribed to it as its creator. The workspace's admins and owners are notified of the submission the same way a widget submission notifies them. A body may embed the URL of media already in the workspace, but the post is not recorded as referencing it — see [Data exposure](#data-exposure).
 
 ### Update a post
 
@@ -194,7 +194,7 @@ An omitted field is left as it is and an explicit `null` clears a nullable one, 
 | `boardId`    | A board id of the workspace; moves the post. |
 | `etaQuarter` | `2026-Q3`-style, or `null` to clear.         |
 
-Every change is recorded in the post's timeline, with no actor, and a status change notifies the post's subscribers exactly as the same change from the dashboard would — including the coalescing window, so several quick status changes send one email rather than one each. A post that has been merged into another is answered with `400 INVALID_REQUEST`: it is still readable, but it is superseded and its changes belong on the survivor.
+Every change is recorded in the post's timeline, with no actor, and a status change notifies the post's subscribers exactly as the same change from the dashboard would — including the coalescing window, so several quick status changes send one email rather than one each. An image the post already referenced keeps its reference while the body still shows it, and loses it when the body stops; a URL the update introduces is not recorded as a reference, for the same reason a create's is not ([Data exposure](#data-exposure)). A post that has been merged into another is answered with `400 INVALID_REQUEST`: it is still readable, but it is superseded and its changes belong on the survivor.
 
 ### Delete a post
 
@@ -543,7 +543,7 @@ A post created, changed, or deleted with an API key has **no author and no actor
 
 Changelog entries carry no author at all: the dashboard's entry rows hold `creatorId` and `creatorMemberId`, and neither has a field in this API. Publishing through the API records the email intent and the in-app notification with no actor, exactly as a key's tag changes have no actor in a post's timeline.
 
-Post `content` is sanitized before it is stored, so the body the API returns is the same sanitized content the dashboard and the public portal render. A body that embeds media already in the workspace is recorded as referencing it, exactly as a dashboard save would be, so the image stays alive even after the post it was uploaded to is gone. Tags carry a name and a slug, nothing else — a tag's creator is an internal identifier and is never returned.
+Post `content` is sanitized before it is stored, so the body the API returns is the same sanitized content the dashboard and the public portal render. Editor media is the one thing a body can name that the API does not manage: a dashboard editor submits the ids of the media it attached, and those ids are what record which posts reference an asset, while a machine key has none to submit. A body may still embed a workspace media URL, but the post is not recorded as referencing it, and media whose only remaining use is such a post can be removed by the workspace's own cleanup — keep the asset attached to a dashboard-authored post, or host the image yourself. Tags carry a name and a slug, nothing else — a tag's creator is an internal identifier and is never returned.
 
 A company carries its name, avatar, your `externalId`, and `source`. Its contacts are not exposed and neither are the custom attribute values a workspace may have defined for companies: those definitions are a workspace-specific vocabulary, so they would need their own contract rather than a field on this one. The workspace is never named in a payload either — a key reads exactly one workspace, so an `organizationId` would be the same string on every response and would invite a filter parameter that would then have to be validated against the key. `source` is the exception that proves the rule: it is bookkeeping about where the row came from, not about who it belongs to, and it is what lets a sync tell its own records from the dashboard's.
 
