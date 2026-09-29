@@ -3,6 +3,7 @@ import {
   PUBLIC_API_COMMENT_MANAGEMENT_SCOPES,
   PUBLIC_API_COMPANY_MANAGEMENT_SCOPES,
   PUBLIC_API_DEFAULT_SCOPES,
+  PUBLIC_API_POST_MANAGEMENT_SCOPES,
   PUBLIC_API_TAG_MANAGEMENT_SCOPES,
   type PublicApiScope,
 } from "@feeblo/domain-contracts/public-api-scope";
@@ -51,6 +52,7 @@ export const API_KEY_EXPIRATION_ITEMS = API_KEY_EXPIRATIONS.map((value) => ({
  * `API_KEY_CAPABILITY_GROUP_SCOPES`, so the two cannot drift.
  */
 export const API_KEY_CAPABILITY_GROUPS = [
+  "posts",
   "comments",
   "tags",
   "changelog",
@@ -65,6 +67,7 @@ export type ApiKeyCapabilityGroup = (typeof API_KEY_CAPABILITY_GROUPS)[number];
  * or miss one it now grants by default.
  */
 export const API_KEY_CAPABILITY_GROUP_SCOPES = {
+  posts: PUBLIC_API_POST_MANAGEMENT_SCOPES,
   comments: PUBLIC_API_COMMENT_MANAGEMENT_SCOPES,
   tags: PUBLIC_API_TAG_MANAGEMENT_SCOPES,
   changelog: PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
@@ -72,6 +75,7 @@ export const API_KEY_CAPABILITY_GROUP_SCOPES = {
 } satisfies Record<ApiKeyCapabilityGroup, readonly PublicApiScope[]>;
 
 export const API_KEY_CAPABILITY_GROUP_LABELS = {
+  posts: "Manage posts",
   comments: "Manage comments",
   tags: "Manage tags",
   changelog: "Manage changelog",
@@ -79,6 +83,8 @@ export const API_KEY_CAPABILITY_GROUP_LABELS = {
 } satisfies Record<ApiKeyCapabilityGroup, string>;
 
 export const API_KEY_CAPABILITY_GROUP_DESCRIPTIONS = {
+  posts:
+    "Create, edit, and delete this workspace's posts, including their title, body, status, board, and ETA quarter. Deleting a post cannot be undone.",
   comments:
     "Create, edit, and delete comments, and pin one to the top of a post. Deleting a comment removes its replies, and a comment created with a key is attributed to the customer the request names.",
   tags: "Create, rename, and delete tags, and set which tags a post carries. Deleting a tag removes it from every post that carries it.",

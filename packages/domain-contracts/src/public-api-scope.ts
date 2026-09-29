@@ -36,6 +36,9 @@ export type PublicApiScopeStatements = {
 export const PUBLIC_API_SCOPES = [
   "boards.read",
   "posts.read",
+  "posts.create",
+  "posts.update",
+  "posts.delete",
   "comments.read",
   "comments.create",
   "comments.update",
@@ -78,6 +81,25 @@ export const PUBLIC_API_DEFAULT_SCOPES = [
   "comments.read",
   "tags.read",
   "changelog.read",
+] as const satisfies readonly PublicApiScope[];
+
+/**
+ * Post writes, granted explicitly at key creation and never by default.
+ *
+ * A key that reads feedback is the common case, so writing to it is opt-in as
+ * a group: creating, changing, and deleting posts are one capability a caller
+ * either wants or does not, in the same way the tag and changelog groups are.
+ *
+ * `posts.update` is the whole writable post, status and board included. The
+ * dashboard splits those from the title and body through member permissions
+ * (`posts.status`, `posts.move`), but a key holds no permissions and has no
+ * membership to derive them from, so splitting the scope would only force a
+ * customer to grant two scopes to do one thing.
+ */
+export const PUBLIC_API_POST_MANAGEMENT_SCOPES = [
+  "posts.create",
+  "posts.update",
+  "posts.delete",
 ] as const satisfies readonly PublicApiScope[];
 
 /**

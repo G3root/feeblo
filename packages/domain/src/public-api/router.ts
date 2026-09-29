@@ -1,12 +1,18 @@
+import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
 import * as Layer from "effect/Layer";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
+import { BoardRepository } from "../board/repository";
 import { CommentRepository } from "../comments/repository";
 import { CommentService } from "../comments/service";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
 import { PostActivityRepository } from "../post-activity/repository";
+import { PostSubscriptionRepository } from "../post-subscription/repository";
+import { PostEmbeddingService } from "../post/embedding-service";
+import { PostRepository } from "../post/repository";
+import { UserRepository } from "../user/repository";
 import { PublicApi } from "./api-contract";
 import { PublicApiLive } from "./api-live";
 import {
@@ -37,24 +43,36 @@ import { PublicApiRepository } from "./repository";
  * does: the repository records tag changes in a post's timeline, so it needs
  * the activity repository at construction time; publishing a changelog entry
  * records a durable email intent and notifies subscribers through the same
- * helper the dashboard uses. A new private dependency is therefore one line
- * here, not an edit in every place that assembles a server or a test.
+ * helper the dashboard uses; and creating, changing, or deleting a post goes
+ * through the dashboard's own shared write path (`post/write.ts`), which needs
+ * the board and post repositories, the creator subscription, the integration
+ * event recorder, the notification fan-out, and the embedding scheduler. A new
+ * private dependency is therefore one line here, not an edit in every place
+ * that assembles a server or a test.
  *
  * Everything the surface shares — the database, `Auth`, the rate limiter, the
- * plan decision, media storage, and its own `PublicApiConfig` — stays a
- * requirement instead, so whoever assembles the server supplies the real
- * service, and a test supplies the substitute it needs (`S3Test`, a smaller
- * rate-limit budget, a `PublicApiConfig.layerTest`) without restating the
- * surface's private wiring.
+ * plan decision, media storage, the email subscription repository (whose token
+ * service reads `AUTH_ENCRYPTION_KEY`, a credential the server already builds
+ * once), and its own `PublicApiConfig` — stays a requirement instead, so
+ * whoever assembles the server supplies the real service, and a test supplies
+ * the substitute it needs (`S3Test`, a smaller rate-limit budget, a
+ * `PublicApiConfig.layerTest`) without restating the surface's private wiring.
  */
-const PublicApiInternals = Layer.mergeAll(
+export const PublicApiInternals = Layer.mergeAll(
+  BoardRepository.layer,
   EmailOutboxRepository.layer,
+  IntegrationEventRecorderLive,
   NotificationService.layer,
   PostActivityRepository.layer,
-  // The shared comment write path needs its own repository and the identity
-  // resolver that attributes a comment to the customer a request names.
-  CommentRepository.layer,
-  ResolvePrincipalService.layer
+  PostEmbeddingService.layer,
+  PostRepository.layer,
+  PostSubscriptionRepository.layer,
+  ResolvePrincipalService.layer,
+  UserRepository.layer,
+  // The shared comment write path needs its own repository; the identity
+  // resolver it attributes a comment through is already above, for the post
+  // write path.
+  CommentRepository.layer
 );
 
 /**
@@ -90,12 +108,6 @@ export const makePublicApiRoute = <E, R>(
     // rejected is part of this API's contract, not something the composition
     // root supplies.
     Layer.provide(PublicApiSchemaErrorHandlerLive),
-    // The comment handlers call the shared write service, and a service
-    // method's effect carries the services it reads from the fiber context
-    // (the identity resolver above all). Providing the internals here makes
-    // them available to the handler's own fiber, not only to the sub-layers
-    // that construct the repository and the service.
-    Layer.provide(PublicApiInternals),
     // Merged rather than only provided: the repository stays in this layer's
     // output because a test drives it directly to reach the races the HTTP
     // surface cannot produce (a row that vanishes between a read and a write).

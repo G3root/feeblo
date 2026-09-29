@@ -27,6 +27,15 @@ const ResponseEntry = Schema.Struct({
 });
 
 const Operation = Schema.Struct({
+  parameters: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        in: Schema.String,
+        name: Schema.String,
+        schema: Schema.Json,
+      })
+    )
+  ),
   requestBody: Schema.optional(Schema.Json),
   responses: Schema.Record(Schema.String, ResponseEntry),
 });
@@ -51,6 +60,8 @@ const decodeDocument = Schema.decodeUnknownSync(
 const document = decodeDocument(JSON.stringify(OpenApi.fromApi(PublicApi)));
 
 const LIST_PATH = "/api/v1/boards/{boardId}/posts";
+const POSTS_PATH = "/api/v1/posts";
+const RETRIEVE_PATH = "/api/v1/posts/retrieve";
 const DETAIL_PATH = "/api/v1/posts/{postId}";
 const SET_POST_TAGS_PATH = "/api/v1/posts/{postId}/tags";
 const TAGS_PATH = "/api/v1/tags";
@@ -81,6 +92,8 @@ describe("PublicApi contract", () => {
     expect(Object.keys(document.paths).sort()).toEqual(
       [
         LIST_PATH,
+        POSTS_PATH,
+        RETRIEVE_PATH,
         CHANGELOG_PATH,
         CHANGELOG_ENTRY_PATH,
         DETAIL_PATH,
@@ -205,6 +218,123 @@ describe("PublicApi contract", () => {
     expect(Object.keys(changelogReadResponses).sort()).toEqual(
       READ_RESPONSE_CODES
     );
+  });
+
+  it("documents the workspace post list and the retrieve lookup", () => {
+    const listResponses = document.paths[POSTS_PATH]?.get?.responses ?? {};
+    const retrieveResponses =
+      document.paths[RETRIEVE_PATH]?.get?.responses ?? {};
+
+    // Both read a post, so neither promises a conflict and both can answer
+    // the missing-resource status.
+    expect(Object.keys(listResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(Object.keys(retrieveResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(JSON.stringify(retrieveResponses)).not.toContain("CONFLICT");
+
+    // The list is the workspace-wide page: same query parameters as a board's
+    // list, which is what lets a caller page both with one rule.
+    const listParameters = (
+      document.paths[POSTS_PATH]?.get?.parameters ?? []
+    ).map((parameter) => parameter.name);
+    expect(listParameters.sort()).toEqual([
+      "cursor",
+      "includeArchived",
+      "limit",
+      "status",
+    ]);
+
+    // The retrieve lookup accepts an id, a board, and a slug, all optional;
+    // the board+slug pairing rule is the handler's, not the document's.
+    const retrieveParameters = (
+      document.paths[RETRIEVE_PATH]?.get?.parameters ?? []
+    ).map((parameter) => parameter.name);
+    expect(retrieveParameters.sort()).toEqual(["boardId", "id", "slug"]);
+
+    const listBody = JSON.stringify(listResponses["200"]);
+    expect(listBody).toContain("nextCursor");
+  });
+
+  it("documents the post resource and the write endpoints' statuses", () => {
+    const createResponses = document.paths[POSTS_PATH]?.post?.responses ?? {};
+    const updateResponses = document.paths[DETAIL_PATH]?.patch?.responses ?? {};
+    const deleteResponses =
+      document.paths[DETAIL_PATH]?.delete?.responses ?? {};
+
+    // 201 for a create that returns the post it made, 200 for an update, 204
+    // for a delete that has nothing left to return. A create can collide on
+    // the workspace's slug index; an update never re-derives a slug, so it
+    // promises no 409; and a create cannot report a missing resource.
+    expect(Object.keys(createResponses).sort()).toEqual([
+      "201",
+      "400",
+      "401",
+      "403",
+      "409",
+      "429",
+      "500",
+      "503",
+    ]);
+    expect(Object.keys(updateResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(Object.keys(deleteResponses).sort()).toEqual([
+      "204",
+      ...READ_RESPONSE_CODES.filter((code) => code !== "200"),
+    ]);
+    expect(JSON.stringify(createResponses["409"])).toContain("CONFLICT");
+    expect(JSON.stringify(updateResponses)).not.toContain("CONFLICT");
+
+    const createBody = JSON.stringify(createResponses["201"]);
+    for (const field of [
+      "id",
+      "boardId",
+      "title",
+      "slug",
+      "excerpt",
+      "url",
+      "status",
+      "etaQuarter",
+      "tags",
+      "voteCount",
+      "commentCount",
+      "author",
+      "createdAt",
+      "updatedAt",
+      "lockedAt",
+      "archivedAt",
+      "mergedIntoPostId",
+      "content",
+    ]) {
+      expect(createBody).toContain(field);
+    }
+
+    // The dashboard's post row carries actor identifiers and the workspace id;
+    // none of them has a name in this contract.
+    for (const forbidden of [
+      "creatorId",
+      "creatorMemberId",
+      "contactId",
+      "organizationId",
+      "userId",
+    ]) {
+      expect(createBody).not.toContain(forbidden);
+    }
+
+    // A create names the board, the title, the body, and the status it starts
+    // in; an update may name any of the writable fields.
+    const createRequest = JSON.stringify(document.paths[POSTS_PATH]?.post);
+    for (const field of ["boardId", "title", "content", "statusId"]) {
+      expect(createRequest).toContain(field);
+    }
+
+    const updateRequest = JSON.stringify(document.paths[DETAIL_PATH]?.patch);
+    for (const field of [
+      "title",
+      "content",
+      "statusId",
+      "boardId",
+      "etaQuarter",
+    ]) {
+      expect(updateRequest).toContain(field);
+    }
   });
 
   it("documents the tag-assignment request and response", () => {

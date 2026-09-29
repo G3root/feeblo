@@ -82,7 +82,12 @@ interface TPostFindPublicBySlug {
 
 interface TPostDelete {
   boardId: string;
-  creatorId: string;
+  /**
+   * The creator a creator-scoped delete is limited to. `null` is only
+   * meaningful with `onlyIfNew: false` — a machine key has no user id, and it
+   * deletes without the creator scope rather than matching a user it is not.
+   */
+  creatorId: string | null;
   id: string | readonly string[];
   onlyIfNew: boolean;
   organizationId: string;
@@ -1021,6 +1026,14 @@ const makePostRepository = Effect.gen(function* () {
         }
 
         if (onlyIfNew) {
+          // A creator-scoped delete needs the creator. A machine key deletes
+          // without the scope (`onlyIfNew: false`), so a null id here can
+          // only be a caller that asked for the creator scope without one,
+          // and it can match nothing.
+          if (creatorId === null) {
+            return { deleted: false, restoredChildren: [] };
+          }
+
           const newPosts = yield* db
             .select({ id: schema.postTable.id })
             .from(schema.postTable)

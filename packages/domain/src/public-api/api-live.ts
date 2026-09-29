@@ -135,6 +135,38 @@ const parseName = (raw: string) =>
     return name;
   });
 
+/**
+ * Post titles are trimmed before they are stored or slugified.
+ *
+ * Without this, `" Dark mode "` and `"Dark mode"` are two titles whose slugs
+ * are one, and an all-whitespace title is not a title at all. The dashboard's
+ * own title schema trims for the same reason.
+ */
+const parseTitle = (raw: string) =>
+  Effect.gen(function* () {
+    const title = raw.trim();
+    if (title.length === 0) {
+      return yield* Effect.fail(
+        invalidRequestError("title must not be empty.")
+      );
+    }
+    return title;
+  });
+
+/**
+ * A query parameter that names something.
+ *
+ * Absent, blank, and whitespace-only are all "not provided", so `?id=` does
+ * not become a lookup for the empty string and cannot be used to probe what an
+ * empty identifier would match. Query parameters are declared as strings and
+ * validated here for the same reason the rest of the API does it: the
+ * framework's own decode failure is not this API's error envelope.
+ */
+const providedQueryParam = (raw: string | undefined) => {
+  const trimmed = raw?.trim();
+  return trimmed === undefined || trimmed.length === 0 ? undefined : trimmed;
+};
+
 /** The same message for both the pre-check and the index race that beats it. */
 const TAG_NAME_CONFLICT = "A tag with this name already exists.";
 
@@ -529,6 +561,195 @@ export const PublicApiLive = HttpApiBuilder.group(
                   organizationId: caller.organizationId,
                 }) satisfies TPublicApiPost
               ),
+          });
+        })
+      )
+      .handle("listPosts", ({ query }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+          const config = yield* currentPublicApiConfig;
+
+          yield* requirePublicApiScope("posts.read");
+
+          const limit = yield* parseLimit(query.limit);
+          const cursor = yield* parseCursor(query.cursor);
+          const includeArchived = yield* parseIncludeArchived(
+            query.includeArchived
+          );
+
+          // No existence check: the key proves the workspace exists, and a
+          // workspace with no posts is an empty page rather than a 404.
+          const page = yield* repository
+            .listPosts({
+              cursor,
+              includeArchived,
+              limit,
+              organizationId: caller.organizationId,
+              statusId: query.status ?? null,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          const mapperContext = {
+            appUrl: config.appUrl,
+            organizationId: caller.organizationId,
+          } as const;
+
+          return {
+            data: page.posts.map((post) =>
+              toPublicApiPostSummary(post, mapperContext)
+            ),
+            nextCursor:
+              page.nextCursor === null ? null : encodeCursor(page.nextCursor),
+          } satisfies TPublicApiPostPage;
+        })
+      )
+      .handle("retrievePost", ({ query }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+          const config = yield* currentPublicApiConfig;
+
+          yield* requirePublicApiScope("posts.read");
+
+          const postId = providedQueryParam(query.id);
+          const boardId = providedQueryParam(query.boardId);
+          const slug = providedQueryParam(query.slug);
+
+          if (postId === undefined && slug === undefined) {
+            return yield* Effect.fail(
+              invalidRequestError(
+                "Provide a post id, or a boardId and a slug, to retrieve a post."
+              )
+            );
+          }
+
+          // A slug only means something next to a board: matching one against
+          // every board would let a caller read a post by a name it did not
+          // know the board of, which is not what the parameter is for.
+          if (slug !== undefined && boardId === undefined) {
+            return yield* Effect.fail(
+              invalidRequestError(
+                "boardId is required when a slug is provided."
+              )
+            );
+          }
+
+          // Every identifier present must match, so an id paired with the
+          // wrong board is answered as not found rather than silently returned.
+          const post = yield* repository
+            .retrievePost({
+              boardId,
+              organizationId: caller.organizationId,
+              postId,
+              slug,
+            })
+            .pipe(Effect.catchTag("InternalServerError", onInternalError));
+
+          return yield* Option.match(post, {
+            // Not found rather than forbidden for another workspace's post: a
+            // 403 would confirm that the id exists somewhere.
+            onNone: () => Effect.fail(notFoundError("Post not found.")),
+            onSome: (found) =>
+              Effect.succeed(
+                toPublicApiPost(found, {
+                  appUrl: config.appUrl,
+                  organizationId: caller.organizationId,
+                }) satisfies TPublicApiPost
+              ),
+          });
+        })
+      )
+      .handle("createPost", ({ payload }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+          const config = yield* currentPublicApiConfig;
+
+          yield* requirePublicApiScope("posts.create");
+
+          const title = yield* parseTitle(payload.title);
+
+          const created = yield* repository.createPost({
+            boardId: payload.boardId,
+            content: payload.content,
+            etaQuarter: payload.etaQuarter ?? null,
+            organizationId: caller.organizationId,
+            statusId: payload.statusId,
+            title,
+          });
+
+          return toPublicApiPost(created, {
+            appUrl: config.appUrl,
+            organizationId: caller.organizationId,
+          }) satisfies TPublicApiPost;
+        })
+      )
+      .handle("updatePost", ({ params, payload }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+          const config = yield* currentPublicApiConfig;
+
+          yield* requirePublicApiScope("posts.update");
+
+          // A body that names no field would otherwise be answered as a
+          // successful write that changed nothing but `updatedAt`, which
+          // tells the caller their request did something it did not. `null`
+          // is a field being named, so a body that only clears an ETA is fine.
+          const namesAField =
+            payload.title !== undefined ||
+            payload.content !== undefined ||
+            payload.statusId !== undefined ||
+            payload.boardId !== undefined ||
+            payload.etaQuarter !== undefined;
+
+          if (!namesAField) {
+            return yield* Effect.fail(
+              invalidRequestError("Provide at least one field to update.")
+            );
+          }
+
+          const title =
+            payload.title === undefined
+              ? undefined
+              : yield* parseTitle(payload.title);
+
+          const updated = yield* repository.updatePost({
+            boardId: payload.boardId,
+            content: payload.content,
+            etaQuarter: payload.etaQuarter,
+            organizationId: caller.organizationId,
+            postId: params.postId,
+            statusId: payload.statusId,
+            title,
+          });
+
+          // The update itself fails with `NOT_FOUND` for a post that is not
+          // there; this covers the row vanishing between the write and the
+          // read-back, which the write cannot prevent.
+          return yield* Option.match(updated, {
+            onNone: () => Effect.fail(notFoundError("Post not found.")),
+            onSome: (post) =>
+              Effect.succeed(
+                toPublicApiPost(post, {
+                  appUrl: config.appUrl,
+                  organizationId: caller.organizationId,
+                }) satisfies TPublicApiPost
+              ),
+          });
+        })
+      )
+      .handle("deletePost", ({ params }) =>
+        Effect.gen(function* () {
+          const caller = yield* currentPublicApiCaller;
+          const repository = yield* currentPublicApiRepository;
+
+          yield* requirePublicApiScope("posts.delete");
+
+          yield* repository.deletePost({
+            organizationId: caller.organizationId,
+            postId: params.postId,
           });
         })
       )
