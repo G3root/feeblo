@@ -2994,6 +2994,35 @@ layer(makeTestApp())("public api v1", (it) => {
       );
       expect(reopened.status).toBe(200);
       expect(decodeComment(responseBody(reopened)).visibility).toBe("PUBLIC");
+
+      // Narrowing the parent leaves the reply public beneath an internal
+      // comment. That state is the parent's doing, so an edit of the reply
+      // that carries the visibility it already has is not refused: only a
+      // change to PUBLIC is the edit this rule is about, and the author can
+      // still edit their own body.
+      const narrowedParent = yield* executeWrite(
+        "PATCH",
+        "/api/v1/comments/cmt_public_parent",
+        {
+          apiKey: "fbk_comments_visibility",
+          body: { content: "Seeded comment", visibility: "INTERNAL" },
+        }
+      );
+      expect(narrowedParent.status).toBe(200);
+
+      const bodyEdit = yield* executeWrite(
+        "PATCH",
+        "/api/v1/comments/cmt_public_reply",
+        {
+          apiKey: "fbk_comments_visibility",
+          body: { content: "Edited body", visibility: "PUBLIC" },
+        }
+      );
+      expect(bodyEdit.status).toBe(200);
+      expect(decodeComment(responseBody(bodyEdit))).toMatchObject({
+        content: "Edited body\n",
+        visibility: "PUBLIC",
+      });
     })
   );
 
@@ -3029,6 +3058,38 @@ layer(makeTestApp())("public api v1", (it) => {
       );
       expect(updated.status).toBe(400);
       expect(decodeError(responseBody(updated))._tag).toBe("INVALID_REQUEST");
+
+      // A body that is not the empty string but sanitizes to nothing is the
+      // same outcome: a comment that renders as nothing must not be stored.
+      const blankCreate = yield* executeWrite(
+        "POST",
+        `/api/v1/posts/${workspace.postId}/comments`,
+        {
+          apiKey: "fbk_comments_empty",
+          body: { content: "   ", author: { email: "jane@example.com" } },
+        }
+      );
+      expect(blankCreate.status).toBe(400);
+      expect(decodeError(responseBody(blankCreate))._tag).toBe(
+        "INVALID_REQUEST"
+      );
+
+      const blankUpdate = yield* executeWrite(
+        "PATCH",
+        "/api/v1/comments/cmt_empty",
+        { apiKey: "fbk_comments_empty", body: { content: "   " } }
+      );
+      expect(blankUpdate.status).toBe(400);
+      expect(decodeError(responseBody(blankUpdate))._tag).toBe(
+        "INVALID_REQUEST"
+      );
+
+      // The stored body is untouched by the refused writes.
+      const after = yield* executeRequest(
+        "/api/v1/comments/cmt_empty",
+        "fbk_comments_empty"
+      );
+      expect(decodeComment(responseBody(after)).content).toBe("Seeded comment");
     })
   );
 

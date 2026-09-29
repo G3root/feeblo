@@ -273,13 +273,38 @@ const makeCommentService = Effect.gen(function* () {
     });
 
   /**
-   * Re-applies the reply rule to a visibility change.
+   * Sanitizes a comment body and refuses one that sanitizes to nothing.
+   *
+   * The published schemas require a non-empty string, but only the sanitizer
+   * knows what survives it: a body that is only whitespace, or only markup
+   * that the sanitizer strips, becomes empty here. Storing it would answer a
+   * successful write with a comment that renders as nothing.
+   */
+  const sanitizeCommentBody = (content: string) => {
+    const { sanitizedMarkdown } = sanitizeMarkdown(content);
+
+    if (sanitizedMarkdown.trim().length === 0) {
+      return Effect.fail(
+        new BadRequestError({
+          message: "A comment body must contain visible text.",
+        })
+      );
+    }
+
+    return Effect.succeed(sanitizedMarkdown);
+  };
+
+  /**
+   * Re-applies the reply rule to a widening edit.
    *
    * A PUBLIC reply may not hang beneath an INTERNAL parent — the rule a create
-   * enforces — and an edit that only flips visibility would otherwise be a way
-   * around it. The comment is read for its own parent, because an edit does
-   * not carry one, and a comment that is gone fails the way a matching update
-   * that found no row does.
+   * enforces — and an edit that flips an INTERNAL reply to PUBLIC would
+   * otherwise be a way around it. Only the change is checked: an edit that
+   * carries the visibility the comment already has is not widening anything,
+   * and refusing it would stop an author editing the body of a reply whose
+   * parent was made INTERNAL after the fact. The comment is read for its own
+   * parent, because an edit does not carry one, and a comment that is gone
+   * fails the way a matching update that found no row does.
    */
   const assertVisibilityAllowedByParent = (edit: CommentEdit) =>
     Effect.gen(function* () {
@@ -297,6 +322,12 @@ const makeCommentService = Effect.gen(function* () {
         return yield* new FailedToUpdateCommentError({
           message: "Failed to update comment",
         });
+      }
+
+      // Already public: the edit is not the change that would create the
+      // forbidden state, so it is not this check's to refuse.
+      if (existing.value.visibility === "PUBLIC") {
+        return;
       }
 
       yield* assertParentBelongsToPost({
@@ -323,7 +354,7 @@ const makeCommentService = Effect.gen(function* () {
       | undefined;
   }) =>
     Effect.gen(function* () {
-      const { sanitizedMarkdown } = sanitizeMarkdown(args.draft.content);
+      const sanitizedMarkdown = yield* sanitizeCommentBody(args.draft.content);
 
       yield* transaction(
         Effect.gen(function* () {
@@ -388,7 +419,7 @@ const makeCommentService = Effect.gen(function* () {
     readonly edit: CommentEdit;
   }) =>
     Effect.gen(function* () {
-      const { sanitizedMarkdown } = sanitizeMarkdown(args.edit.content);
+      const sanitizedMarkdown = yield* sanitizeCommentBody(args.edit.content);
 
       const updatedComment = yield* transaction(
         Effect.gen(function* () {
