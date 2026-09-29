@@ -1,6 +1,12 @@
 import { PostStatusType } from "@feeblo/domain-contracts/post-status-type";
 import * as Schema from "effect/Schema";
 
+import {
+  POST_CONTENT_MAX_LENGTH,
+  POST_TITLE_MAX_LENGTH,
+  POST_TITLE_MIN_LENGTH,
+} from "../content-limits";
+
 /**
  * The Public API's wire contract for v1.
  *
@@ -103,9 +109,106 @@ export const ListBoardPostsQuery = Schema.Struct({
   includeArchived: Schema.optional(Schema.String),
 });
 
+/**
+ * The same paging and filtering rules as a board's list, without the board.
+ *
+ * Declared separately rather than reusing `ListBoardPostsQuery` so the two can
+ * move apart later without a rename: this one answers "what happened in the
+ * workspace", and a caller reading the document should see each endpoint's
+ * parameters written where the endpoint is.
+ */
+export const ListPostsQuery = Schema.Struct({
+  limit: Schema.optional(Schema.String),
+  cursor: Schema.optional(Schema.String),
+  status: Schema.optional(Schema.String),
+  includeArchived: Schema.optional(Schema.String),
+});
+
+/**
+ * How a caller names the post it wants.
+ *
+ * All three are optional because a caller may know the post's id, or only the
+ * board and the slug that appear in its public URL. The pairing rule is the
+ * handler's: a slug is only meaningful next to a board, so a request that
+ * carries one without `boardId` is rejected rather than matched against every
+ * board in the workspace.
+ */
+export const RetrievePostQuery = Schema.Struct({
+  id: Schema.optional(Schema.String),
+  boardId: Schema.optional(Schema.String),
+  slug: Schema.optional(Schema.String),
+});
+
 export const GetPostParams = Schema.Struct({
   postId: Schema.String,
 });
+
+export const UpdatePostParams = Schema.Struct({
+  postId: Schema.String,
+});
+
+export const DeletePostParams = Schema.Struct({
+  postId: Schema.String,
+});
+
+/**
+ * The writable fields of a post, as a create states them.
+ *
+ * `id` is assigned by the server rather than chosen by the caller, for the
+ * same reason a tag's is: a machine key is not a member acting on records it
+ * can already see, and a caller-chosen primary key would make the id part of
+ * the request surface.
+ *
+ * `statusId` is required because a post has no default status: the workspace
+ * defines its own. It is the id the post endpoints already return inside a
+ * post's `status`, so a caller that can read a post can name one.
+ *
+ * The title is trimmed and the body sanitized before they are stored, exactly
+ * as the dashboard does; the limits are the dashboard's own, imported rather
+ * than restated so the two cannot disagree about how long a post may be.
+ */
+export const CreatePostPayload = Schema.Struct({
+  boardId: Schema.String,
+  title: Schema.String.check(
+    Schema.isMinLength(POST_TITLE_MIN_LENGTH),
+    Schema.isMaxLength(POST_TITLE_MAX_LENGTH)
+  ),
+  content: Schema.String.check(Schema.isMaxLength(POST_CONTENT_MAX_LENGTH)),
+  statusId: Schema.String,
+  etaQuarter: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isPattern(ETA_QUARTER_PATTERN)))
+  ),
+});
+
+export type TCreatePostPayload = Schema.Schema.Type<typeof CreatePostPayload>;
+
+/**
+ * A partial update: an absent field is left alone, `null` clears a nullable
+ * one.
+ *
+ * `statusId` and `boardId` are writable here because an integration that syncs
+ * a tracker has to move a post as its state changes; a key that may edit a post
+ * may move it. A body that names no field at all is rejected in the handler
+ * rather than answered as a write that changed only `updatedAt`.
+ */
+export const UpdatePostPayload = Schema.Struct({
+  title: Schema.optional(
+    Schema.String.check(
+      Schema.isMinLength(POST_TITLE_MIN_LENGTH),
+      Schema.isMaxLength(POST_TITLE_MAX_LENGTH)
+    )
+  ),
+  content: Schema.optional(
+    Schema.String.check(Schema.isMaxLength(POST_CONTENT_MAX_LENGTH))
+  ),
+  statusId: Schema.optional(Schema.String),
+  boardId: Schema.optional(Schema.String),
+  etaQuarter: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isPattern(ETA_QUARTER_PATTERN)))
+  ),
+});
+
+export type TUpdatePostPayload = Schema.Schema.Type<typeof UpdatePostPayload>;
 
 /**
  * The tag resource: what the tag endpoints return.

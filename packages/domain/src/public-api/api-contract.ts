@@ -16,9 +16,11 @@ import {
 import {
   CreateChangelogPayload,
   CreateCompanyPayload,
+  CreatePostPayload,
   CreateTagPayload,
   DeleteChangelogParams,
   DeleteCompanyParams,
+  DeletePostParams,
   DeleteTagParams,
   GetChangelogParams,
   GetCompanyParams,
@@ -28,6 +30,7 @@ import {
   ListBoardPostsQuery,
   ListChangelogQuery,
   ListCompaniesQuery,
+  ListPostsQuery,
   ListTagsQuery,
   PublicApiChangelog,
   PublicApiChangelogPage,
@@ -38,12 +41,15 @@ import {
   PublicApiPostTags,
   PublicApiTagDetail,
   PublicApiTagPage,
+  RetrievePostQuery,
   SetPostTagsParams,
   SetPostTagsPayload,
   UpdateChangelogParams,
   UpdateChangelogPayload,
   UpdateCompanyParams,
   UpdateCompanyPayload,
+  UpdatePostParams,
+  UpdatePostPayload,
   UpdateTagParams,
   UpdateTagPayload,
 } from "./schema";
@@ -72,6 +78,32 @@ export class PublicApiV1Group extends HttpApiGroup.make("PublicApiV1")
       )
   )
   .add(
+    HttpApiEndpoint.get("listPosts", "/posts", {
+      query: ListPostsQuery,
+      success: PublicApiPostPage,
+      error: PUBLIC_API_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "List Posts")
+      .annotate(OpenApi.Summary, "List the workspace's posts")
+      .annotate(
+        OpenApi.Description,
+        "Returns the posts of the calling workspace across every board, newest first, as a cursor-paginated page. Private boards are included: the key belongs to the workspace, so board visibility does not restrict it. Archived posts appear only with includeArchived=true, and posts merged into another post are never listed. Use `GET /boards/{boardId}/posts` to page one board."
+      )
+  )
+  .add(
+    HttpApiEndpoint.get("retrievePost", "/posts/retrieve", {
+      query: RetrievePostQuery,
+      success: PublicApiPost,
+      error: PUBLIC_API_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "Retrieve Post")
+      .annotate(OpenApi.Summary, "Find a post by id, or by board and slug")
+      .annotate(
+        OpenApi.Description,
+        "Returns one post with its sanitized body, named either by `id` or by the `boardId` and `slug` pair from its public URL. `boardId` is required when a `slug` is given; a request that names neither an id nor a slug is rejected. Every identifier present must match, so an id combined with another board, or a slug combined with the wrong board, is reported as not found rather than silently resolved. Posts of other workspaces are reported as not found rather than forbidden, so an id cannot be used to probe another workspace."
+      )
+  )
+  .add(
     HttpApiEndpoint.get("getPost", "/posts/:postId", {
       params: GetPostParams,
       success: PublicApiPost,
@@ -96,6 +128,46 @@ export class PublicApiV1Group extends HttpApiGroup.make("PublicApiV1")
       .annotate(
         OpenApi.Description,
         "Replaces the post's tags with the ids given and returns the tags it carries afterwards. An empty list clears them. Ids that do not exist in the workspace are rejected as an invalid request rather than ignored, and the post's timeline records the tags that were added and removed."
+      )
+  )
+  .add(
+    HttpApiEndpoint.post("createPost", "/posts", {
+      payload: CreatePostPayload,
+      success: PublicApiPost.pipe(HttpApiSchema.status(201)),
+      error: PUBLIC_API_CREATE_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "Create Post")
+      .annotate(OpenApi.Summary, "Create a post")
+      .annotate(
+        OpenApi.Description,
+        "Creates a post on a board of the calling workspace and returns it. The id is assigned by the server, the title is trimmed, the slug is derived from it and deduplicated, and the body is sanitized before it is stored. A `boardId` or `statusId` that does not exist in the workspace is an invalid request. The post is recorded with `API` as its source and reaches the workspace's integrations and notifications like any other submission, but it has no author: a machine key is not a member."
+      )
+  )
+  .add(
+    HttpApiEndpoint.patch("updatePost", "/posts/:postId", {
+      params: UpdatePostParams,
+      payload: UpdatePostPayload,
+      success: PublicApiPost,
+      error: PUBLIC_API_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "Update Post")
+      .annotate(OpenApi.Summary, "Update a post")
+      .annotate(
+        OpenApi.Description,
+        "Updates the fields the request names and returns the post afterwards. An omitted field is left as it is and an explicit null clears a nullable one, so `etaQuarter: null` removes the estimate. A body that names no field is rejected as an invalid request. Moving the post to another board or status records the change in its timeline and, for a status change, notifies its subscribers exactly as the dashboard does. A post merged into another post is refused."
+      )
+  )
+  .add(
+    HttpApiEndpoint.delete("deletePost", "/posts/:postId", {
+      params: DeletePostParams,
+      success: HttpApiSchema.NoContent,
+      error: PUBLIC_API_ERROR_SCHEMAS,
+    })
+      .annotate(OpenApi.Title, "Delete Post")
+      .annotate(OpenApi.Summary, "Delete a post")
+      .annotate(
+        OpenApi.Description,
+        "Deletes a post and cannot be undone. A key holding this scope deletes without the dashboard's creator and engagement restriction: it is the workspace's own credential, not a member acting on their own posts. Deleting a post that absorbed merged duplicates restores those duplicates to the board rather than orphaning them. A merged post is refused, and a post that is already gone is reported as not found."
       )
   )
   .add(

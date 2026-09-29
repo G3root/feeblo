@@ -1,6 +1,7 @@
 import { currentDb, Database, schema } from "@feeblo/db";
 import type { TPostStatusType } from "@feeblo/domain-contracts/post-status-type";
-import { ChangelogId, CompanyId, PostTagId, TagId } from "@feeblo/id";
+import { ChangelogId, CompanyId, PostId, PostTagId, TagId } from "@feeblo/id";
+import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { slugify } from "@feeblo/utils/url";
 import {
   and,
@@ -16,26 +17,51 @@ import {
   type SQL,
 } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
 import {
   cleanupOrphanedEditorAssets,
   syncChangelogAssetReferences,
 } from "../asset/service";
 import { makeChangelogPublication } from "../changelog/publication";
+import { EmailOutboxConfig } from "../email-outbox/config";
+import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import { ResolvePrincipalService } from "../identity/service";
+import * as Policy from "../policy";
 import { PostActivityRepository } from "../post-activity/repository";
-import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
+import {
+  FailedToCreatePostError,
+  FailedToDeletePostError,
+  FailedToUpdatePostError,
+  PostAlreadyExistsError,
+  PostNotFoundError,
+} from "../post/errors";
+import { PostRepository } from "../post/repository";
+import { makePostWrites } from "../post/write";
+import {
+  BadRequestError,
+  InternalServerError,
+  withRemapDbErrors,
+} from "../rpc-errors";
 import { S3UploadService } from "../services/s3";
 import { postTagChangeActivities } from "../tag/post-tag-activities";
+import { UserRepository } from "../user/repository";
 import type { Cursor } from "./cursor";
 import type { CrmEntryAllowanceError } from "./entitlement";
 import {
+  ConflictError,
   conflictError,
   forbiddenScopeError,
+  InternalError,
+  internalError,
+  InvalidRequestError,
   invalidRequestError,
+  NotFoundError,
   notFoundError,
 } from "./errors";
 import type {
@@ -329,6 +355,53 @@ interface TFindPost {
   postId: string;
 }
 
+interface TListPosts {
+  cursor: Cursor | null;
+  includeArchived: boolean;
+  limit: number;
+  organizationId: string;
+  statusId: string | null;
+}
+
+/**
+ * What the post read projection may filter by.
+ *
+ * At least one identifier must be present — `postId`, or the `boardId` and
+ * `slug` pair — and the handler is what rejects a request that names none.
+ * Every identifier that is present narrows the lookup, so the storage layer
+ * never has to decide which of two disagreeing identifiers wins.
+ */
+interface TReadPost {
+  boardId?: string | undefined;
+  organizationId: string;
+  postId?: string | undefined;
+  slug?: string | undefined;
+}
+
+interface TCreatePost {
+  readonly boardId: string;
+  readonly content: string;
+  readonly etaQuarter: string | null;
+  readonly organizationId: string;
+  readonly statusId: string;
+  readonly title: string;
+}
+
+interface TUpdatePost {
+  readonly boardId: string | undefined;
+  readonly content: string | undefined;
+  readonly etaQuarter: string | null | undefined;
+  readonly organizationId: string;
+  readonly postId: string;
+  readonly statusId: string | undefined;
+  readonly title: string | undefined;
+}
+
+interface TDeletePost {
+  readonly organizationId: string;
+  readonly postId: string;
+}
+
 /**
  * The author classification is computed in SQL.
  *
@@ -489,6 +562,91 @@ const toSource = (
 });
 
 /**
+ * Translates the shared post write path's failures onto the published codes.
+ *
+ * The path fails in the domain's vocabulary; the Public API publishes its own.
+ * Translating at this boundary is what keeps an internal error rename from
+ * changing what a caller switches on, and it is total: anything this does not
+ * name is an internal failure rather than a type the endpoint never declared.
+ *
+ * A failure that is already one of this API's own errors passes through — the
+ * delete path reads the post before writing it and raises `NOT_FOUND` itself.
+ */
+const toPublicPostWriteError = (
+  cause: unknown
+): InternalError | InvalidRequestError | NotFoundError | ConflictError => {
+  if (Schema.is(NotFoundError)(cause)) return cause;
+  if (Schema.is(InvalidRequestError)(cause)) return cause;
+  if (Schema.is(ConflictError)(cause)) return cause;
+  if (Schema.is(InternalError)(cause)) return cause;
+  if (Schema.is(BadRequestError)(cause)) {
+    return invalidRequestError(cause.message ?? "The request is not valid.");
+  }
+  if (Schema.is(PostAlreadyExistsError)(cause)) {
+    return conflictError("A post with this slug already exists.");
+  }
+  if (Schema.is(PostNotFoundError)(cause)) {
+    return notFoundError("Post not found.");
+  }
+  if (
+    Schema.is(FailedToCreatePostError)(cause) ||
+    Schema.is(FailedToDeletePostError)(cause)
+  ) {
+    return internalError();
+  }
+  if (Schema.is(FailedToUpdatePostError)(cause)) {
+    // The shared update path fails this way when the row it locked to read the
+    // post's previous state is gone: the post was deleted between the request
+    // and the write. A missing resource is what the endpoint documents.
+    return notFoundError("Post not found.");
+  }
+  if (Schema.is(Policy.PolicyDeniedError)(cause)) {
+    // The only policy the shared write path applies to a machine key is the
+    // merged-post guard: a merged post is readable, so this is a request the
+    // resource's state cannot satisfy rather than a missing resource.
+    return invalidRequestError(
+      "This post has been merged into another post and cannot be changed."
+    );
+  }
+  return internalError();
+};
+
+/**
+ * The create endpoint's failures, which cannot include `NOT_FOUND`.
+ *
+ * A create cannot report a missing resource — the resource is what it makes —
+ * so the endpoint publishes no 404 and the mapping drops the branch the shared
+ * vocabulary allows. A `NOT_FOUND` there is unreachable by construction; if it
+ * ever becomes reachable it is an internal failure, not a promise this API
+ * should have made.
+ */
+const mapPostCreateFailure = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  effect.pipe(
+    Effect.catch((cause) => {
+      const mapped = toPublicPostWriteError(cause);
+      return Effect.fail(
+        Schema.is(NotFoundError)(mapped) ? internalError() : mapped
+      );
+    })
+  );
+
+/**
+ * The update and delete endpoints' failures, which cannot include `CONFLICT`.
+ *
+ * Neither re-derives a slug, so neither can collide with another post's. Their
+ * endpoints publish no 409 for the same reason.
+ */
+const mapPostWriteFailure = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  effect.pipe(
+    Effect.catch((cause) => {
+      const mapped = toPublicPostWriteError(cause);
+      return Effect.fail(
+        Schema.is(ConflictError)(mapped) ? internalError() : mapped
+      );
+    })
+  );
+
+/**
  * The Public API's own queries, rather than the dashboard repositories': the
  * rules differ (a private
  * board is readable with a key, archived and merged posts are handled per
@@ -499,11 +657,31 @@ const makePublicApiRepository = Effect.gen(function* () {
   const db = yield* currentDb;
   const s3 = yield* S3UploadService;
   const activities = yield* PostActivityRepository;
+  // The shared post write path drives these from the fiber context rather than
+  // from a value it holds, so the repository keeps a handle on each of them
+  // and provides them below. They are the same instances the route's private
+  // layers built.
+  const crypto = yield* Crypto.Crypto;
+  const emailOutboxConfig = yield* EmailOutboxConfig;
+  const emailSubscriptions = yield* EmailSubscriptionRepository;
+  const integrationEventRecorder = yield* IntegrationEventRecorder;
+  const postRepository = yield* PostRepository;
+  const resolvePrincipal = yield* ResolvePrincipalService;
+  const userRepository = yield* UserRepository;
   // Publishing an entry has the same side effects whichever surface wrote it:
   // a durable email intent and an in-app notification for subscribers. The
   // dashboard's write path uses this same constructor, so the two cannot
   // diverge into "the release note nobody received".
   const publication = yield* makeChangelogPublication;
+  // Creating, changing, and deleting a post is the same work whichever surface
+  // asked (see `post/write.ts`): the sanitizer, the slug deduplication, the
+  // timeline, the integration events, the outbox intents, and the search
+  // embedding. The Public API writes as `api_key`, so the member-only side
+  // effects — on-behalf attribution, the creator's subscription — are skipped
+  // rather than invented. Acquiring it here rather than in a handler keeps the
+  // route's requirements at the repository, the way the changelog publication
+  // is held.
+  const writes = yield* makePostWrites;
 
   /**
    * Keeps an entry's editor-asset references in step with its content.
@@ -549,6 +727,33 @@ const makePublicApiRepository = Effect.gen(function* () {
           cause
         ).pipe(Effect.annotateLogs({ organizationId }))
       )
+    );
+
+  /**
+   * Provides the services the shared post write path reads from the fiber
+   * context.
+   *
+   * The HTTP layer answers a handler's service requirement with a `Request`
+   * failure rather than satisfying it from the route layer, so a handler that
+   * carried these would fail at request time while the layers were sitting
+   * right beside it. The repository already holds each instance for its own
+   * use — the way `syncAssets` holds media storage and the database — and
+   * closing over them here keeps every handler on the public surface
+   * requirement-free.
+   */
+  const providePostWriteEnvironment = <A, E, R>(
+    effect: Effect.Effect<A, E, R>
+  ) =>
+    effect.pipe(
+      Effect.provideService(Crypto.Crypto, crypto),
+      Effect.provideService(Database.Database, db),
+      Effect.provideService(EmailOutboxConfig, emailOutboxConfig),
+      Effect.provideService(EmailSubscriptionRepository, emailSubscriptions),
+      Effect.provideService(IntegrationEventRecorder, integrationEventRecorder),
+      Effect.provideService(PostRepository, postRepository),
+      Effect.provideService(ResolvePrincipalService, resolvePrincipal),
+      Effect.provideService(S3UploadService, s3),
+      Effect.provideService(UserRepository, userRepository)
     );
 
   const countByPostIds = (postIds: readonly string[]) =>
@@ -607,6 +812,196 @@ const makePublicApiRepository = Effect.gen(function* () {
       // same post should not see it shuffle.
       .orderBy(asc(schema.tagTable.name));
 
+  /**
+   * The filters every post list applies, in one place.
+   *
+   * A merged post is superseded by its survivor, so it is never listed — the
+   * same rule as the portal, and it keeps `mergedIntoPostId` meaningful rather
+   * than listing duplicates. Archived posts are excluded unless asked for, and
+   * the cursor walks the `(createdAt, id)` tuple the page is ordered by.
+   */
+  const postPageConditions = ({
+    cursor,
+    includeArchived,
+    organizationId,
+    statusId,
+  }: {
+    readonly cursor: Cursor | null;
+    readonly includeArchived: boolean;
+    readonly organizationId: string;
+    readonly statusId: string | null;
+  }): SQL[] => {
+    const conditions: SQL[] = [
+      eq(schema.postTable.organizationId, organizationId),
+      isNull(schema.postTable.mergedIntoPostId),
+    ];
+    if (!includeArchived) {
+      conditions.push(isNull(schema.postTable.archivedAt));
+    }
+    if (statusId !== null) {
+      conditions.push(eq(schema.postTable.statusId, statusId));
+    }
+    if (cursor !== null) {
+      conditions.push(
+        sql`(${schema.postTable.createdAt}, ${schema.postTable.id}) < (${cursor.createdAt}, ${cursor.id})`
+      );
+    }
+    return conditions;
+  };
+
+  /**
+   * A page of posts matching `conditions`, newest first.
+   *
+   * The page query both list endpoints share: filters come in as conditions so
+   * a board-scoped list and a workspace-wide one cannot diverge on ordering,
+   * the cursor tuple, or how counts and tags are attached.
+   *
+   * Fetches `limit + 1` rows so the caller learns whether another page exists
+   * without a second query, and pages on `(createdAt, id)` — the same tuple
+   * the cursor carries — so concurrently inserted posts cannot make a caller
+   * skip or repeat a row the way an offset would.
+   */
+  const pagePosts = ({
+    conditions,
+    limit,
+  }: {
+    readonly conditions: readonly SQL[];
+    readonly limit: number;
+  }) =>
+    Effect.gen(function* () {
+      const rows = yield* db
+        .select(POST_COLUMNS)
+        .from(schema.postTable)
+        .innerJoin(
+          schema.boardTable,
+          eq(schema.boardTable.id, schema.postTable.boardId)
+        )
+        .innerJoin(
+          schema.postStatusTable,
+          eq(schema.postStatusTable.id, schema.postTable.statusId)
+        )
+        .leftJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.postTable.creatorId)
+        )
+        .leftJoin(
+          schema.contactTable,
+          eq(schema.contactTable.id, schema.postTable.contactId)
+        )
+        .where(and(...conditions))
+        .orderBy(desc(schema.postTable.createdAt), desc(schema.postTable.id))
+        .limit(limit + 1);
+
+      const hasMore = rows.length > limit;
+      const pageRows = hasMore ? rows.slice(0, limit) : rows;
+      if (pageRows.length === 0) {
+        return { posts: [], nextCursor: null } satisfies PublicApiPostPage;
+      }
+
+      const postIds = pageRows.map((row) => row.id);
+      const counts = yield* countByPostIds(postIds);
+      const tagRows = yield* tagsByPostIds(postIds);
+
+      const tagsByPost = new Map<string, { id: string; name: string }[]>();
+      for (const tag of tagRows) {
+        const existing = tagsByPost.get(tag.postId) ?? [];
+        existing.push({ id: tag.id, name: tag.name });
+        tagsByPost.set(tag.postId, existing);
+      }
+
+      const lastRow = pageRows[pageRows.length - 1];
+
+      return {
+        posts: pageRows.map((row) => ({
+          ...toSource(
+            row,
+            {
+              voteCount: counts.voteCount.get(row.id) ?? 0,
+              commentCount: counts.commentCount.get(row.id) ?? 0,
+            },
+            tagsByPost.get(row.id) ?? []
+          ),
+          boardSlug: row.boardSlug,
+        })),
+        nextCursor:
+          hasMore && lastRow !== undefined
+            ? { createdAt: lastRow.createdAt, id: lastRow.id }
+            : null,
+      } satisfies PublicApiPostPage;
+    });
+
+  /**
+   * A single post, including its stored (already sanitized) body.
+   *
+   * A local function rather than only a repository method: the write path
+   * reads back what it wrote through the same projection, so a create or an
+   * update cannot answer with a differently shaped post than a later `GET`.
+   *
+   * At least one identifier is required — `postId`, or the `boardId` and
+   * `slug` pair — and the handler is what rejects a request that names none.
+   * Every identifier that is present narrows the lookup, so a caller that
+   * supplies an id and a board is answered as not found when the post is on a
+   * different board rather than being silently redirected.
+   */
+  const readPost = ({ boardId, organizationId, postId, slug }: TReadPost) =>
+    Effect.gen(function* () {
+      const conditions: SQL[] = [
+        eq(schema.postTable.organizationId, organizationId),
+      ];
+      if (postId !== undefined) {
+        conditions.push(eq(schema.postTable.id, postId));
+      }
+      if (boardId !== undefined) {
+        conditions.push(eq(schema.postTable.boardId, boardId));
+      }
+      if (slug !== undefined) {
+        conditions.push(eq(schema.postTable.slug, slug));
+      }
+
+      const rows = yield* db
+        .select({ ...POST_COLUMNS, content: schema.postTable.content })
+        .from(schema.postTable)
+        .innerJoin(
+          schema.boardTable,
+          eq(schema.boardTable.id, schema.postTable.boardId)
+        )
+        .innerJoin(
+          schema.postStatusTable,
+          eq(schema.postStatusTable.id, schema.postTable.statusId)
+        )
+        .leftJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.postTable.creatorId)
+        )
+        .leftJoin(
+          schema.contactTable,
+          eq(schema.contactTable.id, schema.postTable.contactId)
+        )
+        .where(and(...conditions))
+        .limit(1);
+
+      const row = rows.at(0);
+      if (row === undefined) {
+        return Option.none();
+      }
+
+      const counts = yield* countByPostIds([row.id]);
+      const tagRows = yield* tagsByPostIds([row.id]);
+
+      return Option.some({
+        ...toSource(
+          row,
+          {
+            voteCount: counts.voteCount.get(row.id) ?? 0,
+            commentCount: counts.commentCount.get(row.id) ?? 0,
+          },
+          tagRows.map((tag) => ({ id: tag.id, name: tag.name }))
+        ),
+        boardSlug: row.boardSlug,
+        content: row.content,
+      });
+    });
+
   return {
     /**
      * One page of a board's posts, newest first.
@@ -645,138 +1040,190 @@ const makePublicApiRepository = Effect.gen(function* () {
           return Option.none();
         }
 
-        const conditions: SQL[] = [
-          eq(schema.postTable.organizationId, organizationId),
-          eq(schema.postTable.boardId, boardId),
-          // A merged post is superseded by its survivor. Same rule as the
-          // portal, and it keeps `mergedIntoPostId` meaningful rather than
-          // listing duplicates.
-          isNull(schema.postTable.mergedIntoPostId),
-        ];
-        if (!includeArchived) {
-          conditions.push(isNull(schema.postTable.archivedAt));
-        }
-        if (statusId !== null) {
-          conditions.push(eq(schema.postTable.statusId, statusId));
-        }
-        if (cursor !== null) {
-          conditions.push(
-            sql`(${schema.postTable.createdAt}, ${schema.postTable.id}) < (${cursor.createdAt}, ${cursor.id})`
+        return Option.some(
+          yield* pagePosts({
+            conditions: postPageConditions({
+              cursor,
+              includeArchived,
+              organizationId,
+              statusId,
+            }).concat(eq(schema.postTable.boardId, boardId)),
+            limit,
+          })
+        );
+      }).pipe(withRemapDbErrors("PublicApiPost", "select")),
+
+    /**
+     * One page of the workspace's posts, newest first.
+     *
+     * The board-scoped list with the board filter left out: every board is
+     * included, private ones too, because the key is the workspace's own
+     * credential. Archived and merged posts are handled exactly as they are
+     * there, and the page uses the same cursor tuple, so a caller that has
+     * learned one paging rule has learned both.
+     */
+    listPosts: ({
+      cursor,
+      includeArchived,
+      limit,
+      organizationId,
+      statusId,
+    }: TListPosts) =>
+      pagePosts({
+        conditions: postPageConditions({
+          cursor,
+          includeArchived,
+          organizationId,
+          statusId,
+        }),
+        limit,
+      }).pipe(withRemapDbErrors("PublicApiPost", "select")),
+
+    /**
+     * A single post, including its stored (already sanitized) body.
+     *
+     * The caller narrows with whichever identifiers it has: an id, or a board
+     * and a slug. Every identifier present is matched, so an id that names a
+     * post on another board is answered as not found rather than being
+     * silently returned.
+     */
+    retrievePost: (args: TReadPost) =>
+      readPost(args).pipe(withRemapDbErrors("PublicApiPost", "select")),
+
+    /** A single post, including its stored (already sanitized) body. */
+    findPost: (args: TFindPost) =>
+      readPost(args).pipe(withRemapDbErrors("PublicApiPost", "select")),
+
+    /**
+     * Creates a post and returns it as a later read would.
+     *
+     * The id is minted here rather than accepted from the caller, for the same
+     * reason a tag's is: a machine key is not a member acting on records it
+     * can already see, and a caller-chosen id would make the primary key part
+     * of the request surface. `source` is written as `API` so a workspace can
+     * tell an integration's posts from its own.
+     *
+     * The whole write — the insert, the slug deduplication, the timeline
+     * entry, the integration event, the submission email intent, and the
+     * search embedding — is the dashboard's own path with an `api_key` actor,
+     * so an API-created post is not a second-class kind of post.
+     */
+    createPost: ({
+      boardId,
+      content,
+      etaQuarter,
+      organizationId,
+      statusId,
+      title,
+    }: TCreatePost) =>
+      Effect.gen(function* () {
+        const postId = yield* PostId.generate;
+        yield* writes.create(
+          {
+            assetIds: [],
+            boardId,
+            content,
+            etaQuarter,
+            id: postId,
+            organizationId,
+            source: "API",
+            statusId,
+            title,
+          },
+          { kind: "api_key" }
+        );
+
+        const created = yield* readPost({ organizationId, postId });
+        return yield* Option.match(created, {
+          // An insert that committed is readable a moment later; an empty
+          // read means the row was removed between the two statements, which
+          // is a race this API can only report as its own failure.
+          onNone: () =>
+            Effect.fail(
+              internalError("The post could not be read after it was created.")
+            ),
+          onSome: (post) => Effect.succeed(post),
+        });
+      }).pipe(providePostWriteEnvironment, mapPostCreateFailure),
+
+    /**
+     * Updates the fields the request names and returns the post afterwards.
+     *
+     * A partial update: an absent field is left alone and an explicit `null`
+     * clears a nullable one. The shared write path decides what actually
+     * changed inside one transaction, so a patch naming several fields is
+     * atomic and produces the same timeline and integration events the
+     * dashboard's single-field RPCs do.
+     */
+    updatePost: ({
+      boardId,
+      content,
+      etaQuarter,
+      organizationId,
+      postId,
+      statusId,
+      title,
+    }: TUpdatePost) =>
+      Effect.gen(function* () {
+        yield* writes.update(
+          {
+            boardId,
+            content,
+            etaQuarter,
+            id: postId,
+            organizationId,
+            statusId,
+            title,
+          },
+          { kind: "api_key" }
+        );
+
+        // A read that comes back empty means the post was deleted while this
+        // request was in flight; the handler answers the documented
+        // `NOT_FOUND` rather than a success that changed nothing.
+        return yield* readPost({ organizationId, postId });
+      }).pipe(providePostWriteEnvironment, mapPostWriteFailure),
+
+    /**
+     * Deletes a post, answering as the missing resource when there is none.
+     *
+     * The post is read first for two reasons: the dashboard's delete is
+     * board-scoped while the endpoint names only the post, and a merged post
+     * has to be answered as such — it is still readable through
+     * `GET /posts/{postId}`, so `404` would be a lie.
+     *
+     * A key holding `posts.delete` deletes without the dashboard's
+     * creator-and-engagement scope: it is the workspace's own credential, not
+     * a member acting on their own posts.
+     */
+    deletePost: ({ organizationId, postId }: TDeletePost) =>
+      Effect.gen(function* () {
+        const post = yield* Option.match(
+          yield* readPost({ organizationId, postId }),
+          {
+            onNone: () => Effect.fail(notFoundError("Post not found.")),
+            onSome: (post) => Effect.succeed(post),
+          }
+        );
+
+        if (post.mergedIntoPostId !== null) {
+          return yield* Effect.fail(
+            invalidRequestError(
+              "This post has been merged into another post and cannot be deleted."
+            )
           );
         }
 
-        const rows = yield* db
-          .select(POST_COLUMNS)
-          .from(schema.postTable)
-          .innerJoin(
-            schema.boardTable,
-            eq(schema.boardTable.id, schema.postTable.boardId)
-          )
-          .innerJoin(
-            schema.postStatusTable,
-            eq(schema.postStatusTable.id, schema.postTable.statusId)
-          )
-          .leftJoin(
-            schema.userTable,
-            eq(schema.userTable.id, schema.postTable.creatorId)
-          )
-          .leftJoin(
-            schema.contactTable,
-            eq(schema.contactTable.id, schema.postTable.contactId)
-          )
-          .where(and(...conditions))
-          .orderBy(desc(schema.postTable.createdAt), desc(schema.postTable.id))
-          .limit(limit + 1);
-
-        const hasMore = rows.length > limit;
-        const pageRows = hasMore ? rows.slice(0, limit) : rows;
-        if (pageRows.length === 0) {
-          return Option.some({ posts: [], nextCursor: null });
-        }
-
-        const postIds = pageRows.map((row) => row.id);
-        const counts = yield* countByPostIds(postIds);
-        const tagRows = yield* tagsByPostIds(postIds);
-
-        const tagsByPost = new Map<string, { id: string; name: string }[]>();
-        for (const tag of tagRows) {
-          const existing = tagsByPost.get(tag.postId) ?? [];
-          existing.push({ id: tag.id, name: tag.name });
-          tagsByPost.set(tag.postId, existing);
-        }
-
-        const lastRow = pageRows[pageRows.length - 1];
-
-        return Option.some({
-          posts: pageRows.map((row) => ({
-            ...toSource(
-              row,
-              {
-                voteCount: counts.voteCount.get(row.id) ?? 0,
-                commentCount: counts.commentCount.get(row.id) ?? 0,
-              },
-              tagsByPost.get(row.id) ?? []
-            ),
-            boardSlug: row.boardSlug,
-          })),
-          nextCursor:
-            hasMore && lastRow !== undefined
-              ? { createdAt: lastRow.createdAt, id: lastRow.id }
-              : null,
-        });
-      }).pipe(withRemapDbErrors("PublicApiPost", "select")),
-
-    /** A single post, including its stored (already sanitized) body. */
-    findPost: ({ organizationId, postId }: TFindPost) =>
-      Effect.gen(function* () {
-        const rows = yield* db
-          .select({ ...POST_COLUMNS, content: schema.postTable.content })
-          .from(schema.postTable)
-          .innerJoin(
-            schema.boardTable,
-            eq(schema.boardTable.id, schema.postTable.boardId)
-          )
-          .innerJoin(
-            schema.postStatusTable,
-            eq(schema.postStatusTable.id, schema.postTable.statusId)
-          )
-          .leftJoin(
-            schema.userTable,
-            eq(schema.userTable.id, schema.postTable.creatorId)
-          )
-          .leftJoin(
-            schema.contactTable,
-            eq(schema.contactTable.id, schema.postTable.contactId)
-          )
-          .where(
-            and(
-              eq(schema.postTable.id, postId),
-              eq(schema.postTable.organizationId, organizationId)
-            )
-          )
-          .limit(1);
-
-        const row = rows.at(0);
-        if (row === undefined) {
-          return Option.none();
-        }
-
-        const counts = yield* countByPostIds([row.id]);
-        const tagRows = yield* tagsByPostIds([row.id]);
-
-        return Option.some({
-          ...toSource(
-            row,
-            {
-              voteCount: counts.voteCount.get(row.id) ?? 0,
-              commentCount: counts.commentCount.get(row.id) ?? 0,
-            },
-            tagRows.map((tag) => ({ id: tag.id, name: tag.name }))
-          ),
-          boardSlug: row.boardSlug,
-          content: row.content,
-        });
-      }).pipe(withRemapDbErrors("PublicApiPost", "select")),
+        yield* writes.remove(
+          {
+            boardId: post.boardId,
+            id: postId,
+            mayDeleteEngaged: true,
+            organizationId,
+          },
+          { kind: "api_key" }
+        );
+      }).pipe(providePostWriteEnvironment, mapPostWriteFailure),
 
     /**
      * One page of the workspace's tags, newest first.

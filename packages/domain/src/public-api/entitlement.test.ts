@@ -1,15 +1,19 @@
+import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { EmailOutboxConfig } from "../email-outbox/config";
 import { EmailOutboxRepository } from "../email-outbox/repository";
+import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
-import { PostActivityRepository } from "../post-activity/repository";
 import { S3Test } from "../services/s3-test";
 import { WorkspaceRepository } from "../workspace/repository";
 import { requireCrmEntryAllowance } from "./entitlement";
 import { PublicApiRepository } from "./repository";
+import { PublicApiInternals } from "./router";
 
 /**
  * The CRM entry gate on a company create.
@@ -28,18 +32,34 @@ const Entitlements = EntitlementPolicy.layer.pipe(
 );
 
 const TestLayer = Layer.mergeAll(
-  // The repository publishes changelog entries and sweeps the assets a deleted
-  // one orphaned, so it needs the plan policy, the email outbox, and media
-  // storage at construction time — even though this suite only exercises the
-  // CRM entry count.
+  // The surface's own private wiring, taken from the route rather than
+  // restated (see ADR 0006): the repository publishes changelog entries,
+  // sweeps orphaned assets, and writes posts through the dashboard's shared
+  // post write path, so it needs the plan policy, media storage, and the
+  // write-path side effects at construction time — even though this suite only
+  // exercises the CRM entry count.
   PublicApiRepository.layer.pipe(
-    Layer.provide(PostActivityRepository.layer),
-    Layer.provide(EmailOutboxRepository.layer),
+    Layer.provide(PublicApiInternals),
     Layer.provide(Entitlements),
-    Layer.provide(S3Test)
+    Layer.provide(S3Test),
+    Layer.provide(NodeCrypto.layer),
+    Layer.provide(
+      EmailSubscriptionRepository.layerWithoutDependencies.pipe(
+        Layer.provide(
+          EmailSubscriptionTokenService.layerTest(
+            "public-api-test-signing-secret"
+          )
+        )
+      )
+    ),
+    Layer.provide(
+      EmailOutboxConfig.layerTest(new URL("https://app.feeblo.test"))
+    )
   ),
   Entitlements,
   EmailOutboxRepository.layer,
+  EmailOutboxConfig.layerTest(new URL("https://app.feeblo.test")),
+  NodeCrypto.layer,
   WorkspaceRepository.layer
 ).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
 
