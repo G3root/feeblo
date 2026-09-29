@@ -1,7 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import { PostTagId, TagId } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
-import { and, desc, eq, exists, inArray, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, exists, inArray, ne, or, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -9,8 +9,9 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { PolicyDeniedError } from "../policy";
 import { FailedToCreateTagError } from "./errors";
-import type { TPostTagList, TPostTagSet } from "./schema";
+import type { TPostTagList } from "./schema";
 
 /**
  * The fields a tag read selects, and the only place a tag field is named.
@@ -56,6 +57,18 @@ interface TFindTagPage {
   after: { readonly createdAt: Date; readonly id: string } | null;
   limit: number;
   organizationId: string;
+}
+
+/**
+ * The assignment input, typed with plain identifiers rather than the RPC
+ * payload schema's branded ones: the dashboard decodes a branded id before it
+ * reaches the repository, while the Public API's key is scoped to one
+ * workspace and its ids come from the database, so it passes strings.
+ */
+interface TPostTagSetInput {
+  organizationId: string;
+  postId: string;
+  tagIds: readonly string[];
 }
 
 interface TFindTagNameConflict {
@@ -317,68 +330,118 @@ const makeTagRepository = Effect.gen(function* () {
           )
         ),
 
-    findPostTagIds: ({
-      organizationId,
-      postId,
-    }: {
-      organizationId: string;
-      postId: string;
-    }) =>
-      db
-        .select({ tagId: schema.postTagTable.tagId })
-        .from(schema.postTagTable)
-        .where(
-          and(
-            eq(schema.postTagTable.postId, postId),
-            eq(schema.postTagTable.organizationId, organizationId)
+    setPostTags: ({ postId, organizationId, tagIds }: TPostTagSetInput) =>
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        // Deduplicated here rather than by the caller: the diff below compares
+        // sets, so the same id twice would otherwise look like two additions.
+        const wanted = [...new Set(tagIds)];
+
+        const post = yield* db
+          .select({ id: schema.postTable.id })
+          .from(schema.postTable)
+          .where(
+            and(
+              eq(schema.postTable.id, postId),
+              eq(schema.postTable.organizationId, organizationId)
+            )
           )
-        )
-        .pipe(Effect.map((rows) => rows.map((row) => row.tagId))),
+          .for("no key update");
 
-    setPostTags: ({ postId, organizationId, tagIds }: TPostTagSet) =>
-      db
-        .transaction((tx) =>
-          Effect.gen(function* () {
-            const now = yield* DateTime.nowAsDate;
-            yield* tx
-              .delete(schema.postTagTable)
-              .where(
-                and(
-                  eq(schema.postTagTable.postId, postId),
-                  eq(schema.postTagTable.organizationId, organizationId)
-                )
-              );
+        if (post.length === 0) {
+          return yield* new PolicyDeniedError({
+            reason: "Post does not belong to this organization",
+          });
+        }
 
-            if (tagIds.length === 0) {
-              return;
-            }
+        const previous = yield* db
+          .select({ tagId: schema.postTagTable.tagId })
+          .from(schema.postTagTable)
+          .where(
+            and(
+              eq(schema.postTagTable.postId, postId),
+              eq(schema.postTagTable.organizationId, organizationId)
+            )
+          );
+        const previousTagIds = previous.map((row) => row.tagId);
+        const previousSet = new Set(previousTagIds);
+        const nextSet = new Set(wanted);
 
-            const rows = yield* Effect.forEach(tagIds, (tagId) =>
-              PostTagId.generate.pipe(
-                Effect.map((id) => ({
-                  id,
-                  postId,
-                  tagId,
-                  organizationId,
-                  createdAt: now,
-                  updatedAt: now,
-                }))
+        const removed = previousTagIds.filter((tagId) => !nextSet.has(tagId));
+        if (removed.length > 0) {
+          yield* db
+            .delete(schema.postTagTable)
+            .where(
+              and(
+                eq(schema.postTagTable.postId, postId),
+                eq(schema.postTagTable.organizationId, organizationId),
+                inArray(schema.postTagTable.tagId, removed)
               )
-            );
+            )
+            .pipe(Effect.asVoid);
+        }
 
-            yield* tx
-              .insert(schema.postTagTable)
-              .values(rows)
-              .onConflictDoNothing();
-          })
-        )
-        .pipe(Effect.asVoid),
+        const added = wanted.filter((tagId) => !previousSet.has(tagId));
+        if (added.length > 0) {
+          const rows = yield* Effect.forEach(added, (tagId) =>
+            PostTagId.generate.pipe(
+              Effect.map((id) => ({
+                id,
+                postId,
+                tagId,
+                organizationId,
+                createdAt: now,
+                updatedAt: now,
+              }))
+            )
+          );
 
-    countExistingTags: ({ organizationId, tagIds }: TCountExistingTags) =>
+          // `post_tag_postId_tagId_uidx` would abort the transaction if a
+          // concurrent request inserted the same tag first; the ids are
+          // deduplicated above, so this is the backstop rather than the rule.
+          yield* db
+            .insert(schema.postTagTable)
+            .values(rows)
+            .onConflictDoNothing()
+            .pipe(Effect.asVoid);
+        }
+
+        const tags = yield* db
+          .select({ id: schema.tagTable.id, name: schema.tagTable.name })
+          .from(schema.postTagTable)
+          .innerJoin(
+            schema.tagTable,
+            eq(schema.tagTable.id, schema.postTagTable.tagId)
+          )
+          .where(
+            and(
+              eq(schema.postTagTable.postId, postId),
+              eq(schema.postTagTable.organizationId, organizationId)
+            )
+          )
+          .orderBy(asc(schema.tagTable.name));
+
+        return { previousTagIds, tags };
+      }),
+
+    /**
+     * How many of the given tag ids exist in the workspace.
+     *
+     * `lock: "key share"` takes the lock the foreign-key check itself takes:
+     * a tag deleted concurrently either loses the race and is missing from
+     * this read, or waits here until the rows that reference it exist and then
+     * cascades them away with it. The Public API's replacement asks for it
+     * inside its transaction; the dashboard's pre-check does not need it.
+     */
+    countExistingTags: ({
+      organizationId,
+      tagIds,
+      lock,
+    }: TCountExistingTags & { readonly lock?: "key share" }) =>
       tagIds.length === 0
         ? Effect.succeed(0)
         : Effect.gen(function* () {
-            const rows = yield* db
+            const query = db
               .select({ id: schema.tagTable.id })
               .from(schema.tagTable)
               .where(
@@ -387,6 +450,7 @@ const makeTagRepository = Effect.gen(function* () {
                   inArray(schema.tagTable.id, tagIds)
                 )
               );
+            const rows = yield* lock === undefined ? query : query.for(lock);
             return rows.length;
           }),
 
@@ -447,3 +511,14 @@ export class TagRepository extends Context.Service<TagRepository>()(
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
+
+/**
+ * Reads the repository from the fiber context.
+ *
+ * `HttpApiBuilder` does not thread a handler's service requirements through the
+ * route layer, so the Public API's operations take it from the context the
+ * composition provides — the same shape as `currentCommentService`.
+ */
+export const currentTagRepository = Effect.context<never>().pipe(
+  Effect.map((context) => Context.getUnsafe(context, TagRepository))
+);

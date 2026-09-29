@@ -4,16 +4,12 @@ import { currentDb, Database, schema } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { PublicApiCompanyRepository } from "../company/public-api/repository";
+import { CompanyRepository } from "../company/repository";
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { EmailOutboxRepository } from "../email-outbox/repository";
-import { EmailSubscriptionRepository } from "../email-subscription/repository";
-import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
-import { S3Test } from "../services/s3-test";
 import { WorkspaceRepository } from "../workspace/repository";
 import { requireCrmEntryAllowance } from "./entitlement";
-import { PublicApiInternals } from "./router";
 
 /**
  * The CRM entry gate on a company create.
@@ -32,28 +28,10 @@ const Entitlements = EntitlementPolicy.layer.pipe(
 );
 
 const TestLayer = Layer.mergeAll(
-  // The surface's own private wiring, taken from the route rather than
-  // restated (see ADR 0006): the company repository counts CRM entries
-  // through the database the surface's internals already hold, so the test
-  // supplies the same bundle the route does rather than a second one.
-  PublicApiCompanyRepository.layer.pipe(
-    Layer.provide(PublicApiInternals),
-    Layer.provide(Entitlements),
-    Layer.provide(S3Test),
-    Layer.provide(NodeCrypto.layer),
-    Layer.provide(
-      EmailSubscriptionRepository.layerWithoutDependencies.pipe(
-        Layer.provide(
-          EmailSubscriptionTokenService.layerTest(
-            "public-api-test-signing-secret"
-          )
-        )
-      )
-    ),
-    Layer.provide(
-      EmailOutboxConfig.layerTest(new URL("https://app.feeblo.test"))
-    )
-  ),
+  // The surface reads the shared company repository from the fiber context to
+  // count CRM entries; the test supplies it directly rather than restating the
+  // route's private wiring (see ADR 0006).
+  CompanyRepository.layer,
   Entitlements,
   EmailOutboxRepository.layer,
   EmailOutboxConfig.layerTest(new URL("https://app.feeblo.test")),

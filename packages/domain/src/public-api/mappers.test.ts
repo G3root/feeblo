@@ -5,12 +5,12 @@ import type {
   PublicApiChangelogDetail,
   PublicApiChangelogSource,
 } from "../changelog/public-api/repository";
-import type { PublicApiCompanySource } from "../company/public-api/repository";
+import type { PublicApiCompanySource } from "../company/public-api/mappers";
 import type {
   PublicApiDetailedPost,
   PublicApiListedPost,
 } from "../post/public-api/repository";
-import type { PublicApiTagSource } from "../tag/public-api/repository";
+import type { PublicApiTagSource } from "../tag/public-api/mappers";
 import {
   toPublicApiChangelog,
   toPublicApiChangelogSummary,

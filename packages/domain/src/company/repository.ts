@@ -1,7 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import type { TEntitySource } from "@feeblo/domain-contracts/entity-source";
 import { CompanyId } from "@feeblo/id";
-import { and, count, desc, eq, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ne, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -296,6 +296,102 @@ const makeCompanyRepository = Effect.gen(function* () {
         .from(schema.companyTable)
         .where(eq(schema.companyTable.organizationId, organizationId))
         .pipe(Effect.map((rows) => rows[0]?.count ?? 0)),
+
+    /**
+     * The company that already holds this name, if any.
+     *
+     * `company_organizationId_name_uidx` is the authority; this is the courtesy
+     * check that lets an ordinary duplicate be answered with a message about
+     * the name instead of a driver error the caller cannot act on.
+     */
+    findNameConflict: ({
+      excludeCompanyId,
+      name,
+      organizationId,
+    }: {
+      excludeCompanyId: string | null;
+      name: string;
+      organizationId: string;
+    }) =>
+      db
+        .select({ id: schema.companyTable.id })
+        .from(schema.companyTable)
+        .where(
+          and(
+            eq(schema.companyTable.organizationId, organizationId),
+            eq(schema.companyTable.name, name),
+            ...(excludeCompanyId === null
+              ? []
+              : [ne(schema.companyTable.id, excludeCompanyId)])
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => Option.fromNullishOr(rows[0]))),
+
+    /**
+     * The company that already holds this external id, if any.
+     *
+     * Looked up separately from the name so a caller can say which field
+     * collided: `externalId` is the caller's own identifier, and being told
+     * that a *name* is taken when the caller reused a sync key would send them
+     * looking in the wrong place. Postgres treats `NULL` as distinct in a
+     * unique index, so an unset external id never conflicts with another unset
+     * one and is never passed here.
+     */
+    findExternalIdConflict: ({
+      excludeCompanyId,
+      externalId,
+      organizationId,
+    }: {
+      excludeCompanyId: string | null;
+      externalId: string;
+      organizationId: string;
+    }) =>
+      db
+        .select({ id: schema.companyTable.id })
+        .from(schema.companyTable)
+        .where(
+          and(
+            eq(schema.companyTable.organizationId, organizationId),
+            eq(schema.companyTable.externalId, externalId),
+            ...(excludeCompanyId === null
+              ? []
+              : [ne(schema.companyTable.id, excludeCompanyId)])
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => Option.fromNullishOr(rows[0]))),
+
+    /**
+     * How many CRM entries the workspace holds, for the plan's entry limit.
+     *
+     * Counts companies and contacts together, and selects nothing: the Public
+     * API does not return contacts, but the plan limit that gates creating a
+     * company counts them, and the dashboard's own create is gated on the same
+     * number. Two queries rather than one union, because each then uses its own
+     * `organizationId` index.
+     *
+     * Only meaningful inside the write transaction that holds the workspace
+     * lock: read anywhere else, the number it returns can be stale by the time
+     * the row it authorizes is inserted.
+     */
+    countCrmEntries: (organizationId: string) =>
+      Effect.gen(function* () {
+        const [companyRows, contactRows] = yield* Effect.all([
+          db
+            .select({ total: count(schema.companyTable.id) })
+            .from(schema.companyTable)
+            .where(eq(schema.companyTable.organizationId, organizationId)),
+          db
+            .select({ total: count(schema.contactTable.id) })
+            .from(schema.contactTable)
+            .where(eq(schema.contactTable.organizationId, organizationId)),
+        ]);
+
+        return (
+          (companyRows.at(0)?.total ?? 0) + (contactRows.at(0)?.total ?? 0)
+        );
+      }),
   };
 });
 
@@ -305,3 +401,14 @@ export class CompanyRepository extends Context.Service<CompanyRepository>()(
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
+
+/**
+ * Reads the repository from the fiber context.
+ *
+ * `HttpApiBuilder` does not thread a handler's service requirements through the
+ * route layer, so the Public API's operations take it from the context the
+ * composition provides — the same shape as `currentCommentService`.
+ */
+export const currentCompanyRepository = Effect.context<never>().pipe(
+  Effect.map((context) => Context.getUnsafe(context, CompanyRepository))
+);

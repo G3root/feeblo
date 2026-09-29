@@ -1,6 +1,43 @@
 import type { TPublicApiTag } from "../../public-api/common";
-import type { PublicApiPostTag, PublicApiTagSource } from "./repository";
 import type { TPublicApiTagDetail } from "./schema";
+
+/** A tag reference: identity and label, and nothing else. */
+export type PublicApiPostTag = {
+  readonly id: string;
+  readonly name: string;
+};
+
+/**
+ * What a tag mapper is allowed to read.
+ *
+ * Declared structurally and narrowly on purpose: a mapper cannot accept the
+ * dashboard row (which carries `creatorId`, `creatorMemberId`, and the
+ * workspace) and pass it through, and a column added to the `tag` table cannot
+ * reach a public response without being added here first. `toTagSource` is the
+ * only bridge from the repository row to it.
+ */
+export type PublicApiTagSource = {
+  readonly id: string;
+  readonly name: string;
+  readonly slug: string;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+};
+
+/** Narrows a repository row to the fields a public response may name. */
+export const toTagSource = (row: {
+  readonly id: string;
+  readonly name: string;
+  readonly slug: string;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}): PublicApiTagSource => ({
+  createdAt: row.createdAt,
+  id: row.id,
+  name: row.name,
+  slug: row.slug,
+  updatedAt: row.updatedAt,
+});
 
 /**
  * A tag reference, as a post payload embeds it.

@@ -1,9 +1,13 @@
+import { schema } from "@feeblo/db";
+import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
+import { currentCompanyRepository } from "../../company/repository";
 import { PUBLIC_API_PAGE_DEFAULT_LIMIT } from "../../public-api/common";
 import { decodeCursorOrFail, encodeCursor } from "../../public-api/cursor";
+import { currentPublicApiDatabase } from "../../public-api/database";
 import { requireCrmEntryAllowance } from "../../public-api/entitlement";
 import {
   ConflictError,
@@ -19,8 +23,8 @@ import { onInternalError } from "../../public-api/failure";
 import { currentPublicApiCaller } from "../../public-api/middleware";
 import { defineOperation } from "../../public-api/operation";
 import { parseName } from "../../public-api/parse";
-import { toPublicApiCompany } from "./mappers";
-import { currentPublicApiCompanyRepository } from "./repository";
+import { withRemapDbErrors } from "../../rpc-errors";
+import { toCompanySource, toPublicApiCompany } from "./mappers";
 import {
   CreateCompanyInput,
   DeleteCompanyInput,
@@ -62,9 +66,8 @@ const COMPANY_DELETE_FAILURES = Schema.Union([
 /**
  * The pre-check's messages, one per colliding field.
  *
- * The index race that beats the pre-check is reported by the repository
- * instead, which cannot say which of the two indexes was violated — see
- * `COMPANY_UNIQUE_VIOLATION_MESSAGE` there.
+ * The index race that beats the pre-check is reported by the mapping below,
+ * which cannot say which of the two indexes was violated.
  */
 const COMPANY_NAME_CONFLICT = "A company with this name already exists.";
 
@@ -72,13 +75,24 @@ const COMPANY_EXTERNAL_ID_CONFLICT =
   "A company with this externalId already exists.";
 
 /**
+ * The conflict a unique-index race reports.
+ *
+ * The driver names the constraint it violated, not a field, so a collision
+ * that beats the pre-check can only be reported as "one of these two already
+ * exists". The pre-check answers the ordinary duplicate with the field it
+ * actually found, which is the case a caller can act on.
+ */
+const COMPANY_UNIQUE_VIOLATION_MESSAGE =
+  "A company with this name or externalId already exists.";
+
+/**
  * Rejects a name, or an external id, another company in the workspace holds.
  *
  * A courtesy to the caller, not the authority: the two unique indexes are, and
- * the repository maps their violation to the same conflict. Checking first
- * means an ordinary duplicate is answered with a message about the field that
- * actually collided, which is the difference between "rename it" and "that
- * sync id is already in use" for a caller that has to decide what to do next.
+ * the write maps their violation to the same conflict. Checking first means an
+ * ordinary duplicate is answered with a message about the field that actually
+ * collided, which is the difference between "rename it" and "that sync id is
+ * already in use" for a caller that has to decide what to do next.
  *
  * `excludeCompanyId` is what lets a company keep its own name and its own
  * external id through an update. A name or external id that is not being
@@ -95,16 +109,19 @@ const failIfCompanyIsTaken = (args: {
   readonly organizationId: string;
 }) =>
   Effect.gen(function* () {
-    const repository = yield* currentPublicApiCompanyRepository;
+    const companies = yield* currentCompanyRepository;
 
     if (args.name !== null) {
-      const nameTaken = yield* repository
+      const nameTaken = yield* companies
         .findNameConflict({
           excludeCompanyId: args.excludeCompanyId,
           name: args.name,
           organizationId: args.organizationId,
         })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+        .pipe(
+          withRemapDbErrors("PublicApiCompany", "select"),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
 
       if (Option.isSome(nameTaken)) {
         return yield* conflictError(COMPANY_NAME_CONFLICT);
@@ -115,13 +132,16 @@ const failIfCompanyIsTaken = (args: {
       return undefined;
     }
 
-    const externalIdTaken = yield* repository
+    const externalIdTaken = yield* companies
       .findExternalIdConflict({
         excludeCompanyId: args.excludeCompanyId,
         externalId: args.externalId,
         organizationId: args.organizationId,
       })
-      .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+      .pipe(
+        withRemapDbErrors("PublicApiCompany", "select"),
+        Effect.catchTag("InternalServerError", () => onInternalError)
+      );
 
     if (Option.isSome(externalIdTaken)) {
       return yield* conflictError(COMPANY_EXTERNAL_ID_CONFLICT);
@@ -133,9 +153,11 @@ const failIfCompanyIsTaken = (args: {
 /**
  * The company operations.
  *
- * The writes are `CompanyRepository`'s own, with the plan's room check run
+ * The row writes are `CompanyRepository`'s own, and the plan's room check runs
  * inside the same transaction that holds the workspace lock, so the Public API
- * and the dashboard cannot disagree about what the CRM limit means.
+ * and the dashboard cannot disagree about what the CRM limit means. What is
+ * public-specific is the cursor paging, the pre-checks that name the colliding
+ * field, and the published error vocabulary.
  */
 
 export const listCompaniesOperation = defineOperation(
@@ -151,22 +173,32 @@ export const listCompaniesOperation = defineOperation(
   ({ cursor, limit }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiCompanyRepository;
+      const companies = yield* currentCompanyRepository;
 
       const after = yield* decodeCursorOrFail(cursor);
+      const pageSize = limit ?? PUBLIC_API_PAGE_DEFAULT_LIMIT;
 
-      const page = yield* repository
-        .list({
-          cursor: after,
-          limit: limit ?? PUBLIC_API_PAGE_DEFAULT_LIMIT,
+      const rows = yield* companies
+        .findPage({
+          after,
+          limit: pageSize,
           organizationId: caller.organizationId,
         })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+        .pipe(
+          withRemapDbErrors("PublicApiCompany", "select"),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
+
+      const hasMore = rows.length > pageSize;
+      const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
+      const lastRow = pageRows.at(-1);
 
       return {
-        data: page.companies.map(toPublicApiCompany),
+        data: pageRows.map((row) => toPublicApiCompany(toCompanySource(row))),
         nextCursor:
-          page.nextCursor === null ? null : encodeCursor(page.nextCursor),
+          hasMore && lastRow !== undefined
+            ? encodeCursor({ createdAt: lastRow.createdAt, id: lastRow.id })
+            : null,
       };
     })
 );
@@ -183,7 +215,8 @@ export const createCompanyOperation = defineOperation(
   ({ avatar, externalCreatedAt, externalId, name: rawName }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiCompanyRepository;
+      const db = yield* currentPublicApiDatabase;
+      const companies = yield* currentCompanyRepository;
 
       const name = yield* parseName(rawName);
 
@@ -194,22 +227,52 @@ export const createCompanyOperation = defineOperation(
         organizationId: caller.organizationId,
       });
 
-      // The plan gate and the insert are one call, and one transaction: the
-      // repository locks the workspace, runs this check, and only then
-      // writes, so two creates arriving near a plan's cap cannot both see
-      // room. See `create`.
-      const created = yield* repository
-        .create({
-          avatar: avatar ?? null,
-          ensureRoom: requireCrmEntryAllowance(caller.organizationId),
-          externalCreatedAt: externalCreatedAt ?? null,
-          externalId: externalId ?? null,
-          name,
-          organizationId: caller.organizationId,
-        })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+      // The plan gate and the insert are one transaction: the workspace row is
+      // locked, the check runs after that lock, and only then is the row
+      // written, so two creates arriving near a plan's cap cannot both see
+      // room. `no key update` rather than `update` because every table in the
+      // workspace points at this row, and the stronger lock would block
+      // unrelated inserts that merely reference the workspace.
+      const created = yield* db
+        .transaction(() =>
+          Effect.gen(function* () {
+            yield* db
+              .select({ id: schema.organizationTable.id })
+              .from(schema.organizationTable)
+              .where(eq(schema.organizationTable.id, caller.organizationId))
+              .for("no key update");
 
-      return toPublicApiCompany(created);
+            yield* requireCrmEntryAllowance(caller.organizationId);
+
+            return yield* companies.create(
+              {
+                avatar: avatar ?? null,
+                externalCreatedAt: externalCreatedAt ?? null,
+                externalId: externalId ?? null,
+                name,
+                organizationId: caller.organizationId,
+              },
+              { source: "API" }
+            );
+          })
+        )
+        .pipe(
+          // The domain reports a name collision as a typed failure; the index
+          // race that beats the pre-check is a driver error. Both answer on
+          // the published `CONFLICT`.
+          Effect.catchTag("CompanyAlreadyExistsError", () =>
+            Effect.fail(conflictError(COMPANY_UNIQUE_VIOLATION_MESSAGE))
+          ),
+          withRemapDbErrors({
+            action: "create",
+            entity: "PublicApiCompany",
+            onUniqueViolation: () =>
+              conflictError(COMPANY_UNIQUE_VIOLATION_MESSAGE),
+          }),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
+
+      return toPublicApiCompany(toCompanySource(created));
     })
 );
 
@@ -226,15 +289,19 @@ export const getCompanyOperation = defineOperation(
   ({ companyId }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiCompanyRepository;
+      const companies = yield* currentCompanyRepository;
 
-      const company = yield* repository
-        .find({ companyId, organizationId: caller.organizationId })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+      const company = yield* companies
+        .findById({ id: companyId, organizationId: caller.organizationId })
+        .pipe(
+          withRemapDbErrors("PublicApiCompany", "select"),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
 
       return yield* Option.match(company, {
         onNone: () => Effect.fail(notFoundError("Company not found.")),
-        onSome: (found) => Effect.succeed(toPublicApiCompany(found)),
+        onSome: (found) =>
+          Effect.succeed(toPublicApiCompany(toCompanySource(found))),
       });
     })
 );
@@ -251,7 +318,7 @@ export const updateCompanyOperation = defineOperation(
   ({ avatar, companyId, externalCreatedAt, externalId, name: rawName }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiCompanyRepository;
+      const companies = yield* currentCompanyRepository;
 
       // A body that names no field would otherwise be answered as a
       // successful write that changed nothing but `updatedAt`, which tells
@@ -273,9 +340,12 @@ export const updateCompanyOperation = defineOperation(
 
       // The company is read before the write so another workspace's company
       // is a 404 rather than an update that matches no row and answers 200.
-      const company = yield* repository
-        .find({ companyId, organizationId: caller.organizationId })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+      const company = yield* companies
+        .findById({ id: companyId, organizationId: caller.organizationId })
+        .pipe(
+          withRemapDbErrors("PublicApiCompany", "select"),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
 
       if (Option.isNone(company)) {
         return yield* notFoundError("Company not found.");
@@ -288,25 +358,34 @@ export const updateCompanyOperation = defineOperation(
         organizationId: caller.organizationId,
       });
 
-      const updated = yield* repository
+      const updated = yield* companies
         .update({
           avatar,
-          companyId,
           externalCreatedAt,
           externalId,
-          // `null` means "not being written"; the repository's `undefined`
-          // is what leaves the column alone.
+          id: companyId,
+          // `null` means "not being written"; `undefined` leaves the column
+          // alone.
           name: name ?? undefined,
           organizationId: caller.organizationId,
         })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+        .pipe(
+          withRemapDbErrors({
+            action: "update",
+            entity: "PublicApiCompany",
+            onUniqueViolation: () =>
+              conflictError(COMPANY_UNIQUE_VIOLATION_MESSAGE),
+          }),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
 
       // The read above cannot hold the row still, so a company deleted
       // between the two is answered as the missing company it is rather
       // than as a driver failure the caller cannot act on.
       return yield* Option.match(updated, {
         onNone: () => Effect.fail(notFoundError("Company not found.")),
-        onSome: (found) => Effect.succeed(toPublicApiCompany(found)),
+        onSome: (found) =>
+          Effect.succeed(toPublicApiCompany(toCompanySource(found))),
       });
     })
 );
@@ -324,27 +403,33 @@ export const deleteCompanyOperation = defineOperation(
   ({ companyId }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiCompanyRepository;
+      const companies = yield* currentCompanyRepository;
 
       // A company that is already gone is a 404 rather than a success, for
       // the same reason as a tag: the caller cannot tell a delete that
       // worked from one that named the wrong workspace.
-      const company = yield* repository
-        .find({ companyId, organizationId: caller.organizationId })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+      const company = yield* companies
+        .findById({ id: companyId, organizationId: caller.organizationId })
+        .pipe(
+          withRemapDbErrors("PublicApiCompany", "select"),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
 
       if (Option.isNone(company)) {
         return yield* notFoundError("Company not found.");
       }
 
-      const deleted = yield* repository
-        .delete({ companyId, organizationId: caller.organizationId })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+      const deleted = yield* companies
+        .delete({ id: companyId, organizationId: caller.organizationId })
+        .pipe(
+          withRemapDbErrors("PublicApiCompany", "delete"),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
 
       // The read above cannot hold the row still, so a company deleted
       // between the two is answered as the missing company it is rather
       // than as a success that deleted nothing.
-      if (!deleted) {
+      if (Option.isNone(deleted)) {
         return yield* notFoundError("Company not found.");
       }
 

@@ -1,7 +1,7 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 
-import { currentPublicApiCompanyRepository } from "../company/public-api/repository";
+import { currentCompanyRepository } from "../company/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { withRemapDbErrors } from "../rpc-errors";
 import {
@@ -69,7 +69,7 @@ export const requireCrmEntryAllowance = (
 ): Effect.Effect<void, CrmEntryAllowanceError> =>
   Effect.gen(function* () {
     const policy = yield* currentEntitlementPolicy;
-    const repository = yield* currentPublicApiCompanyRepository;
+    const repository = yield* currentCompanyRepository;
 
     yield* policy
       .canCreateCrmEntry({

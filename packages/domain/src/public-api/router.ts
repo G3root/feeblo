@@ -8,7 +8,6 @@ import { ChangelogRepository } from "../changelog/repository";
 import { PublicApiCommentRepository } from "../comments/public-api/repository";
 import { CommentRepository } from "../comments/repository";
 import { CommentService } from "../comments/service";
-import { PublicApiCompanyRepository } from "../company/public-api/repository";
 import { CompanyRepository } from "../company/repository";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { ResolvePrincipalService } from "../identity/service";
@@ -18,7 +17,6 @@ import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { PostEmbeddingService } from "../post/embedding-service";
 import { PublicApiPostRepository } from "../post/public-api/repository";
 import { PostRepository } from "../post/repository";
-import { PublicApiTagRepository } from "../tag/public-api/repository";
 import { TagRepository } from "../tag/repository";
 import { UserRepository } from "../user/repository";
 import { PublicApi } from "./api-contract";
@@ -130,17 +128,20 @@ export const makePublicApiRoute = <E, R>(
         PublicApiChangelogRepository.layer.pipe(
           Layer.provide(PublicApiInternals)
         ),
-        PublicApiCompanyRepository.layer.pipe(
-          Layer.provide(PublicApiInternals)
-        ),
         PublicApiCommentRepository.layer.pipe(
           Layer.provide(PublicApiInternals)
         ),
-        PublicApiPostRepository.layer.pipe(Layer.provide(PublicApiInternals)),
-        PublicApiTagRepository.layer.pipe(Layer.provide(PublicApiInternals))
+        PublicApiPostRepository.layer.pipe(Layer.provide(PublicApiInternals))
       )
     ),
-    Layer.provideMerge(PublicApiCommentService)
+    Layer.provideMerge(PublicApiCommentService),
+    // Provided into the request context, not merged into the output: the
+    // public operations read the shared feature repositories — and the
+    // database handle they run transactions on — from the fiber context, the
+    // same way they read the caller and the config. This is the one line that
+    // makes `<feature>/public-api` able to call `<feature>/repository`
+    // directly instead of owning a second copy of it.
+    Layer.provide(PublicApiInternals)
   );
 
 /**

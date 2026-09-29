@@ -37,7 +37,7 @@ import {
 } from "../../public-api/errors";
 import { BadRequestError, withRemapDbErrors } from "../../rpc-errors";
 import { S3UploadService } from "../../services/s3";
-import type { PublicApiPostTag } from "../../tag/public-api/repository";
+import type { PublicApiPostTag } from "../../tag/public-api/mappers";
 import { UserRepository } from "../../user/repository";
 import {
   FailedToCreatePostError,

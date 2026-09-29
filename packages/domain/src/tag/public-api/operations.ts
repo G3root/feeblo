@@ -2,22 +2,28 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
+import { currentPostActivityRepository } from "../../post-activity/repository";
 import { PUBLIC_API_PAGE_DEFAULT_LIMIT } from "../../public-api/common";
 import { decodeCursorOrFail, encodeCursor } from "../../public-api/cursor";
+import { currentPublicApiDatabase } from "../../public-api/database";
 import {
   ConflictError,
   InternalError,
   InvalidRequestError,
   NotFoundError,
   conflictError,
+  internalError,
+  invalidRequestError,
   notFoundError,
 } from "../../public-api/errors";
 import { onInternalError } from "../../public-api/failure";
 import { currentPublicApiCaller } from "../../public-api/middleware";
 import { defineOperation } from "../../public-api/operation";
 import { parseName } from "../../public-api/parse";
-import { toPublicApiTag, toPublicApiTagDetail } from "./mappers";
-import { currentPublicApiTagRepository } from "./repository";
+import { withRemapDbErrors } from "../../rpc-errors";
+import { currentTagRepository } from "../../tag/repository";
+import { postTagChangeActivities } from "../post-tag-activities";
+import { toPublicApiTag, toPublicApiTagDetail, toTagSource } from "./mappers";
 import {
   CreateTagInput,
   DeleteTagInput,
@@ -66,7 +72,7 @@ const TAG_DELETE_FAILURES = Schema.Union([
  * Rejects a name another tag in the workspace already holds.
  *
  * A courtesy to the caller, not the authority: the unique index is, and the
- * repository maps its violation to the same conflict. Checking first means an
+ * write maps its violation to the same conflict. Checking first means an
  * ordinary duplicate is answered with a message about the name rather than a
  * driver error the caller cannot act on. `excludeTagId` is what lets a tag
  * keep its own name through a rename.
@@ -77,10 +83,11 @@ const failIfTagNameIsTaken = (args: {
   readonly organizationId: string;
 }) =>
   Effect.gen(function* () {
-    const repository = yield* currentPublicApiTagRepository;
-    const existing = yield* repository
-      .findNameConflict(args)
-      .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+    const tags = yield* currentTagRepository;
+    const existing = yield* tags.findNameConflict(args).pipe(
+      withRemapDbErrors("PublicApiTag", "select"),
+      Effect.catchTag("InternalServerError", () => onInternalError)
+    );
 
     if (Option.isSome(existing)) {
       return yield* conflictError(TAG_NAME_CONFLICT);
@@ -94,9 +101,14 @@ const failIfTagNameIsTaken = (args: {
  *
  * Each is the whole behavior of one tag endpoint, independent of HTTP: it
  * takes typed input, enforces its own scope, and answers with the published
- * DTO. `../tag/http.ts` is the endpoint projection of these, and a future MCP
+ * DTO. `./http.ts` is the endpoint projection of these, and a future MCP
  * projection derives tools from the same records — so the two surfaces cannot
  * drift into different answers for the same call.
+ *
+ * The row writes are `TagRepository`'s own; what is public-specific is the
+ * cursor paging, the pre-checks that name the colliding field, the published
+ * error vocabulary, and the tag assignment's actor — a machine key is not a
+ * member, so the timeline records no actor.
  */
 
 export const listTagsOperation = defineOperation(
@@ -112,22 +124,32 @@ export const listTagsOperation = defineOperation(
   ({ cursor, limit }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiTagRepository;
+      const tags = yield* currentTagRepository;
 
       const after = yield* decodeCursorOrFail(cursor);
+      const pageSize = limit ?? PUBLIC_API_PAGE_DEFAULT_LIMIT;
 
-      const page = yield* repository
-        .list({
-          cursor: after,
-          limit: limit ?? PUBLIC_API_PAGE_DEFAULT_LIMIT,
+      const rows = yield* tags
+        .findPage({
+          after,
+          limit: pageSize,
           organizationId: caller.organizationId,
         })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+        .pipe(
+          withRemapDbErrors("PublicApiTag", "select"),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
+
+      const hasMore = rows.length > pageSize;
+      const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
+      const lastRow = pageRows.at(-1);
 
       return {
-        data: page.tags.map(toPublicApiTagDetail),
+        data: pageRows.map((row) => toPublicApiTagDetail(toTagSource(row))),
         nextCursor:
-          page.nextCursor === null ? null : encodeCursor(page.nextCursor),
+          hasMore && lastRow !== undefined
+            ? encodeCursor({ createdAt: lastRow.createdAt, id: lastRow.id })
+            : null,
       };
     })
 );
@@ -144,7 +166,7 @@ export const createTagOperation = defineOperation(
   ({ name: rawName }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiTagRepository;
+      const tags = yield* currentTagRepository;
 
       const name = yield* parseName(rawName);
 
@@ -154,11 +176,24 @@ export const createTagOperation = defineOperation(
         organizationId: caller.organizationId,
       });
 
-      const created = yield* repository
+      const created = yield* tags
         .create({ name, organizationId: caller.organizationId })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+        .pipe(
+          // An insert either stores a row or fails; the domain reports the
+          // broken invariant as its own failure, which is not a
+          // caller-actionable state and is published as `INTERNAL_ERROR`.
+          Effect.catchTag("FailedToCreateTagError", () =>
+            Effect.fail(internalError())
+          ),
+          withRemapDbErrors({
+            action: "create",
+            entity: "PublicApiTag",
+            onUniqueViolation: () => conflictError(TAG_NAME_CONFLICT),
+          }),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
 
-      return toPublicApiTagDetail(created);
+      return toPublicApiTagDetail(toTagSource(created));
     })
 );
 
@@ -175,15 +210,19 @@ export const getTagOperation = defineOperation(
   ({ tagId }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiTagRepository;
+      const tags = yield* currentTagRepository;
 
-      const tag = yield* repository
-        .find({ organizationId: caller.organizationId, tagId })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+      const tag = yield* tags
+        .findById({ id: tagId, organizationId: caller.organizationId })
+        .pipe(
+          withRemapDbErrors("PublicApiTag", "select"),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
 
       return yield* Option.match(tag, {
         onNone: () => Effect.fail(notFoundError("Tag not found.")),
-        onSome: (found) => Effect.succeed(toPublicApiTagDetail(found)),
+        onSome: (found) =>
+          Effect.succeed(toPublicApiTagDetail(toTagSource(found))),
       });
     })
 );
@@ -200,15 +239,18 @@ export const updateTagOperation = defineOperation(
   ({ name: rawName, tagId }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiTagRepository;
+      const tags = yield* currentTagRepository;
 
       const name = yield* parseName(rawName);
 
       // The tag is read before the rename so another workspace's tag is a
       // 404 rather than an update that matches no row and answers 200.
-      const tag = yield* repository
-        .find({ organizationId: caller.organizationId, tagId })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+      const tag = yield* tags
+        .findById({ id: tagId, organizationId: caller.organizationId })
+        .pipe(
+          withRemapDbErrors("PublicApiTag", "select"),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
 
       if (Option.isNone(tag)) {
         return yield* notFoundError("Tag not found.");
@@ -220,16 +262,24 @@ export const updateTagOperation = defineOperation(
         organizationId: caller.organizationId,
       });
 
-      const updated = yield* repository
-        .update({ name, organizationId: caller.organizationId, tagId })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+      const updated = yield* tags
+        .update({ id: tagId, name, organizationId: caller.organizationId })
+        .pipe(
+          withRemapDbErrors({
+            action: "update",
+            entity: "PublicApiTag",
+            onUniqueViolation: () => conflictError(TAG_NAME_CONFLICT),
+          }),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
 
       return yield* Option.match(updated, {
         // The read above cannot hold the row still, so a tag deleted between
         // the two is answered as the missing tag it is rather than as a
         // success that renamed nothing.
         onNone: () => Effect.fail(notFoundError("Tag not found.")),
-        onSome: (found) => Effect.succeed(toPublicApiTagDetail(found)),
+        onSome: (found) =>
+          Effect.succeed(toPublicApiTagDetail(toTagSource(found))),
       });
     })
 );
@@ -247,22 +297,28 @@ export const deleteTagOperation = defineOperation(
   ({ tagId }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiTagRepository;
+      const tags = yield* currentTagRepository;
 
       // Deleting a tag that is already gone is a 404 rather than a success:
       // the caller cannot tell a delete that worked from one that named the
       // wrong workspace, and the second is worth knowing.
-      const tag = yield* repository
-        .find({ organizationId: caller.organizationId, tagId })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+      const tag = yield* tags
+        .findById({ id: tagId, organizationId: caller.organizationId })
+        .pipe(
+          withRemapDbErrors("PublicApiTag", "select"),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
 
       if (Option.isNone(tag)) {
         return yield* notFoundError("Tag not found.");
       }
 
-      const deleted = yield* repository
-        .delete({ organizationId: caller.organizationId, tagId })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+      const deleted = yield* tags
+        .delete({ id: tagId, organizationId: caller.organizationId })
+        .pipe(
+          withRemapDbErrors("PublicApiTag", "delete"),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
 
       if (!deleted) {
         return yield* notFoundError("Tag not found.");
@@ -284,21 +340,73 @@ export const setPostTagsOperation = defineOperation(
   ({ postId, tagIds }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiTagRepository;
+      const db = yield* currentPublicApiDatabase;
+      const tags = yield* currentTagRepository;
+      const activities = yield* currentPostActivityRepository;
 
-      // The post is read and locked inside the write's own transaction, so
-      // another workspace's post is a 404, a post deleted mid-request is a
-      // 404 rather than a foreign-key failure, and two replacements of one
-      // post's tags cannot interleave into a set neither caller asked for.
-      const tags = yield* repository
-        .setPostTags({
-          organizationId: caller.organizationId,
-          postId,
-          tagIds,
-        })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+      const wanted = [...new Set(tagIds)];
 
-      return { data: tags.map(toPublicApiTag) };
+      return yield* db
+        .transaction(() =>
+          Effect.gen(function* () {
+            if (wanted.length > 0) {
+              // `key share` is the lock the foreign-key check itself takes: a
+              // tag deleted concurrently either loses the race and is missing
+              // from this read, or waits here until these rows exist and then
+              // cascades them away with it.
+              const known = yield* tags.countExistingTags({
+                lock: "key share",
+                organizationId: caller.organizationId,
+                tagIds: wanted,
+              });
+
+              if (known !== wanted.length) {
+                return yield* invalidRequestError(
+                  "One or more tagIds do not exist in this workspace."
+                );
+              }
+            }
+
+            // The replacement locks the post row and returns what it carried
+            // before, so the write and the timeline entry are decided from the
+            // same snapshot. A post outside this workspace is reported on the
+            // dashboard's policy vocabulary; the published answer is the
+            // missing resource.
+            const replaced = yield* tags
+              .setPostTags({
+                organizationId: caller.organizationId,
+                postId,
+                tagIds: wanted,
+              })
+              .pipe(
+                Effect.catchTag("PolicyDenied", () =>
+                  Effect.fail(notFoundError("Post not found."))
+                )
+              );
+
+            yield* activities.createMany(
+              postTagChangeActivities({
+                previousTagIds: replaced.previousTagIds,
+                nextTagIds: wanted,
+                actor: {
+                  actorId: null,
+                  actorMemberId: null,
+                  organizationId: caller.organizationId,
+                  postId,
+                },
+              })
+            );
+
+            return { data: replaced.tags.map(toPublicApiTag) };
+          })
+        )
+        // One remap for the whole transaction: the repository's id generation,
+        // the tag read, and the timeline write all surface driver failures the
+        // same way, and a failure anywhere rolls the transaction back.
+        .pipe(
+          withRemapDbErrors("PublicApiTag", "update"),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
     })
 );
 
