@@ -16,8 +16,8 @@ import {
   syncPostAssetReferences,
 } from "../asset/service";
 import { BoardRepository } from "../board/repository";
+import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { EmailOutboxRepository } from "../email-outbox/repository";
-import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import {

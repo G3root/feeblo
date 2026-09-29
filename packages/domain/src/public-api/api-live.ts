@@ -17,7 +17,7 @@ import {
   type PostDoesNotAcceptCommentsError,
 } from "../comments/errors";
 import { currentCommentService } from "../comments/service";
-import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
+import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { InvalidSubjectError, SubjectNotFoundError } from "../identity/errors";
 import type { OnBehalfSubject } from "../identity/service";
 import { BadRequestError, InternalServerError } from "../rpc-errors";
