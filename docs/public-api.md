@@ -30,7 +30,10 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 
 | Scope | Grants |
 | --- | --- |
-| `posts.read` | Read posts, their status, tags, and vote and comment counts. Required by both post endpoints. |
+| `posts.read` | Read posts, their status, tags, and vote and comment counts. Required by every post read endpoint. |
+| `posts.create` | Create a post on a board of the calling workspace. |
+| `posts.update` | Update a post's title, body, status, board, or ETA quarter. |
+| `posts.delete` | Delete a post. Deleting cannot be undone. |
 | `tags.read` | Read the workspace's tags through the `/tags` endpoints. A post's embedded tags come with the post, under `posts.read`. |
 | `tags.create` | Create a tag. |
 | `tags.update` | Rename a tag. |
@@ -47,7 +50,7 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 | `companies.delete` | Delete a company, which detaches it from the contacts that belonged to it. |
 | `boards.read` | Reserved for a future board-metadata endpoint. No v1 endpoint requires it, and every key receives it so that endpoint is additive when it ships. |
 
-A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above except the `companies` ones; the `tags` and `changelog` write scopes, and all four `companies` scopes, are granted only when the key is created with them — so a key that was minted to read feedback cannot delete a workspace's tags, broadcast a release note, or learn the customer roster. The CRM grant is opt-in as a whole, read included, because a company is a record about the workspace's own customers rather than the workspace's content. That is also why a key created before a scope existed keeps its narrower grant: rotate the key if an integration needs more than it was issued.
+A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above except the `companies` ones; the `posts`, `tags`, and `changelog` write scopes, and all four `companies` scopes, are granted only when the key is created with them — so a key that was minted to read feedback cannot delete a workspace's posts or tags, broadcast a release note, or learn the customer roster. The CRM grant is opt-in as a whole, read included, because a company is a record about the workspace's own customers rather than the workspace's content. That is also why a key created before a scope existed keeps its narrower grant: rotate the key if an integration needs more than it was issued.
 
 `changelog.publish` is separate from `changelog.update` because publishing is not reversible in the way an edit is: it emails every subscriber. A key that syncs drafts from a CMS can hold `changelog.create` and `changelog.update` and still be unable to broadcast.
 
@@ -99,6 +102,21 @@ GET /api/v1/boards/{boardId}/posts
 }
 ```
 
+### List the workspace's posts
+
+```http
+GET /api/v1/posts
+```
+
+| Query parameter | Default | Notes |
+| --- | --- | --- |
+| `limit` | `25` | 1–100. |
+| `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
+| `status` | — | A status id. |
+| `includeArchived` | `false` | Archived posts are excluded by default. |
+
+Returns the same page shape as a board's list, across every board of the calling workspace, newest first. Private boards are included, for the same reason the board list includes them, and posts merged into another post are never listed. Use `GET /api/v1/boards/{boardId}/posts` to page a single board.
+
 ### Get a post
 
 ```http
@@ -106,6 +124,89 @@ GET /api/v1/posts/{postId}
 ```
 
 Returns the same object plus `content`.
+
+### Retrieve a post
+
+```http
+GET /api/v1/posts/retrieve?id=pst_example
+GET /api/v1/posts/retrieve?boardId=brd_feedback&slug=dark-mode
+```
+
+Returns one post with its sanitized body, in the same shape as `GET /api/v1/posts/{postId}`. Requires `posts.read`.
+
+| Query parameter | Notes |
+| --- | --- |
+| `id` | The post's id. |
+| `slug` | The post's slug, the last segment of its public URL. Requires `boardId`. |
+| `boardId` | The board the post is on. Required when `slug` is given. |
+
+All three are optional; name the post with `id`, or with the `boardId` and `slug` pair from its URL. Every parameter that is present must match, so an `id` combined with the wrong `boardId` is answered with `404 NOT_FOUND` rather than silently resolved. A request that names neither an `id` nor a `slug` is `400 INVALID_REQUEST`, and so is a `slug` without a `boardId`. Posts of other workspaces are reported as not found rather than forbidden, so an id cannot be used to probe another workspace.
+
+### Create a post
+
+```http
+POST /api/v1/posts
+Content-Type: application/json
+
+{
+  "boardId": "brd_feedback",
+  "title": "Dark mode",
+  "content": "Please add a dark theme.",
+  "statusId": "pss_open"
+}
+```
+
+Responds `201` with the created post, in the same shape `GET /api/v1/posts/{postId}` returns. Requires `posts.create`.
+
+The `id` is assigned by the server. The title is trimmed, the body is sanitized before it is stored, and the `slug` is derived from the title and deduplicated: creating `Dark mode` twice yields `dark-mode` and `dark-mode-2` rather than a conflict. `boardId` and `statusId` must name a board and a status of the calling workspace, and anything else is answered with `400 INVALID_REQUEST` and nothing written.
+
+| Field | Default | Notes |
+| --- | --- | --- |
+| `boardId` | — | Required. A board id of the workspace, private boards included. |
+| `title` | — | Required. Trimmed; must not be empty. |
+| `content` | — | Required. Markdown; sanitized before it is stored. |
+| `statusId` | — | Required. A status id of the workspace, as returned inside a post's `status`. |
+| `etaQuarter` | `null` | `2026-Q3`-style, or omitted. |
+
+The post carries `source: API`, and reaches the workspace's integrations, notifications, and search exactly like a submission made in the dashboard. It has **no author**: a machine key is not a member, so `author.displayName` and `author.avatarUrl` are `null` and nobody is subscribed to it as its creator. The workspace's admins and owners are notified of the submission the same way a widget submission notifies them. A body may embed the URL of media already in the workspace, but the post is not recorded as referencing it — see [Data exposure](#data-exposure).
+
+### Update a post
+
+```http
+PATCH /api/v1/posts/{postId}
+Content-Type: application/json
+
+{
+  "title": "Dark mode for everyone",
+  "statusId": "pss_planned"
+}
+```
+
+Responds `200` with the post afterwards. Requires `posts.update`.
+
+An omitted field is left as it is and an explicit `null` clears a nullable one, so `"etaQuarter": null` removes the estimate. A body that names no field at all is answered with `400 INVALID_REQUEST` rather than as a write that changed nothing. The `id`, `slug`, author, vote and comment counts, and timestamps are not writable; changing the title does not change the `slug`, so a link a reader already has keeps working.
+
+| Field        | Notes                                        |
+| ------------ | -------------------------------------------- |
+| `title`      | Trimmed; must not be empty.                  |
+| `content`    | Markdown; sanitized before it is stored.     |
+| `statusId`   | A status id of the workspace.                |
+| `boardId`    | A board id of the workspace; moves the post. |
+| `etaQuarter` | `2026-Q3`-style, or `null` to clear.         |
+
+Every change is recorded in the post's timeline, with no actor, and a status change notifies the post's subscribers exactly as the same change from the dashboard would — including the coalescing window, so several quick status changes send one email rather than one each. An image the post already referenced keeps its reference while the body still shows it, and loses it when the body stops; a URL the update introduces is not recorded as a reference, for the same reason a create's is not ([Data exposure](#data-exposure)). A post that has been merged into another is answered with `400 INVALID_REQUEST`: it is still readable, but it is superseded and its changes belong on the survivor.
+
+### Delete a post
+
+```http
+DELETE /api/v1/posts/{postId}
+```
+
+Responds `204` with no body. Requires `posts.delete`.
+
+The post is gone immediately and cannot be restored; its comments, votes, tags, and activity go with it. Unlike the dashboard, a key holding this scope deletes without the creator and engagement restriction — it is the workspace's own credential, not a member acting on their own posts. Deleting a post that had absorbed merged duplicates restores those duplicates to the board first, exactly as the dashboard does.
+
+A post that has been merged into another is answered with `400 INVALID_REQUEST` rather than being deleted, and a post that is already gone is answered with `404 NOT_FOUND` rather than a success that deleted nothing.
 
 ### List tags
 
@@ -265,6 +366,8 @@ Responds `201` with the created entry. Requires `changelog.create`, and addition
 
 The `id` is assigned by the server. The `slug` is derived from the title unless one is sent, and a sent slug is normalized the same way, so `UI Kit` and `ui-kit` are one entry rather than two. `excerpt` is derived from the body, and the body is sanitized before it is stored, exactly as the dashboard sanitizes it. A slug already used in the workspace is answered with `409 CONFLICT`.
 
+A `coverImage` that names a workspace media URL is recorded as the entry referencing that asset, so the entry keeps it alive. An image embedded in the body is not recorded as a reference — see [Data exposure](#data-exposure).
+
 | Field | Default | Notes |
 | --- | --- | --- |
 | `title` | — | Required. Trimmed; must not be empty. |
@@ -291,7 +394,7 @@ Content-Type: application/json
 
 Responds `200` with the updated entry. Requires `changelog.update`.
 
-The fields sent are the entry's new state — the update replaces them rather than merging. `status` is required here, unlike on a create: an update that left it out would move an entry by omission. The same field rules as a create apply to `title`, `slug`, `content`, `coverImage`, `scheduledAt`, and `publishedAt`.
+The fields sent are the entry's new state — the update replaces them rather than merging. `status` is required here, unlike on a create: an update that left it out would move an entry by omission. The same field rules as a create apply to `title`, `slug`, `content`, `coverImage`, `scheduledAt`, and `publishedAt`, and so does the media rule: a `coverImage` referencing a workspace asset is recorded as a reference, a body image is not ([Data exposure](#data-exposure)).
 
 Moving an entry **into** `published` — from `draft` or `scheduled` — also requires `changelog.publish`, and records the publication email intent. Editing an entry that is already published does not: it is an ordinary edit, and subscribers are not emailed again. Use the dashboard's "Send update" action when an edit should be announced.
 
@@ -403,13 +506,13 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 
 | Status | `_tag` | Meaning |
 | --- | --- | --- |
-| 400 | `INVALID_REQUEST` | Malformed parameter, cursor, or limit; a body the endpoint cannot decode; a name that is only whitespace; an update that names no field. |
+| 400 | `INVALID_REQUEST` | Malformed parameter, cursor, or limit; a body the endpoint cannot decode; a name or title that is only whitespace; an update that names no field; a board or status id that is not in the workspace; a post that has been merged into another. |
 | 401 | `MISSING_API_KEY` | No `x-api-key` header was sent. |
 | 401 | `INVALID_API_KEY` | The key is unknown, revoked, expired, or disabled. |
 | 403 | `FORBIDDEN_SCOPE` | The key lacks the scope the endpoint requires. |
 | 403 | `PLAN_REQUIRES_UPGRADE` | The workspace plan does not include the Public API, or has no room left in a limit it sets — such as CRM entries. |
 | 404 | `NOT_FOUND` | The resource does not exist in this workspace. |
-| 409 | `CONFLICT` | A write collided with something that already exists, such as a tag name or a company name or external id, already in use. |
+| 409 | `CONFLICT` | A write collided with something that already exists, such as a tag name or a company name or external id already in use, a changelog slug already taken, or a post title whose slug suffixes are all taken. |
 | 429 | `RATE_LIMITED` | Per-key rate limit exceeded. Carries `Retry-After` in seconds. |
 | 500 | `INTERNAL_ERROR` | Unexpected server failure. |
 | 503 | `SERVICE_UNAVAILABLE` | A required dependency is unavailable; requests fail closed. |
@@ -438,9 +541,11 @@ The Public API never returns:
 
 `author` is always `{ type, displayName, avatarUrl }`: `type` is `member` or `end_user` and distinguishes workspace staff from end users. Display names are included because the workspace already sees them on public boards and the dashboard; they are the workspace's own data. Emails are deliberately excluded — a key travels into third-party infrastructure (an integration platform, a partner's backend, a CI log), and that is a different blast radius from a signed-in session.
 
+A post created, changed, or deleted with an API key has **no author and no actor**: a machine key is not a member, so the post's `author` has `null` display name and avatar, and the entries the API writes to the post's timeline have no actor. The dashboard shows those entries as "Someone", which is true and better than a post whose history silently changes.
+
 Changelog entries carry no author at all: the dashboard's entry rows hold `creatorId` and `creatorMemberId`, and neither has a field in this API. Publishing through the API records the email intent and the in-app notification with no actor, exactly as a key's tag changes have no actor in a post's timeline.
 
-Post `content` is sanitized before it is stored, so the body the API returns is the same sanitized content the dashboard and the public portal render. Tags carry a name and a slug, nothing else — a tag's creator is an internal identifier and is never returned.
+Post and changelog `content` is sanitized before it is stored, so the body the API returns is the same sanitized content the dashboard and the public portal render. Editor media is the one thing a body can name that the API does not manage: a dashboard editor submits the ids of the media it attached, and those ids are what record which posts and entries reference an asset, while a machine key has none to submit. A body may still embed a workspace media URL, but the resource is not recorded as referencing it, so media whose only remaining use is such a body can be removed by the workspace's own cleanup — keep the asset attached to a dashboard-authored post or entry, or host the image yourself. A changelog entry's `coverImage` is the exception: it is resolved by URL and does keep its asset. Tags carry a name and a slug, nothing else — a tag's creator is an internal identifier and is never returned.
 
 A company carries its name, avatar, your `externalId`, and `source`. Its contacts are not exposed and neither are the custom attribute values a workspace may have defined for companies: those definitions are a workspace-specific vocabulary, so they would need their own contract rather than a field on this one. The workspace is never named in a payload either — a key reads exactly one workspace, so an `organizationId` would be the same string on every response and would invite a filter parameter that would then have to be validated against the key. `source` is the exception that proves the rule: it is bookkeeping about where the row came from, not about who it belongs to, and it is what lets a sync tell its own records from the dashboard's.
 
@@ -463,6 +568,6 @@ Anything that cannot respect those rules ships as `/api/v2`. When a v2 exists, v
 
 Keys are managed in the dashboard under **Settings → Developers**, restricted to workspace admins and owners. The list shows a key's name and its first characters — `fbk_ab…` — which is enough to identify a key without exposing it. The plaintext value is displayed once, at creation. Revocation takes effect immediately and is not reversible.
 
-When a key is created you choose its access: **Read only**, **Read and manage tags**, **Read and manage changelog**, or **Read and manage tags and changelog**. The choice fixes the key's scopes for its whole life, so pick the narrowest one the integration needs. Publishing is part of the changelog choice because it emails subscribers, so a key that only syncs drafts is not granted it.
+When a key is created you choose its capabilities with one checkbox each: **Manage posts**, **Manage tags**, **Manage changelog**, and **Manage companies**. Every key reads the workspace's posts, tags, and changelog entries; a capability is the write half of one of those, and publishing is part of the changelog choice because it emails subscribers. The CRM capability is opt-in as a whole — reads included — because a company is a record about the workspace's own customers rather than the workspace's content. The choice fixes the key's scopes for its whole life, so pick the narrowest set the integration needs.
 
 Use one key per integration so that revoking one does not interrupt the others.

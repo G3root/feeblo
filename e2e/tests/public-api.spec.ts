@@ -55,8 +55,9 @@ test.describe("public API keys", () => {
       await test.step("create a key and read the one-time value", async () => {
         await newKeyButton.click();
         await page.getByLabel("Name").fill("Production sync");
-        // A capability, not an access level: the CRM grant is never implied by
-        // asking for a key, so the sheet has to be told to include it.
+        // Capabilities, not an access level: no write scope is implied by
+        // asking for a key, so the sheet has to be told which ones to include.
+        await page.getByRole("checkbox", { name: "Manage posts" }).check();
         await page.getByRole("checkbox", { name: "Manage companies" }).check();
         await page.getByRole("button", { name: "Create key" }).click();
 
@@ -85,6 +86,36 @@ test.describe("public API keys", () => {
         expect(await anonymous.json()).toMatchObject({
           _tag: "MISSING_API_KEY",
         });
+      });
+
+      await test.step("the posts capability reaches the post endpoints", async () => {
+        // The workspace-wide list exists and needs no id, so it is the one
+        // post read that can be exercised without a fixture.
+        const listed = await request.get(`${apiURL}/api/v1/posts`, {
+          headers: { "x-api-key": apiKey },
+        });
+        expect(listed.status()).toBe(200);
+        expect(Array.isArray((await listed.json()).data)).toBe(true);
+
+        // A retrieve that names no post is the documented invalid request,
+        // which only happens after the key, plan, and scope have passed.
+        const retrieve = await request.get(`${apiURL}/api/v1/posts/retrieve`, {
+          headers: { "x-api-key": apiKey },
+        });
+        expect(retrieve.status()).toBe(400);
+        expect(await retrieve.json()).toMatchObject({
+          _tag: "INVALID_REQUEST",
+        });
+
+        // The scope is checked before the post is looked up, so `404` proves
+        // the key holds `posts.delete`; without it this would be `403`.
+        const missing = await request.delete(
+          `${apiURL}/api/v1/posts/pst_missing`,
+          { headers: { "x-api-key": apiKey } }
+        );
+
+        expect(missing.status()).toBe(404);
+        expect(await missing.json()).toMatchObject({ _tag: "NOT_FOUND" });
       });
 
       await test.step("the CRM grant reaches the company endpoints", async () => {

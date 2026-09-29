@@ -241,6 +241,11 @@ export const makeServiceLayers = ({
     workflowLayer,
     SiteRepository.layer,
     EmailOutboxRepository.layer,
+    // The Public API's post writes record integration events, and the recorder
+    // snapshots the post's URL into the event. Required rather than provided
+    // per-layer, so the one value is built from the server's own `APP_URL` and
+    // `API_URL` instead of a second read of the environment.
+    EmailOutboxConfig.layer,
     EmailProviderFeedbackConfig.layer,
     EmailProviderFeedbackService.layer,
     SesEmailFeedbackWebhook.layer.pipe(

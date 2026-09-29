@@ -1,9 +1,16 @@
+import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
 import * as Layer from "effect/Layer";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
+import { BoardRepository } from "../board/repository";
 import { EmailOutboxRepository } from "../email-outbox/repository";
+import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
 import { PostActivityRepository } from "../post-activity/repository";
+import { PostSubscriptionRepository } from "../post-subscription/repository";
+import { PostEmbeddingService } from "../post/embedding-service";
+import { PostRepository } from "../post/repository";
+import { UserRepository } from "../user/repository";
 import { PublicApi } from "./api-contract";
 import { PublicApiLive } from "./api-live";
 import {
@@ -34,20 +41,32 @@ import { PublicApiRepository } from "./repository";
  * does: the repository records tag changes in a post's timeline, so it needs
  * the activity repository at construction time; publishing a changelog entry
  * records a durable email intent and notifies subscribers through the same
- * helper the dashboard uses. A new private dependency is therefore one line
- * here, not an edit in every place that assembles a server or a test.
+ * helper the dashboard uses; and creating, changing, or deleting a post goes
+ * through the dashboard's own shared write path (`post/write.ts`), which needs
+ * the board and post repositories, the creator subscription, the integration
+ * event recorder, the notification fan-out, and the embedding scheduler. A new
+ * private dependency is therefore one line here, not an edit in every place
+ * that assembles a server or a test.
  *
  * Everything the surface shares — the database, `Auth`, the rate limiter, the
- * plan decision, media storage, and its own `PublicApiConfig` — stays a
- * requirement instead, so whoever assembles the server supplies the real
- * service, and a test supplies the substitute it needs (`S3Test`, a smaller
- * rate-limit budget, a `PublicApiConfig.layerTest`) without restating the
- * surface's private wiring.
+ * plan decision, media storage, the email subscription repository (whose token
+ * service reads `AUTH_ENCRYPTION_KEY`, a credential the server already builds
+ * once), and its own `PublicApiConfig` — stays a requirement instead, so
+ * whoever assembles the server supplies the real service, and a test supplies
+ * the substitute it needs (`S3Test`, a smaller rate-limit budget, a
+ * `PublicApiConfig.layerTest`) without restating the surface's private wiring.
  */
-const PublicApiInternals = Layer.mergeAll(
+export const PublicApiInternals = Layer.mergeAll(
+  BoardRepository.layer,
   EmailOutboxRepository.layer,
+  IntegrationEventRecorderLive,
   NotificationService.layer,
-  PostActivityRepository.layer
+  PostActivityRepository.layer,
+  PostEmbeddingService.layer,
+  PostRepository.layer,
+  PostSubscriptionRepository.layer,
+  ResolvePrincipalService.layer,
+  UserRepository.layer
 );
 
 /**

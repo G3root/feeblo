@@ -1,6 +1,7 @@
 import { NodeHttpPlatform, NodeServices } from "@effect/platform-node";
 import { expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
+import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
 import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
@@ -16,7 +17,10 @@ import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 import type { ApiKeyAuthRecord } from "../api-key/schema";
 import { Auth } from "../auth-handler";
+import { EmailOutboxConfig } from "../email-outbox/config";
 import { EmailOutboxRepository } from "../email-outbox/repository";
+import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { PolicyDeniedError } from "../policy";
 import { RateLimitService } from "../rate-limit/service";
@@ -166,10 +170,25 @@ const makePublicApiDependencies = (
     // The route owns the layers only it reads (`PublicApiInternals` in
     // `router.ts`). What is listed here is the shared layers it requires, with
     // the substitutes standing in for the production ones: the plan decision,
-    // media storage, the session seam, the rate-limit budget, and the
-    // application URL.
+    // media storage, the session seam, the rate-limit budget, the runtime URLs
+    // used to snapshot email links, and the application URL.
     PublicApiConfig.layerTest(new URL("https://app.feeblo.test")),
+    // Post writes record integration events, and the recorder snapshots the
+    // post's URL into the event. The test supplies its own URLs rather than
+    // requiring `APP_URL`/`API_URL` in the environment.
+    EmailOutboxConfig.layerTest(new URL("https://app.feeblo.test")),
     entitlements,
+    // The surface requires the subscription repository — its post write path
+    // subscribes a post's creator — and its token service reads
+    // `AUTH_ENCRYPTION_KEY`. The test supplies a deterministic secret the way
+    // the post handler suite does.
+    EmailSubscriptionRepository.layerWithoutDependencies.pipe(
+      Layer.provide(
+        EmailSubscriptionTokenService.layerTest(
+          "public-api-test-signing-secret"
+        )
+      )
+    ),
     // Merged, not only provided: a test asserts the email intent a publish
     // records, and the layer is the only way a test body reaches the outbox.
     EmailOutboxRepository.layer,
@@ -370,10 +389,14 @@ const seedWorkspace = (
 ) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
-    const organizationId = `org_${Math.random().toString(36).slice(2, 10)}`;
-    const boardId = `brd_${organizationId}`;
-    const statusId = `pss_${organizationId}`;
-    const postId = `pst_${organizationId}`;
+    // Minted through the legid factories rather than spelled out: the post
+    // write path parses a board, status, workspace, and post id back into
+    // branded ids when it records an integration event, so a fixture that
+    // looked like one would fail there and nowhere else.
+    const organizationId = yield* WorkspaceId.generate;
+    const boardId = yield* BoardId.generate;
+    const statusId = yield* PostStatusId.generate;
+    const postId = yield* PostId.generate;
     const now = new Date();
 
     yield* db.insert(schema.organizationTable).values({
@@ -457,7 +480,7 @@ const seedWorkspace = (
 
     if (options.includeArchivedPost === true) {
       yield* db.insert(schema.postTable).values({
-        id: `${postId}_archived`,
+        id: yield* PostId.generate,
         title: "Archived",
         slug: "archived",
         content: "<p>Archived body</p>",
@@ -551,6 +574,20 @@ const COMPANY_MANAGEMENT_KEY_SCOPES = {
   posts: ["read"],
   tags: ["read"],
   companies: ["read", "create", "update", "delete"],
+};
+
+/** The post reads plus every post write. */
+const POST_MANAGEMENT_KEY_SCOPES = {
+  boards: ["read"],
+  posts: ["read", "create", "update", "delete"],
+  tags: ["read"],
+};
+
+/** The post writes without the delete scope, to pin that it is required. */
+const POST_EDITOR_KEY_SCOPES = {
+  boards: ["read"],
+  posts: ["read", "create", "update"],
+  tags: ["read"],
 };
 
 const registerKey = (
@@ -838,6 +875,770 @@ layer(makeTestApp())("public api v1", (it) => {
       const listBody = decodePage(responseBody(list));
       // Only the detail projection carries `content`.
       expect(listBody.data.at(0)).not.toHaveProperty("content");
+    })
+  );
+
+  it.effect(
+    "lists the workspace's posts across every board, newest first",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace({
+          postCount: 2,
+          includeArchivedPost: true,
+        });
+        registerKey("fbk_posts_list", workspace.organizationId);
+
+        // A second board with a newer post, so the workspace list is provably
+        // not just the first board's.
+        const db = yield* currentDb;
+        const now = new Date();
+        const otherBoardId = yield* BoardId.generate;
+        const otherPostId = yield* PostId.generate;
+        yield* db.insert(schema.boardTable).values({
+          id: otherBoardId,
+          name: "Roadmap",
+          slug: "roadmap",
+          visibility: "PUBLIC",
+          organizationId: workspace.organizationId,
+          createdAt: now,
+        });
+        yield* db.insert(schema.postTable).values({
+          id: otherPostId,
+          title: "On another board",
+          slug: "on-another-board",
+          content: "<p>Body</p>",
+          excerpt: "Body",
+          boardId: otherBoardId,
+          statusId: workspace.statusId,
+          organizationId: workspace.organizationId,
+          createdAt: new Date(now.getTime() + 60_000),
+          updatedAt: now,
+        });
+
+        const response = yield* executeRequest(
+          "/api/v1/posts",
+          "fbk_posts_list"
+        );
+        expect(response.status).toBe(200);
+        const page = decodePage(responseBody(response));
+        expect(page.data.map((post) => post.id)).toEqual([
+          otherPostId,
+          workspace.postId,
+          `${workspace.postId}_1`,
+        ]);
+        expect(page.data.map((post) => post.boardId)).toEqual([
+          otherBoardId,
+          workspace.boardId,
+          workspace.boardId,
+        ]);
+        expect(page.nextCursor).toBeNull();
+
+        // Same paging rule as the board list: one row per page and the cursor
+        // walks to the next.
+        const firstPage = yield* executeRequest(
+          "/api/v1/posts?limit=1",
+          "fbk_posts_list"
+        );
+        const firstBody = decodePage(responseBody(firstPage));
+        expect(firstBody.data.map((post) => post.id)).toEqual([otherPostId]);
+        expect(firstBody.nextCursor).toBeTypeOf("string");
+
+        const secondPage = yield* executeRequest(
+          `/api/v1/posts?limit=1&cursor=${encodeURIComponent(firstBody.nextCursor ?? "")}`,
+          "fbk_posts_list"
+        );
+        expect(
+          decodePage(responseBody(secondPage)).data.map((post) => post.id)
+        ).toEqual([workspace.postId]);
+
+        // Archived posts are excluded by default and appear on request.
+        const withArchived = yield* executeRequest(
+          "/api/v1/posts?includeArchived=true",
+          "fbk_posts_list"
+        );
+        expect(
+          decodePage(responseBody(withArchived)).data.map((post) => post.title)
+        ).toContain("Archived");
+      })
+  );
+
+  it.effect("keeps the workspace list inside the calling workspace", () =>
+    Effect.gen(function* () {
+      const mine = yield* seedWorkspace();
+      const theirs = yield* seedWorkspace();
+      registerKey("fbk_list_mine", mine.organizationId);
+      registerKey("fbk_list_theirs", theirs.organizationId);
+
+      const response = yield* executeRequest("/api/v1/posts", "fbk_list_mine");
+      const page = decodePage(responseBody(response));
+      expect(page.data.map((post) => post.id)).toContain(mine.postId);
+      expect(page.data.map((post) => post.id)).not.toContain(theirs.postId);
+    })
+  );
+
+  it.effect("retrieves a post by id, or by board and slug", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_retrieve", workspace.organizationId);
+
+      const byId = yield* executeRequest(
+        `/api/v1/posts/retrieve?id=${workspace.postId}`,
+        "fbk_retrieve"
+      );
+      expect(byId.status).toBe(200);
+      const fromId = decodePost(responseBody(byId));
+      expect(fromId.id).toBe(workspace.postId);
+      // The retrieve projection is the detail one: the body is included.
+      expect(fromId.content).toBe("<p>Sanitized body</p>");
+
+      const bySlug = yield* executeRequest(
+        `/api/v1/posts/retrieve?boardId=${workspace.boardId}&slug=post-0`,
+        "fbk_retrieve"
+      );
+      expect(bySlug.status).toBe(200);
+      expect(decodePost(responseBody(bySlug)).id).toBe(workspace.postId);
+
+      // Every identifier present must match, so all three agreeing is one
+      // post and an id with the wrong board is not that post.
+      const allThree = yield* executeRequest(
+        `/api/v1/posts/retrieve?id=${workspace.postId}&boardId=${workspace.boardId}&slug=post-0`,
+        "fbk_retrieve"
+      );
+      expect(allThree.status).toBe(200);
+
+      const db = yield* currentDb;
+      const otherBoardId = yield* BoardId.generate;
+      yield* db.insert(schema.boardTable).values({
+        id: otherBoardId,
+        name: "Roadmap",
+        slug: "roadmap",
+        visibility: "PUBLIC",
+        organizationId: workspace.organizationId,
+        createdAt: new Date(),
+      });
+
+      const wrongBoard = yield* executeRequest(
+        `/api/v1/posts/retrieve?id=${workspace.postId}&boardId=${otherBoardId}`,
+        "fbk_retrieve"
+      );
+      expect(wrongBoard.status).toBe(404);
+      expect(decodeError(responseBody(wrongBoard))._tag).toBe("NOT_FOUND");
+    })
+  );
+
+  it.effect(
+    "rejects a retrieve that names nothing, or a slug with no board",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        registerKey("fbk_retrieve", workspace.organizationId);
+
+        const nothing = yield* executeRequest(
+          "/api/v1/posts/retrieve",
+          "fbk_retrieve"
+        );
+        expect(nothing.status).toBe(400);
+        expect(decodeError(responseBody(nothing))._tag).toBe("INVALID_REQUEST");
+
+        // A board alone does not name a post.
+        const boardOnly = yield* executeRequest(
+          `/api/v1/posts/retrieve?boardId=${workspace.boardId}`,
+          "fbk_retrieve"
+        );
+        expect(boardOnly.status).toBe(400);
+
+        // The pairing rule: a slug is only meaningful next to a board.
+        const slugOnly = yield* executeRequest(
+          "/api/v1/posts/retrieve?slug=post-0",
+          "fbk_retrieve"
+        );
+        expect(slugOnly.status).toBe(400);
+        expect(decodeError(responseBody(slugOnly)).message).toContain(
+          "boardId"
+        );
+
+        // A blank parameter is not an identifier.
+        const blank = yield* executeRequest(
+          "/api/v1/posts/retrieve?id=",
+          "fbk_retrieve"
+        );
+        expect(blank.status).toBe(400);
+      })
+  );
+
+  it.effect("reports another workspace's post as not found on retrieve", () =>
+    Effect.gen(function* () {
+      const mine = yield* seedWorkspace();
+      const theirs = yield* seedWorkspace();
+      registerKey("fbk_retrieve_mine", mine.organizationId);
+
+      const byId = yield* executeRequest(
+        `/api/v1/posts/retrieve?id=${theirs.postId}`,
+        "fbk_retrieve_mine"
+      );
+      expect(byId.status).toBe(404);
+      expect(decodeError(responseBody(byId))._tag).toBe("NOT_FOUND");
+
+      // Their board id does not make their slug retrievable either.
+      const bySlug = yield* executeRequest(
+        `/api/v1/posts/retrieve?boardId=${theirs.boardId}&slug=post-0`,
+        "fbk_retrieve_mine"
+      );
+      expect(bySlug.status).toBe(404);
+    })
+  );
+
+  it.effect("refuses the post reads without the posts.read scope", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_boards_only", workspace.organizationId, {
+        boards: ["read"],
+      });
+
+      const list = yield* executeRequest("/api/v1/posts", "fbk_boards_only");
+      expect(list.status).toBe(403);
+      expect(decodeError(responseBody(list))._tag).toBe("FORBIDDEN_SCOPE");
+
+      const retrieve = yield* executeRequest(
+        `/api/v1/posts/retrieve?id=${workspace.postId}`,
+        "fbk_boards_only"
+      );
+      expect(retrieve.status).toBe(403);
+      expect(decodeError(responseBody(retrieve)).message).toContain(
+        "posts.read"
+      );
+    })
+  );
+
+  it.effect("creates a post, trimming its title and sanitizing its body", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_editor",
+        workspace.organizationId,
+        POST_EDITOR_KEY_SCOPES
+      );
+
+      const created = yield* executeWrite("POST", "/api/v1/posts", {
+        apiKey: "fbk_post_editor",
+        body: {
+          boardId: workspace.boardId,
+          title: "  Dark mode  ",
+          content: "Dark mode please\n\n<script>alert(1)</script>",
+          statusId: workspace.statusId,
+        },
+      });
+
+      expect(created.status).toBe(201);
+      const post = decodePost(responseBody(created));
+      // The id is minted server-side; a caller does not choose identifiers.
+      expect(post.id).toMatch(/^pst_/);
+      expect(post.title).toBe("Dark mode");
+      expect(post.slug).toBe("dark-mode");
+      expect(post.boardId).toBe(workspace.boardId);
+      expect(post.status.id).toBe(workspace.statusId);
+      expect(post.content).not.toContain("<script>");
+      expect(post.excerpt.length).toBeGreaterThan(0);
+      expect(post.voteCount).toBe(0);
+      expect(post.commentCount).toBe(0);
+      expect(post.tags).toEqual([]);
+      // A machine key is not a member: there is no author to name.
+      expect(post.author).toEqual({
+        type: "end_user",
+        displayName: null,
+        avatarUrl: null,
+      });
+
+      const db = yield* currentDb;
+      const [row] = yield* db
+        .select({
+          creatorId: schema.postTable.creatorId,
+          creatorMemberId: schema.postTable.creatorMemberId,
+          source: schema.postTable.source,
+        })
+        .from(schema.postTable)
+        .where(eq(schema.postTable.id, post.id));
+      expect(row?.source).toBe("API");
+      expect(row?.creatorId).toBeNull();
+      expect(row?.creatorMemberId).toBeNull();
+
+      // The shared write path ran its dashboard work: the timeline records the
+      // creation, with no actor, because a key is not a member.
+      const activities = yield* db
+        .select({
+          actorId: schema.postActivityTable.actorId,
+          kind: schema.postActivityTable.kind,
+        })
+        .from(schema.postActivityTable)
+        .where(eq(schema.postActivityTable.postId, post.id));
+      expect(activities.map((activity) => activity.kind)).toEqual([
+        "POST_CREATED",
+      ]);
+      expect(activities.at(0)?.actorId).toBeNull();
+    })
+  );
+
+  it.effect("refuses a post write without the write scope", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_posts_read_only", workspace.organizationId);
+
+      const response = yield* executeWrite("POST", "/api/v1/posts", {
+        apiKey: "fbk_posts_read_only",
+        body: {
+          boardId: workspace.boardId,
+          title: "Nope",
+          content: "Nope",
+          statusId: workspace.statusId,
+        },
+      });
+
+      expect(response.status).toBe(403);
+      const body = decodeError(responseBody(response));
+      expect(body._tag).toBe("FORBIDDEN_SCOPE");
+      expect(body.message).toContain("posts.create");
+    })
+  );
+
+  it.effect("rejects a board or status the workspace does not have", () =>
+    Effect.gen(function* () {
+      const mine = yield* seedWorkspace();
+      const theirs = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_editor",
+        mine.organizationId,
+        POST_EDITOR_KEY_SCOPES
+      );
+
+      const foreignBoard = yield* executeWrite("POST", "/api/v1/posts", {
+        apiKey: "fbk_post_editor",
+        body: {
+          boardId: theirs.boardId,
+          title: "Foreign board",
+          content: "Body",
+          statusId: mine.statusId,
+        },
+      });
+      // A board from another workspace is a request the caller can fix, not a
+      // 404 (the endpoint makes the resource) and not a server error.
+      expect(foreignBoard.status).toBe(400);
+      expect(decodeError(responseBody(foreignBoard))._tag).toBe(
+        "INVALID_REQUEST"
+      );
+
+      const unknownStatus = yield* executeWrite("POST", "/api/v1/posts", {
+        apiKey: "fbk_post_editor",
+        body: {
+          boardId: mine.boardId,
+          title: "Unknown status",
+          content: "Body",
+          statusId: "pss_not_a_status",
+        },
+      });
+      expect(unknownStatus.status).toBe(400);
+      expect(decodeError(responseBody(unknownStatus))._tag).toBe(
+        "INVALID_REQUEST"
+      );
+    })
+  );
+
+  it.effect("measures a title's length after trimming it", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_editor",
+        workspace.organizationId,
+        POST_EDITOR_KEY_SCOPES
+      );
+
+      // The maximum, padded: the old raw-length check would have rejected
+      // this, while the dashboard accepts it and stores it trimmed.
+      const title = "a".repeat(200);
+      const padded = yield* executeWrite("POST", "/api/v1/posts", {
+        apiKey: "fbk_post_editor",
+        body: {
+          boardId: workspace.boardId,
+          title: `  ${title}  `,
+          content: "Body",
+          statusId: workspace.statusId,
+        },
+      });
+
+      expect(padded.status).toBe(201);
+      expect(decodePost(responseBody(padded)).title).toBe(title);
+
+      // Padding does not excuse a title that is too long once trimmed.
+      const tooLong = yield* executeWrite("POST", "/api/v1/posts", {
+        apiKey: "fbk_post_editor",
+        body: {
+          boardId: workspace.boardId,
+          title: `  ${"a".repeat(201)}  `,
+          content: "Body",
+          statusId: workspace.statusId,
+        },
+      });
+      expect(tooLong.status).toBe(400);
+      expect(decodeError(responseBody(tooLong))._tag).toBe("INVALID_REQUEST");
+    })
+  );
+
+  it.effect("rejects a title that is only whitespace", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_editor",
+        workspace.organizationId,
+        POST_EDITOR_KEY_SCOPES
+      );
+
+      const response = yield* executeWrite("POST", "/api/v1/posts", {
+        apiKey: "fbk_post_editor",
+        body: {
+          boardId: workspace.boardId,
+          title: "   ",
+          content: "Body",
+          statusId: workspace.statusId,
+        },
+      });
+
+      expect(response.status).toBe(400);
+      const body = decodeError(responseBody(response));
+      expect(body._tag).toBe("INVALID_REQUEST");
+      expect(body.message).toContain("title");
+    })
+  );
+
+  it.effect(
+    "deduplicates a title's slug instead of refusing the second post",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        registerKey(
+          "fbk_post_editor",
+          workspace.organizationId,
+          POST_EDITOR_KEY_SCOPES
+        );
+
+        const body = {
+          boardId: workspace.boardId,
+          title: "Dark mode",
+          content: "Body",
+          statusId: workspace.statusId,
+        };
+        const first = yield* executeWrite("POST", "/api/v1/posts", {
+          apiKey: "fbk_post_editor",
+          body,
+        });
+        const second = yield* executeWrite("POST", "/api/v1/posts", {
+          apiKey: "fbk_post_editor",
+          body,
+        });
+
+        // Slugs are unique per workspace and two posts really may share a title,
+        // so the create suffixes rather than colliding.
+        expect(first.status).toBe(201);
+        expect(second.status).toBe(201);
+        expect(decodePost(responseBody(first)).slug).toBe("dark-mode");
+        expect(decodePost(responseBody(second)).slug).toBe("dark-mode-2");
+      })
+  );
+
+  it.effect("reports a title whose slug space is exhausted as a conflict", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_editor",
+        workspace.organizationId,
+        POST_EDITOR_KEY_SCOPES
+      );
+
+      const body = {
+        boardId: workspace.boardId,
+        title: "Duplicate",
+        content: "Body",
+        statusId: workspace.statusId,
+      };
+
+      // The create suffixes a taken slug, so the tenth identical title still
+      // succeeds; the attempt after that has no suffix left and is the only
+      // way this endpoint answers a conflict.
+      for (let index = 0; index < 10; index += 1) {
+        const created = yield* executeWrite("POST", "/api/v1/posts", {
+          apiKey: "fbk_post_editor",
+          body,
+        });
+        expect(created.status).toBe(201);
+      }
+
+      const exhausted = yield* executeWrite("POST", "/api/v1/posts", {
+        apiKey: "fbk_post_editor",
+        body,
+      });
+      expect(exhausted.status).toBe(409);
+      expect(decodeError(responseBody(exhausted))._tag).toBe("CONFLICT");
+    })
+  );
+
+  it.effect(
+    "updates a post's fields and answers with the post afterwards",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        registerKey(
+          "fbk_post_editor",
+          workspace.organizationId,
+          POST_MANAGEMENT_KEY_SCOPES
+        );
+
+        // A second board and status, so the update has somewhere to move the
+        // post and something to change its status to.
+        const db = yield* currentDb;
+        const now = new Date();
+        const otherBoardId = yield* BoardId.generate;
+        const otherStatusId = yield* PostStatusId.generate;
+        yield* db.insert(schema.boardTable).values({
+          id: otherBoardId,
+          name: "Roadmap",
+          slug: "roadmap",
+          visibility: "PUBLIC",
+          organizationId: workspace.organizationId,
+          createdAt: now,
+        });
+        yield* db.insert(schema.postStatusTable).values({
+          id: otherStatusId,
+          type: "IN_PROGRESS",
+          label: "In progress",
+          orderIndex: 1,
+          organizationId: workspace.organizationId,
+          createdAt: now,
+        });
+
+        const response = yield* executeWrite(
+          "PATCH",
+          `/api/v1/posts/${workspace.postId}`,
+          {
+            apiKey: "fbk_post_editor",
+            body: {
+              title: "Dark mode, shipped",
+              content: "It is live",
+              statusId: otherStatusId,
+              boardId: otherBoardId,
+              etaQuarter: "2026-Q4",
+            },
+          }
+        );
+
+        expect(response.status).toBe(200);
+        const post = decodePost(responseBody(response));
+        expect(post.id).toBe(workspace.postId);
+        expect(post.title).toBe("Dark mode, shipped");
+        expect(post.content).toContain("It is live");
+        expect(post.status.id).toBe(otherStatusId);
+        expect(post.boardId).toBe(otherBoardId);
+        expect(post.etaQuarter).toBe("2026-Q4");
+
+        // Every change is on the post's timeline, and the actor columns stay
+        // empty: the key is not a member and must not borrow one.
+        const activities = yield* db
+          .select({
+            actorId: schema.postActivityTable.actorId,
+            kind: schema.postActivityTable.kind,
+          })
+          .from(schema.postActivityTable)
+          .where(eq(schema.postActivityTable.postId, workspace.postId));
+        expect(activities.map((activity) => activity.kind).sort()).toEqual([
+          "BOARD_CHANGED",
+          "CONTENT_CHANGED",
+          "ETA_CHANGED",
+          "STATUS_CHANGED",
+          "TITLE_CHANGED",
+        ]);
+        expect(activities.every((activity) => activity.actorId === null)).toBe(
+          true
+        );
+      })
+  );
+
+  it.effect("clears a nullable field with an explicit null", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_editor",
+        workspace.organizationId,
+        POST_MANAGEMENT_KEY_SCOPES
+      );
+
+      const db = yield* currentDb;
+      yield* db
+        .update(schema.postTable)
+        .set({ etaQuarter: "2026-Q1" })
+        .where(eq(schema.postTable.id, workspace.postId));
+
+      const response = yield* executeWrite(
+        "PATCH",
+        `/api/v1/posts/${workspace.postId}`,
+        { apiKey: "fbk_post_editor", body: { etaQuarter: null } }
+      );
+
+      expect(response.status).toBe(200);
+      expect(decodePost(responseBody(response)).etaQuarter).toBeNull();
+    })
+  );
+
+  it.effect("rejects an update that names no field", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_editor",
+        workspace.organizationId,
+        POST_MANAGEMENT_KEY_SCOPES
+      );
+
+      const response = yield* executeWrite(
+        "PATCH",
+        `/api/v1/posts/${workspace.postId}`,
+        { apiKey: "fbk_post_editor", body: {} }
+      );
+
+      // A write that changed nothing is answered as the mistake it is, not as
+      // a successful no-op.
+      expect(response.status).toBe(400);
+      expect(decodeError(responseBody(response))._tag).toBe("INVALID_REQUEST");
+    })
+  );
+
+  it.effect("refuses an update without the posts.update scope", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_posts_read_only", workspace.organizationId);
+
+      const response = yield* executeWrite(
+        "PATCH",
+        `/api/v1/posts/${workspace.postId}`,
+        { apiKey: "fbk_posts_read_only", body: { title: "Nope" } }
+      );
+
+      expect(response.status).toBe(403);
+      const body = decodeError(responseBody(response));
+      expect(body._tag).toBe("FORBIDDEN_SCOPE");
+      expect(body.message).toContain("posts.update");
+    })
+  );
+
+  it.effect("reports another workspace's post as not found on a write", () =>
+    Effect.gen(function* () {
+      const mine = yield* seedWorkspace();
+      const theirs = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_admin",
+        mine.organizationId,
+        POST_MANAGEMENT_KEY_SCOPES
+      );
+
+      const update = yield* executeWrite(
+        "PATCH",
+        `/api/v1/posts/${theirs.postId}`,
+        { apiKey: "fbk_post_admin", body: { title: "Renamed" } }
+      );
+      expect(update.status).toBe(404);
+
+      const remove = yield* executeWrite(
+        "DELETE",
+        `/api/v1/posts/${theirs.postId}`,
+        { apiKey: "fbk_post_admin" }
+      );
+      expect(remove.status).toBe(404);
+      expect(decodeError(responseBody(remove))._tag).toBe("NOT_FOUND");
+    })
+  );
+
+  it.effect("deletes a post and reports it gone afterwards", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_admin",
+        workspace.organizationId,
+        POST_MANAGEMENT_KEY_SCOPES
+      );
+
+      const removed = yield* executeWrite(
+        "DELETE",
+        `/api/v1/posts/${workspace.postId}`,
+        { apiKey: "fbk_post_admin" }
+      );
+      expect(removed.status).toBe(204);
+      expect(responseBody(removed)).toBe("");
+
+      const read = yield* executeRequest(
+        `/api/v1/posts/${workspace.postId}`,
+        "fbk_post_admin"
+      );
+      expect(read.status).toBe(404);
+    })
+  );
+
+  it.effect("refuses a delete without the posts.delete scope", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_editor",
+        workspace.organizationId,
+        POST_EDITOR_KEY_SCOPES
+      );
+
+      const response = yield* executeWrite(
+        "DELETE",
+        `/api/v1/posts/${workspace.postId}`,
+        { apiKey: "fbk_post_editor" }
+      );
+
+      expect(response.status).toBe(403);
+      const body = decodeError(responseBody(response));
+      expect(body._tag).toBe("FORBIDDEN_SCOPE");
+      expect(body.message).toContain("posts.delete");
+    })
+  );
+
+  it.effect("refuses to delete a post that was merged into another", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_admin",
+        workspace.organizationId,
+        POST_MANAGEMENT_KEY_SCOPES
+      );
+
+      const db = yield* currentDb;
+      const now = new Date();
+      const mergedId = yield* PostId.generate;
+      yield* db.insert(schema.postTable).values({
+        id: mergedId,
+        title: "Duplicate",
+        slug: "duplicate",
+        content: "<p>Body</p>",
+        excerpt: "Body",
+        boardId: workspace.boardId,
+        statusId: workspace.statusId,
+        organizationId: workspace.organizationId,
+        mergedIntoPostId: workspace.postId,
+        mergedAt: now,
+        // A merged row must also be archived (the table's own check
+        // constraint), which is the state the merge path leaves behind.
+        archivedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      const response = yield* executeWrite(
+        "DELETE",
+        `/api/v1/posts/${mergedId}`,
+        { apiKey: "fbk_post_admin" }
+      );
+
+      // The post is readable through `GET`, so `404` would be a lie; the
+      // request cannot be applied to its state.
+      expect(response.status).toBe(400);
+      expect(decodeError(responseBody(response))._tag).toBe("INVALID_REQUEST");
     })
   );
 
@@ -2456,6 +3257,8 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/changelog/{changelogId}",
         "/api/v1/companies",
         "/api/v1/companies/{companyId}",
+        "/api/v1/posts",
+        "/api/v1/posts/retrieve",
         "/api/v1/posts/{postId}",
         "/api/v1/posts/{postId}/tags",
         "/api/v1/tags",

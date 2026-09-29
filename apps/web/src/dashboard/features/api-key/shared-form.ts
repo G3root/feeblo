@@ -2,6 +2,7 @@ import {
   PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
   PUBLIC_API_COMPANY_MANAGEMENT_SCOPES,
   PUBLIC_API_DEFAULT_SCOPES,
+  PUBLIC_API_POST_MANAGEMENT_SCOPES,
   PUBLIC_API_TAG_MANAGEMENT_SCOPES,
   type PublicApiScope,
 } from "@feeblo/domain-contracts/public-api-scope";
@@ -50,6 +51,7 @@ export const API_KEY_EXPIRATION_ITEMS = API_KEY_EXPIRATIONS.map((value) => ({
  * `API_KEY_CAPABILITY_GROUP_SCOPES`, so the two cannot drift.
  */
 export const API_KEY_CAPABILITY_GROUPS = [
+  "posts",
   "tags",
   "changelog",
   "companies",
@@ -63,18 +65,22 @@ export type ApiKeyCapabilityGroup = (typeof API_KEY_CAPABILITY_GROUPS)[number];
  * or miss one it now grants by default.
  */
 export const API_KEY_CAPABILITY_GROUP_SCOPES = {
+  posts: PUBLIC_API_POST_MANAGEMENT_SCOPES,
   tags: PUBLIC_API_TAG_MANAGEMENT_SCOPES,
   changelog: PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
   companies: PUBLIC_API_COMPANY_MANAGEMENT_SCOPES,
 } satisfies Record<ApiKeyCapabilityGroup, readonly PublicApiScope[]>;
 
 export const API_KEY_CAPABILITY_GROUP_LABELS = {
+  posts: "Manage posts",
   tags: "Manage tags",
   changelog: "Manage changelog",
   companies: "Manage companies",
 } satisfies Record<ApiKeyCapabilityGroup, string>;
 
 export const API_KEY_CAPABILITY_GROUP_DESCRIPTIONS = {
+  posts:
+    "Create, edit, and delete this workspace's posts, including their title, body, status, board, and ETA quarter. Deleting a post cannot be undone.",
   tags: "Create, rename, and delete tags, and set which tags a post carries. Deleting a tag removes it from every post that carries it.",
   changelog:
     "Create, edit, and delete changelog entries, and publish them. Publishing emails everyone subscribed to the changelog.",
