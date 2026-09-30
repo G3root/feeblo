@@ -1,6 +1,20 @@
 {
   "$schema": "./node_modules/@effect/tsgo/schema.json",
   "extends": "@feeblo/config/tsconfig.base.json",
+  // This config exists for the loose `.ts` files at the repo root: it is the
+  // nearest `tsconfig.json` above `oxlint.config.ts`, `oxfmt.config.ts`, and
+  // `playwright.config.ts`. Every other source file has a package config.
+  //
+  // `include` is load-bearing. Omit it and TypeScript's default `**/*` applies,
+  // so this becomes a whole-repo program: 9,035 files (every package's sources
+  // plus their dependency `.d.ts` graph) rather than 318. Type-aware Oxlint
+  // builds one program per discovered tsconfig, so a single root file dragged a
+  // whole-repo program into `tsgolint` and cost 1.2 GB instead of 79 MB. Module
+  // resolution still pulls in imports; `include` only seeds root files.
+  //
+  // `tools/**` is deliberately absent: those are Oxlint JS plugins, ignored by
+  // the linter, and their `.ts`-extension relative imports are TS5097 here.
+  "include": ["*.ts", "*.mts", "*.cts"],
   "compilerOptions": {
     "strictNullChecks": true,
     "plugins": [
