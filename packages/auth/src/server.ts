@@ -853,6 +853,9 @@ export const initAuthHandler = (
     } satisfies BetterAuthOptions;
     return betterAuth(config);
   }).pipe(
+    // initAuthHandler runs once at server composition to build the auth
+    // handler; this is that composition's entry point.
+    // eslint-disable-next-line effecttsgo/strict-effect-provide -- composition entry point
     Effect.provide(
       Layer.mergeAll(
         AuthConfig.layer,

@@ -10,6 +10,7 @@ const nuke = Effect.gen(function* () {
 });
 
 Effect.runPromise(
+  // eslint-disable-next-line effecttsgo/strict-effect-provide -- script entry point
   nuke.pipe(Effect.provide(Database.DatabaseContextLive))
 ).catch((error) => {
   console.error("Database nuke failed:", error);

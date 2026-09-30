@@ -135,6 +135,12 @@ const makePolarService = Effect.gen(function* () {
 export class PolarService extends Context.Service<PolarService>()(
   "PolarService",
   {
+    // The config layer is folded into `make` rather than the static layer
+    // (Layer.effect(this, this.make).pipe(Layer.provide(PolarConfig.layer))).
+    // The restructure is behaviour-preserving, but billing is an
+    // owner-sign-off surface (AGENTS.md), so the mechanical change waits for
+    // that sign-off instead of being made quietly.
+    // eslint-disable-next-line effecttsgo/strict-effect-provide -- billing surface: needs owner sign-off to restructure
     make: makePolarService.pipe(Effect.provide(PolarConfig.layer)),
   }
 ) {

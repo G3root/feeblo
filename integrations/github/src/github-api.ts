@@ -385,6 +385,11 @@ const withSdk = <A, E>(
   context: string
 ): Effect.Effect<A, GitHubApiFailure> =>
   effect.pipe(
+    // The provider API client is the bottom of the integration stack: nothing
+    // below it provides a transport, so it pins the fetch client (and the
+    // per-token credentials) itself. An injected HttpClient flows through
+    // provideService where a caller supplies one.
+    // eslint-disable-next-line effecttsgo/strict-effect-provide -- provider client pins its transport
     Effect.provide(
       Layer.mergeAll(credentialsLayer(token), FetchHttpClient.layer)
     ),
@@ -461,6 +466,7 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
         )
       );
       const response = yield* HttpClient.execute(httpRequest).pipe(
+        // eslint-disable-next-line effecttsgo/strict-effect-provide -- provider client pins its transport
         Effect.provide(FetchHttpClient.layer),
         Effect.mapError(
           () =>

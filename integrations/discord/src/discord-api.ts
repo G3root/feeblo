@@ -248,7 +248,13 @@ export const makeDiscordApiClient = (
         const execute = HttpClient.execute(input.httpRequest);
         const response = yield* (
           httpClient === undefined
-            ? execute.pipe(Effect.provide(FetchHttpClient.layer))
+            ? execute.pipe(
+                // Fallback when no client is injected: the provider API client
+                // is the bottom of the integration stack and pins the default
+                // fetch transport itself.
+                // eslint-disable-next-line effecttsgo/strict-effect-provide -- provider client pins its transport
+                Effect.provide(FetchHttpClient.layer)
+              )
             : execute.pipe(
                 Effect.provideService(HttpClient.HttpClient, httpClient)
               )

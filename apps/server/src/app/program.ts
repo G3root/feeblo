@@ -154,6 +154,9 @@ const SentryLiveLayer = Layer.unwrap(
 
 export const main = program.pipe(
   Effect.scoped,
+  // This is the application's entry point: everything the server needs is
+  // composed here, exactly as the rule asks.
+  // eslint-disable-next-line effecttsgo/strict-effect-provide -- application entry point
   Effect.provide(
     Layer.mergeAll(
       SentryLiveLayer,
