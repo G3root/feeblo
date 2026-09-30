@@ -6,7 +6,7 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { wakeEmailOutboxBestEffort } from "../../email-outbox/workflow";
+import { wakeEmailOutboxBestEffort } from "../../email-outbox/queue";
 import { PUBLIC_API_PAGE_DEFAULT_LIMIT } from "../../public-api/common";
 import { decodeCursorOrFail, encodeCursor } from "../../public-api/cursor";
 import {

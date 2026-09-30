@@ -40,13 +40,13 @@ export class InvalidPostEmbeddingConfigurationError extends Data.TaggedError(
 }> {}
 
 const make = Effect.gen(function* () {
-  const apiKey = yield* Config.redacted("EMBEDDING_API_KEY").pipe(
+  const apiKey = yield* Config.Redacted("EMBEDDING_API_KEY").pipe(
     Config.option
   );
-  const model = yield* Config.string("EMBEDDING_MODEL").pipe(
+  const model = yield* Config.String("EMBEDDING_MODEL").pipe(
     Config.withDefault(DEFAULT_POST_EMBEDDING_MODEL)
   );
-  const dimensions = yield* Config.number("EMBEDDING_DIMENSIONS").pipe(
+  const dimensions = yield* Config.Number("EMBEDDING_DIMENSIONS").pipe(
     Config.withDefault(defaultPostEmbeddingDimensions)
   );
   if (
@@ -65,12 +65,12 @@ const make = Effect.gen(function* () {
       message: `EMBEDDING_DIMENSIONS (${dimensions}) must match the post embedding column dimension (${defaultPostEmbeddingDimensions})`,
     });
   }
-  const apiUrl = yield* Config.string("EMBEDDING_API_URL").pipe(Config.option);
+  const apiUrl = yield* Config.String("EMBEDDING_API_URL").pipe(Config.option);
   const normalizedApiUrl = Option.filter(
     apiUrl,
     (value) => value.trim().length > 0
   );
-  const timeout = yield* Config.duration("EMBEDDING_TIMEOUT").pipe(
+  const timeout = yield* Config.Duration("EMBEDDING_TIMEOUT").pipe(
     Config.withDefault(Duration.seconds(10))
   );
 

@@ -3,11 +3,11 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import {
   type EmailOutboxDataError,
   EmailOutboxRepository,
 } from "../email-outbox/repository";
-import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import {

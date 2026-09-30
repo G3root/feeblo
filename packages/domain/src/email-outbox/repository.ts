@@ -85,8 +85,23 @@ export interface FindDueEmailDeliveriesInput {
   readonly staleSendingBefore: Date;
 }
 
+/** A paused delivery resumed into `queued`, with the version that resume wrote. */
+export type ResumedEmailDelivery = {
+  readonly attemptCount: number;
+  readonly id: string;
+  readonly transitionVersion: number;
+};
+
 const dataError = (operation: string, reason: string): EmailOutboxDataError =>
   new EmailOutboxDataError({ operation, reason });
+
+/**
+ * SQL expression that advances a delivery's transition version.
+ *
+ * `deliveryElementId` derives the persisted-queue element id from it, so it has
+ * to change on every state transition that can be followed by a re-offer.
+ */
+const nextTransitionVersion = sql`${schema.emailDeliveryTable.transitionVersion} + 1`;
 
 const decodeIntentPayload = (
   input: Schema.Codec.Encoded<typeof EmailIntentPayload>,
@@ -497,6 +512,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       .set({
         state: "queued",
         nextAttemptAt: null,
+        transitionVersion: nextTransitionVersion,
         updatedAt: now,
       })
       .where(
@@ -505,8 +521,14 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
           eq(schema.emailDeliveryTable.state, "paused_by_plan")
         )
       )
-      .returning({ id: schema.emailDeliveryTable.id });
-    return resumed.map((row) => row.id);
+      // The caller re-offers each row, so it needs the persisted attempt count
+      // and the version this resume just produced for the queue element id.
+      .returning({
+        attemptCount: schema.emailDeliveryTable.attemptCount,
+        id: schema.emailDeliveryTable.id,
+        transitionVersion: schema.emailDeliveryTable.transitionVersion,
+      });
+    return resumed;
   });
 
   const expirePausedDeliveries = Effect.fn(
@@ -529,6 +551,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       .update(schema.emailDeliveryTable)
       .set({
         state: "expired",
+        transitionVersion: nextTransitionVersion,
         updatedAt: now,
       })
       .where(
@@ -636,6 +659,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
         state: "sending",
         attemptCount: sql`${schema.emailDeliveryTable.attemptCount} + 1`,
         nextAttemptAt: null,
+        transitionVersion: nextTransitionVersion,
         updatedAt: now,
       })
       .where(
@@ -647,11 +671,15 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
           )
         )
       )
-      .returning({ id: schema.emailDeliveryTable.id });
+      .returning({
+        transitionVersion: schema.emailDeliveryTable.transitionVersion,
+      });
 
     yield* recordEmailDeliveryTransition("sending", claimed.length);
 
-    return claimed.length === 1;
+    // The caller needs the version this claim wrote so a later deferral can
+    // prove the row still belongs to this attempt.
+    return claimed[0]?.transitionVersion;
   });
 
   const recoverStaleSendingDeliveries = Effect.fn(
@@ -663,6 +691,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       .set({
         state: "deferred",
         nextAttemptAt: updatedAt,
+        transitionVersion: nextTransitionVersion,
         updatedAt,
       })
       .where(
@@ -681,10 +710,12 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     "EmailOutboxRepository.deferSendingDelivery"
   )(function* ({
     id,
+    expectedTransitionVersion,
     nextAttemptAt,
     lastError,
   }: {
     readonly id: string;
+    readonly expectedTransitionVersion: number;
     readonly nextAttemptAt: Date;
     readonly lastError: unknown;
   }) {
@@ -695,16 +726,33 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
         state: "deferred",
         nextAttemptAt,
         lastError,
+        transitionVersion: nextTransitionVersion,
         updatedAt,
       })
       .where(
         and(
           eq(schema.emailDeliveryTable.id, id),
-          eq(schema.emailDeliveryTable.state, "sending")
+          // Only the attempt that observed this version may schedule the
+          // retry; a stale attempt must not overwrite a newer claim or
+          // deferral.
+          eq(
+            schema.emailDeliveryTable.transitionVersion,
+            expectedTransitionVersion
+          ),
+          // A deferral can arrive before the claim (an untyped read failure),
+          // so accept every due state rather than only `sending`.
+          inArray(schema.emailDeliveryTable.state, [
+            "queued",
+            "deferred",
+            "sending",
+          ])
         )
       )
       .returning({ id: schema.emailDeliveryTable.id });
     yield* recordEmailDeliveryTransition("deferred", rows.length);
+    // Zero rows means another transition owns the row now; the caller must
+    // treat this attempt as stale rather than as the one that scheduled the
+    // retry.
     return rows.length === 1;
   });
 
@@ -726,6 +774,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
         state: "deferred",
         nextAttemptAt,
         lastError: { tag: "EmailDeliveryThrottle", reason },
+        transitionVersion: nextTransitionVersion,
         updatedAt,
       })
       .where(
@@ -756,6 +805,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
         state: "accepted",
         acceptedAt,
         providerMetadata,
+        transitionVersion: nextTransitionVersion,
         updatedAt: acceptedAt,
       })
       .where(
@@ -791,6 +841,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       .set({
         state,
         ...(lastError === undefined ? undefined : { lastError }),
+        transitionVersion: nextTransitionVersion,
         updatedAt,
       })
       .where(
@@ -821,6 +872,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       .set({
         state: "delivered",
         deliveredAt,
+        transitionVersion: nextTransitionVersion,
         updatedAt: deliveredAt,
       })
       .where(

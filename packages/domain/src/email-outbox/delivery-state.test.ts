@@ -99,8 +99,96 @@ describe("email delivery state", () => {
             { concurrency: "unbounded" }
           );
 
-          expect(claims.filter((claimed) => claimed)).toHaveLength(1);
+          expect(
+            claims.filter((claimed) => claimed !== undefined)
+          ).toHaveLength(1);
         })
+    );
+
+    it.effect("refuses a deferral from a stale attempt that lost the row", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const repository = yield* EmailOutboxRepository;
+        const organizationId = yield* WorkspaceId.generate;
+
+        yield* db.insert(schema.organizationTable).values({
+          id: organizationId,
+          name: "Stale deferral workspace",
+          slug: organizationId,
+          createdAt: new Date(),
+        });
+        const intent = yield* repository.recordIntent({
+          aggregateId: "pst_stale",
+          aggregateType: "post",
+          deduplicationKey: `submission.created:${organizationId}:pst_stale`,
+          expiresAt: null,
+          kind: "submission.created",
+          organizationId,
+          payload: { kind: "submission.created", postId: "pst_stale" },
+          scheduledAt: new Date(),
+        });
+        if (intent._tag !== "Inserted") {
+          expect(intent).toEqual({ _tag: "Inserted" });
+          return;
+        }
+        const created = yield* repository.createDelivery({
+          outboxId: intent.intent.id,
+          recipientEmail: "stale@example.com",
+          template: "submission-notification",
+          templatePayload: { postId: "pst_stale" },
+          templateVersion: 1,
+        });
+        if (created._tag !== "Inserted") {
+          expect(created).toEqual({ _tag: "Inserted" });
+          return;
+        }
+
+        // A pre-claim deferral is valid against the version just read.
+        const preClaimDeferred = yield* repository.deferSendingDelivery({
+          id: created.delivery.id,
+          expectedTransitionVersion: created.delivery.transitionVersion,
+          nextAttemptAt: new Date(),
+          lastError: { tag: "EmailDeliveryActivityError" },
+        });
+        expect(preClaimDeferred).toBe(true);
+
+        const claimedVersion = yield* repository.claimDeliveryForSending({
+          id: created.delivery.id,
+          now: new Date(),
+        });
+        if (claimedVersion === undefined) {
+          return yield* Effect.die("Expected the claim to win");
+        }
+
+        // The pre-claim version is now stale; the deferral must not clobber
+        // the claim it no longer owns.
+        const staleDeferred = yield* repository.deferSendingDelivery({
+          id: created.delivery.id,
+          expectedTransitionVersion: created.delivery.transitionVersion,
+          nextAttemptAt: new Date(),
+          lastError: { tag: "EmailDeliveryActivityError" },
+        });
+        expect(staleDeferred).toBe(false);
+        const afterStale = yield* repository.findDeliveryById(
+          created.delivery.id
+        );
+        expect(afterStale?.state).toBe("sending");
+        expect(afterStale?.transitionVersion).toBe(claimedVersion);
+
+        // The claim holder can still defer against the version it wrote.
+        const claimedDeferred = yield* repository.deferSendingDelivery({
+          id: created.delivery.id,
+          expectedTransitionVersion: claimedVersion,
+          nextAttemptAt: new Date(),
+          lastError: { tag: "EmailDeliveryActivityError" },
+        });
+        expect(claimedDeferred).toBe(true);
+        const afterClaimed = yield* repository.findDeliveryById(
+          created.delivery.id
+        );
+        expect(afterClaimed?.state).toBe("deferred");
+        expect(afterClaimed?.transitionVersion).toBe(claimedVersion + 1);
+      })
     );
 
     it.effect("does not revive a terminal delivery when work is replayed", () =>
@@ -160,7 +248,7 @@ describe("email delivery state", () => {
 
         expect(firstDelivery).toBe(true);
         expect(repeatedDelivery).toBe(false);
-        expect(replayClaim).toBe(false);
+        expect(replayClaim).toBeUndefined();
       })
     );
   });
