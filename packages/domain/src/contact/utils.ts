@@ -35,8 +35,8 @@ export type AttributeSourceValue =
 
 export const AttributeValueColumns = S.Struct({
   valueText: S.NullOr(S.String),
-  valueInteger: S.NullOr(S.Number),
-  valueDecimal: S.NullOr(S.Number),
+  valueInteger: S.NullOr(S.Finite),
+  valueDecimal: S.NullOr(S.Finite),
   valueBoolean: S.NullOr(S.Boolean),
   valueDate: S.NullOr(S.Date),
 });

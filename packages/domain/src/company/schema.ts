@@ -41,7 +41,7 @@ export const CompanyCreate = S.Struct({
         id: S.optional(CompanyAttributeValueId.schema),
         attributeId: CompanyAttributeDefinitionId.schema,
         value: S.NullOr(
-          S.Union([S.String, S.Number, S.Boolean, S.DateFromString])
+          S.Union([S.String, S.Finite, S.Boolean, S.DateFromString])
         ),
       })
     ).check(noDuplicateAttributeIds)

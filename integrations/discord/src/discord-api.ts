@@ -32,7 +32,7 @@ export const DISCORD_API_REQUEST_TIMEOUT_MS = 10_000;
 export const DiscordApiErrorBody = Schema.Struct({
   code: Schema.optionalKey(Schema.Int),
   message: Schema.optionalKey(Schema.String),
-  retry_after: Schema.optionalKey(Schema.Number),
+  retry_after: Schema.optionalKey(Schema.Finite),
 });
 export type DiscordApiErrorBody = Schema.Schema.Type<
   typeof DiscordApiErrorBody

@@ -10,11 +10,11 @@ export const PlanKey = S.Literals(["free", "starter", "professional"]);
 export type TPlanKey = S.Schema.Type<typeof PlanKey>;
 
 const PlanLimits = S.Struct({
-  feedbackBoards: S.NullOr(S.Number),
-  privilegedMembers: S.NullOr(S.Number),
-  changelogCategories: S.NullOr(S.Number),
-  submissionNotificationRecipients: S.NullOr(S.Number),
-  crmEntries: S.NullOr(S.Number),
+  feedbackBoards: S.NullOr(S.Finite),
+  privilegedMembers: S.NullOr(S.Finite),
+  changelogCategories: S.NullOr(S.Finite),
+  submissionNotificationRecipients: S.NullOr(S.Finite),
+  crmEntries: S.NullOr(S.Finite),
 } satisfies { readonly [K in LimitFeatureKey]: S.Schema<number | null> });
 
 const PlanCapabilities = S.Struct({
@@ -33,7 +33,7 @@ const PlanCapabilities = S.Struct({
 
 export const PlanPrice = S.Struct({
   productId: S.String,
-  amount: S.Number,
+  amount: S.Finite,
   currency: S.String,
 });
 

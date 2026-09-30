@@ -37,7 +37,7 @@ export const GitHubIssueWebhookPayload = Schema.Struct({
   installation: Schema.Struct({ id: GitHubInstallationId }),
   issue: Schema.Struct({
     html_url: Schema.URLFromString,
-    id: Schema.Number,
+    id: Schema.Finite,
     node_id: Schema.String,
     number: Schema.Int,
     state: Schema.Literals(["open", "closed"]),
@@ -45,12 +45,12 @@ export const GitHubIssueWebhookPayload = Schema.Struct({
   }),
   repository: Schema.Struct({
     full_name: Schema.NonEmptyString,
-    id: Schema.Number,
+    id: Schema.Finite,
     name: Schema.NonEmptyString,
     owner: Schema.Struct({ login: Schema.NonEmptyString }),
   }),
   sender: Schema.Struct({
-    id: Schema.Number,
+    id: Schema.Finite,
     login: Schema.NonEmptyString,
   }),
 });

@@ -120,7 +120,7 @@ export interface SesComplaint extends Schema.Schema.Type<typeof SesComplaint> {}
 
 export const SesDelivery = Schema.Struct({
   timestamp: OptionalString,
-  processingTimeMillis: Schema.optionalKey(Schema.Number),
+  processingTimeMillis: Schema.optionalKey(Schema.Finite),
   recipients: Schema.optionalKey(Schema.Array(Schema.String)),
   smtpResponse: OptionalString,
   reportingMTA: OptionalString,

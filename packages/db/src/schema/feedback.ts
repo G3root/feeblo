@@ -44,7 +44,7 @@ import {
 import type { TRoadmapMode } from "../validation-schema/roadmap-mode";
 import { memberTable, organizationTable, userTable } from "./auth";
 
-const VectorValues = Schema.Array(Schema.Number);
+const VectorValues = Schema.Array(Schema.Finite);
 export const DEFAULT_POST_EMBEDDING_DIMENSIONS = 1536;
 
 const embeddingVector = (dimensions: number) =>

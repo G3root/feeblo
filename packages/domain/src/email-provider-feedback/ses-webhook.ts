@@ -24,7 +24,7 @@ export class SesWebhookEnvelopeError extends Schema.TaggedError<SesWebhookEnvelo
   "SesWebhookEnvelopeError",
   {
     cause: Schema.optionalKey(Schema.Defect()),
-    httpStatus: Schema.optionalKey(Schema.Number),
+    httpStatus: Schema.optionalKey(Schema.Finite),
     message: Schema.String,
     operation: Schema.String,
   }
@@ -35,7 +35,7 @@ export class SesWebhookConfirmationError extends Schema.TaggedError<SesWebhookCo
   "SesWebhookConfirmationError",
   {
     cause: Schema.optionalKey(Schema.Defect()),
-    httpStatus: Schema.optionalKey(Schema.Number),
+    httpStatus: Schema.optionalKey(Schema.Finite),
     message: Schema.String,
     operation: Schema.String,
   }

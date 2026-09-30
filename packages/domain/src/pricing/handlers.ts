@@ -48,7 +48,7 @@ type PricingProduct = {
 };
 
 const PolarProductPrice = Schema.Struct({
-  priceAmount: Schema.Number,
+  priceAmount: Schema.Finite,
   priceCurrency: Schema.String,
 });
 
