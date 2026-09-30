@@ -2,7 +2,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 
-import { PublicApiV1Group } from "./api-contract";
+import { PublicApiGroups } from "./api-contract";
 import { PUBLIC_API_PAGE_MAX_LIMIT } from "./common";
 import { PublicApiOperations } from "./operations";
 import {
@@ -31,7 +31,9 @@ import {
  */
 describe("public API operations registry", () => {
   it("names exactly the published endpoints", () => {
-    const endpointNames = Object.keys(PublicApiV1Group.endpoints).sort();
+    const endpointNames = PublicApiGroups.flatMap((group) =>
+      Object.keys(group.endpoints)
+    ).sort();
     const operationNames = PublicApiOperations.map(
       (operation) => operation.name
     ).sort();
