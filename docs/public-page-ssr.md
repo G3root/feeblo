@@ -28,7 +28,7 @@ Implemented on `feat/public-page-ssr`. The board's pages are now routes of the h
 
 ## Verification
 
-- Unit: `apps/public-feature-board/test/board-scope.test.ts` (per-scope isolation, slug resolution) and `collections.test.ts` (descriptor materialization and indexes on a real `DbClient`).
+- Unit: `apps/public-feature-board/test/board-scope.test.ts` (per-scope isolation, slug resolution), `preloads.test.ts` (a failing preload marks its own request, not another's), and `collections.test.ts` (descriptor materialization and indexes on a real `DbClient`).
 - e2e: board pages assert their _raw_ HTML (crawler view) and then hydrate; `helpers/hydration.ts` waits for the root shell's `data-hydrated` marker before interacting, because a click can otherwise land before React attaches its handlers — the pre-SSR tests never had that window.
 - `pnpm lint`, `pnpm fmt:check`, `tsc --noEmit` for `apps/web`, `apps/public-feature-board`, `packages/web-shared`, `packages/post-ui`, `e2e`; `pnpm test`; `pnpm test:e2e`.
 
