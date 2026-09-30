@@ -5,7 +5,7 @@ import { cn } from "@feeblo/ui/utils";
 import { useAuth } from "@feeblo/web-shared/auth-context";
 import { Link, useLocation } from "@tanstack/react-router";
 
-import { boardPaths } from "../../lib/board-links";
+import { boardPaths, toBoardPublicPath } from "../../lib/board-links";
 import { m } from "../../paraglide/messages.js";
 import { useSite } from "../../providers/site-provider";
 import { LocaleSwitcher } from "./locale-switcher";
@@ -72,9 +72,15 @@ export function Navbar() {
 }
 
 function NavTab({ href, label }: { href: string; label: string }) {
-  const { pathname } = useLocation();
+  // The location keeps the internal `/s/...` spelling, so both sides are
+  // translated onto the visitor's spelling before matching — otherwise the
+  // home tab (`/s`) prefixes every board route and stays selected everywhere.
+  const currentPath = toBoardPublicPath(useLocation().pathname);
+  const publicHref = toBoardPublicPath(href);
   const isActive =
-    pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
+    publicHref === "/"
+      ? currentPath === "/"
+      : currentPath === publicHref || currentPath.startsWith(`${publicHref}/`);
 
   return (
     <Link

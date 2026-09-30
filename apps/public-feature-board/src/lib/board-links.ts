@@ -16,3 +16,26 @@ export const boardPaths = {
   roadmap: "/s/roadmap",
   roadmapEntry: (slug: string) => `/s/roadmap/${slug}`,
 } as const;
+
+/**
+ * The board's public spelling of an internal path.
+ *
+ * The router's location keeps the internal `/s/...` spelling the rewrite
+ * matched, so anything that compares the location against a *visible* href —
+ * the navbar's selected state — has to translate both sides onto the visitor's
+ * spelling first. A board page never renders outside the `/s` prefix, so an
+ * unrecognised path passes through unchanged and stays comparable.
+ */
+export function toBoardPublicPath(pathname: string): string {
+  const internalHome = boardPaths.home;
+
+  if (pathname === internalHome) {
+    return "/";
+  }
+
+  if (pathname.startsWith(`${internalHome}/`)) {
+    return pathname.slice(internalHome.length);
+  }
+
+  return pathname;
+}
