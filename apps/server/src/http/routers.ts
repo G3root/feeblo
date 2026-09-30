@@ -1,9 +1,9 @@
 import { AUTH_CLIENT_IP_HEADER } from "@feeblo/auth/auth-client-ip-header";
 import { Database } from "@feeblo/db";
 import { ClientIp } from "@feeblo/domain/client-ip";
-import { Api } from "@feeblo/domain/http/api";
 import { handleOgImage } from "@feeblo/domain/og-image/handler";
 import { OgImageService } from "@feeblo/domain/og-image/service";
+import { PublicApi } from "@feeblo/domain/public-api/api-contract";
 import { Auth } from "@feeblo/domain/session-middleware";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
@@ -63,8 +63,17 @@ export const OgImageRouterLive = HttpRouter.use((router) =>
   Layer.orDie
 );
 
-export const DocsRoute = HttpApiScalar.layer(Api, {
-  path: "/docs",
+/**
+ * The Public API's reference page, mounted wherever `PublicApiRoute` is.
+ *
+ * The same `PublicApi` value produces both this page and the document
+ * `PublicApiRoute` serves at `/api/v1/openapi.json`, so the reference cannot
+ * describe a contract the route does not serve. Scalar adds a plain `GET`
+ * route of its own, so the API-key middleware never runs on it: the reference
+ * is readable without a key, which is what makes it self-serve.
+ */
+export const PublicApiDocsRoute = HttpApiScalar.layer(PublicApi, {
+  path: "/api/v1/docs",
 });
 
 export const HealthRouter: Layer.Layer<never, never, HttpRouter.HttpRouter> =

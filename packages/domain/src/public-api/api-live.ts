@@ -1,3 +1,4 @@
+import * as Layer from "effect/Layer";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { changelogHandlers } from "../changelog/public-api/http";
@@ -10,22 +11,30 @@ import { PublicApi } from "./api-contract";
 /**
  * The HTTP implementations of every Public API endpoint.
  *
- * One record per resource, merged here. A handler added to `post` is an edit
- * to `post/http.ts` and nothing else, so two changes to different resources do
- * not collide in this file; a whole resource is the one line below that names
- * it. Each handler parses its HTTP input and delegates to an operation in that
+ * One group per resource, because a group is what carries the resource's tag
+ * and its middleware; `HttpApiBuilder.group` is per-group, so this is the one
+ * place that names all five. A handler added to `post` is an edit to
+ * `post/http.ts` and nothing else, so two changes to different resources do
+ * not collide; a whole resource is one entry per list below.
+ *
+ * Each handler parses its HTTP input and delegates to an operation in that
  * resource's `operations.ts`, which is the same code an MCP tool or a CLI
  * would call.
  */
-export const PublicApiLive = HttpApiBuilder.group(
-  PublicApi,
-  "PublicApiV1",
-  (handlers) =>
-    handlers.handleAll({
-      ...changelogHandlers,
-      ...commentHandlers,
-      ...companyHandlers,
-      ...postHandlers,
-      ...tagHandlers,
-    })
+export const PublicApiLive = Layer.mergeAll(
+  HttpApiBuilder.group(PublicApi, "Changelog", (handlers) =>
+    handlers.handleAll(changelogHandlers)
+  ),
+  HttpApiBuilder.group(PublicApi, "Comments", (handlers) =>
+    handlers.handleAll(commentHandlers)
+  ),
+  HttpApiBuilder.group(PublicApi, "Companies", (handlers) =>
+    handlers.handleAll(companyHandlers)
+  ),
+  HttpApiBuilder.group(PublicApi, "Posts", (handlers) =>
+    handlers.handleAll(postHandlers)
+  ),
+  HttpApiBuilder.group(PublicApi, "Tags", (handlers) =>
+    handlers.handleAll(tagHandlers)
+  )
 );

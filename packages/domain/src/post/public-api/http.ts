@@ -3,7 +3,7 @@ import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
 import * as HttpApiSchema from "effect/unstable/httpapi/HttpApiSchema";
 import * as OpenApi from "effect/unstable/httpapi/OpenApi";
 
-import type { PublicApiV1Group } from "../../public-api/api-contract";
+import type { PublicApiPostGroup } from "../../public-api/api-contract";
 import {
   PUBLIC_API_CREATE_ERROR_SCHEMAS,
   PUBLIC_API_ERROR_SCHEMAS,
@@ -38,7 +38,7 @@ import {
 } from "./schema";
 
 /** The composed group, so a handler is typed with the group's middleware. */
-type PublicApiGroup = InstanceType<typeof PublicApiV1Group>;
+type PublicApiGroup = InstanceType<typeof PublicApiPostGroup>;
 
 /** The post endpoints, and their HTTP implementations. */
 export const postEndpoints = [

@@ -38,6 +38,7 @@ const Operation = Schema.Struct({
   ),
   requestBody: Schema.optional(Schema.Json),
   responses: Schema.Record(Schema.String, ResponseEntry),
+  tags: Schema.optional(Schema.Array(Schema.String)),
 });
 
 const OpenApiDocument = Schema.Struct({
@@ -51,6 +52,7 @@ const OpenApiDocument = Schema.Struct({
       delete: Schema.optional(Operation),
     })
   ),
+  tags: Schema.Array(Schema.Struct({ name: Schema.String })),
 });
 
 const decodeDocument = Schema.decodeUnknownSync(
@@ -58,6 +60,16 @@ const decodeDocument = Schema.decodeUnknownSync(
 );
 
 const document = decodeDocument(JSON.stringify(OpenApi.fromApi(PublicApi)));
+
+const OPERATION_METHODS = ["get", "post", "put", "patch", "delete"] as const;
+
+/** Every operation in the document, with the path and method it sits under. */
+const operations = Object.entries(document.paths).flatMap(([path, item]) =>
+  OPERATION_METHODS.flatMap((method) => {
+    const operation = item[method];
+    return operation === undefined ? [] : [{ method, operation, path }];
+  })
+);
 
 const LIST_PATH = "/api/v1/boards/{boardId}/posts";
 const POSTS_PATH = "/api/v1/posts";
@@ -108,6 +120,56 @@ describe("PublicApi contract", () => {
         COMPANY_PATH,
       ].sort()
     );
+  });
+
+  it("categorizes every endpoint under its resource's tag", () => {
+    // The group is the category: Effect derives an operation's tags from its
+    // group and never from the endpoint's own annotations, so two resources in
+    // one group are two resources in one sidebar section. One tag per
+    // operation is what puts it in exactly one section, and the tag list is
+    // what puts the sections in a deliberate order rather than the order the
+    // endpoints happen to be declared in.
+    expect(document.tags.map((tag) => tag.name)).toEqual([
+      "Changelog",
+      "Comments",
+      "Companies",
+      "Posts",
+      "Tags",
+    ]);
+
+    for (const { method, operation, path } of operations) {
+      expect(operation.tags, `${method.toUpperCase()} ${path}`).toHaveLength(1);
+    }
+
+    // Every tag an operation carries is one of the sections above: a group
+    // added to the API without being named there would be a sixth section that
+    // this list does not describe.
+    expect(
+      [
+        ...new Set(operations.flatMap(({ operation }) => operation.tags ?? [])),
+      ].sort()
+    ).toEqual(["Changelog", "Comments", "Companies", "Posts", "Tags"]);
+  });
+
+  it("gates every published endpoint on a key and a plan", () => {
+    // The key middleware is what checks the key, the workspace's plan, and the
+    // endpoint's scope, and it is applied per group, so a resource split into
+    // a group that forgets it would publish endpoints open to anyone. Nothing
+    // in the type system catches that: the group bakes the middleware into its
+    // endpoints, so `HandlerOf` and `handleAll` lose the middleware's failures
+    // together and still agree. The document is where the invariant is
+    // observable, so it is asserted here.
+    for (const { method, operation, path } of operations) {
+      const where = `${method.toUpperCase()} ${path}`;
+      expect(Object.keys(operation.responses), where).toEqual(
+        expect.arrayContaining(["401", "403", "429"])
+      );
+
+      const body = JSON.stringify(operation.responses);
+      expect(body, where).toContain("MISSING_API_KEY");
+      expect(body, where).toContain("PLAN_REQUIRES_UPGRADE");
+      expect(body, where).toContain("RATE_LIMITED");
+    }
   });
 
   it("documents one response per error status", () => {

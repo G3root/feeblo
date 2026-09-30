@@ -26,9 +26,9 @@ import {
 import { makeOriginCheckMiddleware } from "../http/origin-check";
 import {
   BetterAuthRouterLive,
-  DocsRoute,
   HealthRouter,
   OgImageRouterLive,
+  PublicApiDocsRoute,
   RootRouter,
 } from "../http/routers";
 import { serverTimingMiddleware } from "../http/server-timing";
@@ -56,14 +56,11 @@ export const makePublicRouters = (
 export const makeMergedRoutes = ({
   appUrl,
   integrationRuntime,
-  nodeEnv,
   publicRouters,
 }: {
   /** Dashboard base URL handed to provider routers for redirects. */
   readonly appUrl: string;
   readonly integrationRuntime: IntegrationRuntime;
-  /** Used to keep the API reference out of production builds. */
-  readonly nodeEnv: string;
   readonly publicRouters: ReturnType<typeof makePublicRouters>;
 }) =>
   Layer.mergeAll(
@@ -83,11 +80,12 @@ export const makeMergedRoutes = ({
     ),
     HttpRoute,
     // The Public API is mounted in every environment, including production:
-    // it is the paid feature, and its OpenAPI document is the customer-facing
-    // reference. The dashboard's internal Api stays dev-only below.
+    // it is the paid feature, and its OpenAPI document and reference page are
+    // the customer-facing docs. The dashboard's `Api` is mounted too, but has
+    // no reference page of its own; its document is at `/docs/openapi.json`.
     PublicApiRoute,
+    PublicApiDocsRoute,
     BetterAuthRouterLive,
-    ...(nodeEnv === "production" ? [] : [DocsRoute]),
     makeSlackRouters({
       appUrl,
       registry: integrationRuntime.registry,
