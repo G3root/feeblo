@@ -3,6 +3,7 @@ import {
   preloadPostUserState,
   type PreloadOutcome,
 } from "@feeblo/public-feature-board";
+import { PublicBoardPending } from "@feeblo/public-feature-board/components/pending";
 import { PostPage } from "@feeblo/public-feature-board/pages/post";
 import { getCachedAuthSession } from "@feeblo/web-shared/auth-session";
 import { createFileRoute } from "@tanstack/react-router";
@@ -17,6 +18,12 @@ export const Route = createFileRoute("/s/p/$slug")({
   // mismatch, not just a flash. Server-rendering it needs subsets that
   // hydrate by identity; until then the layout above still resolves the site,
   // the post's metadata and its JSON-LD for crawlers.
+  //
+  // The pending state must be the board's own: with nothing set here, the
+  // router falls back to the dashboard's skeleton — and for an ssr:false
+  // route that skeleton is what the server renders into the board shell and
+  // what the visitor stares at while the client route load runs.
+  pendingComponent: PublicBoardPending,
   ssr: false,
   beforeLoad: async ({
     context,

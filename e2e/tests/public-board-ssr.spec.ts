@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 import { createAuthenticatedWorkspace } from "../helpers/auth";
 import { waitForHydration } from "../helpers/hydration";
 import { assertNoPageErrors, trackPageErrors } from "../helpers/page-errors";
-import { createPost } from "../helpers/posts";
+import { createPost, openPost } from "../helpers/posts";
 import { createTestUser } from "../helpers/test-users";
 import { publicBoardUrl } from "../helpers/urls";
 
@@ -49,6 +49,38 @@ test.describe("public board server rendering", () => {
     // Crawler metadata still resolves server-side.
     expect(html).toContain(`<link rel="canonical" href="${boardUrl}/"`);
     expect(html).toContain('"@type":"WebSite"');
+  });
+
+  test("a client-rendered route still renders the board shell, never the host shell", async ({
+    page,
+    request,
+  }) => {
+    // `/p/$slug` is `ssr: false`, which leaves the router free to fall back to
+    // its `defaultPendingComponent` — the dashboard's skeleton — in the child
+    // slot. The board parent still SSRs around it, so the raw response must
+    // show the board, not a dashboard-shaped shell.
+    const user = createTestUser();
+    await createAuthenticatedWorkspace(page, user);
+
+    const title = `Post route shell ${randomUUID().slice(0, 8)}`;
+    await createPost(page, title, "Shell body.");
+    await openPost(page, title);
+
+    // The dashboard's post URL ends with the post's slug (`…/post/<board>/<slug>`),
+    // which is the path segment the public board serves at `/p/<slug>`.
+    const postSlug = new URL(page.url()).pathname
+      .split("/")
+      .findLast((segment) => segment.length > 0);
+    const response = await request.get(
+      `${publicBoardUrl(user.workspaceName)}/p/${postSlug}`
+    );
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+
+    expect(html).toContain(user.workspaceName);
+    // The dashboard's pending shell ships in its own document; it must never
+    // appear inside the board's.
+    expect(html).not.toContain("pending-shell");
   });
 
   test("a shared document is cacheable; a locale-cookie one is private", async ({
