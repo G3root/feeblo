@@ -302,10 +302,15 @@ function useBoardSsoToken(organizationId: string | undefined) {
         restrictedToOrganizationId &&
         restrictedToOrganizationId !== organizationId
       ) {
-        // A session restricted to another board must not act here.
+        // A session restricted to another board must not act here — discard
+        // it first. The stale restriction says nothing about the token
+        // itself, though: after the sign-out a present token may still claim
+        // this visit, so fall through to the exchange.
         await authClient.signOut();
         await refreshAuthSession();
-        return;
+        if (token === null) {
+          return;
+        }
       }
 
       if (
