@@ -122,6 +122,10 @@ export function toMutableConfig(
   if (config === null || config === undefined) {
     return null;
   }
+  // Throws deliberately and is pinned by a test: an invalid config type is a
+  // programming error at the (currently test-only) call sites, not runtime
+  // data flow. There is no Effect caller to compose through yet.
+  // eslint-disable-next-line effecttsgo/schema-sync -- see comment above
   return S.decodeSync(AttributeConfig)(config, {
     onExcessProperty: "ignore",
   });
