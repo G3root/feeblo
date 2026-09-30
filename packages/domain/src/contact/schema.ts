@@ -32,7 +32,10 @@ export const ContactUpsert = S.Struct({
 export type TContactUpsert = S.Schema.Type<typeof ContactUpsert>;
 
 export const ContactCreate = S.Struct({
-  id: S.optional(ContactId.schema),
+  // Client-minted when present and persisted as the primary key, so the wire
+  // format is checked (see `LegidFactory.formatSchema`). Updates and lookups
+  // keep the plain `ContactId.schema`: their ids reference existing rows.
+  id: S.optional(ContactId.formatSchema),
   organizationId: WorkspaceId.schema,
   externalId: S.optional(S.NullOr(S.String)),
   email: S.optional(S.NullOr(S.String)),
@@ -44,7 +47,9 @@ export const ContactCreate = S.Struct({
   attributeValues: S.optional(
     S.Array(
       S.Struct({
-        id: S.optional(ContactAttributeValueId.schema),
+        // Same create-payload rule as `id` above: client-minted, so the wire
+        // format is checked.
+        id: S.optional(ContactAttributeValueId.formatSchema),
         attributeId: ContactAttributeDefinitionId.schema,
         value: S.NullOr(
           S.Union([S.String, S.Number, S.Boolean, S.DateFromString])

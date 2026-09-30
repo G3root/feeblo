@@ -58,7 +58,11 @@ export const Roadmap = S.Struct({
 export type TRoadmap = S.Schema.Type<typeof Roadmap>;
 
 const RoadmapCreateFields = {
-  id: RoadmapId.schema,
+  // Client-minted and persisted as the primary key, so the wire format is
+  // checked (see `LegidFactory.formatSchema`). `RoadmapUpdateFields` below
+  // overrides this back to the plain codec: its id references an existing
+  // row.
+  id: RoadmapId.formatSchema,
   organizationId: WorkspaceId.schema,
   name: S.String.check(S.isLengthBetween(1, 120)),
   slug: S.String.check(S.isLengthBetween(1, 120)),
@@ -76,6 +80,9 @@ export type TRoadmapCreate = S.Schema.Type<typeof RoadmapCreate>;
 
 const RoadmapUpdateFields = {
   ...RoadmapCreateFields,
+  // An update references an existing row, so it keeps the plain codec: only
+  // creates persist a client-minted id.
+  id: RoadmapId.schema,
   description: S.NullOr(S.String.check(S.isMaxLength(2000))),
   isPrimary: S.Boolean,
 };

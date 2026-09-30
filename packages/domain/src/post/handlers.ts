@@ -510,9 +510,21 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         if (sessionOption._tag === "None") {
           return { eligibleIds: [] };
         }
+        const session = sessionOption.value;
+        // Same restricted-scope rule the other public RPCs enforce through
+        // `Policy.hasRestrictedOrganizationScope`: an SSO-bound session only
+        // ever consults its own organization's board. The query below is
+        // creator-scoped either way, so this bounds which organization it
+        // looks in at all.
+        if (
+          session.user.restrictedToOrganizationId != null &&
+          session.user.restrictedToOrganizationId !== args.organizationId
+        ) {
+          return { eligibleIds: [] };
+        }
         const rows = yield* repository.findDeletableIds({
           organizationId: args.organizationId,
-          userId: sessionOption.value.session.userId,
+          userId: session.session.userId,
         });
         return { eligibleIds: rows.map((row) => row.id) };
       }).pipe(

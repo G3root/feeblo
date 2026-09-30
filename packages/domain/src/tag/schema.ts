@@ -19,7 +19,10 @@ export const TagList = S.Struct({
 export type TTagList = S.Schema.Type<typeof TagList>;
 
 export const TagCreate = S.Struct({
-  id: TagId.schema,
+  // Client-minted and persisted as the primary key, so the wire format is
+  // checked (see `LegidFactory.formatSchema`); `TagUpdate` keeps the plain
+  // `TagId.schema` because its id references an existing row.
+  id: TagId.formatSchema,
   name: S.String,
   organizationId: WorkspaceId.schema,
 });

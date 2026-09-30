@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as S from "effect/Schema";
 
 import {
   asLegidArray,
@@ -189,6 +190,35 @@ describe("makeId", () => {
 
     it("returns false for an id with invalid body characters", () => {
       expect(factory.is("pst_invalid_id!")).toBe(false);
+    });
+  });
+
+  describe("formatSchema", () => {
+    it("decodes an id the factory minted", async () => {
+      const id = await factory.unsafeGenerate();
+
+      expect(S.decodeUnknownSync(factory.formatSchema)(id)).toBe(id);
+    });
+
+    it("decodes any well-formed id, not only ones this factory minted", () => {
+      // The check is format-only: the unique index is the authority on
+      // collisions, so an id from another deployment of the same factory
+      // still decodes.
+      expect(
+        S.decodeUnknownSync(factory.formatSchema)("pst_aB3xY9kQ2rMn")
+      ).toBe("pst_aB3xY9kQ2rMn");
+    });
+
+    it.each([
+      "cmt_aB3xY9kQ2rMn", // wrong prefix
+      "aB3xY9kQ2rMn", // no prefix
+      "pst_invalid_id!", // invalid characters
+      `pst_${"a".repeat(100)}`, // overlong
+      "",
+    ])("rejects %s", (input) => {
+      expect(() => S.decodeUnknownSync(factory.formatSchema)(input)).toThrow(
+        /Must be a valid pst_ id/
+      );
     });
   });
 

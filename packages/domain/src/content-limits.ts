@@ -27,3 +27,13 @@ export const POST_SUGGESTIONS_LIMIT_MAX = 20;
 
 /** Comment bound (dashboard + public). */
 export const COMMENT_CONTENT_MAX_LENGTH = 10_000;
+
+/**
+ * Editor assets one post or changelog entry may reference.
+ *
+ * `assetIds` flows into `IN (...)` queries on the asset table, so the array
+ * has to be bounded; an editor cannot attach anywhere near 50 images to one
+ * document, and the cap keeps a crafted payload from forcing an arbitrarily
+ * large statement.
+ */
+export const EDITOR_ASSET_IDS_MAX_COUNT = 50;

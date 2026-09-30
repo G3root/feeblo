@@ -31,7 +31,11 @@ export type TChangelogCategoryList = S.Schema.Type<
 >;
 
 export const ChangelogCategoryCreate = S.Struct({
-  id: ChangelogCategoryId.schema,
+  // Client-minted and persisted as the primary key, so the wire format is
+  // checked (see `LegidFactory.formatSchema`); the update/delete payloads
+  // keep the plain `ChangelogCategoryId.schema` because their ids reference
+  // existing rows.
+  id: ChangelogCategoryId.formatSchema,
   name: ChangelogCategoryName,
   iconType: ChangelogCategoryColorIcon.iconType,
   icon: ChangelogCategoryColorIcon.schema,

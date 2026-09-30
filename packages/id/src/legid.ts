@@ -30,6 +30,19 @@ export interface LegidFactory<Name extends string> {
   readonly is: (input: string) => input is LegidOf<Name>;
   readonly parse: (input: string) => Effect.Effect<LegidOf<Name>, LegidError>;
   readonly schema: Schema.Codec<LegidOf<Name>, string>;
+  /**
+   * `schema` plus a synchronous format check (prefix separator, prefix,
+   * URL-safe charset, length) applied on decode.
+   *
+   * Use this for create payloads that persist a client-minted id: the id
+   * becomes a row's primary key, so the payload must not be able to carry an
+   * arbitrary, unbounded string. The check mirrors {@link LegidFactory.is}
+   * and is deliberately MAC-free — `verify`/`parse` prove minting, but ids
+   * are not secrets and the table's unique index is the authority on
+   * collisions. It must not replace `schema` on payloads that reference rows
+   * minted by other systems (e.g. better-auth ids sharing a brand).
+   */
+  readonly formatSchema: Schema.Codec<LegidOf<Name>, string>;
   readonly unsafeGenerate: () => Promise<LegidOf<Name>>;
   readonly unsafeParse: (input: string) => Promise<LegidOf<Name>>;
   readonly verify: (input: string) => Effect.Effect<boolean>;
@@ -279,28 +292,37 @@ export const makeId = <
     Schema.brand(brand)
   ) as Schema.Codec<LegidOf<BrandName>, string>;
 
+  const is = (input: string): input is LegidOf<BrandName> => {
+    const separatorIndex = input.indexOf("_");
+    if (separatorIndex === -1) {
+      return false;
+    }
+
+    const inputPrefix = input.slice(0, separatorIndex);
+    const idPart = input.slice(separatorIndex + 1);
+
+    if (inputPrefix !== validPrefix) {
+      return false;
+    }
+
+    return Exit.isSuccess(Effect.runSyncExit(validateLegidFormat(idPart)));
+  };
+
+  // SAFETY: the check narrows to the same branded contract the factory
+  // promises; the cast matches the one `idSchema` already carries.
+  const formatSchema = idSchema.check(
+    Schema.makeFilter(is, { message: `Must be a valid ${validPrefix}_ id` })
+  ) as Schema.Codec<LegidOf<BrandName>, string>;
+
   return {
     brand,
     prefix: validPrefix,
     schema: idSchema,
+    formatSchema,
     generate: generate(),
     verify,
     parse,
-    is: (input): input is LegidOf<BrandName> => {
-      const separatorIndex = input.indexOf("_");
-      if (separatorIndex === -1) {
-        return false;
-      }
-
-      const inputPrefix = input.slice(0, separatorIndex);
-      const idPart = input.slice(separatorIndex + 1);
-
-      if (inputPrefix !== validPrefix) {
-        return false;
-      }
-
-      return Exit.isSuccess(Effect.runSyncExit(validateLegidFormat(idPart)));
-    },
+    is,
     unsafeParse: (input) => Effect.runPromise(parse(input)),
     unsafeGenerate: () => Effect.runPromise(generate()),
   };
