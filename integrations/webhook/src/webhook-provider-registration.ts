@@ -72,9 +72,7 @@ export const makeWebhookProviderRegistration = ({
                 })
             )
           );
-          const payload = yield* Schema.decodeUnknownEffect(
-            WebhookExternalPayload
-          )({
+          const payload = yield* Schema.decodeEffect(WebhookExternalPayload)({
             actor: {
               type: eventData.actor.kind,
               ...(eventData.actor.memberId !== undefined && {

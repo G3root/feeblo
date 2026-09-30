@@ -220,7 +220,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
           const validatedMetadata: TWidgetFeedbackMetadata | undefined =
             metadata === undefined
               ? undefined
-              : yield* Schema.decodeUnknownEffect(WidgetFeedbackMetadataValue)(
+              : yield* Schema.decodeEffect(WidgetFeedbackMetadataValue)(
                   metadata
                 ).pipe(
                   Effect.mapError(

@@ -122,9 +122,7 @@ export const classifyDiscordApiError = (
   context: string
 ): DiscordApiFailure => {
   const status = response.status;
-  const decoded = Schema.decodeUnknownOption(DiscordApiErrorBody)(
-    response.body ?? {}
-  );
+  const decoded = Schema.decodeOption(DiscordApiErrorBody)(response.body ?? {});
   const errorCode = decoded._tag === "Some" ? decoded.value.code : undefined;
   if (status === 401) {
     return new IntegrationProviderAuthenticationError({

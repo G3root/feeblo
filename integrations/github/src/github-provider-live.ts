@@ -201,7 +201,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                 message: "GitHub App integration is not configured.",
               });
             }
-            const parsed = yield* Schema.decodeUnknownEffect(
+            const parsed = yield* Schema.decodeEffect(
               Schema.fromJsonString(IntegrationOAuthState)
             )(input.state).pipe(
               Effect.mapError(() =>

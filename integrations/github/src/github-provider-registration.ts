@@ -103,7 +103,7 @@ const parseGitHubAppWebhook = ({
   }
   switch (eventName) {
     case "issues":
-      return Schema.decodeUnknownEffect(
+      return Schema.decodeEffect(
         Schema.fromJsonString(GitHubIssueWebhookPayload)
       )(rawBody).pipe(
         Effect.map((payload) => ({
@@ -119,7 +119,7 @@ const parseGitHubAppWebhook = ({
         )
       );
     case "installation":
-      return Schema.decodeUnknownEffect(
+      return Schema.decodeEffect(
         Schema.fromJsonString(GitHubInstallationWebhookPayload)
       )(rawBody).pipe(
         Effect.map((payload) => ({
@@ -135,7 +135,7 @@ const parseGitHubAppWebhook = ({
         )
       );
     case "installation_repositories":
-      return Schema.decodeUnknownEffect(
+      return Schema.decodeEffect(
         Schema.fromJsonString(GitHubInstallationRepositoriesWebhookPayload)
       )(rawBody).pipe(
         Effect.map((payload) => ({

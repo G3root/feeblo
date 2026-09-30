@@ -55,8 +55,7 @@ const embeddingVector = (dimensions: number) =>
     dataType: () => `vector(${dimensions})`,
     fromDriver: (value) =>
       Array.from(Schema.decodeUnknownSync(VectorValues)(JSON.parse(value))),
-    toDriver: (value) =>
-      JSON.stringify(Schema.decodeUnknownSync(VectorValues)(value)),
+    toDriver: (value) => JSON.stringify(Schema.decodeSync(VectorValues)(value)),
   });
 
 export const boardVisibilityEnum = pgEnum("board_visibility", [

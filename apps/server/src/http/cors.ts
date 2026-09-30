@@ -16,7 +16,7 @@ const isLocalDevHost = (host: string): boolean =>
   host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost");
 
 const parseUrl = (value: string): URL | null =>
-  Option.getOrNull(Schema.decodeUnknownOption(Schema.URLFromString)(value));
+  Option.getOrNull(Schema.decodeOption(Schema.URLFromString)(value));
 
 const escapeRegExp = (value: string): string =>
   value.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");

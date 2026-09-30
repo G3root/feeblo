@@ -125,7 +125,7 @@ const decodeHistoryCursor = (
       new BadRequestError({ message: "Webhook history cursor is invalid" })
     );
   }
-  return Schema.decodeUnknownEffect(Schema.DateFromString)(timePart).pipe(
+  return Schema.decodeEffect(Schema.DateFromString)(timePart).pipe(
     Effect.map((beforeTime) => Option.some({ beforeId: idPart, beforeTime })),
     Effect.mapError(
       () =>
@@ -942,7 +942,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                 .orderBy(
                   desc(schema.integrationDeliveryAttemptTable.startedAt)
                 );
-        return yield* Schema.decodeUnknownEffect(WebhookDeliveryHistoryPage)({
+        return yield* Schema.decodeEffect(WebhookDeliveryHistoryPage)({
           items: pageRows.map(({ delivery, event }) => ({
             attempts: attempts
               .filter((attempt) => attempt.deliveryId === delivery.id)

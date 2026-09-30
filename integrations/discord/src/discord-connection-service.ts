@@ -211,7 +211,7 @@ export const makeDiscordConnectionServiceLive = (
           readonly code: string;
           readonly state: string;
         }) {
-          const decoded = yield* Schema.decodeUnknownEffect(
+          const decoded = yield* Schema.decodeEffect(
             Schema.fromJsonString(DiscordOAuthState)
           )(state).pipe(
             Effect.mapError(
@@ -221,7 +221,7 @@ export const makeDiscordConnectionServiceLive = (
                 })
             )
           );
-          const decodedOrganizationId = yield* Schema.decodeUnknownEffect(
+          const decodedOrganizationId = yield* Schema.decodeEffect(
             WorkspaceId.schema
           )(decoded.organizationId).pipe(
             Effect.mapError(

@@ -186,7 +186,7 @@ const smtpResponseCode = (response: string): number | undefined => {
   }
 
   return Option.getOrUndefined(
-    Schema.decodeUnknownOption(SmtpResponseCode)(Number(match[1]))
+    Schema.decodeOption(SmtpResponseCode)(Number(match[1]))
   );
 };
 

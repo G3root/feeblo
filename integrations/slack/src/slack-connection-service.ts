@@ -206,7 +206,7 @@ export const makeSlackConnectionServiceLive = (
           readonly code: string;
           readonly state: string;
         }) {
-          const decoded = yield* Schema.decodeUnknownEffect(
+          const decoded = yield* Schema.decodeEffect(
             Schema.fromJsonString(SlackOAuthState)
           )(state).pipe(
             Effect.mapError(

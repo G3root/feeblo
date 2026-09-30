@@ -122,7 +122,7 @@ export function toMutableConfig(
   if (config === null || config === undefined) {
     return null;
   }
-  return S.decodeUnknownSync(AttributeConfig)(config, {
+  return S.decodeSync(AttributeConfig)(config, {
     onExcessProperty: "ignore",
   });
 }
@@ -396,7 +396,7 @@ const decodeCommonFields = <A>(
   kind: string,
   fields: AttributeSource
 ): Effect.Effect<A, DataValidationError> =>
-  S.decodeUnknownEffect(schema)(fields, { onExcessProperty: "ignore" }).pipe(
+  S.decodeEffect(schema)(fields, { onExcessProperty: "ignore" }).pipe(
     Effect.mapError(
       (error: S.SchemaError) =>
         new DataValidationError({

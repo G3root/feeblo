@@ -63,7 +63,7 @@ const makeIntegrationEventRecorder = Effect.gen(function* () {
         )
       );
     const routes = yield* Effect.forEach(selections, (selection) =>
-      Schema.decodeUnknownEffect(StoredRouteSelection)(selection).pipe(
+      Schema.decodeEffect(StoredRouteSelection)(selection).pipe(
         Effect.mapError(
           () =>
             new IntegrationEventRecordingError({

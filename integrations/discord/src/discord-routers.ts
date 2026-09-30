@@ -93,7 +93,7 @@ const organizationIdFromOAuthState = (state: string | null) =>
   state === null
     ? undefined
     : Option.getOrUndefined(
-        Schema.decodeUnknownOption(Schema.fromJsonString(DiscordOAuthState))(
+        Schema.decodeOption(Schema.fromJsonString(DiscordOAuthState))(
           state
         ).pipe(Option.map(({ organizationId }) => organizationId))
       );

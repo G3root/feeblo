@@ -60,9 +60,7 @@ export type SesWebhookOutcome =
 const decodeSnsEnvelope = (
   rawBody: string
 ): Effect.Effect<SesSnsEnvelope, SesWebhookEnvelopeError> =>
-  Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(
-    rawBody
-  ).pipe(
+  Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(rawBody).pipe(
     Effect.mapError(
       (cause) =>
         new SesWebhookEnvelopeError({
@@ -87,9 +85,7 @@ const decodeSnsEnvelope = (
 
 const decodeSesMessage = (message: string): SesEventNotification | undefined =>
   Option.getOrUndefined(
-    Schema.decodeUnknownOption(Schema.fromJsonString(SesEventNotification))(
-      message
-    )
+    Schema.decodeOption(Schema.fromJsonString(SesEventNotification))(message)
   );
 
 const parseSesMessage = (

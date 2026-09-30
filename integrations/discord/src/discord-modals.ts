@@ -76,7 +76,7 @@ export const decodeModalMetadata = (
       })
     );
   }
-  return Schema.decodeUnknownEffect(DiscordFeedbackModalMetadata)({
+  return Schema.decodeEffect(DiscordFeedbackModalMetadata)({
     ...(messageId === undefined ? undefined : { messageId }),
     channelId,
     guildId,

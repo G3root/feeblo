@@ -73,9 +73,7 @@ export const FeedbackModalMetadata = Schema.Struct({
 });
 
 export const decodeModalMetadata = (value: string) =>
-  Schema.decodeUnknownEffect(Schema.fromJsonString(FeedbackModalMetadata))(
-    value
-  );
+  Schema.decodeEffect(Schema.fromJsonString(FeedbackModalMetadata))(value);
 
 /** Slack Block Kit `modal` view document sent to `views.open` / `views.update`. */
 export interface SlackModalViewDocument {
