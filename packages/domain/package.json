@@ -394,9 +394,6 @@
     "./public-api/middleware": {
       "default": "./src/public-api/middleware.ts"
     },
-    "./public-api/repository": {
-      "default": "./src/public-api/repository.ts"
-    },
     "./public-api/router": {
       "default": "./src/public-api/router.ts"
     },

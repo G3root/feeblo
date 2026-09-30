@@ -1,6 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
+import type { TEntitySource } from "@feeblo/domain-contracts/entity-source";
 import { CompanyId } from "@feeblo/id";
-import { and, count, eq, or } from "drizzle-orm";
+import { and, count, desc, eq, ne, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -12,20 +13,77 @@ import {
   FailedToCreateCompanyError,
   FailedToUpdateCompanyError,
 } from "./errors";
-import type {
-  TCompanyCreate,
-  TCompanyDelete,
-  TCompanyUpdate,
-  TCompanyUpsert,
-} from "./schema";
+import type { TCompanyUpsert } from "./schema";
+
+/**
+ * The write inputs, typed with plain identifiers rather than the RPC payload
+ * schemas' branded ones.
+ *
+ * The dashboard decodes a branded id before it reaches the repository; the
+ * Public API's key is scoped to one workspace and its ids come from the
+ * database, so it passes strings. Widening the parameter to `string` keeps one
+ * repository serving both without a decode that proves nothing the request did
+ * not already establish.
+ */
+interface TCompanyCreateInput {
+  id?: string | undefined;
+  organizationId: string;
+  externalId?: string | null | undefined;
+  name: string;
+  avatar?: string | null | undefined;
+  externalCreatedAt?: Date | null | undefined;
+}
+
+interface TCompanyUpdateInput {
+  id: string;
+  organizationId: string;
+  externalId?: string | null | undefined;
+  name?: string | undefined;
+  avatar?: string | null | undefined;
+  externalCreatedAt?: Date | null | undefined;
+}
+
+interface TCompanyDeleteInput {
+  id: string;
+  organizationId: string;
+}
 
 export type Company = typeof schema.companyTable.$inferSelect;
+
+/**
+ * The fields a company read selects, and the only place a company field is
+ * named.
+ *
+ * Shared by the dashboard's list and the Public API's paged reads; the public
+ * response mapper narrows this to the published field set, so the workspace id
+ * cannot reach a payload.
+ */
+const COMPANY_FIELDS = {
+  id: schema.companyTable.id,
+  organizationId: schema.companyTable.organizationId,
+  name: schema.companyTable.name,
+  externalId: schema.companyTable.externalId,
+  avatar: schema.companyTable.avatar,
+  externalCreatedAt: schema.companyTable.externalCreatedAt,
+  source: schema.companyTable.source,
+  createdAt: schema.companyTable.createdAt,
+  updatedAt: schema.companyTable.updatedAt,
+} as const;
+
+interface TCompanyFindPage {
+  after: { readonly createdAt: Date; readonly id: string } | null;
+  limit: number;
+  organizationId: string;
+}
 
 const makeCompanyRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   return {
-    create: (args: TCompanyCreate) =>
+    create: (
+      args: TCompanyCreateInput,
+      options?: { readonly source?: TEntitySource }
+    ) =>
       Effect.gen(function* () {
         const id = args.id ?? (yield* CompanyId.generate);
         const now = yield* DateTime.nowAsDate;
@@ -38,6 +96,9 @@ const makeCompanyRepository = Effect.gen(function* () {
             externalId: args.externalId,
             avatar: args.avatar,
             externalCreatedAt: args.externalCreatedAt,
+            // Omitted rather than defaulted here: the table's own default is
+            // the dashboard's provenance, and the Public API names `API`.
+            ...(options?.source !== undefined && { source: options.source }),
             createdAt: now,
             updatedAt: now,
           })
@@ -57,7 +118,7 @@ const makeCompanyRepository = Effect.gen(function* () {
         return created;
       }),
 
-    update: (args: TCompanyUpdate) =>
+    update: (args: TCompanyUpdateInput) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
         const [updated] = yield* db
@@ -84,7 +145,7 @@ const makeCompanyRepository = Effect.gen(function* () {
         return Option.fromNullishOr(updated);
       }),
 
-    delete: (args: TCompanyDelete) =>
+    delete: (args: TCompanyDeleteInput) =>
       Effect.gen(function* () {
         const [deleted] = yield* db
           .delete(schema.companyTable)
@@ -99,7 +160,7 @@ const makeCompanyRepository = Effect.gen(function* () {
         return Option.fromNullishOr(deleted);
       }),
 
-    exists: ({ id, organizationId }: TCompanyDelete) =>
+    exists: ({ id, organizationId }: TCompanyDeleteInput) =>
       Effect.gen(function* () {
         const [company] = yield* db
           .select({ id: schema.companyTable.id })
@@ -177,16 +238,160 @@ const makeCompanyRepository = Effect.gen(function* () {
 
     findManyCompanies: (organizationId: string) =>
       db
-        .select()
+        .select(COMPANY_FIELDS)
         .from(schema.companyTable)
         .where(eq(schema.companyTable.organizationId, organizationId)),
+
+    /**
+     * One page of the workspace's companies, newest first.
+     *
+     * The same `(createdAt, id)` tuple the Public API's other lists page on,
+     * and one row more than asked for so the caller learns whether another
+     * page exists without a second query.
+     */
+    findPage: ({ after, limit, organizationId }: TCompanyFindPage) => {
+      const conditions = [
+        eq(schema.companyTable.organizationId, organizationId),
+        ...(after === null
+          ? []
+          : [
+              sql`(${schema.companyTable.createdAt}, ${schema.companyTable.id}) < (${after.createdAt}, ${after.id})`,
+            ]),
+      ];
+
+      return db
+        .select(COMPANY_FIELDS)
+        .from(schema.companyTable)
+        .where(and(...conditions))
+        .orderBy(
+          desc(schema.companyTable.createdAt),
+          desc(schema.companyTable.id)
+        )
+        .limit(limit + 1);
+    },
+
+    /** One company of the calling workspace, or nothing. */
+    findById: ({
+      id,
+      organizationId,
+    }: {
+      id: string;
+      organizationId: string;
+    }) =>
+      db
+        .select(COMPANY_FIELDS)
+        .from(schema.companyTable)
+        .where(
+          and(
+            eq(schema.companyTable.id, id),
+            eq(schema.companyTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => Option.fromNullishOr(rows[0]))),
 
     countByOrganizationId: (organizationId: string) =>
       db
         .select({ count: count() })
         .from(schema.companyTable)
         .where(eq(schema.companyTable.organizationId, organizationId))
-        .pipe(Effect.map((rows) => Number(rows[0]?.count ?? 0))),
+        .pipe(Effect.map((rows) => rows[0]?.count ?? 0)),
+
+    /**
+     * The company that already holds this name, if any.
+     *
+     * `company_organizationId_name_uidx` is the authority; this is the courtesy
+     * check that lets an ordinary duplicate be answered with a message about
+     * the name instead of a driver error the caller cannot act on.
+     */
+    findNameConflict: ({
+      excludeCompanyId,
+      name,
+      organizationId,
+    }: {
+      excludeCompanyId: string | null;
+      name: string;
+      organizationId: string;
+    }) =>
+      db
+        .select({ id: schema.companyTable.id })
+        .from(schema.companyTable)
+        .where(
+          and(
+            eq(schema.companyTable.organizationId, organizationId),
+            eq(schema.companyTable.name, name),
+            ...(excludeCompanyId === null
+              ? []
+              : [ne(schema.companyTable.id, excludeCompanyId)])
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => Option.fromNullishOr(rows[0]))),
+
+    /**
+     * The company that already holds this external id, if any.
+     *
+     * Looked up separately from the name so a caller can say which field
+     * collided: `externalId` is the caller's own identifier, and being told
+     * that a *name* is taken when the caller reused a sync key would send them
+     * looking in the wrong place. Postgres treats `NULL` as distinct in a
+     * unique index, so an unset external id never conflicts with another unset
+     * one and is never passed here.
+     */
+    findExternalIdConflict: ({
+      excludeCompanyId,
+      externalId,
+      organizationId,
+    }: {
+      excludeCompanyId: string | null;
+      externalId: string;
+      organizationId: string;
+    }) =>
+      db
+        .select({ id: schema.companyTable.id })
+        .from(schema.companyTable)
+        .where(
+          and(
+            eq(schema.companyTable.organizationId, organizationId),
+            eq(schema.companyTable.externalId, externalId),
+            ...(excludeCompanyId === null
+              ? []
+              : [ne(schema.companyTable.id, excludeCompanyId)])
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => Option.fromNullishOr(rows[0]))),
+
+    /**
+     * How many CRM entries the workspace holds, for the plan's entry limit.
+     *
+     * Counts companies and contacts together, and selects nothing: the Public
+     * API does not return contacts, but the plan limit that gates creating a
+     * company counts them, and the dashboard's own create is gated on the same
+     * number. Two queries rather than one union, because each then uses its own
+     * `organizationId` index.
+     *
+     * Only meaningful inside the write transaction that holds the workspace
+     * lock: read anywhere else, the number it returns can be stale by the time
+     * the row it authorizes is inserted.
+     */
+    countCrmEntries: (organizationId: string) =>
+      Effect.gen(function* () {
+        const [companyRows, contactRows] = yield* Effect.all([
+          db
+            .select({ total: count(schema.companyTable.id) })
+            .from(schema.companyTable)
+            .where(eq(schema.companyTable.organizationId, organizationId)),
+          db
+            .select({ total: count(schema.contactTable.id) })
+            .from(schema.contactTable)
+            .where(eq(schema.contactTable.organizationId, organizationId)),
+        ]);
+
+        return (
+          (companyRows.at(0)?.total ?? 0) + (contactRows.at(0)?.total ?? 0)
+        );
+      }),
   };
 });
 
@@ -196,3 +401,14 @@ export class CompanyRepository extends Context.Service<CompanyRepository>()(
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
+
+/**
+ * Reads the repository from the fiber context.
+ *
+ * `HttpApiBuilder` does not thread a handler's service requirements through the
+ * route layer, so the Public API's operations take it from the context the
+ * composition provides — the same shape as `currentCommentService`.
+ */
+export const currentCompanyRepository = Effect.context<never>().pipe(
+  Effect.map((context) => Context.getUnsafe(context, CompanyRepository))
+);
