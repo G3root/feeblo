@@ -112,7 +112,6 @@ export const program = Effect.gen(function* () {
   const MergedRoutes = makeMergedRoutes({
     appUrl: config.appUrl,
     integrationRuntime,
-    nodeEnv: config.nodeEnv,
     publicRouters: PublicRouters,
   });
   const AllRoutes = withGlobalMiddleware(MergedRoutes, config);
