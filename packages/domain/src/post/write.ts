@@ -3,6 +3,7 @@ import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
@@ -274,19 +275,16 @@ export const makePostWrites = Effect.gen(function* () {
     organizationId: string;
   }) =>
     repository.findActivityState(args).pipe(
-      Effect.flatMap((previous) =>
-        previous === undefined
-          ? Effect.fail(new FailedToUpdatePostError())
-          : Effect.succeed(previous)
+      Effect.filterOrFail(
+        (post) => post !== undefined,
+        () => new FailedToUpdatePostError()
       ),
-      Effect.flatMap((post) =>
-        post.mergedIntoPostId === null
-          ? Effect.succeed(post)
-          : Effect.fail(
-              new Policy.PolicyDeniedError({
-                reason: "This post has been merged into another post",
-              })
-            )
+      Effect.filterOrFail(
+        (post) => post.mergedIntoPostId === null,
+        () =>
+          new Policy.PolicyDeniedError({
+            reason: "This post has been merged into another post",
+          })
       )
     );
 
@@ -307,9 +305,7 @@ export const makePostWrites = Effect.gen(function* () {
         organizationId: args.organizationId,
       });
       if (board._tag === "None") {
-        return yield* Effect.fail(
-          new BadRequestError({ message: "Board not found" })
-        );
+        return yield* new BadRequestError({ message: "Board not found" });
       }
       return board.value;
     });
@@ -321,9 +317,9 @@ export const makePostWrites = Effect.gen(function* () {
         organizationId: args.organizationId,
       });
       if (statusType === undefined) {
-        return yield* Effect.fail(
-          new BadRequestError({ message: "Post status not found" })
-        );
+        return yield* new BadRequestError({
+          message: "Post status not found",
+        });
       }
       return statusType;
     });
@@ -465,8 +461,11 @@ export const makePostWrites = Effect.gen(function* () {
                   organizationId: args.organizationId,
                   source: "post_creator",
                   topic: { topicId: args.id, topicType: "post" },
-                  verificationExpiresAt: new Date(
-                    subscriptionNow.getTime() + 86_400_000
+                  verificationExpiresAt: DateTime.fromDateUnsafe(
+                    subscriptionNow
+                  ).pipe(
+                    DateTime.addDuration(Duration.days(1)),
+                    DateTime.toDate
                   ),
                 })
                 .pipe(
@@ -744,7 +743,10 @@ export const makePostWrites = Effect.gen(function* () {
                   aggregateId: args.id,
                   aggregateType: "post",
                   deduplicationKey: `post.closed:${args.organizationId}:${args.id}:${args.statusId}`,
-                  expiresAt: new Date(now.getTime() + 7 * 86_400_000),
+                  expiresAt: DateTime.fromDateUnsafe(now).pipe(
+                    DateTime.addDuration(Duration.days(7)),
+                    DateTime.toDate
+                  ),
                   kind: "post.closed",
                   organizationId: args.organizationId,
                   payload: { kind: "post.closed", postId: args.id },
@@ -766,8 +768,12 @@ export const makePostWrites = Effect.gen(function* () {
                   aggregateId: args.id,
                   aggregateType: "post",
                   deduplicationKey: `post.status_changed:${args.organizationId}:${args.id}:${now.getTime()}`,
-                  expiresAt: new Date(
-                    now.getTime() + postStatusCoalescingDelayMs + 7 * 86_400_000
+                  expiresAt: DateTime.fromDateUnsafe(now).pipe(
+                    DateTime.addDuration(
+                      Duration.millis(postStatusCoalescingDelayMs)
+                    ),
+                    DateTime.addDuration(Duration.days(7)),
+                    DateTime.toDate
                   ),
                   organizationId: args.organizationId,
                   payload: {
@@ -775,8 +781,11 @@ export const makePostWrites = Effect.gen(function* () {
                     postId: args.id,
                     statusId: args.statusId,
                   },
-                  scheduledAt: new Date(
-                    now.getTime() + postStatusCoalescingDelayMs
+                  scheduledAt: DateTime.fromDateUnsafe(now).pipe(
+                    DateTime.addDuration(
+                      Duration.millis(postStatusCoalescingDelayMs)
+                    ),
+                    DateTime.toDate
                   ),
                 })
                 .pipe(

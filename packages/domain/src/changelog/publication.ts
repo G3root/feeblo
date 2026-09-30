@@ -1,4 +1,5 @@
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
@@ -72,7 +73,10 @@ export const makeChangelogPublication = Effect.gen(function* () {
         aggregateId: changelogId,
         aggregateType: "changelog",
         deduplicationKey: `changelog.published:${changelogId}`,
-        expiresAt: new Date(now.getTime() + PUBLISHED_INTENT_RETENTION_MS),
+        expiresAt: DateTime.fromDateUnsafe(now).pipe(
+          DateTime.addDuration(Duration.millis(PUBLISHED_INTENT_RETENTION_MS)),
+          DateTime.toDate
+        ),
         kind: "changelog.published",
         organizationId,
         payload: {

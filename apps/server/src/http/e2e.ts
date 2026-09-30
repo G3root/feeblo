@@ -5,6 +5,8 @@ import { RoadmapRepository } from "@feeblo/domain/roadmap/repository";
 import { RoadmapColumnId, RoadmapId, WorkspaceId } from "@feeblo/id";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
@@ -144,7 +146,7 @@ export const e2eSetPlanRouter = HttpRouter.use((router) =>
       Effect.gen(function* () {
         const body = yield* request.json;
         const payload = yield* Schema.decodeUnknownEffect(SetPlanPayload)(body);
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
         const productId = `prod_e2e_${payload.organizationId}`;
 
         // Converge on the requested plan atomically so re-runs are idempotent:
@@ -192,7 +194,10 @@ export const e2eSetPlanRouter = HttpRouter.use((router) =>
               recurringIntervalCount: 1,
               status: "trialing",
               currentPeriodStart: now,
-              currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+              currentPeriodEnd: DateTime.fromDateUnsafe(now).pipe(
+                DateTime.addDuration(Duration.days(1)),
+                DateTime.toDate
+              ),
               customerId: `cus_e2e_${payload.organizationId}`,
               productId,
             });

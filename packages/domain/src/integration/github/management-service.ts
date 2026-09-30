@@ -47,7 +47,7 @@ export interface GitHubManagementServiceContract {
   readonly listRules: (
     input: S.GitHubRuleList
   ) => Effect.Effect<readonly S.GitHubSyncRule[], GitHubIntegrationError>;
-  readonly status: () => Effect.Effect<S.GitHubIntegrationStatus, never>;
+  readonly status: Effect.Effect<S.GitHubIntegrationStatus, never>;
   readonly updateRule: (
     input: S.GitHubRuleUpdate
   ) => Effect.Effect<S.GitHubSyncRule, GitHubIntegrationError>;

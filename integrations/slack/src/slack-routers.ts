@@ -40,18 +40,29 @@ const invalidInboundPayload = Effect.succeed(
   HttpServerResponse.text("invalid inbound payload", { status: 400 })
 );
 
-/** Maps signature-verification rejections to 401 instead of a crash. */
-const rejectInboundRejection = Effect.catchTags({
-  IntegrationInboundRejection: (error: IntegrationInboundRejection) =>
-    Effect.logWarning("Slack inbound request was rejected", {
-      message: error.message,
-      provider: error.provider,
-    }).pipe(
-      Effect.as(
-        HttpServerResponse.text("invalid request signature", { status: 401 })
-      )
-    ),
-});
+/**
+ * Maps signature-verification rejections to 401 instead of a crash.
+ *
+ * A generic function rather than a standalone `Effect.catchTags({...})`
+ * value: the data-last combinator infers its error type parameter before
+ * `self` is known, defaults it to `unknown`, and leaves `unknown` in the
+ * output error channel (`Exclude<unknown, ...>` is `unknown`). Taking `self`
+ * first lets `E` come from the effect being handled.
+ */
+const rejectInboundRejection = <A, R>(
+  self: Effect.Effect<A, IntegrationInboundRejection, R>
+) =>
+  Effect.catchTags(self, {
+    IntegrationInboundRejection: (error: IntegrationInboundRejection) =>
+      Effect.logWarning("Slack inbound request was rejected", {
+        message: error.message,
+        provider: error.provider,
+      }).pipe(
+        Effect.as(
+          HttpServerResponse.text("invalid request signature", { status: 401 })
+        )
+      ),
+  });
 
 const respondToSlackInbound = (
   request: HttpServerRequest.HttpServerRequest,
@@ -121,63 +132,61 @@ const makeSlackInteractiveRouter = (registry: IntegrationProviderRegistry) =>
 /** OAuth callback router; completes the install and redirects to the dashboard settings page. */
 export const makeSlackOAuthCallbackRouter = (appUrl: string) =>
   HttpRouter.use((router) =>
-    Effect.gen(function* () {
-      return yield* router.add(
-        "GET",
-        "/slack/oauth/callback",
-        (request: HttpServerRequest.HttpServerRequest) =>
-          Effect.gen(function* () {
-            // request.url is the relative path (e.g.
-            // /slack/oauth/callback?code=…); parse it without a base URL.
-            const { code, error, state } = parseSlackOAuthCallbackUrl(
-              request.url
-            );
-            if (error !== null) {
-              return HttpServerResponse.redirect(
-                settingsRedirect({
-                  appUrl,
-                  message: "Slack installation was cancelled or denied.",
-                  provider: "slack",
-                  status: "error",
-                })
-              );
-            }
-            if (code === null || state === null) {
-              return HttpServerResponse.redirect(
-                settingsRedirect({
-                  appUrl,
-                  message: "Slack installation failed.",
-                  provider: "slack",
-                  status: "error",
-                })
-              );
-            }
-            const management = yield* SlackManagementService;
-            const completed = yield* Effect.exit(
-              management.connectComplete({ code, state })
-            );
-            if (Exit.isFailure(completed)) {
-              return HttpServerResponse.redirect(
-                settingsRedirect({
-                  appUrl,
-                  message: "Slack installation failed.",
-                  provider: "slack",
-                  status: "error",
-                })
-              );
-            }
+    router.add(
+      "GET",
+      "/slack/oauth/callback",
+      (request: HttpServerRequest.HttpServerRequest) =>
+        Effect.gen(function* () {
+          // request.url is the relative path (e.g.
+          // /slack/oauth/callback?code=…); parse it without a base URL.
+          const { code, error, state } = parseSlackOAuthCallbackUrl(
+            request.url
+          );
+          if (error !== null) {
             return HttpServerResponse.redirect(
               settingsRedirect({
                 appUrl,
-                message: "Feeblo is now connected to Slack.",
-                organizationId: completed.value.organizationId,
+                message: "Slack installation was cancelled or denied.",
                 provider: "slack",
-                status: "connected",
+                status: "error",
               })
             );
-          })
-      );
-    })
+          }
+          if (code === null || state === null) {
+            return HttpServerResponse.redirect(
+              settingsRedirect({
+                appUrl,
+                message: "Slack installation failed.",
+                provider: "slack",
+                status: "error",
+              })
+            );
+          }
+          const management = yield* SlackManagementService;
+          const completed = yield* Effect.exit(
+            management.connectComplete({ code, state })
+          );
+          if (Exit.isFailure(completed)) {
+            return HttpServerResponse.redirect(
+              settingsRedirect({
+                appUrl,
+                message: "Slack installation failed.",
+                provider: "slack",
+                status: "error",
+              })
+            );
+          }
+          return HttpServerResponse.redirect(
+            settingsRedirect({
+              appUrl,
+              message: "Feeblo is now connected to Slack.",
+              organizationId: completed.value.organizationId,
+              provider: "slack",
+              status: "connected",
+            })
+          );
+        })
+    )
   ).pipe(Layer.provide(Database.DatabaseContextLive), Layer.orDie);
 
 /**

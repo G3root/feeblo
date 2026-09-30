@@ -1,5 +1,6 @@
 import * as NodeCrypto from "node:crypto";
 
+import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -24,7 +25,7 @@ export class SesWebhookEnvelopeError extends Schema.TaggedError<SesWebhookEnvelo
   "SesWebhookEnvelopeError",
   {
     cause: Schema.optionalKey(Schema.Defect()),
-    httpStatus: Schema.optionalKey(Schema.Number),
+    httpStatus: Schema.optionalKey(Schema.Finite),
     message: Schema.String,
     operation: Schema.String,
   }
@@ -35,7 +36,7 @@ export class SesWebhookConfirmationError extends Schema.TaggedError<SesWebhookCo
   "SesWebhookConfirmationError",
   {
     cause: Schema.optionalKey(Schema.Defect()),
-    httpStatus: Schema.optionalKey(Schema.Number),
+    httpStatus: Schema.optionalKey(Schema.Finite),
     message: Schema.String,
     operation: Schema.String,
   }
@@ -60,9 +61,7 @@ export type SesWebhookOutcome =
 const decodeSnsEnvelope = (
   rawBody: string
 ): Effect.Effect<SesSnsEnvelope, SesWebhookEnvelopeError> =>
-  Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(
-    rawBody
-  ).pipe(
+  Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(rawBody).pipe(
     Effect.mapError(
       (cause) =>
         new SesWebhookEnvelopeError({
@@ -87,9 +86,7 @@ const decodeSnsEnvelope = (
 
 const decodeSesMessage = (message: string): SesEventNotification | undefined =>
   Option.getOrUndefined(
-    Schema.decodeUnknownOption(Schema.fromJsonString(SesEventNotification))(
-      message
-    )
+    Schema.decodeOption(Schema.fromJsonString(SesEventNotification))(message)
   );
 
 const parseSesMessage = (
@@ -243,8 +240,9 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
     "SesEmailFeedbackWebhook.fetchSnsSigningCert"
   )((certUrl: string) =>
     Effect.gen(function* () {
+      const now = yield* Clock.currentTimeMillis;
       const cached = signingCertCache.get(certUrl);
-      if (cached !== undefined && cached.expiresAt > Date.now()) {
+      if (cached !== undefined && cached.expiresAt > now) {
         return cached.pem;
       }
       signingCertCache.delete(certUrl);
@@ -268,15 +266,16 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
               operation: "SesEmailFeedbackWebhook.fetchSnsSigningCert",
             })
         ),
-        Effect.timeout(SNS_SUBSCRIPTION_CONFIRMATION_TIMEOUT_MS),
-        Effect.catchTag("TimeoutError", () =>
-          Effect.fail(
-            new SesWebhookEnvelopeError({
-              message: "SNS signing certificate request timed out",
-              operation: "SesEmailFeedbackWebhook.fetchSnsSigningCert",
-            })
-          )
-        )
+        Effect.timeoutOrElse({
+          duration: SNS_SUBSCRIPTION_CONFIRMATION_TIMEOUT_MS,
+          orElse: () =>
+            Effect.fail(
+              new SesWebhookEnvelopeError({
+                message: "SNS signing certificate request timed out",
+                operation: "SesEmailFeedbackWebhook.fetchSnsSigningCert",
+              })
+            ),
+        })
       );
       if (response.status >= 300 && response.status < 400) {
         return yield* new SesWebhookEnvelopeError({
@@ -303,10 +302,12 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
         )
       );
 
-      const now = Date.now();
+      // A fresh read: the cert fetch above can take a while, so the TTL
+      // window starts when the certificate is actually in hand.
+      const cacheNow = yield* Clock.currentTimeMillis;
       if (signingCertCache.size >= SIGNING_CERT_CACHE_MAX_ENTRIES) {
         for (const [url, entry] of signingCertCache) {
-          if (entry.expiresAt <= now) {
+          if (entry.expiresAt <= cacheNow) {
             signingCertCache.delete(url);
           }
         }
@@ -318,7 +319,7 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
         }
       }
       signingCertCache.set(certUrl, {
-        expiresAt: now + SIGNING_CERT_CACHE_TTL_MS,
+        expiresAt: cacheNow + SIGNING_CERT_CACHE_TTL_MS,
         pem,
       });
       return pem;
@@ -353,15 +354,16 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
               operation: "SesEmailFeedbackWebhook.confirmSubscription",
             })
         ),
-        Effect.timeout(SNS_SUBSCRIPTION_CONFIRMATION_TIMEOUT_MS),
-        Effect.catchTag("TimeoutError", () =>
-          Effect.fail(
-            new SesWebhookConfirmationError({
-              message: "SNS subscription confirmation request timed out",
-              operation: "SesEmailFeedbackWebhook.confirmSubscription",
-            })
-          )
-        )
+        Effect.timeoutOrElse({
+          duration: SNS_SUBSCRIPTION_CONFIRMATION_TIMEOUT_MS,
+          orElse: () =>
+            Effect.fail(
+              new SesWebhookConfirmationError({
+                message: "SNS subscription confirmation request timed out",
+                operation: "SesEmailFeedbackWebhook.confirmSubscription",
+              })
+            ),
+        })
       );
 
       if (response.status >= 300 && response.status < 400) {

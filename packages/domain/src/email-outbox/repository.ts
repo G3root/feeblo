@@ -107,7 +107,7 @@ const decodeIntentPayload = (
   input: Schema.Codec.Encoded<typeof EmailIntentPayload>,
   operation: string
 ): Effect.Effect<IntentPayload, EmailOutboxDataError> =>
-  Schema.decodeUnknownEffect(EmailIntentPayload)(input).pipe(
+  Schema.decodeEffect(EmailIntentPayload)(input).pipe(
     Effect.mapError(() =>
       dataError(operation, "Stored email intent payload is invalid")
     )
@@ -118,9 +118,7 @@ const decodeEmailIntent = (
   operation: string
 ): Effect.Effect<EmailIntent, EmailOutboxDataError> =>
   Effect.gen(function* () {
-    const intent = yield* Schema.decodeUnknownEffect(EmailOutboxRecord)(
-      input
-    ).pipe(
+    const intent = yield* Schema.decodeEffect(EmailOutboxRecord)(input).pipe(
       Effect.mapError(() =>
         dataError(operation, "Stored email intent record is invalid")
       )
@@ -140,7 +138,7 @@ const decodeEmailDelivery = (
   input: Schema.Codec.Encoded<typeof EmailDeliveryRecord>,
   operation: string
 ): Effect.Effect<EmailDelivery, EmailOutboxDataError> =>
-  Schema.decodeUnknownEffect(EmailDeliveryRecord)(input).pipe(
+  Schema.decodeEffect(EmailDeliveryRecord)(input).pipe(
     Effect.mapError(() =>
       dataError(operation, "Stored email delivery record is invalid")
     )

@@ -27,8 +27,8 @@ export const S3Layer = Layer.unwrap(
       endpoint: config.endpoint,
       ...(credentials && { credentials }),
     });
-  }).pipe(Effect.provide(S3Config.layer))
-);
+  })
+).pipe(Layer.provide(S3Config.layer));
 
 const TRAILING_SLASH_REGEX = /\/$/;
 const PROFILE_IMAGE_PREFIX = "profile-images";
@@ -138,10 +138,12 @@ const makeS3UploadService = Effect.gen(function* () {
 export class S3UploadService extends Context.Service<S3UploadService>()(
   "S3UploadService",
   {
-    make: makeS3UploadService.pipe(Effect.provide(S3Config.layer)),
+    make: makeS3UploadService,
   }
 ) {
-  static readonly layer = Layer.effect(this, this.make);
+  static readonly layer = Layer.effect(this, this.make).pipe(
+    Layer.provide(S3Config.layer)
+  );
 }
 
 export const S3UploadServiceLive = Layer.unwrap(
@@ -155,5 +157,5 @@ export const S3UploadServiceLive = Layer.unwrap(
       Layer.provide(S3FileSystemLive),
       Layer.provide(S3Layer)
     );
-  }).pipe(Effect.provide(S3Config.layer))
-);
+  })
+).pipe(Layer.provide(S3Config.layer));

@@ -57,7 +57,7 @@ export interface IntegrationDeliveryWorkerRepository {
     readonly httpStatus?: number;
     readonly outcome: IntegrationDeliveryOutcome;
   }) => Effect.Effect<void, IntegrationDeliveryWorkerPersistenceError>;
-  readonly recoverExpiredLeases: () => Effect.Effect<
+  readonly recoverExpiredLeases: Effect.Effect<
     void,
     IntegrationDeliveryWorkerPersistenceError
   >;
@@ -97,7 +97,7 @@ export const runIntegrationDeliveryWorkerPoll = ({
       semaphores.set(connectionId, created);
       return created;
     };
-    yield* repository.recoverExpiredLeases();
+    yield* repository.recoverExpiredLeases;
     const claimed = yield* repository.claimDueDeliveries({
       leaseDurationMs: integrationDeliveryWorkerDefaults.leaseDurationMs,
       leaseOwner,
@@ -230,7 +230,7 @@ export const runIntegrationDeliveryWorker = (input: {
         operation: error.operation,
       })
     ),
-    Effect.catch(() => Effect.void),
+    Effect.ignore,
     Effect.repeat(
       Schedule.spaced(integrationDeliveryWorkerDefaults.pollIntervalMs)
     )

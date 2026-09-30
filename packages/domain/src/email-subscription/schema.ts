@@ -52,7 +52,7 @@ export const parseEmailAddress = (
   input: string,
   operation: string
 ): Effect.Effect<EmailAddress, EmailSubscriptionInputError> =>
-  Schema.decodeUnknownEffect(EmailAddress)(input.trim().toLowerCase()).pipe(
+  Schema.decodeEffect(EmailAddress)(input.trim().toLowerCase()).pipe(
     Effect.mapError(
       () =>
         new EmailSubscriptionInputError({

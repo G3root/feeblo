@@ -35,7 +35,7 @@ const PostDetailImageData = Schema.Struct({
   status: PostStatusType,
   title: Schema.String,
   type: Schema.Literal("post-detail"),
-  upvoteCount: Schema.Number,
+  upvoteCount: Schema.Finite,
 });
 
 export const OgImageData = Schema.Union([MainImageData, PostDetailImageData]);

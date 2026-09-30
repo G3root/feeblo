@@ -314,6 +314,10 @@ export const makeSlackApiClient = (): SlackApiClient => {
     readonly context: string;
   }) {
     const response = yield* HttpClient.execute(input.httpRequest).pipe(
+      // The provider API client is the bottom of the integration stack: it
+      // pins the default fetch transport itself; nothing below it would
+      // provide one.
+      // eslint-disable-next-line effecttsgo/strict-effect-provide -- provider client pins its transport
       Effect.provide(FetchHttpClient.layer),
       Effect.timeout(SLACK_API_REQUEST_TIMEOUT_MS),
       Effect.mapError(

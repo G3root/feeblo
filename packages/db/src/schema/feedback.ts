@@ -44,7 +44,7 @@ import {
 import type { TRoadmapMode } from "../validation-schema/roadmap-mode";
 import { memberTable, organizationTable, userTable } from "./auth";
 
-const VectorValues = Schema.Array(Schema.Number);
+const VectorValues = Schema.Array(Schema.Finite);
 export const DEFAULT_POST_EMBEDDING_DIMENSIONS = 1536;
 
 const embeddingVector = (dimensions: number) =>
@@ -54,9 +54,16 @@ const embeddingVector = (dimensions: number) =>
   }>({
     dataType: () => `vector(${dimensions})`,
     fromDriver: (value) =>
-      Array.from(Schema.decodeUnknownSync(VectorValues)(JSON.parse(value))),
+      Array.from(
+        // Drizzle's customType callbacks are synchronous by API contract, so
+        // this decode cannot be composed through Effect; a malformed stored
+        // vector throwing here surfaces as a query failure.
+        // eslint-disable-next-line effecttsgo/schema-sync -- Drizzle customType is sync
+        Schema.decodeUnknownSync(VectorValues)(JSON.parse(value))
+      ),
     toDriver: (value) =>
-      JSON.stringify(Schema.decodeUnknownSync(VectorValues)(value)),
+      // eslint-disable-next-line effecttsgo/schema-sync -- Drizzle customType is sync
+      JSON.stringify(Schema.decodeSync(VectorValues)(value)),
   });
 
 export const boardVisibilityEnum = pgEnum("board_visibility", [

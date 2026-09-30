@@ -121,7 +121,7 @@ export const decryptIntegrationCredentialMaterial = <
       Effect.flatMap(
         decryptIntegrationCredential(key, encryptedCredential),
         (value) =>
-          Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(
+          Schema.decodeEffect(Schema.fromJsonString(schema))(
             Redacted.value(value)
           ).pipe(
             Effect.map(redact),

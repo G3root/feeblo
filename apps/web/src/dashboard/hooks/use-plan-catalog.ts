@@ -22,7 +22,10 @@ export const usePlanCatalog = () =>
       }
 
       // SAFETY: The endpoint contract guarantees this shape; Schema rejects
-      // any drift instead of leaking it into the UI.
+      // any drift instead of leaking it into the UI. This is a TanStack Query
+      // queryFn, not Effect code: the throw becomes the query's error state,
+      // which is exactly the recovery the browser platform provides.
+      // eslint-disable-next-line effecttsgo/schema-sync -- non-Effect React Query boundary
       return Schema.decodeUnknownSync(PlansResponse)(await response.json())
         .plans;
     },

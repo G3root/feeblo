@@ -30,6 +30,7 @@ import {
 } from "@feeblo/id";
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { and, asc, eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -358,7 +359,10 @@ const makeGitHubInboundService = Effect.gen(function* () {
           if (webhook.action === "deleted") {
             yield* db
               .update(schema.integrationConnectionTable)
-              .set({ lifecycle: "archived", archivedAt: new Date() })
+              .set({
+                lifecycle: "archived",
+                archivedAt: yield* DateTime.nowAsDate,
+              })
               .where(
                 eq(
                   schema.integrationConnectionTable.id,
@@ -373,7 +377,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
           if (webhook.action === "suspend") {
             yield* db
               .update(schema.githubInstallationTable)
-              .set({ suspendedAt: new Date() })
+              .set({ suspendedAt: yield* DateTime.nowAsDate })
               .where(
                 eq(
                   schema.githubInstallationTable.connectionId,

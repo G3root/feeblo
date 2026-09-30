@@ -186,7 +186,7 @@ const smtpResponseCode = (response: string): number | undefined => {
   }
 
   return Option.getOrUndefined(
-    Schema.decodeUnknownOption(SmtpResponseCode)(Number(match[1]))
+    Schema.decodeOption(SmtpResponseCode)(Number(match[1]))
   );
 };
 
@@ -374,10 +374,9 @@ const makeNodemailerTransport = Effect.gen(function* () {
 });
 
 export class Mailer extends Context.Service<Mailer, MailerService>()("Mailer", {
-  make: makeNodemailerTransport.pipe(
-    Effect.map(makeMailerService),
-    Effect.provide(MailerConfig.layer)
-  ),
+  make: makeNodemailerTransport.pipe(Effect.map(makeMailerService)),
 }) {
-  static readonly layer = Layer.effect(this, this.make);
+  static readonly layer = Layer.effect(this, this.make).pipe(
+    Layer.provide(MailerConfig.layer)
+  );
 }

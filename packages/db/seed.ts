@@ -1454,6 +1454,7 @@ const seedHandle = createSeedAuth({
 Effect.runPromise(
   seed(seedHandle.auth).pipe(
     Effect.ensuring(Effect.tryPromise(seedHandle.close).pipe(Effect.ignore)),
+    // eslint-disable-next-line effecttsgo/strict-effect-provide -- script entry point
     Effect.provide(SeedLayer)
   )
 ).catch((error) => {

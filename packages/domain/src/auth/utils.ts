@@ -79,7 +79,7 @@ export const generateVerificationOTPCookieData = (isSecure: boolean) => ({
 export const getCookieVerificationOTPState = (data: string, secret: string) =>
   decryptVerificationOTPState(data, secret).pipe(
     Effect.flatMap((decrypted) =>
-      Schema.decodeUnknownEffect(VerificationOTPStateFromJson)(decrypted).pipe(
+      Schema.decodeEffect(VerificationOTPStateFromJson)(decrypted).pipe(
         Effect.mapError(
           (cause) => new InvalidVerificationOTPStateError({ cause })
         )

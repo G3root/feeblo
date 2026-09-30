@@ -78,7 +78,6 @@ const testConnection = (db: PgDrizzle.EffectPgDatabase) =>
 
 // Create the DB effect with default services for a Postgres server.
 const pgDbEffect = PgDrizzle.make({ relations }).pipe(
-  Effect.provide(PgDrizzle.DefaultServices),
   Effect.tap(testConnection)
 );
 
@@ -90,7 +89,6 @@ const pgDbEffect = PgDrizzle.make({ relations }).pipe(
 // if they diverge (e.g. different `execute` return types), this will fail at
 // runtime with no compile-time guard.
 const pgliteDbEffect = PgDrizzlePglite.make({ relations }).pipe(
-  Effect.provide(PgDrizzlePglite.DefaultServices),
   Effect.tap(testConnection),
   // SAFETY: PgDrizzlePglite.make returns a fully-initialized EffectPgDatabase;
   // the cast bridges the driver-specific return type to the pg dialect type
@@ -106,12 +104,14 @@ export class Database extends Context.Service<
 
 // Postgres-backed layers
 export const PgDatabaseLive = Layer.effect(Database, pgDbEffect).pipe(
-  Layer.provide(PgClientLive)
+  Layer.provide(PgClientLive),
+  Layer.provide(PgDrizzle.DefaultServices)
 );
 
 // PGlite-backed layers
 export const PgliteDatabaseLive = Layer.effect(Database, pgliteDbEffect).pipe(
-  Layer.provide(PgliteClientLive)
+  Layer.provide(PgliteClientLive),
+  Layer.provide(PgDrizzlePglite.DefaultServices)
 );
 
 // Pick the appropriate database layer based on the configured DATABASE_URL.

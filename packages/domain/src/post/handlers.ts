@@ -2,6 +2,7 @@ import { currentDb, schema, transaction } from "@feeblo/db";
 import * as Permissions from "@feeblo/permissions";
 import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -115,19 +116,16 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     organizationId: string;
   }) =>
     repository.findActivityState(args).pipe(
-      Effect.flatMap((previous) =>
-        previous === undefined
-          ? Effect.fail(new FailedToUpdatePostError())
-          : Effect.succeed(previous)
+      Effect.filterOrFail(
+        (post) => post !== undefined,
+        () => new FailedToUpdatePostError()
       ),
-      Effect.flatMap((post) =>
-        post.mergedIntoPostId === null
-          ? Effect.succeed(post)
-          : Effect.fail(
-              new Policy.PolicyDeniedError({
-                reason: "This post has been merged into another post",
-              })
-            )
+      Effect.filterOrFail(
+        (post) => post.mergedIntoPostId === null,
+        () =>
+          new Policy.PolicyDeniedError({
+            reason: "This post has been merged into another post",
+          })
       )
     );
 
@@ -849,7 +847,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                 aggregateId: args.postId,
                 aggregateType: "post",
                 deduplicationKey: `post.official_update_published:${args.updateId}`,
-                expiresAt: new Date(now.getTime() + 7 * 86_400_000),
+                expiresAt: DateTime.fromDateUnsafe(now).pipe(
+                  DateTime.addDuration(Duration.days(7)),
+                  DateTime.toDate
+                ),
                 kind: "post.official_update_published",
                 organizationId: args.organizationId,
                 payload: {
@@ -943,7 +944,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                 aggregateId: args.sourcePostId,
                 aggregateType: "post",
                 deduplicationKey: `post.merged:${args.organizationId}:${args.sourcePostId}:${args.targetPostId}:${now.getTime()}`,
-                expiresAt: new Date(now.getTime() + 7 * 86_400_000),
+                expiresAt: DateTime.fromDateUnsafe(now).pipe(
+                  DateTime.addDuration(Duration.days(7)),
+                  DateTime.toDate
+                ),
                 kind: "post.merged",
                 organizationId: args.organizationId,
                 payload: {
@@ -1015,7 +1019,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                 // Timestamped so a post merged, unmerged, and merged again
                 // sends a fresh email instead of matching the first attempt.
                 deduplicationKey: `post.unmerged:${args.organizationId}:${args.sourcePostId}:${targetPostId}:${now.getTime()}`,
-                expiresAt: new Date(now.getTime() + 7 * 86_400_000),
+                expiresAt: DateTime.fromDateUnsafe(now).pipe(
+                  DateTime.addDuration(Duration.days(7)),
+                  DateTime.toDate
+                ),
                 kind: "post.unmerged",
                 organizationId: args.organizationId,
                 payload: {

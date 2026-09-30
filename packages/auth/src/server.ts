@@ -45,6 +45,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
+import type { ManagedRuntime as ManagedRuntimeType } from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
@@ -233,8 +234,14 @@ export const initAuthHandler = (
       },
     };
 
-    const runCallbackPolicy = async (
-      effect: Parameters<typeof callbackRuntime.runPromise>[0]
+    const runCallbackPolicy = async <A, E>(
+      effect: Effect.Effect<
+        A,
+        E,
+        typeof callbackRuntime extends ManagedRuntimeType<infer R, unknown>
+          ? R
+          : never
+      >
     ) => {
       try {
         await callbackRuntime.runPromise(effect);
@@ -853,6 +860,9 @@ export const initAuthHandler = (
     } satisfies BetterAuthOptions;
     return betterAuth(config);
   }).pipe(
+    // initAuthHandler runs once at server composition to build the auth
+    // handler; this is that composition's entry point.
+    // eslint-disable-next-line effecttsgo/strict-effect-provide -- composition entry point
     Effect.provide(
       Layer.mergeAll(
         AuthConfig.layer,

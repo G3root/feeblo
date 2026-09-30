@@ -78,7 +78,7 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
 
     const intentStates = emptyIntentStates();
     for (const row of intents) {
-      const state = yield* Schema.decodeUnknownEffect(EmailOutboxState)(
+      const state = yield* Schema.decodeEffect(EmailOutboxState)(
         row.state
       ).pipe(
         Effect.mapError(
@@ -94,7 +94,7 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
     const deliveryStates = emptyDeliveryStates();
     let oldestQueuedAt: Date | undefined;
     for (const row of deliveries) {
-      const state = yield* Schema.decodeUnknownEffect(EmailDeliveryState)(
+      const state = yield* Schema.decodeEffect(EmailDeliveryState)(
         row.state
       ).pipe(
         Effect.mapError(
@@ -109,9 +109,9 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
         (state === "queued" || state === "deferred" || state === "sending") &&
         row.oldestCreatedAt !== null
       ) {
-        const oldestCreatedAt = yield* Schema.decodeUnknownEffect(
-          PersistedDate
-        )(row.oldestCreatedAt).pipe(
+        const oldestCreatedAt = yield* Schema.decodeEffect(PersistedDate)(
+          row.oldestCreatedAt
+        ).pipe(
           Effect.mapError(
             () =>
               new EmailOutboxInspectionError({

@@ -189,7 +189,10 @@ export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
             })
           );
 
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+    // SAFETY: Every RemappedDbError variant below is caught and remapped, so
+    // the assertion states an invariant the type system cannot express
+    // through catchIf's `unassigned` sentinel.
+    // eslint-disable-next-line effecttsgo/unsafe-effect-type-assertion -- invariant documented above
     return effect.pipe(
       Effect.catchIf(
         (

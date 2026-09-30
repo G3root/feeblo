@@ -24,53 +24,51 @@ import { parseGitHubAppInstallationCallbackUrl } from "./github-oauth-callback";
 /** GitHub redirects here after its App installer authorizes Feeblo to verify ownership. */
 export const makeGitHubAppInstallationCallbackRouter = (appUrl: string) =>
   HttpRouter.use((router) =>
-    Effect.gen(function* () {
-      return yield* router.add(
-        "GET",
-        "/github/app/installations/callback",
-        (request: HttpServerRequest.HttpServerRequest) =>
-          Effect.gen(function* () {
-            const parsed = yield* Effect.exit(
-              parseGitHubAppInstallationCallbackUrl(request.url)
-            );
-            if (Exit.isFailure(parsed)) {
-              yield* Effect.logError(parsed.cause);
-              return HttpServerResponse.redirect(
-                settingsRedirect({
-                  appUrl,
-                  message: "GitHub App installation failed.",
-                  provider: "github",
-                  status: "error",
-                })
-              );
-            }
-            const management = yield* GitHubManagementService;
-            const completed = yield* Effect.exit(
-              management.connectComplete(parsed.value)
-            );
-            if (Exit.isFailure(completed)) {
-              yield* Effect.logError(completed.cause);
-              return HttpServerResponse.redirect(
-                settingsRedirect({
-                  appUrl,
-                  message: "GitHub App installation failed.",
-                  provider: "github",
-                  status: "error",
-                })
-              );
-            }
+    router.add(
+      "GET",
+      "/github/app/installations/callback",
+      (request: HttpServerRequest.HttpServerRequest) =>
+        Effect.gen(function* () {
+          const parsed = yield* Effect.exit(
+            parseGitHubAppInstallationCallbackUrl(request.url)
+          );
+          if (Exit.isFailure(parsed)) {
+            yield* Effect.logError(parsed.cause);
             return HttpServerResponse.redirect(
               settingsRedirect({
                 appUrl,
-                message: "Feeblo is now connected to GitHub.",
-                organizationId: completed.value.organizationId,
+                message: "GitHub App installation failed.",
                 provider: "github",
-                status: "connected",
+                status: "error",
               })
             );
-          })
-      );
-    })
+          }
+          const management = yield* GitHubManagementService;
+          const completed = yield* Effect.exit(
+            management.connectComplete(parsed.value)
+          );
+          if (Exit.isFailure(completed)) {
+            yield* Effect.logError(completed.cause);
+            return HttpServerResponse.redirect(
+              settingsRedirect({
+                appUrl,
+                message: "GitHub App installation failed.",
+                provider: "github",
+                status: "error",
+              })
+            );
+          }
+          return HttpServerResponse.redirect(
+            settingsRedirect({
+              appUrl,
+              message: "Feeblo is now connected to GitHub.",
+              organizationId: completed.value.organizationId,
+              provider: "github",
+              status: "connected",
+            })
+          );
+        })
+    )
   ).pipe(Layer.provide(Database.DatabaseContextLive), Layer.orDie);
 
 /**

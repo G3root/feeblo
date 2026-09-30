@@ -1,5 +1,6 @@
 import { transaction } from "@feeblo/db";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -60,7 +61,10 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
               organizationId: args.organizationId,
               source: "explicit",
               topic: { topicId: args.postId, topicType: "post" },
-              verificationExpiresAt: new Date(now.getTime() + 86_400_000),
+              verificationExpiresAt: DateTime.fromDateUnsafe(now).pipe(
+                DateTime.addDuration(Duration.days(1)),
+                DateTime.toDate
+              ),
             })
             .pipe(
               Effect.mapError(

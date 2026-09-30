@@ -128,9 +128,8 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     TagUpdate: (args: TTagUpdate) =>
-      Effect.gen(function* () {
-        yield* repository.update(args);
-      }).pipe(
+      repository.update(args).pipe(
+        Effect.asVoid,
         Policy.withPolicy(
           tagPolicy.canUpdate({
             organizationId: args.organizationId,

@@ -47,7 +47,7 @@ export const ContactCreate = S.Struct({
         id: S.optional(ContactAttributeValueId.schema),
         attributeId: ContactAttributeDefinitionId.schema,
         value: S.NullOr(
-          S.Union([S.String, S.Number, S.Boolean, S.DateFromString])
+          S.Union([S.String, S.Finite, S.Boolean, S.DateFromString])
         ),
       })
     ).check(noDuplicateAttributeIds)
