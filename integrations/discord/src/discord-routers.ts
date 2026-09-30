@@ -38,18 +38,28 @@ import { parseDiscordOAuthCallbackUrl } from "./discord-oauth-callback";
  * domain service answers with the interaction callback JSON.
  */
 
-/** Maps signature-verification rejections to 401 instead of a crash. */
-const rejectInboundRejection = Effect.catchTags({
-  IntegrationInboundRejection: (error: IntegrationInboundRejection) =>
-    Effect.logWarning("Discord inbound request was rejected", {
-      message: error.message,
-      provider: error.provider,
-    }).pipe(
-      Effect.as(
-        HttpServerResponse.text("invalid request signature", { status: 401 })
-      )
-    ),
-});
+/**
+ * Maps signature-verification rejections to 401 instead of a crash.
+ *
+ * Takes `self` first so the effect's error type is known when `catchTags`
+ * picks its type parameters: a standalone `Effect.catchTags({...})` value
+ * defaults the unconstrained error parameter to `unknown` and can only
+ * produce `Exclude<unknown, ...>`, which is `unknown`.
+ */
+const rejectInboundRejection = <A, R>(
+  self: Effect.Effect<A, IntegrationInboundRejection, R>
+) =>
+  Effect.catchTags(self, {
+    IntegrationInboundRejection: (error: IntegrationInboundRejection) =>
+      Effect.logWarning("Discord inbound request was rejected", {
+        message: error.message,
+        provider: error.provider,
+      }).pipe(
+        Effect.as(
+          HttpServerResponse.text("invalid request signature", { status: 401 })
+        )
+      ),
+  });
 
 /** Interactions router for every Discord interaction type. */
 const makeDiscordInteractionsRouter = (registry: IntegrationProviderRegistry) =>
@@ -101,65 +111,63 @@ const organizationIdFromOAuthState = (state: string | null) =>
 /** OAuth callback router; completes the install and redirects to the dashboard settings page. */
 export const makeDiscordOAuthCallbackRouter = (appUrl: string) =>
   HttpRouter.use((router) =>
-    Effect.gen(function* () {
-      return yield* router.add(
-        "GET",
-        "/discord/oauth/callback",
-        (request: HttpServerRequest.HttpServerRequest) =>
-          Effect.gen(function* () {
-            // request.url is the relative path (e.g.
-            // /discord/oauth/callback?code=…); parse it without a base URL.
-            const { code, error, state } = parseDiscordOAuthCallbackUrl(
-              request.url
-            );
-            if (error !== null) {
-              return HttpServerResponse.redirect(
-                settingsRedirect({
-                  appUrl,
-                  message: "Discord installation was cancelled or denied.",
-                  organizationId: organizationIdFromOAuthState(state),
-                  provider: "discord",
-                  status: "error",
-                })
-              );
-            }
-            if (code === null || state === null) {
-              return HttpServerResponse.redirect(
-                settingsRedirect({
-                  appUrl,
-                  message: "Discord installation failed.",
-                  organizationId: organizationIdFromOAuthState(state),
-                  provider: "discord",
-                  status: "error",
-                })
-              );
-            }
-            const management = yield* DiscordManagementService;
-            const completed = yield* Effect.exit(
-              management.connectComplete({ code, state })
-            );
-            if (Exit.isFailure(completed)) {
-              return HttpServerResponse.redirect(
-                settingsRedirect({
-                  appUrl,
-                  message: "Discord installation failed.",
-                  provider: "discord",
-                  status: "error",
-                })
-              );
-            }
+    router.add(
+      "GET",
+      "/discord/oauth/callback",
+      (request: HttpServerRequest.HttpServerRequest) =>
+        Effect.gen(function* () {
+          // request.url is the relative path (e.g.
+          // /discord/oauth/callback?code=…); parse it without a base URL.
+          const { code, error, state } = parseDiscordOAuthCallbackUrl(
+            request.url
+          );
+          if (error !== null) {
             return HttpServerResponse.redirect(
               settingsRedirect({
                 appUrl,
-                message: "Feeblo is now connected to Discord.",
-                organizationId: completed.value.organizationId,
+                message: "Discord installation was cancelled or denied.",
+                organizationId: organizationIdFromOAuthState(state),
                 provider: "discord",
-                status: "connected",
+                status: "error",
               })
             );
-          })
-      );
-    })
+          }
+          if (code === null || state === null) {
+            return HttpServerResponse.redirect(
+              settingsRedirect({
+                appUrl,
+                message: "Discord installation failed.",
+                organizationId: organizationIdFromOAuthState(state),
+                provider: "discord",
+                status: "error",
+              })
+            );
+          }
+          const management = yield* DiscordManagementService;
+          const completed = yield* Effect.exit(
+            management.connectComplete({ code, state })
+          );
+          if (Exit.isFailure(completed)) {
+            return HttpServerResponse.redirect(
+              settingsRedirect({
+                appUrl,
+                message: "Discord installation failed.",
+                provider: "discord",
+                status: "error",
+              })
+            );
+          }
+          return HttpServerResponse.redirect(
+            settingsRedirect({
+              appUrl,
+              message: "Feeblo is now connected to Discord.",
+              organizationId: completed.value.organizationId,
+              provider: "discord",
+              status: "connected",
+            })
+          );
+        })
+    )
   ).pipe(Layer.provide(Database.DatabaseContextLive), Layer.orDie);
 
 /**

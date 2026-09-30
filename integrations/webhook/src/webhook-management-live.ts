@@ -114,7 +114,7 @@ const decodeHistoryCursor = (
   BadRequestError
 > => {
   if (cursor === undefined) {
-    return Effect.succeed(Option.none());
+    return Effect.succeedNone;
   }
   const separatorIndex = cursor.lastIndexOf("~");
   const timePart =
@@ -245,7 +245,7 @@ export const WebhookManagementServiceLive = Layer.effect(
               })
           )
         );
-        const signingSecret = yield* generateWebhookSigningSecret();
+        const signingSecret = yield* generateWebhookSigningSecret;
         const ciphertext = yield* encryptWebhookCredentialMaterial(
           encryptionKey,
           {

@@ -294,15 +294,16 @@ export const makeDiscordApiClient = (
           )
         );
       }).pipe(
-        Effect.timeout(DISCORD_API_REQUEST_TIMEOUT_MS),
-        Effect.catchTag(
-          "TimeoutError",
-          () =>
-            new IntegrationProviderTemporaryFailure({
-              message: `Discord request failed during ${input.context}`,
-              provider: discordProviderKey,
-            })
-        )
+        Effect.timeoutOrElse({
+          duration: DISCORD_API_REQUEST_TIMEOUT_MS,
+          orElse: () =>
+            Effect.fail(
+              new IntegrationProviderTemporaryFailure({
+                message: `Discord request failed during ${input.context}`,
+                provider: discordProviderKey,
+              })
+            ),
+        })
       )
   );
 

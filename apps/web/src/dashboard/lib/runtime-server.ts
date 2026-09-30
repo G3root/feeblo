@@ -22,7 +22,10 @@ async function runEffect<A, E, R>(
   options?: { signal?: AbortSignal }
 ): Promise<A> {
   const result = await getRuntime().runPromiseExit(
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+    // SAFETY: The runtime was built with the layers this effect needs;
+    // requiring the caller to spell that R out would just repeat the
+    // composition root.
+    // eslint-disable-next-line effecttsgo/unsafe-effect-type-assertion -- runtime supplies the environment
     effect as Effect.Effect<A, E, never>,
     { signal: options?.signal }
   );

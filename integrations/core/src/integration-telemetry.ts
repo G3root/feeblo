@@ -79,5 +79,7 @@ export const recordIntegrationLeaseRecoveries = (count: number) =>
   Metric.update(leaseRecoveries, count);
 
 /** Counts connections paused after consecutive exhausted deliveries. */
-export const recordIntegrationAutomaticPause = () =>
-  Metric.update(automaticPauses, 1);
+export const recordIntegrationAutomaticPause = Metric.update(
+  automaticPauses,
+  1
+);
