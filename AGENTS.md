@@ -98,6 +98,8 @@ Dependency direction: apps → `packages/domain` → `{db, id, permissions, util
 
 A domain module is `packages/domain/src/<entity>/` with a consistent shape: `schema.ts` (Effect Schema), `errors.ts` (tagged errors), `repository.ts` (Drizzle access), `rpcs.ts` (the RPC contract), `handlers.ts` (the layers), and `policies.ts` where authorization applies. Follow the shape of a neighbouring module rather than inventing one.
 
+A feature that has a Public API surface owns it in `<entity>/public-api/`: `schema.ts` (closed DTOs and HTTP shapes), `operations.ts` (the surface-neutral capability a future MCP tool binds), `http.ts` (the `HttpApiEndpoint`s and handlers), `mappers.ts`, and a `repository.ts` only where the public projection is genuinely different from the feature repository (the post and comment reads, the changelog publication orchestration). Tag and company operations call `<entity>/repository.ts` directly. The shared infrastructure — the operation helper, the registry, the key middleware, the error vocabulary, and the composition root — stays in `packages/domain/src/public-api/`. See `docs/adr/0007`.
+
 Two files are hand-maintained lists that must stay in sync, and today nothing checks them:
 
 - `packages/domain/src/rpc-group.ts` composes every `*Rpcs` group into `AllRpcs`.

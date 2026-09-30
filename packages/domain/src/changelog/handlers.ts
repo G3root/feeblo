@@ -165,6 +165,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
 
     ChangelogDelete: (args: TChangelogDelete) =>
       repository.delete(args).pipe(
+        Effect.asVoid,
         Effect.tap(() =>
           cleanupOrphanedEditorAssets({
             organizationId: args.organizationId,

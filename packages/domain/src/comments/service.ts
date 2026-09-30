@@ -575,7 +575,7 @@ export class CommentService extends Context.Service<CommentService>()(
  *
  * `HttpApiBuilder` does not thread a handler's service requirements through
  * the route layer, so the Public API's handlers take it from the context the
- * composition provides — the same shape as `currentPublicApiRepository`.
+ * composition provides — the same shape as `currentPublicApiCaller`.
  */
 export const currentCommentService = Effect.context<never>().pipe(
   Effect.map((context) => Context.getUnsafe(context, CommentService))

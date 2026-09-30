@@ -1,6 +1,7 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 
+import { currentCompanyRepository } from "../company/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { withRemapDbErrors } from "../rpc-errors";
 import {
@@ -9,7 +10,6 @@ import {
   planRequiresUpgradeError,
   PlanRequiresUpgradeError,
 } from "./errors";
-import { currentPublicApiRepository } from "./repository";
 
 /**
  * What the room check can fail with, so a caller can name it without restating
@@ -33,7 +33,7 @@ const CRM_LIMIT_MESSAGE =
  *
  * `HttpApiBuilder` does not thread a handler's service requirements through the
  * route layer, so handlers take services from the context the composition
- * provides — the same shape as `currentPublicApiRepository` and
+ * provides — the same shape as `currentPublicApiCaller` and
  * `currentPublicApiConfig`. `EntitlementPolicy` is already in that context
  * because the key middleware requires it for the plan gate.
  */
@@ -69,7 +69,7 @@ export const requireCrmEntryAllowance = (
 ): Effect.Effect<void, CrmEntryAllowanceError> =>
   Effect.gen(function* () {
     const policy = yield* currentEntitlementPolicy;
-    const repository = yield* currentPublicApiRepository;
+    const repository = yield* currentCompanyRepository;
 
     yield* policy
       .canCreateCrmEntry({

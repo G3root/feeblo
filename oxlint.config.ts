@@ -187,12 +187,14 @@ export default defineConfig({
       },
     },
     {
-      // Architecture boundary for the Public API (see ADR 0004). Response
-      // schemas from the dashboard and the public portal carry internal actor
-      // identifiers (`creatorId`, `creatorMemberId`) that must never reach an
-      // API key's owner, and the session middleware would let a machine
-      // credential resolve into a member session. The Public API owns its DTOs
-      // in `public-api/schema.ts` and reads the key seam from `auth-handler`.
+      // Architecture boundary for the Public API's shared root (see ADR 0004).
+      // Response schemas from the dashboard and the public portal carry
+      // internal actor identifiers (`creatorId`, `creatorMemberId`) that must
+      // never reach an API key's owner, and the session middleware would let a
+      // machine credential resolve into a member session. The named modules are
+      // the ones ADR 0004 calls out; a bare `**/post/schema` also matched the
+      // Public API's own contract, and `../*/schema` matched unrelated modules
+      // like `api-key/schema`.
       files: ["packages/domain/src/public-api/**"],
       rules: {
         "eslint/no-restricted-imports": [
@@ -201,17 +203,49 @@ export default defineConfig({
             patterns: [
               {
                 group: [
-                  "**/post/schema",
-                  "**/widget/schema",
-                  "**/public-actor",
-                  "**/session-middleware",
+                  "../post/schema",
+                  "../widget/schema",
+                  "../public-actor",
+                  "../session-middleware",
                   "@feeblo/domain/post/schema",
                   "@feeblo/domain/widget/schema",
                   "@feeblo/domain/public-actor",
                   "@feeblo/domain/session-middleware",
                 ],
                 message:
-                  "The Public API must not import dashboard or portal response schemas (they carry internal actor identifiers) or the session middleware (a machine key must never resolve into a session). Define DTOs in public-api/schema.ts and use the key seam from auth-handler.",
+                  "The Public API must not import dashboard or portal response schemas (they carry internal actor identifiers) or the session middleware (a machine key must never resolve into a session). Define DTOs in the feature's public-api schema and use the key seam from auth-handler.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      // The same boundary for a feature's colocated public slice. From
+      // `<feature>/public-api/`, the feature's own dashboard schema is
+      // `../schema` and another feature's is `../../<feature>/schema`; banning
+      // every `../schema` here is deliberate — the public DTOs are hand-written
+      // and must not borrow a dashboard row shape.
+      files: ["packages/domain/src/*/public-api/**"],
+      rules: {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: [
+                  "../schema",
+                  "../../post/schema",
+                  "../../widget/schema",
+                  "../../public-actor",
+                  "../../session-middleware",
+                  "@feeblo/domain/post/schema",
+                  "@feeblo/domain/widget/schema",
+                  "@feeblo/domain/public-actor",
+                  "@feeblo/domain/session-middleware",
+                ],
+                message:
+                  "The Public API must not import dashboard or portal response schemas (they carry internal actor identifiers) or the session middleware (a machine key must never resolve into a session). Define DTOs in the feature's public-api schema and use the key seam from auth-handler.",
               },
             ],
           },
