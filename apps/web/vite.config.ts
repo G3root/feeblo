@@ -104,6 +104,18 @@ export default defineConfig({
         routeFileIgnorePrefix: "-",
         quoteStyle: "double",
       },
+      dev: {
+        // Start's dev-only SSR styles aggregation (`/@tanstack-start/styles.css?routes=…`)
+        // crawls the module graph during the render, so the sheet the first paint
+        // uses is nondeterministic: it can miss the responsive rules entirely, and
+        // once the graph is warm it appends the unprocessed `tailwindcss/index.css`
+        // *after* the compiled sheet — its default `.hidden` then wins the cascade
+        // over `.lg\:flex`, so the board's right sidebar renders hidden and the
+        // page paints "zoomed in" until hydration injects the real CSS.
+        // `__root.tsx` links the compiled stylesheet directly instead, and Vite
+        // serves that URL as plain CSS for the `<link>` request.
+        ssrStyles: { enabled: false },
+      },
     }),
     viteReact(),
     tailwindcss(),

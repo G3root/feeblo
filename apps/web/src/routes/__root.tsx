@@ -38,6 +38,13 @@ import "../styles/global.css";
  * server function — on Workers env is request-scoped, so it cannot be read at
  * module scope.
  *
+ * In dev the stylesheet is linked directly: Vite serves the compiled sheet at
+ * `/src/styles/global.css` for a plain `<link>` request, so the first paint is
+ * fully styled and stable. This replaces Start's `dev.ssrStyles` aggregation,
+ * which served a nondeterministic blend that broke the responsive cascade (see
+ * `vite.config.ts`); in production the bundler emits the same sheet as an
+ * asset linked by `HeadContent`.
+ *
  * The dashboard is client-only (`/_dashboard` is `ssr: false`), so its routes
  * render after hydration behind `DashboardPendingShell`. The public board
  * renders its metadata on the server and hands the SPA over to the client.
@@ -86,6 +93,9 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang={getLocale()} dir={getTextDirection()} suppressHydrationWarning>
       <head>
+        {import.meta.env.DEV ? (
+          <link rel="stylesheet" href="/src/styles/global.css" />
+        ) : null}
         <HeadContent />
         <ScriptOnce children={clientHintCheckScript} />
         <ScriptOnce children={envScript(env)} />
