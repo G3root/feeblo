@@ -128,9 +128,8 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     TagUpdate: (args: TTagUpdate) =>
-      Effect.gen(function* () {
-        yield* repository.update(args);
-      }).pipe(
+      repository.update(args).pipe(
+        Effect.asVoid,
         Policy.withPolicy(
           tagPolicy.canUpdate({
             organizationId: args.organizationId,
@@ -142,6 +141,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
 
     TagDelete: (args: TTagDelete) =>
       repository.delete(args).pipe(
+        Effect.asVoid,
         Policy.withPolicy(
           tagPolicy.canDelete({
             organizationId: args.organizationId,
@@ -174,8 +174,13 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
 
         yield* transaction(
           Effect.gen(function* () {
-            const previousTagIds = yield* repository.findPostTagIds(args);
-            yield* repository.setPostTags({ ...args, tagIds });
+            // The replacement locks the post and returns what it carried
+            // before, so the timeline entry and the write are decided from the
+            // same snapshot.
+            const { previousTagIds } = yield* repository.setPostTags({
+              ...args,
+              tagIds,
+            });
 
             yield* postActivityRepository.createMany(
               postTagChangeActivities({

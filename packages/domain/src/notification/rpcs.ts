@@ -28,7 +28,7 @@ export class NotificationRpcs extends RpcGroup.make(
     .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("NotificationUnreadCount", {
     payload: NotificationUnreadCount,
-    success: S.Struct({ count: S.Number }),
+    success: S.Struct({ count: S.Finite }),
     error: NotificationPublicErrors,
   })
     .middleware(AuthMiddleware)
@@ -60,7 +60,7 @@ export class NotificationRpcs extends RpcGroup.make(
     .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("NotificationUnreadCountPublic", {
     payload: NotificationUnreadCount,
-    success: S.Struct({ count: S.Number }),
+    success: S.Struct({ count: S.Finite }),
     error: NotificationPublicErrors,
   })
     .middleware(PublicAuthMiddleware)

@@ -86,13 +86,24 @@ const ProductMetadataFromPolar = Schema.Unknown.pipe(
   )
 );
 
+// These decode Polar webhook payload fields synchronously on purpose: the
+// Polar SDK types them as strings, so a decode failure means the SDK sent
+// garbage, and dying the fiber (defect) is deliberate over silently coercing
+// the tenancy key. Typing the failure would widen the billing repository's
+// error contract, which needs owner sign-off (AGENTS.md, billing surface).
+// eslint-disable-next-line effecttsgo/schema-sync -- see block comment above
 const decodeString = Schema.decodeUnknownSync(Schema.String);
+// eslint-disable-next-line effecttsgo/schema-sync -- see block comment above
 const decodeSubscriptionStatus = Schema.decodeUnknownSync(
   SubscriptionStatusFromPolar
 );
+// eslint-disable-next-line effecttsgo/schema-sync -- see block comment above
 const decodeProductRecurringInterval = Schema.decodeUnknownSync(
   ProductRecurringIntervalFromPolar
 );
+// Never throws: the ProductMetadataFromPolar transformation is total
+// (Option.getOrNull). Reported only because the rule cannot see that.
+// eslint-disable-next-line effecttsgo/schema-sync -- see block comment above
 const decodeProductMetadata = Schema.decodeUnknownSync(
   ProductMetadataFromPolar
 );

@@ -47,7 +47,7 @@ import {
 export const program = Effect.gen(function* () {
   const config = yield* ServerConfig;
 
-  const useTestMailer = yield* Config.boolean("E2E_TEST_MAILER").pipe(
+  const useTestMailer = yield* Config.Boolean("E2E_TEST_MAILER").pipe(
     Config.withDefault(false)
   );
   const mailbox = useTestMailer ? yield* TestMailer.make : undefined;
@@ -131,7 +131,7 @@ export const program = Effect.gen(function* () {
       NodeHttpServer.layerConfig(
         createServer,
         Config.all({
-          port: Config.number("SERVER_PORT").pipe(Config.withDefault(3000)),
+          port: Config.Number("SERVER_PORT").pipe(Config.withDefault(3000)),
         })
       )
     )
@@ -154,6 +154,9 @@ const SentryLiveLayer = Layer.unwrap(
 
 export const main = program.pipe(
   Effect.scoped,
+  // This is the application's entry point: everything the server needs is
+  // composed here, exactly as the rule asks.
+  // eslint-disable-next-line effecttsgo/strict-effect-provide -- application entry point
   Effect.provide(
     Layer.mergeAll(
       SentryLiveLayer,

@@ -322,7 +322,7 @@ describe("integration persistence", () => {
               eq(schema.integrationDeliveryTable.id, claimed.input.delivery.id)
             );
 
-          yield* repository.recoverExpiredLeases();
+          yield* repository.recoverExpiredLeases;
           const [recovered] = yield* db
             .select()
             .from(schema.integrationDeliveryTable)
@@ -357,7 +357,7 @@ describe("integration persistence", () => {
                 reclaimed.input.delivery.id
               )
             );
-          yield* repository.recoverExpiredLeases();
+          yield* repository.recoverExpiredLeases;
           const [canceledAfterRecovery] = yield* db
             .select()
             .from(schema.integrationDeliveryTable)

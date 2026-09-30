@@ -31,7 +31,7 @@ export interface DiscordManagementServiceContract {
     input: S.TDiscordChannelNotificationsUpdate
   ) => Effect.Effect<void, DiscordIntegrationError>;
   /** Reports whether the Discord integration is configured for this deployment. */
-  readonly status: () => Effect.Effect<S.TDiscordIntegrationStatus, never>;
+  readonly status: Effect.Effect<S.TDiscordIntegrationStatus, never>;
 }
 
 /** Service key implemented by the server composition root for Discord commands. */

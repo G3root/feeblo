@@ -53,7 +53,7 @@ export interface GitHubUserAccessToken extends Schema.Schema.Type<
 
 /** GitHub account associated with an app installation. */
 export const GitHubInstallationAccount = Schema.Struct({
-  id: Schema.Number,
+  id: Schema.Finite,
   login: Schema.NonEmptyString,
   type: Schema.Literals(["Organization", "User"]),
 });
@@ -64,7 +64,7 @@ export interface GitHubInstallationAccount extends Schema.Schema.Type<
 /** Installation facts necessary to verify setup and route globally delivered webhooks. */
 export const GitHubUserInstallation = Schema.Struct({
   account: Schema.NullOr(GitHubInstallationAccount),
-  id: Schema.Number,
+  id: Schema.Finite,
   repository_selection: Schema.Literals(["all", "selected"]),
   suspended_at: Schema.NullOr(Schema.DateFromString),
 });
@@ -84,7 +84,7 @@ export interface GitHubUserInstallations extends Schema.Schema.Type<
 /** A repository accessible to an authenticated GitHub App installation. */
 export const GitHubRepository = Schema.Struct({
   full_name: Schema.NonEmptyString,
-  id: Schema.Number,
+  id: Schema.Finite,
   name: Schema.NonEmptyString,
   owner: Schema.Struct({ login: Schema.NonEmptyString }),
   private: Schema.Boolean,
@@ -105,7 +105,7 @@ export interface GitHubInstallationRepositories extends Schema.Schema.Type<
 /** Safe issue fields used to persist a normalized external resource link. */
 export const GitHubIssue = Schema.Struct({
   html_url: Schema.URLFromString,
-  id: Schema.Number,
+  id: Schema.Finite,
   node_id: Schema.String,
   number: Schema.Int,
   state: Schema.Literals(["open", "closed"]),
@@ -385,6 +385,11 @@ const withSdk = <A, E>(
   context: string
 ): Effect.Effect<A, GitHubApiFailure> =>
   effect.pipe(
+    // The provider API client is the bottom of the integration stack: nothing
+    // below it provides a transport, so it pins the fetch client (and the
+    // per-token credentials) itself. An injected HttpClient flows through
+    // provideService where a caller supplies one.
+    // eslint-disable-next-line effecttsgo/strict-effect-provide -- provider client pins its transport
     Effect.provide(
       Layer.mergeAll(credentialsLayer(token), FetchHttpClient.layer)
     ),
@@ -461,6 +466,7 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
         )
       );
       const response = yield* HttpClient.execute(httpRequest).pipe(
+        // eslint-disable-next-line effecttsgo/strict-effect-provide -- provider client pins its transport
         Effect.provide(FetchHttpClient.layer),
         Effect.mapError(
           () =>

@@ -72,7 +72,7 @@ export const HealthRouter: Layer.Layer<never, never, HttpRouter.HttpRouter> =
     Effect.gen(function* () {
       // Resolve APP_RELEASE once during layer construction so the /health
       // handler does not re-read configuration on every request.
-      const release = yield* Config.string("APP_RELEASE").pipe(
+      const release = yield* Config.String("APP_RELEASE").pipe(
         Config.withDefault("dev"),
         Effect.orDie
       );

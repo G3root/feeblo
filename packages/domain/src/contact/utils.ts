@@ -35,8 +35,8 @@ export type AttributeSourceValue =
 
 export const AttributeValueColumns = S.Struct({
   valueText: S.NullOr(S.String),
-  valueInteger: S.NullOr(S.Number),
-  valueDecimal: S.NullOr(S.Number),
+  valueInteger: S.NullOr(S.Finite),
+  valueDecimal: S.NullOr(S.Finite),
   valueBoolean: S.NullOr(S.Boolean),
   valueDate: S.NullOr(S.Date),
 });
@@ -122,7 +122,11 @@ export function toMutableConfig(
   if (config === null || config === undefined) {
     return null;
   }
-  return S.decodeUnknownSync(AttributeConfig)(config, {
+  // Throws deliberately and is pinned by a test: an invalid config type is a
+  // programming error at the (currently test-only) call sites, not runtime
+  // data flow. There is no Effect caller to compose through yet.
+  // eslint-disable-next-line effecttsgo/schema-sync -- see comment above
+  return S.decodeSync(AttributeConfig)(config, {
     onExcessProperty: "ignore",
   });
 }
@@ -396,7 +400,7 @@ const decodeCommonFields = <A>(
   kind: string,
   fields: AttributeSource
 ): Effect.Effect<A, DataValidationError> =>
-  S.decodeUnknownEffect(schema)(fields, { onExcessProperty: "ignore" }).pipe(
+  S.decodeEffect(schema)(fields, { onExcessProperty: "ignore" }).pipe(
     Effect.mapError(
       (error: S.SchemaError) =>
         new DataValidationError({
@@ -452,9 +456,8 @@ const parseCompanies = (
   definitions: readonly TCompanyAttributeDefinition[]
 ): Effect.Effect<ParsedCompanyAttributes[], DataValidationError> =>
   Array.isArray(companies) && companies.length > 0
-    ? Effect.all(
-        companies.map((company) => parseSingleCompany(company, definitions)),
-        { concurrency: "unbounded" }
+    ? Effect.forEach(companies, (company) =>
+        parseSingleCompany(company, definitions)
       )
     : Effect.succeed([]);
 

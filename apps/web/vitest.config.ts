@@ -19,5 +19,9 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // The collections module-evaluation test imports the dashboard graph,
+    // which can exceed the 5s default while turbo is running every package's
+    // tests in parallel. Keep slow-under-load a slow test, not a flake.
+    testTimeout: 15_000,
   },
 });

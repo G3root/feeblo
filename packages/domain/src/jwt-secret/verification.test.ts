@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import { TestClock } from "effect/testing";
 import * as jose from "jose";
 
 import { UnauthorizedError } from "../rpc-errors";
@@ -35,6 +36,7 @@ const signTokenEffect = (payload: jose.JWTPayload, secret: string) =>
 describe("verifyJwt", () => {
   it.effect("verifies a token bound to the organization via aud with exp", () =>
     Effect.gen(function* () {
+      yield* TestClock.setTime(Date.now());
       const token = yield* signTokenEffect(basePayload(), SECRET);
 
       const payload = yield* verifyJwt(token, [SECRET], ORGANIZATION_ID);
@@ -201,6 +203,7 @@ describe("verifyJwt", () => {
 
   it.effect("accepts a token with a lifetime within the default cap", () =>
     Effect.gen(function* () {
+      yield* TestClock.setTime(Date.now());
       const token = yield* signTokenEffect(
         {
           ...basePayload(),
@@ -239,6 +242,7 @@ describe("verifyJwt", () => {
 
   it.effect("accepts a token within a tightened per-workspace cap", () =>
     Effect.gen(function* () {
+      yield* TestClock.setTime(Date.now());
       const token = yield* signTokenEffect(
         { ...basePayload(), iat: nowSeconds(), exp: nowSeconds() + 3600 },
         SECRET
@@ -279,6 +283,7 @@ describe("verifyJwt", () => {
 
   it.effect("succeeds when at least one secret matches", () =>
     Effect.gen(function* () {
+      yield* TestClock.setTime(Date.now());
       const token = yield* signTokenEffect(basePayload(), OTHER_SECRET);
 
       const payload = yield* verifyJwt(

@@ -2,7 +2,6 @@ import { Database, schema, transaction } from "@feeblo/db";
 import type { Database as DatabaseService } from "@feeblo/db/database";
 import {
   Mailer,
-  MailPermanentDeliveryError,
   MailTemplateRenderError,
   MailTemporaryDeliveryError,
   MailUncertainDeliveryError,
@@ -11,14 +10,17 @@ import { createChangelogEmail } from "@feeblo/transactional/templates/changelog"
 import { createEmailSubscriptionVerificationEmail } from "@feeblo/transactional/templates/email-subscription-verification";
 import { createNotificationEmail } from "@feeblo/transactional/templates/notification";
 import { and, eq, gte, isNull, sql, sum } from "drizzle-orm";
+import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
+import * as Ref from "effect/Ref";
+import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
-import * as W from "effect/unstable/workflow";
-import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
+import * as PersistedQueue from "effect/unstable/persistence/PersistedQueue";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
@@ -30,7 +32,7 @@ import {
   makeSubmissionNotificationPayload,
   resolveSubscriptionNotificationContent,
 } from "./content";
-import { EmailOutboxDataError, EmailOutboxRepository } from "./repository";
+import { EmailOutboxRepository, type ResumedEmailDelivery } from "./repository";
 import {
   ChangelogTemplatePayload,
   EmailUnsubscribeTarget,
@@ -49,7 +51,7 @@ import {
 
 const DeliveryAttemptOutcomeSchema = Schema.TaggedUnion({
   retry: {
-    delayMs: Schema.Number,
+    delay: Schema.Duration,
     infrastructureFailure: Schema.Boolean,
   },
   terminal: {},
@@ -63,44 +65,130 @@ const maximumDeliveryAttempts = 5;
 const maximumInfrastructureFailures = 10;
 const materializationBatchSize = 100;
 const reconciliationBatchSize = 100;
-const sendingLeaseRecoveryDelayMs = 5 * 60 * 1000;
+/** Retry delay for a delivery whose `sending` lease has to be reclaimed. */
+const sendingLeaseRecoveryDelay = Duration.minutes(5);
+/** Retry delay while the internal circuit breaker has delivery paused. */
+const circuitBreakerRetryDelay = Duration.minutes(5);
+/** Retry delay while the provider's monthly send limit is spent. */
+const monthlyVolumeRetryDelay = Duration.hours(1);
+/**
+ * Backoff before a worker re-enters `take` after a failure.
+ *
+ * `take` fails fast while the queue store is unavailable, so without this the
+ * `forever` loop would hot-spin and flood the log until the store recovers.
+ */
+const queueTakeRetryDelay = Duration.seconds(1);
 
 // Tokenized unsubscribe/verification links carry a bearer token in the query
 // string, so they must never be rendered against a plain-HTTP origin. Loopback
 // hosts stay allowed so local development keeps working.
 const loopbackHostPattern = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/;
 
-const retryDelayMs = (deliveryId: string, attempt: number): number => {
+const retryDelay = (deliveryId: string, attempt: number): Duration.Duration => {
   const exponential = Math.min(60 * 60 * 1000, 1000 * 2 ** (attempt - 1));
   let hash = 0;
   for (const character of deliveryId) {
     hash = (hash * 31 + character.charCodeAt(0)) % 10_000;
   }
-  return exponential + Math.floor((exponential * (hash % 2001)) / 10_000);
+  return Duration.millis(
+    exponential + Math.floor((exponential * (hash % 2001)) / 10_000)
+  );
 };
 
-const workflowError = Schema.Union([
-  EmailOutboxDataError,
-  MailPermanentDeliveryError,
-  MailTemplateRenderError,
-  MailTemporaryDeliveryError,
-  MailUncertainDeliveryError,
-]);
+const EmailOutboxIntentQueueItem = Schema.Struct({
+  outboxId: Schema.String,
+});
 
-export const EmailOutboxDispatcherWorkflow = W.Workflow.make(
-  "EmailOutboxDispatcherWorkflow",
-  {
-    payload: { outboxId: Schema.String },
-    error: workflowError,
-    idempotencyKey: ({ outboxId }) => outboxId,
-  }
+const EmailDeliveryQueueItem = Schema.Struct({
+  deliveryId: Schema.String,
+});
+
+/**
+ * Crash backoff owned by the queue itself.
+ *
+ * This shapes only the recovery of an element whose worker died mid-flight:
+ * ordinary retries are scheduled on the row (`next_attempt_at`) and re-offered
+ * by reconciliation, so this curve is never what a recipient waits on.
+ */
+const emailOutboxWorkerCrashSchedule = Schedule.jittered(
+  Schedule.min([Schedule.exponential("1 second"), Schedule.spaced("1 hour")])
 );
 
-export const EmailDeliveryWorkflow = W.Workflow.make("EmailDeliveryWorkflow", {
-  payload: { deliveryId: Schema.String },
-  error: workflowError,
-  idempotencyKey: ({ deliveryId }) => deliveryId,
-});
+/**
+ * Durable handoff between the outbox tables and the two background workers.
+ *
+ * The database rows stay the source of truth: an element carries only the id of
+ * the intent or delivery to work on, so a redelivery after a crash re-reads the
+ * row and repeats an idempotent, guarded write.
+ */
+export class EmailOutboxQueues extends Context.Service<EmailOutboxQueues>()(
+  "EmailOutboxQueues",
+  {
+    make: Effect.gen(function* () {
+      return {
+        dispatcher: yield* PersistedQueue.make({
+          name: "email-outbox-dispatcher",
+          schema: EmailOutboxIntentQueueItem,
+          maxAttempts: maximumInfrastructureFailures,
+          retrySchedule: emailOutboxWorkerCrashSchedule,
+        }),
+        delivery: yield* PersistedQueue.make({
+          name: "email-outbox-delivery",
+          schema: EmailDeliveryQueueItem,
+          maxAttempts: maximumInfrastructureFailures,
+          retrySchedule: emailOutboxWorkerCrashSchedule,
+        }),
+      } as const;
+    }),
+  }
+) {
+  static readonly layer = Layer.effect(this, this.make);
+}
+
+/**
+ * Dispatcher element id, bucketed by the intent's `scheduledAt` and
+ * `updatedAt`.
+ *
+ * A coalescing window can move `scheduledAt` later, so a later bucket has to be
+ * offerable again. A resume (or another update) can leave `scheduledAt` alone
+ * while making the row due again, so `updatedAt` joins the bucket. Duplicate
+ * offers for one revision stay de-duplicated by the queue, which is what keeps
+ * a lost wake from double-materializing an intent.
+ */
+const dispatcherElementId = ({
+  id,
+  scheduledAt,
+  updatedAt,
+}: {
+  readonly id: string;
+  readonly scheduledAt: DateTime.Utc;
+  readonly updatedAt: DateTime.Utc;
+}): string =>
+  `${id}:${DateTime.toEpochMillis(scheduledAt)}:${DateTime.toEpochMillis(updatedAt)}`;
+
+/**
+ * Whether an intent row's expiry instant has passed.
+ *
+ * Drizzle returns `timestamp` columns as `Date`, so convert at the row boundary
+ * before comparing against the `DateTime` clock.
+ */
+const isIntentExpired = (expiresAt: Date | null, now: DateTime.Utc): boolean =>
+  expiresAt !== null &&
+  DateTime.isLessThanOrEqualTo(DateTime.fromDateUnsafe(expiresAt), now);
+
+/**
+ * Delivery element id, bucketed by the row's attempt and transition version.
+ *
+ * Both parts move when the row becomes due again: the attempt on a claim, the
+ * version on any transition. A completed element must never block the next
+ * offer, and throttle or plan-resume deferrals do not consume an attempt, so
+ * `attempt_count` alone cannot distinguish them.
+ */
+const deliveryElementId = (
+  deliveryId: string,
+  attemptCount: number,
+  transitionVersion: number
+): string => `${deliveryId}:${attemptCount + 1}:${transitionVersion}`;
 
 /** Materializes one durable intent into immutable per-recipient deliveries. */
 export const materializeEmailIntent = (outboxId: string) =>
@@ -109,13 +197,13 @@ export const materializeEmailIntent = (outboxId: string) =>
     const { appUrl, appRootDomain } = yield* EmailOutboxConfig;
     const policy = yield* EntitlementPolicy;
     const db = yield* Database.Database;
-    const now = yield* DateTime.nowAsDate;
+    const now = yield* DateTime.now;
     const intent = yield* repository.findById(outboxId);
     if (!intent) {
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       return [] as readonly string[];
     }
-    if (intent.expiresAt && intent.expiresAt.getTime() <= now.getTime()) {
+    if (isIntentExpired(intent.expiresAt, now)) {
       yield* repository.markIntentState({ id: intent.id, state: "expired" });
       yield* recordEmailIntentTransition(intent.kind, "expired");
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
@@ -418,7 +506,10 @@ export const materializeEmailIntent = (outboxId: string) =>
     );
   });
 
-const sendDeliveryAttempt = (deliveryId: string) =>
+const sendDeliveryAttempt = (
+  deliveryId: string,
+  observedVersionRef: Ref.Ref<Option.Option<number>>
+) =>
   Effect.gen(function* () {
     const repository = yield* EmailOutboxRepository;
     const subscriptions = yield* EmailSubscriptionRepository;
@@ -447,13 +538,16 @@ const sendDeliveryAttempt = (deliveryId: string) =>
         }
         return `${url.origin}${url.pathname}?token=${encodeURIComponent(token)}`;
       });
-    const now = yield* DateTime.nowAsDate;
+    const now = yield* DateTime.now;
     const delivery = yield* repository.findDeliveryById(deliveryId);
     if (
       !(delivery && ["queued", "deferred", "sending"].includes(delivery.state))
     ) {
       return { _tag: "terminal" as const };
     }
+    // Remember the version this attempt observed so the infrastructure catch
+    // can prove the row still belongs to it before deferring.
+    yield* Ref.set(observedVersionRef, Option.some(delivery.transitionVersion));
     // A prior activity may have claimed this row and then lost its worker
     // before persisting the result. Do not complete the deterministic workflow
     // in that state: reconciliation will release the lease, after which this
@@ -461,15 +555,12 @@ const sendDeliveryAttempt = (deliveryId: string) =>
     if (delivery.state === "sending") {
       return {
         _tag: "retry" as const,
-        delayMs: sendingLeaseRecoveryDelayMs,
+        delay: sendingLeaseRecoveryDelay,
         infrastructureFailure: true,
       };
     }
     const intent = yield* repository.findById(delivery.outboxId);
-    if (
-      !intent ||
-      (intent.expiresAt && intent.expiresAt.getTime() <= now.getTime())
-    ) {
+    if (!intent || isIntentExpired(intent.expiresAt, now)) {
       yield* repository.markDeliveryOutcome({
         id: delivery.id,
         state: "expired",
@@ -495,18 +586,18 @@ const sendDeliveryAttempt = (deliveryId: string) =>
       );
       yield* repository.deferDeliveryForThrottle({
         id: delivery.id,
-        nextAttemptAt: new Date(now.getTime() + 5 * 60_000),
+        nextAttemptAt: DateTime.toDateUtc(
+          DateTime.addDuration(now, circuitBreakerRetryDelay)
+        ),
         reason,
       });
       return {
         _tag: "retry" as const,
-        delayMs: 5 * 60_000,
+        delay: circuitBreakerRetryDelay,
         infrastructureFailure: false,
       };
     }
-    const monthStart = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
-    );
+    const monthStart = DateTime.toDateUtc(DateTime.startOf(now, "month"));
     const [monthlyVolume] = yield* db
       .select({ attempts: sum(schema.emailDeliveryTable.attemptCount) })
       .from(schema.emailDeliveryTable)
@@ -523,12 +614,14 @@ const sendDeliveryAttempt = (deliveryId: string) =>
       );
       yield* repository.deferDeliveryForThrottle({
         id: delivery.id,
-        nextAttemptAt: new Date(now.getTime() + 60 * 60_000),
+        nextAttemptAt: DateTime.toDateUtc(
+          DateTime.addDuration(now, monthlyVolumeRetryDelay)
+        ),
         reason: "monthly_volume_limit",
       });
       return {
         _tag: "retry" as const,
-        delayMs: 60 * 60_000,
+        delay: monthlyVolumeRetryDelay,
         infrastructureFailure: false,
       };
     }
@@ -719,13 +812,14 @@ const sendDeliveryAttempt = (deliveryId: string) =>
         }
       }
     }
-    const claimed = yield* repository.claimDeliveryForSending({
+    const claimedVersion = yield* repository.claimDeliveryForSending({
       id: delivery.id,
-      now,
+      now: DateTime.toDateUtc(now),
     });
-    if (!claimed) {
+    if (claimedVersion === undefined) {
       return { _tag: "terminal" as const };
     }
+    yield* Ref.set(observedVersionRef, Option.some(claimedVersion));
     // Resolves the unsubscribe target into a rendered mail message: settings
     // targets use their stored URL directly, subscription targets derive a
     // purpose-bound bearer token and add List-Unsubscribe one-click headers.
@@ -821,7 +915,7 @@ const sendDeliveryAttempt = (deliveryId: string) =>
           createNotificationEmail({ ...payload, unsubscribeUrl })
       );
     }).pipe(
-      Effect.map(Option.some),
+      Effect.asSome,
       // Template/link derivation failures are permanent (including insecure
       // API_URL): mark the delivery failed instead of churning through
       // infrastructure retries, and finish the attempt terminally.
@@ -858,22 +952,26 @@ const sendDeliveryAttempt = (deliveryId: string) =>
           })
           .pipe(Effect.as<DeliveryAttemptOutcome>({ _tag: "terminal" }));
       }
-      const delayMs = retryDelayMs(delivery.id, attempt);
-      const retryMetric = recordEmailDeliveryRetry(error._tag);
-      return repository
-        .deferSendingDelivery({
+      const delay = retryDelay(delivery.id, attempt);
+      return Effect.gen(function* () {
+        const deferred = yield* repository.deferSendingDelivery({
           id: delivery.id,
-          nextAttemptAt: new Date(now.getTime() + delayMs),
+          expectedTransitionVersion: claimedVersion,
+          nextAttemptAt: DateTime.toDateUtc(DateTime.addDuration(now, delay)),
           lastError: { tag: error._tag },
-        })
-        .pipe(
-          Effect.tap(() => retryMetric),
-          Effect.as<DeliveryAttemptOutcome>({
-            _tag: "retry",
-            delayMs,
-            infrastructureFailure: false,
-          })
-        );
+        });
+        // Zero rows means a newer attempt owns the row; this one must not
+        // record a retry it did not schedule.
+        if (!deferred) {
+          return { _tag: "terminal" as const };
+        }
+        yield* recordEmailDeliveryRetry(error._tag);
+        return {
+          _tag: "retry" as const,
+          delay,
+          infrastructureFailure: false,
+        };
+      });
     };
     // Queued deliveries may wait out throttles and retries; re-check the
     // changelog read boundary as the last step before provider submission so
@@ -944,7 +1042,7 @@ const sendDeliveryAttempt = (deliveryId: string) =>
             return repository
               .markDeliveryAccepted({
                 id: delivery.id,
-                acceptedAt: now,
+                acceptedAt: DateTime.toDateUtc(now),
                 providerMetadata: result.providerMetadata,
               })
               .pipe(
@@ -987,306 +1085,316 @@ const sendDeliveryAttempt = (deliveryId: string) =>
     return sent;
   });
 
-export const EmailOutboxWorkflowLayer = Layer.mergeAll(
-  EmailOutboxDispatcherWorkflow.toLayer(
-    Effect.fnUntraced(function* ({ outboxId }) {
-      const { maxConcurrentSends } = yield* EmailOutboxConfig;
-      let dispatch: (
-        attempt: number,
-        infrastructureFailures: number
-      ) => Effect.Effect<
-        void,
-        never,
-        | WorkflowEngine.WorkflowEngine
-        | WorkflowEngine.WorkflowInstance
-        | EmailOutboxRepository
-        | EmailOutboxConfig
-        | EntitlementPolicy
-        | DatabaseService
-      >;
-      dispatch = Effect.fnUntraced(function* (
-        attempt: number,
-        infrastructureFailures: number
-      ) {
-        const failIntentAfterInfrastructureExhaustion = W.Activity.make({
-          name: `FailEmailOutboxIntent-${attempt}`,
-          success: Schema.Boolean,
-          error: EmailOutboxDataError,
-          execute: Effect.gen(function* () {
-            const repository = yield* EmailOutboxRepository;
-            const intent = yield* repository.findById(outboxId);
-            if (intent === undefined) {
-              return false;
-            }
-            const failed = yield* repository.markIntentState({
-              id: outboxId,
-              state: "failed",
-            });
-            if (failed) {
-              yield* recordEmailIntentTransition(intent.kind, "failed");
-            }
-            return failed;
-          }).pipe(
-            Effect.mapError(
-              () =>
-                new EmailOutboxDataError({
-                  operation: "fail intent",
-                  reason: "Could not mark exhausted email outbox intent failed",
-                })
-            )
-          ),
-        }).pipe(
-          Effect.catch((error) =>
-            Effect.logError(
-              "Could not persist exhausted email outbox intent",
-              error
-            ).pipe(Effect.as(false))
-          )
-        );
-        const delay = yield* W.Activity.make({
-          name: `LoadEmailOutboxSchedule-${attempt}`,
-          success: Schema.Number,
-          error: EmailOutboxDataError,
-          execute: Effect.gen(function* () {
-            const intent = yield* (yield* EmailOutboxRepository).findById(
-              outboxId
-            );
-            const now = yield* DateTime.nowAsDate;
-            return intent
-              ? Math.max(0, intent.scheduledAt.getTime() - now.getTime())
-              : 0;
-          }).pipe(
-            Effect.mapError(
-              () =>
-                new EmailOutboxDataError({
-                  operation: "load schedule",
-                  reason: "Could not load email outbox intent",
-                })
-            )
-          ),
-        }).pipe(Effect.catch(() => Effect.void));
-        if (delay === undefined) {
-          if (infrastructureFailures + 1 >= maximumInfrastructureFailures) {
-            yield* failIntentAfterInfrastructureExhaustion;
-            return;
-          }
-          yield* W.DurableClock.sleep({
-            name: `email-outbox-dispatcher-retry-${outboxId}-${attempt}`,
-            duration: retryDelayMs(outboxId, attempt),
-          });
-          return yield* dispatch(attempt + 1, infrastructureFailures + 1);
-        }
-        if (delay > 0) {
-          yield* W.DurableClock.sleep({
-            name: `email-outbox-scheduled-${outboxId}`,
-            duration: delay,
-          });
-        }
-        const deliveryIds = yield* W.Activity.make({
-          name: `MaterializeEmailOutboxIntent-${attempt}`,
-          success: Schema.Array(Schema.String),
-          error: EmailOutboxDataError,
-          execute: materializeEmailIntent(outboxId).pipe(
-            Effect.mapError(
-              () =>
-                new EmailOutboxDataError({
-                  operation: "materialize",
-                  reason: "Could not materialize email outbox intent",
-                })
-            )
-          ),
-        }).pipe(Effect.catch(() => Effect.void));
-        if (deliveryIds === undefined) {
-          if (infrastructureFailures + 1 >= maximumInfrastructureFailures) {
-            yield* failIntentAfterInfrastructureExhaustion;
-            return;
-          }
-          yield* W.DurableClock.sleep({
-            name: `email-outbox-dispatcher-retry-${outboxId}-${attempt}`,
-            duration: retryDelayMs(outboxId, attempt),
-          });
-          return yield* dispatch(attempt + 1, infrastructureFailures + 1);
-        }
-        yield* Effect.forEach(
-          deliveryIds,
-          (deliveryId) =>
-            EmailDeliveryWorkflow.execute({ deliveryId }, { discard: true }),
-          { concurrency: maxConcurrentSends, discard: true }
-        );
-        const hasMoreRecipients = yield* W.Activity.make({
-          name: `CheckEmailOutboxMaterialization-${attempt}`,
-          success: Schema.Boolean,
-          error: EmailOutboxDataError,
-          execute: Effect.gen(function* () {
-            const intent = yield* (yield* EmailOutboxRepository).findById(
-              outboxId
-            );
-            return intent?.state === "pending";
-          }).pipe(
-            Effect.mapError(
-              () =>
-                new EmailOutboxDataError({
-                  operation: "check materialization",
-                  reason: "Could not inspect email outbox materialization",
-                })
-            )
-          ),
-        }).pipe(Effect.catch(() => Effect.void));
-        if (hasMoreRecipients === undefined) {
-          if (infrastructureFailures + 1 >= maximumInfrastructureFailures) {
-            yield* failIntentAfterInfrastructureExhaustion;
-            return;
-          }
-          yield* W.DurableClock.sleep({
-            name: `email-outbox-dispatcher-retry-${outboxId}-${attempt}`,
-            duration: retryDelayMs(outboxId, attempt),
-          });
-          return yield* dispatch(attempt + 1, infrastructureFailures + 1);
-        }
-        if (hasMoreRecipients) {
-          return yield* dispatch(attempt + 1, 0);
-        }
-      });
-      yield* dispatch(1, 0);
-    })
-  ),
-  EmailDeliveryWorkflow.toLayer(
-    Effect.fnUntraced(function* ({ deliveryId }) {
-      const repository = yield* EmailOutboxRepository;
-      let run: (
-        attempt: number,
-        infrastructureFailures: number
-      ) => Effect.Effect<
-        void,
-        never,
-        | WorkflowEngine.WorkflowEngine
-        | WorkflowEngine.WorkflowInstance
-        | EmailOutboxRepository
-        | EntitlementPolicy
-        | DatabaseService
-        | Mailer
-        | EmailOutboxConfig
-        | EmailSubscriptionRepository
-      >;
-      run = Effect.fnUntraced(function* (
-        attempt: number,
-        infrastructureFailures: number
-      ) {
-        const outcome = yield* W.Activity.make({
-          name: `SendEmailDelivery-${attempt}`,
-          success: DeliveryAttemptOutcomeSchema,
-          error: workflowError,
-          execute: sendDeliveryAttempt(deliveryId).pipe(
-            // Preserve repository-level typed failures; only the residual
-            // infrastructure channel (SqlError and other untyped drivers)
-            // collapses into the activity's EmailOutboxDataError envelope.
-            Effect.catchTags({
-              EmailOutboxDataError: (error) => Effect.fail(error),
-            }),
-            Effect.mapError(
-              () =>
-                new EmailOutboxDataError({
-                  operation: "deliver",
-                  reason: "Could not process email delivery",
-                })
-            )
-          ),
-        }).pipe(
-          // Database and workflow activity infrastructure failures leave the
-          // delivery non-terminal; retry through the durable timer instead of
-          // completing this deterministic workflow with a cached failure.
-          Effect.catch(() => {
-            const delayMs = retryDelayMs(deliveryId, attempt);
-            const retryOutcome = {
-              _tag: "retry" as const,
-              delayMs,
-              infrastructureFailure: true,
-            };
-            return W.Activity.make({
-              name: `DeferEmailDeliveryInfrastructure-${attempt}`,
-              success: DeliveryAttemptOutcomeSchema,
-              error: EmailOutboxDataError,
-              execute: Effect.gen(function* () {
-                const now = yield* DateTime.nowAsDate;
-                yield* repository.deferSendingDelivery({
-                  id: deliveryId,
-                  nextAttemptAt: new Date(now.getTime() + delayMs),
-                  lastError: { tag: "EmailDeliveryActivityError" },
-                });
-                return retryOutcome;
-              }).pipe(
-                Effect.mapError(
-                  () =>
-                    new EmailOutboxDataError({
-                      operation: "defer delivery after infrastructure failure",
-                      reason: "Could not persist the deferred delivery",
-                    })
-                )
-              ),
-            }).pipe(Effect.catch(() => Effect.succeed(retryOutcome)));
-          })
-        );
-        if (outcome._tag === "terminal") {
-          return;
-        }
-        const nextInfrastructureFailures = outcome.infrastructureFailure
-          ? infrastructureFailures + 1
-          : 0;
-        if (nextInfrastructureFailures >= maximumInfrastructureFailures) {
-          yield* W.Activity.make({
-            name: `FailEmailDeliveryInfrastructure-${attempt}`,
-            success: Schema.Boolean,
-            error: EmailOutboxDataError,
-            execute: repository
-              .markDeliveryOutcome({
-                id: deliveryId,
-                state: "failed",
-                lastError: {
-                  tag: "EmailDeliveryInfrastructureFailure",
-                  reason: "retry_exhausted",
-                },
-              })
-              .pipe(
-                Effect.mapError(
-                  () =>
-                    new EmailOutboxDataError({
-                      operation: "fail delivery",
-                      reason: "Could not mark exhausted email delivery failed",
-                    })
-                )
-              ),
-          }).pipe(
-            Effect.catch((error) =>
-              Effect.logError(
-                "Could not persist exhausted email delivery",
-                error
-              ).pipe(Effect.as(false))
-            )
-          );
-          return;
-        }
-        yield* W.DurableClock.sleep({
-          name: `email-delivery-retry-${deliveryId}-${attempt}`,
-          duration: outcome.delayMs,
-        });
-        yield* run(attempt + 1, nextInfrastructureFailures);
-      });
-      yield* run(1, 0);
-    })
-  )
-);
+/**
+ * Shape of the retry bookkeeping stored on `email_delivery.last_error`.
+ *
+ * The consecutive-infrastructure counter lives on the row rather than in the
+ * worker loop so a redelivery after a crash resumes the same budget instead of
+ * starting the count over. Provider and throttle deferrals write a different
+ * `tag` without the counter, which decodes to zero and resets the budget — the
+ * same reset the workflow previously applied to a non-infrastructure failure.
+ */
+const EmailDeliveryRetryState = Schema.Struct({
+  consecutiveInfrastructureFailures: Schema.Finite,
+  tag: Schema.String,
+});
 
-/** Best-effort post-commit wake; reconciliation closes any lost-wake window. */
-export const wakeEmailOutbox = (outboxId: string) =>
+/** Marks an intent failed once its infrastructure budget is spent. */
+const failIntentAfterInfrastructureExhaustion = (outboxId: string) =>
   Effect.gen(function* () {
-    const engine = yield* Effect.serviceOption(WorkflowEngine.WorkflowEngine);
-    if (Option.isNone(engine)) {
+    const repository = yield* EmailOutboxRepository;
+    const intent = yield* repository.findById(outboxId);
+    if (intent === undefined) {
       return;
     }
-    yield* EmailOutboxDispatcherWorkflow.execute(
-      { outboxId },
+    const failed = yield* repository.markIntentState({
+      id: outboxId,
+      state: "failed",
+    });
+    if (failed) {
+      yield* recordEmailIntentTransition(intent.kind, "failed");
+    }
+  }).pipe(
+    // The write is the only record that the intent's budget is spent, so a
+    // failure must fail the element. `take` then re-offers it under the same
+    // id instead of acknowledging work whose row never moved.
+    Effect.tapError((error) =>
+      Effect.logError("Could not persist exhausted email outbox intent", error)
+    )
+  );
+
+/**
+ * Retry curve for a dispatcher element whose database work kept failing.
+ *
+ * The intent row carries no attempt counter, so this budget is the only bound
+ * on dispatch retries; the queue's own `maxAttempts` is a crash net behind it.
+ */
+const dispatchRetrySchedule = (outboxId: string): Schedule.Schedule<number> =>
+  Schedule.recurs(maximumInfrastructureFailures - 1).pipe(
+    Schedule.modifyDelay(({ attempt }) =>
+      Effect.succeed(retryDelay(outboxId, attempt))
+    )
+  );
+
+/**
+ * Materializes one due intent into per-recipient deliveries.
+ *
+ * A future `scheduledAt` returns without work. The coalescing window belongs to
+ * the row: reconciliation offers a later bucket once the intent comes due.
+ * Sleeping in this worker instead would pin a slot for the whole window and, on
+ * a crash, spend the intent's attempt budget on waiting rather than on work.
+ */
+export const dispatchEmailOutboxIntent = Effect.fn("dispatchEmailOutboxIntent")(
+  function* ({ outboxId }: { readonly outboxId: string }) {
+    const repository = yield* EmailOutboxRepository;
+    const { maxConcurrentSends } = yield* EmailOutboxConfig;
+
+    const materializeDueIntent = Effect.gen(function* () {
+      let hasMoreRecipients = true;
+      while (hasMoreRecipients) {
+        const intent = yield* repository.findById(outboxId);
+        if (intent === undefined || intent.state !== "pending") {
+          return;
+        }
+        // The coalescing window belongs to the row. Returning completes this
+        // element; reconciliation offers a later bucket once the row is due.
+        if (
+          yield* DateTime.isFuture(DateTime.fromDateUnsafe(intent.scheduledAt))
+        ) {
+          return;
+        }
+        const deliveryIds = yield* materializeEmailIntent(outboxId);
+        yield* Effect.forEach(
+          deliveryIds,
+          (deliveryId) => enqueueEmailDelivery(deliveryId, 0, 0),
+          { concurrency: maxConcurrentSends, discard: true }
+        );
+        hasMoreRecipients = deliveryIds.length > 0;
+      }
+    });
+
+    yield* materializeDueIntent.pipe(
+      Effect.retryOrElse(dispatchRetrySchedule(outboxId), (error) =>
+        Effect.logError("Email outbox dispatch retries exhausted", error).pipe(
+          Effect.annotateLogs({ outboxId }),
+          Effect.andThen(failIntentAfterInfrastructureExhaustion(outboxId))
+        )
+      )
+    );
+  }
+);
+
+/**
+ * Attempts one delivery, deferring it on the schedule the row records.
+ *
+ * Each element is a single attempt. A retry outcome writes `next_attempt_at`
+ * (and, for infrastructure failures, the consecutive-failure count) onto the
+ * row and returns; reconciliation re-offers the row when it is due, with a
+ * fresh element id from the bumped `transition_version`. That keeps the retry
+ * delay off a worker slot, which a `retryDelay` of up to an hour would
+ * otherwise hold. The queue's own `retrySchedule` still covers a worker that
+ * dies with the element claimed.
+ */
+export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
+  function* ({ deliveryId }: { readonly deliveryId: string }) {
+    const repository = yield* EmailOutboxRepository;
+    const delivery = yield* repository.findDeliveryById(deliveryId);
+    if (delivery === undefined) {
+      return;
+    }
+
+    // `last_error` is untyped JSON on the row, so parse the retry bookkeeping at
+    // this boundary rather than trusting a shape the column cannot express. A
+    // deferral written by a provider or throttle path carries no counter, and
+    // therefore resumes the infrastructure budget at zero.
+    const retryState = Schema.decodeUnknownOption(EmailDeliveryRetryState)(
+      delivery.lastError
+    );
+    const infrastructureFailures = Option.isSome(retryState)
+      ? retryState.value.consecutiveInfrastructureFailures
+      : 0;
+
+    // `sendDeliveryAttempt` records the row version it observed here, so a
+    // failure can defer against the version this attempt actually holds
+    // rather than clobbering a newer claim.
+    const observedVersionRef = yield* Ref.make(Option.none<number>());
+    const outcome = yield* sendDeliveryAttempt(
+      deliveryId,
+      observedVersionRef
+    ).pipe(
+      // Preserve repository-level typed failures; only the residual
+      // infrastructure channel (SqlError and other untyped drivers)
+      // collapses into a deferral that advances the infrastructure budget.
+      Effect.catch((error) => {
+        const delay = retryDelay(deliveryId, delivery.attemptCount + 1);
+        const nextInfrastructureFailures = infrastructureFailures + 1;
+        return Effect.gen(function* () {
+          const observedVersion = yield* Ref.get(observedVersionRef);
+          const expectedTransitionVersion = Option.getOrElse(
+            observedVersion,
+            () => delivery.transitionVersion
+          );
+          yield* Effect.logWarning(
+            "Email delivery infrastructure failure, deferring"
+          ).pipe(
+            Effect.annotateLogs({
+              attempt: delivery.attemptCount + 1,
+              delay,
+              deliveryId,
+              error,
+            })
+          );
+          const now = yield* DateTime.now;
+          const deferred = yield* repository.deferSendingDelivery({
+            id: deliveryId,
+            expectedTransitionVersion,
+            nextAttemptAt: DateTime.toDateUtc(DateTime.addDuration(now, delay)),
+            lastError: {
+              consecutiveInfrastructureFailures: nextInfrastructureFailures,
+              tag: "EmailDeliveryActivityError",
+            },
+          });
+          // Zero rows means a newer attempt owns the row, so this one is a
+          // stale no-op. A deferral that throws still fails the element so
+          // the queue retries it under the same id rather than completing
+          // without a row transition.
+          return deferred
+            ? {
+                _tag: "retry" as const,
+                delay,
+                infrastructureFailure: true,
+              }
+            : { _tag: "terminal" as const };
+        });
+      })
+    );
+    if (outcome._tag === "terminal") {
+      return;
+    }
+    const nextInfrastructureFailures = outcome.infrastructureFailure
+      ? infrastructureFailures + 1
+      : 0;
+    if (nextInfrastructureFailures >= maximumInfrastructureFailures) {
+      yield* repository
+        .markDeliveryOutcome({
+          id: deliveryId,
+          state: "failed",
+          lastError: {
+            tag: "EmailDeliveryInfrastructureFailure",
+            reason: "retry_exhausted",
+          },
+        })
+        .pipe(
+          // As above: swallowing this would complete the queue element with
+          // the delivery still mid-retry on the row. Fail so the element is
+          // retried and the terminal write is attempted again.
+          Effect.tapError((error) =>
+            Effect.logError("Could not persist exhausted email delivery", error)
+          )
+        );
+      return;
+    }
+    // The deferral is on the row; reconciliation is the only scheduler.
+  }
+);
+
+/**
+ * Forks the concurrent take loops that drain the outbox queues.
+ *
+ * Each `take` error channel carries the handler's failures — including a
+ * persistence error propagated from a terminal write — plus the queue's own
+ * `PersistedQueueError`. The take scope has already re-offered the element, so
+ * the loops log the cause and continue instead of taking the layer down.
+ */
+export const EmailOutboxWorkerLayer = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const { maxConcurrentSends } = yield* EmailOutboxConfig;
+    const queues = yield* EmailOutboxQueues;
+    const dispatcherWorker = queues.dispatcher
+      .take(dispatchEmailOutboxIntent)
+      .pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning(
+            "Email outbox dispatcher element failed",
+            cause
+          ).pipe(Effect.andThen(Effect.sleep(queueTakeRetryDelay)))
+        ),
+        Effect.forever
+      );
+    const deliveryWorker = queues.delivery.take(deliverEmailDelivery).pipe(
+      Effect.catchCause((cause) =>
+        Effect.logWarning("Email delivery element failed", cause).pipe(
+          Effect.andThen(Effect.sleep(queueTakeRetryDelay))
+        )
+      ),
+      Effect.forever
+    );
+    yield* Effect.forEach(
+      Array.from({ length: maxConcurrentSends }, (_, index) => index),
+      () => dispatcherWorker.pipe(Effect.forkScoped),
       { discard: true }
-    ).pipe(Effect.provideService(WorkflowEngine.WorkflowEngine, engine.value));
+    );
+    yield* Effect.forEach(
+      Array.from({ length: maxConcurrentSends }, (_, index) => index),
+      () => deliveryWorker.pipe(Effect.forkScoped),
+      { discard: true }
+    );
+  })
+);
+
+/**
+ * Enqueues one delivery attempt for the row's persisted attempt and transition
+ * version, so a completed element never blocks a later due transition.
+ */
+export const enqueueEmailDelivery = (
+  deliveryId: string,
+  attemptCount: number,
+  transitionVersion: number
+): Effect.Effect<
+  string,
+  PersistedQueue.PersistedQueueError | Schema.SchemaError,
+  EmailOutboxQueues
+> =>
+  Effect.flatMap(EmailOutboxQueues, (queues) =>
+    queues.delivery.offer(
+      { deliveryId },
+      { id: deliveryElementId(deliveryId, attemptCount, transitionVersion) }
+    )
+  );
+
+/**
+ * Best-effort post-commit wake; reconciliation closes any lost-wake window.
+ *
+ * An intent whose coalescing window has not elapsed is deliberately left alone:
+ * reconciliation offers it once the row comes due, so a worker is never handed
+ * an element it cannot act on. The element id is bucketed by `scheduledAt` and
+ * `updatedAt`, so a later window or a resumed row is a distinct element rather
+ * than a de-duplicated no-op.
+ */
+export const wakeEmailOutbox = (outboxId: string) =>
+  Effect.gen(function* () {
+    const queues = yield* Effect.serviceOption(EmailOutboxQueues);
+    const repository = yield* Effect.serviceOption(EmailOutboxRepository);
+    if (Option.isNone(queues) || Option.isNone(repository)) {
+      return;
+    }
+    const intent = yield* repository.value.findById(outboxId);
+    if (intent === undefined || intent.state !== "pending") {
+      return;
+    }
+    if (yield* DateTime.isFuture(DateTime.fromDateUnsafe(intent.scheduledAt))) {
+      return;
+    }
+    yield* queues.value.dispatcher.offer(
+      { outboxId },
+      {
+        id: dispatcherElementId({
+          id: intent.id,
+          scheduledAt: DateTime.fromDateUnsafe(intent.scheduledAt),
+          updatedAt: DateTime.fromDateUnsafe(intent.updatedAt),
+        }),
+      }
+    );
   });
 
 /** Logs a failed post-commit wake; reconciliation closes the lost-wake window. */
@@ -1297,16 +1405,21 @@ export const wakeEmailOutboxBestEffort = (
   outboxId === undefined
     ? Effect.void
     : wakeEmailOutbox(outboxId).pipe(
-        Effect.annotateLogs({ organizationId, outboxId })
+        Effect.annotateLogs({ organizationId, outboxId }),
+        // Best-effort by contract: a lost wake is closed by the reconciliation
+        // sweep, so this must never fail the caller's already-committed write.
+        Effect.catchCause((cause) =>
+          Effect.logWarning("Email outbox wake failed", cause).pipe(
+            Effect.annotateLogs({ organizationId, outboxId })
+          )
+        )
       );
 
 /** Recover database intents and delivery rows whose best-effort workflow wake was lost. */
 export const reconcileEmailOutbox = ({
-  now,
-  staleSendingAfterMs = 5 * 60_000,
+  staleSendingAfter = Duration.minutes(5),
 }: {
-  readonly now?: Date;
-  readonly staleSendingAfterMs?: number;
+  readonly staleSendingAfter?: Duration.Duration;
 } = {}): Effect.Effect<
   void,
   never,
@@ -1315,23 +1428,26 @@ export const reconcileEmailOutbox = ({
   | EmailOutboxRepository
   | EmailSubscriptionRepository
   | EntitlementPolicy
-  | WorkflowEngine.WorkflowEngine
+  | EmailOutboxQueues
 > =>
   Effect.gen(function* () {
-    const reconciliationNow = now ?? (yield* DateTime.nowAsDate);
+    const reconciliationNow = yield* DateTime.now;
+    // The repositories read and write `timestamp` columns as `Date`; convert
+    // the sweep's instant once instead of at every call.
+    const reconciliationNowDate = DateTime.toDateUtc(reconciliationNow);
     const repository = yield* EmailOutboxRepository;
     const subscriptions = yield* EmailSubscriptionRepository;
     const policy = yield* EntitlementPolicy;
     const { maxConcurrentSends } = yield* EmailOutboxConfig;
     const pending = yield* repository.findPending({
-      before: reconciliationNow,
+      before: reconciliationNowDate,
       limit: reconciliationBatchSize,
     });
     const paused = yield* repository.findPausedByPlan({
-      before: reconciliationNow,
+      before: reconciliationNowDate,
       limit: reconciliationBatchSize,
     });
-    yield* repository.expirePausedDeliveries({ now: reconciliationNow });
+    yield* repository.expirePausedDeliveries({ now: reconciliationNowDate });
     const subscriptionOrganizations =
       yield* subscriptions.findPlanStateOrganizationIds();
     const resumedPausedDeliveryIds = yield* Effect.forEach(
@@ -1349,7 +1465,7 @@ export const reconcileEmailOutbox = ({
           });
           yield* subscriptions.reconcileSubscriptionPlanStates({
             eligible,
-            now: reconciliationNow,
+            now: reconciliationNowDate,
             organizationId,
             // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
             // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
@@ -1357,10 +1473,10 @@ export const reconcileEmailOutbox = ({
           // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
           return eligible
             ? yield* repository.resumePausedDeliveries({
-                now: reconciliationNow,
+                now: reconciliationNowDate,
                 organizationId,
               })
-            : ([] as readonly string[]);
+            : ([] as readonly ResumedEmailDelivery[]);
         }),
       { concurrency: maxConcurrentSends }
     );
@@ -1376,21 +1492,27 @@ export const reconcileEmailOutbox = ({
       resumedDeliveryIds.reduce((count, ids) => count + ids.length, 0) +
         resumedPausedDeliveryIds.reduce((count, ids) => count + ids.length, 0)
     );
+    const staleSendingBefore = DateTime.toDateUtc(
+      DateTime.subtractDuration(reconciliationNow, staleSendingAfter)
+    );
     yield* repository.recoverStaleSendingDeliveries({
-      before: new Date(reconciliationNow.getTime() - staleSendingAfterMs),
+      before: staleSendingBefore,
     });
     const deliveries = yield* repository.findDueDeliveries({
-      before: reconciliationNow,
+      before: reconciliationNowDate,
       limit: reconciliationBatchSize,
-      staleSendingBefore: new Date(
-        reconciliationNow.getTime() - staleSendingAfterMs
-      ),
+      staleSendingBefore,
     });
     const oldestQueuedAt = deliveries[0]?.createdAt;
     yield* recordEmailOldestQueuedAge(
       oldestQueuedAt === undefined
         ? 0
-        : reconciliationNow.getTime() - oldestQueuedAt.getTime()
+        : Duration.toMillis(
+            DateTime.distance(
+              DateTime.fromDateUnsafe(oldestQueuedAt),
+              reconciliationNow
+            )
+          )
     );
     yield* Effect.forEach(pending, (intent) => wakeEmailOutbox(intent.id), {
       discard: true,
@@ -1398,22 +1520,28 @@ export const reconcileEmailOutbox = ({
     yield* Effect.forEach(
       deliveries,
       (delivery) =>
-        EmailDeliveryWorkflow.execute(
-          { deliveryId: delivery.id },
-          { discard: true }
+        enqueueEmailDelivery(
+          delivery.id,
+          delivery.attemptCount,
+          delivery.transitionVersion
         ),
       { concurrency: maxConcurrentSends, discard: true }
     );
     yield* Effect.forEach(
       resumedDeliveryIds.flat(),
-      (deliveryId) =>
-        EmailDeliveryWorkflow.execute({ deliveryId }, { discard: true }),
+      (deliveryId) => enqueueEmailDelivery(deliveryId, 0, 0),
       { concurrency: maxConcurrentSends, discard: true }
     );
     yield* Effect.forEach(
       resumedPausedDeliveryIds.flat(),
-      (deliveryId) =>
-        EmailDeliveryWorkflow.execute({ deliveryId }, { discard: true }),
+      // `resumePausedDeliveries` returns the version its update just persisted,
+      // so the re-offer cannot collide with the completed pause element.
+      (delivery) =>
+        enqueueEmailDelivery(
+          delivery.id,
+          delivery.attemptCount,
+          delivery.transitionVersion
+        ),
       { concurrency: maxConcurrentSends, discard: true }
     );
   }).pipe(

@@ -128,6 +128,9 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
               ...(nextState === "delivered" && {
                 deliveredAt: event.occurredAt,
               }),
+              // Keep the persisted queue element id distinct after a provider
+              // transition: `deferred` makes the row due again.
+              transitionVersion: sql`${schema.emailDeliveryTable.transitionVersion} + 1`,
               updatedAt: sql`greatest(${schema.emailDeliveryTable.updatedAt}, ${event.occurredAt})`,
             })
             .where(

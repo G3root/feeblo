@@ -1,11 +1,10 @@
 import { defineConfig } from "vitest/config";
 
+import { pgliteTestOptions } from "../../packages/domain/test/vitest-preset";
+
 export default defineConfig({
   test: {
-    environment: "node",
-    globalSetup: ["../../packages/domain/test/global-setup.ts"],
+    ...pgliteTestOptions,
     include: ["src/**/*.test.ts"],
-    pool: "threads",
-    setupFiles: ["../../packages/domain/test/setup.ts"],
   },
 });

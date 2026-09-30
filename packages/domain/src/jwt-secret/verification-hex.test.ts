@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import { TestClock } from "effect/testing";
 import * as jose from "jose";
 
 import { verifyJwt } from "./verification";
@@ -30,6 +31,7 @@ describe("verifyJwt hex secret handling", () => {
     "verifies token signed with raw hex bytes using 64-char hex secret",
     () =>
       Effect.gen(function* () {
+        yield* TestClock.setTime(Date.now());
         const token = yield* Effect.promise(() =>
           signWithHex(
             {
@@ -63,6 +65,7 @@ describe("verifyJwt hex secret handling", () => {
 
   it.effect("succeeds when one of multiple hex secrets matches", () =>
     Effect.gen(function* () {
+      yield* TestClock.setTime(Date.now());
       const token = yield* Effect.promise(() =>
         signWithHex(
           { aud: ORGANIZATION_ID, exp: futureExp, iat: nowSeconds, sub: "u2" },

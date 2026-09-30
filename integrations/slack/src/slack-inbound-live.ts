@@ -109,7 +109,7 @@ export const makeSlackInboundServiceLive = (
         SlackInboundFailure
       > =>
         connection.credentialsCiphertext === null
-          ? Effect.succeed(Option.none())
+          ? Effect.succeedNone
           : decryptSlackCredentialMaterial(
               config.encryptionKey,
               connection.credentialsCiphertext
@@ -369,8 +369,8 @@ export const makeSlackInboundServiceLive = (
           }
         });
 
-      const withFallback = (
-        effect: Effect.Effect<SlackInboundHttpResponse, unknown>
+      const withFallback = <E>(
+        effect: Effect.Effect<SlackInboundHttpResponse, E>
       ): Effect.Effect<SlackInboundHttpResponse, never> =>
         effect.pipe(
           Effect.catchCause((cause) =>

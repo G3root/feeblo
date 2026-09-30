@@ -4,7 +4,6 @@
 import type { Permission, Role } from "@feeblo/permissions";
 import * as Permissions from "@feeblo/permissions";
 import type { NonEmptyReadonlyArray } from "effect/Array";
-import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import type * as Option from "effect/Option";
@@ -56,17 +55,18 @@ export const publicPolicy = <E, R>(
   predicate: (
     user: Option.Option<CurrentSession["Service"]>
   ) => Effect.Effect<boolean, E, R>
-  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 ): PublicPolicy<E, R> =>
-  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   Effect.gen(function* () {
-    const context = yield* Effect.context<CurrentSession>();
-    const user = Context.getOption(context, CurrentSession);
+    // `serviceOption`, not a context read: an optional session must not add
+    // `CurrentSession` to the requirements channel the way `Effect.context`
+    // does. The previous implementation read the context and cast the cast
+    // the requirement away; this expresses the same lookup with no assertion.
+    const user = yield* Effect.serviceOption(CurrentSession);
 
     return yield* Effect.flatMap(predicate(user), (result) =>
       result ? Effect.void : Effect.fail(new PolicyDeniedError())
     );
-  }) as PublicPolicy<E, R>;
+  });
 
 export class DenyAccess extends Data.TaggedError("DenyAccess")<{}> {}
 

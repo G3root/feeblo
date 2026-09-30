@@ -1,14 +1,20 @@
+import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+
+import { invalidRequestError } from "./errors";
 
 /**
  * Opaque page cursors.
  *
  * A cursor is the sort key of the last row of the previous page, base64url
  * encoded so callers treat it as opaque. It is deliberately *not* signed: it
- * carries a timestamp and a post id the caller already received, and every
+ * carries a timestamp and a record id the caller already received, and every
  * query that consumes it is scoped to the calling workspace, so a forged cursor
  * can only move a caller around its own data.
+ *
+ * One cursor serves every paginated endpoint — posts and tags page on the same
+ * `(createdAt, id)` tuple — so a caller learns one paging rule for the API.
  */
 const CursorPayload = Schema.Struct({
   createdAt: Schema.DateFromString,
@@ -31,3 +37,26 @@ export const encodeCursor = (cursor: Cursor): string =>
  */
 export const decodeCursor = (value: string): Option.Option<Cursor> =>
   decodeCursorPayload(Buffer.from(value, "base64url").toString("utf8"));
+
+/**
+ * The cursor an operation was given, or the published refusal.
+ *
+ * Distinguishes "no cursor" from "a cursor I cannot read": ignoring an
+ * unreadable cursor would silently return the first page forever, so it is
+ * reported as `INVALID_REQUEST` instead. A surface with typed input (MCP)
+ * passes the opaque string from a previous page, so this decoding belongs to
+ * the operation rather than to any one projection.
+ */
+export const decodeCursorOrFail = (raw: string | undefined) =>
+  Effect.gen(function* () {
+    if (raw === undefined || raw.length === 0) {
+      return null;
+    }
+
+    const decoded = Option.getOrNull(decodeCursor(raw));
+    if (decoded === null) {
+      return yield* invalidRequestError("cursor is not a valid page cursor.");
+    }
+
+    return decoded;
+  });

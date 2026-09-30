@@ -155,24 +155,23 @@ const handleSesFeedback = (
  * TopicArn are verified by {@link SesEmailFeedbackWebhook} before any event is
  * ingested.
  */
-export const makeSesEmailFeedbackRouter = () =>
-  HttpRouter.use((router) =>
-    Effect.gen(function* () {
-      yield* router.add(
-        "POST",
-        "/email-provider/ses/:token",
-        (request: HttpServerRequest.HttpServerRequest) =>
-          Effect.gen(function* () {
-            const params = yield* HttpRouter.params;
-            const token = params.token ?? headerToken(request) ?? "";
-            return yield* handleSesFeedback(request, token);
-          })
-      );
-      yield* router.add(
-        "POST",
-        "/email-provider/ses",
-        (request: HttpServerRequest.HttpServerRequest) =>
-          handleSesFeedback(request, headerToken(request) ?? "")
-      );
-    })
-  ).pipe(Layer.orDie);
+export const SesEmailFeedbackRouter = HttpRouter.use((router) =>
+  Effect.gen(function* () {
+    yield* router.add(
+      "POST",
+      "/email-provider/ses/:token",
+      (request: HttpServerRequest.HttpServerRequest) =>
+        Effect.gen(function* () {
+          const params = yield* HttpRouter.params;
+          const token = params.token ?? headerToken(request) ?? "";
+          return yield* handleSesFeedback(request, token);
+        })
+    );
+    yield* router.add(
+      "POST",
+      "/email-provider/ses",
+      (request: HttpServerRequest.HttpServerRequest) =>
+        handleSesFeedback(request, headerToken(request) ?? "")
+    );
+  })
+).pipe(Layer.orDie);

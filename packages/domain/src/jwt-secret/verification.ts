@@ -1,4 +1,6 @@
 import { isNumber } from "@feeblo/utils/runtime-kind";
+import * as Clock from "effect/Clock";
+import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as jose from "jose";
@@ -102,7 +104,11 @@ export const verifyJwt = (
 
     const maxTokenLifetime =
       options.maxTokenLifetime ?? DEFAULT_MAX_TOKEN_LIFETIME;
-    const nowSeconds = options.nowSeconds ?? Math.floor(Date.now() / 1000);
+    const nowSeconds =
+      options.nowSeconds ??
+      (yield* Effect.map(Clock.currentTimeMillis, (ms) =>
+        Math.floor(ms / 1000)
+      ));
 
     for (const secret of secrets) {
       const key = secretToKey(secret);
@@ -114,18 +120,20 @@ export const verifyJwt = (
       // jose's exp/nbf checks to the same instant as the post-signature
       // time-claim rules below — the wall clock by default, the test seam's
       // instant when `options.nowSeconds` is provided.
-      const result = yield* Effect.catch(
+      const result = yield* Effect.orElseSucceed(
         Effect.map(
           Effect.tryPromise(() =>
             jose.jwtVerify(token, key, {
               algorithms: ["HS256"],
               clockTolerance: CLOCK_SKEW_LEEWAY_SECONDS,
-              currentDate: new Date(nowSeconds * 1000),
+              currentDate: DateTime.toDate(
+                DateTime.makeUnsafe(nowSeconds * 1000)
+              ),
             })
           ),
           (r) => r.payload
         ),
-        () => Effect.succeed(null)
+        () => null
       );
 
       if (result !== null && result.aud === expectedOrganizationId) {

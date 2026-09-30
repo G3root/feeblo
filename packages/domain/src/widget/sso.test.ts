@@ -7,6 +7,7 @@ import { WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import { TestClock } from "effect/testing";
 import * as jose from "jose";
 
 import { EntitlementPolicy } from "../entitlement/policies";
@@ -118,6 +119,7 @@ describe("createSsoSession", () => {
   layer(TestLayer)("token contract", (it) => {
     it.effect("creates a restricted SSO user for a valid org-bound token", () =>
       Effect.gen(function* () {
+        yield* TestClock.setTime(Date.now());
         const fixture = yield* makeFixture(true);
         const token = yield* signToken(validPayload(fixture), fixture.secret);
 
@@ -301,6 +303,7 @@ describe("createSsoSession", () => {
       "accepts a token within a tightened per-organization lifetime cap",
       () =>
         Effect.gen(function* () {
+          yield* TestClock.setTime(Date.now());
           const fixture = yield* makeFixture(true);
           const db = yield* currentDb;
           yield* db
@@ -344,6 +347,7 @@ describe("createSsoSession", () => {
 
     it.effect("rate limits repeated SSO sign-ins per organization", () =>
       Effect.gen(function* () {
+        yield* TestClock.setTime(Date.now());
         const fixture = yield* makeFixture(true);
         const token = yield* signToken(validPayload(fixture), fixture.secret);
 
@@ -370,6 +374,7 @@ describe("createSsoSession", () => {
       "limits invalid tokens by client without spending an organization limit",
       () =>
         Effect.gen(function* () {
+          yield* TestClock.setTime(Date.now());
           const fixture = yield* makeFixture(true);
           const validToken = yield* signToken(
             validPayload(fixture),
@@ -427,6 +432,7 @@ describe("createSsoSession", () => {
       "promotes a matched behalf-* shadow into a clean verified SSO identity",
       () =>
         Effect.gen(function* () {
+          yield* TestClock.setTime(Date.now());
           const db = yield* currentDb;
           const fixture = yield* makeFixture(true);
           const now = new Date();
@@ -513,6 +519,7 @@ describe("createSsoSession", () => {
 
     it.effect("leaves native SSO users untouched when they sign in again", () =>
       Effect.gen(function* () {
+        yield* TestClock.setTime(Date.now());
         const fixture = yield* makeFixture(true);
         const token = yield* signToken(validPayload(fixture), fixture.secret);
 

@@ -13,7 +13,7 @@ export const PostStatus = S.Struct({
   type: PostStatusType,
   label: S.String,
   color: S.optional(S.NullOr(S.String)),
-  orderIndex: S.Number,
+  orderIndex: S.Finite,
   organizationId: S.String,
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,

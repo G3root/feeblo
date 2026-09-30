@@ -203,14 +203,16 @@ export const sendWebhookDelivery = Effect.fn(
       };
     })
   ).pipe(
-    Effect.timeout(WEBHOOK_REQUEST_TIMEOUT_MS),
-    Effect.catchTag(
-      "TimeoutError",
-      () =>
-        new WebhookTransportError({
-          kind: "timeout",
-          message: "WebhookTransportError: webhook delivery request timed out",
-        })
-    )
+    Effect.timeoutOrElse({
+      duration: WEBHOOK_REQUEST_TIMEOUT_MS,
+      orElse: () =>
+        Effect.fail(
+          new WebhookTransportError({
+            kind: "timeout",
+            message:
+              "WebhookTransportError: webhook delivery request timed out",
+          })
+        ),
+    })
   );
 });

@@ -1,5 +1,5 @@
+import * as ByteSize from "effect/ByteSize";
 import * as Effect from "effect/Effect";
-import * as FileSystem from "effect/FileSystem";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
@@ -97,5 +97,5 @@ export const bodySizeLimitMiddleware = <E, R>(
   Effect.provideService(
     httpApp,
     HttpServerRequest.MaxBodySize,
-    FileSystem.Size(MAX_REQUEST_BODY_BYTES)
+    ByteSize.bytes(MAX_REQUEST_BODY_BYTES)
   );

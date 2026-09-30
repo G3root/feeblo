@@ -43,7 +43,7 @@ export const makeDiscordManagementServiceLive = (
         listChannels: channelService.listChannels,
         listConnections: connectionService.listConnections,
         setChannelNotifications: channelService.setChannelNotifications,
-        status: () => Effect.succeed({ configured: config.configured }),
+        status: Effect.sync(() => ({ configured: config.configured })),
       });
     })
   ).pipe(

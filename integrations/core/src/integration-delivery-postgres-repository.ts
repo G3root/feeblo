@@ -14,6 +14,7 @@ import {
 } from "@feeblo/id";
 import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Random from "effect/Random";
 import * as Schema from "effect/Schema";
@@ -266,8 +267,9 @@ export const makeIntegrationDeliveryWorkerRepository = (
                     skipLocked: true,
                     of: schema.integrationDeliveryTable,
                   });
-                const leaseExpiresAt = new Date(
-                  now.getTime() + leaseDurationMs
+                const leaseExpiresAt = DateTime.fromDateUnsafe(now).pipe(
+                  DateTime.addDuration(Duration.millis(leaseDurationMs)),
+                  DateTime.toDate
                 );
                 return yield* Effect.forEach(due, ({ id }) =>
                   Effect.gen(function* () {
@@ -302,9 +304,13 @@ export const makeIntegrationDeliveryWorkerRepository = (
                         attemptNumber: delivery.attemptCount,
                         deliveryId: delivery.id,
                         id: attemptId,
-                        retentionExpiresAt: new Date(
-                          now.getTime() +
-                            integrationDeliveryWorkerDefaults.retentionMs
+                        retentionExpiresAt: DateTime.fromDateUnsafe(now).pipe(
+                          DateTime.addDuration(
+                            Duration.millis(
+                              integrationDeliveryWorkerDefaults.retentionMs
+                            )
+                          ),
+                          DateTime.toDate
                         ),
                         startedAt: now,
                       });
@@ -508,7 +514,10 @@ export const makeIntegrationDeliveryWorkerRepository = (
                     lastError: errorTag === undefined ? null : { errorTag },
                     leaseExpiresAt: null,
                     leaseOwner: null,
-                    nextAttemptAt: new Date(now.getTime() + decision.delayMs),
+                    nextAttemptAt: DateTime.fromDateUnsafe(now).pipe(
+                      DateTime.addDuration(Duration.millis(decision.delayMs)),
+                      DateTime.toDate
+                    ),
                     state: "pending",
                     updatedAt: now,
                   })
@@ -617,7 +626,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
                     eq(schema.integrationDeliveryTable.state, "pending")
                   )
                 );
-              yield* recordIntegrationAutomaticPause();
+              yield* recordIntegrationAutomaticPause;
             })
           )
         );
@@ -715,149 +724,144 @@ export const makeIntegrationDeliveryWorkerRepository = (
         );
 
     const recoverExpiredLeases: IntegrationDeliveryWorkerRepository["recoverExpiredLeases"] =
-      () =>
-        mapPersistenceError(
-          "recover_expired_leases",
-          db.transaction(() =>
-            Effect.gen(function* () {
-              const now = yield* DateTime.nowAsDate;
-              const expired = yield* db
-                .select({
-                  connectionLifecycle:
-                    schema.integrationConnectionTable.lifecycle,
-                  id: schema.integrationDeliveryTable.id,
-                  leaseExpiresAt:
-                    schema.integrationDeliveryTable.leaseExpiresAt,
-                  routeEnabled: schema.integrationRouteTable.enabled,
+      mapPersistenceError(
+        "recover_expired_leases",
+        db.transaction(() =>
+          Effect.gen(function* () {
+            const now = yield* DateTime.nowAsDate;
+            const expired = yield* db
+              .select({
+                connectionLifecycle:
+                  schema.integrationConnectionTable.lifecycle,
+                id: schema.integrationDeliveryTable.id,
+                leaseExpiresAt: schema.integrationDeliveryTable.leaseExpiresAt,
+                routeEnabled: schema.integrationRouteTable.enabled,
+              })
+              .from(schema.integrationDeliveryTable)
+              .innerJoin(
+                schema.integrationConnectionTable,
+                eq(
+                  schema.integrationDeliveryTable.connectionId,
+                  schema.integrationConnectionTable.id
+                )
+              )
+              .innerJoin(
+                schema.integrationRouteTable,
+                eq(
+                  schema.integrationDeliveryTable.routeId,
+                  schema.integrationRouteTable.id
+                )
+              )
+              .where(
+                and(
+                  eq(schema.integrationDeliveryTable.state, "leased"),
+                  lte(schema.integrationDeliveryTable.leaseExpiresAt, now)
+                )
+              )
+              .for("update", {
+                skipLocked: true,
+                of: schema.integrationDeliveryTable,
+              });
+            if (expired.length === 0) {
+              return;
+            }
+            const recoverableIds = expired
+              .filter(
+                ({ connectionLifecycle, routeEnabled }) =>
+                  connectionLifecycle === "active" && routeEnabled
+              )
+              .map(({ id }) => id);
+            const canceledIds = expired
+              .filter(
+                ({ connectionLifecycle, routeEnabled }) =>
+                  connectionLifecycle !== "active" || !routeEnabled
+              )
+              .map(({ id }) => id);
+            const oldestLeaseExpiry = expired.reduce(
+              (oldest, delivery) =>
+                delivery.leaseExpiresAt !== null &&
+                delivery.leaseExpiresAt < oldest
+                  ? delivery.leaseExpiresAt
+                  : oldest,
+              now
+            );
+            yield* recordIntegrationRecoveredLeaseAge(
+              now.getTime() -
+                oldestLeaseExpiry.getTime() +
+                integrationDeliveryWorkerDefaults.leaseDurationMs
+            );
+            if (recoverableIds.length > 0) {
+              yield* db
+                .update(schema.integrationDeliveryAttemptTable)
+                .set({
+                  durationMs: 0,
+                  errorTag: "lease_expired",
+                  finishedAt: now,
+                  retryDecision: "retry",
                 })
-                .from(schema.integrationDeliveryTable)
-                .innerJoin(
-                  schema.integrationConnectionTable,
-                  eq(
-                    schema.integrationDeliveryTable.connectionId,
-                    schema.integrationConnectionTable.id
-                  )
-                )
-                .innerJoin(
-                  schema.integrationRouteTable,
-                  eq(
-                    schema.integrationDeliveryTable.routeId,
-                    schema.integrationRouteTable.id
-                  )
-                )
                 .where(
                   and(
-                    eq(schema.integrationDeliveryTable.state, "leased"),
-                    lte(schema.integrationDeliveryTable.leaseExpiresAt, now)
+                    inArray(
+                      schema.integrationDeliveryAttemptTable.deliveryId,
+                      recoverableIds
+                    ),
+                    isNull(schema.integrationDeliveryAttemptTable.finishedAt)
                   )
-                )
-                .for("update", {
-                  skipLocked: true,
-                  of: schema.integrationDeliveryTable,
-                });
-              if (expired.length === 0) {
-                return;
-              }
-              const recoverableIds = expired
-                .filter(
-                  ({ connectionLifecycle, routeEnabled }) =>
-                    connectionLifecycle === "active" && routeEnabled
-                )
-                .map(({ id }) => id);
-              const canceledIds = expired
-                .filter(
-                  ({ connectionLifecycle, routeEnabled }) =>
-                    connectionLifecycle !== "active" || !routeEnabled
-                )
-                .map(({ id }) => id);
-              const oldestLeaseExpiry = expired.reduce(
-                (oldest, delivery) =>
-                  delivery.leaseExpiresAt !== null &&
-                  delivery.leaseExpiresAt < oldest
-                    ? delivery.leaseExpiresAt
-                    : oldest,
-                now
-              );
-              yield* recordIntegrationRecoveredLeaseAge(
-                now.getTime() -
-                  oldestLeaseExpiry.getTime() +
-                  integrationDeliveryWorkerDefaults.leaseDurationMs
-              );
-              if (recoverableIds.length > 0) {
-                yield* db
-                  .update(schema.integrationDeliveryAttemptTable)
-                  .set({
-                    durationMs: 0,
-                    errorTag: "lease_expired",
-                    finishedAt: now,
-                    retryDecision: "retry",
-                  })
-                  .where(
-                    and(
-                      inArray(
-                        schema.integrationDeliveryAttemptTable.deliveryId,
-                        recoverableIds
-                      ),
-                      isNull(schema.integrationDeliveryAttemptTable.finishedAt)
-                    )
-                  );
-                yield* db
-                  .update(schema.integrationDeliveryTable)
-                  .set({
-                    leaseExpiresAt: null,
-                    leaseOwner: null,
-                    nextAttemptAt: now,
-                    state: "pending",
-                    updatedAt: now,
-                  })
-                  .where(
-                    and(
-                      inArray(
-                        schema.integrationDeliveryTable.id,
-                        recoverableIds
-                      ),
-                      eq(schema.integrationDeliveryTable.state, "leased")
-                    )
-                  );
-              }
-              if (canceledIds.length > 0) {
-                yield* db
-                  .update(schema.integrationDeliveryAttemptTable)
-                  .set({
-                    durationMs: 0,
-                    errorTag: "lifecycle_canceled",
-                    finishedAt: now,
-                    retryDecision: "canceled",
-                  })
-                  .where(
-                    and(
-                      inArray(
-                        schema.integrationDeliveryAttemptTable.deliveryId,
-                        canceledIds
-                      ),
-                      isNull(schema.integrationDeliveryAttemptTable.finishedAt)
-                    )
-                  );
-                yield* db
-                  .update(schema.integrationDeliveryTable)
-                  .set({
-                    canceledAt: now,
-                    leaseExpiresAt: null,
-                    leaseOwner: null,
-                    state: "canceled",
-                    updatedAt: now,
-                  })
-                  .where(
-                    and(
-                      inArray(schema.integrationDeliveryTable.id, canceledIds),
-                      eq(schema.integrationDeliveryTable.state, "leased")
-                    )
-                  );
-              }
-              yield* recordIntegrationLeaseRecoveries(expired.length);
-            })
-          )
-        );
+                );
+              yield* db
+                .update(schema.integrationDeliveryTable)
+                .set({
+                  leaseExpiresAt: null,
+                  leaseOwner: null,
+                  nextAttemptAt: now,
+                  state: "pending",
+                  updatedAt: now,
+                })
+                .where(
+                  and(
+                    inArray(schema.integrationDeliveryTable.id, recoverableIds),
+                    eq(schema.integrationDeliveryTable.state, "leased")
+                  )
+                );
+            }
+            if (canceledIds.length > 0) {
+              yield* db
+                .update(schema.integrationDeliveryAttemptTable)
+                .set({
+                  durationMs: 0,
+                  errorTag: "lifecycle_canceled",
+                  finishedAt: now,
+                  retryDecision: "canceled",
+                })
+                .where(
+                  and(
+                    inArray(
+                      schema.integrationDeliveryAttemptTable.deliveryId,
+                      canceledIds
+                    ),
+                    isNull(schema.integrationDeliveryAttemptTable.finishedAt)
+                  )
+                );
+              yield* db
+                .update(schema.integrationDeliveryTable)
+                .set({
+                  canceledAt: now,
+                  leaseExpiresAt: null,
+                  leaseOwner: null,
+                  state: "canceled",
+                  updatedAt: now,
+                })
+                .where(
+                  and(
+                    inArray(schema.integrationDeliveryTable.id, canceledIds),
+                    eq(schema.integrationDeliveryTable.state, "leased")
+                  )
+                );
+            }
+            yield* recordIntegrationLeaseRecoveries(expired.length);
+          })
+        )
+      );
 
     return {
       canExecuteClaimedDelivery,

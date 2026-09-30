@@ -167,7 +167,7 @@ export type EmailOutboxRecord = Schema.Schema.Type<typeof EmailOutboxRecord>;
 
 export const EmailDeliveryRecord = Schema.Struct({
   acceptedAt: Schema.NullOr(PersistedDate),
-  attemptCount: Schema.Number,
+  attemptCount: Schema.Finite,
   contactId: Schema.NullOr(EmailContactId.schema),
   createdAt: PersistedDate,
   deliveredAt: Schema.NullOr(PersistedDate),
@@ -181,7 +181,8 @@ export const EmailDeliveryRecord = Schema.Struct({
   state: EmailDeliveryState,
   template: Schema.String,
   templatePayload: Schema.Unknown,
-  templateVersion: Schema.Number,
+  templateVersion: Schema.Finite,
+  transitionVersion: Schema.Finite,
   updatedAt: PersistedDate,
 });
 

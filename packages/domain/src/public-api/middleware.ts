@@ -1,3 +1,8 @@
+import {
+  hasPublicApiScope,
+  type PublicApiScope,
+  type PublicApiScopeStatements,
+} from "@feeblo/domain-contracts/public-api-scope";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -5,6 +10,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Headers from "effect/unstable/http/Headers";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
+import type { HttpApiSchemaError } from "effect/unstable/httpapi/HttpApiError";
 import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
 
 import { Auth } from "../auth-handler";
@@ -15,17 +21,14 @@ import {
   forbiddenScopeError,
   internalError,
   invalidApiKeyError,
+  invalidRequestError,
+  InvalidRequestError,
   missingApiKeyError,
   planRequiresUpgradeError,
-  PUBLIC_API_ERROR_SCHEMAS,
+  PUBLIC_API_MIDDLEWARE_ERROR_SCHEMAS,
   rateLimitedError,
   serviceUnavailableError,
 } from "./errors";
-import {
-  hasPublicApiScope,
-  type PublicApiScope,
-  type PublicApiScopeStatements,
-} from "./scopes";
 
 /** The header a caller presents its key in. */
 export const PUBLIC_API_KEY_HEADER = "x-api-key";
@@ -62,7 +65,7 @@ export class ApiKeyAuthMiddleware extends HttpApiMiddleware.Service<
   ApiKeyAuthMiddleware,
   { provides: PublicApiCaller }
 >()("@feeblo/domain/PublicApi/ApiKeyAuthMiddleware", {
-  error: PUBLIC_API_ERROR_SCHEMAS,
+  error: PUBLIC_API_MIDDLEWARE_ERROR_SCHEMAS,
 }) {}
 
 /**
@@ -76,7 +79,7 @@ export const requirePublicApiScope = (scope: PublicApiScope) =>
   Effect.gen(function* () {
     const caller = yield* currentPublicApiCaller;
     if (!hasPublicApiScope(caller.scopes, scope)) {
-      return yield* Effect.fail(forbiddenScopeError(scope));
+      return yield* forbiddenScopeError(scope);
     }
   });
 
@@ -126,7 +129,7 @@ export const makeApiKeyAuthMiddlewareLive = (
           )?.trim();
 
           if (presented === undefined || presented.length === 0) {
-            return yield* Effect.fail(missingApiKeyError());
+            return yield* missingApiKeyError();
           }
 
           // Server-side verification: the plugin's verifier is a server-only
@@ -146,7 +149,7 @@ export const makeApiKeyAuthMiddlewareLive = (
 
           const record = verified.valid ? verified.key : null;
           if (record === null) {
-            return yield* Effect.fail(invalidApiKeyError());
+            return yield* invalidApiKeyError();
           }
 
           const organizationId = record.referenceId;
@@ -207,3 +210,68 @@ export const makeApiKeyAuthMiddlewareLive = (
 
 /** The middleware as production composes it. */
 export const ApiKeyAuthMiddlewareLive = makeApiKeyAuthMiddlewareLive();
+
+/**
+ * The middleware that answers a request the framework could not decode.
+ *
+ * `HttpApiBuilder` decodes params, query, headers, and payload before a handler
+ * runs, and a decode failure is a typed `HttpApiSchemaError` which the builder
+ * turns into a defect — an unhandled route error, not this API's envelope. A
+ * malformed body is the caller's mistake and has to be reported as one; doing
+ * it in a middleware means it is reported the same way for every endpoint
+ * rather than by re-declaring a schema on each.
+ *
+ * A service of its own rather than a branch inside the key middleware, because
+ * the framework hands this job to `layerSchemaErrorTransform` and because this
+ * one provides nothing and must run *inside* authentication: a request with no
+ * key is a 401, and its body is never decoded.
+ *
+ * Declares `INVALID_REQUEST`, which every endpoint already publishes, so the
+ * document gains no status from it.
+ */
+export class PublicApiSchemaErrorHandler extends HttpApiMiddleware.Service<PublicApiSchemaErrorHandler>()(
+  "@feeblo/domain/PublicApi/PublicApiSchemaErrorHandler",
+  {
+    error: InvalidRequestError,
+  }
+) {}
+
+/**
+ * The message for a request the endpoint's schema rejected.
+ *
+ * Per kind rather than one string, so a caller can tell a body it sent wrong
+ * from a query it built wrong. Fixed strings: the schema error carries the
+ * offending field path and the value's type, and echoing a caller's own input
+ * back in an error body is a reflection the contract does not need.
+ */
+const requestSchemaErrorMessage = (
+  error: HttpApiSchemaError
+): string | undefined => {
+  switch (error.kind) {
+    case "Headers":
+      return "The request headers are not valid for this endpoint.";
+    case "Params":
+      return "The request path parameters are not valid for this endpoint.";
+    case "Payload":
+      return "The request body is not valid for this endpoint.";
+    case "Query":
+      return "The request query parameters are not valid for this endpoint.";
+    default:
+      // `Body` and `ResponseHeaders` wrap response *encoding*. A response this
+      // API cannot encode is a server defect, not the caller's mistake, so it
+      // is re-failed and stays the 500 the framework already made it.
+      return undefined;
+  }
+};
+
+/** The schema-error handler as production composes it. */
+export const PublicApiSchemaErrorHandlerLive =
+  HttpApiMiddleware.layerSchemaErrorTransform(
+    PublicApiSchemaErrorHandler,
+    (error) => {
+      const message = requestSchemaErrorMessage(error);
+      return message === undefined
+        ? Effect.fail(error)
+        : Effect.fail(invalidRequestError(message));
+    }
+  );

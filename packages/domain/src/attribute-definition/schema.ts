@@ -9,8 +9,8 @@ import {
 import * as S from "effect/Schema";
 
 export const AttributeConfig = S.Struct({
-  min: S.optional(S.Number),
-  max: S.optional(S.Number),
+  min: S.optional(S.Finite),
+  max: S.optional(S.Finite),
   pattern: S.optional(S.String),
 });
 
@@ -134,8 +134,8 @@ const AttributeValueFields = {
   attributeId: S.String,
   organizationId: S.String,
   valueText: S.NullOr(S.String),
-  valueInteger: S.NullOr(S.Number),
-  valueDecimal: S.NullOr(S.Number),
+  valueInteger: S.NullOr(S.Finite),
+  valueDecimal: S.NullOr(S.Finite),
   valueBoolean: S.NullOr(S.Boolean),
   valueDate: S.NullOr(S.DateFromString),
   createdAt: S.DateFromString,
@@ -144,7 +144,7 @@ const AttributeValueFields = {
 
 const AttributeValueUpsertFields = {
   organizationId: WorkspaceId.schema,
-  value: S.NullOr(S.Union([S.String, S.Number, S.Boolean, S.DateFromString])),
+  value: S.NullOr(S.Union([S.String, S.Finite, S.Boolean, S.DateFromString])),
 };
 
 export const ContactAttributeValueUpsert = S.Struct({

@@ -30,6 +30,8 @@ import {
 import { and, desc, eq, inArray } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
+import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -206,7 +208,7 @@ export const makeSlackConnectionServiceLive = (
           readonly code: string;
           readonly state: string;
         }) {
-          const decoded = yield* Schema.decodeUnknownEffect(
+          const decoded = yield* Schema.decodeEffect(
             Schema.fromJsonString(SlackOAuthState)
           )(state).pipe(
             Effect.mapError(
@@ -283,7 +285,7 @@ export const makeSlackConnectionServiceLive = (
                   message: "Slack OAuth state does not match",
                 });
               }
-              const now = new Date();
+              const now = yield* DateTime.nowAsDate;
               // A Slack workspace has at most one active connection per
               // organization: archive any pre-existing active connection for
               // the same team before activating the current row, so
@@ -294,7 +296,10 @@ export const makeSlackConnectionServiceLive = (
                   archivedAt: now,
                   credentialsCiphertext: null,
                   lifecycle: "archived",
-                  retentionExpiresAt: new Date(now.getTime() + retentionMs),
+                  retentionExpiresAt: DateTime.fromDateUnsafe(now).pipe(
+                    DateTime.addDuration(Duration.millis(retentionMs)),
+                    DateTime.toDate
+                  ),
                   updatedAt: now,
                 })
                 .where(
@@ -423,7 +428,7 @@ export const makeSlackConnectionServiceLive = (
               if (connection.lifecycle === "archived") {
                 return;
               }
-              const now = new Date();
+              const now = yield* DateTime.nowAsDate;
               yield* db
                 .update(schema.integrationConnectionTable)
                 .set({ lifecycle: "disconnecting", updatedAt: now })
@@ -493,14 +498,17 @@ export const makeSlackConnectionServiceLive = (
                     );
                   }
                 }
-                const now = new Date();
+                const now = yield* DateTime.nowAsDate;
                 yield* db
                   .update(schema.integrationConnectionTable)
                   .set({
                     archivedAt: now,
                     credentialsCiphertext: null,
                     lifecycle: "archived",
-                    retentionExpiresAt: new Date(now.getTime() + retentionMs),
+                    retentionExpiresAt: DateTime.fromDateUnsafe(now).pipe(
+                      DateTime.addDuration(Duration.millis(retentionMs)),
+                      DateTime.toDate
+                    ),
                     updatedAt: now,
                   })
                   .where(

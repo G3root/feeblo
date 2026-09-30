@@ -481,7 +481,7 @@ function GitHubPublishingSettings({
                 onCheckedChange={(checked) => {
                   if (checked) {
                     Option.match(
-                      Schema.decodeUnknownOption(BoardId.schema)(board.id),
+                      Schema.decodeOption(BoardId.schema)(board.id),
                       {
                         onNone: () =>
                           toastManager.add({
@@ -784,9 +784,7 @@ function GitHubSyncRuleSlot({
         label="Set Feeblo status"
         onValueChange={(postStatusId) => {
           Option.match(
-            Schema.decodeUnknownOption(PostStatusId.schema)(
-              String(postStatusId)
-            ),
+            Schema.decodeOption(PostStatusId.schema)(String(postStatusId)),
             {
               onNone: () =>
                 toastManager.add({

@@ -1,21 +1,45 @@
 import { currentDb, schema } from "@feeblo/db";
-import { PostTagId } from "@feeblo/id";
+import { PostTagId, TagId } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
-import { and, eq, exists, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, exists, inArray, ne, or, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
-import type { TPostTagList, TPostTagSet } from "./schema";
+import { PolicyDeniedError } from "../policy";
+import { FailedToCreateTagError } from "./errors";
+import type { TPostTagList } from "./schema";
+
+/**
+ * The fields a tag read selects, and the only place a tag field is named.
+ *
+ * Shared by the dashboard's lists and the Public API's paged reads so the two
+ * cannot disagree about what a tag is made of; the public response mapper
+ * narrows this to the published field set.
+ */
+const TAG_FIELDS = {
+  id: schema.tagTable.id,
+  name: schema.tagTable.name,
+  slug: schema.tagTable.slug,
+  organizationId: schema.tagTable.organizationId,
+  createdAt: schema.tagTable.createdAt,
+  updatedAt: schema.tagTable.updatedAt,
+} as const;
 
 interface TTagCreate {
-  creatorId: string;
-  creatorMemberId?: string;
-  id: string;
+  /**
+   * Omitted by the Public API, whose key is not a member acting on records it
+   * can already see; a dashboard caller mints one client-side.
+   */
+  id?: string;
   name: string;
   organizationId: string;
+  /** Omitted when the writer is a machine key rather than a member. */
+  creatorId?: string;
+  creatorMemberId?: string;
 }
 
 interface TTagUpdate {
@@ -26,6 +50,31 @@ interface TTagUpdate {
 
 interface TTagDelete {
   id: string;
+  organizationId: string;
+}
+
+interface TFindTagPage {
+  after: { readonly createdAt: Date; readonly id: string } | null;
+  limit: number;
+  organizationId: string;
+}
+
+/**
+ * The assignment input, typed with plain identifiers rather than the RPC
+ * payload schema's branded ones: the dashboard decodes a branded id before it
+ * reaches the repository, while the Public API's key is scoped to one
+ * workspace and its ids come from the database, so it passes strings.
+ */
+interface TPostTagSetInput {
+  organizationId: string;
+  postId: string;
+  tagIds: readonly string[];
+}
+
+interface TFindTagNameConflict {
+  /** The tag being renamed, excluded from its own conflict check. */
+  excludeTagId: string | null;
+  name: string;
   organizationId: string;
 }
 
@@ -113,6 +162,13 @@ const makeTagRepository = Effect.gen(function* () {
         );
     },
 
+    /**
+     * Creates a tag and returns the stored row.
+     *
+     * The id is optional so the Public API can have the server mint it; a
+     * dashboard caller still supplies one, and the insert is otherwise
+     * identical, so the slug rule lives here rather than in either caller.
+     */
     create: ({
       id,
       name,
@@ -121,26 +177,35 @@ const makeTagRepository = Effect.gen(function* () {
       creatorMemberId,
     }: TTagCreate) =>
       Effect.gen(function* () {
+        const tagId = id ?? (yield* TagId.generate);
         const now = yield* DateTime.nowAsDate;
-        yield* db
+        const [created] = yield* db
           .insert(schema.tagTable)
           .values({
-            id,
+            id: tagId,
             name,
             slug: slugify(name),
             organizationId,
-            creatorId,
-            ...(creatorMemberId && { creatorMemberId }),
+            ...(creatorId !== undefined && { creatorId }),
+            ...(creatorMemberId !== undefined && { creatorMemberId }),
             createdAt: now,
             updatedAt: now,
           })
-          .pipe(Effect.asVoid);
+          .returning(TAG_FIELDS);
+
+        // An insert either stores a row or fails; an empty `returning` is a
+        // broken invariant, not something the caller did.
+        if (created === undefined) {
+          return yield* new FailedToCreateTagError();
+        }
+
+        return created;
       }),
 
     update: ({ id, name, organizationId }: TTagUpdate) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
-        yield* db
+        const [updated] = yield* db
           .update(schema.tagTable)
           .set({
             name,
@@ -153,9 +218,14 @@ const makeTagRepository = Effect.gen(function* () {
               eq(schema.tagTable.organizationId, organizationId)
             )
           )
-          .pipe(Effect.asVoid);
+          .returning(TAG_FIELDS);
+
+        // `None` rather than a failure: a caller that read the tag first is
+        // owed the "not found" it documented, not a server fault for a race.
+        return Option.fromNullishOr(updated);
       }),
 
+    /** Deletes a tag, reporting whether there was one to delete. */
     delete: ({ id, organizationId }: TTagDelete) =>
       db
         .delete(schema.tagTable)
@@ -165,7 +235,68 @@ const makeTagRepository = Effect.gen(function* () {
             eq(schema.tagTable.organizationId, organizationId)
           )
         )
-        .pipe(Effect.asVoid),
+        .returning({ id: schema.tagTable.id })
+        .pipe(Effect.map((rows) => rows.length > 0)),
+
+    /**
+     * The tag that already holds this name or slug, if any.
+     *
+     * Takes the name rather than a slug so that the slug rule lives in exactly
+     * one place: a pre-check that derived the slug differently from the insert
+     * would let a caller through to an index violation it could not explain.
+     * Both indexes are checked together because they are two spellings of the
+     * same collision — `UI Kit` and `ui-kit` slugify alike — and a caller told
+     * only about the name would retry and hit the other index instead.
+     */
+    findNameConflict: ({
+      excludeTagId,
+      name,
+      organizationId,
+    }: TFindTagNameConflict) =>
+      db
+        .select({ id: schema.tagTable.id })
+        .from(schema.tagTable)
+        .where(
+          and(
+            eq(schema.tagTable.organizationId, organizationId),
+            or(
+              eq(schema.tagTable.name, name),
+              eq(schema.tagTable.slug, slugify(name))
+            ),
+            ...(excludeTagId === null
+              ? []
+              : [ne(schema.tagTable.id, excludeTagId)])
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map(EffectArray.get(0))),
+
+    /**
+     * One page of the workspace's tags, newest first.
+     *
+     * The page tuple is `(createdAt, id)` so a cursor names a row rather than
+     * an offset, and the caller passes it back through `after`; the ordering
+     * and the tuple live here so the dashboard list and the Public API page
+     * cannot page differently. Selects one more row than asked for so the
+     * caller learns whether another page exists without a second query.
+     */
+    findPage: ({ after, limit, organizationId }: TFindTagPage) => {
+      const conditions = [
+        eq(schema.tagTable.organizationId, organizationId),
+        ...(after === null
+          ? []
+          : [
+              sql`(${schema.tagTable.createdAt}, ${schema.tagTable.id}) < (${after.createdAt}, ${after.id})`,
+            ]),
+      ];
+
+      return db
+        .select(TAG_FIELDS)
+        .from(schema.tagTable)
+        .where(and(...conditions))
+        .orderBy(desc(schema.tagTable.createdAt), desc(schema.tagTable.id))
+        .limit(limit + 1);
+    },
 
     findPostTags: (
       { organizationId, slug }: TPostTagList,
@@ -199,68 +330,118 @@ const makeTagRepository = Effect.gen(function* () {
           )
         ),
 
-    findPostTagIds: ({
-      organizationId,
-      postId,
-    }: {
-      organizationId: string;
-      postId: string;
-    }) =>
-      db
-        .select({ tagId: schema.postTagTable.tagId })
-        .from(schema.postTagTable)
-        .where(
-          and(
-            eq(schema.postTagTable.postId, postId),
-            eq(schema.postTagTable.organizationId, organizationId)
+    setPostTags: ({ postId, organizationId, tagIds }: TPostTagSetInput) =>
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        // Deduplicated here rather than by the caller: the diff below compares
+        // sets, so the same id twice would otherwise look like two additions.
+        const wanted = [...new Set(tagIds)];
+
+        const post = yield* db
+          .select({ id: schema.postTable.id })
+          .from(schema.postTable)
+          .where(
+            and(
+              eq(schema.postTable.id, postId),
+              eq(schema.postTable.organizationId, organizationId)
+            )
           )
-        )
-        .pipe(Effect.map((rows) => rows.map((row) => row.tagId))),
+          .for("no key update");
 
-    setPostTags: ({ postId, organizationId, tagIds }: TPostTagSet) =>
-      db
-        .transaction((tx) =>
-          Effect.gen(function* () {
-            const now = yield* DateTime.nowAsDate;
-            yield* tx
-              .delete(schema.postTagTable)
-              .where(
-                and(
-                  eq(schema.postTagTable.postId, postId),
-                  eq(schema.postTagTable.organizationId, organizationId)
-                )
-              );
+        if (post.length === 0) {
+          return yield* new PolicyDeniedError({
+            reason: "Post does not belong to this organization",
+          });
+        }
 
-            if (tagIds.length === 0) {
-              return;
-            }
+        const previous = yield* db
+          .select({ tagId: schema.postTagTable.tagId })
+          .from(schema.postTagTable)
+          .where(
+            and(
+              eq(schema.postTagTable.postId, postId),
+              eq(schema.postTagTable.organizationId, organizationId)
+            )
+          );
+        const previousTagIds = previous.map((row) => row.tagId);
+        const previousSet = new Set(previousTagIds);
+        const nextSet = new Set(wanted);
 
-            const rows = yield* Effect.forEach(tagIds, (tagId) =>
-              PostTagId.generate.pipe(
-                Effect.map((id) => ({
-                  id,
-                  postId,
-                  tagId,
-                  organizationId,
-                  createdAt: now,
-                  updatedAt: now,
-                }))
+        const removed = previousTagIds.filter((tagId) => !nextSet.has(tagId));
+        if (removed.length > 0) {
+          yield* db
+            .delete(schema.postTagTable)
+            .where(
+              and(
+                eq(schema.postTagTable.postId, postId),
+                eq(schema.postTagTable.organizationId, organizationId),
+                inArray(schema.postTagTable.tagId, removed)
               )
-            );
+            )
+            .pipe(Effect.asVoid);
+        }
 
-            yield* tx
-              .insert(schema.postTagTable)
-              .values(rows)
-              .onConflictDoNothing();
-          })
-        )
-        .pipe(Effect.asVoid),
+        const added = wanted.filter((tagId) => !previousSet.has(tagId));
+        if (added.length > 0) {
+          const rows = yield* Effect.forEach(added, (tagId) =>
+            PostTagId.generate.pipe(
+              Effect.map((id) => ({
+                id,
+                postId,
+                tagId,
+                organizationId,
+                createdAt: now,
+                updatedAt: now,
+              }))
+            )
+          );
 
-    countExistingTags: ({ organizationId, tagIds }: TCountExistingTags) =>
+          // `post_tag_postId_tagId_uidx` would abort the transaction if a
+          // concurrent request inserted the same tag first; the ids are
+          // deduplicated above, so this is the backstop rather than the rule.
+          yield* db
+            .insert(schema.postTagTable)
+            .values(rows)
+            .onConflictDoNothing()
+            .pipe(Effect.asVoid);
+        }
+
+        const tags = yield* db
+          .select({ id: schema.tagTable.id, name: schema.tagTable.name })
+          .from(schema.postTagTable)
+          .innerJoin(
+            schema.tagTable,
+            eq(schema.tagTable.id, schema.postTagTable.tagId)
+          )
+          .where(
+            and(
+              eq(schema.postTagTable.postId, postId),
+              eq(schema.postTagTable.organizationId, organizationId)
+            )
+          )
+          .orderBy(asc(schema.tagTable.name));
+
+        return { previousTagIds, tags };
+      }),
+
+    /**
+     * How many of the given tag ids exist in the workspace.
+     *
+     * `lock: "key share"` takes the lock the foreign-key check itself takes:
+     * a tag deleted concurrently either loses the race and is missing from
+     * this read, or waits here until the rows that reference it exist and then
+     * cascades them away with it. The Public API's replacement asks for it
+     * inside its transaction; the dashboard's pre-check does not need it.
+     */
+    countExistingTags: ({
+      organizationId,
+      tagIds,
+      lock,
+    }: TCountExistingTags & { readonly lock?: "key share" }) =>
       tagIds.length === 0
         ? Effect.succeed(0)
         : Effect.gen(function* () {
-            const rows = yield* db
+            const query = db
               .select({ id: schema.tagTable.id })
               .from(schema.tagTable)
               .where(
@@ -269,6 +450,7 @@ const makeTagRepository = Effect.gen(function* () {
                   inArray(schema.tagTable.id, tagIds)
                 )
               );
+            const rows = yield* lock === undefined ? query : query.for(lock);
             return rows.length;
           }),
 
@@ -305,12 +487,10 @@ const makeTagRepository = Effect.gen(function* () {
         return rows.length > 0;
       }),
 
+    /** One tag of the calling workspace, or nothing. */
     findById: ({ id, organizationId }: TFindTagById) =>
       db
-        .select({
-          id: schema.tagTable.id,
-          creatorId: schema.tagTable.creatorId,
-        })
+        .select(TAG_FIELDS)
         .from(schema.tagTable)
         .where(
           and(
@@ -331,3 +511,14 @@ export class TagRepository extends Context.Service<TagRepository>()(
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
+
+/**
+ * Reads the repository from the fiber context.
+ *
+ * `HttpApiBuilder` does not thread a handler's service requirements through the
+ * route layer, so the Public API's operations take it from the context the
+ * composition provides — the same shape as `currentCommentService`.
+ */
+export const currentTagRepository = Effect.context<never>().pipe(
+  Effect.map((context) => Context.getUnsafe(context, TagRepository))
+);

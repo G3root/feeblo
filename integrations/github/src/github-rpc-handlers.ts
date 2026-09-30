@@ -11,7 +11,7 @@ export const GitHubManagementRpcHandlersEffect = Effect.gen(function* () {
       Policy.canPermission(organizationId, "integrations.manage")
     );
   return {
-    GitHubIntegrationStatus: () => service.status(),
+    GitHubIntegrationStatus: () => service.status,
     GitHubConnectionList: (
       input: Parameters<typeof service.listConnections>[0]
     ) => service.listConnections(input).pipe(authorize(input.organizationId)),

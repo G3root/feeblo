@@ -20,12 +20,12 @@ catalog:
   "@dotenvx/dotenvx": ^1.75.1
   "@effect-aws/client-s3": 2.0.0-beta.6
   "@effect-aws/s3": 1.0.0-beta.5
-  "@effect/ai-openai": 4.0.0-rc.112
-  "@effect/atom-react": 4.0.0-rc.112
-  "@effect/platform-node": 4.0.0-rc.112
-  "@effect/sql-pg": 4.0.0-rc.112
-  "@effect/sql-pglite": 4.0.0-rc.112
-  "@effect/vitest": 4.0.0-rc.112
+  "@effect/ai-openai": 4.0.0-rc.117
+  "@effect/atom-react": 4.0.0-rc.117
+  "@effect/platform-node": 4.0.0-rc.117
+  "@effect/sql-pg": 4.0.0-rc.117
+  "@effect/sql-pglite": 4.0.0-rc.117
+  "@effect/vitest": 4.0.0-rc.117
   "@floating-ui/dom": ^1.8.0
   "@isaacs/ttlcache": ^2.1.5
   "@polar-sh/better-auth": ^1.8.3
@@ -36,11 +36,11 @@ catalog:
   "@tanstack/query-db-collection": 1.2.15
   "@tanstack/react-db": ^0.4.1
   "@tanstack/react-form": ^1.33.3
+  "@tanstack/react-query": ^5.101.0
   "@tanstack/react-router": ^1.170.38
   "@tanstack/react-router-with-db": ^0.1.0
   "@tanstack/react-start": ^1.168.57
   "@tanstack/react-virtual": ^3.13.23
-  "@tanstack/react-query": ^5.101.0
   "@types/node": ^24.12.2
   "@types/react": ^19.2.18
   "@types/react-dom": ^19.2.4
@@ -53,12 +53,12 @@ catalog:
   drizzle-kit: 1.0.0-rc.4
   drizzle-orm: 1.0.0-rc.5-169397b
   drizzle-seed: 1.0.0-rc.4
-  effect: 4.0.0-rc.112
+  effect: 4.0.0-rc.117
   jose: ^6.2.3
   postgres: ^3.4.7
+  rangi: ^2.2.0
   react: ^19.2.8
   react-dom: ^19.2.8
-  rangi: ^2.2.0
   rolldown: v1.0.0-rc.16
   shadcn: ^3.8.5
   solid-js: ^1.9.14
@@ -69,9 +69,14 @@ catalog:
   vite: ^8.0.16
   "vite-plugin-icons-spritesheet": ^3.1.0
   vite-plugin-solid: ^2.11.12
-  vitest: ^4.1.11
+  # `@effect/vitest` 4.0.0-rc.117 peers on vitest >=5.0.0 <6.0.0; keep the
+  # two on the same major so the helper package is not running against an
+  # unsupported vitest API.
+  vitest: ^5.0.2
   zod: ^4.4.3
 nodeLinker: hoisted
 overrides:
+  "@effect/platform-node-shared": 4.0.0-rc.117
   prosemirror-model: ^1.25.9
-  "@effect/platform-node-shared": 4.0.0-rc.112
+patchedDependencies:
+  "@effect-aws/s3@1.0.0-beta.5": patches/@effect-aws__s3@1.0.0-beta.5.patch

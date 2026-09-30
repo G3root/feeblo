@@ -4,6 +4,8 @@
 
 Public API request and response schemas are hand-written, closed structs in `packages/domain/src/public-api/schema.ts`. The public module shares repositories with the rest of the domain but never imports a dashboard or portal response schema (`post/schema.ts`, `widget/schema.ts`, `public-actor.ts`), and never imports the session middleware; an `oxlint` boundary override enforces both, and the credential seam it _does_ need was moved to `packages/domain/src/auth-handler.ts` so the ban can cover the whole session module. The published OpenAPI document for `/api/v1` is a separately curated contract, asserted against the declared field set and the endpoint list.
 
+_Updated by ADR 0007: the schemas now live in each feature's `public-api/schema.ts` and `public-api/schema.ts` re-exports them; the boundary override names the dashboard modules' paths (`../schema` from a feature slice, `../*/schema` from the root) rather than any file called `post/schema`. The decision below is unchanged._
+
 ## Why
 
 `PostListItem` — the projection the dashboard and the public portal share — carries `creatorId` and `creatorMemberId`, internal `usr_*` and `mem_*` identifiers that `public-actor.ts` states must never be exposed. Its existing escape hatch, `redactCreatorIdentity`, nulls rather than omits those fields and is session-aware: it keeps the current user's own identifiers. A machine key has no session user, so that path either redacts everything or requires inventing an actor. Reusing it would make a portal-runtime concern the Public API's safety mechanism, and a field later added to `PostListItem` would silently widen the public payload.

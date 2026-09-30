@@ -14,7 +14,7 @@ export class ProfanityConfig extends Context.Service<ProfanityConfig>()(
   "ProfanityConfig",
   {
     make: Effect.gen(function* () {
-      const extraWords = yield* Config.string("PROFANITY_EXTRA_WORDS").pipe(
+      const extraWords = yield* Config.String("PROFANITY_EXTRA_WORDS").pipe(
         Config.option
       );
 

@@ -26,6 +26,7 @@
     "@egoist/tailwindcss-icons": "^1.9.2",
     "@feeblo/auth": "workspace:*",
     "@feeblo/domain": "workspace:*",
+    "@feeblo/domain-contracts": "workspace:*",
     "@feeblo/feedback-widget": "workspace:*",
     "@feeblo/id": "workspace:*",
     "@feeblo/permissions": "workspace:*",

@@ -61,7 +61,7 @@ const validateConfig = (
   // an Effect defect — bypassing the `BadRequestError` channel
   // `validateAttributeValueEffect` declares — instead of the validation failure
   // the other misconfiguration branches already return.
-  const decodedConfig = S.decodeUnknownOption(AttributeConfig)(
+  const decodedConfig = S.decodeOption(AttributeConfig)(
     definition.config ?? {},
     { onExcessProperty: "ignore" }
   );

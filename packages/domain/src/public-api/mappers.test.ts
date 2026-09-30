@@ -1,9 +1,34 @@
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 
-import { toPublicApiPost, toPublicApiPostSummary } from "./mappers";
-import type { PublicApiDetailedPost, PublicApiListedPost } from "./repository";
-import { PublicApiPost, PublicApiPostSummary } from "./schema";
+import type {
+  PublicApiChangelogDetail,
+  PublicApiChangelogSource,
+} from "../changelog/public-api/repository";
+import type { PublicApiCompanySource } from "../company/public-api/mappers";
+import type {
+  PublicApiDetailedPost,
+  PublicApiListedPost,
+} from "../post/public-api/repository";
+import type { PublicApiTagSource } from "../tag/public-api/mappers";
+import {
+  toPublicApiChangelog,
+  toPublicApiChangelogSummary,
+  toPublicApiCompany,
+  toPublicApiPost,
+  toPublicApiPostSummary,
+  toPublicApiTag,
+  toPublicApiTagDetail,
+} from "./mappers";
+import {
+  PublicApiChangelog,
+  PublicApiChangelogSummary,
+  PublicApiCompany,
+  PublicApiPost,
+  PublicApiPostSummary,
+  PublicApiTag,
+  PublicApiTagDetail,
+} from "./schema";
 
 /**
  * Mapper tests.
@@ -44,6 +69,56 @@ const detailed: PublicApiDetailedPost = {
   ...source,
   content: "<p>Sanitized body</p>",
 };
+
+const tagSource: PublicApiTagSource = {
+  id: "tag_ui",
+  name: "UI",
+  slug: "ui",
+  createdAt: new Date("2026-08-11T00:00:00.000Z"),
+  updatedAt: new Date("2026-08-12T09:30:00.000Z"),
+};
+
+const companySource: PublicApiCompanySource = {
+  id: "cmp_acme",
+  name: "Acme",
+  externalId: "crm-1",
+  avatar: null,
+  externalCreatedAt: new Date("2026-01-02T00:00:00.000Z"),
+  source: "API",
+  createdAt: new Date("2026-08-11T00:00:00.000Z"),
+  updatedAt: new Date("2026-08-12T09:30:00.000Z"),
+};
+
+const changelogSource: PublicApiChangelogSource = {
+  id: "chg_example",
+  title: "Dark mode shipped",
+  slug: "dark-mode-shipped",
+  excerpt: "Dark mode is live for every workspace.",
+  coverImage: null,
+  status: "published",
+  scheduledAt: null,
+  publishedAt: new Date("2026-08-12T00:00:00.000Z"),
+  createdAt: new Date("2026-08-11T00:00:00.000Z"),
+  updatedAt: new Date("2026-08-12T09:30:00.000Z"),
+};
+
+const changelogDetail: PublicApiChangelogDetail = {
+  ...changelogSource,
+  content: "Dark mode is live. Enable it in **Settings**.",
+};
+
+const CHANGELOG_LIST_KEYS = [
+  "coverImage",
+  "createdAt",
+  "excerpt",
+  "id",
+  "publishedAt",
+  "scheduledAt",
+  "slug",
+  "status",
+  "title",
+  "updatedAt",
+];
 
 const LIST_KEYS = [
   "archivedAt",
@@ -103,6 +178,133 @@ describe("public API mappers", () => {
       "contactId",
       "userId",
       "memberId",
+      "email",
+    ]) {
+      expect(encoded).not.toContain(forbidden);
+    }
+  });
+
+  it("emits exactly the documented tag fields", () => {
+    const encoded = Schema.encodeSync(PublicApiTagDetail)(
+      toPublicApiTagDetail(tagSource)
+    );
+
+    expect(Object.keys(encoded).sort()).toEqual([
+      "createdAt",
+      "id",
+      "name",
+      "slug",
+      "updatedAt",
+    ]);
+  });
+
+  it("emits exactly the documented tag reference fields", () => {
+    // The reference is the same mapper behind a post's `tags` array and behind
+    // the response of setting a post's tags, so one shape lock covers both.
+    const encoded = Schema.encodeSync(PublicApiTag)(
+      toPublicApiTag({ id: "tag_ui", name: "UI" })
+    );
+
+    expect(Object.keys(encoded).sort()).toEqual(["id", "name"]);
+  });
+
+  it("keeps a post's embedded tag to its identity", () => {
+    // The embedded tag and the tag resource are separate schemas so that
+    // widening one does not silently widen every post payload that carries it.
+    const encoded = Schema.encodeSync(PublicApiPostSummary)(
+      toPublicApiPostSummary(source, CONTEXT)
+    );
+
+    expect(Object.keys(encoded.tags[0] ?? {}).sort()).toEqual(["id", "name"]);
+  });
+
+  it("never emits a tag's internal identifiers", () => {
+    const encoded = JSON.stringify(
+      Schema.encodeSync(PublicApiTagDetail)(toPublicApiTagDetail(tagSource))
+    );
+
+    for (const forbidden of [
+      "creatorId",
+      "creatorMemberId",
+      "organizationId",
+    ]) {
+      expect(encoded).not.toContain(forbidden);
+    }
+  });
+
+  it("emits exactly the documented company fields", () => {
+    const encoded = Schema.encodeSync(PublicApiCompany)(
+      toPublicApiCompany(companySource)
+    );
+
+    expect(Object.keys(encoded).sort()).toEqual([
+      "avatar",
+      "createdAt",
+      "externalCreatedAt",
+      "externalId",
+      "id",
+      "name",
+      "source",
+      "updatedAt",
+    ]);
+  });
+
+  it("drops anything a company row carries beyond the contract", () => {
+    // Deliberately a variable rather than an inline literal, so the extra
+    // fields survive the type checker: the point is that the closed struct,
+    // not the source type, is what keeps them out of the payload.
+    const withExtraColumns = {
+      ...companySource,
+      organizationId: "org_example",
+      attributeValues: [{ attributeId: "cad_size", value: "enterprise" }],
+    };
+
+    const encoded = JSON.stringify(
+      Schema.encodeSync(PublicApiCompany)(toPublicApiCompany(withExtraColumns))
+    );
+
+    for (const forbidden of [
+      "organizationId",
+      "attributeValues",
+      "creatorId",
+      "org_example",
+      "enterprise",
+    ]) {
+      expect(encoded).not.toContain(forbidden);
+    }
+  });
+
+  it("emits exactly the documented changelog fields", () => {
+    const encoded = Schema.encodeSync(PublicApiChangelogSummary)(
+      toPublicApiChangelogSummary(changelogSource)
+    );
+
+    expect(Object.keys(encoded).sort()).toEqual(CHANGELOG_LIST_KEYS);
+  });
+
+  it("adds only the body on the changelog detail projection", () => {
+    const encoded = Schema.encodeSync(PublicApiChangelog)(
+      toPublicApiChangelog(changelogDetail)
+    );
+
+    expect(Object.keys(encoded).sort()).toEqual(
+      [...CHANGELOG_LIST_KEYS, "content"].sort()
+    );
+    expect(encoded.content).toBe(changelogDetail.content);
+  });
+
+  it("never emits a changelog entry's internal identifiers", () => {
+    const encoded = JSON.stringify(
+      Schema.encodeSync(PublicApiChangelog)(
+        toPublicApiChangelog(changelogDetail)
+      )
+    );
+
+    for (const forbidden of [
+      "creatorId",
+      "creatorMemberId",
+      "organizationId",
+      "userId",
       "email",
     ]) {
       expect(encoded).not.toContain(forbidden);

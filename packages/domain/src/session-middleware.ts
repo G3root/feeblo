@@ -158,7 +158,7 @@ export const OptionalAuthMiddlewareLive = Layer.effect(
             ? Option.none()
             : Option.some(session)
         ),
-        Effect.catch(() => Effect.succeed(Option.none())),
+        Effect.orElseSucceed(() => Option.none()),
         Effect.flatMap((session) =>
           effect.pipe(Effect.provideService(OptionalCurrentSession, session))
         )

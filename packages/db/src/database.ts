@@ -12,21 +12,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schedule from "effect/Schedule";
 import type { SqlError } from "effect/unstable/sql/SqlError";
-import { type CustomTypesConfig, types } from "pg";
 
 import { relations } from "./relations";
-
-const pgTypes: CustomTypesConfig = {
-  getTypeParser: (typeId, format) => {
-    if (
-      [1184, 1114, 1082, 1186, 1231, 1115, 1185, 1187, 1182].includes(typeId)
-    ) {
-      return (value: string) => value;
-    }
-
-    return types.getTypeParser(typeId, format);
-  },
-};
 
 // Detect whether the configured DATABASE_URL points at an embedded PGlite
 // instance (`pglite:/path/...`) instead of a real PostgreSQL server.
@@ -46,7 +33,7 @@ const pgliteDataDir = (url: string): string => {
 export const PgliteClientLive = PgliteClient.layerFrom(
   Effect.acquireRelease(
     Effect.map(
-      Config.string("DATABASE_URL"),
+      Config.String("DATABASE_URL"),
       (url) =>
         new PGlite(pgliteDataDir(url), {
           extensions: { vector, pg_trgm },
@@ -59,9 +46,13 @@ export const PgliteClientLive = PgliteClient.layerFrom(
 );
 
 // Configure the Postgres client layer.
+//
+// `PgClient` owns the wire protocol as of rc.117 and no longer accepts `pg`
+// type parsers, so the former `types` shim is gone. Timestamp columns now
+// decode to `Date` rather than the raw strings that shim forced; the domain
+// schemas read them through `Schema.Union([Schema.Date, Schema.DateFromString])`.
 export const PgClientLive = SQLPG.PgClient.layerConfig({
-  url: Config.redacted("DATABASE_URL"),
-  types: Config.succeed(pgTypes),
+  url: Config.Redacted("DATABASE_URL"),
 });
 
 /** Connection health-check that retries with jittered backoff on startup. */
@@ -87,7 +78,6 @@ const testConnection = (db: PgDrizzle.EffectPgDatabase) =>
 
 // Create the DB effect with default services for a Postgres server.
 const pgDbEffect = PgDrizzle.make({ relations }).pipe(
-  Effect.provide(PgDrizzle.DefaultServices),
   Effect.tap(testConnection)
 );
 
@@ -99,7 +89,6 @@ const pgDbEffect = PgDrizzle.make({ relations }).pipe(
 // if they diverge (e.g. different `execute` return types), this will fail at
 // runtime with no compile-time guard.
 const pgliteDbEffect = PgDrizzlePglite.make({ relations }).pipe(
-  Effect.provide(PgDrizzlePglite.DefaultServices),
   Effect.tap(testConnection),
   // SAFETY: PgDrizzlePglite.make returns a fully-initialized EffectPgDatabase;
   // the cast bridges the driver-specific return type to the pg dialect type
@@ -115,26 +104,31 @@ export class Database extends Context.Service<
 
 // Postgres-backed layers
 export const PgDatabaseLive = Layer.effect(Database, pgDbEffect).pipe(
-  Layer.provide(PgClientLive)
+  Layer.provide(PgClientLive),
+  Layer.provide(PgDrizzle.DefaultServices)
 );
 
 // PGlite-backed layers
 export const PgliteDatabaseLive = Layer.effect(Database, pgliteDbEffect).pipe(
-  Layer.provide(PgliteClientLive)
+  Layer.provide(PgliteClientLive),
+  Layer.provide(PgDrizzlePglite.DefaultServices)
 );
 
 // Pick the appropriate database layer based on the configured DATABASE_URL.
 // `memory://` URLs (and any other PGlite-style data directory) use the
 // embedded PGlite client; everything else assumes a real Postgres server.
 export const DatabaseContextLive = Layer.unwrap(
-  Effect.map(Config.string("DATABASE_URL"), (url) =>
+  Effect.map(Config.String("DATABASE_URL"), (url) =>
     isPgliteUrl(url) ? PgliteDatabaseLive : PgDatabaseLive
   )
 );
 
-/** Effect SQL client used by cluster workflow persistence. */
+/**
+ * Effect SQL client backing the durable stores that need raw SQL access,
+ * currently the cluster workflow engine's message storage.
+ */
 export const SqlClientContextLive = Layer.unwrap(
-  Effect.map(Config.string("DATABASE_URL"), (url) =>
+  Effect.map(Config.String("DATABASE_URL"), (url) =>
     isPgliteUrl(url) ? PgliteClientLive : PgClientLive
   )
 );

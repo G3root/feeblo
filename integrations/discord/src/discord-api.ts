@@ -32,7 +32,7 @@ export const DISCORD_API_REQUEST_TIMEOUT_MS = 10_000;
 export const DiscordApiErrorBody = Schema.Struct({
   code: Schema.optionalKey(Schema.Int),
   message: Schema.optionalKey(Schema.String),
-  retry_after: Schema.optionalKey(Schema.Number),
+  retry_after: Schema.optionalKey(Schema.Finite),
 });
 export type DiscordApiErrorBody = Schema.Schema.Type<
   typeof DiscordApiErrorBody
@@ -122,9 +122,7 @@ export const classifyDiscordApiError = (
   context: string
 ): DiscordApiFailure => {
   const status = response.status;
-  const decoded = Schema.decodeUnknownOption(DiscordApiErrorBody)(
-    response.body ?? {}
-  );
+  const decoded = Schema.decodeOption(DiscordApiErrorBody)(response.body ?? {});
   const errorCode = decoded._tag === "Some" ? decoded.value.code : undefined;
   if (status === 401) {
     return new IntegrationProviderAuthenticationError({
@@ -250,7 +248,13 @@ export const makeDiscordApiClient = (
         const execute = HttpClient.execute(input.httpRequest);
         const response = yield* (
           httpClient === undefined
-            ? execute.pipe(Effect.provide(FetchHttpClient.layer))
+            ? execute.pipe(
+                // Fallback when no client is injected: the provider API client
+                // is the bottom of the integration stack and pins the default
+                // fetch transport itself.
+                // eslint-disable-next-line effecttsgo/strict-effect-provide -- provider client pins its transport
+                Effect.provide(FetchHttpClient.layer)
+              )
             : execute.pipe(
                 Effect.provideService(HttpClient.HttpClient, httpClient)
               )
@@ -290,15 +294,16 @@ export const makeDiscordApiClient = (
           )
         );
       }).pipe(
-        Effect.timeout(DISCORD_API_REQUEST_TIMEOUT_MS),
-        Effect.catchTag(
-          "TimeoutError",
-          () =>
-            new IntegrationProviderTemporaryFailure({
-              message: `Discord request failed during ${input.context}`,
-              provider: discordProviderKey,
-            })
-        )
+        Effect.timeoutOrElse({
+          duration: DISCORD_API_REQUEST_TIMEOUT_MS,
+          orElse: () =>
+            Effect.fail(
+              new IntegrationProviderTemporaryFailure({
+                message: `Discord request failed during ${input.context}`,
+                provider: discordProviderKey,
+              })
+            ),
+        })
       )
   );
 

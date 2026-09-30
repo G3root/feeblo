@@ -183,9 +183,9 @@ const parseInteractive = (
       })
     );
   }
-  return Schema.decodeUnknownEffect(
-    Schema.fromJsonString(SlackInteractivePayload)
-  )(payloadJson).pipe(
+  return Schema.decodeEffect(Schema.fromJsonString(SlackInteractivePayload))(
+    payloadJson
+  ).pipe(
     Effect.map((payload): ParsedSlackInboundRequest => ({
       kind: "interactive",
       payload,

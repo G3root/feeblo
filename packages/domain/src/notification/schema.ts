@@ -20,7 +20,7 @@ export const Notification = S.Struct({
 export const NotificationList = S.Struct({
   organizationId: WorkspaceId.schema,
   cursor: S.optional(S.DateFromString),
-  limit: S.optional(S.Number),
+  limit: S.optional(S.Finite),
 });
 
 export const NotificationUnreadCount = S.Struct({

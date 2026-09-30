@@ -17,12 +17,12 @@ export class EmailProviderFeedbackConfig extends Context.Service<EmailProviderFe
       return {
         // Independent of AUTH_ENCRYPTION_KEY: the provider delivery secret must
         // not be derivable from the at-rest auth encryption key.
-        webhookToken: yield* Config.redacted(
+        webhookToken: yield* Config.Redacted(
           "EMAIL_PROVIDER_WEBHOOK_TOKEN"
         ).pipe(Config.option),
         // When configured, only SNS messages from this topic are accepted.
         // Configure it alongside the token to reject cross-topic deliveries.
-        expectedTopicArn: yield* Config.string(
+        expectedTopicArn: yield* Config.String(
           "EMAIL_PROVIDER_SNS_TOPIC_ARN"
         ).pipe(Config.option),
       } as const;

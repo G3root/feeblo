@@ -1,5 +1,7 @@
 import { useAtomSet } from "@effect/atom-react";
 import { Button } from "@feeblo/ui/button";
+import { Checkbox } from "@feeblo/ui/checkbox";
+import { CheckboxGroup } from "@feeblo/ui/checkbox-group";
 import { Field, FieldDescription, FieldLabel } from "@feeblo/ui/field";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
@@ -27,7 +29,14 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 
 import { apiKeyReactivityKeys, createApiKeyAtom } from "../atoms";
 import { useApiKeyCreateDialogContext } from "../dialog-stores";
-import { API_KEY_EXPIRATION_ITEMS, apiKeyFormOpts } from "../shared-form";
+import {
+  API_KEY_CAPABILITY_GROUP_ITEMS,
+  API_KEY_EXPIRATION_ITEMS,
+  API_KEY_READ_ONLY_DESCRIPTION,
+  apiKeyFormOpts,
+  apiKeyScopes,
+  toApiKeyCapabilityGroups,
+} from "../shared-form";
 
 export type CreatedApiKey = {
   /** Plaintext key, returned by the server exactly once. */
@@ -85,6 +94,7 @@ function ApiKeyCreateForm({
             name: value.name.trim(),
             organizationId,
             expiration: value.expiration,
+            scopes: apiKeyScopes(value.capabilities),
           },
           reactivityKeys: apiKeyReactivityKeys(organizationId),
         });
@@ -143,6 +153,39 @@ function ApiKeyCreateForm({
               <FieldDescription>
                 The key stops working after this. You can revoke it sooner at
                 any time.
+              </FieldDescription>
+            </Field>
+          )}
+        </form.AppField>
+        <form.AppField name="capabilities">
+          {(field) => (
+            <Field name={field.name}>
+              <FieldLabel>Access</FieldLabel>
+              <CheckboxGroup
+                aria-label="Access"
+                onValueChange={(values) =>
+                  field.handleChange(toApiKeyCapabilityGroups(values))
+                }
+                value={field.state.value}
+              >
+                {API_KEY_CAPABILITY_GROUP_ITEMS.map((item) => (
+                  // A `Field` per capability: Base UI names a control from the
+                  // label of the field it sits in, so checkboxes nested directly
+                  // in the group's own field would all be named "Access" —
+                  // wrong for a screen reader, and unfindable by name in a test.
+                  // The label and description wire themselves to the checkbox
+                  // through that field, so neither needs an id here.
+                  <Field key={item.value} orientation="horizontal">
+                    <Checkbox value={item.value} />
+                    <div className="grid gap-0.5">
+                      <FieldLabel>{item.label}</FieldLabel>
+                      <FieldDescription>{item.description}</FieldDescription>
+                    </div>
+                  </Field>
+                ))}
+              </CheckboxGroup>
+              <FieldDescription>
+                {API_KEY_READ_ONLY_DESCRIPTION}
               </FieldDescription>
             </Field>
           )}

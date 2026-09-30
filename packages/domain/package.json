@@ -337,6 +337,9 @@
     "./policy": {
       "default": "./src/policy.ts"
     },
+    "./post-activity/repository": {
+      "default": "./src/post-activity/repository.ts"
+    },
     "./post-activity/schema": {
       "default": "./src/post-activity/schema.ts"
     },
@@ -379,6 +382,9 @@
     "./public-api/cursor": {
       "default": "./src/public-api/cursor.ts"
     },
+    "./public-api/entitlement": {
+      "default": "./src/public-api/entitlement.ts"
+    },
     "./public-api/errors": {
       "default": "./src/public-api/errors.ts"
     },
@@ -388,17 +394,11 @@
     "./public-api/middleware": {
       "default": "./src/public-api/middleware.ts"
     },
-    "./public-api/repository": {
-      "default": "./src/public-api/repository.ts"
-    },
     "./public-api/router": {
       "default": "./src/public-api/router.ts"
     },
     "./public-api/schema": {
       "default": "./src/public-api/schema.ts"
-    },
-    "./public-api/scopes": {
-      "default": "./src/public-api/scopes.ts"
     },
     "./rate-limit": {
       "default": "./src/rate-limit.ts"

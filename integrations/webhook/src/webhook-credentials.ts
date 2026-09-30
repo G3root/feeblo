@@ -90,7 +90,7 @@ export const decryptWebhookCredentialMaterial = (
       Effect.flatMap(
         decryptWebhookCredential(key, encryptedCredential),
         (value) =>
-          Schema.decodeUnknownEffect(
+          Schema.decodeEffect(
             Schema.fromJsonString(WebhookEncryptedCredentialMaterial)
           )(Redacted.value(value)).pipe(
             Effect.map((decoded) => ({

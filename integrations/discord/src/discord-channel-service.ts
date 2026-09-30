@@ -15,6 +15,7 @@ import {
 } from "@feeblo/integration-discord/manifest";
 import { and, eq } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -217,7 +218,7 @@ export const makeDiscordChannelServiceLive = (
                   )
                   .limit(1);
                 const channelName = selectedChannel.name;
-                const now = new Date();
+                const now = yield* DateTime.nowAsDate;
                 if (input.enabled) {
                   if (route === undefined) {
                     yield* db.insert(schema.integrationRouteTable).values({

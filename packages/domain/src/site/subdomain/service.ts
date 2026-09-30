@@ -37,7 +37,7 @@ export class SubdomainValidationService extends Context.Service<SubdomainValidat
   {
     make: Effect.gen(function* () {
       const { extraWords } = yield* ProfanityConfig;
-      const reservedSubdomainsEnv = yield* Config.string(
+      const reservedSubdomainsEnv = yield* Config.String(
         "RESERVED_SUBDOMAINS"
       ).pipe(Config.withDefault(""));
       const reservedSubdomains = getReservedSubdomains(reservedSubdomainsEnv);

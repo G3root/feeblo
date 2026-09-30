@@ -32,7 +32,7 @@ import {
   RootRouter,
 } from "../http/routers";
 import { serverTimingMiddleware } from "../http/server-timing";
-import { makeSesEmailFeedbackRouter } from "../http/ses";
+import { SesEmailFeedbackRouter } from "../http/ses";
 import type { IntegrationRuntime } from "../integrations";
 
 export const makePublicRouters = (
@@ -97,7 +97,7 @@ export const makeMergedRoutes = ({
       registry: integrationRuntime.registry,
     }),
     makeGitHubRouters({ appUrl, registry: integrationRuntime.registry }),
-    makeSesEmailFeedbackRouter()
+    SesEmailFeedbackRouter
   );
 
 export const withGlobalMiddleware = <A, E, R>(
