@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { PolicyDeniedError } from "../policy";
 import { InvalidSubjectError, SubjectNotFoundError } from "./errors";
 import { ResolvePrincipalService } from "./service";
 
@@ -246,10 +247,21 @@ describe("ResolvePrincipalService", () => {
     it.effect("resolves by explicit userId ahead of any email", () =>
       Effect.gen(function* () {
         const service = yield* ResolvePrincipalService;
+        const db = yield* currentDb;
         const organizationId = yield* makeOrganization();
         yield* insertGlobalUser({
           id: "user_alice",
           email: "alice@example.com",
+        });
+        // Attribution by id requires a workspace relationship; a member row
+        // is one (the picker submits member rows by userId — see
+        // docs/on-behalf.md).
+        yield* db.insert(schema.memberTable).values({
+          id: `member_alice`,
+          organizationId,
+          userId: "user_alice",
+          role: "contributor",
+          createdAt: new Date(),
         });
 
         const resolved = yield* service.resolve({
@@ -266,6 +278,88 @@ describe("ResolvePrincipalService", () => {
         expect(contact?.userId).toBe("user_alice");
         expect(resolved.userId).toBe("user_alice");
       })
+    );
+
+    it.effect(
+      "resolves an SSO-bound account by explicit userId without a member row",
+      () =>
+        Effect.gen(function* () {
+          const service = yield* ResolvePrincipalService;
+          const organizationId = yield* makeOrganization();
+          yield* insertGlobalUser({
+            id: "user_portal",
+            email: "portal-identity@example.com",
+            restrictedToOrganizationId: organizationId,
+          });
+
+          const resolved = yield* service.resolve({
+            organizationId,
+            needsUser: false,
+            subject: { userId: "user_portal" },
+          });
+
+          const contact = yield* getContactById(resolved.contactId);
+          expect(contact?.userId).toBe("user_portal");
+        })
+    );
+
+    it.effect(
+      "resolves a global account by explicit userId when a contact already links it",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const service = yield* ResolvePrincipalService;
+          const organizationId = yield* makeOrganization();
+          yield* insertGlobalUser({
+            id: "user_adopted",
+            email: "adopted@example.com",
+          });
+          const contactId = yield* ContactId.generate;
+          yield* db.insert(schema.contactTable).values({
+            id: contactId,
+            organizationId,
+            email: "adopted@example.com",
+            userId: "user_adopted",
+          });
+
+          const resolved = yield* service.resolve({
+            organizationId,
+            needsUser: false,
+            subject: { userId: "user_adopted" },
+          });
+
+          expect(resolved.contactId).toBe(contactId);
+        })
+    );
+
+    it.effect(
+      "rejects an explicit userId of a global account with no workspace relationship",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const service = yield* ResolvePrincipalService;
+          const organizationId = yield* makeOrganization();
+          yield* insertGlobalUser({
+            id: "user_stranger",
+            email: "stranger@example.com",
+          });
+
+          const error = yield* service
+            .resolve({
+              organizationId,
+              needsUser: false,
+              subject: { userId: "user_stranger" },
+            })
+            .pipe(Effect.flip);
+
+          expect(error).toBeInstanceOf(SubjectNotFoundError);
+          // The account must be untouched: no contact was created for it.
+          const linked = yield* db
+            .select()
+            .from(schema.contactTable)
+            .where(eq(schema.contactTable.userId, "user_stranger"));
+          expect(linked).toEqual([]);
+        })
     );
 
     it.effect("fails when an explicit userId does not exist", () =>
@@ -394,6 +488,56 @@ describe("ResolvePrincipalService", () => {
 
         expect(error).toBeInstanceOf(InvalidSubjectError);
       })
+    );
+
+    it.effect(
+      "gates contact creation on the plan's CRM entry cap, but never reuse",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const service = yield* ResolvePrincipalService;
+          const organizationId = yield* makeOrganization();
+
+          // The free plan allows 10 CRM entries (contacts + companies).
+          const cap = 10;
+          yield* Effect.forEach(
+            Array.from({ length: cap }, (_, index) => index),
+            (index) =>
+              Effect.gen(function* () {
+                const contactId = yield* ContactId.generate;
+                yield* db.insert(schema.contactTable).values({
+                  id: contactId,
+                  organizationId,
+                  email: `filled-${index}@example.com`,
+                });
+              })
+          );
+
+          // Resolving to an existing contact is never capped.
+          const reused = yield* service.resolve({
+            organizationId,
+            needsUser: false,
+            subject: { email: "filled-0@example.com" },
+          });
+          expect(reused.contactId).toBeDefined();
+
+          // A resolution that would create a new contact is denied.
+          const error = yield* service
+            .resolve({
+              organizationId,
+              needsUser: false,
+              subject: { email: "new-customer@example.com" },
+            })
+            .pipe(Effect.flip);
+          expect(error).toBeInstanceOf(PolicyDeniedError);
+
+          // The denied resolution must not have written anything.
+          const created = yield* db
+            .select()
+            .from(schema.contactTable)
+            .where(eq(schema.contactTable.email, "new-customer@example.com"));
+          expect(created).toEqual([]);
+        })
     );
   });
 });

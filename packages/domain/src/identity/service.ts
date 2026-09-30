@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { ContactId } from "@feeblo/id";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, count, eq, isNull, sql } from "drizzle-orm";
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -8,7 +8,9 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import { UserRepository } from "../user/repository";
+import { WorkspaceRepository } from "../workspace/repository";
 import { isSyntheticEmail } from "./emails";
 import { InvalidSubjectError, SubjectNotFoundError } from "./errors";
 
@@ -59,6 +61,55 @@ const normalizeEmail = (email: string | undefined): string | undefined => {
 const makeResolvePrincipalService = Effect.gen(function* () {
   const db = yield* currentDb;
   const userRepository = yield* UserRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
+
+  /**
+   * Whether the account carries a `member` row in the workspace.
+   *
+   * Queried directly rather than through a repository so the resolver's only
+   * service dependencies stay the user repository and the plan policy.
+   */
+  const hasMemberRow = (organizationId: string, userId: string) =>
+    Effect.gen(function* () {
+      const rows = yield* db
+        .select({ id: schema.memberTable.id })
+        .from(schema.memberTable)
+        .where(
+          and(
+            eq(schema.memberTable.organizationId, organizationId),
+            eq(schema.memberTable.userId, userId)
+          )
+        )
+        .limit(1);
+      return rows.length > 0;
+    });
+
+  /**
+   * Contacts and companies together are the workspace's CRM entries (the
+   * same count the contact-create RPC gates on), so a resolution that would
+   * create a contact consumes plan room exactly like a staff-created one.
+   * Resolving to an existing contact is never capped.
+   */
+  const ensureCrmCapacity = (organizationId: string) =>
+    entitlementPolicy.canCreateCrmEntry({
+      organizationId,
+      crmEntryCount: Effect.gen(function* () {
+        const [contactRows, companyRows] = yield* Effect.all([
+          db
+            .select({ total: count() })
+            .from(schema.contactTable)
+            .where(eq(schema.contactTable.organizationId, organizationId)),
+          db
+            .select({ total: count() })
+            .from(schema.companyTable)
+            .where(eq(schema.companyTable.organizationId, organizationId)),
+        ]);
+        return (
+          Number(contactRows[0]?.total ?? 0) +
+          Number(companyRows[0]?.total ?? 0)
+        );
+      }),
+    });
 
   const getContactInOrganization = (id: string, organizationId: string) =>
     Effect.gen(function* () {
@@ -227,6 +278,11 @@ const makeResolvePrincipalService = Effect.gen(function* () {
    * Insert that tolerates losing a race against the `(organization_id, email)`
    * or `(organization_id, external_id)` unique indexes by re-reading the
    * winner.
+   *
+   * Every contact the resolver creates goes through here, which makes this
+   * the one place the plan's CRM entry limit has to be enforced: a resolution
+   * that creates a contact consumes plan room exactly like the contact-create
+   * RPC does, and a limit only one surface enforces is not a limit.
    */
   function insertContactToleratingRace(
     values: Omit<ContactInsert, "id" | "createdAt" | "updatedAt">,
@@ -236,6 +292,8 @@ const makeResolvePrincipalService = Effect.gen(function* () {
     >
   ) {
     return Effect.gen(function* () {
+      yield* ensureCrmCapacity(values.organizationId);
+
       const id = yield* ContactId.generate;
       const now = yield* DateTime.nowAsDate;
       const [created = null] = yield* db
@@ -285,6 +343,26 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             yield* findContactByUser(organizationId, user.value.id)
           );
           if (!contact) {
+            // Attribution by explicit id requires a workspace relationship:
+            // a member row or an SSO-bound account. Without it, a manager
+            // holding a user id learned in another workspace could attribute
+            // this workspace's content to an account that never touched it —
+            // the display name would render on this workspace's public board.
+            // Capturing such a human is the email path's job (see
+            // docs/on-behalf.md); an existing linked contact above already
+            // proves the relationship, which is what keeps adopted global
+            // accounts resolvable by id.
+            const isSsoBound =
+              user.value.restrictedToOrganizationId === organizationId;
+            if (
+              !isSsoBound &&
+              !(yield* hasMemberRow(organizationId, user.value.id))
+            ) {
+              return yield* new SubjectNotFoundError({
+                message: "This account has no relationship with this workspace",
+              });
+            }
+
             // Avoid tripping the `(organization_id, email)` unique index by
             // matching on a usable address before inserting. Synthetic
             // inboxes are excluded: they are never usable contact emails.
@@ -502,6 +580,12 @@ export class ResolvePrincipalService extends Context.Service<ResolvePrincipalSer
   }
 ) {
   static readonly layer = Layer.effect(this, this.make).pipe(
-    Layer.provide(UserRepository.layer)
+    Layer.provide(UserRepository.layer),
+    // The plan policy is what the CRM-entry gate inside the resolver reads;
+    // it is provided here so every composition (dashboard handlers, the
+    // Public API route, tests) supplies the database once and nothing else.
+    Layer.provide(
+      EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
+    )
   );
 }
