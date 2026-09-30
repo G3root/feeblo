@@ -452,9 +452,8 @@ const parseCompanies = (
   definitions: readonly TCompanyAttributeDefinition[]
 ): Effect.Effect<ParsedCompanyAttributes[], DataValidationError> =>
   Array.isArray(companies) && companies.length > 0
-    ? Effect.all(
-        companies.map((company) => parseSingleCompany(company, definitions)),
-        { concurrency: "unbounded" }
+    ? Effect.forEach(companies, (company) =>
+        parseSingleCompany(company, definitions)
       )
     : Effect.succeed([]);
 

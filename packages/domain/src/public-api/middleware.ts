@@ -79,7 +79,7 @@ export const requirePublicApiScope = (scope: PublicApiScope) =>
   Effect.gen(function* () {
     const caller = yield* currentPublicApiCaller;
     if (!hasPublicApiScope(caller.scopes, scope)) {
-      return yield* Effect.fail(forbiddenScopeError(scope));
+      return yield* forbiddenScopeError(scope);
     }
   });
 
@@ -129,7 +129,7 @@ export const makeApiKeyAuthMiddlewareLive = (
           )?.trim();
 
           if (presented === undefined || presented.length === 0) {
-            return yield* Effect.fail(missingApiKeyError());
+            return yield* missingApiKeyError();
           }
 
           // Server-side verification: the plugin's verifier is a server-only
@@ -149,7 +149,7 @@ export const makeApiKeyAuthMiddlewareLive = (
 
           const record = verified.valid ? verified.key : null;
           if (record === null) {
-            return yield* Effect.fail(invalidApiKeyError());
+            return yield* invalidApiKeyError();
           }
 
           const organizationId = record.referenceId;

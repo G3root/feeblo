@@ -27,7 +27,7 @@ export const DiscordManagementRpcHandlersEffect = Effect.gen(function* () {
     DiscordConnectionDisconnect: (
       input: Parameters<typeof service.disconnect>[0]
     ) => service.disconnect(input).pipe(authorize(input.organizationId)),
-    DiscordIntegrationStatus: () => service.status(),
+    DiscordIntegrationStatus: () => service.status,
   };
 });
 

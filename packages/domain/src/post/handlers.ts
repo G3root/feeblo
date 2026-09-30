@@ -115,19 +115,16 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     organizationId: string;
   }) =>
     repository.findActivityState(args).pipe(
-      Effect.flatMap((previous) =>
-        previous === undefined
-          ? Effect.fail(new FailedToUpdatePostError())
-          : Effect.succeed(previous)
+      Effect.filterOrFail(
+        (post) => post !== undefined,
+        () => new FailedToUpdatePostError()
       ),
-      Effect.flatMap((post) =>
-        post.mergedIntoPostId === null
-          ? Effect.succeed(post)
-          : Effect.fail(
-              new Policy.PolicyDeniedError({
-                reason: "This post has been merged into another post",
-              })
-            )
+      Effect.filterOrFail(
+        (post) => post.mergedIntoPostId === null,
+        () =>
+          new Policy.PolicyDeniedError({
+            reason: "This post has been merged into another post",
+          })
       )
     );
 

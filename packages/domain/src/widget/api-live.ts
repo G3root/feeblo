@@ -441,27 +441,27 @@ export const WidgetApiLive = HttpApiBuilder.group(
             PostRepository.layer,
             PostStatusRepository.layer,
           ]),
-          Effect.catchTag("ConfigError", () =>
-            Effect.fail(
-              new InternalServerError({
-                message: "Missing APP_URL for widget integration events",
-              })
-            )
-          ),
-          Effect.catchTag("PostAlreadyExistsError", () =>
-            Effect.logWarning(
-              "Exhausted post slug candidates while creating widget feedback; post was not stored",
-              { organizationId, boardId }
-            ).pipe(
-              Effect.andThen(
-                Effect.fail(
-                  new InternalServerError({
-                    message: "Failed to create feedback",
-                  })
+          Effect.catchTags({
+            ConfigError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Missing APP_URL for widget integration events",
+                })
+              ),
+            PostAlreadyExistsError: () =>
+              Effect.logWarning(
+                "Exhausted post slug candidates while creating widget feedback; post was not stored",
+                { organizationId, boardId }
+              ).pipe(
+                Effect.andThen(
+                  Effect.fail(
+                    new InternalServerError({
+                      message: "Failed to create feedback",
+                    })
+                  )
                 )
-              )
-            )
-          ),
+              ),
+          }),
           withRemapDbErrors("Feedback", "create")
         );
       })

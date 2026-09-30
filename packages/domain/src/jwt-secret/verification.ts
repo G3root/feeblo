@@ -114,7 +114,7 @@ export const verifyJwt = (
       // jose's exp/nbf checks to the same instant as the post-signature
       // time-claim rules below — the wall clock by default, the test seam's
       // instant when `options.nowSeconds` is provided.
-      const result = yield* Effect.catch(
+      const result = yield* Effect.orElseSucceed(
         Effect.map(
           Effect.tryPromise(() =>
             jose.jwtVerify(token, key, {
@@ -125,7 +125,7 @@ export const verifyJwt = (
           ),
           (r) => r.payload
         ),
-        () => Effect.succeed(null)
+        () => null
       );
 
       if (result !== null && result.aud === expectedOrganizationId) {

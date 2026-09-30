@@ -343,10 +343,10 @@ export const createSsoSession = ({
   }).pipe(
     // Normalize any remaining (unexpected) failures into a generic SSO error
     // so the plugin always receives a SsoError.
-    Effect.catch((error) =>
-      S.is(SsoError)(error)
-        ? Effect.fail(error)
-        : Effect.fail(new SsoError({ code: "FAILED_TO_CREATE_SSO_USER" }))
+    Effect.catchIf(
+      S.is(SsoError),
+      Effect.fail,
+      () => new SsoError({ code: "FAILED_TO_CREATE_SSO_USER" })
     )
   );
 
@@ -445,16 +445,14 @@ export const linkAnonymousAccount = ({
     // Normalize transport failures (unexpected database/SQL errors) into the
     // typed error while preserving link-specific rejections byte-for-byte, so
     // the caller sees a single error channel it can log and retry safely.
-    Effect.catch((error) =>
-      S.is(LinkAnonymousAccountError)(error)
-        ? Effect.fail(error)
-        : Effect.fail(
-            new LinkAnonymousAccountError({
-              code: "LINK_FAILED",
-              message:
-                "Failed to transfer widget portal data to the real account",
-            })
-          )
+    Effect.catchIf(
+      S.is(LinkAnonymousAccountError),
+      Effect.fail,
+      () =>
+        new LinkAnonymousAccountError({
+          code: "LINK_FAILED",
+          message: "Failed to transfer widget portal data to the real account",
+        })
     )
   );
 

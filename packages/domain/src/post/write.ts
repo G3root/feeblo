@@ -274,19 +274,16 @@ export const makePostWrites = Effect.gen(function* () {
     organizationId: string;
   }) =>
     repository.findActivityState(args).pipe(
-      Effect.flatMap((previous) =>
-        previous === undefined
-          ? Effect.fail(new FailedToUpdatePostError())
-          : Effect.succeed(previous)
+      Effect.filterOrFail(
+        (post) => post !== undefined,
+        () => new FailedToUpdatePostError()
       ),
-      Effect.flatMap((post) =>
-        post.mergedIntoPostId === null
-          ? Effect.succeed(post)
-          : Effect.fail(
-              new Policy.PolicyDeniedError({
-                reason: "This post has been merged into another post",
-              })
-            )
+      Effect.filterOrFail(
+        (post) => post.mergedIntoPostId === null,
+        () =>
+          new Policy.PolicyDeniedError({
+            reason: "This post has been merged into another post",
+          })
       )
     );
 
@@ -307,9 +304,7 @@ export const makePostWrites = Effect.gen(function* () {
         organizationId: args.organizationId,
       });
       if (board._tag === "None") {
-        return yield* Effect.fail(
-          new BadRequestError({ message: "Board not found" })
-        );
+        return yield* new BadRequestError({ message: "Board not found" });
       }
       return board.value;
     });
@@ -321,9 +316,9 @@ export const makePostWrites = Effect.gen(function* () {
         organizationId: args.organizationId,
       });
       if (statusType === undefined) {
-        return yield* Effect.fail(
-          new BadRequestError({ message: "Post status not found" })
-        );
+        return yield* new BadRequestError({
+          message: "Post status not found",
+        });
       }
       return statusType;
     });

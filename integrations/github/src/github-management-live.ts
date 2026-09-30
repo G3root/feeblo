@@ -198,7 +198,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
       return { externalResourceId: recorded.externalResourceId, link };
     });
   const service: GitHubManagementServiceContract = {
-    status: () => Effect.succeed({ configured: config.configured }),
+    status: Effect.sync(() => ({ configured: config.configured })),
     connectStart: (input) => provider.startInstallation(input.organizationId),
     connectComplete: (input) => provider.completeInstallation(input),
     disconnect: (input) =>

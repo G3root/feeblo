@@ -268,15 +268,16 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
               operation: "SesEmailFeedbackWebhook.fetchSnsSigningCert",
             })
         ),
-        Effect.timeout(SNS_SUBSCRIPTION_CONFIRMATION_TIMEOUT_MS),
-        Effect.catchTag("TimeoutError", () =>
-          Effect.fail(
-            new SesWebhookEnvelopeError({
-              message: "SNS signing certificate request timed out",
-              operation: "SesEmailFeedbackWebhook.fetchSnsSigningCert",
-            })
-          )
-        )
+        Effect.timeoutOrElse({
+          duration: SNS_SUBSCRIPTION_CONFIRMATION_TIMEOUT_MS,
+          orElse: () =>
+            Effect.fail(
+              new SesWebhookEnvelopeError({
+                message: "SNS signing certificate request timed out",
+                operation: "SesEmailFeedbackWebhook.fetchSnsSigningCert",
+              })
+            ),
+        })
       );
       if (response.status >= 300 && response.status < 400) {
         return yield* new SesWebhookEnvelopeError({
@@ -353,15 +354,16 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
               operation: "SesEmailFeedbackWebhook.confirmSubscription",
             })
         ),
-        Effect.timeout(SNS_SUBSCRIPTION_CONFIRMATION_TIMEOUT_MS),
-        Effect.catchTag("TimeoutError", () =>
-          Effect.fail(
-            new SesWebhookConfirmationError({
-              message: "SNS subscription confirmation request timed out",
-              operation: "SesEmailFeedbackWebhook.confirmSubscription",
-            })
-          )
-        )
+        Effect.timeoutOrElse({
+          duration: SNS_SUBSCRIPTION_CONFIRMATION_TIMEOUT_MS,
+          orElse: () =>
+            Effect.fail(
+              new SesWebhookConfirmationError({
+                message: "SNS subscription confirmation request timed out",
+                operation: "SesEmailFeedbackWebhook.confirmSubscription",
+              })
+            ),
+        })
       );
 
       if (response.status >= 300 && response.status < 400) {

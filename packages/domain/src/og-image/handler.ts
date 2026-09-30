@@ -58,7 +58,7 @@ const ogImageCache = new TTLCache<string, Uint8Array>({
 
 const decodeRequest = (
   request: HttpServerRequest.HttpServerRequest
-): Effect.Effect<typeof OgImageRequest.Type, OgImageRequestValidationError> => {
+): Effect.Effect<OgImageRequest, OgImageRequestValidationError> => {
   const params = new URL(request.url, "http://localhost").searchParams;
   return Schema.decodeUnknownEffect(OgImageRequest)(
     Object.fromEntries(params.entries())
@@ -124,38 +124,36 @@ export const handleOgImage = (
           name: "OgImage",
           level: "expensive",
         }),
-        Effect.catchTag("RateLimitExceededError", () =>
-          Effect.succeed(
-            HttpServerResponse.text("Too many requests", { status: 429 })
-          )
-        ),
-        Effect.catchTag("RateLimitUnavailableError", () =>
-          Effect.succeed(
-            HttpServerResponse.text("Rate limiter unavailable", { status: 503 })
-          )
-        ),
-        Effect.catchTag("OgImagePostNotFoundError", () =>
-          Effect.succeed(
-            HttpServerResponse.text("Post not found", { status: 404 })
-          )
-        ),
-        Effect.catchTag("OgImageRenderError", () =>
-          Effect.succeed(
-            HttpServerResponse.text("Unable to render OG image", {
-              status: 500,
-            })
-          )
-        ),
-        Effect.catchTag("OgImageRequestValidationError", (error) =>
-          Effect.succeed(
-            HttpServerResponse.text(error.message, { status: 400 })
-          )
-        ),
-        Effect.catchTag("OgImageSiteNotFoundError", () =>
-          Effect.succeed(
-            HttpServerResponse.text("Site not found", { status: 404 })
-          )
-        ),
+        Effect.catchTags({
+          RateLimitExceededError: () =>
+            Effect.succeed(
+              HttpServerResponse.text("Too many requests", { status: 429 })
+            ),
+          RateLimitUnavailableError: () =>
+            Effect.succeed(
+              HttpServerResponse.text("Rate limiter unavailable", {
+                status: 503,
+              })
+            ),
+          OgImagePostNotFoundError: () =>
+            Effect.succeed(
+              HttpServerResponse.text("Post not found", { status: 404 })
+            ),
+          OgImageRenderError: () =>
+            Effect.succeed(
+              HttpServerResponse.text("Unable to render OG image", {
+                status: 500,
+              })
+            ),
+          OgImageRequestValidationError: (error) =>
+            Effect.succeed(
+              HttpServerResponse.text(error.message, { status: 400 })
+            ),
+          OgImageSiteNotFoundError: () =>
+            Effect.succeed(
+              HttpServerResponse.text("Site not found", { status: 404 })
+            ),
+        }),
         Effect.orDie
       ),
       RateLimit.PublicRpcRateLimiter,
