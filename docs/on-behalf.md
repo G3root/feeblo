@@ -29,7 +29,7 @@ userId  >  contactId  >  externalId  >  email (+ name/avatar enrichment)
 | No match anywhere | New contact, plus a shadow user when required. |
 | Explicit `userId` of an account with no workspace relationship | Rejected. Attribution by id requires a member row, an SSO-bound account, or an existing linked contact — otherwise a manager holding a user id learned in another workspace could attribute this workspace's content to an account that never touched it. Capture the human by email instead; their account links up automatically when they surface. |
 
-Creating a contact through resolution consumes a CRM entry and is gated by the workspace plan's `crmEntries` limit — the same contacts-plus-companies count the contact-create RPC checks. Resolving to an existing contact is never capped, so staff can always attribute to customers the workspace already knows. A denied resolution fails with the plan's `PolicyDenied` reason; the Public API publishes it as `PLAN_REQUIRES_UPGRADE`.
+Creating a contact through resolution consumes a CRM entry and is gated by the workspace plan's `crmEntries` limit — the same contacts-plus-companies count the contact-create RPC checks, evaluated under the workspace row's lock inside the write's transaction so concurrent creates cannot race the count past the cap. Resolving to an existing contact is never capped, so staff can always attribute to customers the workspace already knows. A denied resolution fails with the plan's `PolicyDenied` reason; the Public API publishes it as `PLAN_REQUIRES_UPGRADE`.
 
 Subject fields never overwrite known contact data; they backfill empty name/avatar only. Inserts tolerate unique-index races by re-reading the winner.
 

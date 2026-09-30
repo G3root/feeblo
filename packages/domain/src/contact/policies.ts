@@ -2,16 +2,12 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { CompanyRepository } from "../company/repository";
-import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { ContactRepository } from "./repository";
 import type { TContactCreate, TContactDelete, TContactUpdate } from "./schema";
 
 const makeContactPolicy = Effect.gen(function* () {
   const repository = yield* ContactRepository;
-  const companyRepository = yield* CompanyRepository;
-  const entitlementPolicy = yield* EntitlementPolicy;
 
   const belongsToOrganization = (args: TContactDelete) =>
     Policy.policy(() => repository.exists(args));
@@ -51,25 +47,19 @@ const makeContactPolicy = Effect.gen(function* () {
     });
 
   const canCreate = (args: TContactCreate) =>
+    // The plan's CRM-entry limit is deliberately not checked here: the count
+    // is only exact inside the create's transaction, where
+    // `CrmEntryGate.ensureCapacity` runs it under the workspace row's lock
+    // (a policy runs before the transaction, so two concurrent creates could
+    // both see room). Permission, membership, and company ownership stay
+    // here as the fast-fail pre-checks.
     Policy.all(
       Policy.canPermission(args.organizationId, "contacts.create"),
       userIsOrgMember({
         organizationId: args.organizationId,
         userId: args.userId,
       }),
-      companyBelongsToOrganization(args),
-      entitlementPolicy.canCreateCrmEntry({
-        organizationId: args.organizationId,
-        crmEntryCount: Effect.gen(function* () {
-          const contactCount = yield* repository.countByOrganizationId(
-            args.organizationId
-          );
-          const companyCount = yield* companyRepository.countByOrganizationId(
-            args.organizationId
-          );
-          return contactCount + companyCount;
-        }),
-      })
+      companyBelongsToOrganization(args)
     );
 
   const canUpdate = (args: TContactUpdate) =>
