@@ -6,6 +6,7 @@ import {
   PostExternalResourceLinkId,
 } from "@feeblo/id";
 import { and, eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -239,12 +240,13 @@ const makeExternalResourceService = Effect.gen(function* () {
             message: "External resource creation reservation was not found.",
           });
         }
+        const now = yield* DateTime.nowAsDate;
         const stale =
           existing.state === "pending" &&
           existing.createdAt.getTime() <
-            Date.now() - creationReservationStaleMs;
+            now.getTime() - creationReservationStaleMs;
         if (existing.state === "failed" || stale) {
-          const reclaimedAt = new Date();
+          const reclaimedAt = now;
           yield* db
             .update(schema.externalResourceCreateRequestTable)
             .set({

@@ -1,5 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -117,8 +119,9 @@ export const subscribeOnBehalfSubject = (args: {
           organizationId: args.organizationId,
           source: args.source,
           topic: { topicId: args.topicId, topicType: "post" },
-          verificationExpiresAt: new Date(
-            args.now.getTime() + VERIFICATION_WINDOW_MS
+          verificationExpiresAt: DateTime.fromDateUnsafe(args.now).pipe(
+            DateTime.addDuration(Duration.millis(VERIFICATION_WINDOW_MS)),
+            DateTime.toDate
           ),
         })
         .pipe(
@@ -150,8 +153,9 @@ export const subscribeOnBehalfSubject = (args: {
           organizationId: args.organizationId,
           source: args.source,
           topic: { topicId: args.topicId, topicType: "post" },
-          verificationExpiresAt: new Date(
-            args.now.getTime() + VERIFICATION_WINDOW_MS
+          verificationExpiresAt: DateTime.fromDateUnsafe(args.now).pipe(
+            DateTime.addDuration(Duration.millis(VERIFICATION_WINDOW_MS)),
+            DateTime.toDate
           ),
         })
         .pipe(

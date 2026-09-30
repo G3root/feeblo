@@ -2,6 +2,7 @@ import { transaction } from "@feeblo/db";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -295,7 +296,10 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                 aggregateId: args.id,
                 aggregateType: "changelog",
                 deduplicationKey: `changelog.update_requested:${args.id}:${args.requestId}`,
-                expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+                expiresAt: DateTime.fromDateUnsafe(now).pipe(
+                  DateTime.addDuration(Duration.days(7)),
+                  DateTime.toDate
+                ),
                 kind: "changelog.update_requested",
                 organizationId: args.organizationId,
                 payload: {

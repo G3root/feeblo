@@ -14,6 +14,7 @@ import {
 } from "@feeblo/id";
 import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Random from "effect/Random";
 import * as Schema from "effect/Schema";
@@ -266,8 +267,9 @@ export const makeIntegrationDeliveryWorkerRepository = (
                     skipLocked: true,
                     of: schema.integrationDeliveryTable,
                   });
-                const leaseExpiresAt = new Date(
-                  now.getTime() + leaseDurationMs
+                const leaseExpiresAt = DateTime.fromDateUnsafe(now).pipe(
+                  DateTime.addDuration(Duration.millis(leaseDurationMs)),
+                  DateTime.toDate
                 );
                 return yield* Effect.forEach(due, ({ id }) =>
                   Effect.gen(function* () {
@@ -302,9 +304,13 @@ export const makeIntegrationDeliveryWorkerRepository = (
                         attemptNumber: delivery.attemptCount,
                         deliveryId: delivery.id,
                         id: attemptId,
-                        retentionExpiresAt: new Date(
-                          now.getTime() +
-                            integrationDeliveryWorkerDefaults.retentionMs
+                        retentionExpiresAt: DateTime.fromDateUnsafe(now).pipe(
+                          DateTime.addDuration(
+                            Duration.millis(
+                              integrationDeliveryWorkerDefaults.retentionMs
+                            )
+                          ),
+                          DateTime.toDate
                         ),
                         startedAt: now,
                       });
@@ -508,7 +514,10 @@ export const makeIntegrationDeliveryWorkerRepository = (
                     lastError: errorTag === undefined ? null : { errorTag },
                     leaseExpiresAt: null,
                     leaseOwner: null,
-                    nextAttemptAt: new Date(now.getTime() + decision.delayMs),
+                    nextAttemptAt: DateTime.fromDateUnsafe(now).pipe(
+                      DateTime.addDuration(Duration.millis(decision.delayMs)),
+                      DateTime.toDate
+                    ),
                     state: "pending",
                     updatedAt: now,
                   })

@@ -29,6 +29,8 @@ import {
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
+import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -352,7 +354,7 @@ export const makeDiscordConnectionServiceLive = (
                   message: "Discord OAuth state does not match",
                 });
               }
-              const now = new Date();
+              const now = yield* DateTime.nowAsDate;
               // A Discord guild has at most one active connection per
               // organization: archive any pre-existing active connection for
               // the same guild before activating the current row, so
@@ -363,7 +365,10 @@ export const makeDiscordConnectionServiceLive = (
                   archivedAt: now,
                   credentialsCiphertext: null,
                   lifecycle: "archived",
-                  retentionExpiresAt: new Date(now.getTime() + retentionMs),
+                  retentionExpiresAt: DateTime.fromDateUnsafe(now).pipe(
+                    DateTime.addDuration(Duration.millis(retentionMs)),
+                    DateTime.toDate
+                  ),
                   updatedAt: now,
                 })
                 .where(
@@ -490,7 +495,7 @@ export const makeDiscordConnectionServiceLive = (
               if (connection.lifecycle === "archived") {
                 return undefined;
               }
-              const now = new Date();
+              const now = yield* DateTime.nowAsDate;
               yield* db
                 .update(schema.integrationConnectionTable)
                 .set({ lifecycle: "disconnecting", updatedAt: now })
@@ -546,7 +551,7 @@ export const makeDiscordConnectionServiceLive = (
               .update(schema.integrationConnectionTable)
               .set({
                 lifecycle: "revocation_unconfirmed",
-                updatedAt: new Date(),
+                updatedAt: yield* DateTime.nowAsDate,
               })
               .where(eq(schema.integrationConnectionTable.id, connectionId))
               .pipe(mapManagementError("disconnect state update"));
@@ -584,14 +589,17 @@ export const makeDiscordConnectionServiceLive = (
             }
           }
         }
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
         yield* db
           .update(schema.integrationConnectionTable)
           .set({
             archivedAt: now,
             credentialsCiphertext: null,
             lifecycle: "archived",
-            retentionExpiresAt: new Date(now.getTime() + retentionMs),
+            retentionExpiresAt: DateTime.fromDateUnsafe(now).pipe(
+              DateTime.addDuration(Duration.millis(retentionMs)),
+              DateTime.toDate
+            ),
             updatedAt: now,
           })
           .where(eq(schema.integrationConnectionTable.id, connectionId))

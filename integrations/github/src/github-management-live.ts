@@ -32,6 +32,7 @@ import { makeGitHubIssueExternalResourceDraft } from "@feeblo/integration-github
 import { githubIssueCreateCapabilityKey } from "@feeblo/integration-github/manifest";
 import { and, eq, ne } from "drizzle-orm";
 import * as Cause from "effect/Cause";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -223,7 +224,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
                   message: "GitHub integration connection was not found.",
                 });
               }
-              const now = new Date();
+              const now = yield* DateTime.nowAsDate;
               yield* db
                 .update(schema.integrationConnectionTable)
                 .set({ lifecycle: "disconnecting", updatedAt: now })
@@ -298,13 +299,16 @@ const makeGitHubManagementService = Effect.gen(function* () {
         if (Exit.isFailure(uninstall)) {
           yield* db
             .update(schema.integrationConnectionTable)
-            .set({ lifecycle: "revocation_unconfirmed", updatedAt: new Date() })
+            .set({
+              lifecycle: "revocation_unconfirmed",
+              updatedAt: yield* DateTime.nowAsDate,
+            })
             .where(eq(schema.integrationConnectionTable.id, input.connectionId))
             .pipe(Effect.mapError(databaseError("disconnect state update")));
           return yield* Effect.failCause(uninstall.cause);
         }
 
-        const archivedAt = new Date();
+        const archivedAt = yield* DateTime.nowAsDate;
         yield* db
           .update(schema.integrationConnectionTable)
           .set({

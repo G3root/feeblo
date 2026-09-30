@@ -26,6 +26,7 @@ import {
 } from "@feeblo/id";
 import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -627,7 +628,10 @@ export const WebhookManagementServiceLive = Layer.effect(
                   archivedAt: now,
                   credentialsCiphertext: null,
                   lifecycle: "archived",
-                  retentionExpiresAt: new Date(now.getTime() + retentionMs),
+                  retentionExpiresAt: DateTime.fromDateUnsafe(now).pipe(
+                    DateTime.addDuration(Duration.millis(retentionMs)),
+                    DateTime.toDate
+                  ),
                   updatedAt: now,
                 })
                 .where(
@@ -838,7 +842,10 @@ export const WebhookManagementServiceLive = Layer.effect(
                     url: "https://example.invalid/webhook-test",
                   },
                 },
-                retentionExpiresAt: new Date(now.getTime() + retentionMs),
+                retentionExpiresAt: DateTime.fromDateUnsafe(now).pipe(
+                  DateTime.addDuration(Duration.millis(retentionMs)),
+                  DateTime.toDate
+                ),
                 type: "webhook.test",
                 version: 1,
               });
@@ -849,7 +856,10 @@ export const WebhookManagementServiceLive = Layer.effect(
                 id: deliveryId,
                 nextAttemptAt: now,
                 organizationId,
-                retentionExpiresAt: new Date(now.getTime() + retentionMs),
+                retentionExpiresAt: DateTime.fromDateUnsafe(now).pipe(
+                  DateTime.addDuration(Duration.millis(retentionMs)),
+                  DateTime.toDate
+                ),
                 routeId: route.id,
                 state: "pending",
               });

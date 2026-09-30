@@ -1,5 +1,6 @@
 import * as NodeCrypto from "node:crypto";
 
+import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -239,8 +240,9 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
     "SesEmailFeedbackWebhook.fetchSnsSigningCert"
   )((certUrl: string) =>
     Effect.gen(function* () {
+      const now = yield* Clock.currentTimeMillis;
       const cached = signingCertCache.get(certUrl);
-      if (cached !== undefined && cached.expiresAt > Date.now()) {
+      if (cached !== undefined && cached.expiresAt > now) {
         return cached.pem;
       }
       signingCertCache.delete(certUrl);
@@ -300,10 +302,12 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
         )
       );
 
-      const now = Date.now();
+      // A fresh read: the cert fetch above can take a while, so the TTL
+      // window starts when the certificate is actually in hand.
+      const cacheNow = yield* Clock.currentTimeMillis;
       if (signingCertCache.size >= SIGNING_CERT_CACHE_MAX_ENTRIES) {
         for (const [url, entry] of signingCertCache) {
-          if (entry.expiresAt <= now) {
+          if (entry.expiresAt <= cacheNow) {
             signingCertCache.delete(url);
           }
         }
@@ -315,7 +319,7 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
         }
       }
       signingCertCache.set(certUrl, {
-        expiresAt: now + SIGNING_CERT_CACHE_TTL_MS,
+        expiresAt: cacheNow + SIGNING_CERT_CACHE_TTL_MS,
         pem,
       });
       return pem;

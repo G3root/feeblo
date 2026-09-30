@@ -21,6 +21,7 @@ import {
 } from "@feeblo/integration-core";
 import { and, eq } from "drizzle-orm";
 import * as Crypto from "effect/Crypto";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -376,7 +377,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                         safeDisplayMetadata: {
                           login: installationAccount.login,
                         },
-                        updatedAt: new Date(),
+                        updatedAt: yield* DateTime.nowAsDate,
                       })
                       .where(
                         eq(
@@ -542,9 +543,10 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
           Effect.gen(function* () {
             const installationId =
               yield* installationIdForConnection(connectionId);
+            const now = yield* DateTime.nowAsDate;
             const appJwt = yield* createGitHubAppJwt({
               appId: config.githubAppId ?? "",
-              now: new Date(),
+              now,
               privateKey: config.githubPrivateKey,
             }).pipe(
               Effect.mapError(() => providerFailure("App authentication"))
