@@ -7,6 +7,7 @@ It is **not** the public portal — the feedback board and widget that anyone ca
 - **Base URL:** `{API_URL}/api/v1`
 - **Content type:** `application/json`
 - **OpenAPI:** `GET {API_URL}/api/v1/openapi.json`
+- **Reference:** `{API_URL}/api/v1/docs` — a Scalar page rendered from the same document. It carries the API key security scheme, so the Authorize button stores the key and sends it as `x-api-key` in the Try-it requests.
 
 ## Authentication
 

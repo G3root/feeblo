@@ -1,37 +1,51 @@
 import {
   hasPublicApiScope,
   type PublicApiScope,
-  type PublicApiScopeStatements,
 } from "@feeblo/domain-contracts/public-api-scope";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Headers from "effect/unstable/http/Headers";
-import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
+import * as Redacted from "effect/Redacted";
 import type { HttpApiSchemaError } from "effect/unstable/httpapi/HttpApiError";
 import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
+import * as HttpApiSecurity from "effect/unstable/httpapi/HttpApiSecurity";
+import * as OpenApi from "effect/unstable/httpapi/OpenApi";
 
 import { Auth } from "../auth-handler";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { RateLimitService } from "../rate-limit/service";
-import { withRemapDbErrors } from "../rpc-errors";
+import { authenticatePublicApiKey, type PublicApiCall } from "./api-key-auth";
 import {
   forbiddenScopeError,
-  internalError,
-  invalidApiKeyError,
   invalidRequestError,
   InvalidRequestError,
-  missingApiKeyError,
-  planRequiresUpgradeError,
   PUBLIC_API_MIDDLEWARE_ERROR_SCHEMAS,
-  rateLimitedError,
-  serviceUnavailableError,
 } from "./errors";
 
 /** The header a caller presents its key in. */
 export const PUBLIC_API_KEY_HEADER = "x-api-key";
+
+/**
+ * The credential location of the Public API, as the document declares it.
+ *
+ * Declared on the key middleware rather than hand-annotated into the document:
+ * `OpenApi.fromApi` reads the `security` record of every group's middleware to
+ * emit `components.securitySchemes` and a requirement on each operation, which
+ * is what the published reference reads to show the Authorize button and the
+ * lock on every operation. Declaring it here keeps the header name one value —
+ * the middleware reads the credential the framework decodes with the same
+ * declaration — so a renamed header cannot drift between the two.
+ */
+export const PublicApiKeySecurity = HttpApiSecurity.apiKey({
+  key: PUBLIC_API_KEY_HEADER,
+  in: "header",
+}).pipe(
+  HttpApiSecurity.annotate(
+    OpenApi.Description,
+    "A workspace API key, presented in the x-api-key header."
+  )
+);
 
 /**
  * Per-key request budget. Documented in `docs/public-api.md`, so changing it is
@@ -41,20 +55,6 @@ export const PUBLIC_API_KEY_RATE_LIMIT = {
   limit: 300,
   window: "1 minute",
 } as const satisfies { limit: number; window: Duration.Input };
-
-/**
- * The identity behind a request: the workspace the key belongs to, the key
- * itself, and the scopes it carries.
- *
- * Deliberately not a `CurrentSession`: a machine credential must not become a
- * member session, so nothing downstream of this middleware can reach session
- * semantics, memberships, or the dashboard policies that depend on them.
- */
-export type PublicApiCall = {
-  readonly keyId: string;
-  readonly organizationId: string;
-  readonly scopes: PublicApiScopeStatements | null;
-};
 
 export class PublicApiCaller extends Context.Service<
   PublicApiCaller,
@@ -66,6 +66,10 @@ export class ApiKeyAuthMiddleware extends HttpApiMiddleware.Service<
   { provides: PublicApiCaller }
 >()("@feeblo/domain/PublicApi/ApiKeyAuthMiddleware", {
   error: PUBLIC_API_MIDDLEWARE_ERROR_SCHEMAS,
+  // The schema above documents which failures the middleware answers with;
+  // this declaration is what names the credential in the document so a
+  // generated client can send it and the reference can offer to Authorize.
+  security: { apiKey: PublicApiKeySecurity },
 }) {}
 
 /**
@@ -94,18 +98,22 @@ export const currentPublicApiCaller = Effect.context<never>().pipe(
   Effect.map((context) => Context.getUnsafe(context, PublicApiCaller))
 );
 
-const retryAfterSeconds = (
-  retryAfter: Duration.Duration | undefined
-): number =>
-  retryAfter === undefined
-    ? 1
-    : Math.max(1, Math.ceil(Duration.toSeconds(retryAfter)));
-
 /**
  * Builds the key middleware for one composition.
  *
  * The limit is a parameter so a test can exhaust it without issuing three
  * hundred requests; production passes `PUBLIC_API_KEY_RATE_LIMIT`.
+ *
+ * The implementation is the middleware's own security form: because the class
+ * declares `PublicApiKeySecurity`, `of` takes one handler per declared scheme
+ * and the framework decodes the credential from the request before calling it —
+ * so a missing header arrives as an empty string and still fails here, with
+ * `MISSING_API_KEY`, rather than being skipped.
+ *
+ * The check itself is `authenticatePublicApiKey`, shared with the `/mcp`
+ * route's key gate: this layer only resolves the services once and hands them
+ * to it, because an `HttpApiMiddleware` implementation may not take request-
+ * time requirements of its own.
  */
 export const makeApiKeyAuthMiddlewareLive = (
   options: {
@@ -120,91 +128,29 @@ export const makeApiKeyAuthMiddlewareLive = (
       const entitlementPolicy = yield* EntitlementPolicy;
       const rateLimitService = yield* RateLimitService;
 
-      return ApiKeyAuthMiddleware.of((effect) =>
-        Effect.gen(function* () {
-          const request = yield* HttpServerRequest.HttpServerRequest;
+      return ApiKeyAuthMiddleware.of({
+        apiKey: (effect, { credential }) =>
+          Effect.gen(function* () {
+            // The framework reads the raw header, so trim here: a padded value
+            // still verifies and whitespace alone is still "no key".
+            const presented = Redacted.value(credential).trim();
 
-          const presented = Option.getOrUndefined(
-            Headers.get(request.headers, PUBLIC_API_KEY_HEADER)
-          )?.trim();
-
-          if (presented === undefined || presented.length === 0) {
-            return yield* missingApiKeyError();
-          }
-
-          // Server-side verification: the plugin's verifier is a server-only
-          // endpoint, so a bearer key cannot be validated by reaching it over
-          // HTTP, and it checks `enabled`, expiry, and the stored hash.
-          // Verification failures can carry library or database detail, so the
-          // cause is logged server-side and the public body stays fixed.
-          const verified = yield* Effect.promise(() =>
-            auth.api.verifyApiKey({ body: { key: presented } })
-          ).pipe(
-            Effect.catchCause((cause) =>
-              Effect.logError("API key verification failed", cause).pipe(
-                Effect.andThen(Effect.fail(internalError()))
-              )
-            )
-          );
-
-          const record = verified.valid ? verified.key : null;
-          if (record === null) {
-            return yield* invalidApiKeyError();
-          }
-
-          const organizationId = record.referenceId;
-
-          // Per key rather than per IP: a customer behind a shared NAT is not
-          // throttled by neighbours, and a leaked key cannot escape its budget by
-          // rotating source addresses.
-          //
-          // Runs before the plan gate: the gate reads the database, so a
-          // verified key must spend budget before it can trigger that lookup,
-          // including a downgraded key that the gate will then reject.
-          yield* rateLimitService
-            .consume({
-              key: `public-api:key:${record.id}`,
-              limit: options.limit,
-              window: options.window,
-            })
-            .pipe(
-              Effect.catchTag("RateLimiterError", (error) =>
-                Effect.fail(
-                  error.reason._tag === "RateLimitExceeded"
-                    ? rateLimitedError(
-                        retryAfterSeconds(error.reason.retryAfter)
-                      )
-                    : // Fail closed: admitting unlimited traffic because the
-                      // limiter is down would make an outage an abuse window.
-                      serviceUnavailableError()
-                )
-              )
+            const call = yield* authenticatePublicApiKey(
+              presented,
+              options
+            ).pipe(
+              Effect.provideService(Auth, auth),
+              Effect.provideService(EntitlementPolicy, entitlementPolicy),
+              Effect.provideService(RateLimitService, rateLimitService)
             );
 
-          // Plan gate on every request, not only at key creation: a workspace
-          // that downgraded must stop being served, and the distinct code tells
-          // the caller's logs the difference between "bad key" and "billing".
-          yield* entitlementPolicy.canUsePublicApi(organizationId).pipe(
-            Effect.catchTag("PolicyDenied", () =>
-              Effect.fail(planRequiresUpgradeError())
-            ),
-            // The plan lookup reads the database; a driver failure here is a
-            // server problem, not a plan problem.
-            withRemapDbErrors("PublicApiPlan", "select"),
-            Effect.catchTag("InternalServerError", () =>
-              Effect.fail(internalError("The request could not be completed."))
-            )
-          );
-
-          return yield* effect.pipe(
-            Effect.provideService(PublicApiCaller, {
-              keyId: record.id,
-              organizationId,
-              scopes: record.permissions ?? null,
-            })
-          );
-        })
-      );
+            // The effect is the endpoint this middleware wraps; give it the
+            // caller now that the key is verified and paid for.
+            return yield* effect.pipe(
+              Effect.provideService(PublicApiCaller, call)
+            );
+          }),
+      });
     })
   );
 
