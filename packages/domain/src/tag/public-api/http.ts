@@ -19,7 +19,6 @@ import {
   deleteTagOperation,
   getTagOperation,
   listTagsOperation,
-  setPostTagsOperation,
   updateTagOperation,
 } from "./operations";
 import {
@@ -27,11 +26,8 @@ import {
   DeleteTagParams,
   GetTagParams,
   ListTagsQuery,
-  PublicApiPostTags,
   PublicApiTagDetail,
   PublicApiTagPage,
-  SetPostTagsParams,
-  SetPostTagsPayload,
   UpdateTagParams,
   UpdateTagPayload,
 } from "./schema";
@@ -47,18 +43,6 @@ import {
  */
 
 export const tagEndpoints = [
-  HttpApiEndpoint.put("setPostTags", "/posts/:postId/tags", {
-    params: SetPostTagsParams,
-    payload: SetPostTagsPayload,
-    success: PublicApiPostTags,
-    error: PUBLIC_API_ERROR_SCHEMAS,
-  })
-    .annotate(OpenApi.Title, "Set Post Tags")
-    .annotate(OpenApi.Summary, "Set which tags a post carries")
-    .annotate(
-      OpenApi.Description,
-      "Replaces the post's tags with the ids given and returns the tags it carries afterwards. An empty list clears them. Ids that do not exist in the workspace are rejected as an invalid request rather than ignored, and the post's timeline records the tags that were added and removed."
-    ),
   HttpApiEndpoint.get("listTags", "/tags", {
     query: ListTagsQuery,
     success: PublicApiTagPage,
@@ -118,12 +102,6 @@ export const tagEndpoints = [
 ] as const;
 
 export const tagHandlers = {
-  setPostTags: (({ params, payload }) =>
-    setPostTagsOperation.handler({
-      postId: params.postId,
-      tagIds: payload.tagIds,
-    })) satisfies HandlerOf<PublicApiGroup, "setPostTags">,
-
   listTags: (({ query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
