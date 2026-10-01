@@ -391,6 +391,9 @@
     "./public-api/mappers": {
       "default": "./src/public-api/mappers.ts"
     },
+    "./public-api/mcp": {
+      "default": "./src/public-api/mcp.ts"
+    },
     "./public-api/middleware": {
       "default": "./src/public-api/middleware.ts"
     },

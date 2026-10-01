@@ -29,7 +29,7 @@ The HTTP contract is unchanged: the published document, response bodies, error c
 
 Adding an endpoint is now: an operation in `<feature>/public-api/operations.ts`, a handler and endpoint in `<feature>/public-api/http.ts`, and whatever new schema it needs in `<feature>/public-api/schema.ts`. Nothing shared is edited unless the feature is new. The registry parity test fails if the operation and the endpoint sets diverge.
 
-A non-HTTP surface is a projection over `PublicApiOperations`, not a second implementation. The operation's typed input is what an MCP tool advertises, its annotations are the tool hints, and its handler already enforces the scope. The MCP server itself — transport, key binding, and how a workspace's scopes are presented to a client — is not part of this decision and remains future work.
+A non-HTTP surface is a projection over `PublicApiOperations`, not a second implementation. The operation's typed input is what an MCP tool advertises, its annotations are the tool hints, and its handler already enforces the scope. That projection now ships: `public-api/mcp.ts` serves `/mcp` with a `Toolkit` built from this registry, and `docs/adr/0008` records the transport, the key binding, and how a workspace's scopes are presented to a client.
 
 The public repositories that remain are `provideMerge`d rather than only provided, because their tests drive them directly to reach races the HTTP surface cannot produce (ADR 0006). A new feature is one line in `operations.ts`, one in `api-contract.ts`, one in `api-live.ts`, and one in `router.ts`; an endpoint added to an existing feature edits none of them.
 

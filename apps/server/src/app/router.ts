@@ -1,5 +1,6 @@
 import { makeClientIpGlobalMiddleware } from "@feeblo/domain/client-ip";
 import { HttpRoute } from "@feeblo/domain/http/router";
+import { PublicApiMcpRoute } from "@feeblo/domain/public-api/mcp";
 import { PublicApiRoute } from "@feeblo/domain/public-api/router";
 import { makeRpcRoute } from "@feeblo/domain/rpc-router";
 import { makeDiscordRouters } from "@feeblo/integration-discord/routers";
@@ -85,6 +86,10 @@ export const makeMergedRoutes = ({
     // no reference page of its own; its document is at `/docs/openapi.json`.
     PublicApiRoute,
     PublicApiDocsRoute,
+    // The MCP surface is a projection of the same operations the route above
+    // serves, gated by the same key: mounting one without the other would let
+    // a key that pays for the Public API reach only half of it.
+    PublicApiMcpRoute,
     BetterAuthRouterLive,
     makeSlackRouters({
       appUrl,

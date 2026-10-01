@@ -13,11 +13,11 @@ import { tagOperations } from "../tag/public-api/operations";
  * there, and a test (`operations.test.ts`) asserts the registry and the
  * published endpoints name the same operations.
  *
- * A future MCP server derives its tools from this list — name, description,
- * typed input and output schemas, scope, and annotations are all on the
- * operation — and binds them to the same handlers the HTTP endpoints call, so
- * the two surfaces cannot drift into different answers for the same call. See
- * `docs/adr/0007`.
+ * The MCP surface (`mcp.ts`) derives its toolkit from this list — name,
+ * description, typed input and output schemas, scope, and annotations are all
+ * on the operation — and binds it to the same handlers the HTTP endpoints call,
+ * so the two surfaces cannot drift into different answers for the same call.
+ * See `docs/adr/0007` and `docs/adr/0008`.
  */
 export const PublicApiOperations = [
   ...changelogOperations,
