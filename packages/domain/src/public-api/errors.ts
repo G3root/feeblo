@@ -39,14 +39,15 @@ export const PUBLIC_API_ERROR_CODES = [
 
 export type PublicApiErrorCode = (typeof PUBLIC_API_ERROR_CODES)[number];
 
-/** 401 — the request carried no `x-api-key` header. */
+/** 401 — the request carried no `x-api-key` header, or an empty one. */
 export class MissingApiKeyError extends Schema.TaggedError<MissingApiKeyError>()(
   "MISSING_API_KEY",
   { message: Schema.String },
   {
     httpApiStatus: 401,
     identifier: "MISSING_API_KEY",
-    description: "The request carried no x-api-key header.",
+    description:
+      "The request carried no x-api-key header, or the header value was empty.",
   }
 ) {}
 

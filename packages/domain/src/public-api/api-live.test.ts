@@ -4461,6 +4461,54 @@ layer(
     })
   );
 
+  it.effect("writes through the same services the endpoints use", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedTag(workspace.organizationId, "tag_mcp_write", "Roadmap");
+      registerKey(
+        "fbk_mcp_write",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const sessionId = yield* openMcpSession("fbk_mcp_write");
+
+      // A write that records a post's timeline entry needs the activity
+      // repository, which none of the reads touch: this is the composition
+      // check the read calls cannot make.
+      const assigned = yield* callTool(
+        sessionId,
+        "fbk_mcp_write",
+        "setPostTags",
+        {
+          postId: workspace.postId,
+          tagIds: ["tag_mcp_write"],
+        }
+      );
+      expect(assigned.isError).toBe(false);
+      const tags = yield* Schema.decodeUnknownEffect(PublicApiPostTags)(
+        assigned.structuredContent
+      );
+      expect(tags.data).toEqual([{ id: "tag_mcp_write", name: "Roadmap" }]);
+
+      // A delete declares `Schema.Void`; the toolkit answers with no content
+      // rather than a failure or an unencodable result.
+      const deleted = yield* callTool(sessionId, "fbk_mcp_write", "deleteTag", {
+        tagId: "tag_mcp_write",
+      });
+      expect(deleted.isError).toBe(false);
+      expect(deleted.content).toEqual([]);
+
+      // The write landed: the same side effect the endpoint produces.
+      const db = yield* currentDb;
+      const remaining = yield* db
+        .select()
+        .from(schema.tagTable)
+        .where(eq(schema.tagTable.id, "tag_mcp_write"));
+      expect(remaining).toHaveLength(0);
+    })
+  );
+
   it.effect("refuses a tool the key has no scope for", () =>
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace();
@@ -4533,6 +4581,43 @@ layer(
       });
       expect(response.status).toBe(401);
       expect(decodeError(responseBody(response))._tag).toBe("INVALID_API_KEY");
+    })
+  );
+});
+
+/**
+ * The `/mcp` key gate's rate-limit refusal.
+ *
+ * The HTTP suite has its own budget suite; this one pins that the MCP adapter
+ * answers the header-wrapped `RATE_LIMITED` failure with the status and the
+ * `Retry-After` header the contract promises, rather than a bare 500 or a body
+ * without the header.
+ */
+layer(
+  makePublicApiMcpRoute({ limit: 1, window: Duration.minutes(1) }).pipe(
+    Layer.provideMerge(PublicApiDependencies),
+    Layer.provideMerge(HttpRouter.layer)
+  )
+)("public api mcp rate limiting", (it) => {
+  it.effect("returns 429 with Retry-After once the key's budget is spent", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_mcp_limited", workspace.organizationId);
+
+      // The handshake is the key's one request; the call after it is the one
+      // the budget refuses.
+      const sessionId = yield* openMcpSession("fbk_mcp_limited");
+
+      const refused = yield* executeMcp({
+        apiKey: "fbk_mcp_limited",
+        body: { id: 2, jsonrpc: "2.0", method: "tools/list", params: {} },
+        protocolVersion: MCP_PROTOCOL_VERSION,
+        sessionId,
+      });
+
+      expect(refused.status).toBe(429);
+      expect(decodeError(responseBody(refused))._tag).toBe("RATE_LIMITED");
+      expect(Number(refused.headers["retry-after"])).toBeGreaterThan(0);
     })
   );
 });

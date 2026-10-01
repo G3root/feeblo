@@ -23,7 +23,7 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 
 | Failure | Status | Code |
 | --- | --- | --- |
-| No `x-api-key` header | 401 | `MISSING_API_KEY` |
+| No `x-api-key` header, or an empty one | 401 | `MISSING_API_KEY` |
 | Unknown, revoked, expired, or disabled key | 401 | `INVALID_API_KEY` |
 | Key lacks the scope the endpoint requires | 403 | `FORBIDDEN_SCOPE` |
 | Workspace plan does not include the Public API | 403 | `PLAN_REQUIRES_UPGRADE` |
@@ -633,7 +633,7 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 | Status | `_tag` | Meaning |
 | --- | --- | --- |
 | 400 | `INVALID_REQUEST` | Malformed parameter, cursor, or limit; a body the endpoint cannot decode; a comment body that is empty or sanitizes to nothing; a name or title that is only whitespace; an update that names no field; a board or status id that is not in the workspace; a post that has been merged into another; a reply whose parent is not a comment on the same post; a reply widened to public beneath an internal parent; an author subject that resolves to no account. |
-| 401 | `MISSING_API_KEY` | No `x-api-key` header was sent. |
+| 401 | `MISSING_API_KEY` | No `x-api-key` header was sent, or its value was empty. |
 | 401 | `INVALID_API_KEY` | The key is unknown, revoked, expired, or disabled. |
 | 403 | `FORBIDDEN_SCOPE` | The key lacks the scope the endpoint requires. |
 | 403 | `PLAN_REQUIRES_UPGRADE` | The workspace plan does not include the Public API, or has no room left in a limit it sets — such as CRM entries. |
