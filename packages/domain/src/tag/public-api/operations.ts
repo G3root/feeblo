@@ -2,10 +2,8 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { currentPostActivityRepository } from "../../post-activity/repository";
 import { PUBLIC_API_PAGE_DEFAULT_LIMIT } from "../../public-api/common";
 import { decodeCursorOrFail, encodeCursor } from "../../public-api/cursor";
-import { currentPublicApiDatabase } from "../../public-api/database";
 import {
   ConflictError,
   InternalError,
@@ -13,7 +11,6 @@ import {
   NotFoundError,
   conflictError,
   internalError,
-  invalidRequestError,
   notFoundError,
 } from "../../public-api/errors";
 import { onInternalError } from "../../public-api/failure";
@@ -22,17 +19,14 @@ import { defineOperation } from "../../public-api/operation";
 import { parseName } from "../../public-api/parse";
 import { withRemapDbErrors } from "../../rpc-errors";
 import { currentTagRepository } from "../../tag/repository";
-import { postTagChangeActivities } from "../post-tag-activities";
-import { toPublicApiTag, toPublicApiTagDetail, toTagSource } from "./mappers";
+import { toPublicApiTagDetail, toTagSource } from "./mappers";
 import {
   CreateTagInput,
   DeleteTagInput,
   GetTagInput,
   ListTagsInput,
-  PublicApiPostTags,
   PublicApiTagDetail,
   PublicApiTagPage,
-  SetPostTagsInput,
   UpdateTagInput,
 } from "./schema";
 
@@ -61,7 +55,7 @@ const TAG_RENAME_FAILURES = Schema.Union([
   InternalError,
 ]);
 
-/** A delete or a tag assignment can report a missing row, but never collides. */
+/** A delete can report a missing row, but never collides. */
 const TAG_DELETE_FAILURES = Schema.Union([
   InvalidRequestError,
   NotFoundError,
@@ -106,9 +100,8 @@ const failIfTagNameIsTaken = (args: {
  * drift into different answers for the same call.
  *
  * The row writes are `TagRepository`'s own; what is public-specific is the
- * cursor paging, the pre-checks that name the colliding field, the published
- * error vocabulary, and the tag assignment's actor — a machine key is not a
- * member, so the timeline records no actor.
+ * cursor paging, the pre-checks that name the colliding field, and the
+ * published error vocabulary.
  */
 
 export const listTagsOperation = defineOperation(
@@ -328,93 +321,10 @@ export const deleteTagOperation = defineOperation(
     })
 );
 
-export const setPostTagsOperation = defineOperation(
-  "setPostTags",
-  {
-    description: "Replace the complete set of tags a post carries.",
-    failure: TAG_DELETE_FAILURES,
-    input: SetPostTagsInput,
-    output: PublicApiPostTags,
-    scope: "tags.assign",
-  },
-  ({ postId, tagIds }) =>
-    Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const db = yield* currentPublicApiDatabase;
-      const tags = yield* currentTagRepository;
-      const activities = yield* currentPostActivityRepository;
-
-      const wanted = [...new Set(tagIds)];
-
-      return yield* db
-        .transaction(() =>
-          Effect.gen(function* () {
-            if (wanted.length > 0) {
-              // `key share` is the lock the foreign-key check itself takes: a
-              // tag deleted concurrently either loses the race and is missing
-              // from this read, or waits here until these rows exist and then
-              // cascades them away with it.
-              const known = yield* tags.countExistingTags({
-                lock: "key share",
-                organizationId: caller.organizationId,
-                tagIds: wanted,
-              });
-
-              if (known !== wanted.length) {
-                return yield* invalidRequestError(
-                  "One or more tagIds do not exist in this workspace."
-                );
-              }
-            }
-
-            // The replacement locks the post row and returns what it carried
-            // before, so the write and the timeline entry are decided from the
-            // same snapshot. A post outside this workspace is reported on the
-            // dashboard's policy vocabulary; the published answer is the
-            // missing resource.
-            const replaced = yield* tags
-              .setPostTags({
-                organizationId: caller.organizationId,
-                postId,
-                tagIds: wanted,
-              })
-              .pipe(
-                Effect.catchTag("PolicyDenied", () =>
-                  Effect.fail(notFoundError("Post not found."))
-                )
-              );
-
-            yield* activities.createMany(
-              postTagChangeActivities({
-                previousTagIds: replaced.previousTagIds,
-                nextTagIds: wanted,
-                actor: {
-                  actorId: null,
-                  actorMemberId: null,
-                  organizationId: caller.organizationId,
-                  postId,
-                },
-              })
-            );
-
-            return { data: replaced.tags.map(toPublicApiTag) };
-          })
-        )
-        // One remap for the whole transaction: the repository's id generation,
-        // the tag read, and the timeline write all surface driver failures the
-        // same way, and a failure anywhere rolls the transaction back.
-        .pipe(
-          withRemapDbErrors("PublicApiTag", "update"),
-          Effect.catchTag("InternalServerError", () => onInternalError)
-        );
-    })
-);
-
 export const tagOperations = [
   listTagsOperation,
   createTagOperation,
   getTagOperation,
   updateTagOperation,
   deleteTagOperation,
-  setPostTagsOperation,
 ] as const;

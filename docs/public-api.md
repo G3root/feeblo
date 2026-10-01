@@ -43,7 +43,7 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 | `tags.create` | Create a tag. |
 | `tags.update` | Rename a tag. |
 | `tags.delete` | Delete a tag, which removes it from every post that carried it. |
-| `tags.assign` | Set which tags a post carries. |
+| `tags.assign` | Set which tags a post carries. The endpoint is documented under [Set a post's tags](#set-a-posts-tags), with the post resource, because it writes a post. |
 | `changelog.read` | Read changelog entries, drafts and scheduled entries included, through the `/changelog` endpoints. Every key receives it. |
 | `changelog.create` | Create a changelog entry. Omitting `status` creates a draft, and sending `published` additionally requires `changelog.publish`. |
 | `changelog.update` | Replace a changelog entry's title, slug, body, cover image, status, and timestamps. |
@@ -203,6 +203,34 @@ An omitted field is left as it is and an explicit `null` clears a nullable one, 
 
 Every change is recorded in the post's timeline, with no actor, and a status change notifies the post's subscribers exactly as the same change from the dashboard would — including the coalescing window, so several quick status changes send one email rather than one each. An image the post already referenced keeps its reference while the body still shows it, and loses it when the body stops; a URL the update introduces is not recorded as a reference, for the same reason a create's is not ([Data exposure](#data-exposure)). A post that has been merged into another is answered with `400 INVALID_REQUEST`: it is still readable, but it is superseded and its changes belong on the survivor.
 
+### Set a post's tags
+
+```http
+PUT /api/v1/posts/{postId}/tags
+Content-Type: application/json
+
+{ "tagIds": ["tag_ui", "tag_performance"] }
+```
+
+Responds `200` with the tags the post carries afterwards:
+
+```json
+{
+  "data": [
+    { "id": "tag_performance", "name": "Performance" },
+    { "id": "tag_ui", "name": "UI" }
+  ]
+}
+```
+
+Requires `tags.assign`.
+
+The list **replaces** the post's tags rather than adding to them, so a caller that knows the final set cannot leave a tag behind by forgetting to remove it. An empty list clears the post. Tags are ordered by name, so repeated reads of the same post return the same order, and the same array appears in the post's own `tags` field.
+
+Every id must exist in the workspace: an unknown id — including one belonging to another workspace — is answered with `400 INVALID_REQUEST` and nothing is written, rather than silently tagging the post with whatever happened to exist. Sending the same id twice is one tag, not an error.
+
+The change is recorded in the post's timeline as the tags that were added and removed. A key is not a member, so those entries have no actor and the dashboard shows them as "Someone".
+
 ### Delete a post
 
 ```http
@@ -286,34 +314,6 @@ DELETE /api/v1/tags/{tagId}
 Responds `204` with no body. Requires `tags.delete`.
 
 The tag is removed from every post that carried it. The posts themselves are not modified, and the deletion cannot be undone.
-
-### Set a post's tags
-
-```http
-PUT /api/v1/posts/{postId}/tags
-Content-Type: application/json
-
-{ "tagIds": ["tag_ui", "tag_performance"] }
-```
-
-Responds `200` with the tags the post carries afterwards:
-
-```json
-{
-  "data": [
-    { "id": "tag_performance", "name": "Performance" },
-    { "id": "tag_ui", "name": "UI" }
-  ]
-}
-```
-
-Requires `tags.assign`.
-
-The list **replaces** the post's tags rather than adding to them, so a caller that knows the final set cannot leave a tag behind by forgetting to remove it. An empty list clears the post. Tags are ordered by name, so repeated reads of the same post return the same order, and the same array appears in the post's own `tags` field.
-
-Every id must exist in the workspace: an unknown id — including one belonging to another workspace — is answered with `400 INVALID_REQUEST` and nothing is written, rather than silently tagging the post with whatever happened to exist. Sending the same id twice is one tag, not an error.
-
-The change is recorded in the post's timeline as the tags that were added and removed. A key is not a member, so those entries have no actor and the dashboard shows them as "Someone".
 
 ### List a post's comments
 

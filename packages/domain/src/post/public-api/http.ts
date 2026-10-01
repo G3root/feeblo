@@ -21,6 +21,7 @@ import {
   listBoardPostsOperation,
   listPostsOperation,
   retrievePostOperation,
+  setPostTagsOperation,
   updatePostOperation,
 } from "./operations";
 import {
@@ -32,7 +33,10 @@ import {
   ListPostsQuery,
   PublicApiPost,
   PublicApiPostPage,
+  PublicApiPostTags,
   RetrievePostQuery,
+  SetPostTagsParams,
+  SetPostTagsPayload,
   UpdatePostParams,
   UpdatePostPayload,
 } from "./schema";
@@ -110,6 +114,18 @@ export const postEndpoints = [
       OpenApi.Description,
       "Updates the fields the request names and returns the post afterwards. An omitted field is left as it is and an explicit null clears a nullable one, so `etaQuarter: null` removes the estimate. A body that names no field is rejected as an invalid request. Moving the post to another board or status records the change in its timeline and, for a status change, notifies its subscribers exactly as the dashboard does. A post merged into another post is refused."
     ),
+  HttpApiEndpoint.put("setPostTags", "/posts/:postId/tags", {
+    params: SetPostTagsParams,
+    payload: SetPostTagsPayload,
+    success: PublicApiPostTags,
+    error: PUBLIC_API_ERROR_SCHEMAS,
+  })
+    .annotate(OpenApi.Title, "Set Post Tags")
+    .annotate(OpenApi.Summary, "Set which tags a post carries")
+    .annotate(
+      OpenApi.Description,
+      "Replaces the post's tags with the ids given and returns the tags it carries afterwards. An empty list clears them. Ids that do not exist in the workspace are rejected as an invalid request rather than ignored, and the post's timeline records the tags that were added and removed."
+    ),
   HttpApiEndpoint.delete("deletePost", "/posts/:postId", {
     params: DeletePostParams,
     success: HttpApiSchema.NoContent,
@@ -183,6 +199,12 @@ export const postHandlers = {
       statusId: payload.statusId,
       title: payload.title,
     })) satisfies HandlerOf<PublicApiGroup, "updatePost">,
+
+  setPostTags: (({ params, payload }) =>
+    setPostTagsOperation.handler({
+      postId: params.postId,
+      tagIds: payload.tagIds,
+    })) satisfies HandlerOf<PublicApiGroup, "setPostTags">,
 
   deletePost: (({ params }) =>
     deletePostOperation.handler({

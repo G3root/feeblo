@@ -406,6 +406,11 @@ describe("PublicApi contract", () => {
     // Assigning tags cannot collide — the write is a replacement and the pair
     // is unique — so a 409 here would promise a status it never returns.
     expect(Object.keys(responses).sort()).toEqual(READ_RESPONSE_CODES);
+
+    // The endpoint is documented under the resource it writes — a post — not
+    // under Tags: the group is the section a customer reads, and setting a
+    // post's tags writes the post.
+    expect(operation?.tags).toEqual(["Posts"]);
     expect(JSON.stringify(operation?.requestBody)).toContain("tagIds");
 
     // The response is the post's tag references, not the tag resource: no slug

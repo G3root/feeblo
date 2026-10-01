@@ -70,6 +70,18 @@ export const PublicApiPostPage = Schema.Struct({
 export type TPublicApiPostPage = Schema.Schema.Type<typeof PublicApiPostPage>;
 
 /**
+ * The tags a post carries after a write.
+ *
+ * The embedded tag shape, not the tag resource: these are references to tags,
+ * and a caller that wants a slug or a timestamp reads the tag itself.
+ */
+export const PublicApiPostTags = Schema.Struct({
+  data: Schema.Array(PublicApiTag),
+});
+
+export type TPublicApiPostTags = Schema.Schema.Type<typeof PublicApiPostTags>;
+
+/**
  * Query parameters are declared as strings and validated in the handler.
  *
  * A typed parameter would make the framework reject a malformed request with
@@ -126,6 +138,10 @@ export const UpdatePostParams = Schema.Struct({
 });
 
 export const DeletePostParams = Schema.Struct({
+  postId: Schema.String,
+});
+
+export const SetPostTagsParams = Schema.Struct({
   postId: Schema.String,
 });
 
@@ -196,6 +212,19 @@ export const UpdatePostPayload = Schema.Struct({
 });
 
 export type TUpdatePostPayload = Schema.Schema.Type<typeof UpdatePostPayload>;
+
+/**
+ * The complete set of tags a post should carry.
+ *
+ * A replacement rather than add and remove calls: the dashboard's own tag
+ * picker works this way, and a caller that states the final set cannot leave a
+ * tag behind by forgetting to remove it. An empty array clears the post.
+ */
+export const SetPostTagsPayload = Schema.Struct({
+  tagIds: Schema.Array(Schema.String),
+});
+
+export type TSetPostTagsPayload = Schema.Schema.Type<typeof SetPostTagsPayload>;
 
 /** Typed input for a page of a board's posts. */
 export const ListBoardPostsInput = Schema.Struct({
@@ -274,4 +303,12 @@ export const UpdatePostInput = Schema.Struct({
 /** Typed input for deleting a post. */
 export const DeletePostInput = Schema.Struct({
   postId: Schema.String,
+});
+
+/** Typed input for replacing the tags a post carries. */
+export const SetPostTagsInput = Schema.Struct({
+  postId: Schema.String,
+  tagIds: Schema.Array(Schema.String).annotate({
+    description: "The complete set of tag ids the post should carry",
+  }),
 });
