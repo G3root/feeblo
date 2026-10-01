@@ -7,6 +7,8 @@ It is **not** the public portal — the feedback board and widget that anyone ca
 - **Base URL:** `{API_URL}/api/v1`
 - **Content type:** `application/json`
 - **OpenAPI:** `GET {API_URL}/api/v1/openapi.json`
+- **Reference:** `{API_URL}/api/v1/docs` — a Scalar page rendered from the same document. It carries the API key security scheme, so the Authorize button stores the key and sends it as `x-api-key` in the Try-it requests.
+- **MCP:** `POST {API_URL}/mcp` — the same operations as [Model Context Protocol (MCP)](#model-context-protocol-mcp) tools, for a client that speaks the protocol instead of HTTP.
 
 ## Authentication
 
@@ -21,7 +23,7 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 
 | Failure | Status | Code |
 | --- | --- | --- |
-| No `x-api-key` header | 401 | `MISSING_API_KEY` |
+| No `x-api-key` header, or an empty one | 401 | `MISSING_API_KEY` |
 | Unknown, revoked, expired, or disabled key | 401 | `INVALID_API_KEY` |
 | Key lacks the scope the endpoint requires | 403 | `FORBIDDEN_SCOPE` |
 | Workspace plan does not include the Public API | 403 | `PLAN_REQUIRES_UPGRADE` |
@@ -62,6 +64,20 @@ A key is created with a fixed set of scopes and never gains one afterwards. Ever
 `changelog.publish` is separate from `changelog.update` because publishing is not reversible in the way an edit is: it emails every subscriber. A key that syncs drafts from a CMS can hold `changelog.create` and `changelog.update` and still be unable to broadcast.
 
 `end_users.read` is reserved for a future release.
+
+## Model Context Protocol (MCP)
+
+The same API is served as an MCP server, so an MCP client can read and manage the workspace through tools instead of HTTP calls.
+
+- **Endpoint:** `POST {API_URL}/mcp`, the MCP Streamable HTTP transport.
+- **Protocol revisions:** `2026-07-28`, `2025-11-25`, `2025-06-18`, `2025-03-26`, and `2024-11-05`.
+- **Authentication:** the same API key, in the `x-api-key` header of every request. There is no separate MCP credential and no OAuth flow.
+
+Every endpoint above is one tool, named after the operation it serves — `listTags`, `createPost`, and so on. A tool's input is the endpoint's input as JSON Schema; its result carries the same published DTO as the HTTP response, as structured content and as text. The hints a client shows in an approval prompt — read-only, destructive, idempotent, open world — are the same annotations the endpoint declares.
+
+Scopes, the plan gate, and the per-key rate limit apply exactly as they do to HTTP requests: the key is resolved once per request, and a refusal answers the envelope and status listed under [Errors](#errors). `tools/list` returns every tool regardless of the key's scopes; calling one the key does not hold answers a tool error whose text names the missing scope — `This API key is missing the … scope.` — so a client learns which scope is missing instead of silently lacking a capability.
+
+Requests carrying an `Origin` header are rejected: the transport does not enable cross-origin access, so a browser-based client must reach it through a same-origin proxy. Clients that send no `Origin` — the desktop and server integrations — are unaffected.
 
 ## Endpoints
 
@@ -617,7 +633,7 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 | Status | `_tag` | Meaning |
 | --- | --- | --- |
 | 400 | `INVALID_REQUEST` | Malformed parameter, cursor, or limit; a body the endpoint cannot decode; a comment body that is empty or sanitizes to nothing; a name or title that is only whitespace; an update that names no field; a board or status id that is not in the workspace; a post that has been merged into another; a reply whose parent is not a comment on the same post; a reply widened to public beneath an internal parent; an author subject that resolves to no account. |
-| 401 | `MISSING_API_KEY` | No `x-api-key` header was sent. |
+| 401 | `MISSING_API_KEY` | No `x-api-key` header was sent, or its value was empty. |
 | 401 | `INVALID_API_KEY` | The key is unknown, revoked, expired, or disabled. |
 | 403 | `FORBIDDEN_SCOPE` | The key lacks the scope the endpoint requires. |
 | 403 | `PLAN_REQUIRES_UPGRADE` | The workspace plan does not include the Public API, or has no room left in a limit it sets — such as CRM entries. |

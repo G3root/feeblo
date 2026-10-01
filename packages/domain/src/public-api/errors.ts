@@ -39,46 +39,72 @@ export const PUBLIC_API_ERROR_CODES = [
 
 export type PublicApiErrorCode = (typeof PUBLIC_API_ERROR_CODES)[number];
 
-/** 401 — the request carried no `x-api-key` header. */
+/** 401 — the request carried no `x-api-key` header, or an empty one. */
 export class MissingApiKeyError extends Schema.TaggedError<MissingApiKeyError>()(
   "MISSING_API_KEY",
   { message: Schema.String },
-  { httpApiStatus: 401, identifier: "MISSING_API_KEY" }
+  {
+    httpApiStatus: 401,
+    identifier: "MISSING_API_KEY",
+    description:
+      "The request carried no x-api-key header, or the header value was empty.",
+  }
 ) {}
 
 /** 401 — the key is unknown, revoked, disabled, or expired. */
 export class InvalidApiKeyError extends Schema.TaggedError<InvalidApiKeyError>()(
   "INVALID_API_KEY",
   { message: Schema.String },
-  { httpApiStatus: 401, identifier: "INVALID_API_KEY" }
+  {
+    httpApiStatus: 401,
+    identifier: "INVALID_API_KEY",
+    description: "The API key is unknown, revoked, disabled, or expired.",
+  }
 ) {}
 
 /** 403 — the key does not hold the scope the endpoint requires. */
 export class ForbiddenScopeError extends Schema.TaggedError<ForbiddenScopeError>()(
   "FORBIDDEN_SCOPE",
   { message: Schema.String },
-  { httpApiStatus: 403, identifier: "FORBIDDEN_SCOPE" }
+  {
+    httpApiStatus: 403,
+    identifier: "FORBIDDEN_SCOPE",
+    description: "The API key does not hold the scope this endpoint requires.",
+  }
 ) {}
 
 /** 403 — the workspace plan does not include the Public API. */
 export class PlanRequiresUpgradeError extends Schema.TaggedError<PlanRequiresUpgradeError>()(
   "PLAN_REQUIRES_UPGRADE",
   { message: Schema.String },
-  { httpApiStatus: 403, identifier: "PLAN_REQUIRES_UPGRADE" }
+  {
+    httpApiStatus: 403,
+    identifier: "PLAN_REQUIRES_UPGRADE",
+    description: "The workspace's plan does not include the Public API.",
+  }
 ) {}
 
 /** 400 — a malformed parameter, cursor, or limit. */
 export class InvalidRequestError extends Schema.TaggedError<InvalidRequestError>()(
   "INVALID_REQUEST",
   { message: Schema.String },
-  { httpApiStatus: 400, identifier: "INVALID_REQUEST" }
+  {
+    httpApiStatus: 400,
+    identifier: "INVALID_REQUEST",
+    description:
+      "A path parameter, query parameter, header, or body field of the request is malformed.",
+  }
 ) {}
 
 /** 404 — the resource does not exist in the calling workspace. */
 export class NotFoundError extends Schema.TaggedError<NotFoundError>()(
   "NOT_FOUND",
   { message: Schema.String },
-  { httpApiStatus: 404, identifier: "NOT_FOUND" }
+  {
+    httpApiStatus: 404,
+    identifier: "NOT_FOUND",
+    description: "The requested resource does not exist in this workspace.",
+  }
 ) {}
 
 /**
@@ -91,7 +117,12 @@ export class NotFoundError extends Schema.TaggedError<NotFoundError>()(
 export class ConflictError extends Schema.TaggedError<ConflictError>()(
   "CONFLICT",
   { message: Schema.String },
-  { httpApiStatus: 409, identifier: "CONFLICT" }
+  {
+    httpApiStatus: 409,
+    identifier: "CONFLICT",
+    description:
+      "The write collides with something that already exists, such as a name or slug this workspace already uses.",
+  }
 ) {}
 
 /**
@@ -101,14 +132,23 @@ export class ConflictError extends Schema.TaggedError<ConflictError>()(
 export class RateLimitedError extends Schema.TaggedError<RateLimitedError>()(
   "RATE_LIMITED",
   { message: Schema.String },
-  { httpApiStatus: 429, identifier: "RATE_LIMITED" }
+  {
+    httpApiStatus: 429,
+    identifier: "RATE_LIMITED",
+    description:
+      "The per-key rate limit is exhausted; retry after the Retry-After interval.",
+  }
 ) {}
 
 /** 500 — an unexpected server failure. */
 export class InternalError extends Schema.TaggedError<InternalError>()(
   "INTERNAL_ERROR",
   { message: Schema.String },
-  { httpApiStatus: 500, identifier: "INTERNAL_ERROR" }
+  {
+    httpApiStatus: 500,
+    identifier: "INTERNAL_ERROR",
+    description: "An unexpected server failure.",
+  }
 ) {}
 
 /**
@@ -119,7 +159,12 @@ export class InternalError extends Schema.TaggedError<InternalError>()(
 export class ServiceUnavailableError extends Schema.TaggedError<ServiceUnavailableError>()(
   "SERVICE_UNAVAILABLE",
   { message: Schema.String },
-  { httpApiStatus: 503, identifier: "SERVICE_UNAVAILABLE" }
+  {
+    httpApiStatus: 503,
+    identifier: "SERVICE_UNAVAILABLE",
+    description:
+      "A dependency the request needs is unavailable; retry shortly.",
+  }
 ) {}
 
 /** 429 with the `Retry-After` header the contract promises. */

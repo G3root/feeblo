@@ -24,6 +24,15 @@ const ResponseEntry = Schema.Struct({
       Schema.Struct({ schema: Schema.optional(Schema.Json) })
     )
   ),
+  headers: Schema.optional(
+    Schema.Record(
+      Schema.String,
+      Schema.Struct({
+        required: Schema.optional(Schema.Boolean),
+        schema: Schema.optional(Schema.Json),
+      })
+    )
+  ),
 });
 
 const Operation = Schema.Struct({
@@ -38,10 +47,29 @@ const Operation = Schema.Struct({
   ),
   requestBody: Schema.optional(Schema.Json),
   responses: Schema.Record(Schema.String, ResponseEntry),
+  security: Schema.optional(
+    Schema.Array(Schema.Record(Schema.String, Schema.Array(Schema.String)))
+  ),
   tags: Schema.optional(Schema.Array(Schema.String)),
 });
 
 const OpenApiDocument = Schema.Struct({
+  components: Schema.optional(
+    Schema.Struct({
+      securitySchemes: Schema.optional(
+        Schema.Record(
+          Schema.String,
+          Schema.Struct({
+            type: Schema.String,
+            description: Schema.optional(Schema.String),
+            in: Schema.optional(Schema.String),
+            name: Schema.optional(Schema.String),
+            scheme: Schema.optional(Schema.String),
+          })
+        )
+      ),
+    })
+  ),
   paths: Schema.Record(
     Schema.String,
     Schema.Struct({
@@ -172,6 +200,29 @@ describe("PublicApi contract", () => {
     }
   });
 
+  it("declares the api-key credential on every published operation", () => {
+    // The requirement is what puts the Authorize button and the per-operation
+    // lock on the published reference, and what makes a client generated from
+    // this document send the key. The middleware carries the scheme, so a
+    // group added without `ApiKeyAuthMiddleware` would drop it — and would
+    // also fall out of the "gates every published endpoint" test below, since
+    // that middleware is what declares the 401 responses.
+    const securitySchemes = document.components?.securitySchemes ?? undefined;
+    expect(securitySchemes).toBeDefined();
+    expect(securitySchemes?.["apiKey"]).toEqual({
+      description: "A workspace API key, presented in the x-api-key header.",
+      in: "header",
+      name: "x-api-key",
+      type: "apiKey",
+    });
+
+    for (const { method, operation, path } of operations) {
+      expect(operation.security, `${method.toUpperCase()} ${path}`).toEqual([
+        { apiKey: [] },
+      ]);
+    }
+  });
+
   it("documents one response per error status", () => {
     const responses = document.paths[LIST_PATH]?.get?.responses ?? {};
 
@@ -192,10 +243,14 @@ describe("PublicApi contract", () => {
     const responses = document.paths[LIST_PATH]?.get?.responses ?? {};
 
     // The `Retry-After` header is promised by `docs/public-api.md` and asserted
-    // at runtime in `api-live.test.ts`. Header schemas attached to an error
-    // response are not reflected in the generated document, so it is not
-    // asserted here.
+    // at runtime in `api-live.test.ts`; the middleware attaches it through
+    // `HttpApiSchema.WithHeaders`, and the document reflects it, so a caller
+    // can see it before it happens.
     expect(JSON.stringify(responses["429"])).toContain("RATE_LIMITED");
+    expect(responses["429"]?.headers?.["retry-after"]).toEqual({
+      schema: { type: "string" },
+      required: true,
+    });
   });
 
   it("promises a conflict only from the endpoints that write", () => {

@@ -38,8 +38,8 @@ const DEFAULT_ANNOTATIONS: PublicApiOperationAnnotations = {
  * typed values rather than query strings, the handler returns the published DTO
  * rather than an `HttpServerResponse`, and nothing here names a method, a path,
  * or a status code. The HTTP projection in this package derives endpoints from
- * the same declarations, and a future MCP projection can derive tools from them
- * without restating a single branch of the handler.
+ * the same declarations, and the MCP projection (`mcp.ts`) derives tools from
+ * them without restating a single branch of the handler.
  *
  * The scope is a field *and* is enforced by the handler: `defineOperation`
  * wraps the implementation in `requirePublicApiScope`, so a surface that

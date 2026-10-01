@@ -1,5 +1,6 @@
 import * as HttpApi from "effect/unstable/httpapi/HttpApi";
 import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
+import * as OpenApi from "effect/unstable/httpapi/OpenApi";
 
 import { changelogEndpoints } from "../changelog/public-api/http";
 import { commentEndpoints } from "../comments/public-api/http";
@@ -35,28 +36,53 @@ import {
  * `requirePublicApiScope`, which fails with the key middleware's
  * `FORBIDDEN_SCOPE`. The price is that a sixth group has to repeat the two
  * lines; `api-contract.test.ts` fails if it does not.
+ *
+ * Each group also carries a `Description` annotation. The document derives a
+ * `tags` entry per group — the `Title` annotation if it carries one, the group
+ * identifier otherwise — and this annotation is what puts a one-line summary
+ * under the section in the published reference rather than leaving it bare.
  */
 export class PublicApiChangelogGroup extends HttpApiGroup.make("Changelog")
+  .annotate(
+    OpenApi.Description,
+    "Create, publish, edit, and delete the workspace's changelog entries. Reads include drafts and scheduled entries."
+  )
   .add(...changelogEndpoints)
   .middleware(PublicApiSchemaErrorHandler)
   .middleware(ApiKeyAuthMiddleware) {}
 
 export class PublicApiCommentGroup extends HttpApiGroup.make("Comments")
+  .annotate(
+    OpenApi.Description,
+    "Read, create, edit, and delete comments on posts, and pin one comment per post."
+  )
   .add(...commentEndpoints)
   .middleware(PublicApiSchemaErrorHandler)
   .middleware(ApiKeyAuthMiddleware) {}
 
 export class PublicApiCompanyGroup extends HttpApiGroup.make("Companies")
+  .annotate(
+    OpenApi.Description,
+    "Read, create, edit, and delete the workspace's companies — records about its own customers, so a key needs the CRM capability for these endpoints."
+  )
   .add(...companyEndpoints)
   .middleware(PublicApiSchemaErrorHandler)
   .middleware(ApiKeyAuthMiddleware) {}
 
 export class PublicApiPostGroup extends HttpApiGroup.make("Posts")
+  .annotate(
+    OpenApi.Description,
+    "Read, create, edit, and delete posts, and set which tags a post carries."
+  )
   .add(...postEndpoints)
   .middleware(PublicApiSchemaErrorHandler)
   .middleware(ApiKeyAuthMiddleware) {}
 
 export class PublicApiTagGroup extends HttpApiGroup.make("Tags")
+  .annotate(
+    OpenApi.Description,
+    "Read, create, rename, and delete the workspace's tags."
+  )
   .add(...tagEndpoints)
   .middleware(PublicApiSchemaErrorHandler)
   .middleware(ApiKeyAuthMiddleware) {}
@@ -85,5 +111,18 @@ export const PublicApiGroups = [
  * dashboard's spec stays dev-only.
  */
 export class PublicApi extends HttpApi.make("PublicApi")
+  /**
+   * The document's `info` block. Generated defaults name it `Api` at `0.0.1`,
+   * which a customer cannot resolve against anything. Title and description
+   * are what the reference page shows above the sidebar; the version is the
+   * path prefix, not an npm-style counter — `/api/v1` is this document, and
+   * `/api/v2` will be its own.
+   */
+  .annotate(OpenApi.Title, "Feeblo Public API")
+  .annotate(
+    OpenApi.Description,
+    "Read and manage a workspace's posts, comments, tags, changelog entries, and companies. Every request is authenticated with an API key presented in the x-api-key header; the response is always JSON and errors carry a machine-readable code in `_tag`."
+  )
+  .annotate(OpenApi.Version, "1.0.0")
   .add(...PublicApiGroups)
   .prefix("/api/v1") {}
