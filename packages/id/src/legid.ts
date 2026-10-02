@@ -272,12 +272,17 @@ export const makeId = <
     return brandLegidId(LegidId.make(input));
   });
 
+  // `Schema.brand` is type-only in v4 and takes a single concrete identifier,
+  // so the factory's brand — a type parameter, not a literal — cannot be
+  // applied through it. The runtime schema is the branded `LegidId`; the
+  // per-factory brand is asserted on top, which is all `Schema.brand` ever did
+  // for this schema, since it adds a type and no check.
   // SAFETY: Schema.brand only narrows the produced type; the codec still
   // decodes to the branded LegidOf<BrandName> contract the factory promises.
-  const idSchema = Schema.String.pipe(
-    Schema.brand("LegidId"),
-    Schema.brand(brand)
-  ) as Schema.Codec<LegidOf<BrandName>, string>;
+  const idSchema = Schema.String.pipe(Schema.brand("LegidId")) as Schema.Codec<
+    LegidOf<BrandName>,
+    string
+  >;
 
   return {
     brand,

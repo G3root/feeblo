@@ -1,9 +1,9 @@
 import { Clock } from "effect/Clock";
 import * as Effect from "effect/Effect";
-import * as HttpEffect from "effect/unstable/http/HttpEffect";
-import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
-import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
+import * as HttpEffect from "effect/http/HttpEffect";
+import * as HttpMiddleware from "effect/http/HttpMiddleware";
+import type * as HttpServerRequest from "effect/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 
 /**
  * Human-readable request label used to identify each timing entry. Dynamic

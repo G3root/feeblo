@@ -5,11 +5,11 @@ import { isString } from "@feeblo/utils/runtime-kind";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Headers from "effect/http/Headers";
+import * as HttpBody from "effect/http/HttpBody";
+import * as HttpClient from "effect/http/HttpClient";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
-import * as Headers from "effect/unstable/http/Headers";
-import * as HttpBody from "effect/unstable/http/HttpBody";
-import * as HttpClient from "effect/unstable/http/HttpClient";
 
 import type { ValidatedWebhookEndpoint } from "./webhook-endpoint-security";
 import { WebhookTransportError } from "./webhook-errors";

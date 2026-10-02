@@ -20,7 +20,7 @@ export type TRoadmapColumnConfig = S.Schema.Type<typeof RoadmapColumnConfig>;
 export const RoadmapColumn = S.Struct({
   id: S.String,
   roadmapId: S.String,
-  name: S.String.check(S.isLengthBetween(1, 120)),
+  name: S.String.check(S.isBetweenLength(1, 120)),
   position: S.Int,
   config: RoadmapColumnConfig,
   createdAt: S.DateFromString,
@@ -35,7 +35,7 @@ export type TRoadmapColumn = S.Schema.Type<typeof RoadmapColumn>;
 export const StatusRoadmapColumn = S.Struct({
   id: S.String,
   roadmapId: S.String,
-  name: S.String.check(S.isLengthBetween(1, 120)),
+  name: S.String.check(S.isBetweenLength(1, 120)),
   position: S.Int,
   statusId: S.String,
   createdAt: S.DateFromString,
@@ -46,7 +46,7 @@ export type TStatusRoadmapColumn = S.Schema.Type<typeof StatusRoadmapColumn>;
 const ColumnInput = {
   roadmapId: RoadmapId.schema,
   organizationId: WorkspaceId.schema,
-  name: S.String.check(S.isLengthBetween(1, 120)),
+  name: S.String.check(S.isBetweenLength(1, 120)),
   position: S.Int,
   config: RoadmapColumnConfig,
 };

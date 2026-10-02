@@ -1,8 +1,8 @@
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Layer from "effect/Layer";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 import type { AllowedOriginConfig } from "./cors";
 import { makeOriginCheckMiddleware } from "./origin-check";

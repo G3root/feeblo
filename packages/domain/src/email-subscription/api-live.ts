@@ -1,7 +1,7 @@
 import type { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as Effect from "effect/Effect";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";

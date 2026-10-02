@@ -20,7 +20,7 @@ import {
 } from "@feeblo/ui/frame";
 import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
-import * as Result from "effect/unstable/reactivity/AsyncResult";
+import * as Result from "effect/reactivity/AsyncResult";
 import { useState } from "react";
 
 import { useAsyncList } from "~/hooks/use-async-list";

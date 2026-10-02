@@ -8,7 +8,7 @@ import { createUserFeedbackEmail } from "@feeblo/transactional/templates/user-fe
 import { createUserOnboardingEmail } from "@feeblo/transactional/templates/user-onboarding";
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
-import * as W from "effect/unstable/workflow";
+import * as W from "effect/workflow";
 
 export const WelcomeUserWorkflow = W.Workflow.make("WelcomeUserWorkflow", {
   payload: {

@@ -31,8 +31,8 @@ import { toastManager } from "@feeblo/ui/toast";
 import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import * as Option from "effect/Option";
+import * as Result from "effect/reactivity/AsyncResult";
 import * as Schema from "effect/Schema";
-import * as Result from "effect/unstable/reactivity/AsyncResult";
 import {
   startTransition,
   useMemo,

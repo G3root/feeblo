@@ -9,12 +9,12 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import { TestClock } from "effect/testing";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
 import { EmailProviderFeedbackConfig } from "./config";
 import { EmailProviderFeedbackService } from "./service";

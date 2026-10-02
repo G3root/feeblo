@@ -9,16 +9,16 @@ import {
 import { isString } from "@feeblo/utils/runtime-kind";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as Headers from "effect/http/Headers";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientError from "effect/http/HttpClientError";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
-import * as Headers from "effect/unstable/http/Headers";
-import * as HttpClient from "effect/unstable/http/HttpClient";
-import * as HttpClientError from "effect/unstable/http/HttpClientError";
-import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 
 import type { GitHubApiFailure } from "./github-errors";
 import { githubProviderKey } from "./github-manifest";
@@ -521,7 +521,7 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
       withSdk(
         accessToken,
         GitHub.Retry.none(
-          GitHub.Services.issues.createComment({
+          GitHub.issues.createComment({
             owner: repositoryOwner,
             repo: repositoryName,
             issue_number: issueNumber,
@@ -540,7 +540,7 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
       withSdk(
         accessToken,
         GitHub.Retry.none(
-          GitHub.Services.issues.create({
+          GitHub.issues.create({
             owner: repositoryOwner,
             repo: repositoryName,
             title,
@@ -559,7 +559,7 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
           withSdk(
             appJwt,
             GitHub.Retry.none(
-              GitHub.Services.apps.createInstallationAccessToken({
+              GitHub.apps.createInstallationAccessToken({
                 installation_id,
               })
             ),
@@ -583,7 +583,7 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
           withSdk(
             appJwt,
             GitHub.Retry.none(
-              GitHub.Services.apps.deleteInstallation({
+              GitHub.apps.deleteInstallation({
                 installation_id,
               })
             ),
@@ -605,7 +605,7 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
       withSdk(
         accessToken,
         GitHub.Retry.none(
-          GitHub.Services.issues.get({
+          GitHub.issues.get({
             owner: repositoryOwner,
             repo: repositoryName,
             issue_number: issueNumber,
@@ -621,7 +621,7 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
       withSdk(
         accessToken,
         GitHub.Retry.none(
-          GitHub.Services.apps.listReposAccessibleToInstallation({
+          GitHub.apps.listReposAccessibleToInstallation({
             per_page: 100,
             page,
           })
@@ -648,7 +648,7 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
       withSdk(
         accessToken,
         GitHub.Retry.none(
-          GitHub.Services.apps.listInstallationsForAuthenticatedUser({
+          GitHub.apps.listInstallationsForAuthenticatedUser({
             per_page: 100,
             page,
           })

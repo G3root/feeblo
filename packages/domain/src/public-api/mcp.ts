@@ -1,15 +1,15 @@
+import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
+import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServerRequest from "effect/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaAST from "effect/SchemaAST";
 import type { unhandled } from "effect/Types";
-import { McpProtocol, McpServer, Tool, Toolkit } from "effect/unstable/ai";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
-import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
-import * as HttpApiSchema from "effect/unstable/httpapi/HttpApiSchema";
 
 import { Auth } from "../auth-handler";
 import { PublicApiChangelogRepository } from "../changelog/public-api/repository";

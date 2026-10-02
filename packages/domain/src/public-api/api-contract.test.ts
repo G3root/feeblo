@@ -1,5 +1,5 @@
+import * as OpenApi from "effect/http-api/OpenApi";
 import * as Schema from "effect/Schema";
-import * as OpenApi from "effect/unstable/httpapi/OpenApi";
 import { describe, expect, it } from "vitest";
 
 import { PublicApi } from "./api-contract";

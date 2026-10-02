@@ -1,14 +1,14 @@
 import { MailerConfig } from "@feeblo/transactional/config";
 import { Mailer } from "@feeblo/transactional/mailer";
-import * as Cron from "effect/Cron";
-import * as Layer from "effect/Layer";
 import {
   ClusterCron,
   ClusterWorkflowEngine,
   SingleRunner,
   TestRunner,
-} from "effect/unstable/cluster";
-import * as PersistedQueue from "effect/unstable/persistence/PersistedQueue";
+} from "effect/cluster";
+import * as Cron from "effect/Cron";
+import * as Layer from "effect/Layer";
+import * as PersistedQueue from "effect/persistence/PersistedQueue";
 
 import { EmailOutboxConfig } from "./email-outbox/config";
 import {

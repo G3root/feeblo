@@ -1,6 +1,6 @@
 import type { GitHubSyncRule as GitHubSyncRuleSchema } from "@feeblo/domain/integration/github/schema";
-import * as Result from "effect/unstable/reactivity/AsyncResult";
-import * as Atom from "effect/unstable/reactivity/Atom";
+import * as Result from "effect/reactivity/AsyncResult";
+import * as Atom from "effect/reactivity/Atom";
 
 import { DashboardClient, dashboardSWR } from "~/lib/atom-rpc";
 

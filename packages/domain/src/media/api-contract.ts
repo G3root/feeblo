@@ -1,12 +1,12 @@
 import * as Effect from "effect/Effect";
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
+import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware";
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
+import * as OpenApi from "effect/http-api/OpenApi";
+import * as Multipart from "effect/http/Multipart";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import * as Multipart from "effect/unstable/http/Multipart";
-import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
-import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
-import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
-import * as HttpApiSchema from "effect/unstable/httpapi/HttpApiSchema";
-import * as OpenApi from "effect/unstable/httpapi/OpenApi";
 
 import {
   BadRequestError,

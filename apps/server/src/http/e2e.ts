@@ -8,11 +8,11 @@ import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 /** Test-only mailbox router; returns every message the test mailer rendered. */
 export const testMailboxRouter = (mailbox: Ref.Ref<TestMailerState>) =>
@@ -30,17 +30,17 @@ export const testMailboxRouter = (mailbox: Ref.Ref<TestMailerState>) =>
   );
 
 const SeedRoadmapColumn = Schema.Struct({
-  name: Schema.String.check(Schema.isLengthBetween(1, 120)),
+  name: Schema.String.check(Schema.isBetweenLength(1, 120)),
   status: Schema.Literals(schema.POST_STATUS_TYPES),
 });
 
 const SeedRoadmapPayload = Schema.Struct({
   organizationId: WorkspaceId.schema,
-  name: Schema.String.check(Schema.isLengthBetween(1, 120)),
-  slug: Schema.String.check(Schema.isLengthBetween(1, 120)),
+  name: Schema.String.check(Schema.isBetweenLength(1, 120)),
+  slug: Schema.String.check(Schema.isBetweenLength(1, 120)),
   description: Schema.optional(Schema.NullOr(Schema.String)),
   visibility: Schema.optional(Schema.Literals(["public", "private"])),
-  columns: Schema.Array(SeedRoadmapColumn).check(Schema.isLengthBetween(1, 20)),
+  columns: Schema.Array(SeedRoadmapColumn).check(Schema.isBetweenLength(1, 20)),
 });
 
 /**

@@ -6,8 +6,8 @@ import { LockedIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type HugeiconsIconProps } from "@hugeicons/react";
 import { useRouter } from "@tanstack/react-router";
 import * as Option from "effect/Option";
-import * as Result from "effect/unstable/reactivity/AsyncResult";
-import type * as Atom from "effect/unstable/reactivity/Atom";
+import * as Result from "effect/reactivity/AsyncResult";
+import type * as Atom from "effect/reactivity/Atom";
 import { useState } from "react";
 
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";

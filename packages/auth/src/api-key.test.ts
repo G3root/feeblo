@@ -16,7 +16,7 @@ import { eq } from "drizzle-orm";
 import type * as Config from "effect/Config";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
-import type * as SqlError from "effect/unstable/sql/SqlError";
+import type * as SqlError from "effect/sql/SqlError";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { drizzleAdapter } from "./adapter/drizzle-adapter";

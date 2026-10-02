@@ -1,5 +1,5 @@
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { changelogHandlers } from "../changelog/public-api/http";
 import { commentHandlers } from "../comments/public-api/http";

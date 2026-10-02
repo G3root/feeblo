@@ -1,5 +1,5 @@
+import { Tool } from "effect/ai";
 import * as Context from "effect/Context";
-import { Tool } from "effect/unstable/ai";
 import { describe, expect, it } from "vitest";
 
 import { PublicApiMcpToolkit } from "./mcp";
