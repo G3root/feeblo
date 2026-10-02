@@ -54,6 +54,46 @@ export type OrganizationAccessVerdict = {
 };
 
 /**
+ * Whether a delivery's email can be proven to name only public posts.
+ *
+ * The gate at send time reads the rows that exist now, but the email names the
+ * posts that resolved when it was rendered. A post deleted — or moved to a
+ * private board — since then is missing from that read while its title is still
+ * in the mail, so the snapshot taken with the payload is what keeps the
+ * decision fail-closed.
+ *
+ * The snapshot is authoritative for what the mail names, and the current rows
+ * are the only witness for what the recipient can reach today, so either can
+ * deny rule 3 and neither can overrule the other's denial:
+ *
+ * | captured  | current   | verdict | because                                    |
+ * | --------- | --------- | ------- | ------------------------------------------ |
+ * | `PRIVATE` | any       | PRIVATE | the mail names a post that was not public  |
+ * | `PUBLIC`  | `PRIVATE` | PRIVATE | a named post is not public now             |
+ * | `PUBLIC`  | `PUBLIC`  | PUBLIC  | both halves agree                          |
+ * | `PUBLIC`  | `null`    | PUBLIC  | the mail's content is proven; none is left |
+ * | `null`    | any       | current | nothing was named, so nothing to prove     |
+ * | undefined | any       | current | delivery predates the snapshot             |
+ */
+export const evaluateNotifiedBoardVisibility = ({
+  captured,
+  current,
+}: {
+  readonly captured: PostBoardVisibility | null | undefined;
+  readonly current: PostBoardVisibility | null;
+}): PostBoardVisibility | null => {
+  if (captured === undefined || captured === null) {
+    return current;
+  }
+
+  if (captured === "PRIVATE" || current === "PRIVATE") {
+    return "PRIVATE";
+  }
+
+  return "PUBLIC";
+};
+
+/**
  * Classifies one recipient and decides whether post-update email may leave to
  * them. Pure so the vocabulary stays unit-testable without a database.
  */

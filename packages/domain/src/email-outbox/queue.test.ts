@@ -2244,6 +2244,71 @@ describe("EmailOutbox workflows", () => {
     );
 
     it.effect(
+      "does not admit a global recipient after a private post in the window is deleted",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { intentId, organizationId } = yield* fixture;
+          const db = yield* Database.Database;
+          const globalUserId = yield* UserId.generate;
+          const globalEmail = `deleted-private-${organizationId}@example.test`;
+          yield* db.insert(schema.userTable).values({
+            id: globalUserId,
+            email: globalEmail,
+            name: "Global user",
+            emailVerified: true,
+          });
+          yield* addSubscriptionContact({
+            email: globalEmail,
+            organizationId,
+            state: "active",
+            topicId: null,
+            topicType: "submission",
+            userId: globalUserId,
+          });
+          const { postId: privatePostId } =
+            yield* insertPrivateBoardPost(organizationId);
+          yield* (yield* EmailOutboxRepository).upsertPendingSubmissionWindow({
+            now: yield* DateTime.nowAsDate,
+            organizationId,
+            postId: privatePostId,
+          });
+          yield* TestClock.adjust("5 minutes");
+
+          // The email is rendered now, while the private post still exists, so
+          // its title is in the stored payload.
+          const deliveryIds = yield* materializeEmailIntent(intentId);
+          expect(deliveryIds).toHaveLength(1);
+          const [rendered] = yield* db
+            .select({
+              templatePayload: schema.emailDeliveryTable.templatePayload,
+            })
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+          expect(rendered?.templatePayload).toMatchObject({
+            posts: [{ label: "Ship email outbox" }, { label: "Private post" }],
+          });
+
+          // The post is gone by the time the delivery is attempted, so a check
+          // that only reads current rows cannot see the private board any more
+          // even though the rendered email still names it.
+          yield* db
+            .delete(schema.postTable)
+            .where(eq(schema.postTable.id, privatePostId));
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            deliverEmailDelivery({ deliveryId })
+          );
+
+          const [delivery] = yield* db
+            .select()
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+          expect(delivery?.state).toBe("no_organization_access");
+          expect((yield* testMailerState).sentMessages).toHaveLength(0);
+        })
+    );
+
+    it.effect(
       "delivers a submission window whose posts are all on public boards",
       () =>
         Effect.gen(function* () {

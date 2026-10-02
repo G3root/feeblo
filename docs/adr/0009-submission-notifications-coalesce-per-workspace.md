@@ -28,6 +28,8 @@ Exactly-once membership falls out of the key rather than needing a join table. T
 
 The gate reads every board the window notifies, and the global-user rule needs **all** of them public. The email carries each post's title, so admitting on one public board would leak the private posts beside it; a window whose boards have all gone private fails closed.
 
+The gate also reads the access proof captured with the rendered email (`notifiedBoardVisibility`, stored beside the template fields and ignored by the template decoder). Rendering happens once, at materialization, while the gate runs per send attempt, so a post deleted — or moved to a private board — in between is invisible to a query on current rows while its title is still in the mail. The snapshot is authoritative for what the mail names and the current rows for what the recipient can reach today; either can deny and neither overrules the other's denial. `evaluateNotifiedBoardVisibility` holds that table and is unit-tested directly.
+
 The deploy is compatible in both directions. Rows written before the change carry a single `postId`; the payload decoder accepts either shape, so an intent that was pending across the release still materializes. A submission recorded by new code against an old window appends to it.
 
 Spam posts are still public on the board, still in the database, and still trigger an in-app notification per post. This decision bounds what an attacker can make **us** send; it does not make submitting harder. That work — server-verified Turnstile on the public write RPCs and a moderation hold — is separate and still open.

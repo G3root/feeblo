@@ -24,7 +24,10 @@ import * as PersistedQueue from "effect/unstable/persistence/PersistedQueue";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
-import { evaluateOrganizationAccess } from "./access";
+import {
+  evaluateNotifiedBoardVisibility,
+  evaluateOrganizationAccess,
+} from "./access";
 import { EmailOutboxConfig } from "./config";
 import {
   emailSubscriptionTopicForIntent,
@@ -35,6 +38,7 @@ import {
 import { EmailOutboxRepository, type ResumedEmailDelivery } from "./repository";
 import {
   ChangelogTemplatePayload,
+  DeliveryAccessSnapshot,
   EmailUnsubscribeTarget,
   NotificationTemplatePayload,
   SubscriptionVerificationTemplatePayload,
@@ -339,6 +343,7 @@ export const materializeEmailIntent = (outboxId: string) =>
               : yield* db
                   .select({
                     boardSlug: schema.boardTable.slug,
+                    boardVisibility: schema.boardTable.visibility,
                     id: schema.postTable.id,
                     slug: schema.postTable.slug,
                     title: schema.postTable.title,
@@ -365,8 +370,15 @@ export const materializeEmailIntent = (outboxId: string) =>
               ? []
               : [
                   {
+                    // A post whose board no longer resolves cannot be proven
+                    // public, which the payload snapshot records.
                     board:
-                      row.boardSlug === null ? null : { slug: row.boardSlug },
+                      row.boardSlug === null || row.boardVisibility === null
+                        ? null
+                        : {
+                            slug: row.boardSlug,
+                            visibility: row.boardVisibility,
+                          },
                     slug: row.slug,
                     title: row.title,
                   },
@@ -891,7 +903,9 @@ const sendDeliveryAttempt = (
             : yield* db
                 .select({ visibility: schema.boardTable.visibility })
                 .from(schema.postTable)
-                .innerJoin(
+                // LEFT JOIN so a post whose board row is gone still counts as
+                // unproven instead of vanishing from the proof.
+                .leftJoin(
                   schema.boardTable,
                   eq(schema.boardTable.id, schema.postTable.boardId)
                 )
@@ -901,12 +915,24 @@ const sendDeliveryAttempt = (
                     eq(schema.postTable.organizationId, intent.organizationId)
                   )
                 );
-        const boardVisibility =
+        const currentBoardVisibility =
           boardRows.length === 0
             ? null
             : boardRows.every((row) => row.visibility === "PUBLIC")
               ? "PUBLIC"
               : "PRIVATE";
+        // A post deleted since the email was rendered is absent from the rows
+        // above while its title is still in the mail, so the visibility
+        // captured with the payload is part of the answer.
+        const accessSnapshot = Schema.decodeUnknownOption(
+          DeliveryAccessSnapshot
+        )(delivery.templatePayload);
+        const boardVisibility = evaluateNotifiedBoardVisibility({
+          captured: Option.isSome(accessSnapshot)
+            ? accessSnapshot.value.notifiedBoardVisibility
+            : undefined,
+          current: currentBoardVisibility,
+        });
 
         const [memberRow] = yield* db
           .select({ id: schema.memberTable.id })

@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 
 import type { EmailSubscriptionTopic } from "../email-subscription/schema";
+import type { PostBoardVisibility } from "./access";
 import type {
   ChangelogTemplatePayload,
   EmailIntentPayload,
@@ -31,6 +32,16 @@ type PostNotificationContent = {
 const submissionNotificationMaxListed = 20;
 
 /**
+ * A rendered submission notification plus the access proof it was rendered
+ * under. The proof rides in the delivery's stored payload so the send-time gate
+ * can see what the email names even after a post is gone; the template decoder
+ * ignores it.
+ */
+export type SubmissionNotificationPayload = NotificationTemplatePayload & {
+  readonly notifiedBoardVisibility: PostBoardVisibility | null;
+};
+
+/**
  * Builds the immutable administrative submission-notification snapshot.
  *
  * The payload covers every post in the window, so the title carries the count
@@ -42,7 +53,10 @@ export const makeSubmissionNotificationPayload = (
   posts: ReadonlyArray<{
     readonly slug: string;
     readonly title: string;
-    readonly board: { readonly slug: string } | null;
+    readonly board: {
+      readonly slug: string;
+      readonly visibility: PostBoardVisibility;
+    } | null;
   }>,
   /**
    * Submissions the window covers. Larger than `posts.length` once a window
@@ -50,7 +64,7 @@ export const makeSubmissionNotificationPayload = (
    * happened rather than what could still be rendered.
    */
   submissionCount: number
-): NotificationTemplatePayload => {
+): SubmissionNotificationPayload => {
   const listed = posts.slice(0, submissionNotificationMaxListed);
   const remaining = submissionCount - listed.length;
   const isSingle = submissionCount === 1;
@@ -84,6 +98,15 @@ export const makeSubmissionNotificationPayload = (
     title: isSingle
       ? "New submission in your workspace"
       : `${submissionCount} new submissions in your workspace`,
+    // Only the listed posts are named in the mail, so only they need proving.
+    // An empty list (a capped window whose tracked posts were all deleted) has
+    // nothing to prove either way, which stays fail-closed for rule 3.
+    notifiedBoardVisibility:
+      listed.length === 0
+        ? null
+        : listed.every((post) => post.board?.visibility === "PUBLIC")
+          ? "PUBLIC"
+          : "PRIVATE",
     unsubscribe: {
       kind: "settings",
       url: `${appUrl}/settings/notifications`,

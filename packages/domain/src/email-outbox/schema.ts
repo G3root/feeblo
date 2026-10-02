@@ -109,6 +109,26 @@ export const EmailIntentPayload = Schema.Union([
 export type EmailIntentPayload = Schema.Schema.Type<typeof EmailIntentPayload>;
 
 /**
+ * Board visibility of one notified post, as captured with a rendered email.
+ *
+ * The send-time access gate reads current rows, but an email names the posts
+ * that resolved when it was rendered. A post deleted — or moved to a private
+ * board — since then is invisible to that read while its title is still in the
+ * mail, so what was captured is part of the proof. `undefined` means the
+ * delivery predates the capture, which leaves the current rows as the only
+ * input.
+ */
+export const DeliveryAccessSnapshot = Schema.Struct({
+  notifiedBoardVisibility: Schema.optionalKey(
+    Schema.NullOr(Schema.Literals(["PUBLIC", "PRIVATE"]))
+  ),
+});
+
+export type DeliveryAccessSnapshot = Schema.Schema.Type<
+  typeof DeliveryAccessSnapshot
+>;
+
+/**
  * Post ids a submission notification covers.
  *
  * A window written before submissions coalesced carries a single `postId`; a
