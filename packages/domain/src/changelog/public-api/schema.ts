@@ -1,3 +1,4 @@
+import { ChangelogCategoryIconType } from "@feeblo/domain-contracts/changelog-category-icon-type";
 import * as Schema from "effect/Schema";
 
 import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
@@ -28,6 +29,44 @@ export type TPublicApiChangelogStatus = Schema.Schema.Type<
 >;
 
 /**
+ * A label on an entry.
+ *
+ * The workspace's own vocabulary: a category is named, and `iconType` says how
+ * to read `icon` (`color`, `emoji`, or `icon`), so a caller can render the
+ * label rather than showing an id. A category id no longer exists once the
+ * category is deleted; the entry then simply carries one fewer label, exactly
+ * as the dashboard shows it.
+ */
+export const PublicApiChangelogCategory = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  iconType: ChangelogCategoryIconType,
+  icon: Schema.String,
+});
+
+export type TPublicApiChangelogCategory = Schema.Schema.Type<
+  typeof PublicApiChangelogCategory
+>;
+
+/**
+ * A post an entry announces.
+ *
+ * The summary fields a reader needs to follow the link; the post itself is
+ * `GET /api/v1/posts/{postId}`, which is also where its `url` comes from. The
+ * link is unordered by meaning but stable across reads, ordered by when it was
+ * made.
+ */
+export const PublicApiChangelogLinkedPost = Schema.Struct({
+  id: Schema.String,
+  title: Schema.String,
+  slug: Schema.String,
+});
+
+export type TPublicApiChangelogLinkedPost = Schema.Schema.Type<
+  typeof PublicApiChangelogLinkedPost
+>;
+
+/**
  * A changelog entry without its body.
  *
  * Carries no author and no internal identifier: a machine key is not a member,
@@ -46,6 +85,8 @@ export const PublicApiChangelogSummary = Schema.Struct({
   publishedAt: Schema.NullOr(Schema.DateFromString),
   createdAt: Schema.DateFromString,
   updatedAt: Schema.DateFromString,
+  categories: Schema.Array(PublicApiChangelogCategory),
+  linkedPosts: Schema.Array(PublicApiChangelogLinkedPost),
 });
 
 export type TPublicApiChangelogSummary = Schema.Schema.Type<

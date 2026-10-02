@@ -25,6 +25,20 @@ export const toPublicApiChangelogSummary = (
   publishedAt: entry.publishedAt,
   createdAt: entry.createdAt,
   updatedAt: entry.updatedAt,
+  // Named field by field rather than spread: the repository row carries ids
+  // and timestamps the payload does not, and this is the boundary where they
+  // stop.
+  categories: entry.categories.map((category) => ({
+    icon: category.icon,
+    iconType: category.iconType,
+    id: category.id,
+    name: category.name,
+  })),
+  linkedPosts: entry.linkedPosts.map((post) => ({
+    id: post.id,
+    slug: post.slug,
+    title: post.title,
+  })),
 });
 
 /** The detail projection: the summary plus the stored, sanitized body. */

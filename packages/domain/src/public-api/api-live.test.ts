@@ -2413,6 +2413,66 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect("returns a changelog entry's labels and linked posts", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      registerKey("fbk_changelog_labels", workspace.organizationId);
+      const changelogId = yield* seedChangelog(workspace.organizationId, {
+        id: "chg_labelled",
+        status: "published",
+        title: "Dark mode shipped",
+      });
+
+      yield* db.insert(schema.changelogCategoryTable).values({
+        id: "chc_new",
+        name: "New",
+        iconType: "color",
+        icon: "oklch(0.7 0.15 250)",
+        organizationId: workspace.organizationId,
+      });
+      yield* db.insert(schema.changelogCategoryLinkTable).values({
+        id: "chcl_new",
+        changelogId,
+        categoryId: "chc_new",
+        organizationId: workspace.organizationId,
+      });
+      yield* db.insert(schema.changelogPostTable).values({
+        changelogId,
+        postId: workspace.postId,
+        organizationId: workspace.organizationId,
+      });
+
+      const response = yield* executeRequest(
+        `/api/v1/changelog/${changelogId}`,
+        "fbk_changelog_labels"
+      );
+      expect(response.status).toBe(200);
+
+      const entry = decodeChangelog(responseBody(response));
+      expect(entry.categories).toEqual([
+        {
+          icon: "oklch(0.7 0.15 250)",
+          iconType: "color",
+          id: "chc_new",
+          name: "New",
+        },
+      ]);
+
+      // A linked post is a reference: the fields a reader needs to follow the
+      // link, not a second copy of the post.
+      expect(entry.linkedPosts).toEqual([
+        { id: workspace.postId, slug: "post-0", title: "Post 0" },
+      ]);
+
+      // The link rows carry the workspace and the linked ids; neither is a
+      // field of the payload.
+      const raw = responseBody(response);
+      expect(raw).not.toContain("organizationId");
+      expect(raw).not.toContain("categoryId");
+    })
+  );
+
   it.effect("refuses the changelog without the changelog.read scope", () =>
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace();

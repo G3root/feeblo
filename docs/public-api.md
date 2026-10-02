@@ -566,7 +566,18 @@ GET /api/v1/changelog
       "scheduledAt": null,
       "publishedAt": "2026-09-01T00:00:00.000Z",
       "createdAt": "2026-08-30T10:00:00.000Z",
-      "updatedAt": "2026-09-01T00:00:00.000Z"
+      "updatedAt": "2026-09-01T00:00:00.000Z",
+      "categories": [
+        {
+          "id": "chc_new",
+          "name": "New",
+          "iconType": "color",
+          "icon": "oklch(0.7 0.15 250)"
+        }
+      ],
+      "linkedPosts": [
+        { "id": "pst_dark_mode", "title": "Dark mode", "slug": "dark-mode" }
+      ]
     }
   ],
   "nextCursor": null
@@ -574,6 +585,8 @@ GET /api/v1/changelog
 ```
 
 Requires `changelog.read`. Entries of every status are returned, newest first — the key is the workspace's own credential, so an integration that syncs release notes sees what has not shipped yet. Pass `status=published` to list only what readers can already see.
+
+`categories` are the entry's labels: the workspace's own vocabulary, each with a name and an `iconType` of `color`, `emoji`, or `icon` that says how to read `icon`. `linkedPosts` are the posts the entry announces, as `{ id, title, slug }` references — read the post itself through `GET /api/v1/posts/{postId}` when the body is needed. Both are set in the dashboard, not through this API, and both are ordered by when they were attached.
 
 ### Get a changelog entry
 

@@ -733,17 +733,20 @@ describe("PublicApi contract", () => {
       "createdAt",
       "updatedAt",
       "content",
+      "categories",
+      "linkedPosts",
     ]) {
       expect(createBody).toContain(field);
     }
 
     // The dashboard's `Changelog` carries actor identifiers and the workspace
-    // id; none of them has a name in this contract.
+    // id; neither the entry nor its labels and linked posts may name them.
     for (const forbidden of [
       "creatorId",
       "creatorMemberId",
       "organizationId",
       "userId",
+      "categoryId",
     ]) {
       expect(createBody).not.toContain(forbidden);
     }
