@@ -317,11 +317,16 @@ export const ListBoardPostsInput = Schema.Struct({
     })
   ),
   statusId: Schema.optional(Schema.NullOr(Schema.String)),
-  tagIds: Schema.optional(Schema.Array(Schema.String)).annotate({
-    description: "Keep posts carrying at least one of these tag ids",
+  tagIds: Schema.optional(Schema.NonEmptyArray(Schema.String)).annotate({
+    description:
+      "Keep posts carrying at least one of these tag ids; at least one id is required",
   }),
-  updatedAfter: Schema.optional(Schema.DateFromString).annotate({
-    description: "Keep posts changed after this instant",
+  // A string rather than a `Schema.DateFromString`: the operation validates
+  // the ISO shape and the calendar itself, so the HTTP query parameter and the
+  // MCP tool argument are checked by the same code and an MCP caller cannot
+  // send a day that does not exist while an HTTP caller cannot.
+  updatedAfter: Schema.optional(Schema.String).annotate({
+    description: "Keep posts changed after this ISO 8601 instant",
   }),
 });
 
@@ -342,11 +347,12 @@ export const ListPostsInput = Schema.Struct({
     })
   ),
   statusId: Schema.optional(Schema.NullOr(Schema.String)),
-  tagIds: Schema.optional(Schema.Array(Schema.String)).annotate({
-    description: "Keep posts carrying at least one of these tag ids",
+  tagIds: Schema.optional(Schema.NonEmptyArray(Schema.String)).annotate({
+    description:
+      "Keep posts carrying at least one of these tag ids; at least one id is required",
   }),
-  updatedAfter: Schema.optional(Schema.DateFromString).annotate({
-    description: "Keep posts changed after this instant",
+  updatedAfter: Schema.optional(Schema.String).annotate({
+    description: "Keep posts changed after this ISO 8601 instant",
   }),
 });
 

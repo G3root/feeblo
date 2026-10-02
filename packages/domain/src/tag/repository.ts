@@ -406,6 +406,27 @@ const makeTagRepository = Effect.gen(function* () {
             .pipe(Effect.asVoid);
         }
 
+        // A post's tags are part of the post, so a replacement that changed
+        // them is a change to the post: `post.updatedAt` moves, and a caller
+        // filtering on it — the Public API's `updatedAfter` — sees the post
+        // rather than a stale tag list. A replacement that named the set the
+        // post already carried changes nothing and does not bump, matching the
+        // shared write path's rule that storing the same values is not an
+        // update. The row is already locked for the comparison above, so this
+        // update cannot race a concurrent replacement.
+        if (removed.length > 0 || added.length > 0) {
+          yield* db
+            .update(schema.postTable)
+            .set({ updatedAt: now })
+            .where(
+              and(
+                eq(schema.postTable.id, postId),
+                eq(schema.postTable.organizationId, organizationId)
+              )
+            )
+            .pipe(Effect.asVoid);
+        }
+
         const tags = yield* db
           .select({ id: schema.tagTable.id, name: schema.tagTable.name })
           .from(schema.postTagTable)

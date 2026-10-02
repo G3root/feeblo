@@ -106,4 +106,30 @@ describe("public API operations registry", () => {
       expect("nextCursor" in page.fields).toBe(true);
     }
   });
+
+  it("refuses an empty tag filter on the typed input too", () => {
+    // The HTTP projection rejects `?tagIds=`, but an MCP client sends typed
+    // parameters, so the operation's own schema has to refuse the empty list:
+    // otherwise the same call means "every post" on one surface and "no
+    // filter" on the other, and a caller that joined an empty array gets a
+    // page it did not ask for.
+    expect(
+      Option.isNone(Schema.decodeUnknownOption(ListPostsInput)({ tagIds: [] }))
+    ).toBe(true);
+    expect(
+      Option.isNone(
+        Schema.decodeUnknownOption(ListBoardPostsInput)({
+          boardId: "brd_feedback",
+          tagIds: [],
+        })
+      )
+    ).toBe(true);
+
+    // A list with one id is the shape the input does accept.
+    expect(
+      Option.isSome(
+        Schema.decodeUnknownOption(ListPostsInput)({ tagIds: ["tag_ui"] })
+      )
+    ).toBe(true);
+  });
 });

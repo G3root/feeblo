@@ -58,15 +58,18 @@ export const parseIncludeArchived = (raw: string | undefined) => {
 /**
  * A comma-separated list of tag ids on a query string.
  *
- * Absent, blank, and whitespace-only are all "no tag filter", so `?tagIds=`
- * does not become a filter that matches nothing. An id that does not exist in
- * the workspace simply matches no post: unlike assigning tags, filtering is a
- * read, so a mistyped id is answered with an empty page rather than a
- * rejection that would cost a second query to distinguish.
+ * Absent is "no tag filter". A parameter that is *present* but names no id —
+ * `?tagIds=`, `?tagIds=,,` — is `INVALID_REQUEST` rather than an unfiltered
+ * list: a caller that joins an empty array into the parameter asked for posts
+ * carrying one of nothing, and handing it every post silently is the opposite
+ * of what it asked. An id that does not exist in the workspace simply matches
+ * no post: unlike assigning tags, filtering is a read, so a mistyped id is
+ * answered with an empty page rather than a rejection that would cost a
+ * second query to distinguish.
  */
 export const parseTagIds = (raw: string | undefined) =>
   Effect.gen(function* () {
-    if (raw === undefined || raw.trim().length === 0) {
+    if (raw === undefined) {
       return null;
     }
 
@@ -75,24 +78,100 @@ export const parseTagIds = (raw: string | undefined) =>
       .map((id) => id.trim())
       .filter((id) => id.length > 0);
 
-    if (tagIds.length === 0) {
+    // Built as a tuple rather than returned as the filtered array: the
+    // operation's input schema is a non-empty array, so the empty case is
+    // unrepresentable past this point rather than merely unreachable.
+    const [first, ...rest] = tagIds;
+    if (first === undefined) {
       return yield* invalidRequestError(
         "tagIds must be a comma-separated list of tag ids."
       );
     }
 
-    return tagIds;
+    const nonEmpty: readonly [string, ...string[]] = [first, ...rest];
+    return nonEmpty;
   });
 
+/**
+ * The shape an `updatedAfter` value must have before it is decoded.
+ *
+ * A date-only value, or a datetime with at least hours and minutes, an
+ * optional seconds-and-fraction part, and an optional timezone. Date and
+ * time components are captured separately because the shape alone cannot
+ * reject a date that names no day. Both `+05:30` and `+0530` offsets are
+ * accepted: both are ISO 8601, and refusing the basic form would be a
+ * narrowing the contract never promised.
+ */
+const ISO_DATE_OR_DATETIME =
+  /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+
+const isLeapYear = (year: number): boolean =>
+  (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+
+const daysInMonth = (year: number, month: number): number => {
+  if (month === 2) {
+    return isLeapYear(year) ? 29 : 28;
+  }
+  return [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1] ?? 0;
+};
+
+/**
+ * True when `value` is an ISO 8601 date or timestamp that names a real
+ * instant.
+ *
+ * `Schema.DateFromString` is not enough on its own: it falls back to the
+ * host's date parsing, which accepts `August 11, 2026` and `2026/08/11`, and
+ * it *rolls over* a day that does not exist — `2026-02-30` becomes March 2 —
+ * so a caller with a typo in a sync cursor would silently filter from the
+ * wrong day. The shape check keeps the value ISO (the contract the document
+ * promises) and the component check keeps it a real calendar date.
+ */
+const isIsoDateOrTimestamp = (value: string): boolean => {
+  const match = ISO_DATE_OR_DATETIME.exec(value);
+  if (match === null) {
+    return false;
+  }
+
+  const [, year, month, day, hour, minute, second] = match;
+  const monthNumber = Number(month);
+  const dayNumber = Number(day);
+
+  if (monthNumber < 1 || monthNumber > 12) {
+    return false;
+  }
+  if (dayNumber < 1 || dayNumber > daysInMonth(Number(year), monthNumber)) {
+    return false;
+  }
+  if (hour !== undefined && Number(hour) > 23) {
+    return false;
+  }
+  if (minute !== undefined && Number(minute) > 59) {
+    return false;
+  }
+  if (second !== undefined && Number(second) > 59) {
+    return false;
+  }
+
+  return true;
+};
+
 const decodeUpdatedAfter = Schema.decodeUnknownOption(Schema.DateFromString);
+
+const UPDATED_AFTER_INVALID =
+  "updatedAfter must be an ISO 8601 date or timestamp naming a real date.";
 
 /**
  * An ISO-8601 instant that bounds a list to the rows changed after it.
  *
  * A bare date is accepted (`2026-08-11`, midnight UTC) as well as a full
  * timestamp, because a caller catching up day by day does not have to spell out
- * the midnight. Anything else is the caller's mistake and is reported as one,
- * rather than being silently ignored as an unfiltered list.
+ * the midnight. Anything that is not an ISO 8601 date or timestamp naming a
+ * real day — `2026-02-30`, `August 11, 2026`, `yesterday` — is the caller's
+ * mistake and is reported as one, rather than being silently ignored as an
+ * unfiltered list or, worse, quietly rolled into the next month.
+ *
+ * Blank is still "no filter": a caller's first sync has no cursor yet, and an
+ * empty string is how that is spelt in a query it builds.
  */
 export const parseUpdatedAfter = (raw: string | undefined) =>
   Effect.gen(function* () {
@@ -101,11 +180,16 @@ export const parseUpdatedAfter = (raw: string | undefined) =>
       return null;
     }
 
+    if (!isIsoDateOrTimestamp(trimmed)) {
+      return yield* invalidRequestError(UPDATED_AFTER_INVALID);
+    }
+
     const decoded = Option.getOrNull(decodeUpdatedAfter(trimmed));
     if (decoded === null) {
-      return yield* invalidRequestError(
-        "updatedAfter must be an ISO 8601 date or timestamp."
-      );
+      // Unreachable while the shape and calendar checks above hold; kept so
+      // the decoder remains the authority on what an instant is rather than
+      // the regex.
+      return yield* invalidRequestError(UPDATED_AFTER_INVALID);
     }
 
     return decoded;

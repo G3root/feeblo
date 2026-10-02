@@ -18,7 +18,7 @@ import {
 import { onInternalError } from "../../public-api/failure";
 import { currentPublicApiCaller } from "../../public-api/middleware";
 import { defineOperation } from "../../public-api/operation";
-import { parseTitle } from "../../public-api/parse";
+import { parseTitle, parseUpdatedAfter } from "../../public-api/parse";
 import { withRemapDbErrors } from "../../rpc-errors";
 import { postTagChangeActivities } from "../../tag/post-tag-activities";
 import { toPublicApiTag } from "../../tag/public-api/mappers";
@@ -115,6 +115,11 @@ export const listBoardPostsOperation = defineOperation(
       const config = yield* currentPublicApiConfig;
 
       const after = yield* decodeCursorOrFail(cursor);
+      // Parsed here rather than in the HTTP handler, so the MCP projection of
+      // this operation validates the same way: the two surfaces cannot answer
+      // differently for the same value, and a day that does not exist cannot
+      // be rolled over on one of them.
+      const changedAfter = yield* parseUpdatedAfter(updatedAfter);
 
       const page = yield* repository
         .listBoardPosts({
@@ -125,7 +130,7 @@ export const listBoardPostsOperation = defineOperation(
           organizationId: caller.organizationId,
           statusId: statusId ?? null,
           tagIds: tagIds ?? null,
-          updatedAfter: updatedAfter ?? null,
+          updatedAfter: changedAfter,
         })
         .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
 
@@ -178,6 +183,8 @@ export const listPostsOperation = defineOperation(
       const config = yield* currentPublicApiConfig;
 
       const after = yield* decodeCursorOrFail(cursor);
+      // Parsed here rather than in the HTTP handler: see the board list above.
+      const changedAfter = yield* parseUpdatedAfter(updatedAfter);
 
       // No existence check: the key proves the workspace exists, and a
       // workspace with no posts is an empty page rather than a 404.
@@ -190,7 +197,7 @@ export const listPostsOperation = defineOperation(
           organizationId: caller.organizationId,
           statusId: statusId ?? null,
           tagIds: tagIds ?? null,
-          updatedAfter: updatedAfter ?? null,
+          updatedAfter: changedAfter,
         })
         .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
 

@@ -4363,19 +4363,112 @@ layer(makeTestApp())("public api v1", (it) => {
 
       // A malformed filter is the caller's mistake, reported as one rather
       // than silently ignored as an unfiltered list.
-      const malformed = yield* executeRequest(
-        "/api/v1/posts?updatedAfter=yesterday",
-        "fbk_post_filter"
-      );
-      expect(malformed.status).toBe(400);
-      expect(decodeError(responseBody(malformed))._tag).toBe("INVALID_REQUEST");
+      for (const query of [
+        "updatedAfter=yesterday",
+        // A day that does not exist: the host's date parsing would roll this
+        // into March 2 and filter from the wrong day.
+        "updatedAfter=2026-02-30",
+        // A date the host parses but ISO 8601 does not describe.
+        `updatedAfter=${encodeURIComponent("August 11, 2026")}`,
+      ]) {
+        const malformed = yield* executeRequest(
+          `/api/v1/posts?${query}`,
+          "fbk_post_filter"
+        );
+        expect(malformed.status, query).toBe(400);
+        expect(decodeError(responseBody(malformed))._tag, query).toBe(
+          "INVALID_REQUEST"
+        );
+      }
 
-      const emptyTags = yield* executeRequest(
-        "/api/v1/posts?tagIds=,,",
-        "fbk_post_filter"
+      // A `tagIds` parameter that names no id is refused rather than widened
+      // into a page of everything: an empty value is present but asks for
+      // nothing.
+      for (const query of ["tagIds=", "tagIds=,,", "tagIds=%20"]) {
+        const emptyTags = yield* executeRequest(
+          `/api/v1/posts?${query}`,
+          "fbk_post_filter"
+        );
+        expect(emptyTags.status, query).toBe(400);
+        expect(decodeError(responseBody(emptyTags))._tag, query).toBe(
+          "INVALID_REQUEST"
+        );
+      }
+
+      // The ISO shape check still accepts what ISO 8601 describes: a bare
+      // date, and a timestamp whose offset is written with or without the
+      // colon.
+      for (const value of [
+        "2026-08-11",
+        "2026-08-11T00:00:00+05:30",
+        "2026-08-11T00:00:00+0530",
+      ]) {
+        const accepted = yield* executeRequest(
+          `/api/v1/posts?updatedAfter=${encodeURIComponent(value)}`,
+          "fbk_post_filter"
+        );
+        expect(accepted.status, value).toBe(200);
+      }
+    })
+  );
+
+  it.effect("moves a post's updatedAt when its tags change", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      const nowDateTime = yield* DateTime.now;
+      const earlier = DateTime.toDate(
+        DateTime.subtract(nowDateTime, { minutes: 30 })
       );
-      expect(emptyTags.status).toBe(400);
-      expect(decodeError(responseBody(emptyTags))._tag).toBe("INVALID_REQUEST");
+      const cutoff = DateTime.toDate(
+        DateTime.subtract(nowDateTime, { minutes: 15 })
+      );
+
+      // The post's record is old, so only a tag write can bring it into the
+      // window the poll below asks for.
+      yield* db
+        .update(schema.postTable)
+        .set({ updatedAt: earlier })
+        .where(eq(schema.postTable.id, workspace.postId));
+
+      yield* seedTag(workspace.organizationId, "tag_sync", "Sync");
+      registerKey(
+        "fbk_tag_sync",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      // Before the assignment the post is outside the window.
+      const before = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts?updatedAfter=${encodeURIComponent(cutoff.toISOString())}`,
+            "fbk_tag_sync"
+          )
+        )
+      );
+      expect(before.data.map((post) => post.id)).toEqual([]);
+
+      const assigned = yield* executeWrite(
+        "PUT",
+        `/api/v1/posts/${workspace.postId}/tags`,
+        { apiKey: "fbk_tag_sync", body: { tagIds: ["tag_sync"] } }
+      );
+      expect(assigned.status).toBe(200);
+
+      // The tags are part of the post, so the assignment moved its
+      // `updatedAt`: a caller polling for changes sees the post instead of a
+      // stale tag list.
+      const after = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts?updatedAfter=${encodeURIComponent(cutoff.toISOString())}`,
+            "fbk_tag_sync"
+          )
+        )
+      );
+      expect(after.data.map((post) => post.id)).toEqual([workspace.postId]);
+      expect(after.data[0]?.tags).toEqual([{ id: "tag_sync", name: "Sync" }]);
     })
   );
 
@@ -5204,6 +5297,28 @@ layer(
         workspace.statusId,
       ]);
       expect(statuses.data[0]?.name).toBe("Planned");
+    })
+  );
+
+  it.effect("refuses a rolled-over date the same way HTTP does", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_mcp_date", workspace.organizationId);
+
+      const sessionId = yield* openMcpSession("fbk_mcp_date");
+      const result = yield* callTool(sessionId, "fbk_mcp_date", "listPosts", {
+        updatedAfter: "2026-02-30",
+      });
+      expect(result.isError).toBe(true);
+
+      // The operation validates the instant, not the HTTP projection, so the
+      // tool refuses what the query parameter refuses: a date that does not
+      // exist cannot be rolled into March on one surface and not the other.
+      const [content] = result.content;
+      if (content?.type !== "text") {
+        return yield* Effect.die("the refusal carried no text content");
+      }
+      expect(content.text).toContain("ISO 8601");
     })
   );
 

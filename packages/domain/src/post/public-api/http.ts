@@ -13,7 +13,6 @@ import {
   parseIncludeArchived,
   parseLimit,
   parseTagIds,
-  parseUpdatedAfter,
   providedQueryParam,
 } from "../../public-api/parse";
 import {
@@ -165,7 +164,6 @@ export const postHandlers = {
         query.includeArchived
       );
       const tagIds = yield* parseTagIds(query.tagIds);
-      const updatedAfter = yield* parseUpdatedAfter(query.updatedAfter);
       return yield* listBoardPostsOperation.handler({
         boardId: params.boardId,
         cursor: query.cursor,
@@ -173,7 +171,9 @@ export const postHandlers = {
         limit,
         statusId: query.status ?? null,
         tagIds: tagIds ?? undefined,
-        updatedAfter: updatedAfter ?? undefined,
+        // Passed through raw: the operation validates the ISO shape and the
+        // calendar, so the HTTP and MCP surfaces share one check.
+        updatedAfter: query.updatedAfter,
       });
     })) satisfies HandlerOf<PublicApiGroup, "listBoardPosts">,
 
@@ -184,7 +184,6 @@ export const postHandlers = {
         query.includeArchived
       );
       const tagIds = yield* parseTagIds(query.tagIds);
-      const updatedAfter = yield* parseUpdatedAfter(query.updatedAfter);
       return yield* listPostsOperation.handler({
         boardId: providedQueryParam(query.boardId),
         cursor: query.cursor,
@@ -192,7 +191,8 @@ export const postHandlers = {
         limit,
         statusId: query.status ?? null,
         tagIds: tagIds ?? undefined,
-        updatedAfter: updatedAfter ?? undefined,
+        // Passed through raw: see the board list above.
+        updatedAfter: query.updatedAfter,
       });
     })) satisfies HandlerOf<PublicApiGroup, "listPosts">,
 

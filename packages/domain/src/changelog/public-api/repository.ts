@@ -159,8 +159,10 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
    *
    * Batched by the page's ids rather than fetched per entry, so a page of
    * twenty entries is three queries rather than forty-one. Both collections
-   * are ordered by their link's creation time, which is the order the editor
-   * wrote them in, so a repeated read of the same entry does not shuffle.
+   * are ordered by their link's creation time and then by the link's own
+   * identifier — the category link's id, the post link's post id — so two
+   * labels or posts attached at the same instant still read in one stable
+   * order rather than whatever the planner returns.
    */
   const collectionsByChangelogId = (
     changelogIds: readonly string[],
@@ -200,7 +202,10 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
             inArray(schema.changelogCategoryLinkTable.changelogId, changelogIds)
           )
         )
-        .orderBy(asc(schema.changelogCategoryLinkTable.createdAt));
+        .orderBy(
+          asc(schema.changelogCategoryLinkTable.createdAt),
+          asc(schema.changelogCategoryLinkTable.id)
+        );
 
       const postRows = yield* db
         .select({
@@ -220,7 +225,12 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
             inArray(schema.changelogPostTable.changelogId, changelogIds)
           )
         )
-        .orderBy(asc(schema.changelogPostTable.createdAt));
+        .orderBy(
+          asc(schema.changelogPostTable.createdAt),
+          // The table's key is `(changelogId, postId)`, so the post id is the
+          // unique tiebreaker a link created in the same instant needs.
+          asc(schema.changelogPostTable.postId)
+        );
 
       const categories = new Map<string, PublicApiChangelogCategoryEntry[]>();
       for (const row of categoryRows) {

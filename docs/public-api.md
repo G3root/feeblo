@@ -155,7 +155,7 @@ GET /api/v1/boards/{boardId}/posts
 | `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
 | `status` | — | A status id. |
 | `includeArchived` | `false` | Archived posts are excluded by default. |
-| `tagIds` | — | Comma-separated tag ids; a post matches if it carries **at least one**. |
+| `tagIds` | — | Comma-separated tag ids; a post matches if it carries **at least one**. At least one id is required when the parameter is present. |
 | `updatedAfter` | — | An ISO 8601 date or timestamp; keeps posts changed after it. |
 
 ```json
@@ -202,12 +202,14 @@ GET /api/v1/posts
 | `status` | — | A status id. |
 | `includeArchived` | `false` | Archived posts are excluded by default. |
 | `boardId` | — | Only posts on this board. |
-| `tagIds` | — | Comma-separated tag ids; a post matches if it carries **at least one**. |
+| `tagIds` | — | Comma-separated tag ids; a post matches if it carries **at least one**. At least one id is required when the parameter is present. |
 | `updatedAfter` | — | An ISO 8601 date or timestamp; keeps posts changed after it. |
 
 Returns the same page shape as a board's list, across every board of the calling workspace, newest first. Private boards are included, for the same reason the board list includes them, and posts merged into another post are never listed. Use `GET /api/v1/boards/{boardId}/posts` to page a single board.
 
-To sync incrementally, page the workspace list with `updatedAfter` set to the timestamp of the last change you processed and apply `updatedAt > updatedAfter`. A page is still ordered and cursored by `createdAt`, so an old post that changed recently appears in its original position rather than at the top — page the filtered list to the end, or read it again from the first page. A tag id that does not exist in the workspace matches no post rather than being rejected: filtering is a read, and a typo should not cost you a second request to diagnose.
+To sync incrementally, page the workspace list with `updatedAfter` set to the instant of the last change you processed. It matches posts whose own record changed after it — title, body, status, board, ETA, lock or archive state, a merge, or a tag assignment — so a caller re-reads each post it returns and gets the current values. Comments and votes are engagement rather than changes to the post, so they do not move `updatedAt`; read those counts from the post itself, or read [`GET /api/v1/posts/{postId}/activity`](#list-a-posts-activity) when the entries themselves are needed. A page is still ordered and cursored by `createdAt`, so an old post that changed recently appears in its original position rather than at the top — page the filtered list to the end, or read it again from the first page.
+
+A `tagIds` parameter that names no id — `?tagIds=`, `?tagIds=,,` — is `400 INVALID_REQUEST` rather than a page of everything: a caller that joins an empty list into the query asked for posts carrying one of nothing. An id that does not exist in the workspace is different: it matches no post rather than being rejected, because a typo should not cost a second request to diagnose.
 
 ### Get a post
 
@@ -754,7 +756,7 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 
 | Status | `_tag` | Meaning |
 | --- | --- | --- |
-| 400 | `INVALID_REQUEST` | Malformed parameter, cursor, limit, `tagIds` list, or `updatedAfter` instant; a body the endpoint cannot decode; a comment body that is empty or sanitizes to nothing; a name or title that is only whitespace; an update that names no field; a board or status id that is not in the workspace; a post that has been merged into another; a reply whose parent is not a comment on the same post; a reply widened to public beneath an internal parent; an author subject that resolves to no account. |
+| 400 | `INVALID_REQUEST` | Malformed parameter, cursor, limit, `tagIds` list (empty or malformed), or `updatedAfter` instant (not an ISO 8601 date or timestamp naming a real day); a body the endpoint cannot decode; a comment body that is empty or sanitizes to nothing; a name or title that is only whitespace; an update that names no field; a board or status id that is not in the workspace; a post that has been merged into another; a reply whose parent is not a comment on the same post; a reply widened to public beneath an internal parent; an author subject that resolves to no account. |
 | 401 | `MISSING_API_KEY` | No `x-api-key` header was sent, or its value was empty. |
 | 401 | `INVALID_API_KEY` | The key is unknown, revoked, expired, or disabled. |
 | 403 | `FORBIDDEN_SCOPE` | The key lacks the scope the endpoint requires. |
