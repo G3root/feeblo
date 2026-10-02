@@ -11,12 +11,14 @@ import {
   ListChangelogInput,
   ListCompaniesInput,
   ListPostCommentsInput,
+  ListPostActivityInput,
   ListPostsInput,
   ListTagsInput,
   PublicApiBoardPage,
   PublicApiChangelogPage,
   PublicApiCommentPage,
   PublicApiCompanyPage,
+  PublicApiPostActivityPage,
   PublicApiPostPage,
   PublicApiTagPage,
 } from "./schema";
@@ -63,6 +65,7 @@ describe("public API operations registry", () => {
       ListBoardPostsInput,
       ListBoardsInput,
       ListPostsInput,
+      ListPostActivityInput,
       ListPostCommentsInput,
       ListTagsInput,
       ListCompaniesInput,
@@ -70,6 +73,7 @@ describe("public API operations registry", () => {
     ];
     const pageOutputs = [
       PublicApiBoardPage,
+      PublicApiPostActivityPage,
       PublicApiPostPage,
       PublicApiCommentPage,
       PublicApiTagPage,

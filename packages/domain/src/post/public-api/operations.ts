@@ -23,15 +23,22 @@ import { withRemapDbErrors } from "../../rpc-errors";
 import { postTagChangeActivities } from "../../tag/post-tag-activities";
 import { toPublicApiTag } from "../../tag/public-api/mappers";
 import { currentTagRepository } from "../../tag/repository";
-import { toPublicApiPost, toPublicApiPostSummary } from "./mappers";
+import {
+  toActivitySource,
+  toPublicApiPost,
+  toPublicApiPostActivity,
+  toPublicApiPostSummary,
+} from "./mappers";
 import { currentPublicApiPostRepository } from "./repository";
 import {
   CreatePostInput,
   DeletePostInput,
   GetPostInput,
   ListBoardPostsInput,
+  ListPostActivityInput,
   ListPostsInput,
   PublicApiPost,
+  PublicApiPostActivityPage,
   PublicApiPostPage,
   PublicApiPostTags,
   RetrievePostInput,
@@ -299,6 +306,65 @@ export const getPostOperation = defineOperation(
     })
 );
 
+export const listPostActivityOperation = defineOperation(
+  "listPostActivity",
+  {
+    annotations: { idempotent: true, readOnly: true },
+    description:
+      "List one post's timeline, newest first, as a cursor-paginated page: creation, status and board moves, tag changes, merges, and comment entries, each with the values it moved between. An entry written by an API key has no actor.",
+    failure: POST_READ_FAILURES,
+    input: ListPostActivityInput,
+    output: PublicApiPostActivityPage,
+    scope: "posts.read",
+  },
+  ({ cursor, limit, postId }) =>
+    Effect.gen(function* () {
+      const caller = yield* currentPublicApiCaller;
+      const posts = yield* currentPublicApiPostRepository;
+      const activity = yield* currentPostActivityRepository;
+
+      // The post is read first so a missing post and a post with no history
+      // are not the same answer, and another workspace's post is reported as
+      // missing rather than forbidden, like every other post-scoped read.
+      const post = yield* posts
+        .findPost({ organizationId: caller.organizationId, postId })
+        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+
+      if (Option.isNone(post)) {
+        return yield* notFoundError("Post not found.");
+      }
+
+      const after = yield* decodeCursorOrFail(cursor);
+      const pageSize = limit ?? PUBLIC_API_PAGE_DEFAULT_LIMIT;
+
+      const rows = yield* activity
+        .findPage({
+          after,
+          limit: pageSize,
+          organizationId: caller.organizationId,
+          postId,
+        })
+        .pipe(
+          withRemapDbErrors("PublicApiPostActivity", "select"),
+          Effect.catchTag("InternalServerError", () => onInternalError)
+        );
+
+      const hasMore = rows.length > pageSize;
+      const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
+      const lastRow = pageRows.at(-1);
+
+      return {
+        data: pageRows.map((row) =>
+          toPublicApiPostActivity(toActivitySource(row))
+        ),
+        nextCursor:
+          hasMore && lastRow !== undefined
+            ? encodeCursor({ createdAt: lastRow.createdAt, id: lastRow.id })
+            : null,
+      };
+    })
+);
+
 export const createPostOperation = defineOperation(
   "createPost",
   {
@@ -502,6 +568,7 @@ export const postOperations = [
   listPostsOperation,
   retrievePostOperation,
   getPostOperation,
+  listPostActivityOperation,
   createPostOperation,
   updatePostOperation,
   setPostTagsOperation,

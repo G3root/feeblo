@@ -21,6 +21,7 @@ import {
   deletePostOperation,
   getPostOperation,
   listBoardPostsOperation,
+  listPostActivityOperation,
   listPostsOperation,
   retrievePostOperation,
   setPostTagsOperation,
@@ -32,8 +33,11 @@ import {
   GetPostParams,
   ListBoardPostsParams,
   ListBoardPostsQuery,
+  ListPostActivityParams,
+  ListPostActivityQuery,
   ListPostsQuery,
   PublicApiPost,
+  PublicApiPostActivityPage,
   PublicApiPostPage,
   PublicApiPostTags,
   RetrievePostQuery,
@@ -92,6 +96,18 @@ export const postEndpoints = [
     .annotate(
       OpenApi.Description,
       "Returns one post with its sanitized body. Posts of other workspaces are reported as not found rather than forbidden, so an id cannot be used to probe another workspace."
+    ),
+  HttpApiEndpoint.get("listPostActivity", "/posts/:postId/activity", {
+    params: ListPostActivityParams,
+    query: ListPostActivityQuery,
+    success: PublicApiPostActivityPage,
+    error: PUBLIC_API_ERROR_SCHEMAS,
+  })
+    .annotate(OpenApi.Title, "List Post Activity")
+    .annotate(OpenApi.Summary, "List a post's timeline")
+    .annotate(
+      OpenApi.Description,
+      'Returns one post\'s history, newest first, as a cursor-paginated page: creation, status and board moves, tag changes, merges, and comment entries. `kind` names what happened and `previousValue`/`nextValue` are the values it moved between — a status id for STATUS_CHANGED, a tag id for TAG_ADDED, a post id for POST_MERGED. `actor` is null when the entry was written by an API key, which has no member identity; the dashboard shows the same entry as "Someone". A post merged into another is readable and reports its own history, including the merge.'
     ),
   HttpApiEndpoint.post("createPost", "/posts", {
     payload: CreatePostPayload,
@@ -191,6 +207,16 @@ export const postHandlers = {
     getPostOperation.handler({
       postId: params.postId,
     })) satisfies HandlerOf<PublicApiGroup, "getPost">,
+
+  listPostActivity: (({ params, query }) =>
+    Effect.gen(function* () {
+      const limit = yield* parseLimit(query.limit);
+      return yield* listPostActivityOperation.handler({
+        cursor: query.cursor,
+        limit,
+        postId: params.postId,
+      });
+    })) satisfies HandlerOf<PublicApiGroup, "listPostActivity">,
 
   createPost: (({ payload }) =>
     createPostOperation.handler({

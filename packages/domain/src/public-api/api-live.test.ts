@@ -52,6 +52,7 @@ import {
   PublicApiCompany,
   PublicApiCompanyPage,
   PublicApiPost,
+  PublicApiPostActivityPage,
   PublicApiPostPage,
   PublicApiPostTags,
   PublicApiStatusList,
@@ -118,6 +119,9 @@ const decodeBoardPage = Schema.decodeUnknownSync(
 );
 const decodeStatuses = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiStatusList)
+);
+const decodeActivityPage = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiPostActivityPage)
 );
 const decodePost = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiPost)
@@ -4056,6 +4060,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/posts",
         "/api/v1/posts/retrieve",
         "/api/v1/posts/{postId}",
+        "/api/v1/posts/{postId}/activity",
         "/api/v1/posts/{postId}/comments",
         "/api/v1/posts/{postId}/tags",
         "/api/v1/statuses",
@@ -4312,6 +4317,161 @@ layer(makeTestApp())("public api v1", (it) => {
       expect(emptyTags.status).toBe(400);
       expect(decodeError(responseBody(emptyTags))._tag).toBe("INVALID_REQUEST");
     })
+  );
+
+  it.effect(
+    "lists a post's timeline newest first, with actors classified",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const db = yield* currentDb;
+        const nowDateTime = yield* DateTime.now;
+        const now = DateTime.toDate(nowDateTime);
+        const atMinutesAgo = (count: number) =>
+          DateTime.toDate(DateTime.subtract(nowDateTime, { minutes: count }));
+        const threeMinutesAgo = atMinutesAgo(3);
+        const twoMinutesAgo = atMinutesAgo(2);
+        const oneMinuteAgo = atMinutesAgo(1);
+
+        // A member and an end user, each with a user row so the timeline can
+        // name them; the member row is what distinguishes the two.
+        const memberUserId = `user_activity_member_${workspace.organizationId}`;
+        const endUserId = `user_activity_end_${workspace.organizationId}`;
+        yield* db.insert(schema.userTable).values([
+          {
+            id: memberUserId,
+            email: `${memberUserId}@example.com`,
+            name: "Morgan Staff",
+          },
+          {
+            id: endUserId,
+            email: `${endUserId}@example.com`,
+            name: "Jamie Customer",
+          },
+        ]);
+        yield* db.insert(schema.memberTable).values({
+          id: `mem_activity_${workspace.organizationId}`,
+          organizationId: workspace.organizationId,
+          userId: memberUserId,
+          role: "admin",
+          createdAt: now,
+        });
+
+        yield* db.insert(schema.postActivityTable).values([
+          {
+            id: "act_created",
+            organizationId: workspace.organizationId,
+            postId: workspace.postId,
+            actorId: endUserId,
+            actorMemberId: null,
+            kind: "POST_CREATED",
+            createdAt: threeMinutesAgo,
+          },
+          {
+            id: "act_status",
+            organizationId: workspace.organizationId,
+            postId: workspace.postId,
+            actorId: memberUserId,
+            actorMemberId: `mem_activity_${workspace.organizationId}`,
+            kind: "STATUS_CHANGED",
+            previousValue: "pss_open",
+            nextValue: "pss_planned",
+            // Internal provenance that must not reach the payload.
+            metadata: { onBehalfOf: { contactId: "cnt_secret" } },
+            createdAt: twoMinutesAgo,
+          },
+          {
+            id: "act_tag",
+            organizationId: workspace.organizationId,
+            postId: workspace.postId,
+            actorId: null,
+            actorMemberId: null,
+            kind: "TAG_ADDED",
+            nextValue: "tag_dark_mode",
+            createdAt: oneMinuteAgo,
+          },
+        ]);
+
+        registerKey("fbk_activity", workspace.organizationId);
+
+        // One page at a time, so the cursor is exercised on the same ordering
+        // the response uses.
+        const firstResponse = yield* executeRequest(
+          `/api/v1/posts/${workspace.postId}/activity?limit=2`,
+          "fbk_activity"
+        );
+        expect(firstResponse.status).toBe(200);
+
+        const first = decodeActivityPage(responseBody(firstResponse));
+        expect(first.data.map((entry) => entry.id)).toEqual([
+          "act_tag",
+          "act_status",
+        ]);
+        expect(first.nextCursor).not.toBeNull();
+
+        const secondResponse = yield* executeRequest(
+          `/api/v1/posts/${workspace.postId}/activity?cursor=${encodeURIComponent(first.nextCursor ?? "")}`,
+          "fbk_activity"
+        );
+        expect(secondResponse.status).toBe(200);
+        const second = decodeActivityPage(responseBody(secondResponse));
+        expect(second.data.map((entry) => entry.id)).toEqual(["act_created"]);
+        expect(second.nextCursor).toBeNull();
+
+        const [tagEntry, statusEntry] = first.data;
+        const [createdEntry] = second.data;
+
+        // A machine key is not an actor: the entry reports nobody rather than
+        // inventing an identity.
+        expect(tagEntry?.actor).toBeNull();
+        expect(tagEntry?.kind).toBe("TAG_ADDED");
+        expect(tagEntry?.nextValue).toBe("tag_dark_mode");
+
+        expect(statusEntry?.actor).toEqual({
+          avatarUrl: null,
+          displayName: "Morgan Staff",
+          type: "member",
+        });
+        expect(statusEntry?.previousValue).toBe("pss_open");
+        expect(statusEntry?.nextValue).toBe("pss_planned");
+
+        expect(createdEntry?.actor).toEqual({
+          avatarUrl: null,
+          displayName: "Jamie Customer",
+          type: "end_user",
+        });
+
+        // The internal provenance and the actor's member id stay internal.
+        const raw = responseBody(firstResponse) + responseBody(secondResponse);
+        expect(raw).not.toContain("metadata");
+        expect(raw).not.toContain("actorMemberId");
+        expect(raw).not.toContain("cnt_secret");
+        expect(raw).not.toContain("mem_activity");
+      })
+  );
+
+  it.effect(
+    "reports another workspace's post as not found on its timeline",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const other = yield* seedWorkspace();
+        registerKey("fbk_activity_scoped", workspace.organizationId);
+
+        const foreign = yield* executeRequest(
+          `/api/v1/posts/${other.postId}/activity`,
+          "fbk_activity_scoped"
+        );
+        expect(foreign.status).toBe(404);
+        expect(decodeError(responseBody(foreign))._tag).toBe("NOT_FOUND");
+
+        const unknown = yield* executeRequest(
+          "/api/v1/posts/pst_does_not_exist/activity",
+          "fbk_activity_scoped"
+        );
+        expect(unknown.status).toBe(404);
+        expect(decodeError(responseBody(unknown))._tag).toBe("NOT_FOUND");
+      })
   );
 
   it.effect("refuses the board reads without the boards.read scope", () =>

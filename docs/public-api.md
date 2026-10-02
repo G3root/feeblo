@@ -328,6 +328,44 @@ The post is gone immediately and cannot be restored; its comments, votes, tags, 
 
 A post that has been merged into another is answered with `400 INVALID_REQUEST` rather than being deleted, and a post that is already gone is answered with `404 NOT_FOUND` rather than a success that deleted nothing.
 
+### List a post's activity
+
+```http
+GET /api/v1/posts/{postId}/activity
+```
+
+| Query parameter | Default | Notes |
+| --- | --- | --- |
+| `limit` | `25` | 1–100. |
+| `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
+
+```json
+{
+  "data": [
+    {
+      "id": "act_example",
+      "kind": "STATUS_CHANGED",
+      "actor": {
+        "type": "member",
+        "displayName": "Morgan",
+        "avatarUrl": null
+      },
+      "previousValue": "pss_open",
+      "nextValue": "pss_planned",
+      "commentId": null,
+      "createdAt": "2026-08-12T09:30:00.000Z"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+Requires `posts.read`. The post's own history, newest first, so an integration can tell what happened to a post without diffing snapshots. The timeline is append-only: entries are never edited or deleted, and deleting the post takes them with it.
+
+`kind` is the vocabulary that names what happened, and `previousValue` and `nextValue` are the values the entry moved between. What they name depends on `kind`: a status id for `STATUS_CHANGED`, a board id for `BOARD_CHANGED`, a tag id for `TAG_ADDED` and `TAG_REMOVED`, a post id for `POST_MERGED`, `POST_MERGED_INTO`, and `POST_UNMERGED`. `commentId` is set on the comment entries, so a caller can resolve them through `GET /api/v1/comments/{commentId}`.
+
+`actor` is the same `{ type, displayName, avatarUrl }` shape a post's author uses, never an internal identifier. It is `null` when the entry was written by an API key: a machine credential has no member identity, so the alternative would be to invent one. (The dashboard shows the same entry as "Someone".) A post merged into another is still readable and reports its own timeline, including the entry that says where it went.
+
 ### List tags
 
 ```http

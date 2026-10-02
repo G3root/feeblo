@@ -105,6 +105,7 @@ const LIST_PATH = "/api/v1/boards/{boardId}/posts";
 const POSTS_PATH = "/api/v1/posts";
 const RETRIEVE_PATH = "/api/v1/posts/retrieve";
 const DETAIL_PATH = "/api/v1/posts/{postId}";
+const POST_ACTIVITY_PATH = "/api/v1/posts/{postId}/activity";
 const SET_POST_TAGS_PATH = "/api/v1/posts/{postId}/tags";
 const STATUSES_PATH = "/api/v1/statuses";
 const TAGS_PATH = "/api/v1/tags";
@@ -142,6 +143,7 @@ describe("PublicApi contract", () => {
         CHANGELOG_PATH,
         CHANGELOG_ENTRY_PATH,
         DETAIL_PATH,
+        POST_ACTIVITY_PATH,
         SET_POST_TAGS_PATH,
         STATUSES_PATH,
         POST_COMMENTS_PATH,
@@ -545,6 +547,42 @@ describe("PublicApi contract", () => {
     // by the workspace's own `orderIndex` rather than by age, so a cursor on
     // the shared `(createdAt, id)` tuple would order them the wrong way.
     expect(body).not.toContain("nextCursor");
+  });
+
+  it("documents the post timeline without an internal actor identifier", () => {
+    const responses = document.paths[POST_ACTIVITY_PATH]?.get?.responses ?? {};
+
+    // Reading a post's history is a read: it cannot collide with anything, and
+    // it can report a missing post.
+    expect(Object.keys(responses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(JSON.stringify(responses)).not.toContain("CONFLICT");
+
+    const body = JSON.stringify(responses["200"]);
+    for (const field of [
+      "id",
+      "kind",
+      "actor",
+      "previousValue",
+      "nextValue",
+      "commentId",
+      "createdAt",
+      "nextCursor",
+    ]) {
+      expect(body).toContain(field);
+    }
+
+    // `post_activity` also carries the workspace, the actor's user and member
+    // ids, and the on-behalf metadata; none of them has a name in this
+    // contract, and the key already names the workspace.
+    for (const forbidden of [
+      "organizationId",
+      "actorId",
+      "actorMemberId",
+      "metadata",
+      "postId",
+    ]) {
+      expect(body).not.toContain(forbidden);
+    }
   });
 
   it("documents the board resource without an internal identifier", () => {
