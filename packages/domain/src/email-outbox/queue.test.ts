@@ -181,8 +181,46 @@ const fixture = Effect.gen(function* () {
   if (intent._tag !== "Inserted") {
     return yield* Effect.die("Expected inserted outbox intent");
   }
-  return { intentId: intent.intent.id, organizationId, ownerEmail };
+  return {
+    boardId,
+    intentId: intent.intent.id,
+    organizationId,
+    ownerEmail,
+    ownerMemberId: ownerId,
+    postId,
+    statusId,
+    userId,
+  };
 });
+
+/** A second submission on the fixture's board, for window-coalescing tests. */
+const addSubmissionPost = (args: {
+  readonly boardId: string;
+  readonly organizationId: string;
+  readonly ownerMemberId: string;
+  readonly postId: string;
+  readonly slug: string;
+  readonly statusId: string;
+  readonly title: string;
+  readonly userId: string;
+}) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    yield* db.insert(schema.postTable).values({
+      id: args.postId,
+      organizationId: args.organizationId,
+      boardId: args.boardId,
+      statusId: args.statusId,
+      title: args.title,
+      slug: args.slug,
+      content: "x",
+      excerpt: "x",
+      creatorId: args.userId,
+      creatorMemberId: args.ownerMemberId,
+      createdAt: fixtureNow,
+      updatedAt: fixtureNow,
+    });
+  });
 
 const enableSubscriberEmails = (organizationId: string) =>
   Effect.gen(function* () {
@@ -224,7 +262,7 @@ const addSubscriptionContact = (args: {
   readonly organizationId: string;
   readonly state: "active" | "pending_verification" | "unsubscribed";
   readonly topicId: string | null;
-  readonly topicType: "changelog" | "post";
+  readonly topicType: "changelog" | "post" | "submission";
   /** Links the email contact to a feeblo user (on-behalf attribution). */
   readonly userId?: string | null;
 }) =>
@@ -471,6 +509,153 @@ describe("EmailOutbox workflows", () => {
           expect(deliveries).toHaveLength(1);
           expect(deliveries[0]?.state).toBe("accepted");
         })
+    );
+
+    it.effect("coalesces submissions in one window into a single email", () =>
+      Effect.gen(function* () {
+        yield* resetTestMailer();
+        const {
+          boardId,
+          intentId,
+          organizationId,
+          ownerMemberId,
+          statusId,
+          userId,
+        } = yield* fixture;
+        const repository = yield* EmailOutboxRepository;
+        const db = yield* Database.Database;
+        const secondPostId = yield* PostId.generate;
+        yield* addSubmissionPost({
+          boardId,
+          organizationId,
+          ownerMemberId,
+          postId: secondPostId,
+          slug: "second-submission",
+          statusId,
+          title: "Second submission",
+          userId,
+        });
+
+        // The fixture writes the pre-window single-post intent shape, so this
+        // also covers a window that was pending across the change.
+        const appended = yield* repository.upsertPendingSubmissionWindow({
+          now: fixtureNow,
+          organizationId,
+          postId: secondPostId,
+        });
+        expect(appended).toEqual({ _tag: "Written", intentId });
+
+        // The appended post slid the window five minutes out; nothing sends
+        // until the burst has been quiet that long.
+        expect(yield* materializeEmailIntent(intentId)).toEqual([]);
+        yield* TestClock.adjust("5 minutes");
+
+        const deliveryIds = yield* materializeEmailIntent(intentId);
+        expect(deliveryIds).toHaveLength(1);
+        yield* Effect.forEach(deliveryIds, (deliveryId) =>
+          deliverEmailDelivery({ deliveryId })
+        );
+
+        const state = yield* testMailerState;
+        expect(state.sentMessages).toHaveLength(1);
+        expect(state.sentMessages[0]?.subject).toBe(
+          "2 new submissions in your workspace"
+        );
+        const [delivery] = yield* db
+          .select({
+            templatePayload: schema.emailDeliveryTable.templatePayload,
+          })
+          .from(schema.emailDeliveryTable)
+          .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+        expect(delivery?.templatePayload).toMatchObject({
+          body: "2 new posts have been submitted.",
+          posts: [
+            {
+              label: "Ship email outbox",
+              url: expect.stringContaining("feedback/ship-email-outbox"),
+            },
+            {
+              label: "Second submission",
+              url: expect.stringContaining("feedback/second-submission"),
+            },
+          ],
+        });
+      })
+    );
+
+    it.effect("drops a post deleted before its window sends", () =>
+      Effect.gen(function* () {
+        yield* resetTestMailer();
+        const {
+          boardId,
+          intentId,
+          organizationId,
+          ownerMemberId,
+          statusId,
+          userId,
+        } = yield* fixture;
+        const repository = yield* EmailOutboxRepository;
+        const db = yield* Database.Database;
+        const deletedPostId = yield* PostId.generate;
+        yield* addSubmissionPost({
+          boardId,
+          organizationId,
+          ownerMemberId,
+          postId: deletedPostId,
+          slug: "deleted-submission",
+          statusId,
+          title: "Deleted submission",
+          userId,
+        });
+        yield* repository.upsertPendingSubmissionWindow({
+          now: fixtureNow,
+          organizationId,
+          postId: deletedPostId,
+        });
+        yield* db
+          .delete(schema.postTable)
+          .where(eq(schema.postTable.id, deletedPostId));
+        yield* TestClock.adjust("5 minutes");
+
+        const deliveryIds = yield* materializeEmailIntent(intentId);
+        expect(deliveryIds).toHaveLength(1);
+        // Deliver it rather than leaving a queued row behind: this suite shares
+        // one database, and a later reconciliation would offer it to a worker
+        // whose send lands in another test's mailbox assertion.
+        yield* Effect.forEach(deliveryIds, (deliveryId) =>
+          deliverEmailDelivery({ deliveryId })
+        );
+        const [delivery] = yield* db
+          .select({
+            templatePayload: schema.emailDeliveryTable.templatePayload,
+          })
+          .from(schema.emailDeliveryTable)
+          .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+        expect(delivery?.templatePayload).toMatchObject({
+          body: "A new post has been submitted.",
+          posts: [{ label: "Ship email outbox" }],
+        });
+      })
+    );
+
+    it.effect("expires a window whose posts were all deleted", () =>
+      Effect.gen(function* () {
+        yield* resetTestMailer();
+        const { intentId, postId } = yield* fixture;
+        const repository = yield* EmailOutboxRepository;
+        const db = yield* Database.Database;
+        yield* db
+          .delete(schema.postTable)
+          .where(eq(schema.postTable.id, postId));
+
+        expect(yield* materializeEmailIntent(intentId)).toEqual([]);
+        expect((yield* repository.findById(intentId))?.state).toBe("expired");
+        const deliveries = yield* db
+          .select({ id: schema.emailDeliveryTable.id })
+          .from(schema.emailDeliveryTable)
+          .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+        expect(deliveries).toHaveLength(0);
+      })
     );
 
     it.effect(
@@ -1919,6 +2104,107 @@ describe("EmailOutbox workflows", () => {
     );
 
     it.effect(
+      "keeps a submission window eligible while any of its posts is on a public board",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { intentId, organizationId } = yield* fixture;
+          const db = yield* Database.Database;
+          const globalUserId = yield* UserId.generate;
+          const globalEmail = `window-global-${organizationId}@example.test`;
+          yield* db.insert(schema.userTable).values({
+            id: globalUserId,
+            email: globalEmail,
+            name: "Global user",
+            emailVerified: true,
+          });
+          // The free plan notifies one opted-in address; this one resolves to a
+          // global account with no membership, so only rule 3 can admit it.
+          yield* addSubscriptionContact({
+            email: globalEmail,
+            organizationId,
+            state: "active",
+            topicId: null,
+            topicType: "submission",
+            userId: globalUserId,
+          });
+          const { postId: privatePostId } =
+            yield* insertPrivateBoardPost(organizationId);
+          yield* (yield* EmailOutboxRepository).upsertPendingSubmissionWindow({
+            now: yield* DateTime.nowAsDate,
+            organizationId,
+            postId: privatePostId,
+          });
+          yield* TestClock.adjust("5 minutes");
+
+          const deliveryIds = yield* materializeEmailIntent(intentId);
+          expect(deliveryIds).toHaveLength(1);
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            deliverEmailDelivery({ deliveryId })
+          );
+          const [delivery] = yield* db
+            .select()
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+          // The window spans the fixture's public post and a private one, so
+          // the gate must read every notified post rather than the aggregate.
+          expect(delivery?.state).toBe("accepted");
+          expect((yield* testMailerState).sentMessages).toHaveLength(1);
+        })
+    );
+
+    it.effect(
+      "skips a submission window whose posts are all on private boards",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { intentId, organizationId, postId } = yield* fixture;
+          const db = yield* Database.Database;
+          const globalUserId = yield* UserId.generate;
+          const globalEmail = `private-window-${organizationId}@example.test`;
+          yield* db.insert(schema.userTable).values({
+            id: globalUserId,
+            email: globalEmail,
+            name: "Global user",
+            emailVerified: true,
+          });
+          yield* addSubscriptionContact({
+            email: globalEmail,
+            organizationId,
+            state: "active",
+            topicId: null,
+            topicType: "submission",
+            userId: globalUserId,
+          });
+          const { postId: privatePostId } =
+            yield* insertPrivateBoardPost(organizationId);
+          // The fixture's public post is the window's only public member; drop
+          // it so the window is private-only.
+          yield* db
+            .delete(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+          yield* (yield* EmailOutboxRepository).upsertPendingSubmissionWindow({
+            now: yield* DateTime.nowAsDate,
+            organizationId,
+            postId: privatePostId,
+          });
+          yield* TestClock.adjust("5 minutes");
+
+          const deliveryIds = yield* materializeEmailIntent(intentId);
+          expect(deliveryIds).toHaveLength(1);
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            deliverEmailDelivery({ deliveryId })
+          );
+          const [delivery] = yield* db
+            .select()
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+          expect(delivery?.state).toBe("no_organization_access");
+          expect((yield* testMailerState).sentMessages).toHaveLength(0);
+        })
+    );
+
+    it.effect(
       "keeps members and SSO-bound users eligible even on private boards",
       () =>
         Effect.gen(function* () {
@@ -2349,6 +2635,118 @@ describe("EmailOutbox queues with delivery paused", () => {
               .from(schema.emailDeliveryTable)
               .where(eq(schema.emailDeliveryTable.outboxId, intent.intent.id));
             expect(deliveries).toHaveLength(100);
+          })
+      );
+    }
+  );
+});
+
+describe("EmailOutbox workspace volume limit", () => {
+  // A workspace may spend its own monthly allowance without spending the
+  // platform-wide one every other workspace shares.
+  layer(makeTestLayer({ workspaceMonthlySendLimit: 1 }))(
+    "in-memory persisted queue",
+    (it) => {
+      it.effect(
+        "defers one workspace's delivery without touching another's",
+        () =>
+          Effect.gen(function* () {
+            yield* resetTestMailer();
+            const first = yield* fixture;
+            const second = yield* fixture;
+            const db = yield* Database.Database;
+            const firstDeliveryId = (yield* materializeEmailIntent(
+              first.intentId
+            ))[0];
+            const secondDeliveryId = (yield* materializeEmailIntent(
+              second.intentId
+            ))[0];
+            if (
+              firstDeliveryId === undefined ||
+              secondDeliveryId === undefined
+            ) {
+              return yield* Effect.die("Expected one delivery per workspace");
+            }
+
+            // One spent attempt is enough to trip a limit of one.
+            yield* db
+              .update(schema.emailDeliveryTable)
+              .set({ attemptCount: 1 })
+              .where(eq(schema.emailDeliveryTable.id, firstDeliveryId));
+
+            yield* deliverEmailDelivery({ deliveryId: firstDeliveryId });
+            yield* deliverEmailDelivery({ deliveryId: secondDeliveryId });
+
+            const [throttled] = yield* db
+              .select()
+              .from(schema.emailDeliveryTable)
+              .where(eq(schema.emailDeliveryTable.id, firstDeliveryId));
+            expect(throttled?.state).toBe("deferred");
+            expect(throttled?.lastError).toMatchObject({
+              reason: "workspace_monthly_volume_limit",
+            });
+
+            const [unaffected] = yield* db
+              .select()
+              .from(schema.emailDeliveryTable)
+              .where(eq(schema.emailDeliveryTable.id, secondDeliveryId));
+            expect(unaffected?.state).toBe("accepted");
+            expect((yield* testMailerState).sentMessages).toHaveLength(1);
+          })
+      );
+    }
+  );
+});
+
+describe("EmailOutbox platform volume limit", () => {
+  // The per-workspace breaker must not replace the platform-wide backstop: a
+  // workspace under its own allowance still stops once the shared one is spent.
+  layer(makeTestLayer({ monthlySendLimit: 1 }))(
+    "in-memory persisted queue",
+    (it) => {
+      it.effect(
+        "still defers every workspace once the shared allowance is spent",
+        () =>
+          Effect.gen(function* () {
+            yield* resetTestMailer();
+            const first = yield* fixture;
+            const second = yield* fixture;
+            const db = yield* Database.Database;
+            const firstDeliveryId = (yield* materializeEmailIntent(
+              first.intentId
+            ))[0];
+            const secondDeliveryId = (yield* materializeEmailIntent(
+              second.intentId
+            ))[0];
+            if (
+              firstDeliveryId === undefined ||
+              secondDeliveryId === undefined
+            ) {
+              return yield* Effect.die("Expected one delivery per workspace");
+            }
+
+            yield* db
+              .update(schema.emailDeliveryTable)
+              .set({ attemptCount: 1 })
+              .where(eq(schema.emailDeliveryTable.id, firstDeliveryId));
+
+            yield* deliverEmailDelivery({ deliveryId: firstDeliveryId });
+            yield* deliverEmailDelivery({ deliveryId: secondDeliveryId });
+
+            const [firstStored] = yield* db
+              .select()
+              .from(schema.emailDeliveryTable)
+              .where(eq(schema.emailDeliveryTable.id, firstDeliveryId));
+            const [secondStored] = yield* db
+              .select()
+              .from(schema.emailDeliveryTable)
+              .where(eq(schema.emailDeliveryTable.id, secondDeliveryId));
+            expect(firstStored?.state).toBe("deferred");
+            expect(secondStored?.state).toBe("deferred");
+            expect(secondStored?.lastError).toMatchObject({
+              reason: "monthly_volume_limit",
+            });
+            expect((yield* testMailerState).sentMessages).toHaveLength(0);
           })
       );
     }

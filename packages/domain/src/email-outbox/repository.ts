@@ -5,6 +5,7 @@ import { EmailDeliveryId, EmailOutboxId } from "@feeblo/id";
 import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -13,6 +14,11 @@ import {
   type EmailAddress,
   parseEmailAddress,
 } from "../email-subscription/schema";
+import {
+  submissionWindowBurst,
+  submissionWindowCeiling,
+  submissionWindowMaxPosts,
+} from "./config";
 import { deliverySourceStatesFor } from "./delivery-state";
 import {
   type EmailDeliveryRecord as EmailDelivery,
@@ -21,6 +27,7 @@ import {
   EmailIntentPayload,
   EmailOutboxRecord,
   type EmailIntentPayload as IntentPayload,
+  submissionWindowPostIds,
 } from "./schema";
 import {
   recordEmailDeliveryTransition,
@@ -64,6 +71,22 @@ export type RecordStatusChangeIntentInput = EmailIntentWriteFields & {
   >;
 };
 
+/** One submission joining its workspace's pending notification window. */
+export type RecordSubmissionWindowInput = {
+  /** The instant the submission is recorded; bounds the window's slide. */
+  readonly now: Date;
+  readonly organizationId: string;
+  readonly postId: string;
+};
+
+/**
+ * Outcome of joining a submission window. `Duplicate` means this exact post is
+ * already covered, so a replayed create never notifies twice.
+ */
+export type UpsertSubmissionWindowResult =
+  | { readonly _tag: "Written"; readonly intentId: string }
+  | { readonly _tag: "Duplicate" };
+
 export type CreateEmailDeliveryInput = {
   readonly contactId?: string | null;
   readonly outboxId: string;
@@ -102,6 +125,15 @@ const dataError = (operation: string, reason: string): EmailOutboxDataError =>
  * to change on every state transition that can be followed by a re-offer.
  */
 const nextTransitionVersion = sql`${schema.emailDeliveryTable.transitionVersion} + 1`;
+
+/**
+ * Bucket width used for a new submission window's deduplication key.
+ *
+ * Two submissions that find no pending window at the same moment derive the
+ * same key and the unique index collapses them into one window; without a
+ * bucket every concurrent first submission would open its own.
+ */
+const submissionWindowBucketMs = Duration.toMillis(submissionWindowBurst);
 
 const decodeIntentPayload = (
   input: Schema.Codec.Encoded<typeof EmailIntentPayload>,
@@ -339,6 +371,158 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       : { _tag: "AlreadyMaterialized" as const };
   });
 
+  /**
+   * Joins one submission to its workspace's pending notification window.
+   *
+   * Submissions coalesce by workspace rather than by post: a workspace has at
+   * most one pending window, every submission appends to it, and the window's
+   * `scheduledAt` slides to `now + submissionWindowBurst` without ever passing
+   * `createdAt + submissionWindowCeiling`. A burst therefore sends one email
+   * `submissionWindowBurst` after the last post, and a sustained flood is
+   * bounded to one email per window per hour instead of one per submission.
+   *
+   * The locked read is what makes concurrent submissions join the same window:
+   * a second transaction blocks on the row until the first commits, so it sees
+   * the appended post rather than opening a competing window. When no window is
+   * pending, the insert key is bucketed by `submissionWindowBurst` so that two
+   * simultaneous first submissions still converge on one row through the
+   * `(organizationId, deduplicationKey)` unique index.
+   *
+   * `aggregateId` names the post that opened the window. It is not the set of
+   * notified posts (that is `postIds`, which grows), but it keeps the intent
+   * under the post-attributed access gate and gives delivery telemetry a
+   * stable post reference.
+   */
+  const upsertPendingSubmissionWindow = Effect.fn(
+    "EmailOutboxRepository.upsertPendingSubmissionWindow"
+  )(function* ({ now, organizationId, postId }: RecordSubmissionWindowInput) {
+    const burstAt = DateTime.addDuration(
+      DateTime.fromDateUnsafe(now),
+      submissionWindowBurst
+    );
+    const [pending] = yield* db
+      .select({
+        createdAt: schema.emailOutboxTable.createdAt,
+        id: schema.emailOutboxTable.id,
+        payload: schema.emailOutboxTable.payload,
+      })
+      .from(schema.emailOutboxTable)
+      .where(
+        and(
+          eq(schema.emailOutboxTable.organizationId, organizationId),
+          eq(schema.emailOutboxTable.kind, "submission.created"),
+          eq(schema.emailOutboxTable.state, "pending")
+        )
+      )
+      .orderBy(schema.emailOutboxTable.createdAt)
+      .limit(1)
+      .for("update");
+
+    if (pending !== undefined) {
+      const payload = yield* decodeIntentPayload(
+        // SAFETY: the stored row is the encoded intent payload; the decoder
+        // re-validates the tag union before it is used.
+        pending.payload as Schema.Codec.Encoded<typeof EmailIntentPayload>,
+        "upsertPendingSubmissionWindow.decodePayload"
+      );
+      if (payload.kind !== "submission.created") {
+        return yield* dataError(
+          "upsertPendingSubmissionWindow",
+          "Pending submission window carries another intent kind"
+        );
+      }
+      const windowPostIds = submissionWindowPostIds(payload);
+      if (windowPostIds.includes(postId)) {
+        return { _tag: "Duplicate" as const };
+      }
+      // A full window spills into a new one instead of dropping the post.
+      if (windowPostIds.length < submissionWindowMaxPosts) {
+        const ceilingAt = DateTime.addDuration(
+          DateTime.fromDateUnsafe(pending.createdAt),
+          submissionWindowCeiling
+        );
+        const updatedAt = yield* DateTime.nowAsDate;
+        const rows = yield* db
+          .update(schema.emailOutboxTable)
+          .set({
+            payload: {
+              kind: "submission.created" as const,
+              postIds: [...windowPostIds, postId],
+            },
+            // A quiet workspace sends five minutes after its last submission;
+            // a busy one stops sliding an hour after the window opened.
+            scheduledAt: DateTime.toDateUtc(DateTime.min(burstAt, ceilingAt)),
+            updatedAt,
+          })
+          .where(
+            and(
+              eq(schema.emailOutboxTable.id, pending.id),
+              eq(schema.emailOutboxTable.state, "pending")
+            )
+          )
+          .returning({ id: schema.emailOutboxTable.id });
+
+        const updated = rows[0];
+        if (updated !== undefined) {
+          return { _tag: "Written" as const, intentId: updated.id };
+        }
+        // Zero rows means the window materialized between the locked read and
+        // this write. The post is not lost: it opens the next window below.
+      }
+    }
+
+    const outboxId = yield* EmailOutboxId.generate;
+    const payload = {
+      kind: "submission.created" as const,
+      postIds: [postId],
+    };
+    const insertWindow = (deduplicationKey: string) =>
+      db
+        .insert(schema.emailOutboxTable)
+        .values({
+          id: outboxId,
+          organizationId,
+          kind: "submission.created" as const,
+          aggregateType: "post",
+          aggregateId: postId,
+          deduplicationKey,
+          payload,
+          scheduledAt: DateTime.toDateUtc(burstAt),
+          expiresAt: null,
+          state: "pending" as const,
+          // The window's own open instant, not the row's audit default: the
+          // ceiling above is measured from it, and it has to be the same clock
+          // the sliding `now` comes from.
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoNothing()
+        .returning({ id: schema.emailOutboxTable.id });
+
+    const bucketStart =
+      Math.floor(now.getTime() / submissionWindowBucketMs) *
+      submissionWindowBucketMs;
+    const bucketedKey = `submission.created:${organizationId}:${bucketStart}`;
+    // The bucketed key collapses concurrent first submissions. The fallback
+    // covers a bucket whose window is already terminal, which a window cannot
+    // reach inside its own bucket (its send never precedes the bucket's end),
+    // so it exists only to fail closed rather than to overwrite a sent window.
+    let inserted = (yield* insertWindow(bucketedKey))[0];
+    if (inserted === undefined) {
+      inserted = (yield* insertWindow(`${bucketedKey}:${now.getTime()}`))[0];
+    }
+
+    if (inserted === undefined) {
+      return yield* dataError(
+        "upsertPendingSubmissionWindow",
+        "Could not open a submission notification window"
+      );
+    }
+
+    yield* recordEmailIntentTransition("submission.created", "pending");
+    return { _tag: "Written" as const, intentId: inserted.id };
+  });
+
   const findPending = Effect.fn("EmailOutboxRepository.findPending")(
     function* ({
       before,
@@ -413,6 +597,34 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
           "findById.decodeIntent"
         )
       : undefined;
+  });
+
+  /**
+   * Reads one intent while holding its row lock.
+   *
+   * Materialization uses this so a concurrent append to the same window
+   * serializes behind it: the appender's guarded update sees the state flip and
+   * opens the next window instead of writing into one that is already being
+   * sent. The caller must already be inside a transaction, or the lock is
+   * released before the state flip it is meant to protect.
+   */
+  const findByIdForUpdate = Effect.fn(
+    "EmailOutboxRepository.findByIdForUpdate"
+  )(function* (id: string) {
+    const [row] = yield* db
+      .select()
+      .from(schema.emailOutboxTable)
+      .where(eq(schema.emailOutboxTable.id, id))
+      .limit(1)
+      .for("update");
+    return row === undefined
+      ? undefined
+      : yield* decodeEmailIntent(
+          // SAFETY: the stored row is the encoded outbox record; the decoder
+          // re-validates it before it is used.
+          row as Schema.Codec.Encoded<typeof EmailOutboxRecord>,
+          "findByIdForUpdate.decodeIntent"
+        );
   });
 
   const findDeliveryById = Effect.fn("EmailOutboxRepository.findDeliveryById")(
@@ -892,9 +1104,11 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
   return {
     recordIntent,
     upsertPendingStatusChange,
+    upsertPendingSubmissionWindow,
     findPending,
     findPausedByPlan,
     findById,
+    findByIdForUpdate,
     findDeliveryById,
     markIntentState,
     resumePausedIntent,

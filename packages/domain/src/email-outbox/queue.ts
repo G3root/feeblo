@@ -9,7 +9,7 @@ import {
 import { createChangelogEmail } from "@feeblo/transactional/templates/changelog";
 import { createEmailSubscriptionVerificationEmail } from "@feeblo/transactional/templates/email-subscription-verification";
 import { createNotificationEmail } from "@feeblo/transactional/templates/notification";
-import { and, eq, gte, isNull, sql, sum } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, sql, sum } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -38,6 +38,7 @@ import {
   EmailUnsubscribeTarget,
   NotificationTemplatePayload,
   SubscriptionVerificationTemplatePayload,
+  submissionWindowPostIds,
 } from "./schema";
 import {
   recordEmailDeliveryAccessSkip,
@@ -60,6 +61,14 @@ const DeliveryAttemptOutcomeSchema = Schema.TaggedUnion({
 type DeliveryAttemptOutcome = Schema.Schema.Type<
   typeof DeliveryAttemptOutcomeSchema
 >;
+
+/**
+ * Returned where an element completed without enqueuing a delivery.
+ *
+ * A materialization can legitimately produce none: the window was already sent
+ * by another worker, slid into the future, or lost all of its posts.
+ */
+const noDeliveryIds: readonly string[] = [];
 
 const maximumDeliveryAttempts = 5;
 const maximumInfrastructureFailures = 10;
@@ -296,90 +305,144 @@ export const materializeEmailIntent = (outboxId: string) =>
     }
 
     if (intent.payload.kind === "submission.created") {
-      const post = yield* db.query.postTable.findFirst({
-        where: {
-          id: intent.payload.postId,
-          organizationId: intent.organizationId,
-        },
-        columns: { slug: true, title: true },
-        with: { board: { columns: { slug: true } } },
-        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      });
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      if (!post) {
-        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-        yield* repository.markIntentState({ id: intent.id, state: "expired" });
-        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-        yield* recordEmailIntentTransition(intent.kind, "expired");
-        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-        return [] as readonly string[];
-      }
-
-      const recipientLimit = yield* policy.submissionNotificationRecipientLimit(
-        intent.organizationId
-      );
-      const members = yield* db.query.memberTable.findMany({
-        where: { organizationId: intent.organizationId },
-        columns: { role: true, userId: true },
-        with: { user: { columns: { email: true } } },
-      });
-      const optedInContacts = yield* db
-        .select({
-          email: schema.emailContactTable.email,
-          userId: schema.emailContactTable.userId,
-        })
-        .from(schema.emailSubscriptionTable)
-        .innerJoin(
-          schema.emailContactTable,
-          eq(
-            schema.emailContactTable.id,
-            schema.emailSubscriptionTable.contactId
-          )
-        )
-        .where(
-          and(
-            eq(
-              schema.emailSubscriptionTable.organizationId,
-              intent.organizationId
-            ),
-            eq(schema.emailSubscriptionTable.topicType, "submission"),
-            isNull(schema.emailSubscriptionTable.topicId),
-            eq(schema.emailSubscriptionTable.state, "active"),
-            eq(schema.emailContactTable.verificationState, "verified")
-          )
-        );
-      const privilegedUserIds = new Set(
-        members.flatMap((member) =>
-          member.role === "owner" || member.role === "admin"
-            ? [member.userId]
-            : []
-        )
-      );
-      const ownerEmail = members.find((member) => member.role === "owner")?.user
-        ?.email;
-      const configuredFreeRecipient = optedInContacts[0]?.email;
-      const recipients =
-        recipientLimit === 1
-          ? [configuredFreeRecipient ?? ownerEmail].filter(
-              (email): email is string => email !== undefined
-            )
-          : optedInContacts.flatMap((contact) =>
-              contact.userId !== null && privilegedUserIds.has(contact.userId)
-                ? [contact.email]
-                : []
-            );
-      const templatePayload = makeSubmissionNotificationPayload(
-        appUrl,
-        intent.organizationId,
-        post
-      );
-
       return yield* transaction(
         Effect.gen(function* () {
+          // Re-read under the row lock. `upsertPendingSubmissionWindow` appends
+          // to a pending window without waiting for this worker, so the payload
+          // the element was offered with may already be stale. Holding the lock
+          // through the state flip means a concurrent append either lands in
+          // this email or opens the next window; it is never dropped.
+          const window = yield* repository.findByIdForUpdate(intent.id);
+          if (window === undefined || window.state !== "pending") {
+            return noDeliveryIds;
+          }
+          if (window.payload.kind !== "submission.created") {
+            return noDeliveryIds;
+          }
+          // An append may have slid the window into the future while this
+          // element waited for the lock, which is the burst coalescing doing
+          // its job. Reconciliation re-offers the window when it comes due.
+          if (
+            yield* DateTime.isFuture(
+              DateTime.fromDateUnsafe(window.scheduledAt)
+            )
+          ) {
+            return noDeliveryIds;
+          }
+
+          const postIds = submissionWindowPostIds(window.payload);
+          const rows =
+            postIds.length === 0
+              ? []
+              : yield* db
+                  .select({
+                    boardSlug: schema.boardTable.slug,
+                    id: schema.postTable.id,
+                    slug: schema.postTable.slug,
+                    title: schema.postTable.title,
+                  })
+                  .from(schema.postTable)
+                  .leftJoin(
+                    schema.boardTable,
+                    eq(schema.boardTable.id, schema.postTable.boardId)
+                  )
+                  .where(
+                    and(
+                      inArray(schema.postTable.id, [...postIds]),
+                      eq(schema.postTable.organizationId, window.organizationId)
+                    )
+                  );
+          // Posts deleted between submission and send are dropped from the
+          // email; a window whose posts are all gone has nothing to say. The
+          // window's order is the submission order, so resolve through a map
+          // rather than relying on the query's row order.
+          const rowsById = new Map(rows.map((row) => [row.id, row]));
+          const posts = postIds.flatMap((postId) => {
+            const row = rowsById.get(postId);
+            return row === undefined
+              ? []
+              : [
+                  {
+                    board:
+                      row.boardSlug === null ? null : { slug: row.boardSlug },
+                    slug: row.slug,
+                    title: row.title,
+                  },
+                ];
+          });
+          if (posts.length === 0) {
+            yield* repository.markIntentState({
+              id: window.id,
+              state: "expired",
+            });
+            yield* recordEmailIntentTransition(window.kind, "expired");
+            return noDeliveryIds;
+          }
+
+          const recipientLimit =
+            yield* policy.submissionNotificationRecipientLimit(
+              window.organizationId
+            );
+          const members = yield* db.query.memberTable.findMany({
+            where: { organizationId: window.organizationId },
+            columns: { role: true, userId: true },
+            with: { user: { columns: { email: true } } },
+          });
+          const optedInContacts = yield* db
+            .select({
+              email: schema.emailContactTable.email,
+              userId: schema.emailContactTable.userId,
+            })
+            .from(schema.emailSubscriptionTable)
+            .innerJoin(
+              schema.emailContactTable,
+              eq(
+                schema.emailContactTable.id,
+                schema.emailSubscriptionTable.contactId
+              )
+            )
+            .where(
+              and(
+                eq(
+                  schema.emailSubscriptionTable.organizationId,
+                  window.organizationId
+                ),
+                eq(schema.emailSubscriptionTable.topicType, "submission"),
+                isNull(schema.emailSubscriptionTable.topicId),
+                eq(schema.emailSubscriptionTable.state, "active"),
+                eq(schema.emailContactTable.verificationState, "verified")
+              )
+            );
+          const privilegedUserIds = new Set(
+            members.flatMap((member) =>
+              member.role === "owner" || member.role === "admin"
+                ? [member.userId]
+                : []
+            )
+          );
+          const ownerEmail = members.find((member) => member.role === "owner")
+            ?.user?.email;
+          const configuredFreeRecipient = optedInContacts[0]?.email;
+          const recipients =
+            recipientLimit === 1
+              ? [configuredFreeRecipient ?? ownerEmail].filter(
+                  (email): email is string => email !== undefined
+                )
+              : optedInContacts.flatMap((contact) =>
+                  contact.userId !== null &&
+                  privilegedUserIds.has(contact.userId)
+                    ? [contact.email]
+                    : []
+                );
+          const templatePayload = makeSubmissionNotificationPayload(
+            appUrl,
+            window.organizationId,
+            posts
+          );
+
           const created = yield* Effect.forEach(recipients, (recipientEmail) =>
             repository.createDelivery({
-              outboxId: intent.id,
+              outboxId: window.id,
               recipientEmail,
               template: "submission-notification",
               templateVersion: 1,
@@ -387,10 +450,10 @@ export const materializeEmailIntent = (outboxId: string) =>
             })
           );
           yield* repository.markIntentState({
-            id: intent.id,
+            id: window.id,
             state: "materialized",
           });
-          yield* recordEmailIntentTransition(intent.kind, "materialized");
+          yield* recordEmailIntentTransition(window.kind, "materialized");
           return created.flatMap((result) =>
             result._tag === "Inserted" ? [result.delivery.id] : []
           );
@@ -598,6 +661,47 @@ const sendDeliveryAttempt = (
       };
     }
     const monthStart = DateTime.toDateUtc(DateTime.startOf(now, "month"));
+    // Per-workspace breaker first. The global allowance below is shared by every
+    // workspace, so without this one flooded workspace defers every other
+    // workspace's email until the month rolls over.
+    const [workspaceVolume] = yield* db
+      .select({ attempts: sum(schema.emailDeliveryTable.attemptCount) })
+      .from(schema.emailDeliveryTable)
+      .innerJoin(
+        schema.emailOutboxTable,
+        eq(schema.emailOutboxTable.id, schema.emailDeliveryTable.outboxId)
+      )
+      .where(
+        and(
+          gte(schema.emailDeliveryTable.createdAt, monthStart),
+          eq(schema.emailOutboxTable.organizationId, intent.organizationId)
+        )
+      );
+    if (
+      Number(workspaceVolume?.attempts ?? 0) >= config.workspaceMonthlySendLimit
+    ) {
+      yield* recordEmailDeliveryThrottle("workspace_monthly_volume_limit");
+      yield* Effect.logWarning(
+        "Email delivery paused by workspace monthly volume limit"
+      ).pipe(
+        Effect.annotateLogs({
+          deliveryId,
+          organizationId: intent.organizationId,
+        })
+      );
+      yield* repository.deferDeliveryForThrottle({
+        id: delivery.id,
+        nextAttemptAt: DateTime.toDateUtc(
+          DateTime.addDuration(now, monthlyVolumeRetryDelay)
+        ),
+        reason: "workspace_monthly_volume_limit",
+      });
+      return {
+        _tag: "retry" as const,
+        delay: monthlyVolumeRetryDelay,
+        infrastructureFailure: false,
+      };
+    }
     const [monthlyVolume] = yield* db
       .select({ attempts: sum(schema.emailDeliveryTable.attemptCount) })
       .from(schema.emailDeliveryTable)
@@ -759,20 +863,36 @@ const sendDeliveryAttempt = (
       // No resolvable account means the recipient is a pure external
       // subscriber; their consent was already proven above.
       if (account !== null) {
-        const [postBoard] = yield* db
-          .select({ visibility: schema.boardTable.visibility })
-          .from(schema.postTable)
-          .innerJoin(
-            schema.boardTable,
-            eq(schema.boardTable.id, schema.postTable.boardId)
-          )
-          .where(
-            and(
-              eq(schema.postTable.id, intent.aggregateId),
-              eq(schema.postTable.organizationId, intent.organizationId)
-            )
-          )
-          .limit(1);
+        // A submission window spans posts on possibly different boards, so the
+        // gate resolves every notified post: any public board satisfies rule 3,
+        // and a window whose posts have all been deleted keeps the fail-closed
+        // null. Every other post-attributed intent is about its aggregate.
+        const notifiedPostIds =
+          intent.payload.kind === "submission.created"
+            ? submissionWindowPostIds(intent.payload)
+            : [intent.aggregateId];
+        const boardRows =
+          notifiedPostIds.length === 0
+            ? []
+            : yield* db
+                .select({ visibility: schema.boardTable.visibility })
+                .from(schema.postTable)
+                .innerJoin(
+                  schema.boardTable,
+                  eq(schema.boardTable.id, schema.postTable.boardId)
+                )
+                .where(
+                  and(
+                    inArray(schema.postTable.id, [...notifiedPostIds]),
+                    eq(schema.postTable.organizationId, intent.organizationId)
+                  )
+                );
+        const boardVisibility =
+          boardRows.length === 0
+            ? null
+            : boardRows.some((row) => row.visibility === "PUBLIC")
+              ? "PUBLIC"
+              : "PRIVATE";
 
         const [memberRow] = yield* db
           .select({ id: schema.memberTable.id })
@@ -788,9 +908,7 @@ const sendDeliveryAttempt = (
         const accessVerdict = evaluateOrganizationAccess({
           account,
           hasMembership: memberRow !== undefined,
-          // A post or board that no longer resolves fails rule 3 fail-closed
-          // without affecting rules 1–2.
-          boardVisibility: postBoard?.visibility ?? null,
+          boardVisibility,
           organizationId: intent.organizationId,
         });
         if (!accessVerdict.eligible) {

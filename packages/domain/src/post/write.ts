@@ -497,16 +497,11 @@ export const makePostWrites = Effect.gen(function* () {
             });
           }
 
-          const intent = yield* emailOutbox
-            .recordIntent({
-              aggregateId: args.id,
-              aggregateType: "post",
-              deduplicationKey: `submission.created:${args.organizationId}:${args.id}`,
-              expiresAt: null,
-              kind: "submission.created",
+          const submissionWindow = yield* emailOutbox
+            .upsertPendingSubmissionWindow({
+              now: subscriptionNow,
               organizationId: args.organizationId,
-              payload: { kind: "submission.created", postId: args.id },
-              scheduledAt: subscriptionNow,
+              postId: args.id,
             })
             .pipe(
               Effect.mapError(
@@ -528,7 +523,10 @@ export const makePostWrites = Effect.gen(function* () {
 
           return {
             slug: persistedSlug,
-            outboxId: intent._tag === "Inserted" ? intent.intent.id : undefined,
+            outboxId:
+              submissionWindow._tag === "Written"
+                ? submissionWindow.intentId
+                : undefined,
           };
         })
       ).pipe(

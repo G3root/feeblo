@@ -27,7 +27,13 @@ const PersistedDate = Schema.Union([Schema.Date, Schema.DateFromString]);
 
 export const SubmissionCreatedEmailIntentPayload = Schema.Struct({
   kind: Schema.tag("submission.created"),
-  postId: PostId.schema,
+  /**
+   * The post that opened this window. Kept because the access gate keys off
+   * `aggregateType === "post"`; the window's notified posts live in `postIds`.
+   */
+  postId: Schema.optionalKey(PostId.schema),
+  /** The window's posts, oldest first. */
+  postIds: Schema.optionalKey(Schema.Array(PostId.schema)),
 });
 
 export const ChangelogPublishedEmailIntentPayload = Schema.Struct({
@@ -93,6 +99,19 @@ export const EmailIntentPayload = Schema.Union([
 ]).pipe(Schema.toTaggedUnion("kind"));
 
 export type EmailIntentPayload = Schema.Schema.Type<typeof EmailIntentPayload>;
+
+/**
+ * Post ids a submission notification covers.
+ *
+ * A window written before submissions coalesced carries a single `postId`; a
+ * window written since carries the ordered `postIds` it accumulated. Reading
+ * both here is what lets an intent that was pending across the deploy still
+ * materialize.
+ */
+export const submissionWindowPostIds = (
+  payload: Extract<EmailIntentPayload, { readonly kind: "submission.created" }>
+): readonly string[] =>
+  payload.postIds ?? (payload.postId === undefined ? [] : [payload.postId]);
 
 export const EmailUnsubscribeTarget = Schema.Union([
   Schema.Struct({

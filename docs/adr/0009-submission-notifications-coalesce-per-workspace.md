@@ -1,0 +1,29 @@
+# ADR 0009: Submission notifications coalesce per workspace
+
+## Decision
+
+A new post no longer sends its own email. Every submission joins one pending `submission.created` outbox intent per workspace — the submission window — and that window sends one email covering all of its posts.
+
+The window's send slides on every append: `scheduledAt = min(now + 5 minutes, window opened + 1 hour)`. A single submission is emailed five minutes later; a burst is emailed once, five minutes after its last post; a sustained flood is bounded to one email per window per hour instead of one per submission. A window carries at most 200 posts and spills the rest into a new window rather than dropping a submission. The email lists the first 20 posts and then links to the dashboard with a count.
+
+The same change scopes the monthly provider-volume guard per organization, evaluated before the platform-wide one. The platform cap remains as the backstop.
+
+## Why
+
+One submission produced one delivery per opted-in recipient, with no upper bound. `PostCreatePublic` allows five writes per minute per IP, so a single source produced 300 emails an hour into an owner's inbox, and the email's subject line was constant, which is exactly the pattern receiving providers degrade as bulk spam. The blast radius was the workspace's own recipients, and — worse — the platform's shared monthly provider allowance, which was summed across every organization against one 100k cap with a one-hour deferral. A flooded workspace therefore deferred every other workspace's email for the rest of the calendar month.
+
+The market does not send this email either. Canny's own email inventory has no "a post was created" message at all: admins get a report that is daily by default with a configurable frequency, and Slack or Teams is the realtime channel. Featurebase debounces its notifications by three minutes, bundles everything into one message, and suppresses the email when the admin already saw it in the app.
+
+What keeps this from being a daily digest here is plan gating. `integrations: false` on the free plan means a free workspace has no Slack or webhook channel at all, so email is its only push notification; a digest-only policy would delay a customer's bug report by up to a day for exactly the workspaces least able to watch a dashboard. A short window keeps the signal while bounding the volume, and a frequency preference (including a daily digest) remains a later setting on top of the same mechanism rather than a different one.
+
+## Consequences
+
+The volume bound is now structural rather than behavioral. A flood of any size produces one email per window: a workspace cannot spend more than one window an hour unless a window fills at 200 posts, at which point the spill window starts its own hour. The outbox row count for submissions is one per workspace per window instead of one per post.
+
+Exactly-once membership falls out of the key rather than needing a join table. The window's `deduplicationKey` is bucketed by the burst delay, so two simultaneous first submissions converge on one row through the existing `(organizationId, deduplicationKey)` unique index. Materialization re-reads the window under a row lock and re-checks that it is still pending and still due, so an append either lands in the email being sent or opens the next window; it is never dropped. This is why `findByIdForUpdate` exists.
+
+`aggregateType`/`aggregateId` still name one post — the window's opener — so the intent stays under the post-attributed organization-access gate. The gate reads every board the window notifies, because a window can span boards: any public board satisfies the global-user rule, and a window whose boards have all gone private fails closed.
+
+The deploy is compatible in both directions. Rows written before the change carry a single `postId`; the payload decoder accepts either shape, so an intent that was pending across the release still materializes. A submission recorded by new code against an old window appends to it.
+
+Spam posts are still public on the board, still in the database, and still trigger an in-app notification per post. This decision bounds what an attacker can make **us** send; it does not make submitting harder. That work — server-verified Turnstile on the public write RPCs and a moderation hold — is separate and still open.

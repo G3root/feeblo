@@ -22,32 +22,65 @@ type PostNotificationContent = {
   readonly topic: EmailSubscriptionTopic;
 };
 
-/** Builds the immutable administrative submission-notification snapshot. */
+/**
+ * Most posts one notification email lists before it links to the dashboard.
+ *
+ * The window itself may hold more (see `submissionWindowMaxPosts`); a flood is
+ * summarised by count rather than by an email that renders hundreds of rows.
+ */
+const submissionNotificationMaxListed = 20;
+
+/**
+ * Builds the immutable administrative submission-notification snapshot.
+ *
+ * The payload covers every post in the window, so the title carries the count
+ * and the list is truncated with a link rather than one email per submission.
+ */
 export const makeSubmissionNotificationPayload = (
   appUrl: string,
   organizationId: string,
-  post: {
+  posts: ReadonlyArray<{
     readonly slug: string;
     readonly title: string;
     readonly board: { readonly slug: string } | null;
-  }
-): NotificationTemplatePayload => ({
-  actionLabel: "View dashboard",
-  actionUrl: appUrl,
-  body: "A new post has been submitted.",
-  eyebrow: "Feedback",
-  posts: [
-    {
-      label: post.title,
-      url: `${appUrl}/${organizationId}/post/${post.board?.slug ?? ""}/${post.slug}`,
+  }>
+): NotificationTemplatePayload => {
+  const listed = posts.slice(0, submissionNotificationMaxListed);
+  const remaining = posts.length - listed.length;
+  const isSingle = posts.length === 1;
+
+  return {
+    actionLabel: "View dashboard",
+    actionUrl: appUrl,
+    // A single submission keeps the wording it had before windows existed; the
+    // count only appears once a window actually coalesced two or more.
+    body: isSingle
+      ? "A new post has been submitted."
+      : `${posts.length} new posts have been submitted.`,
+    eyebrow: "Feedback",
+    posts: [
+      ...listed.map((post) => ({
+        label: post.title,
+        url: `${appUrl}/${organizationId}/post/${post.board?.slug ?? ""}/${post.slug}`,
+      })),
+      ...(remaining > 0
+        ? [
+            {
+              label: `and ${remaining} more submitted posts`,
+              url: appUrl,
+            },
+          ]
+        : []),
+    ],
+    title: isSingle
+      ? "New submission in your workspace"
+      : `${posts.length} new submissions in your workspace`,
+    unsubscribe: {
+      kind: "settings",
+      url: `${appUrl}/settings/notifications`,
     },
-  ],
-  title: "New submission in your workspace",
-  unsubscribe: {
-    kind: "settings",
-    url: `${appUrl}/settings/notifications`,
-  },
-});
+  };
+};
 
 const titleCase = (value: string): string =>
   value
