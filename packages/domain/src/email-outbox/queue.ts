@@ -38,6 +38,7 @@ import {
   EmailUnsubscribeTarget,
   NotificationTemplatePayload,
   SubscriptionVerificationTemplatePayload,
+  submissionWindowPostCount,
   submissionWindowPostIds,
 } from "./schema";
 import {
@@ -331,6 +332,7 @@ export const materializeEmailIntent = (outboxId: string) =>
           }
 
           const postIds = submissionWindowPostIds(window.payload);
+          const windowPostCount = submissionWindowPostCount(window.payload);
           const rows =
             postIds.length === 0
               ? []
@@ -378,6 +380,11 @@ export const materializeEmailIntent = (outboxId: string) =>
             yield* recordEmailIntentTransition(window.kind, "expired");
             return noDeliveryIds;
           }
+          // A stored post that no longer resolves was deleted, so it stops
+          // being a submission worth reporting. Ids the window never stored
+          // stay in the count: they are past its cap, not gone.
+          const submissionCount =
+            windowPostCount - (postIds.length - posts.length);
 
           const recipientLimit =
             yield* policy.submissionNotificationRecipientLimit(
@@ -437,7 +444,8 @@ export const materializeEmailIntent = (outboxId: string) =>
           const templatePayload = makeSubmissionNotificationPayload(
             appUrl,
             window.organizationId,
-            posts
+            posts,
+            submissionCount
           );
 
           const created = yield* Effect.forEach(recipients, (recipientEmail) =>

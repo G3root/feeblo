@@ -25,8 +25,8 @@ export const submissionWindowBurst = Duration.minutes(5);
 /** Hard bound on how far one window's send may slide, from its creation. */
 export const submissionWindowCeiling = Duration.hours(1);
 /**
- * Most posts one window carries. A full window spills into a new one rather
- * than dropping a submission, which is reachable only under a flood.
+ * Most posts one window stores. A window past this keeps counting without
+ * storing, so overflowing it cannot open a second window and double the rate.
  */
 export const submissionWindowMaxPosts = 200;
 

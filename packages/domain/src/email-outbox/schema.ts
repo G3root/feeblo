@@ -32,8 +32,14 @@ export const SubmissionCreatedEmailIntentPayload = Schema.Struct({
    * `aggregateType === "post"`; the window's notified posts live in `postIds`.
    */
   postId: Schema.optionalKey(PostId.schema),
-  /** The window's posts, oldest first. */
+  /**
+   * The window's posts, oldest first, capped at `submissionWindowMaxPosts`.
+   * Submissions past the cap are counted in `postCount` but not stored: the
+   * email could not have listed them anyway.
+   */
   postIds: Schema.optionalKey(Schema.Array(PostId.schema)),
+  /** Submissions the window covers, including those past the stored id cap. */
+  postCount: Schema.optionalKey(Schema.Int),
 });
 
 export const ChangelogPublishedEmailIntentPayload = Schema.Struct({
@@ -112,6 +118,15 @@ export const submissionWindowPostIds = (
   payload: Extract<EmailIntentPayload, { readonly kind: "submission.created" }>
 ): readonly string[] =>
   payload.postIds ?? (payload.postId === undefined ? [] : [payload.postId]);
+
+/**
+ * Submissions a window covers. Higher than `submissionWindowPostIds().length`
+ * only once a window has stored its id cap, which bounds the row's payload
+ * without stopping the count that the email renders.
+ */
+export const submissionWindowPostCount = (
+  payload: Extract<EmailIntentPayload, { readonly kind: "submission.created" }>
+): number => payload.postCount ?? submissionWindowPostIds(payload).length;
 
 export const EmailUnsubscribeTarget = Schema.Union([
   Schema.Struct({

@@ -212,6 +212,7 @@ describe("EmailOutboxRepository", () => {
           });
           expect(first?.payload).toEqual({
             kind: "submission.created",
+            postCount: 1,
             postIds: ["pst_first"],
           });
           // The key is bucketed by the burst delay, so two simultaneous first
@@ -241,6 +242,7 @@ describe("EmailOutboxRepository", () => {
           });
           expect(slid?.payload).toEqual({
             kind: "submission.created",
+            postCount: 2,
             postIds: ["pst_first", "pst_second"],
           });
           expect(slid?.scheduledAt).toEqual(
@@ -290,6 +292,7 @@ describe("EmailOutboxRepository", () => {
         expect(intent?.id).toBe(opened.intentId);
         expect(intent?.payload).toEqual({
           kind: "submission.created",
+          postCount: 1,
           postIds: ["pst_replay"],
         });
         expect(intent?.scheduledAt).toEqual(
@@ -332,17 +335,22 @@ describe("EmailOutboxRepository", () => {
         });
         expect(intent?.payload).toEqual({
           kind: "submission.created",
+          postCount: 1,
           postIds: ["pst_next"],
         });
       })
     );
 
-    it.effect("keeps a full window and spills the next post into its own", () =>
+    it.effect("keeps counting past the stored id cap on one window", () =>
       Effect.gen(function* () {
         const organizationId = yield* WorkspaceId.generate;
         const repository = yield* EmailOutboxRepository;
         const db = yield* currentDb;
         const openedAt = new Date("2026-08-09T10:02:00.000Z");
+        const fullPostIds = Array.from(
+          { length: submissionWindowMaxPosts },
+          (_, index) => `pst_full_${index}`
+        );
 
         yield* createOrganization(organizationId);
         yield* db.insert(schema.emailOutboxTable).values({
@@ -354,10 +362,8 @@ describe("EmailOutboxRepository", () => {
           deduplicationKey: `submission.created:${organizationId}:seeded`,
           payload: {
             kind: "submission.created",
-            postIds: Array.from(
-              { length: submissionWindowMaxPosts },
-              (_, index) => `pst_full_${index}`
-            ),
+            postCount: fullPostIds.length,
+            postIds: fullPostIds,
           },
           scheduledAt: new Date("2026-08-09T10:07:00.000Z"),
           expiresAt: null,
@@ -366,23 +372,30 @@ describe("EmailOutboxRepository", () => {
           updatedAt: openedAt,
         });
 
-        const spilled = yield* repository.upsertPendingSubmissionWindow({
+        const overflowed = yield* repository.upsertPendingSubmissionWindow({
           now: new Date("2026-08-09T10:04:00.000Z"),
           organizationId,
           postId: "pst_after_full",
         });
 
-        expect(spilled._tag).toBe("Written");
-        expect(spilled.intentId).not.toBe("eob_full_window");
-        const pending = yield* repository.findPending({
+        // One window per burst is the flood bound, so overflowing the stored
+        // ids must not open a second one. The email summarises by count anyway.
+        expect(overflowed).toEqual({
+          _tag: "Written",
+          intentId: "eob_full_window",
+        });
+        const [intent] = yield* repository.findPending({
           before: new Date("2026-08-10"),
           organizationId,
         });
-        const spill = pending.find((intent) => intent.id === spilled.intentId);
-        expect(spill?.payload).toEqual({
+        expect(intent?.payload).toEqual({
           kind: "submission.created",
-          postIds: ["pst_after_full"],
+          postCount: submissionWindowMaxPosts + 1,
+          postIds: fullPostIds,
         });
+        expect(intent?.scheduledAt).toEqual(
+          new Date("2026-08-09T10:09:00.000Z")
+        );
       })
     );
 
@@ -406,6 +419,7 @@ describe("EmailOutboxRepository", () => {
             deduplicationKey: `submission.created:${organizationId}:${bucketStart}`,
             payload: {
               kind: "submission.created",
+              postCount: 1,
               postIds: ["pst_sent_bucket"],
             },
             scheduledAt: new Date("2026-08-09T10:07:00.000Z"),
@@ -431,6 +445,7 @@ describe("EmailOutboxRepository", () => {
           );
           expect(intent?.payload).toEqual({
             kind: "submission.created",
+            postCount: 1,
             postIds: ["pst_next_in_bucket"],
           });
         })

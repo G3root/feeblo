@@ -4,7 +4,7 @@
 
 A new post no longer sends its own email. Every submission joins one pending `submission.created` outbox intent per workspace — the submission window — and that window sends one email covering all of its posts.
 
-The window's send slides on every append: `scheduledAt = min(now + 5 minutes, window opened + 1 hour)`. A single submission is emailed five minutes later; a burst is emailed once, five minutes after its last post; a sustained flood is bounded to one email per window per hour instead of one per submission. A window carries at most 200 posts and spills the rest into a new window rather than dropping a submission. The email lists the first 20 posts and then links to the dashboard with a count.
+The window's send slides on every append: `scheduledAt = min(now + 5 minutes, window opened + 1 hour)`. A single submission is emailed five minutes later; a burst is emailed once, five minutes after its last post; a sustained flood is bounded to one email per window per hour instead of one per submission. A window stores at most 200 post ids and keeps counting past that, so a flood cannot buy a second window by overflowing the first. The email lists the first 20 posts and then reports the rest as a count, linking to the dashboard.
 
 The same change scopes the monthly provider-volume guard per organization, evaluated before the platform-wide one. The platform cap remains as the backstop.
 
@@ -18,7 +18,9 @@ What keeps this from being a daily digest here is plan gating. `integrations: fa
 
 ## Consequences
 
-The volume bound is now structural rather than behavioral. A flood of any size produces one email per window: a workspace cannot spend more than one window an hour unless a window fills at 200 posts, at which point the spill window starts its own hour. The outbox row count for submissions is one per workspace per window instead of one per post.
+The volume bound is now structural rather than behavioral. A flood of any size produces one email per window, and a workspace cannot hold more than one window open: a window that reaches 200 stored ids keeps counting rather than opening another. The outbox row count for submissions is one per workspace per window instead of one per post.
+
+The copy separates what happened from what can be shown. `postCount` records every submission the window covers, the email renders at most twenty of them, and a stored post deleted before the send is subtracted from the count — a deleted submission stops being news, while one past the stored-id cap is still a submission the admin should know about.
 
 Exactly-once membership falls out of the key rather than needing a join table. The window's `deduplicationKey` is bucketed by the burst delay, so two simultaneous first submissions converge on one row through the existing `(organizationId, deduplicationKey)` unique index. Materialization re-reads the window under a row lock and re-checks that it is still pending and still due, so an append either lands in the email being sent or opens the next window; it is never dropped. This is why `findByIdForUpdate` exists.
 

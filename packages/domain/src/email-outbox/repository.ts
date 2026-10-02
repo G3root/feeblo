@@ -27,6 +27,7 @@ import {
   EmailIntentPayload,
   EmailOutboxRecord,
   type EmailIntentPayload as IntentPayload,
+  submissionWindowPostCount,
   submissionWindowPostIds,
 } from "./schema";
 import {
@@ -435,45 +436,50 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       if (windowPostIds.includes(postId)) {
         return { _tag: "Duplicate" as const };
       }
-      // A full window spills into a new one instead of dropping the post.
-      if (windowPostIds.length < submissionWindowMaxPosts) {
-        const ceilingAt = DateTime.addDuration(
-          DateTime.fromDateUnsafe(pending.createdAt),
-          submissionWindowCeiling
-        );
-        const updatedAt = yield* DateTime.nowAsDate;
-        const rows = yield* db
-          .update(schema.emailOutboxTable)
-          .set({
-            payload: {
-              kind: "submission.created" as const,
-              postIds: [...windowPostIds, postId],
-            },
-            // A quiet workspace sends five minutes after its last submission;
-            // a busy one stops sliding an hour after the window opened.
-            scheduledAt: DateTime.toDateUtc(DateTime.min(burstAt, ceilingAt)),
-            updatedAt,
-          })
-          .where(
-            and(
-              eq(schema.emailOutboxTable.id, pending.id),
-              eq(schema.emailOutboxTable.state, "pending")
-            )
+      const windowPostCount = submissionWindowPostCount(payload);
+      const ceilingAt = DateTime.addDuration(
+        DateTime.fromDateUnsafe(pending.createdAt),
+        submissionWindowCeiling
+      );
+      const updatedAt = yield* DateTime.nowAsDate;
+      const rows = yield* db
+        .update(schema.emailOutboxTable)
+        .set({
+          payload: {
+            kind: "submission.created" as const,
+            // Past the id cap the window keeps counting without storing, so a
+            // flood cannot open a second window by overflowing this one.
+            postIds:
+              windowPostIds.length < submissionWindowMaxPosts
+                ? [...windowPostIds, postId]
+                : windowPostIds,
+            postCount: windowPostCount + 1,
+          },
+          // A quiet workspace sends five minutes after its last submission;
+          // a busy one stops sliding an hour after the window opened.
+          scheduledAt: DateTime.toDateUtc(DateTime.min(burstAt, ceilingAt)),
+          updatedAt,
+        })
+        .where(
+          and(
+            eq(schema.emailOutboxTable.id, pending.id),
+            eq(schema.emailOutboxTable.state, "pending")
           )
-          .returning({ id: schema.emailOutboxTable.id });
+        )
+        .returning({ id: schema.emailOutboxTable.id });
 
-        const updated = rows[0];
-        if (updated !== undefined) {
-          return { _tag: "Written" as const, intentId: updated.id };
-        }
-        // Zero rows means the window materialized between the locked read and
-        // this write. The post is not lost: it opens the next window below.
+      const updated = rows[0];
+      if (updated !== undefined) {
+        return { _tag: "Written" as const, intentId: updated.id };
       }
+      // Zero rows means the window materialized between the locked read and
+      // this write. The post is not lost: it opens the next window below.
     }
 
     const outboxId = yield* EmailOutboxId.generate;
     const payload = {
       kind: "submission.created" as const,
+      postCount: 1,
       postIds: [postId],
     };
     const insertWindow = (deduplicationKey: string) =>

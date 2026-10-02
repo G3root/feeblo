@@ -25,8 +25,8 @@ type PostNotificationContent = {
 /**
  * Most posts one notification email lists before it links to the dashboard.
  *
- * The window itself may hold more (see `submissionWindowMaxPosts`); a flood is
- * summarised by count rather than by an email that renders hundreds of rows.
+ * A window may cover more than it stores (`submissionWindowMaxPosts`); the
+ * email summarises the rest by count rather than rendering hundreds of rows.
  */
 const submissionNotificationMaxListed = 20;
 
@@ -43,11 +43,17 @@ export const makeSubmissionNotificationPayload = (
     readonly slug: string;
     readonly title: string;
     readonly board: { readonly slug: string } | null;
-  }>
+  }>,
+  /**
+   * Submissions the window covers. Larger than `posts.length` once a window
+   * stored its id cap or lost a post to deletion, so the copy counts what
+   * happened rather than what could still be rendered.
+   */
+  submissionCount: number
 ): NotificationTemplatePayload => {
   const listed = posts.slice(0, submissionNotificationMaxListed);
-  const remaining = posts.length - listed.length;
-  const isSingle = posts.length === 1;
+  const remaining = submissionCount - listed.length;
+  const isSingle = submissionCount === 1;
 
   return {
     actionLabel: "View dashboard",
@@ -56,7 +62,7 @@ export const makeSubmissionNotificationPayload = (
     // count only appears once a window actually coalesced two or more.
     body: isSingle
       ? "A new post has been submitted."
-      : `${posts.length} new posts have been submitted.`,
+      : `${submissionCount} new posts have been submitted.`,
     eyebrow: "Feedback",
     posts: [
       ...listed.map((post) => ({
@@ -74,7 +80,7 @@ export const makeSubmissionNotificationPayload = (
     ],
     title: isSingle
       ? "New submission in your workspace"
-      : `${posts.length} new submissions in your workspace`,
+      : `${submissionCount} new submissions in your workspace`,
     unsubscribe: {
       kind: "settings",
       url: `${appUrl}/settings/notifications`,

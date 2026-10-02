@@ -583,6 +583,50 @@ describe("EmailOutbox workflows", () => {
       })
     );
 
+    it.effect("summarises a window past its stored id cap", () =>
+      Effect.gen(function* () {
+        yield* resetTestMailer();
+        const { intentId, postId } = yield* fixture;
+        const db = yield* Database.Database;
+        // A window that reached its stored id cap and kept counting: the email
+        // reports the volume it cannot render rather than understating it.
+        yield* db
+          .update(schema.emailOutboxTable)
+          .set({
+            payload: {
+              kind: "submission.created",
+              postCount: 350,
+              postIds: [postId],
+            },
+          })
+          .where(eq(schema.emailOutboxTable.id, intentId));
+
+        const deliveryIds = yield* materializeEmailIntent(intentId);
+        expect(deliveryIds).toHaveLength(1);
+        yield* Effect.forEach(deliveryIds, (deliveryId) =>
+          deliverEmailDelivery({ deliveryId })
+        );
+
+        const state = yield* testMailerState;
+        expect(state.sentMessages[0]?.subject).toBe(
+          "350 new submissions in your workspace"
+        );
+        const [delivery] = yield* db
+          .select({
+            templatePayload: schema.emailDeliveryTable.templatePayload,
+          })
+          .from(schema.emailDeliveryTable)
+          .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+        expect(delivery?.templatePayload).toMatchObject({
+          body: "350 new posts have been submitted.",
+          posts: [
+            { label: "Ship email outbox" },
+            { label: "and 349 more submitted posts" },
+          ],
+        });
+      })
+    );
+
     it.effect("drops a post deleted before its window sends", () =>
       Effect.gen(function* () {
         yield* resetTestMailer();
