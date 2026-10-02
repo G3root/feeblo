@@ -43,6 +43,8 @@ import {
 import { PublicApiOperations } from "./operations";
 import { makePublicApiRoute } from "./router";
 import {
+  PublicApiBoard,
+  PublicApiBoardPage,
   PublicApiChangelog,
   PublicApiChangelogPage,
   PublicApiComment,
@@ -106,6 +108,12 @@ const decodeError = Schema.decodeUnknownSync(
 );
 const decodePage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiPostPage)
+);
+const decodeBoard = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiBoard)
+);
+const decodeBoardPage = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiBoardPage)
 );
 const decodePost = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiPost)
@@ -4016,6 +4024,8 @@ layer(makeTestApp())("public api v1", (it) => {
       expect(response.status).toBe(200);
       const document = decodeDocument(responseBody(response));
       expect(Object.keys(document.paths).sort()).toEqual([
+        "/api/v1/boards",
+        "/api/v1/boards/{boardId}",
         "/api/v1/boards/{boardId}/posts",
         "/api/v1/changelog",
         "/api/v1/changelog/{changelogId}",
@@ -4032,6 +4042,125 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/tags",
         "/api/v1/tags/{tagId}",
       ]);
+    })
+  );
+
+  it.effect("lists the workspace's boards, private ones included", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      const privateBoardId = yield* BoardId.generate;
+      const now = yield* DateTime.nowAsDate;
+
+      yield* db.insert(schema.boardTable).values({
+        id: privateBoardId,
+        name: "Internal",
+        slug: "internal",
+        visibility: "PRIVATE",
+        organizationId: workspace.organizationId,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      registerKey("fbk_board_reader", workspace.organizationId);
+
+      // One page at a time, so the cursor is exercised rather than assumed:
+      // the two boards are one page of one with a cursor to the other.
+      const firstResponse = yield* executeRequest(
+        "/api/v1/boards?limit=1",
+        "fbk_board_reader"
+      );
+      expect(firstResponse.status).toBe(200);
+
+      const first = decodeBoardPage(responseBody(firstResponse));
+      expect(first.data).toHaveLength(1);
+      expect(first.nextCursor).not.toBeNull();
+
+      const secondResponse = yield* executeRequest(
+        `/api/v1/boards?cursor=${encodeURIComponent(first.nextCursor ?? "")}`,
+        "fbk_board_reader"
+      );
+      expect(secondResponse.status).toBe(200);
+
+      const second = decodeBoardPage(responseBody(secondResponse));
+      expect(second.data).toHaveLength(1);
+      expect(second.nextCursor).toBeNull();
+
+      const byId = new Map(
+        [...first.data, ...second.data].map((board) => [board.id, board])
+      );
+      expect([...byId.keys()].sort()).toEqual(
+        [privateBoardId, workspace.boardId].sort()
+      );
+
+      // A key reads private boards too, and the field says which is which
+      // rather than gating the read.
+      expect(byId.get(privateBoardId)?.visibility).toBe("PRIVATE");
+      const publicBoard = byId.get(workspace.boardId);
+      expect(publicBoard?.visibility).toBe("PUBLIC");
+      expect(publicBoard?.name).toBe("Feedback");
+      expect(publicBoard?.slug).toBe("feedback");
+      expect(publicBoard?.url).toBe(
+        `https://app.feeblo.test/${workspace.organizationId}/board/feedback`
+      );
+
+      // The board row carries the workspace; the key already names it.
+      expect(responseBody(secondResponse)).not.toContain("organizationId");
+    })
+  );
+
+  it.effect("reads one board and hides another workspace's", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const other = yield* seedWorkspace();
+      registerKey("fbk_board_getter", workspace.organizationId);
+
+      const found = yield* executeRequest(
+        `/api/v1/boards/${workspace.boardId}`,
+        "fbk_board_getter"
+      );
+      expect(found.status).toBe(200);
+
+      const board = decodeBoard(responseBody(found));
+      expect(board.id).toBe(workspace.boardId);
+      expect(board.slug).toBe("feedback");
+      expect(board.visibility).toBe("PUBLIC");
+
+      // A board of another workspace is not found rather than forbidden, so
+      // the id cannot be used to probe another workspace.
+      const foreign = yield* executeRequest(
+        `/api/v1/boards/${other.boardId}`,
+        "fbk_board_getter"
+      );
+      expect(foreign.status).toBe(404);
+      expect(decodeError(responseBody(foreign))._tag).toBe("NOT_FOUND");
+
+      const unknown = yield* executeRequest(
+        "/api/v1/boards/brd_does_not_exist",
+        "fbk_board_getter"
+      );
+      expect(unknown.status).toBe(404);
+      expect(decodeError(responseBody(unknown))._tag).toBe("NOT_FOUND");
+    })
+  );
+
+  it.effect("refuses the board reads without the boards.read scope", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_no_boards", workspace.organizationId, {
+        posts: ["read"],
+      });
+
+      const list = yield* executeRequest("/api/v1/boards", "fbk_no_boards");
+      expect(list.status).toBe(403);
+      expect(decodeError(responseBody(list))._tag).toBe("FORBIDDEN_SCOPE");
+
+      const get = yield* executeRequest(
+        `/api/v1/boards/${workspace.boardId}`,
+        "fbk_no_boards"
+      );
+      expect(get.status).toBe(403);
+      expect(decodeError(responseBody(get)).message).toContain("boards.read");
     })
   );
 });

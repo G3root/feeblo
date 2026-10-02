@@ -2,6 +2,7 @@ import * as HttpApi from "effect/unstable/httpapi/HttpApi";
 import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
 import * as OpenApi from "effect/unstable/httpapi/OpenApi";
 
+import { boardEndpoints } from "../board/public-api/http";
 import { changelogEndpoints } from "../changelog/public-api/http";
 import { commentEndpoints } from "../comments/public-api/http";
 import { companyEndpoints } from "../company/public-api/http";
@@ -42,6 +43,15 @@ import {
  * identifier otherwise — and this annotation is what puts a one-line summary
  * under the section in the published reference rather than leaving it bare.
  */
+export class PublicApiBoardGroup extends HttpApiGroup.make("Boards")
+  .annotate(
+    OpenApi.Description,
+    "Read the workspace's boards and their slugs, so a post can be filed under one."
+  )
+  .add(...boardEndpoints)
+  .middleware(PublicApiSchemaErrorHandler)
+  .middleware(ApiKeyAuthMiddleware) {}
+
 export class PublicApiChangelogGroup extends HttpApiGroup.make("Changelog")
   .annotate(
     OpenApi.Description,
@@ -95,6 +105,7 @@ export class PublicApiTagGroup extends HttpApiGroup.make("Tags")
  * to them.
  */
 export const PublicApiGroups = [
+  PublicApiBoardGroup,
   PublicApiChangelogGroup,
   PublicApiCommentGroup,
   PublicApiCompanyGroup,

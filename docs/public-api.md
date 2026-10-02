@@ -55,7 +55,7 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 | `companies.create` | Create a company. |
 | `companies.update` | Update a company's name, external id, avatar, or external creation date. |
 | `companies.delete` | Delete a company, which detaches it from the contacts that belonged to it. |
-| `boards.read` | Reserved for a future board-metadata endpoint. No v1 endpoint requires it, and every key receives it so that endpoint is additive when it ships. |
+| `boards.read` | Read the workspace's boards through the `/boards` endpoints. Required by every board endpoint, and every key receives it. |
 
 A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above except the `companies` ones; the `posts`, `comments`, `tags`, and `changelog` write scopes, and all four `companies` scopes, are granted only when the key is created with them — so a key that was minted to read feedback cannot delete a workspace's posts, comments, or tags, broadcast a release note, or learn the customer roster. The CRM grant is opt-in as a whole, read included, because a company is a record about the workspace's own customers rather than the workspace's content. That is also why a key created before a scope existed keeps its narrower grant: rotate the key if an integration needs more than it was issued.
 
@@ -80,6 +80,44 @@ Scopes, the plan gate, and the per-key rate limit apply exactly as they do to HT
 Requests carrying an `Origin` header are rejected: the transport does not enable cross-origin access, so a browser-based client must reach it through a same-origin proxy. Clients that send no `Origin` — the desktop and server integrations — are unaffected.
 
 ## Endpoints
+
+### List boards
+
+```http
+GET /api/v1/boards
+```
+
+| Query parameter | Default | Notes |
+| --- | --- | --- |
+| `limit` | `25` | 1–100. |
+| `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
+
+```json
+{
+  "data": [
+    {
+      "id": "brd_feedback",
+      "name": "Feedback",
+      "slug": "feedback",
+      "visibility": "PUBLIC",
+      "url": "https://app.feeblo.com/org_example/board/feedback",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-12T09:30:00.000Z"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+Requires `boards.read`. Every board of the workspace is returned, private ones included: the key is the workspace's own credential, not a public visitor, so `visibility` tells an integration where its own records appear rather than gating the read. Use this endpoint to resolve the `boardId` a post needs, or the `slug` a public URL contains.
+
+### Get a board
+
+```http
+GET /api/v1/boards/{boardId}
+```
+
+Returns one board in the shape above. Requires `boards.read`. A board of another workspace is answered with `404 NOT_FOUND` rather than `403`, so an id cannot be used to probe another workspace.
 
 ### List a board's posts
 

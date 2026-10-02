@@ -7,11 +7,13 @@ import { PUBLIC_API_PAGE_MAX_LIMIT } from "./common";
 import { PublicApiOperations } from "./operations";
 import {
   ListBoardPostsInput,
+  ListBoardsInput,
   ListChangelogInput,
   ListCompaniesInput,
   ListPostCommentsInput,
   ListPostsInput,
   ListTagsInput,
+  PublicApiBoardPage,
   PublicApiChangelogPage,
   PublicApiCommentPage,
   PublicApiCompanyPage,
@@ -59,6 +61,7 @@ describe("public API operations registry", () => {
   it("pages every list with a cursor and a bounded page size", () => {
     const listInputs = [
       ListBoardPostsInput,
+      ListBoardsInput,
       ListPostsInput,
       ListPostCommentsInput,
       ListTagsInput,
@@ -66,6 +69,7 @@ describe("public API operations registry", () => {
       ListChangelogInput,
     ];
     const pageOutputs = [
+      PublicApiBoardPage,
       PublicApiPostPage,
       PublicApiCommentPage,
       PublicApiTagPage,

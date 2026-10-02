@@ -99,6 +99,8 @@ const operations = Object.entries(document.paths).flatMap(([path, item]) =>
   })
 );
 
+const BOARDS_PATH = "/api/v1/boards";
+const BOARD_PATH = "/api/v1/boards/{boardId}";
 const LIST_PATH = "/api/v1/boards/{boardId}/posts";
 const POSTS_PATH = "/api/v1/posts";
 const RETRIEVE_PATH = "/api/v1/posts/retrieve";
@@ -131,6 +133,8 @@ describe("PublicApi contract", () => {
   it("publishes exactly the documented endpoints", () => {
     expect(Object.keys(document.paths).sort()).toEqual(
       [
+        BOARDS_PATH,
+        BOARD_PATH,
         LIST_PATH,
         POSTS_PATH,
         RETRIEVE_PATH,
@@ -158,6 +162,7 @@ describe("PublicApi contract", () => {
     // what puts the sections in a deliberate order rather than the order the
     // endpoints happen to be declared in.
     expect(document.tags.map((tag) => tag.name)).toEqual([
+      "Boards",
       "Changelog",
       "Comments",
       "Companies",
@@ -176,7 +181,14 @@ describe("PublicApi contract", () => {
       [
         ...new Set(operations.flatMap(({ operation }) => operation.tags ?? [])),
       ].sort()
-    ).toEqual(["Changelog", "Comments", "Companies", "Posts", "Tags"]);
+    ).toEqual([
+      "Boards",
+      "Changelog",
+      "Comments",
+      "Companies",
+      "Posts",
+      "Tags",
+    ]);
   });
 
   it("gates every published endpoint on a key and a plan", () => {
@@ -475,6 +487,44 @@ describe("PublicApi contract", () => {
     expect(body).toContain("name");
     expect(body).not.toContain("slug");
     expect(body).not.toContain("createdAt");
+  });
+
+  it("documents the board resource without an internal identifier", () => {
+    const listResponses = document.paths[BOARDS_PATH]?.get?.responses ?? {};
+    const getResponses = document.paths[BOARD_PATH]?.get?.responses ?? {};
+
+    // Both read a board, so neither promises a conflict and neither can answer
+    // a missing-resource status it never returns.
+    expect(Object.keys(listResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(Object.keys(getResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(JSON.stringify(listResponses)).not.toContain("CONFLICT");
+    expect(JSON.stringify(getResponses)).not.toContain("CONFLICT");
+
+    const listBody = JSON.stringify(listResponses["200"]);
+    expect(listBody).toContain("nextCursor");
+
+    const body = JSON.stringify(getResponses["200"]);
+    for (const field of [
+      "id",
+      "name",
+      "slug",
+      "visibility",
+      "url",
+      "createdAt",
+      "updatedAt",
+    ]) {
+      expect(body).toContain(field);
+    }
+
+    // `board` also carries the workspace and the member who created it; the
+    // key already names the workspace, so neither has a name in this contract.
+    for (const forbidden of [
+      "organizationId",
+      "creatorId",
+      "creatorMemberId",
+    ]) {
+      expect(body).not.toContain(forbidden);
+    }
   });
 
   it("documents the tag resource without an internal identifier", () => {
