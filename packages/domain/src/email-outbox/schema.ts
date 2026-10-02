@@ -28,10 +28,12 @@ const PersistedDate = Schema.Union([Schema.Date, Schema.DateFromString]);
 export const SubmissionCreatedEmailIntentPayload = Schema.Struct({
   kind: Schema.tag("submission.created"),
   /**
-   * The post that opened this window, preserved on every write. A worker still
-   * running the release before windows existed reads only this field, so
-   * keeping it current is what lets that worker send the window (about its
-   * opener) instead of expiring it. The full set lives in `postIds`.
+   * The post that opened this window, kept unchanged across every append. A
+   * worker from the release before windows existed decodes only this field, so
+   * its presence is what lets that worker send the window — about the opener —
+   * rather than fail on a payload it cannot read. If the opener itself is
+   * deleted first, that worker expires the window instead; accepted, because
+   * the overlap lasts only as long as the deploy. The full set is `postIds`.
    */
   postId: Schema.optionalKey(PostId.schema),
   /**

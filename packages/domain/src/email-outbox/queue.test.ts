@@ -2807,6 +2807,35 @@ describe("EmailOutbox queues with delivery paused", () => {
   );
 });
 
+/**
+ * Two fresh workspaces, each with one materialized delivery, and the first
+ * delivery marked as having spent one attempt this month.
+ *
+ * Both volume-limit suites trip their guard by spending that one attempt; only
+ * the layer config and the assertions differ.
+ */
+const spendOneAttemptInTwoWorkspaces = Effect.gen(function* () {
+  yield* resetTestMailer();
+  const first = yield* fixture;
+  const second = yield* fixture;
+  const db = yield* Database.Database;
+  const firstDeliveryId = (yield* materializeEmailIntent(first.intentId))[0];
+  const secondDeliveryId = (yield* materializeEmailIntent(second.intentId))[0];
+  if (firstDeliveryId === undefined || secondDeliveryId === undefined) {
+    return yield* Effect.die("Expected one delivery per workspace");
+  }
+
+  yield* db
+    .update(schema.emailDeliveryTable)
+    .set({ attemptCount: 1 })
+    .where(eq(schema.emailDeliveryTable.id, firstDeliveryId));
+
+  yield* deliverEmailDelivery({ deliveryId: firstDeliveryId });
+  yield* deliverEmailDelivery({ deliveryId: secondDeliveryId });
+
+  return { db, firstDeliveryId, secondDeliveryId };
+});
+
 describe("EmailOutbox workspace volume limit", () => {
   // A workspace may spend its own monthly allowance without spending the
   // platform-wide one every other workspace shares.
@@ -2817,31 +2846,8 @@ describe("EmailOutbox workspace volume limit", () => {
         "defers one workspace's delivery without touching another's",
         () =>
           Effect.gen(function* () {
-            yield* resetTestMailer();
-            const first = yield* fixture;
-            const second = yield* fixture;
-            const db = yield* Database.Database;
-            const firstDeliveryId = (yield* materializeEmailIntent(
-              first.intentId
-            ))[0];
-            const secondDeliveryId = (yield* materializeEmailIntent(
-              second.intentId
-            ))[0];
-            if (
-              firstDeliveryId === undefined ||
-              secondDeliveryId === undefined
-            ) {
-              return yield* Effect.die("Expected one delivery per workspace");
-            }
-
-            // One spent attempt is enough to trip a limit of one.
-            yield* db
-              .update(schema.emailDeliveryTable)
-              .set({ attemptCount: 1 })
-              .where(eq(schema.emailDeliveryTable.id, firstDeliveryId));
-
-            yield* deliverEmailDelivery({ deliveryId: firstDeliveryId });
-            yield* deliverEmailDelivery({ deliveryId: secondDeliveryId });
+            const { db, firstDeliveryId, secondDeliveryId } =
+              yield* spendOneAttemptInTwoWorkspaces;
 
             const [throttled] = yield* db
               .select()
@@ -2874,30 +2880,8 @@ describe("EmailOutbox platform volume limit", () => {
         "still defers every workspace once the shared allowance is spent",
         () =>
           Effect.gen(function* () {
-            yield* resetTestMailer();
-            const first = yield* fixture;
-            const second = yield* fixture;
-            const db = yield* Database.Database;
-            const firstDeliveryId = (yield* materializeEmailIntent(
-              first.intentId
-            ))[0];
-            const secondDeliveryId = (yield* materializeEmailIntent(
-              second.intentId
-            ))[0];
-            if (
-              firstDeliveryId === undefined ||
-              secondDeliveryId === undefined
-            ) {
-              return yield* Effect.die("Expected one delivery per workspace");
-            }
-
-            yield* db
-              .update(schema.emailDeliveryTable)
-              .set({ attemptCount: 1 })
-              .where(eq(schema.emailDeliveryTable.id, firstDeliveryId));
-
-            yield* deliverEmailDelivery({ deliveryId: firstDeliveryId });
-            yield* deliverEmailDelivery({ deliveryId: secondDeliveryId });
+            const { db, firstDeliveryId, secondDeliveryId } =
+              yield* spendOneAttemptInTwoWorkspaces;
 
             const [firstStored] = yield* db
               .select()

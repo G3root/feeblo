@@ -30,6 +30,13 @@ export const submissionWindowCeiling = Duration.hours(1);
  */
 export const submissionWindowMaxPosts = 200;
 
+/**
+ * Monthly delivery attempts one workspace may spend before its own email is
+ * deferred (`EMAIL_OUTBOX_WORKSPACE_MONTHLY_SEND_LIMIT`). Shared by the config
+ * default and the test controls so the breaker's resting point has one name.
+ */
+export const workspaceMonthlySendLimitDefault = 25_000;
+
 const AppUrl = Config.schema(Schema.URLFromString, "APP_URL");
 const ApiUrl = Config.schema(Schema.URLFromString, "API_URL");
 const GlobalDeliveryPaused = Config.Boolean(
@@ -46,7 +53,7 @@ const EstimatedSendCostMicros = Config.Number(
 ).pipe(Config.withDefault(100));
 const WorkspaceMonthlySendLimit = Config.Number(
   "EMAIL_OUTBOX_WORKSPACE_MONTHLY_SEND_LIMIT"
-).pipe(Config.withDefault(25_000));
+).pipe(Config.withDefault(workspaceMonthlySendLimitDefault));
 const PausedWorkspaceIds = Config.String(
   "EMAIL_OUTBOX_PAUSED_WORKSPACE_IDS"
 ).pipe(Config.withDefault(""));
@@ -126,7 +133,9 @@ export class EmailOutboxConfig extends Context.Service<EmailOutboxConfig>()(
         pausedWorkspaceIds: new Set(
           controls.pausedWorkspaceIds ?? new Set<string>()
         ),
-        workspaceMonthlySendLimit: controls.workspaceMonthlySendLimit ?? 25_000,
+        workspaceMonthlySendLimit:
+          controls.workspaceMonthlySendLimit ??
+          workspaceMonthlySendLimitDefault,
       })
     );
 }

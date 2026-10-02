@@ -685,6 +685,46 @@ const sendDeliveryAttempt = (
       };
     }
     const monthStart = DateTime.toDateUtc(DateTime.startOf(now, "month"));
+    /**
+     * One volume guard, shared by both scopes: defer the delivery by the
+     * monthly retry delay when this month's attempt count reaches the limit,
+     * and record which guard spent it.
+     */
+    const deferOnVolumeLimit = (args: {
+      readonly attempts: number;
+      readonly limit: number;
+      readonly reason:
+        | "monthly_volume_limit"
+        | "workspace_monthly_volume_limit";
+    }) =>
+      Effect.gen(function* () {
+        if (args.attempts < args.limit) {
+          return undefined;
+        }
+        yield* recordEmailDeliveryThrottle(args.reason);
+        yield* Effect.logWarning(
+          "Email delivery paused by monthly volume limit"
+        ).pipe(
+          Effect.annotateLogs({
+            deliveryId,
+            organizationId: intent.organizationId,
+            reason: args.reason,
+          })
+        );
+        yield* repository.deferDeliveryForThrottle({
+          id: deliveryId,
+          nextAttemptAt: DateTime.toDateUtc(
+            DateTime.addDuration(now, monthlyVolumeRetryDelay)
+          ),
+          reason: args.reason,
+        });
+        return {
+          _tag: "retry" as const,
+          delay: monthlyVolumeRetryDelay,
+          infrastructureFailure: false,
+        } satisfies DeliveryAttemptOutcome;
+      });
+
     // Per-workspace breaker first. The global allowance below is shared by every
     // workspace, so without this one flooded workspace defers every other
     // workspace's email until the month rolls over.
@@ -701,57 +741,26 @@ const sendDeliveryAttempt = (
           eq(schema.emailOutboxTable.organizationId, intent.organizationId)
         )
       );
-    if (
-      Number(workspaceVolume?.attempts ?? 0) >= config.workspaceMonthlySendLimit
-    ) {
-      yield* recordEmailDeliveryThrottle("workspace_monthly_volume_limit");
-      yield* Effect.logWarning(
-        "Email delivery paused by workspace monthly volume limit"
-      ).pipe(
-        Effect.annotateLogs({
-          deliveryId,
-          organizationId: intent.organizationId,
-        })
-      );
-      yield* repository.deferDeliveryForThrottle({
-        id: delivery.id,
-        nextAttemptAt: DateTime.toDateUtc(
-          DateTime.addDuration(now, monthlyVolumeRetryDelay)
-        ),
-        reason: "workspace_monthly_volume_limit",
-      });
-      return {
-        _tag: "retry" as const,
-        delay: monthlyVolumeRetryDelay,
-        infrastructureFailure: false,
-      };
+    const workspaceOutcome = yield* deferOnVolumeLimit({
+      attempts: Number(workspaceVolume?.attempts ?? 0),
+      limit: config.workspaceMonthlySendLimit,
+      reason: "workspace_monthly_volume_limit",
+    });
+    if (workspaceOutcome !== undefined) {
+      return workspaceOutcome;
     }
+
     const [monthlyVolume] = yield* db
       .select({ attempts: sum(schema.emailDeliveryTable.attemptCount) })
       .from(schema.emailDeliveryTable)
       .where(gte(schema.emailDeliveryTable.createdAt, monthStart));
-    if (Number(monthlyVolume?.attempts ?? 0) >= config.monthlySendLimit) {
-      yield* recordEmailDeliveryThrottle("monthly_volume_limit");
-      yield* Effect.logWarning(
-        "Email delivery paused by monthly volume limit"
-      ).pipe(
-        Effect.annotateLogs({
-          deliveryId,
-          organizationId: intent.organizationId,
-        })
-      );
-      yield* repository.deferDeliveryForThrottle({
-        id: delivery.id,
-        nextAttemptAt: DateTime.toDateUtc(
-          DateTime.addDuration(now, monthlyVolumeRetryDelay)
-        ),
-        reason: "monthly_volume_limit",
-      });
-      return {
-        _tag: "retry" as const,
-        delay: monthlyVolumeRetryDelay,
-        infrastructureFailure: false,
-      };
+    const platformOutcome = yield* deferOnVolumeLimit({
+      attempts: Number(monthlyVolume?.attempts ?? 0),
+      limit: config.monthlySendLimit,
+      reason: "monthly_volume_limit",
+    });
+    if (platformOutcome !== undefined) {
+      return platformOutcome;
     }
     if (
       !(yield* policy.mayMaterializeEmailIntent({

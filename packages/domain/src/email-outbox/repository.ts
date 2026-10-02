@@ -81,8 +81,12 @@ export type RecordSubmissionWindowInput = {
 };
 
 /**
- * Outcome of joining a submission window. `Duplicate` means this exact post is
- * already covered, so a replayed create never notifies twice.
+ * Outcome of joining a submission window. `Duplicate` means the post is
+ * already stored in this window, so replaying its create writes nothing.
+ * Past the window's stored-id cap a replay is not stored, so it increments
+ * `postCount` instead — no second email either way, but the summary then
+ * counts that submission twice; that is accepted, because the cap exists
+ * exactly where per-post exactness stops mattering.
  */
 export type UpsertSubmissionWindowResult =
   | { readonly _tag: "Written"; readonly intentId: string }
@@ -126,6 +130,18 @@ const dataError = (operation: string, reason: string): EmailOutboxDataError =>
  * to change on every state transition that can be followed by a re-offer.
  */
 const nextTransitionVersion = sql`${schema.emailDeliveryTable.transitionVersion} + 1`;
+
+/**
+ * The columns appending to a window needs from its row.
+ *
+ * The pending-window lookup and the insert-conflict read-back both project
+ * this shape, and both hand it to the same append.
+ */
+const submissionWindowAppendColumns = {
+  createdAt: schema.emailOutboxTable.createdAt,
+  id: schema.emailOutboxTable.id,
+  payload: schema.emailOutboxTable.payload,
+};
 
 /**
  * Bucket width used for a new submission window's deduplication key.
@@ -438,7 +454,9 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
             payload: {
               kind: "submission.created" as const,
               // The opener is preserved across every write so a worker still
-              // running the previous release can send this window at all.
+              // running the previous release can decode and send this window
+              // at all; see the `postId` vocabulary comment for the accepted
+              // failure mode when the opener is deleted first.
               postId: payload.postId ?? windowPostIds[0] ?? postId,
               // Past the id cap the window keeps counting without storing, so
               // a flood cannot open a second window by overflowing this one.
@@ -468,11 +486,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       });
 
     const [pending] = yield* db
-      .select({
-        createdAt: schema.emailOutboxTable.createdAt,
-        id: schema.emailOutboxTable.id,
-        payload: schema.emailOutboxTable.payload,
-      })
+      .select(submissionWindowAppendColumns)
       .from(schema.emailOutboxTable)
       .where(
         and(
@@ -538,11 +552,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       // per burst, where a timestamped key on top of a pending window would
       // send the same submissions twice.
       const [conflicting] = yield* db
-        .select({
-          createdAt: schema.emailOutboxTable.createdAt,
-          id: schema.emailOutboxTable.id,
-          payload: schema.emailOutboxTable.payload,
-        })
+        .select(submissionWindowAppendColumns)
         .from(schema.emailOutboxTable)
         .where(
           and(
