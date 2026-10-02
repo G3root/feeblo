@@ -261,12 +261,25 @@ describe("PublicApi contract", () => {
     // The `Retry-After` header is promised by `docs/public-api.md` and asserted
     // at runtime in `api-live.test.ts`; the middleware attaches it through
     // `HttpApiSchema.WithHeaders`, and the document reflects it, so a caller
-    // can see it before it happens.
+    // can see it before it happens. The budget headers travel with it, so a
+    // client generated from this document can pace itself on a success and a
+    // refusal alike.
     expect(JSON.stringify(responses["429"])).toContain("RATE_LIMITED");
     expect(responses["429"]?.headers?.["retry-after"]).toEqual({
       schema: { type: "string" },
       required: true,
     });
+
+    for (const header of [
+      "x-ratelimit-limit",
+      "x-ratelimit-remaining",
+      "x-ratelimit-reset",
+    ]) {
+      expect(responses["429"]?.headers?.[header]).toEqual({
+        schema: { type: "string" },
+        required: true,
+      });
+    }
   });
 
   it("promises a conflict only from the endpoints that write", () => {

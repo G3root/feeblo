@@ -884,6 +884,21 @@ layer(makeTestApp())("public api v1", (it) => {
       expect(response.status).toBe(200);
       const body = decodePage(responseBody(response));
 
+      // The published production budget, as the headers report it: the first
+      // request against a fresh key leaves one less than the limit.
+      expect(response.headers["x-ratelimit-limit"]).toBe(
+        String(PUBLIC_API_KEY_RATE_LIMIT.limit)
+      );
+      expect(response.headers["x-ratelimit-remaining"]).toBe(
+        String(PUBLIC_API_KEY_RATE_LIMIT.limit - 1)
+      );
+      // Under the test clock the epoch is small, so the reset instant is not
+      // necessarily past the first second: what matters is that it is present
+      // and numeric rather than absent or `NaN`.
+      expect(Number.isNaN(Number(response.headers["x-ratelimit-reset"]))).toBe(
+        false
+      );
+
       expect(body.data).toHaveLength(2);
       expect(body.nextCursor).toBeTypeOf("string");
 
@@ -4425,6 +4440,12 @@ layer(makeTestApp({ limit: 1, window: Duration.minutes(1) }))(
           );
           expect(first.status).toBe(200);
 
+          // Every response that reports a budget describes the window it is
+          // counting, on the success as well as the refusal.
+          expect(first.headers["x-ratelimit-limit"]).toBe("1");
+          expect(first.headers["x-ratelimit-remaining"]).toBe("0");
+          expect(Number(first.headers["x-ratelimit-reset"])).toBeGreaterThan(0);
+
           const second = yield* executeRequest(
             `/api/v1/posts/${workspace.postId}`,
             "fbk_limited"
@@ -4432,6 +4453,11 @@ layer(makeTestApp({ limit: 1, window: Duration.minutes(1) }))(
           expect(second.status).toBe(429);
           expect(decodeError(responseBody(second))._tag).toBe("RATE_LIMITED");
           expect(second.headers["retry-after"]).toBeDefined();
+          expect(second.headers["x-ratelimit-limit"]).toBe("1");
+          expect(second.headers["x-ratelimit-remaining"]).toBe("0");
+          expect(Number(second.headers["x-ratelimit-reset"])).toBeGreaterThan(
+            0
+          );
 
           // A different key has its own budget.
           const other = yield* seedWorkspace();
@@ -5014,6 +5040,11 @@ layer(
       expect(refused.status).toBe(429);
       expect(decodeError(responseBody(refused))._tag).toBe("RATE_LIMITED");
       expect(Number(refused.headers["retry-after"])).toBeGreaterThan(0);
+
+      // The MCP surface resolves the same key and publishes the same budget
+      // headers, so a client pacing itself reads one contract on both.
+      expect(refused.headers["x-ratelimit-limit"]).toBe("1");
+      expect(refused.headers["x-ratelimit-remaining"]).toBe("0");
     })
   );
 });

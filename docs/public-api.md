@@ -710,7 +710,7 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 | 403 | `PLAN_REQUIRES_UPGRADE` | The workspace plan does not include the Public API, or has no room left in a limit it sets — such as CRM entries. |
 | 404 | `NOT_FOUND` | The resource does not exist in this workspace. |
 | 409 | `CONFLICT` | A write collided with something that already exists, such as a tag name or a company name or external id already in use, a changelog slug already taken, a post title whose slug suffixes are all taken, or comments on a post whose conversation is locked. |
-| 429 | `RATE_LIMITED` | Per-key rate limit exceeded. Carries `Retry-After` in seconds. |
+| 429 | `RATE_LIMITED` | Per-key rate limit exceeded. Carries `Retry-After` in seconds, and the `X-RateLimit-*` headers described under [Rate limits](#rate-limits). |
 | 500 | `INTERNAL_ERROR` | Unexpected server failure. |
 | 503 | `SERVICE_UNAVAILABLE` | A required dependency is unavailable; requests fail closed. |
 
@@ -720,7 +720,17 @@ Switch on `_tag`. Codes are append-only within v1 — a new one may appear, an e
 
 Limits are per key, not per IP, and are shared across server instances: **300 requests per minute**, shared by reads and writes. Limits may increase without notice; decreases are announced in advance.
 
-The per-key bucket means a customer behind a shared NAT is not throttled by their neighbours, and a leaked key cannot escape its limit by rotating source IPs. When the limit is exceeded the API returns `429 RATE_LIMITED` with `Retry-After`. If the rate limiter itself is unavailable, requests fail closed with `503 SERVICE_UNAVAILABLE` rather than being admitted unlimited.
+Every successful response, and every `429`, carries the state of the caller's budget:
+
+| Header | Meaning |
+| --- | --- |
+| `X-RateLimit-Limit` | Requests allowed in the current window. |
+| `X-RateLimit-Remaining` | Requests left in the window after this one. |
+| `X-RateLimit-Reset` | When this budget next allows a request, as a Unix timestamp in seconds. |
+
+A request refused before it spends a budget — a missing or invalid key, or a workspace whose plan does not include the API — has no window to describe and carries none of them. The same three headers are sent on the `/mcp` transport.
+
+The per-key bucket means a customer behind a shared NAT is not throttled by their neighbours, and a leaked key cannot escape its limit by rotating source IPs. When the limit is exceeded the API returns `429 RATE_LIMITED` with `Retry-After` and the three headers above. If the rate limiter itself is unavailable, requests fail closed with `503 SERVICE_UNAVAILABLE` rather than being admitted unlimited.
 
 ## Plans
 

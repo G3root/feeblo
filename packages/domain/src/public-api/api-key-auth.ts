@@ -1,4 +1,5 @@
 import type { PublicApiScopeStatements } from "@feeblo/domain-contracts/public-api-scope";
+import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 
@@ -13,6 +14,7 @@ import {
   planRequiresUpgradeError,
   rateLimitedError,
   serviceUnavailableError,
+  type PublicApiRateLimitHeaders,
 } from "./errors";
 
 /**
@@ -22,12 +24,45 @@ import {
  * Deliberately not a `CurrentSession`: a machine credential must not become a
  * member session, so nothing downstream of this resolution can reach session
  * semantics, memberships, or the dashboard policies that depend on them.
+ *
+ * `rateLimit` is the budget state after this request was charged, which is what
+ * the response's `X-RateLimit-*` headers report. Keeping it on the call means
+ * every surface that resolves a key through this function can send the same
+ * headers, and none of them has to spend a second limiter read to learn them.
  */
 export type PublicApiCall = {
   readonly keyId: string;
   readonly organizationId: string;
   readonly scopes: PublicApiScopeStatements | null;
+  readonly rateLimit: PublicApiRateLimit;
 };
+
+/** The budget state after one request, as the published headers report it. */
+export type PublicApiRateLimit = {
+  readonly limit: number;
+  readonly remaining: number;
+  readonly resetAfter: Duration.Duration;
+};
+
+/**
+ * The `X-RateLimit-*` headers for one budget state.
+ *
+ * `X-RateLimit-Reset` is a unix timestamp in seconds, so it is computed from a
+ * clock reading taken when the response is built rather than stored beside the
+ * budget: the same `resetAfter` maps to a later instant as a request sits in
+ * flight. `nowMillis` is a parameter so the HTTP and MCP surfaces share one
+ * implementation without either reading a global clock.
+ */
+export const publicApiRateLimitHeaders = (
+  rateLimit: PublicApiRateLimit,
+  nowMillis: number
+): PublicApiRateLimitHeaders => ({
+  "x-ratelimit-limit": String(rateLimit.limit),
+  "x-ratelimit-remaining": String(rateLimit.remaining),
+  "x-ratelimit-reset": String(
+    Math.floor((nowMillis + Duration.toMillis(rateLimit.resetAfter)) / 1000)
+  ),
+});
 
 /** The per-key request budget a caller's key is spent against. */
 export type PublicApiKeyBudget = {
@@ -99,23 +134,43 @@ export const authenticatePublicApiKey = (
     // Runs before the plan gate: the gate reads the database, so a verified
     // key must spend budget before it can trigger that lookup, including a
     // downgraded key that the gate will then reject.
-    yield* rateLimitService
-      .consume({
-        key: `public-api:key:${record.id}`,
-        limit: budget.limit,
-        window: budget.window,
-      })
-      .pipe(
-        Effect.catchTag("RateLimiterError", (error) =>
-          Effect.fail(
-            error.reason._tag === "RateLimitExceeded"
-              ? rateLimitedError(retryAfterSeconds(error.reason.retryAfter))
-              : // Fail closed: admitting unlimited traffic because the limiter
-                // is down would make an outage an abuse window.
-                serviceUnavailableError()
+    //
+    // The clock is read before the consume rather than inside the failure, so
+    // the 429's `X-RateLimit-Reset` is an absolute instant like every other
+    // response's; the read and the charge are microseconds apart, and the
+    // window it names is the one the limiter reports.
+    const rateLimit = yield* Effect.gen(function* () {
+      const now = yield* Clock.currentTimeMillis;
+
+      return yield* rateLimitService
+        .consume({
+          key: `public-api:key:${record.id}`,
+          limit: budget.limit,
+          window: budget.window,
+        })
+        .pipe(
+          Effect.catchTag("RateLimiterError", (error) =>
+            Effect.fail(
+              error.reason._tag === "RateLimitExceeded"
+                ? rateLimitedError(
+                    retryAfterSeconds(error.reason.retryAfter),
+                    publicApiRateLimitHeaders(
+                      {
+                        limit: error.reason.limit,
+                        remaining: error.reason.remaining,
+                        resetAfter:
+                          error.reason.retryAfter ?? Duration.seconds(1),
+                      },
+                      now
+                    )
+                  )
+                : // Fail closed: admitting unlimited traffic because the
+                  // limiter is down would make an outage an abuse window.
+                  serviceUnavailableError()
+            )
           )
-        )
-      );
+        );
+    });
 
     // Plan gate on every request, not only at key creation: a workspace that
     // downgraded must stop being served, and the distinct code tells the
@@ -135,6 +190,11 @@ export const authenticatePublicApiKey = (
     return {
       keyId: record.id,
       organizationId,
+      rateLimit: {
+        limit: rateLimit.limit,
+        remaining: rateLimit.remaining,
+        resetAfter: rateLimit.resetAfter,
+      },
       scopes: record.permissions ?? null,
     };
   });
