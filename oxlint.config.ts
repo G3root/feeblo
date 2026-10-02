@@ -13,7 +13,7 @@ import { defineConfig } from "oxlint";
  * `global-*`, `crypto-*`, `process-env`, `new-promise`, `schema-sync` and
  * `instance-of-schema` rules out of `recommended` and into the opt-in
  * `effect-native` preset. Extending only `recommended` would therefore have
- * dropped `global-date-in-effect` — the 433-finding defect ADR 0005 ranks
+ * dropped `global-date-in-effect` — the 372-finding defect ADR 0005 ranks
  * first, and the rule this file's `off` entries below are written against —
  * without a single test or type error to say so. The two presets together are
  * exactly the rule set `0.45.0`'s `recommended` carried, plus the three rules
