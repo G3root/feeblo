@@ -213,6 +213,7 @@ describe("EmailOutboxRepository", () => {
           expect(first?.payload).toEqual({
             kind: "submission.created",
             postCount: 1,
+            postId: "pst_first",
             postIds: ["pst_first"],
           });
           // The key is bucketed by the burst delay, so two simultaneous first
@@ -243,6 +244,7 @@ describe("EmailOutboxRepository", () => {
           expect(slid?.payload).toEqual({
             kind: "submission.created",
             postCount: 2,
+            postId: "pst_first",
             postIds: ["pst_first", "pst_second"],
           });
           expect(slid?.scheduledAt).toEqual(
@@ -293,6 +295,7 @@ describe("EmailOutboxRepository", () => {
         expect(intent?.payload).toEqual({
           kind: "submission.created",
           postCount: 1,
+          postId: "pst_replay",
           postIds: ["pst_replay"],
         });
         expect(intent?.scheduledAt).toEqual(
@@ -336,6 +339,7 @@ describe("EmailOutboxRepository", () => {
         expect(intent?.payload).toEqual({
           kind: "submission.created",
           postCount: 1,
+          postId: "pst_next",
           postIds: ["pst_next"],
         });
       })
@@ -363,6 +367,7 @@ describe("EmailOutboxRepository", () => {
           payload: {
             kind: "submission.created",
             postCount: fullPostIds.length,
+            postId: "pst_full_0",
             postIds: fullPostIds,
           },
           scheduledAt: new Date("2026-08-09T10:07:00.000Z"),
@@ -391,6 +396,7 @@ describe("EmailOutboxRepository", () => {
         expect(intent?.payload).toEqual({
           kind: "submission.created",
           postCount: submissionWindowMaxPosts + 1,
+          postId: "pst_full_0",
           postIds: fullPostIds,
         });
         expect(intent?.scheduledAt).toEqual(
@@ -446,7 +452,60 @@ describe("EmailOutboxRepository", () => {
           expect(intent?.payload).toEqual({
             kind: "submission.created",
             postCount: 1,
+            postId: "pst_next_in_bucket",
             postIds: ["pst_next_in_bucket"],
+          });
+        })
+    );
+
+    it.effect(
+      "opens the next window when the bucket key belongs to another intent kind",
+      () =>
+        Effect.gen(function* () {
+          const organizationId = yield* WorkspaceId.generate;
+          const repository = yield* EmailOutboxRepository;
+          const db = yield* currentDb;
+          const now = new Date("2026-08-09T10:02:00.000Z");
+          const bucketStart = new Date("2026-08-09T10:00:00.000Z").getTime();
+
+          yield* createOrganization(organizationId);
+          // Same deduplication key, different kind: the pending-window lookup
+          // misses it, so the bucketed insert conflicts and the read-back has
+          // to reject the row as unappendable rather than write a submission
+          // into a changelog intent.
+          yield* db.insert(schema.emailOutboxTable).values({
+            id: "eob_other_kind",
+            organizationId,
+            kind: "changelog.published",
+            aggregateType: "changelog",
+            aggregateId: "chl_bucket",
+            deduplicationKey: `submission.created:${organizationId}:${bucketStart}`,
+            payload: { kind: "changelog.published", changelogId: "chl_bucket" },
+            scheduledAt: now,
+            expiresAt: null,
+            state: "pending",
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          const opened = yield* repository.upsertPendingSubmissionWindow({
+            now,
+            organizationId,
+            postId: "pst_other_kind",
+          });
+          if (opened._tag !== "Written") {
+            return yield* Effect.die("Expected an opened window");
+          }
+
+          const intent = yield* repository.findById(opened.intentId);
+          expect(intent?.deduplicationKey).toBe(
+            `submission.created:${organizationId}:${bucketStart}:${now.getTime()}`
+          );
+          expect(intent?.payload).toEqual({
+            kind: "submission.created",
+            postCount: 1,
+            postId: "pst_other_kind",
+            postIds: ["pst_other_kind"],
           });
         })
     );

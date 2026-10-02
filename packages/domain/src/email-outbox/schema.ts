@@ -28,8 +28,10 @@ const PersistedDate = Schema.Union([Schema.Date, Schema.DateFromString]);
 export const SubmissionCreatedEmailIntentPayload = Schema.Struct({
   kind: Schema.tag("submission.created"),
   /**
-   * The post that opened this window. Kept because the access gate keys off
-   * `aggregateType === "post"`; the window's notified posts live in `postIds`.
+   * The post that opened this window, preserved on every write. A worker still
+   * running the release before windows existed reads only this field, so
+   * keeping it current is what lets that worker send the window (about its
+   * opener) instead of expiring it. The full set lives in `postIds`.
    */
   postId: Schema.optionalKey(PostId.schema),
   /**

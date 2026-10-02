@@ -72,7 +72,10 @@ export const makeSubmissionNotificationPayload = (
       ...(remaining > 0
         ? [
             {
-              label: `and ${remaining} more submitted posts`,
+              label:
+                remaining === 1
+                  ? "and 1 more submitted post"
+                  : `and ${remaining} more submitted posts`,
               url: appUrl,
             },
           ]

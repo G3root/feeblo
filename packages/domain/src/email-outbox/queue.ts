@@ -372,7 +372,16 @@ export const materializeEmailIntent = (outboxId: string) =>
                   },
                 ];
           });
-          if (posts.length === 0) {
+          // A stored post that no longer resolves was deleted, so it stops
+          // being a submission worth reporting. Ids the window never stored
+          // stay in the count: they are past its cap, and a window cannot
+          // observe a deletion it never tracked.
+          const submissionCount =
+            windowPostCount - (postIds.length - posts.length);
+          // Expire on the adjusted count, not on the rendered list: a capped
+          // window whose stored posts were all deleted still has submissions
+          // to report, and must not go silent about them.
+          if (submissionCount <= 0) {
             yield* repository.markIntentState({
               id: window.id,
               state: "expired",
@@ -380,11 +389,6 @@ export const materializeEmailIntent = (outboxId: string) =>
             yield* recordEmailIntentTransition(window.kind, "expired");
             return noDeliveryIds;
           }
-          // A stored post that no longer resolves was deleted, so it stops
-          // being a submission worth reporting. Ids the window never stored
-          // stay in the count: they are past its cap, not gone.
-          const submissionCount =
-            windowPostCount - (postIds.length - posts.length);
 
           const recipientLimit =
             yield* policy.submissionNotificationRecipientLimit(
@@ -872,9 +876,11 @@ const sendDeliveryAttempt = (
       // subscriber; their consent was already proven above.
       if (account !== null) {
         // A submission window spans posts on possibly different boards, so the
-        // gate resolves every notified post: any public board satisfies rule 3,
-        // and a window whose posts have all been deleted keeps the fail-closed
-        // null. Every other post-attributed intent is about its aggregate.
+        // gate resolves every notified post. PUBLIC requires all of them to be
+        // public: the email carries each post's title, so admitting on one
+        // public board would leak the private ones beside it. A window whose
+        // posts have all been deleted keeps the fail-closed null. Every other
+        // post-attributed intent is about its aggregate.
         const notifiedPostIds =
           intent.payload.kind === "submission.created"
             ? submissionWindowPostIds(intent.payload)
@@ -898,7 +904,7 @@ const sendDeliveryAttempt = (
         const boardVisibility =
           boardRows.length === 0
             ? null
-            : boardRows.some((row) => row.visibility === "PUBLIC")
+            : boardRows.every((row) => row.visibility === "PUBLIC")
               ? "PUBLIC"
               : "PRIVATE";
 

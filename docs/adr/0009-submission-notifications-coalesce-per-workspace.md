@@ -20,11 +20,13 @@ What keeps this from being a daily digest here is plan gating. `integrations: fa
 
 The volume bound is now structural rather than behavioral. A flood of any size produces one email per window, and a workspace cannot hold more than one window open: a window that reaches 200 stored ids keeps counting rather than opening another. The outbox row count for submissions is one per workspace per window instead of one per post.
 
-The copy separates what happened from what can be shown. `postCount` records every submission the window covers, the email renders at most twenty of them, and a stored post deleted before the send is subtracted from the count — a deleted submission stops being news, while one past the stored-id cap is still a submission the admin should know about.
+The copy separates what happened from what can be shown. `postCount` records every submission the window covers, the email renders at most twenty of them, and a stored post deleted before the send is subtracted from the count — a deleted submission stops being news, while one past the stored-id cap is still a submission the admin should know about. Expiry is decided on that adjusted count rather than on the rendered list, so a capped window whose tracked posts were all deleted still reports the submissions it counted. A deletion among the untracked remainder cannot be observed and stays in the count; the count is a flood summary, not an audit.
 
 Exactly-once membership falls out of the key rather than needing a join table. The window's `deduplicationKey` is bucketed by the burst delay, so two simultaneous first submissions converge on one row through the existing `(organizationId, deduplicationKey)` unique index. Materialization re-reads the window under a row lock and re-checks that it is still pending and still due, so an append either lands in the email being sent or opens the next window; it is never dropped. This is why `findByIdForUpdate` exists.
 
-`aggregateType`/`aggregateId` still name one post — the window's opener — so the intent stays under the post-attributed organization-access gate. The gate reads every board the window notifies, because a window can span boards: any public board satisfies the global-user rule, and a window whose boards have all gone private fails closed.
+`aggregateType`/`aggregateId` still name one post — the window's opener — so the intent stays under the post-attributed organization-access gate, and `postId` is rewritten on every append so a worker from the previous release can still send the window rather than expiring it.
+
+The gate reads every board the window notifies, and the global-user rule needs **all** of them public. The email carries each post's title, so admitting on one public board would leak the private posts beside it; a window whose boards have all gone private fails closed.
 
 The deploy is compatible in both directions. Rows written before the change carry a single `postId`; the payload decoder accepts either shape, so an intent that was pending across the release still materializes. A submission recorded by new code against an old window appends to it.
 

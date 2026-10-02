@@ -627,6 +627,52 @@ describe("EmailOutbox workflows", () => {
       })
     );
 
+    it.effect(
+      "reports a capped window whose stored posts were all deleted",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { intentId, postId } = yield* fixture;
+          const db = yield* Database.Database;
+          // The window reached its stored id cap and kept counting; every post it
+          // tracked has since been deleted. The four submissions it still counts
+          // are real and must not go unreported.
+          yield* db
+            .update(schema.emailOutboxTable)
+            .set({
+              payload: {
+                kind: "submission.created",
+                postCount: 5,
+                postId,
+                postIds: [postId],
+              },
+            })
+            .where(eq(schema.emailOutboxTable.id, intentId));
+          yield* db
+            .delete(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+
+          const deliveryIds = yield* materializeEmailIntent(intentId);
+          expect(deliveryIds).toHaveLength(1);
+          // Deliver it rather than leaving a queued row behind: this suite shares
+          // one database, and a later reconciliation would offer it to a worker
+          // whose send lands in another test's mailbox assertion.
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            deliverEmailDelivery({ deliveryId })
+          );
+          const [delivery] = yield* db
+            .select({
+              templatePayload: schema.emailDeliveryTable.templatePayload,
+            })
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+          expect(delivery?.templatePayload).toMatchObject({
+            body: "4 new posts have been submitted.",
+            posts: [{ label: "and 4 more submitted posts" }],
+          });
+        })
+    );
+
     it.effect("drops a post deleted before its window sends", () =>
       Effect.gen(function* () {
         yield* resetTestMailer();
@@ -2148,7 +2194,7 @@ describe("EmailOutbox workflows", () => {
     );
 
     it.effect(
-      "keeps a submission window eligible while any of its posts is on a public board",
+      "skips a submission window that includes a post on a private board",
       () =>
         Effect.gen(function* () {
           yield* resetTestMailer();
@@ -2190,22 +2236,29 @@ describe("EmailOutbox workflows", () => {
             .select()
             .from(schema.emailDeliveryTable)
             .where(eq(schema.emailDeliveryTable.outboxId, intentId));
-          // The window spans the fixture's public post and a private one, so
-          // the gate must read every notified post rather than the aggregate.
-          expect(delivery?.state).toBe("accepted");
-          expect((yield* testMailerState).sentMessages).toHaveLength(1);
+          // The window's email carries the private post's title too, so one
+          // public board must not admit a recipient who cannot see the rest.
+          expect(delivery?.state).toBe("no_organization_access");
+          expect((yield* testMailerState).sentMessages).toHaveLength(0);
         })
     );
 
     it.effect(
-      "skips a submission window whose posts are all on private boards",
+      "delivers a submission window whose posts are all on public boards",
       () =>
         Effect.gen(function* () {
           yield* resetTestMailer();
-          const { intentId, organizationId, postId } = yield* fixture;
+          const {
+            boardId,
+            intentId,
+            organizationId,
+            ownerMemberId,
+            statusId,
+            userId,
+          } = yield* fixture;
           const db = yield* Database.Database;
           const globalUserId = yield* UserId.generate;
-          const globalEmail = `private-window-${organizationId}@example.test`;
+          const globalEmail = `public-window-${organizationId}@example.test`;
           yield* db.insert(schema.userTable).values({
             id: globalUserId,
             email: globalEmail,
@@ -2220,17 +2273,21 @@ describe("EmailOutbox workflows", () => {
             topicType: "submission",
             userId: globalUserId,
           });
-          const { postId: privatePostId } =
-            yield* insertPrivateBoardPost(organizationId);
-          // The fixture's public post is the window's only public member; drop
-          // it so the window is private-only.
-          yield* db
-            .delete(schema.postTable)
-            .where(eq(schema.postTable.id, postId));
+          const secondPostId = yield* PostId.generate;
+          yield* addSubmissionPost({
+            boardId,
+            organizationId,
+            ownerMemberId,
+            postId: secondPostId,
+            slug: "second-public-submission",
+            statusId,
+            title: "Second public submission",
+            userId,
+          });
           yield* (yield* EmailOutboxRepository).upsertPendingSubmissionWindow({
             now: yield* DateTime.nowAsDate,
             organizationId,
-            postId: privatePostId,
+            postId: secondPostId,
           });
           yield* TestClock.adjust("5 minutes");
 
@@ -2243,8 +2300,8 @@ describe("EmailOutbox workflows", () => {
             .select()
             .from(schema.emailDeliveryTable)
             .where(eq(schema.emailDeliveryTable.outboxId, intentId));
-          expect(delivery?.state).toBe("no_organization_access");
-          expect((yield* testMailerState).sentMessages).toHaveLength(0);
+          expect(delivery?.state).toBe("accepted");
+          expect((yield* testMailerState).sentMessages).toHaveLength(1);
         })
     );
 
