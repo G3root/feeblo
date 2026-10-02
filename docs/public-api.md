@@ -119,6 +119,30 @@ GET /api/v1/boards/{boardId}
 
 Returns one board in the shape above. Requires `boards.read`. A board of another workspace is answered with `404 NOT_FOUND` rather than `403`, so an id cannot be used to probe another workspace.
 
+### List statuses
+
+```http
+GET /api/v1/statuses
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "pss_planned",
+      "name": "Planned",
+      "type": "PLANNED",
+      "orderIndex": 2,
+      "color": "oklch(0.7 0.15 250)"
+    }
+  ]
+}
+```
+
+Requires `posts.read`. Every status of the workspace is returned, in display order, so a caller that creates or moves a post knows the `statusId` to send and the name each one renders as. `name` is the workspace's label, falling back to a humanized `type` when the label is empty — the same rule a post's embedded `status` follows, so one status never has two names across endpoints.
+
+The catalog is the workspace's own: it may rename, recolor, and reorder its statuses, so a caller cannot hard-code them. This endpoint is **not paginated** — a workspace has a handful of statuses and they are ordered by `orderIndex` rather than by age, so there is no cursor and no `nextCursor`.
+
 ### List a board's posts
 
 ```http
@@ -656,6 +680,8 @@ The company's contacts are **not** deleted: they keep their own records and simp
 ## Pagination
 
 Pagination is cursor-based. A response carries `nextCursor`; `null` means the last page. Cursors are opaque — do not construct or parse them — and are invalidated by the API without notice if they are malformed, in which case the API returns `400 INVALID_REQUEST`. Do not poll with offsets: posts, comments, tags, changelog entries, and companies are inserted continuously and offset paging skips and repeats rows.
+
+The one list that is not a page is [`GET /statuses`](#list-statuses): the status catalog is small and ordered by the workspace's own `orderIndex`, so it is returned whole, with no cursor.
 
 ## Errors
 

@@ -54,6 +54,7 @@ import {
   PublicApiPost,
   PublicApiPostPage,
   PublicApiPostTags,
+  PublicApiStatusList,
   PublicApiTagDetail,
   PublicApiTagPage,
 } from "./schema";
@@ -114,6 +115,9 @@ const decodeBoard = Schema.decodeUnknownSync(
 );
 const decodeBoardPage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiBoardPage)
+);
+const decodeStatuses = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiStatusList)
 );
 const decodePost = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiPost)
@@ -4039,6 +4043,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/posts/{postId}",
         "/api/v1/posts/{postId}/comments",
         "/api/v1/posts/{postId}/tags",
+        "/api/v1/statuses",
         "/api/v1/tags",
         "/api/v1/tags/{tagId}",
       ]);
@@ -4161,6 +4166,91 @@ layer(makeTestApp())("public api v1", (it) => {
       );
       expect(get.status).toBe(403);
       expect(decodeError(responseBody(get)).message).toContain("boards.read");
+    })
+  );
+
+  it.effect("lists the workspace's statuses in display order", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      const customStatusId = yield* PostStatusId.generate;
+      const now = yield* DateTime.nowAsDate;
+
+      yield* db.insert(schema.postStatusTable).values({
+        id: customStatusId,
+        type: "COMPLETED",
+        // A workspace that has not customized the status leaves the label
+        // empty; the name falls back to the humanized type, exactly as it does
+        // inside a post payload.
+        label: "",
+        // Before the seeded status, so the order is observable.
+        orderIndex: -1,
+        organizationId: workspace.organizationId,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      registerKey("fbk_status_reader", workspace.organizationId);
+
+      const response = yield* executeRequest(
+        "/api/v1/statuses",
+        "fbk_status_reader"
+      );
+      expect(response.status).toBe(200);
+
+      const list = decodeStatuses(responseBody(response));
+      expect(list.data.map((status) => status.id)).toEqual([
+        customStatusId,
+        workspace.statusId,
+      ]);
+      expect(list.data[0]?.name).toBe("Completed");
+      expect(list.data[1]?.name).toBe("Planned");
+      expect(list.data[1]?.type).toBe("PLANNED");
+
+      // The status row carries the workspace; the key already names it.
+      expect(responseBody(response)).not.toContain("organizationId");
+    })
+  );
+
+  it.effect("keeps the status list inside the calling workspace", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const other = yield* seedWorkspace();
+      registerKey("fbk_status_scoped", workspace.organizationId);
+
+      const response = yield* executeRequest(
+        "/api/v1/statuses",
+        "fbk_status_scoped"
+      );
+      expect(response.status).toBe(200);
+
+      const list = decodeStatuses(responseBody(response));
+      expect(list.data.map((status) => status.id)).toEqual([
+        workspace.statusId,
+      ]);
+      expect(list.data.map((status) => status.id)).not.toContain(
+        other.statusId
+      );
+    })
+  );
+
+  it.effect("refuses the status read without the posts.read scope", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_status_no_posts", workspace.organizationId, {
+        boards: ["read"],
+        tags: ["read"],
+      });
+
+      const response = yield* executeRequest(
+        "/api/v1/statuses",
+        "fbk_status_no_posts"
+      );
+      expect(response.status).toBe(403);
+      expect(decodeError(responseBody(response))._tag).toBe("FORBIDDEN_SCOPE");
+      expect(decodeError(responseBody(response)).message).toContain(
+        "posts.read"
+      );
     })
   );
 });
@@ -4691,6 +4781,33 @@ layer(
       const message = decodeMcpMessage(yield* mcpMessage(response));
       expect(message.result).toBeUndefined();
       expect(message.error?.code).toBe(-32_602);
+    })
+  );
+
+  it.effect("calls a tool that takes no parameters", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_mcp_statuses", workspace.organizationId);
+
+      const sessionId = yield* openMcpSession("fbk_mcp_statuses");
+      const result = yield* callTool(
+        sessionId,
+        "fbk_mcp_statuses",
+        "listStatuses",
+        {}
+      );
+      expect(result.isError).toBe(false);
+
+      // The empty input is an object schema rather than an empty struct: the
+      // tool's `inputSchema` has to carry `type: "object"` for the transport
+      // to accept the descriptor at all.
+      const statuses = yield* Schema.decodeUnknownEffect(PublicApiStatusList)(
+        result.structuredContent
+      );
+      expect(statuses.data.map((status) => status.id)).toEqual([
+        workspace.statusId,
+      ]);
+      expect(statuses.data[0]?.name).toBe("Planned");
     })
   );
 

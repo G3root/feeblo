@@ -106,6 +106,7 @@ const POSTS_PATH = "/api/v1/posts";
 const RETRIEVE_PATH = "/api/v1/posts/retrieve";
 const DETAIL_PATH = "/api/v1/posts/{postId}";
 const SET_POST_TAGS_PATH = "/api/v1/posts/{postId}/tags";
+const STATUSES_PATH = "/api/v1/statuses";
 const TAGS_PATH = "/api/v1/tags";
 const TAG_PATH = "/api/v1/tags/{tagId}";
 const COMPANIES_PATH = "/api/v1/companies";
@@ -142,6 +143,7 @@ describe("PublicApi contract", () => {
         CHANGELOG_ENTRY_PATH,
         DETAIL_PATH,
         SET_POST_TAGS_PATH,
+        STATUSES_PATH,
         POST_COMMENTS_PATH,
         COMMENT_PATH,
         PIN_COMMENT_PATH,
@@ -167,6 +169,7 @@ describe("PublicApi contract", () => {
       "Comments",
       "Companies",
       "Posts",
+      "Statuses",
       "Tags",
     ]);
 
@@ -175,8 +178,8 @@ describe("PublicApi contract", () => {
     }
 
     // Every tag an operation carries is one of the sections above: a group
-    // added to the API without being named there would be a sixth section that
-    // this list does not describe.
+    // added to the API without being named there would be a seventh section
+    // that this list does not describe.
     expect(
       [
         ...new Set(operations.flatMap(({ operation }) => operation.tags ?? [])),
@@ -187,6 +190,7 @@ describe("PublicApi contract", () => {
       "Comments",
       "Companies",
       "Posts",
+      "Statuses",
       "Tags",
     ]);
   });
@@ -487,6 +491,28 @@ describe("PublicApi contract", () => {
     expect(body).toContain("name");
     expect(body).not.toContain("slug");
     expect(body).not.toContain("createdAt");
+  });
+
+  it("documents the status catalog as a complete ordered list", () => {
+    const responses = document.paths[STATUSES_PATH]?.get?.responses ?? {};
+
+    // A status read has no input to get wrong and nothing to collide with, so
+    // it answers the read vocabulary and never a conflict.
+    expect(Object.keys(responses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(JSON.stringify(responses)).not.toContain("CONFLICT");
+
+    const body = JSON.stringify(responses["200"]);
+    for (const field of ["id", "name", "type", "orderIndex", "color"]) {
+      expect(body).toContain(field);
+    }
+
+    // `post_status` also carries the workspace; the key already names it.
+    expect(body).not.toContain("organizationId");
+
+    // Deliberately not a page: a workspace has a handful of statuses, ordered
+    // by the workspace's own `orderIndex` rather than by age, so a cursor on
+    // the shared `(createdAt, id)` tuple would order them the wrong way.
+    expect(body).not.toContain("nextCursor");
   });
 
   it("documents the board resource without an internal identifier", () => {

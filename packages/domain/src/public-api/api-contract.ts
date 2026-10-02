@@ -6,6 +6,7 @@ import { boardEndpoints } from "../board/public-api/http";
 import { changelogEndpoints } from "../changelog/public-api/http";
 import { commentEndpoints } from "../comments/public-api/http";
 import { companyEndpoints } from "../company/public-api/http";
+import { statusEndpoints } from "../post-status/public-api/http";
 import { postEndpoints } from "../post/public-api/http";
 import { tagEndpoints } from "../tag/public-api/http";
 import {
@@ -35,7 +36,7 @@ import {
  * implements — `HandlerOf` reads the failures of a group's middleware from the
  * group's own endpoints, and every operation is wrapped in
  * `requirePublicApiScope`, which fails with the key middleware's
- * `FORBIDDEN_SCOPE`. The price is that a sixth group has to repeat the two
+ * `FORBIDDEN_SCOPE`. The price is that a seventh group has to repeat the two
  * lines; `api-contract.test.ts` fails if it does not.
  *
  * Each group also carries a `Description` annotation. The document derives a
@@ -88,6 +89,15 @@ export class PublicApiPostGroup extends HttpApiGroup.make("Posts")
   .middleware(PublicApiSchemaErrorHandler)
   .middleware(ApiKeyAuthMiddleware) {}
 
+export class PublicApiPostStatusGroup extends HttpApiGroup.make("Statuses")
+  .annotate(
+    OpenApi.Description,
+    "Read the workspace's post statuses, so a post can be filed with one."
+  )
+  .add(...statusEndpoints)
+  .middleware(PublicApiSchemaErrorHandler)
+  .middleware(ApiKeyAuthMiddleware) {}
+
 export class PublicApiTagGroup extends HttpApiGroup.make("Tags")
   .annotate(
     OpenApi.Description,
@@ -110,6 +120,7 @@ export const PublicApiGroups = [
   PublicApiCommentGroup,
   PublicApiCompanyGroup,
   PublicApiPostGroup,
+  PublicApiPostStatusGroup,
   PublicApiTagGroup,
 ] as const;
 

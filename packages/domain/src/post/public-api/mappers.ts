@@ -1,5 +1,6 @@
 import type { TPostStatusType } from "@feeblo/domain-contracts/post-status-type";
 
+import { statusDisplayName } from "../../post-status/public-api/mappers";
 import { toPublicApiTag } from "../../tag/public-api/mappers";
 import type { PublicApiDetailedPost, PublicApiListedPost } from "./repository";
 import type { TPublicApiPost, TPublicApiPostSummary } from "./schema";
@@ -26,25 +27,14 @@ const postUrl = (post: PublicApiListedPost, context: PublicApiMapperContext) =>
 /**
  * A non-empty status name.
  *
- * `post_status.label` is user-facing and may be empty until a workspace
- * customizes it, and an API response with an empty status name is useless.
- * The dashboard and portal fall back to the same humanized type through
- * `@feeblo/web-shared/board/constants`, which this package cannot import
- * without inverting the dependency direction, so the rule is restated here.
+ * The rule lives with the status resource (`statusDisplayName`), which the
+ * statuses endpoint uses too, so a post's embedded status and the catalog
+ * cannot call the same status two different things.
  */
 const statusName = (status: {
   readonly name: string;
   readonly type: TPostStatusType;
-}): string => {
-  const label = status.name.trim();
-  if (label.length > 0) {
-    return label;
-  }
-
-  const [first = "", ...rest] = status.type.toLowerCase().split("_");
-  const capitalized = first.charAt(0).toUpperCase() + first.slice(1);
-  return [capitalized, ...rest].join(" ");
-};
+}): string => statusDisplayName(status.name, status.type);
 
 /**
  * Row → DTO mappers for the public post contract.
