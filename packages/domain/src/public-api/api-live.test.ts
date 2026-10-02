@@ -7,7 +7,7 @@ import { expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
@@ -4146,6 +4146,156 @@ layer(makeTestApp())("public api v1", (it) => {
       );
       expect(unknown.status).toBe(404);
       expect(decodeError(responseBody(unknown))._tag).toBe("NOT_FOUND");
+    })
+  );
+
+  it.effect("filters the post lists by board, tag, and change time", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace({ postCount: 2 });
+      const db = yield* currentDb;
+      const now = DateTime.toDate(yield* DateTime.now);
+      const earlier = DateTime.toDate(
+        DateTime.subtract(yield* DateTime.now, { minutes: 30 })
+      );
+      const cutoff = DateTime.toDate(
+        DateTime.subtract(yield* DateTime.now, { minutes: 15 })
+      );
+      const longAgo = DateTime.toDate(
+        DateTime.subtract(yield* DateTime.now, { days: 1 })
+      ).toISOString();
+
+      // A second board with one recent post, so the board filter has two
+      // boards to choose between and `updatedAfter` has something to keep.
+      const otherBoardId = yield* BoardId.generate;
+      yield* db.insert(schema.boardTable).values({
+        id: otherBoardId,
+        name: "Bugs",
+        slug: "bugs",
+        visibility: "PUBLIC",
+        organizationId: workspace.organizationId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const otherPostId = yield* PostId.generate;
+      yield* db.insert(schema.postTable).values({
+        id: otherPostId,
+        title: "Crash on save",
+        slug: "crash-on-save",
+        content: "<p>Body</p>",
+        excerpt: "Crash on save",
+        boardId: otherBoardId,
+        statusId: workspace.statusId,
+        organizationId: workspace.organizationId,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // The two seeded posts changed half an hour ago; the new one stays
+      // recent, so `updatedAfter` has exactly one row to keep.
+      yield* db
+        .update(schema.postTable)
+        .set({ updatedAt: earlier })
+        .where(
+          inArray(schema.postTable.id, [
+            workspace.postId,
+            `${workspace.postId}_1`,
+          ])
+        );
+
+      yield* seedTag(workspace.organizationId, "tag_filter", "Filter me");
+      yield* db.insert(schema.postTagTable).values({
+        id: "ptag_filter",
+        postId: workspace.postId,
+        tagId: "tag_filter",
+        organizationId: workspace.organizationId,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      registerKey("fbk_post_filter", workspace.organizationId);
+
+      const byBoard = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts?boardId=${otherBoardId}`,
+            "fbk_post_filter"
+          )
+        )
+      );
+      expect(byBoard.data.map((post) => post.id)).toEqual([otherPostId]);
+
+      const byTag = decodePage(
+        responseBody(
+          yield* executeRequest(
+            "/api/v1/posts?tagIds=tag_filter",
+            "fbk_post_filter"
+          )
+        )
+      );
+      expect(byTag.data.map((post) => post.id)).toEqual([workspace.postId]);
+
+      // An id that does not exist is a filter that matches nothing, not an
+      // error: filtering is a read.
+      const byUnknownTag = decodePage(
+        responseBody(
+          yield* executeRequest(
+            "/api/v1/posts?tagIds=tag_missing",
+            "fbk_post_filter"
+          )
+        )
+      );
+      expect(byUnknownTag.data).toEqual([]);
+
+      const byChangeTime = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts?updatedAfter=${encodeURIComponent(cutoff.toISOString())}`,
+            "fbk_post_filter"
+          )
+        )
+      );
+      expect(byChangeTime.data.map((post) => post.id)).toEqual([otherPostId]);
+
+      // A bare date is accepted, and a cutoff older than every row keeps the
+      // whole workspace.
+      const wholeWorkspace = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts?updatedAfter=${encodeURIComponent(longAgo)}`,
+            "fbk_post_filter"
+          )
+        )
+      );
+      expect(wholeWorkspace.data.map((post) => post.id).sort()).toEqual(
+        [workspace.postId, `${workspace.postId}_1`, otherPostId].sort()
+      );
+
+      // The filters compose, and the board list takes the same ones.
+      const composed = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/boards/${workspace.boardId}/posts?tagIds=tag_filter&updatedAfter=${encodeURIComponent(longAgo)}`,
+            "fbk_post_filter"
+          )
+        )
+      );
+      expect(composed.data.map((post) => post.id)).toEqual([workspace.postId]);
+
+      // A malformed filter is the caller's mistake, reported as one rather
+      // than silently ignored as an unfiltered list.
+      const malformed = yield* executeRequest(
+        "/api/v1/posts?updatedAfter=yesterday",
+        "fbk_post_filter"
+      );
+      expect(malformed.status).toBe(400);
+      expect(decodeError(responseBody(malformed))._tag).toBe("INVALID_REQUEST");
+
+      const emptyTags = yield* executeRequest(
+        "/api/v1/posts?tagIds=,,",
+        "fbk_post_filter"
+      );
+      expect(emptyTags.status).toBe(400);
+      expect(decodeError(responseBody(emptyTags))._tag).toBe("INVALID_REQUEST");
     })
   );
 

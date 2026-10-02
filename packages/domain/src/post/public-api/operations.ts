@@ -86,13 +86,22 @@ export const listBoardPostsOperation = defineOperation(
   "listBoardPosts",
   {
     annotations: { idempotent: true, readOnly: true },
-    description: "List one board's posts, newest first.",
+    description:
+      "List one board's posts, newest first, optionally filtered by status, tag, or change time.",
     failure: POST_READ_FAILURES,
     input: ListBoardPostsInput,
     output: PublicApiPostPage,
     scope: "posts.read",
   },
-  ({ boardId, cursor, includeArchived, limit, statusId }) =>
+  ({
+    boardId,
+    cursor,
+    includeArchived,
+    limit,
+    statusId,
+    tagIds,
+    updatedAfter,
+  }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
       const repository = yield* currentPublicApiPostRepository;
@@ -108,6 +117,8 @@ export const listBoardPostsOperation = defineOperation(
           limit: limit ?? PUBLIC_API_PAGE_DEFAULT_LIMIT,
           organizationId: caller.organizationId,
           statusId: statusId ?? null,
+          tagIds: tagIds ?? null,
+          updatedAfter: updatedAfter ?? null,
         })
         .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
 
@@ -138,13 +149,22 @@ export const listPostsOperation = defineOperation(
   "listPosts",
   {
     annotations: { idempotent: true, readOnly: true },
-    description: "List the workspace's posts, newest first.",
+    description:
+      "List the workspace's posts, newest first, optionally filtered by board, status, tag, or change time.",
     failure: POST_READ_FAILURES,
     input: ListPostsInput,
     output: PublicApiPostPage,
     scope: "posts.read",
   },
-  ({ cursor, includeArchived, limit, statusId }) =>
+  ({
+    boardId,
+    cursor,
+    includeArchived,
+    limit,
+    statusId,
+    tagIds,
+    updatedAfter,
+  }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
       const repository = yield* currentPublicApiPostRepository;
@@ -156,11 +176,14 @@ export const listPostsOperation = defineOperation(
       // workspace with no posts is an empty page rather than a 404.
       const page = yield* repository
         .listPosts({
+          boardId: boardId ?? null,
           cursor: after,
           includeArchived: includeArchived ?? false,
           limit: limit ?? PUBLIC_API_PAGE_DEFAULT_LIMIT,
           organizationId: caller.organizationId,
           statusId: statusId ?? null,
+          tagIds: tagIds ?? null,
+          updatedAfter: updatedAfter ?? null,
         })
         .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
 

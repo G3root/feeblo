@@ -1,4 +1,6 @@
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
 import {
   PUBLIC_API_PAGE_DEFAULT_LIMIT,
@@ -52,6 +54,62 @@ export const parseIncludeArchived = (raw: string | undefined) => {
     invalidRequestError("includeArchived must be true or false.")
   );
 };
+
+/**
+ * A comma-separated list of tag ids on a query string.
+ *
+ * Absent, blank, and whitespace-only are all "no tag filter", so `?tagIds=`
+ * does not become a filter that matches nothing. An id that does not exist in
+ * the workspace simply matches no post: unlike assigning tags, filtering is a
+ * read, so a mistyped id is answered with an empty page rather than a
+ * rejection that would cost a second query to distinguish.
+ */
+export const parseTagIds = (raw: string | undefined) =>
+  Effect.gen(function* () {
+    if (raw === undefined || raw.trim().length === 0) {
+      return null;
+    }
+
+    const tagIds = raw
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0);
+
+    if (tagIds.length === 0) {
+      return yield* invalidRequestError(
+        "tagIds must be a comma-separated list of tag ids."
+      );
+    }
+
+    return tagIds;
+  });
+
+const decodeUpdatedAfter = Schema.decodeUnknownOption(Schema.DateFromString);
+
+/**
+ * An ISO-8601 instant that bounds a list to the rows changed after it.
+ *
+ * A bare date is accepted (`2026-08-11`, midnight UTC) as well as a full
+ * timestamp, because a caller catching up day by day does not have to spell out
+ * the midnight. Anything else is the caller's mistake and is reported as one,
+ * rather than being silently ignored as an unfiltered list.
+ */
+export const parseUpdatedAfter = (raw: string | undefined) =>
+  Effect.gen(function* () {
+    const trimmed = raw?.trim();
+    if (trimmed === undefined || trimmed.length === 0) {
+      return null;
+    }
+
+    const decoded = Option.getOrNull(decodeUpdatedAfter(trimmed));
+    if (decoded === null) {
+      return yield* invalidRequestError(
+        "updatedAfter must be an ISO 8601 date or timestamp."
+      );
+    }
+
+    return decoded;
+  });
 
 /**
  * Tag and company names are trimmed before they are stored or compared.

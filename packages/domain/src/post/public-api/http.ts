@@ -12,6 +12,8 @@ import type { HandlerOf } from "../../public-api/handler";
 import {
   parseIncludeArchived,
   parseLimit,
+  parseTagIds,
+  parseUpdatedAfter,
   providedQueryParam,
 } from "../../public-api/parse";
 import {
@@ -56,7 +58,7 @@ export const postEndpoints = [
     .annotate(OpenApi.Summary, "List a board's posts")
     .annotate(
       OpenApi.Description,
-      "Returns the posts on one board of the calling workspace, newest first, as a cursor-paginated page. Private boards are included: the key belongs to the workspace, so board visibility does not restrict it. Archived posts appear only with includeArchived=true, and posts merged into another post are never listed."
+      "Returns the posts on one board of the calling workspace, newest first, as a cursor-paginated page. Private boards are included: the key belongs to the workspace, so board visibility does not restrict it. Archived posts appear only with includeArchived=true, and posts merged into another post are never listed. `tagIds` is a comma-separated list and keeps posts carrying at least one of the tags; `updatedAfter` keeps posts changed after the given instant, which is how a sync catches up without re-reading everything."
     ),
   HttpApiEndpoint.get("listPosts", "/posts", {
     query: ListPostsQuery,
@@ -67,7 +69,7 @@ export const postEndpoints = [
     .annotate(OpenApi.Summary, "List the workspace's posts")
     .annotate(
       OpenApi.Description,
-      "Returns the posts of the calling workspace across every board, newest first, as a cursor-paginated page. Private boards are included: the key belongs to the workspace, so board visibility does not restrict it. Archived posts appear only with includeArchived=true, and posts merged into another post are never listed. Use `GET /boards/{boardId}/posts` to page one board."
+      "Returns the posts of the calling workspace across every board, newest first, as a cursor-paginated page. Private boards are included: the key belongs to the workspace, so board visibility does not restrict it. Archived posts appear only with includeArchived=true, and posts merged into another post are never listed. `boardId`, `tagIds`, and `updatedAfter` narrow the page, so one endpoint serves both a filtered read and a sync that only wants what changed. Use `GET /boards/{boardId}/posts` to page one board."
     ),
   HttpApiEndpoint.get("retrievePost", "/posts/retrieve", {
     query: RetrievePostQuery,
@@ -146,12 +148,16 @@ export const postHandlers = {
       const includeArchived = yield* parseIncludeArchived(
         query.includeArchived
       );
+      const tagIds = yield* parseTagIds(query.tagIds);
+      const updatedAfter = yield* parseUpdatedAfter(query.updatedAfter);
       return yield* listBoardPostsOperation.handler({
         boardId: params.boardId,
         cursor: query.cursor,
         includeArchived,
         limit,
         statusId: query.status ?? null,
+        tagIds: tagIds ?? undefined,
+        updatedAfter: updatedAfter ?? undefined,
       });
     })) satisfies HandlerOf<PublicApiGroup, "listBoardPosts">,
 
@@ -161,11 +167,16 @@ export const postHandlers = {
       const includeArchived = yield* parseIncludeArchived(
         query.includeArchived
       );
+      const tagIds = yield* parseTagIds(query.tagIds);
+      const updatedAfter = yield* parseUpdatedAfter(query.updatedAfter);
       return yield* listPostsOperation.handler({
+        boardId: providedQueryParam(query.boardId),
         cursor: query.cursor,
         includeArchived,
         limit,
         statusId: query.status ?? null,
+        tagIds: tagIds ?? undefined,
+        updatedAfter: updatedAfter ?? undefined,
       });
     })) satisfies HandlerOf<PublicApiGroup, "listPosts">,
 

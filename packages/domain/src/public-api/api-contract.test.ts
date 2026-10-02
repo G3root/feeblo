@@ -364,16 +364,35 @@ describe("PublicApi contract", () => {
     expect(Object.keys(retrieveResponses).sort()).toEqual(READ_RESPONSE_CODES);
     expect(JSON.stringify(retrieveResponses)).not.toContain("CONFLICT");
 
-    // The list is the workspace-wide page: same query parameters as a board's
-    // list, which is what lets a caller page both with one rule.
+    // The list is the workspace-wide page: the board's list plus the board
+    // filter itself, and the filters an integration syncs with.
     const listParameters = (
       document.paths[POSTS_PATH]?.get?.parameters ?? []
     ).map((parameter) => parameter.name);
     expect(listParameters.sort()).toEqual([
+      "boardId",
       "cursor",
       "includeArchived",
       "limit",
       "status",
+      "tagIds",
+      "updatedAfter",
+    ]);
+
+    // A board's list names its board through the path rather than a query
+    // parameter, and takes the same filters otherwise; the document reports
+    // both forms as parameters, which is why the two name lists agree.
+    const boardListParameters = (
+      document.paths[LIST_PATH]?.get?.parameters ?? []
+    ).map((parameter) => parameter.name);
+    expect(boardListParameters.sort()).toEqual([
+      "boardId",
+      "cursor",
+      "includeArchived",
+      "limit",
+      "status",
+      "tagIds",
+      "updatedAfter",
     ]);
 
     // The retrieve lookup accepts an id, a board, and a slug, all optional;

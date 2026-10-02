@@ -97,6 +97,8 @@ export const ListBoardPostsQuery = Schema.Struct({
   cursor: Schema.optional(Schema.String),
   status: Schema.optional(Schema.String),
   includeArchived: Schema.optional(Schema.String),
+  tagIds: Schema.optional(Schema.String),
+  updatedAfter: Schema.optional(Schema.String),
 });
 
 /**
@@ -112,6 +114,9 @@ export const ListPostsQuery = Schema.Struct({
   cursor: Schema.optional(Schema.String),
   status: Schema.optional(Schema.String),
   includeArchived: Schema.optional(Schema.String),
+  boardId: Schema.optional(Schema.String),
+  tagIds: Schema.optional(Schema.String),
+  updatedAfter: Schema.optional(Schema.String),
 });
 
 /**
@@ -243,10 +248,17 @@ export const ListBoardPostsInput = Schema.Struct({
     })
   ),
   statusId: Schema.optional(Schema.NullOr(Schema.String)),
+  tagIds: Schema.optional(Schema.Array(Schema.String)).annotate({
+    description: "Keep posts carrying at least one of these tag ids",
+  }),
+  updatedAfter: Schema.optional(Schema.DateFromString).annotate({
+    description: "Keep posts changed after this instant",
+  }),
 });
 
 /** Typed input for a page of the workspace's posts. */
 export const ListPostsInput = Schema.Struct({
+  boardId: Schema.optional(Schema.String),
   cursor: Schema.optional(
     Schema.String.annotate({ description: "Opaque page cursor" })
   ),
@@ -261,6 +273,12 @@ export const ListPostsInput = Schema.Struct({
     })
   ),
   statusId: Schema.optional(Schema.NullOr(Schema.String)),
+  tagIds: Schema.optional(Schema.Array(Schema.String)).annotate({
+    description: "Keep posts carrying at least one of these tag ids",
+  }),
+  updatedAfter: Schema.optional(Schema.DateFromString).annotate({
+    description: "Keep posts changed after this instant",
+  }),
 });
 
 /** Typed input for finding a post by id, or by board and slug. */
