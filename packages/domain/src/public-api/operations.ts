@@ -2,6 +2,7 @@ import { boardOperations } from "../board/public-api/operations";
 import { changelogOperations } from "../changelog/public-api/operations";
 import { commentOperations } from "../comments/public-api/operations";
 import { companyOperations } from "../company/public-api/operations";
+import { endUserOperations } from "../contact/public-api/operations";
 import { statusOperations } from "../post-status/public-api/operations";
 import { postOperations } from "../post/public-api/operations";
 import { tagOperations } from "../tag/public-api/operations";
@@ -27,6 +28,7 @@ export const PublicApiOperations = [
   ...changelogOperations,
   ...commentOperations,
   ...companyOperations,
+  ...endUserOperations,
   ...postOperations,
   ...statusOperations,
   ...tagOperations,

@@ -6,6 +6,7 @@ import { boardEndpoints } from "../board/public-api/http";
 import { changelogEndpoints } from "../changelog/public-api/http";
 import { commentEndpoints } from "../comments/public-api/http";
 import { companyEndpoints } from "../company/public-api/http";
+import { endUserEndpoints } from "../contact/public-api/http";
 import { statusEndpoints } from "../post-status/public-api/http";
 import { postEndpoints } from "../post/public-api/http";
 import { tagEndpoints } from "../tag/public-api/http";
@@ -81,6 +82,15 @@ export class PublicApiCompanyGroup extends HttpApiGroup.make("Companies")
   .middleware(PublicApiSchemaErrorHandler)
   .middleware(ApiKeyAuthMiddleware) {}
 
+export class PublicApiEndUserGroup extends HttpApiGroup.make("End users")
+  .annotate(
+    OpenApi.Description,
+    "Read the workspace's end users and create or update them — records about its own customers, so a key needs the end-user capability for these endpoints."
+  )
+  .add(...endUserEndpoints)
+  .middleware(PublicApiSchemaErrorHandler)
+  .middleware(ApiKeyAuthMiddleware) {}
+
 export class PublicApiPostGroup extends HttpApiGroup.make("Posts")
   .annotate(
     OpenApi.Description,
@@ -129,6 +139,7 @@ export const PublicApiGroups = [
   PublicApiChangelogGroup,
   PublicApiCommentGroup,
   PublicApiCompanyGroup,
+  PublicApiEndUserGroup,
   PublicApiPostGroup,
   PublicApiPostStatusGroup,
   PublicApiTagGroup,
@@ -154,7 +165,7 @@ export class PublicApi extends HttpApi.make("PublicApi")
   .annotate(OpenApi.Title, "Feeblo Public API")
   .annotate(
     OpenApi.Description,
-    "Read and manage a workspace's posts, comments, votes, tags, changelog entries, and companies. Every request is authenticated with an API key presented in the x-api-key header; the response is always JSON and errors carry a machine-readable code in `_tag`."
+    "Read and manage a workspace's posts, comments, votes, tags, changelog entries, companies, and end users. Every request is authenticated with an API key presented in the x-api-key header; the response is always JSON and errors carry a machine-readable code in `_tag`."
   )
   .annotate(OpenApi.Version, "1.0.0")
   .add(...PublicApiGroups)

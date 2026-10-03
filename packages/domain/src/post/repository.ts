@@ -1259,31 +1259,37 @@ const makePostRepository = Effect.gen(function* () {
           if (!(sourcePost && targetPost)) {
             return yield* new FailedToMergePostError({
               message: "Source or target post not found",
+              reason: "post_not_found",
             });
           }
           if (sourcePostId === targetPostId) {
             return yield* new FailedToMergePostError({
               message: "Source and target posts must be different",
+              reason: "same_post",
             });
           }
           if (sourcePost.mergedIntoPostId) {
             return yield* new FailedToMergePostError({
               message: "Source post is already merged into another post",
+              reason: "source_merged",
             });
           }
           if (sourcePost.archivedAt) {
             return yield* new FailedToMergePostError({
               message: "Source post is archived and cannot be merged",
+              reason: "source_archived",
             });
           }
           if (targetPost.mergedIntoPostId) {
             return yield* new FailedToMergePostError({
               message: "Target post is already merged into another post",
+              reason: "target_merged",
             });
           }
           if (targetPost.archivedAt) {
             return yield* new FailedToMergePostError({
               message: "Target post is archived and cannot be a merge target",
+              reason: "target_archived",
             });
           }
           // Chained merges (A into B, then B into C) would strand A under C:
@@ -1307,6 +1313,7 @@ const makePostRepository = Effect.gen(function* () {
             return yield* new FailedToMergePostError({
               message:
                 "Source post has merged children and cannot be merged again",
+              reason: "source_has_children",
             });
           }
 
@@ -1616,11 +1623,13 @@ const makePostRepository = Effect.gen(function* () {
           if (!preSource) {
             return yield* new FailedToMergePostError({
               message: "Post not found",
+              reason: "post_not_found",
             });
           }
           if (!preSource.mergedIntoPostId) {
             return yield* new FailedToMergePostError({
               message: "Post is not merged",
+              reason: "post_not_merged",
             });
           }
 
@@ -1655,11 +1664,13 @@ const makePostRepository = Effect.gen(function* () {
           if (!sourcePost || !targetPost) {
             return yield* new FailedToMergePostError({
               message: "Post not found",
+              reason: "post_not_found",
             });
           }
           if (sourcePost.mergedIntoPostId !== preSource.mergedIntoPostId) {
             return yield* new FailedToMergePostError({
               message: "Post is not merged",
+              reason: "post_not_merged",
             });
           }
 

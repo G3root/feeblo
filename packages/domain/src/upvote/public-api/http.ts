@@ -9,11 +9,12 @@ import {
   PUBLIC_API_WRITE_ERROR_SCHEMAS,
 } from "../../public-api/errors";
 import type { HandlerOf } from "../../public-api/handler";
-import { parseLimit } from "../../public-api/parse";
+import { parseLimit, providedQueryParam } from "../../public-api/parse";
 import {
   createVoteOperation,
   deleteVoteOperation,
   listPostVotesOperation,
+  listVotesOperation,
 } from "./operations";
 import {
   CreateVoteParams,
@@ -21,12 +22,37 @@ import {
   DeleteVoteParams,
   ListPostVotesParams,
   ListPostVotesQuery,
+  ListVotesQuery,
   PublicApiVote,
   PublicApiVotePage,
+  type TPublicApiVoterFilter,
 } from "./schema";
 
 /** The composed group, so a handler is typed with the group's middleware. */
 type PublicApiGroup = InstanceType<typeof PublicApiVoteGroup>;
+
+/**
+ * The voter filter a query names, or `undefined` when it names none.
+ *
+ * Blank parameters are "not provided", the same rule `providedQueryParam`
+ * applies elsewhere, so `?voterEmail=` is an unfiltered list rather than a
+ * lookup for the empty string.
+ */
+const voterFilterFromQuery = (query: {
+  readonly voterEmail?: string | undefined;
+  readonly voterExternalId?: string | undefined;
+  readonly voterId?: string | undefined;
+}): TPublicApiVoterFilter | undefined => {
+  const id = providedQueryParam(query.voterId);
+  const externalId = providedQueryParam(query.voterExternalId);
+  const email = providedQueryParam(query.voterEmail);
+  const voter: TPublicApiVoterFilter = {
+    ...(id !== undefined && { id }),
+    ...(externalId !== undefined && { externalId }),
+    ...(email !== undefined && { email }),
+  };
+  return Object.keys(voter).length === 0 ? undefined : voter;
+};
 
 /**
  * The vote endpoints, and their HTTP implementations.
@@ -46,7 +72,18 @@ export const voteEndpoints = [
     .annotate(OpenApi.Summary, "List a post's votes")
     .annotate(
       OpenApi.Description,
-      "Returns the votes on one post of the calling workspace, newest first, as a cursor-paginated page. Each vote carries its id and its voter's display identity — a classification (`member` or `end_user`) and a display name and avatar, never an account identifier. A post that does not exist in the workspace is reported as not found rather than as an empty page, so an id cannot be used to probe another workspace."
+      "Returns the votes on one post of the calling workspace, newest first, as a cursor-paginated page. Each vote carries its id and its voter's display identity — a classification (`member` or `end_user`) and a display name and avatar, never an account identifier — and `voterId`, the workspace's own end-user record for the voter, null when a member cast it. `voterId`, `voterExternalId`, and `voterEmail` narrow the page to one customer, matched together. A post that does not exist in the workspace is reported as not found rather than as an empty page, so an id cannot be used to probe another workspace."
+    ),
+  HttpApiEndpoint.get("listVotes", "/votes", {
+    query: ListVotesQuery,
+    success: PublicApiVotePage,
+    error: PUBLIC_API_ERROR_SCHEMAS,
+  })
+    .annotate(OpenApi.Title, "List Votes")
+    .annotate(OpenApi.Summary, "List the workspace's votes")
+    .annotate(
+      OpenApi.Description,
+      'Returns the votes of the calling workspace across every board, newest first, as a cursor-paginated page with the same vote shape as a post\'s list. `postId` and `boardId` narrow it to one post or one board; `voterId`, `voterExternalId`, and `voterEmail` narrow it to one customer, matched together — which is how a caller answers "has this customer voted, and on what" in one request. A `postId` or `boardId` that does not exist in the workspace is reported as not found rather than as an empty page.'
     ),
   HttpApiEndpoint.post("createVote", "/posts/:postId/votes", {
     params: CreateVoteParams,
@@ -83,8 +120,21 @@ export const voteHandlers = {
         cursor: query.cursor,
         limit,
         postId: params.postId,
+        voter: voterFilterFromQuery(query),
       });
     })) satisfies HandlerOf<PublicApiGroup, "listPostVotes">,
+
+  listVotes: (({ query }) =>
+    Effect.gen(function* () {
+      const limit = yield* parseLimit(query.limit);
+      return yield* listVotesOperation.handler({
+        boardId: providedQueryParam(query.boardId),
+        cursor: query.cursor,
+        limit,
+        postId: providedQueryParam(query.postId),
+        voter: voterFilterFromQuery(query),
+      });
+    })) satisfies HandlerOf<PublicApiGroup, "listVotes">,
 
   createVote: (({ params, payload }) =>
     createVoteOperation.handler({

@@ -21,6 +21,19 @@ import {
 export const PublicApiVote = Schema.Struct({
   id: Schema.String,
   postId: Schema.String,
+  /**
+   * The workspace's own end-user record for the voter, or null when there is
+   * none.
+   *
+   * This is the id `GET /end-users/{endUserId}` addresses, so a caller that
+   * holds both scopes can join a vote back to the customer it belongs to
+   * without paging every end user. It is an opaque handle: the record behind
+   * it, and the email on it, still need `end_users.read`. Members are staff
+   * rather than customers, so a member's vote is always null here; an
+   * end-user vote is null only when the voter has no contact row — a legacy
+   * or directly seeded account that never went through a resolution.
+   */
+  voterId: Schema.NullOr(Schema.String),
   author: PublicApiAuthor,
   createdAt: Schema.DateFromString,
 });
@@ -42,7 +55,62 @@ export const ListPostVotesParams = Schema.Struct({
 export const ListPostVotesQuery = Schema.Struct({
   limit: Schema.optional(Schema.String),
   cursor: Schema.optional(Schema.String),
+  voterId: Schema.optional(Schema.String),
+  voterExternalId: Schema.optional(Schema.String),
+  voterEmail: Schema.optional(Schema.String),
 });
+
+/**
+ * The workspace-wide vote list.
+ *
+ * The same page and the same voter filter as a post's list, without the post:
+ * it answers "what has this customer voted on" and "what votes does this
+ * board carry", which a caller reconciling a sync needs and cannot get from a
+ * per-post read without paging every post.
+ */
+export const ListVotesQuery = Schema.Struct({
+  limit: Schema.optional(Schema.String),
+  cursor: Schema.optional(Schema.String),
+  postId: Schema.optional(Schema.String),
+  boardId: Schema.optional(Schema.String),
+  voterId: Schema.optional(Schema.String),
+  voterExternalId: Schema.optional(Schema.String),
+  voterEmail: Schema.optional(Schema.String),
+});
+
+/**
+ * The voter a vote list is filtered by.
+ *
+ * Declared as typed values for an operation that already has types (MCP, a
+ * CLI); the HTTP projection spells them as the flat `voterId`,
+ * `voterExternalId`, and `voterEmail` query parameters and assembles this
+ * shape in the handler. The identifiers are matched together, so a request
+ * that names an external id and an email returns the votes of a voter that
+ * satisfies both; a voter that satisfies no identifier yields an empty page
+ * rather than an error, because a list filter that matches nothing is not a
+ * malformed request.
+ */
+export const PublicApiVoterFilter = Schema.Struct({
+  id: Schema.optional(
+    Schema.String.annotate({
+      description: "The end-user record id the vote belongs to",
+    })
+  ),
+  externalId: Schema.optional(
+    Schema.String.annotate({
+      description: "The caller's own identifier for the voter",
+    })
+  ),
+  email: Schema.optional(
+    Schema.String.annotate({
+      description: "The voter's email address, matched case-insensitively",
+    })
+  ),
+});
+
+export type TPublicApiVoterFilter = Schema.Schema.Type<
+  typeof PublicApiVoterFilter
+>;
 
 export const CreateVoteParams = Schema.Struct({
   postId: Schema.String,
@@ -92,9 +160,35 @@ export const ListPostVotesInput = Schema.Struct({
       description: "Page size, 1–100",
     })
   ),
+  voter: Schema.optional(PublicApiVoterFilter),
 });
 
 export type TListPostVotesInput = Schema.Schema.Type<typeof ListPostVotesInput>;
+
+/** Typed input for a page of the workspace's votes. */
+export const ListVotesInput = Schema.Struct({
+  boardId: Schema.optional(
+    Schema.String.annotate({ description: "Only votes on this board's posts" })
+  ),
+  cursor: Schema.optional(
+    Schema.String.annotate({ description: "Opaque page cursor" })
+  ),
+  limit: Schema.optional(
+    Schema.Finite.check(
+      Schema.isInt(),
+      Schema.isGreaterThan(0),
+      Schema.isLessThanOrEqualTo(PUBLIC_API_PAGE_MAX_LIMIT)
+    ).annotate({
+      description: "Page size, 1–100",
+    })
+  ),
+  postId: Schema.optional(
+    Schema.String.annotate({ description: "Only votes on this post" })
+  ),
+  voter: Schema.optional(PublicApiVoterFilter),
+});
+
+export type TListVotesInput = Schema.Schema.Type<typeof ListVotesInput>;
 
 /** Typed input for adding a vote to a post. */
 export const CreateVoteInput = Schema.Struct({
