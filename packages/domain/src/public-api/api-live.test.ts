@@ -34,6 +34,7 @@ import { EntitlementPolicy } from "../entitlement/policies";
 import { PolicyDeniedError } from "../policy";
 import { RateLimitService } from "../rate-limit/service";
 import { S3Test } from "../services/s3-test";
+import { PublicApiVoteRepository } from "../upvote/public-api/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { PublicApiConfig } from "./config";
 import { makePublicApiMcpRoute } from "./mcp";
@@ -1671,6 +1672,11 @@ layer(makeTestApp())("public api v1", (it) => {
         POST_MANAGEMENT_KEY_SCOPES
       );
 
+      const [before] = yield* db
+        .select({ updatedAt: schema.postTable.updatedAt })
+        .from(schema.postTable)
+        .where(eq(schema.postTable.id, workspace.postId));
+
       const response = yield* executeWrite(
         "PATCH",
         `/api/v1/posts/${workspace.postId}`,
@@ -1694,12 +1700,17 @@ layer(makeTestApp())("public api v1", (it) => {
           contactId: schema.postTable.contactId,
           creatorId: schema.postTable.creatorId,
           creatorMemberId: schema.postTable.creatorMemberId,
+          updatedAt: schema.postTable.updatedAt,
         })
         .from(schema.postTable)
         .where(eq(schema.postTable.id, workspace.postId));
       expect(row?.creatorMemberId).toBeNull();
       expect(row?.creatorId).toBeNull();
       expect(row?.contactId).not.toBeNull();
+      // A re-attribution is a change an `updatedAfter` sync has to see.
+      expect(row?.updatedAt.getTime()).toBeGreaterThan(
+        before?.updatedAt.getTime() ?? 0
+      );
 
       const activities = yield* db
         .select({
@@ -1774,6 +1785,38 @@ layer(makeTestApp())("public api v1", (it) => {
       // `updatedAt` stays the write's clock: an import that backdated the
       // row must still be visible to a sync filtering by `updatedAfter`.
       expect(post.updatedAt.toISOString()).toBe(writeTime.toISOString());
+    })
+  );
+
+  it.effect("refuses a createdAt that is not a real ISO instant", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_bad_date",
+        workspace.organizationId,
+        POST_MANAGEMENT_KEY_SCOPES
+      );
+
+      // `Schema.DateFromString` alone would accept a host format and roll a
+      // day that does not exist into the next month; the shared calendar check
+      // refuses both before the decoder sees them.
+      for (const createdAt of ["August 11, 2026", "2026-02-30"]) {
+        const response = yield* executeWrite("POST", "/api/v1/posts", {
+          apiKey: "fbk_post_bad_date",
+          body: {
+            boardId: workspace.boardId,
+            content: "Nope",
+            createdAt,
+            statusId: workspace.statusId,
+            title: "Nope",
+          },
+        });
+
+        expect(response.status).toBe(400);
+        expect(decodeError(responseBody(response))._tag).toBe(
+          "INVALID_REQUEST"
+        );
+      }
     })
   );
 
@@ -4433,6 +4476,47 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect(
+    "removes the named vote, not a newer one for the same account",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace({ withVotesAndComments: true });
+        const db = yield* currentDb;
+        const votes = yield* PublicApiVoteRepository;
+        const oldVoteId = `upv_${workspace.organizationId}`;
+        const userId = `user_voter_${workspace.organizationId}`;
+
+        // The vote the caller names is gone and the same account has voted
+        // again, which the unique index allows only as a new row.
+        yield* db
+          .delete(schema.upvoteTable)
+          .where(eq(schema.upvoteTable.id, oldVoteId));
+        yield* db.insert(schema.upvoteTable).values({
+          id: "upv_newer",
+          userId,
+          postId: workspace.postId,
+          organizationId: workspace.organizationId,
+          createdAt: new Date(),
+        });
+
+        // A delete by the old id must not fall back to the account: the row it
+        // names is gone, so the answer is the missing resource and the newer
+        // vote stays.
+        const removed = yield* votes.removeVoteById({
+          organizationId: workspace.organizationId,
+          postId: workspace.postId,
+          voteId: oldVoteId,
+        });
+        expect(removed).toEqual({ removed: false });
+
+        const rows = yield* db
+          .select({ id: schema.upvoteTable.id })
+          .from(schema.upvoteTable)
+          .where(eq(schema.upvoteTable.postId, workspace.postId));
+        expect(rows.map((row) => row.id)).toEqual(["upv_newer"]);
+      })
+  );
+
   it.effect("refuses a vote write without the vote scopes", () =>
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace();
@@ -4511,6 +4595,52 @@ layer(makeTestApp())("public api v1", (it) => {
           body: { author: { email: "vera@example.com" } },
         }
       );
+      expect(response.status).toBe(409);
+      expect(decodeError(responseBody(response))._tag).toBe("CONFLICT");
+
+      // A locked post refuses the removal too, even before the vote is named:
+      // changing its voters is the same closed gate as adding one.
+      const removed = yield* executeWrite(
+        "DELETE",
+        `/api/v1/posts/${workspace.postId}/votes/upv_any`,
+        { apiKey: "fbk_votes_locked" }
+      );
+      expect(removed.status).toBe(409);
+      expect(decodeError(responseBody(removed))._tag).toBe("CONFLICT");
+    })
+  );
+
+  it.effect("refuses a vote on a post merged into another", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace({ postCount: 2 });
+      const db = yield* currentDb;
+      registerKey(
+        "fbk_votes_merged",
+        workspace.organizationId,
+        VOTE_MANAGEMENT_KEY_SCOPES
+      );
+
+      // A merged post redirects to its survivor and every interaction gate
+      // treats it as read-only until it is unmerged. The check constraints
+      // require a merge timestamp and an archived source, so both are set.
+      yield* db
+        .update(schema.postTable)
+        .set({
+          archivedAt: new Date(),
+          mergedAt: new Date(),
+          mergedIntoPostId: `${workspace.postId}_1`,
+        })
+        .where(eq(schema.postTable.id, workspace.postId));
+
+      const response = yield* executeWrite(
+        "POST",
+        `/api/v1/posts/${workspace.postId}/votes`,
+        {
+          apiKey: "fbk_votes_merged",
+          body: { author: { email: "vera@example.com" } },
+        }
+      );
+
       expect(response.status).toBe(409);
       expect(decodeError(responseBody(response))._tag).toBe("CONFLICT");
     })

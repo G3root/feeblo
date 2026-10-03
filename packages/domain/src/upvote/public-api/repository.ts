@@ -12,10 +12,12 @@ import {
   type OnBehalfSubject,
 } from "../../identity/service";
 import { PostActivityRepository } from "../../post-activity/repository";
+import { PostRepository } from "../../post/repository";
 import type { Cursor } from "../../public-api/cursor";
+import { conflictError, notFoundError } from "../../public-api/errors";
 import { withRemapDbErrors } from "../../rpc-errors";
 import { UserRepository } from "../../user/repository";
-import { addVoteOnBehalf, removeVoteOnBehalf } from "../on-behalf";
+import { addVoteOnBehalf, recordVoteRemoved } from "../on-behalf";
 import { UpvoteRepository } from "../repository";
 
 /** An author reduced to a classification and display fields — never an id. */
@@ -103,6 +105,7 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
   const emailSubscriptions = yield* EmailSubscriptionRepository;
   const activities = yield* PostActivityRepository;
   const resolvePrincipal = yield* ResolvePrincipalService;
+  const posts = yield* PostRepository;
   const upvotes = yield* UpvoteRepository;
   const users = yield* UserRepository;
 
@@ -128,6 +131,41 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
       Effect.provideService(UpvoteRepository, upvotes),
       Effect.provideService(UserRepository, users)
     );
+
+  /**
+   * Locks the post row and rejects a state that no longer accepts vote
+   * changes.
+   *
+   * Must run inside the write's own transaction: the row lock is what keeps a
+   * concurrent lock or merge from landing between this check and the write,
+   * which is the race a check in a separate transaction cannot close. The
+   * failure vocabulary is the published one, so the operation does not have to
+   * translate a policy denial.
+   */
+  const requireVotablePost = (args: {
+    readonly organizationId: string;
+    readonly postId: string;
+  }) =>
+    Effect.gen(function* () {
+      const post = yield* posts.findActivityState({
+        id: args.postId,
+        organizationId: args.organizationId,
+      });
+
+      if (post === undefined) {
+        return yield* notFoundError("Post not found.");
+      }
+      if (post.mergedIntoPostId !== null) {
+        return yield* conflictError(
+          "This post has been merged into another post and cannot be voted on."
+        );
+      }
+      if (post.lockedAt !== null) {
+        return yield* conflictError(
+          "This post is locked and no longer accepts votes."
+        );
+      }
+    }).pipe(withRemapDbErrors("PublicApiVote", "select"));
 
   return {
     /**
@@ -210,40 +248,6 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
       }).pipe(withRemapDbErrors("PublicApiVote", "select")),
 
     /**
-     * The post a vote is added to: whether it exists in this workspace and
-     * whether it still accepts votes.
-     *
-     * A locked or merged post is read-only for every interaction gate in the
-     * dashboard, and the shared on-behalf path does not re-check it, so the
-     * state is read here and the operation answers the published conflict.
-     */
-    findVoteTarget: ({
-      organizationId,
-      postId,
-    }: {
-      organizationId: string;
-      postId: string;
-    }) =>
-      Effect.gen(function* () {
-        const rows = yield* db
-          .select({
-            id: schema.postTable.id,
-            lockedAt: schema.postTable.lockedAt,
-            mergedIntoPostId: schema.postTable.mergedIntoPostId,
-          })
-          .from(schema.postTable)
-          .where(
-            and(
-              eq(schema.postTable.id, postId),
-              eq(schema.postTable.organizationId, organizationId)
-            )
-          )
-          .limit(1);
-
-        return Option.fromNullishOr(rows.at(0));
-      }).pipe(withRemapDbErrors("PublicApiVote", "select")),
-
-    /**
      * One vote on a post, by the account behind it.
      *
      * Used to read back the vote a create just resolved, and to answer the
@@ -285,85 +289,68 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
      * The behavior is the shared `upvote/on-behalf.ts` path — the same
      * resolution, idempotent insert, timeline entry, and voter subscription
      * the dashboard's `UpvoteAddOnBehalf` performs — with a machine-key actor,
-     * because a key is not a member and has no person to record.
+     * because a key is not a member and has no person to record. The post's
+     * state is checked under its row lock inside the same transaction, so a
+     * concurrent lock or merge cannot slip between the check and the insert.
      */
     addVoteOnBehalf: (args: {
       readonly organizationId: string;
       readonly postId: string;
       readonly subject: OnBehalfSubject;
     }) =>
-      provideVoteWriteEnvironment(
-        addVoteOnBehalf({
-          actor: { memberId: null, userId: null },
-          organizationId: args.organizationId,
-          postId: args.postId,
-          subject: args.subject,
+      db.transaction(() =>
+        Effect.gen(function* () {
+          yield* requireVotablePost(args);
+          return yield* provideVoteWriteEnvironment(
+            addVoteOnBehalf({
+              actor: { memberId: null, userId: null },
+              organizationId: args.organizationId,
+              postId: args.postId,
+              subject: args.subject,
+            })
+          );
         })
       ),
 
     /**
-     * Removes exactly one voter's vote on behalf of the workspace.
+     * Removes exactly the vote a delete names.
      *
-     * The behavior is the shared `upvote/on-behalf.ts` path — a non-voter is a
-     * success no-op, a removal records the same provenance the dashboard
-     * records, and the voter's email subscription is left alone.
+     * The row is deleted by its own id inside one transaction that first locks
+     * the post and re-checks its state, so neither a concurrent lock or merge
+     * nor a removal-and-re-vote for the same account can make this request
+     * delete a vote it did not name. The activity entry carries the same
+     * provenance the dashboard's removal records.
      */
-    removeVoteOnBehalf: (args: {
+    removeVoteById: (args: {
       readonly organizationId: string;
       readonly postId: string;
-      readonly userId: string;
+      readonly voteId: string;
     }) =>
-      provideVoteWriteEnvironment(
-        removeVoteOnBehalf({
-          actor: { memberId: null, userId: null },
-          organizationId: args.organizationId,
-          postId: args.postId,
-          userId: args.userId,
+      db.transaction(() =>
+        Effect.gen(function* () {
+          yield* requireVotablePost(args);
+
+          const removed = yield* upvotes.removeById({
+            organizationId: args.organizationId,
+            postId: args.postId,
+            voteId: args.voteId,
+          });
+          if (Option.isNone(removed)) {
+            return { removed: false } as const;
+          }
+
+          yield* provideVoteWriteEnvironment(
+            recordVoteRemoved({
+              actor: { memberId: null, userId: null },
+              organizationId: args.organizationId,
+              postId: args.postId,
+              userId: removed.value.userId,
+            })
+          );
+
+          return { removed: true } as const;
         })
       ),
-
-    /**
-     * The vote a delete names, and the state of the post it sits on.
-     *
-     * The account id is selected only so the shared removal can name the voter
-     * it removes and record the same provenance the dashboard records; it is
-     * not mapped into a payload. The post state travels with the row so a
-     * delete cannot remove a vote from a post that has since been locked or
-     * merged without answering the documented conflict.
-     */
-    findVoteForRemoval: ({
-      organizationId,
-      postId,
-      voteId,
-    }: {
-      organizationId: string;
-      postId: string;
-      voteId: string;
-    }) =>
-      Effect.gen(function* () {
-        const rows = yield* db
-          .select({
-            id: schema.upvoteTable.id,
-            userId: schema.upvoteTable.userId,
-            lockedAt: schema.postTable.lockedAt,
-            mergedIntoPostId: schema.postTable.mergedIntoPostId,
-          })
-          .from(schema.upvoteTable)
-          .innerJoin(
-            schema.postTable,
-            eq(schema.postTable.id, schema.upvoteTable.postId)
-          )
-          .where(
-            and(
-              eq(schema.upvoteTable.id, voteId),
-              eq(schema.upvoteTable.postId, postId),
-              eq(schema.upvoteTable.organizationId, organizationId)
-            )
-          )
-          .limit(1);
-
-        return Option.fromNullishOr(rows.at(0));
-      }).pipe(withRemapDbErrors("PublicApiVote", "select")),
   };
 });
 

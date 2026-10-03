@@ -1,6 +1,7 @@
 import { PostActivityKind } from "@feeblo/domain-contracts/activity-kind";
 import { PostStatusType } from "@feeblo/domain-contracts/post-status-type";
 import * as Schema from "effect/Schema";
+import * as SchemaTransformation from "effect/SchemaTransformation";
 
 import {
   POST_CONTENT_MAX_LENGTH,
@@ -12,6 +13,7 @@ import {
   PublicApiOnBehalfAuthor,
   PublicApiTag,
 } from "../../public-api/common";
+import { isIsoDateOrTimestamp } from "../../public-api/parse";
 
 /**
  * The post resource: what the post endpoints return, and the typed input every
@@ -31,6 +33,21 @@ export const PublicApiPostStatus = Schema.Struct({
 });
 
 const ETA_QUARTER_PATTERN = /^[0-9]{4}-Q[1-4]$/;
+
+/**
+ * A raw date string that names a real instant.
+ *
+ * `Schema.DateFromString` alone is too permissive: it accepts host formats
+ * like `August 11, 2026` and rolls a day that does not exist (`2026-02-30`)
+ * over into the next month. The shape and calendar checks are the same ones
+ * the post list's `updatedAfter` filter uses, so the two date parameters
+ * cannot disagree about which strings are real dates.
+ */
+const IsoInstant = Schema.String.check(
+  Schema.makeFilter(isIsoDateOrTimestamp, {
+    message: "must be an ISO 8601 date or timestamp naming a real date",
+  })
+).pipe(Schema.decodeTo(Schema.Date, SchemaTransformation.dateFromString));
 
 /** List projection: everything except the post body. */
 export const PublicApiPostSummary = Schema.Struct({
@@ -272,7 +289,7 @@ export const CreatePostPayload = Schema.Struct({
     Schema.NullOr(Schema.String.check(Schema.isPattern(ETA_QUARTER_PATTERN)))
   ),
   author: Schema.optional(PublicApiOnBehalfAuthor),
-  createdAt: Schema.optional(Schema.DateFromString),
+  createdAt: Schema.optional(IsoInstant),
 });
 
 export type TCreatePostPayload = Schema.Schema.Type<typeof CreatePostPayload>;
@@ -392,7 +409,7 @@ export const CreatePostInput = Schema.Struct({
   statusId: Schema.String,
   title: Schema.String,
   author: Schema.optional(PublicApiOnBehalfAuthor),
-  createdAt: Schema.optional(Schema.DateFromString),
+  createdAt: Schema.optional(IsoInstant),
 });
 
 /** Typed input for updating a post. */

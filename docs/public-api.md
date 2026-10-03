@@ -581,7 +581,7 @@ GET /api/v1/posts/{postId}/votes
 
 Requires `votes.read`. Votes are returned newest first, on the same cursor as every other list. `author.type` is `member` for a vote cast by a workspace member and `end_user` for everyone else; the account identifier behind the vote is never returned. A post that does not exist in the workspace, or belongs to another one, is `404 NOT_FOUND` rather than an empty page.
 
-A vote belongs to the post it currently lives on. When a post is merged into another, its votes move to the survivor, so ask the survivor for them; the source reports none of its own.
+A vote belongs to the post it currently lives on. When a post is merged into another, its votes move to the survivor, so ask the survivor for them. The exception is a voter who had already voted on the survivor: their original vote stays on the source — it is what a later unmerge restores — and is not an additional vote on the survivor, so the source can still report that vote.
 
 ### Vote on a post
 

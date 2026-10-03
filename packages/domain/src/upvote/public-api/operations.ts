@@ -13,7 +13,6 @@ import {
   InternalError,
   InvalidRequestError,
   NotFoundError,
-  conflictError,
   internalError,
   invalidRequestError,
   notFoundError,
@@ -60,26 +59,43 @@ const VOTE_DELETE_FAILURES = Schema.Union([
  *
  * The identity failures carry the caller's own identifier in their detail, so
  * the published message is fixed: echoing a subject id back would make the
- * error body an existence oracle. Everything else — a lost id-generation race,
- * a subscription write, a driver failure the remap did not name — has no
+ * error body an existence oracle. The repository's own state checks already
+ * answer on the published vocabulary — they run inside the write's transaction
+ * — so those pass through unchanged. Everything else — a lost id-generation
+ * race, a subscription write, a driver failure the remap did not name — has no
  * caller-actionable meaning and stays the documented internal failure.
  */
 const withVoteWriteFailures = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(
     withRemapDbErrors("PublicApiVote", "update"),
-    Effect.mapError((cause): InvalidRequestError | InternalError => {
-      if (Schema.is(InvalidSubjectError)(cause)) {
-        return invalidRequestError(
-          "The vote's author could not be resolved in this workspace."
-        );
+    Effect.mapError(
+      (
+        cause
+      ):
+        | InvalidRequestError
+        | NotFoundError
+        | ConflictError
+        | InternalError => {
+        if (Schema.is(InvalidSubjectError)(cause)) {
+          return invalidRequestError(
+            "The vote's author could not be resolved in this workspace."
+          );
+        }
+        if (Schema.is(SubjectNotFoundError)(cause)) {
+          return invalidRequestError(
+            "The vote's author could not be found in this workspace."
+          );
+        }
+        if (
+          Schema.is(NotFoundError)(cause) ||
+          Schema.is(ConflictError)(cause) ||
+          Schema.is(InvalidRequestError)(cause)
+        ) {
+          return cause;
+        }
+        return internalError("The request could not be completed.");
       }
-      if (Schema.is(SubjectNotFoundError)(cause)) {
-        return invalidRequestError(
-          "The vote's author could not be found in this workspace."
-        );
-      }
-      return internalError("The request could not be completed.");
-    })
+    )
   );
 
 /**
@@ -152,29 +168,10 @@ export const createVoteOperation = defineOperation(
       const caller = yield* currentPublicApiCaller;
       const repository = yield* currentPublicApiVoteRepository;
 
-      // The post is read first so a missing post is a 404 and a locked or
-      // merged one is the documented conflict, rather than a foreign-key
-      // failure the caller cannot act on. The shared on-behalf path performs
-      // the mutation; this is the same state gate the dashboard's
-      // `canVoteOnBehalf` policy applies.
-      const target = yield* repository
-        .findVoteTarget({ organizationId: caller.organizationId, postId })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
-
-      if (Option.isNone(target)) {
-        return yield* notFoundError("Post not found.");
-      }
-      if (target.value.mergedIntoPostId !== null) {
-        return yield* conflictError(
-          "This post has been merged into another post and cannot be voted on."
-        );
-      }
-      if (target.value.lockedAt !== null) {
-        return yield* conflictError(
-          "This post is locked and no longer accepts votes."
-        );
-      }
-
+      // The post's state is checked inside the write's own transaction, under
+      // the post row's lock: a check in a separate transaction would leave a
+      // window for a concurrent lock or merge to land between the check and
+      // the insert, and the write would still report success.
       const added = yield* repository
         .addVoteOnBehalf({
           organizationId: caller.organizationId,
@@ -223,43 +220,22 @@ export const deleteVoteOperation = defineOperation(
       const caller = yield* currentPublicApiCaller;
       const repository = yield* currentPublicApiVoteRepository;
 
-      const vote = yield* repository
-        .findVoteForRemoval({
+      // The removal names the vote's own id, and the repository deletes that
+      // row inside one transaction that also locks the post and re-checks its
+      // state. A vote that vanished — or was removed and cast again for the
+      // same account — is reported as the missing resource this request named
+      // rather than silently removing the newer vote.
+      const removed = yield* repository
+        .removeVoteById({
           organizationId: caller.organizationId,
           postId,
           voteId,
         })
-        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+        .pipe(withVoteWriteFailures);
 
-      if (Option.isNone(vote)) {
+      if (!removed.removed) {
         return yield* notFoundError("Vote not found.");
       }
-
-      // The dashboard refuses to change voters on a locked or merged post, and
-      // the public delete is the same act: a post that no longer accepts votes
-      // does not have its voters changed through this endpoint either.
-      if (vote.value.mergedIntoPostId !== null) {
-        return yield* conflictError(
-          "This post has been merged into another post and cannot be voted on."
-        );
-      }
-      if (vote.value.lockedAt !== null) {
-        return yield* conflictError(
-          "This post is locked and no longer accepts votes."
-        );
-      }
-
-      // The removal is the shared on-behalf path: it deletes exactly this
-      // voter's vote and records the same provenance the dashboard records.
-      // A row that vanished between the read above and the write is a no-op
-      // success, which is what a retried delete should see.
-      yield* repository
-        .removeVoteOnBehalf({
-          organizationId: caller.organizationId,
-          postId,
-          userId: vote.value.userId,
-        })
-        .pipe(withVoteWriteFailures);
     })
 );
 

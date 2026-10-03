@@ -103,16 +103,59 @@ export const addVoteOnBehalf = (args: {
   );
 
 /**
+ * Records the `VOTE_REMOVED` timeline entry for one voter, inside the caller's
+ * transaction.
+ *
+ * The entry keeps its documented `{ contactId, userId }` provenance shape: the
+ * contact is resolved when the voter has one, and a pre-existing voter with no
+ * contact records only the account id, because nothing is invented. Shared by
+ * the remove-by-voter and remove-by-id paths so the two cannot disagree about
+ * what a removal records.
+ */
+export const recordVoteRemoved = (args: {
+  readonly actor: VoteWriteActor;
+  readonly organizationId: string;
+  readonly postId: string;
+  readonly userId: string;
+}) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const activityRepository = yield* PostActivityRepository;
+
+    const [voterContact] = yield* db
+      .select({ contactId: schema.contactTable.id })
+      .from(schema.contactTable)
+      .where(
+        and(
+          eq(schema.contactTable.organizationId, args.organizationId),
+          eq(schema.contactTable.userId, args.userId)
+        )
+      )
+      .limit(1);
+
+    yield* activityRepository.create({
+      organizationId: args.organizationId,
+      postId: args.postId,
+      actorId: args.actor.userId,
+      actorMemberId: args.actor.memberId,
+      kind: "VOTE_REMOVED",
+      metadata: {
+        onBehalfOf: {
+          ...(voterContact && { contactId: voterContact.contactId }),
+          userId: args.userId,
+        },
+      },
+    });
+  });
+
+/**
  * Removes exactly one voter's vote on behalf of the workspace, as one
  * transaction.
  *
  * Removing a non-voter is a success no-op that records nothing — the same
- * semantics as the dashboard's `UpvoteRemoveOnBehalf`. When a vote is actually
- * removed the timeline entry keeps its documented `{ contactId, userId }`
- * provenance shape: the contact is resolved when the voter has one, and
- * pre-existing voters with no contact record only the account id, because
- * nothing is invented. Unsubscribing stays explicit: removing a voter never
- * touches their email subscription.
+ * semantics as the dashboard's `UpvoteRemoveOnBehalf`. A removal records the
+ * provenance `recordVoteRemoved` describes. Unsubscribing stays explicit:
+ * removing a voter never touches their email subscription.
  */
 export const removeVoteOnBehalf = (args: {
   readonly actor: VoteWriteActor;
@@ -122,9 +165,7 @@ export const removeVoteOnBehalf = (args: {
 }) =>
   transaction(
     Effect.gen(function* () {
-      const db = yield* currentDb;
       const repository = yield* UpvoteRepository;
-      const activityRepository = yield* PostActivityRepository;
 
       const removed = yield* repository.removeAs({
         organizationId: args.organizationId,
@@ -135,30 +176,7 @@ export const removeVoteOnBehalf = (args: {
         return removed;
       }
 
-      const [voterContact] = yield* db
-        .select({ contactId: schema.contactTable.id })
-        .from(schema.contactTable)
-        .where(
-          and(
-            eq(schema.contactTable.organizationId, args.organizationId),
-            eq(schema.contactTable.userId, args.userId)
-          )
-        )
-        .limit(1);
-
-      yield* activityRepository.create({
-        organizationId: args.organizationId,
-        postId: args.postId,
-        actorId: args.actor.userId,
-        actorMemberId: args.actor.memberId,
-        kind: "VOTE_REMOVED",
-        metadata: {
-          onBehalfOf: {
-            ...(voterContact && { contactId: voterContact.contactId }),
-            userId: args.userId,
-          },
-        },
-      });
+      yield* recordVoteRemoved(args);
 
       return removed;
     })
