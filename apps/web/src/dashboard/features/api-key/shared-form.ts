@@ -5,6 +5,7 @@ import {
   PUBLIC_API_DEFAULT_SCOPES,
   PUBLIC_API_POST_MANAGEMENT_SCOPES,
   PUBLIC_API_TAG_MANAGEMENT_SCOPES,
+  PUBLIC_API_VOTE_MANAGEMENT_SCOPES,
   type PublicApiScope,
 } from "@feeblo/domain-contracts/public-api-scope";
 import {
@@ -54,6 +55,7 @@ export const API_KEY_EXPIRATION_ITEMS = API_KEY_EXPIRATIONS.map((value) => ({
 export const API_KEY_CAPABILITY_GROUPS = [
   "posts",
   "comments",
+  "votes",
   "tags",
   "changelog",
   "companies",
@@ -69,6 +71,7 @@ export type ApiKeyCapabilityGroup = (typeof API_KEY_CAPABILITY_GROUPS)[number];
 export const API_KEY_CAPABILITY_GROUP_SCOPES = {
   posts: PUBLIC_API_POST_MANAGEMENT_SCOPES,
   comments: PUBLIC_API_COMMENT_MANAGEMENT_SCOPES,
+  votes: PUBLIC_API_VOTE_MANAGEMENT_SCOPES,
   tags: PUBLIC_API_TAG_MANAGEMENT_SCOPES,
   changelog: PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
   companies: PUBLIC_API_COMPANY_MANAGEMENT_SCOPES,
@@ -77,6 +80,7 @@ export const API_KEY_CAPABILITY_GROUP_SCOPES = {
 export const API_KEY_CAPABILITY_GROUP_LABELS = {
   posts: "Manage posts",
   comments: "Manage comments",
+  votes: "Manage votes",
   tags: "Manage tags",
   changelog: "Manage changelog",
   companies: "Manage companies",
@@ -87,6 +91,8 @@ export const API_KEY_CAPABILITY_GROUP_DESCRIPTIONS = {
     "Create, edit, and delete this workspace's posts, including their title, body, status, board, and ETA quarter. Deleting a post cannot be undone.",
   comments:
     "Create, edit, and delete comments, and pin one to the top of a post. Deleting a comment removes its replies, and a comment created with a key is attributed to the customer the request names.",
+  votes:
+    "Add and remove votes on the workspace's posts, each attributed to the customer the request names. Reading votes is included with every key.",
   tags: "Create, rename, and delete tags, and set which tags a post carries. Deleting a tag removes it from every post that carries it.",
   changelog:
     "Create, edit, and delete changelog entries, and publish them. Publishing emails everyone subscribed to the changelog.",
@@ -138,7 +144,7 @@ export const apiKeyScopes = (
  * group the caller may not select.
  */
 export const API_KEY_READ_ONLY_DESCRIPTION =
-  "Every key reads posts, comments, tags, and changelog entries. Select a capability to grant more.";
+  "Every key reads posts, comments, votes, tags, and changelog entries. Select a capability to grant more.";
 
 /**
  * Mirrors the server's `ApiKeyCreate` payload: a name between 1 and 32

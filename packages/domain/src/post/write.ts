@@ -1,7 +1,8 @@
-import { transaction } from "@feeblo/db";
+import { currentDb, schema, transaction } from "@feeblo/db";
 import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -93,6 +94,14 @@ export type PostCreateWrite = {
   readonly author?: PostWriteAuthor | undefined;
   readonly boardId: string;
   readonly content: string;
+  /**
+   * The instant the post is recorded as created, when the caller supplies
+   * one. An import uses this to backdate history; an ordinary create leaves it
+   * absent and the row is stamped with the write's own clock. `updatedAt` is
+   * still the write's clock, so a sync filtering by `updatedAfter` sees the
+   * import rather than silently missing it.
+   */
+  readonly createdAt?: Date | undefined;
   readonly etaQuarter?: string | null | undefined;
   readonly id: string;
   readonly organizationId: string;
@@ -115,6 +124,12 @@ export type PostCreateWrite = {
  */
 export type PostUpdateWrite = {
   readonly assetIds?: readonly string[] | undefined;
+  /**
+   * Present ⇒ the post is re-attributed to the resolved customer. Absent
+   * leaves the current author alone; unlike `etaQuarter`, an explicit `null`
+   * is not a value the resolver accepts.
+   */
+  readonly author?: PostWriteAuthor | undefined;
   readonly boardId?: string | undefined;
   /** Raw Markdown; the shared path sanitizes it before it is stored. */
   readonly content?: string | undefined;
@@ -158,6 +173,7 @@ export type PostRemoveWrite = {
  * the dashboard handlers.
  */
 export const makePostWrites = Effect.gen(function* () {
+  const db = yield* currentDb;
   const boardRepository = yield* BoardRepository;
   const repository = yield* PostRepository;
   const emailOutbox = yield* EmailOutboxRepository;
@@ -725,6 +741,99 @@ export const makePostWrites = Effect.gen(function* () {
         }
 
         yield* activityRepository.createMany(activities);
+
+        // Re-attribution is part of the same transaction as the field writes,
+        // so a `PATCH` that names a title and an author is atomic: either the
+        // post and its timeline both move or neither does. The dashboard's
+        // `PostUpdateAuthor` RPC is this branch with no other field named.
+        if (args.author !== undefined) {
+          const subject = yield* resolveOnBehalfSubject({
+            organizationId: args.organizationId,
+            needsUser: false,
+            subject: args.author,
+            action: "post author",
+          });
+
+          if (
+            previous.contactId !== subject.contactId ||
+            previous.creatorId !== subject.userId
+          ) {
+            const onBehalfMetadata = toOnBehalfMetadata(subject);
+            yield* repository.updateAuthor({
+              contactId: subject.contactId,
+              // On-behalf posts keep staff attribution out of the author
+              // fields, matching the create path.
+              creatorId: subject.userId,
+              creatorMemberId: null,
+              id: args.id,
+              organizationId: args.organizationId,
+            });
+            yield* activityRepository.create({
+              ...columns,
+              kind: "AUTHOR_CHANGED",
+              organizationId: args.organizationId,
+              postId: args.id,
+              ...(onBehalfMetadata && { metadata: onBehalfMetadata }),
+            });
+
+            // The new author inherits the creator subscription exactly as if
+            // the post had been created on their behalf: a verified account
+            // is trusted, everyone else defers until identity linking grants
+            // them access. The previous author is unsubscribed first —
+            // otherwise they keep receiving status mail for a post no longer
+            // attributed to them. Only identifiers that differ from the new
+            // subject's are retired, so a shared address survives for the
+            // fresh subscribe below.
+            const subscriptionNow = yield* DateTime.nowAsDate;
+            const retiredUserId =
+              previous.creatorId !== null &&
+              previous.creatorId !== subject.userId
+                ? previous.creatorId
+                : null;
+            if (retiredUserId !== null) {
+              yield* subscriptionRepository.unsubscribe({
+                postId: args.id,
+                userId: retiredUserId,
+              });
+            }
+            let retiredContactEmail: string | null = null;
+            if (
+              previous.contactId !== null &&
+              previous.contactId !== subject.contactId
+            ) {
+              const [previousContact] = yield* db
+                .select({ email: schema.contactTable.email })
+                .from(schema.contactTable)
+                .where(eq(schema.contactTable.id, previous.contactId))
+                .limit(1);
+              retiredContactEmail = previousContact?.email ?? null;
+            }
+            if (retiredUserId !== null || retiredContactEmail !== null) {
+              yield* emailSubscriptions.unsubscribePreviousAuthorTopic({
+                contactEmail: retiredContactEmail,
+                now: subscriptionNow,
+                organizationId: args.organizationId,
+                topic: { topicId: args.id, topicType: "post" },
+                userId: retiredUserId,
+              });
+            }
+            if (subject.userId !== null) {
+              yield* subscriptionRepository.subscribe({
+                organizationId: args.organizationId,
+                postId: args.id,
+                userId: subject.userId,
+              });
+            }
+            yield* subscribeOnBehalfSubject({
+              organizationId: args.organizationId,
+              topicId: args.id,
+              subject,
+              source: "post_creator",
+              subjectKind: "post author",
+              now: subscriptionNow,
+            });
+          }
+        }
 
         if (statusChanged && args.statusId !== undefined) {
           yield* recordPostIntegrationEvent({

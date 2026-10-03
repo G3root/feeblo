@@ -381,7 +381,15 @@ export const createPostOperation = defineOperation(
     output: PublicApiPost,
     scope: "posts.create",
   },
-  ({ boardId, content, etaQuarter, statusId, title: rawTitle }) =>
+  ({
+    boardId,
+    content,
+    createdAt,
+    etaQuarter,
+    statusId,
+    title: rawTitle,
+    author,
+  }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
       const repository = yield* currentPublicApiPostRepository;
@@ -390,8 +398,10 @@ export const createPostOperation = defineOperation(
       const title = yield* parseTitle(rawTitle);
 
       const created = yield* repository.createPost({
+        author,
         boardId,
         content,
+        createdAt,
         etaQuarter: etaQuarter ?? null,
         organizationId: caller.organizationId,
         statusId,
@@ -414,7 +424,15 @@ export const updatePostOperation = defineOperation(
     output: PublicApiPost,
     scope: "posts.update",
   },
-  ({ boardId, content, etaQuarter, postId, statusId, title: rawTitle }) =>
+  ({
+    author,
+    boardId,
+    content,
+    etaQuarter,
+    postId,
+    statusId,
+    title: rawTitle,
+  }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
       const repository = yield* currentPublicApiPostRepository;
@@ -423,13 +441,15 @@ export const updatePostOperation = defineOperation(
       // A body that names no field would otherwise be answered as a
       // successful write that changed nothing but `updatedAt`, which
       // tells the caller their request did something it did not. `null`
-      // is a field being named, so a body that only clears an ETA is fine.
+      // is a field being named, so a body that only clears an ETA is fine,
+      // and an author is a field like any other.
       const namesAField =
         rawTitle !== undefined ||
         content !== undefined ||
         statusId !== undefined ||
         boardId !== undefined ||
-        etaQuarter !== undefined;
+        etaQuarter !== undefined ||
+        author !== undefined;
 
       if (!namesAField) {
         return yield* invalidRequestError(
@@ -441,6 +461,7 @@ export const updatePostOperation = defineOperation(
         rawTitle === undefined ? undefined : yield* parseTitle(rawTitle);
 
       const updated = yield* repository.updatePost({
+        author,
         boardId,
         content,
         etaQuarter,

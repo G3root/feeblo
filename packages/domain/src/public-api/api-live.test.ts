@@ -15,6 +15,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import { TestClock } from "effect/testing";
 import { McpSchema } from "effect/unstable/ai";
 import * as Etag from "effect/unstable/http/Etag";
 import * as HttpEffect from "effect/unstable/http/HttpEffect";
@@ -58,6 +59,8 @@ import {
   PublicApiStatusList,
   PublicApiTagDetail,
   PublicApiTagPage,
+  PublicApiVote,
+  PublicApiVotePage,
 } from "./schema";
 
 /**
@@ -152,6 +155,12 @@ const decodeComment = Schema.decodeUnknownSync(
 );
 const decodeCommentPage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiCommentPage)
+);
+const decodeVote = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiVote)
+);
+const decodeVotePage = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiVotePage)
 );
 const decodeDocument = Schema.decodeUnknownSync(
   Schema.fromJsonString(OpenApiDocument)
@@ -631,6 +640,7 @@ const READ_KEY_SCOPES = {
   boards: ["read"],
   posts: ["read"],
   comments: ["read"],
+  votes: ["read"],
   tags: ["read"],
   changelog: ["read"],
 };
@@ -692,6 +702,13 @@ const COMMENT_MANAGEMENT_KEY_SCOPES = {
   posts: ["read"],
   comments: ["read", "create", "update", "delete", "pin"],
   tags: ["read"],
+};
+
+/** The vote reads plus every vote write, as a key is created with them. */
+const VOTE_MANAGEMENT_KEY_SCOPES = {
+  boards: ["read"],
+  posts: ["read"],
+  votes: ["read", "create", "delete"],
 };
 
 const registerKey = (
@@ -1576,6 +1593,188 @@ layer(makeTestApp())("public api v1", (it) => {
           true
         );
       })
+  );
+
+  it.effect("creates a post attributed to a customer", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      registerKey(
+        "fbk_post_attribution",
+        workspace.organizationId,
+        POST_MANAGEMENT_KEY_SCOPES
+      );
+
+      const created = yield* executeWrite("POST", "/api/v1/posts", {
+        apiKey: "fbk_post_attribution",
+        body: {
+          author: {
+            email: "ada@example.com",
+            externalId: "crm-7",
+            name: "Ada",
+          },
+          boardId: workspace.boardId,
+          content: "Please add this",
+          statusId: workspace.statusId,
+          title: "Reported by a customer",
+        },
+      });
+
+      expect(created.status).toBe(201);
+      const post = decodePost(responseBody(created));
+      expect(post.author).toEqual({
+        avatarUrl: null,
+        displayName: "Ada",
+        type: "end_user",
+      });
+
+      // The author columns name the resolved contact and no member: a post
+      // attributed on behalf of a customer keeps staff attribution out, the
+      // same way a dashboard on-behalf create does.
+      const [row] = yield* db
+        .select({
+          contactId: schema.postTable.contactId,
+          creatorId: schema.postTable.creatorId,
+          creatorMemberId: schema.postTable.creatorMemberId,
+        })
+        .from(schema.postTable)
+        .where(eq(schema.postTable.id, post.id));
+      expect(row?.creatorMemberId).toBeNull();
+      expect(row?.creatorId).toBeNull();
+      expect(row?.contactId).not.toBeNull();
+
+      // The timeline entry carries the on-behalf provenance and no actor: a
+      // machine key is not a member.
+      const [activity] = yield* db
+        .select({
+          actorId: schema.postActivityTable.actorId,
+          kind: schema.postActivityTable.kind,
+          metadata: schema.postActivityTable.metadata,
+        })
+        .from(schema.postActivityTable)
+        .where(eq(schema.postActivityTable.postId, post.id));
+      expect(activity?.kind).toBe("POST_CREATED");
+      expect(activity?.actorId).toBeNull();
+      expect(activity?.metadata).toMatchObject({
+        onBehalfOf: { contactId: row?.contactId },
+      });
+    })
+  );
+
+  it.effect("re-attributes a post on update and records the change", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      registerKey(
+        "fbk_post_reassign",
+        workspace.organizationId,
+        POST_MANAGEMENT_KEY_SCOPES
+      );
+
+      const response = yield* executeWrite(
+        "PATCH",
+        `/api/v1/posts/${workspace.postId}`,
+        {
+          apiKey: "fbk_post_reassign",
+          body: {
+            author: { email: "grace@example.com", name: "Grace" },
+          },
+        }
+      );
+
+      expect(response.status).toBe(200);
+      expect(decodePost(responseBody(response)).author).toEqual({
+        avatarUrl: null,
+        displayName: "Grace",
+        type: "end_user",
+      });
+
+      const [row] = yield* db
+        .select({
+          contactId: schema.postTable.contactId,
+          creatorId: schema.postTable.creatorId,
+          creatorMemberId: schema.postTable.creatorMemberId,
+        })
+        .from(schema.postTable)
+        .where(eq(schema.postTable.id, workspace.postId));
+      expect(row?.creatorMemberId).toBeNull();
+      expect(row?.creatorId).toBeNull();
+      expect(row?.contactId).not.toBeNull();
+
+      const activities = yield* db
+        .select({
+          actorId: schema.postActivityTable.actorId,
+          kind: schema.postActivityTable.kind,
+        })
+        .from(schema.postActivityTable)
+        .where(eq(schema.postActivityTable.postId, workspace.postId));
+      expect(activities.map((activity) => activity.kind)).toEqual([
+        "AUTHOR_CHANGED",
+      ]);
+      expect(activities.every((activity) => activity.actorId === null)).toBe(
+        true
+      );
+    })
+  );
+
+  it.effect("refuses an author that resolves to nothing", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_bad_author",
+        workspace.organizationId,
+        POST_MANAGEMENT_KEY_SCOPES
+      );
+
+      const response = yield* executeWrite("POST", "/api/v1/posts", {
+        apiKey: "fbk_post_bad_author",
+        body: {
+          author: { userId: "usr_does_not_exist" },
+          boardId: workspace.boardId,
+          content: "Nope",
+          statusId: workspace.statusId,
+          title: "Nope",
+        },
+      });
+
+      expect(response.status).toBe(400);
+      expect(decodeError(responseBody(response))._tag).toBe("INVALID_REQUEST");
+    })
+  );
+
+  it.effect("backdates a post's createdAt for an import", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_post_import",
+        workspace.organizationId,
+        POST_MANAGEMENT_KEY_SCOPES
+      );
+      const createdAt = new Date("2024-03-01T12:00:00.000Z");
+      // The write's own clock is the TestClock, which starts at the epoch.
+      // Pin it ahead of the backdated instant so the assertion below measures
+      // the behavior rather than the fixture clock.
+      const writeTime = new Date("2026-08-11T00:00:00.000Z");
+      yield* TestClock.setTime(writeTime.getTime());
+
+      const created = yield* executeWrite("POST", "/api/v1/posts", {
+        apiKey: "fbk_post_import",
+        body: {
+          boardId: workspace.boardId,
+          content: "An old post",
+          createdAt: createdAt.toISOString(),
+          statusId: workspace.statusId,
+          title: "Imported post",
+        },
+      });
+
+      expect(created.status).toBe(201);
+      const post = decodePost(responseBody(created));
+      expect(post.createdAt.toISOString()).toBe(createdAt.toISOString());
+      // `updatedAt` stays the write's clock: an import that backdated the
+      // row must still be visible to a sync filtering by `updatedAfter`.
+      expect(post.updatedAt.toISOString()).toBe(writeTime.toISOString());
+    })
   );
 
   it.effect("clears a nullable field with an explicit null", () =>
@@ -4098,6 +4297,225 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect("lists a post's votes without an internal identifier", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace({ withVotesAndComments: true });
+      registerKey("fbk_votes_read", workspace.organizationId);
+
+      const response = yield* executeRequest(
+        `/api/v1/posts/${workspace.postId}/votes`,
+        "fbk_votes_read"
+      );
+
+      expect(response.status).toBe(200);
+      const page = decodeVotePage(responseBody(response));
+
+      expect(page.data).toHaveLength(1);
+      expect(page.data[0]).toMatchObject({
+        id: `upv_${workspace.organizationId}`,
+        postId: workspace.postId,
+        // A seeded vote has no member id, so the voter is an end user.
+        author: { type: "end_user", displayName: "Voter" },
+      });
+      expect(page.nextCursor).toBeNull();
+
+      // `upvote` also carries `userId`, `memberId`, and `mergedFromPostId`;
+      // none of them may appear on the wire.
+      const body = responseBody(response);
+      for (const forbidden of [
+        "userId",
+        "memberId",
+        "organizationId",
+        "mergedFromPostId",
+      ]) {
+        expect(body).not.toContain(forbidden);
+      }
+    })
+  );
+
+  it.effect("adds a vote on a customer's behalf, idempotently", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      registerKey(
+        "fbk_votes_create",
+        workspace.organizationId,
+        VOTE_MANAGEMENT_KEY_SCOPES
+      );
+
+      const body = {
+        author: {
+          externalId: "crm-42",
+          email: "vera@example.com",
+          name: "Vera",
+        },
+      };
+
+      const first = yield* executeWrite(
+        "POST",
+        `/api/v1/posts/${workspace.postId}/votes`,
+        { apiKey: "fbk_votes_create", body }
+      );
+      expect(first.status).toBe(201);
+      const vote = decodeVote(responseBody(first));
+      expect(vote.postId).toBe(workspace.postId);
+      expect(vote.author).toEqual({
+        avatarUrl: null,
+        displayName: "Vera",
+        type: "end_user",
+      });
+
+      // Repeating the same subject is the same vote, not a second row: the
+      // dashboard's add-on-behalf path is idempotent and so is this one.
+      const second = yield* executeWrite(
+        "POST",
+        `/api/v1/posts/${workspace.postId}/votes`,
+        { apiKey: "fbk_votes_create", body }
+      );
+      expect(second.status).toBe(201);
+      expect(decodeVote(responseBody(second)).id).toBe(vote.id);
+
+      const rows = yield* db
+        .select()
+        .from(schema.upvoteTable)
+        .where(eq(schema.upvoteTable.postId, workspace.postId));
+      expect(rows).toHaveLength(1);
+
+      // The timeline records the on-behalf add, and a machine key has no
+      // actor to record.
+      const activity = yield* executeRequest(
+        `/api/v1/posts/${workspace.postId}/activity`,
+        "fbk_votes_create"
+      );
+      expect(activity.status).toBe(200);
+      const activityPage = decodeActivityPage(responseBody(activity));
+      expect(activityPage.data[0]).toMatchObject({
+        actor: null,
+        kind: "VOTE_ADDED",
+      });
+    })
+  );
+
+  it.effect("removes a vote by its id", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace({ withVotesAndComments: true });
+      const db = yield* currentDb;
+      registerKey(
+        "fbk_votes_delete",
+        workspace.organizationId,
+        VOTE_MANAGEMENT_KEY_SCOPES
+      );
+
+      const voteId = `upv_${workspace.organizationId}`;
+      const removed = yield* executeWrite(
+        "DELETE",
+        `/api/v1/posts/${workspace.postId}/votes/${voteId}`,
+        { apiKey: "fbk_votes_delete" }
+      );
+      expect(removed.status).toBe(204);
+
+      const rows = yield* db
+        .select()
+        .from(schema.upvoteTable)
+        .where(eq(schema.upvoteTable.id, voteId));
+      expect(rows).toHaveLength(0);
+
+      // Deleting it again is the documented not-found, not a silent success:
+      // the caller cannot tell a delete that worked from one that named the
+      // wrong workspace, and the second is worth knowing.
+      const again = yield* executeWrite(
+        "DELETE",
+        `/api/v1/posts/${workspace.postId}/votes/${voteId}`,
+        { apiKey: "fbk_votes_delete" }
+      );
+      expect(again.status).toBe(404);
+      expect(decodeError(responseBody(again))._tag).toBe("NOT_FOUND");
+    })
+  );
+
+  it.effect("refuses a vote write without the vote scopes", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      // The default grant reads votes but does not write them.
+      registerKey("fbk_votes_reader", workspace.organizationId);
+
+      const create = yield* executeWrite(
+        "POST",
+        `/api/v1/posts/${workspace.postId}/votes`,
+        {
+          apiKey: "fbk_votes_reader",
+          body: { author: { email: "vera@example.com" } },
+        }
+      );
+      expect(create.status).toBe(403);
+      expect(decodeError(responseBody(create))._tag).toBe("FORBIDDEN_SCOPE");
+
+      const remove = yield* executeWrite(
+        "DELETE",
+        `/api/v1/posts/${workspace.postId}/votes/upv_any`,
+        { apiKey: "fbk_votes_reader" }
+      );
+      expect(remove.status).toBe(403);
+      expect(decodeError(responseBody(remove))._tag).toBe("FORBIDDEN_SCOPE");
+    })
+  );
+
+  it.effect("reports another workspace's post as not found for votes", () =>
+    Effect.gen(function* () {
+      const mine = yield* seedWorkspace();
+      const theirs = yield* seedWorkspace();
+      registerKey(
+        "fbk_votes_isolation",
+        mine.organizationId,
+        VOTE_MANAGEMENT_KEY_SCOPES
+      );
+
+      const list = yield* executeRequest(
+        `/api/v1/posts/${theirs.postId}/votes`,
+        "fbk_votes_isolation"
+      );
+      expect(list.status).toBe(404);
+
+      const create = yield* executeWrite(
+        "POST",
+        `/api/v1/posts/${theirs.postId}/votes`,
+        {
+          apiKey: "fbk_votes_isolation",
+          body: { author: { email: "vera@example.com" } },
+        }
+      );
+      expect(create.status).toBe(404);
+      expect(decodeError(responseBody(create))._tag).toBe("NOT_FOUND");
+    })
+  );
+
+  it.effect("refuses a vote on a locked post", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      yield* db
+        .update(schema.postTable)
+        .set({ lockedAt: new Date() })
+        .where(eq(schema.postTable.id, workspace.postId));
+      registerKey(
+        "fbk_votes_locked",
+        workspace.organizationId,
+        VOTE_MANAGEMENT_KEY_SCOPES
+      );
+
+      const response = yield* executeWrite(
+        "POST",
+        `/api/v1/posts/${workspace.postId}/votes`,
+        {
+          apiKey: "fbk_votes_locked",
+          body: { author: { email: "vera@example.com" } },
+        }
+      );
+      expect(response.status).toBe(409);
+      expect(decodeError(responseBody(response))._tag).toBe("CONFLICT");
+    })
+  );
+
   it.effect("serves its own OpenAPI document without a key", () =>
     Effect.gen(function* () {
       const response = yield* executeRequest("/api/v1/openapi.json");
@@ -4123,6 +4541,8 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/posts/{postId}/activity",
         "/api/v1/posts/{postId}/comments",
         "/api/v1/posts/{postId}/tags",
+        "/api/v1/posts/{postId}/votes",
+        "/api/v1/posts/{postId}/votes/{voteId}",
         "/api/v1/statuses",
         "/api/v1/tags",
         "/api/v1/tags/{tagId}",

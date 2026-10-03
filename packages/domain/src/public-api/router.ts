@@ -19,6 +19,8 @@ import { PostEmbeddingService } from "../post/embedding-service";
 import { PublicApiPostRepository } from "../post/public-api/repository";
 import { PostRepository } from "../post/repository";
 import { TagRepository } from "../tag/repository";
+import { PublicApiVoteRepository } from "../upvote/public-api/repository";
+import { UpvoteRepository } from "../upvote/repository";
 import { UserRepository } from "../user/repository";
 import { PublicApi } from "./api-contract";
 import { PublicApiLive } from "./api-live";
@@ -81,6 +83,10 @@ export const PublicApiInternals = Layer.mergeAll(
   ResolvePrincipalService.layer,
   TagRepository.layer,
   UserRepository.layer,
+  // The shared on-behalf vote write path (`upvote/on-behalf.ts`) resolves a
+  // voter, records the timeline entry, and subscribes them through the same
+  // repositories the dashboard's voter management uses.
+  UpvoteRepository.layer,
   // The shared comment write path needs its own repository; the identity
   // resolver it attributes a comment through is already above, for the post
   // write path.
@@ -133,7 +139,8 @@ export const makePublicApiRoute = <E, R>(
         PublicApiCommentRepository.layer.pipe(
           Layer.provide(PublicApiInternals)
         ),
-        PublicApiPostRepository.layer.pipe(Layer.provide(PublicApiInternals))
+        PublicApiPostRepository.layer.pipe(Layer.provide(PublicApiInternals)),
+        PublicApiVoteRepository.layer.pipe(Layer.provide(PublicApiInternals))
       )
     ),
     Layer.provideMerge(PublicApiCommentService),

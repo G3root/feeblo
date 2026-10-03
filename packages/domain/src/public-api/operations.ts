@@ -5,6 +5,7 @@ import { companyOperations } from "../company/public-api/operations";
 import { statusOperations } from "../post-status/public-api/operations";
 import { postOperations } from "../post/public-api/operations";
 import { tagOperations } from "../tag/public-api/operations";
+import { voteOperations } from "../upvote/public-api/operations";
 
 /**
  * Every Public API operation, in one registry.
@@ -29,6 +30,7 @@ export const PublicApiOperations = [
   ...postOperations,
   ...statusOperations,
   ...tagOperations,
+  ...voteOperations,
 ] as const;
 
 export type PublicApiOperationName =

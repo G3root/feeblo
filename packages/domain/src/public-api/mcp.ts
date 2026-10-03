@@ -19,6 +19,7 @@ import { CommentService } from "../comments/service";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { PublicApiPostRepository } from "../post/public-api/repository";
 import { RateLimitService } from "../rate-limit/service";
+import { PublicApiVoteRepository } from "../upvote/public-api/repository";
 import {
   authenticatePublicApiKey,
   type PublicApiAuthenticationFailure,
@@ -72,7 +73,7 @@ const MCP_SERVER_NAME = "feeblo";
  * missing capability.
  */
 const MCP_SERVER_INSTRUCTIONS =
-  "Read and write the calling workspace's Feeblo posts, comments, tags, companies, and changelog entries. Every tool is scoped to the workspace that owns the presented API key, and a tool the key's scopes do not cover answers FORBIDDEN_SCOPE.";
+  "Read and write the calling workspace's Feeblo posts, comments, votes, tags, companies, and changelog entries. Every tool is scoped to the workspace that owns the presented API key, and a tool the key's scopes do not cover answers FORBIDDEN_SCOPE.";
 
 /**
  * The protocol revisions the transport serves.
@@ -336,6 +337,7 @@ const PublicApiMcpRepositories = Layer.mergeAll(
   PublicApiChangelogRepository.layer,
   PublicApiCommentRepository.layer,
   PublicApiPostRepository.layer,
+  PublicApiVoteRepository.layer,
   CommentService.layer
 ).pipe(Layer.provide(PublicApiInternals));
 

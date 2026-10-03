@@ -24,8 +24,13 @@ import * as Schema from "effect/Schema";
 
 import { EmailOutboxConfig } from "../../email-outbox/config";
 import { EmailSubscriptionRepository } from "../../email-subscription/repository";
+import {
+  InvalidSubjectError,
+  SubjectNotFoundError,
+} from "../../identity/errors";
 import { ResolvePrincipalService } from "../../identity/service";
 import * as Policy from "../../policy";
+import type { TPublicApiOnBehalfAuthor } from "../../public-api/common";
 import type { Cursor } from "../../public-api/cursor";
 import {
   ConflictError,
@@ -219,6 +224,19 @@ const toPublicPostWriteError = (
   }
   if (Schema.is(PostNotFoundError)(cause)) {
     return notFoundError("Post not found.");
+  }
+  // The on-behalf subject a create or an update names can fail to resolve;
+  // that is the caller's input, and the message is fixed because the identity
+  // failures carry the subject id in their detail.
+  if (Schema.is(InvalidSubjectError)(cause)) {
+    return invalidRequestError(
+      "The post's author could not be resolved in this workspace."
+    );
+  }
+  if (Schema.is(SubjectNotFoundError)(cause)) {
+    return invalidRequestError(
+      "The post's author could not be found in this workspace."
+    );
   }
   if (
     Schema.is(FailedToCreatePostError)(cause) ||
@@ -747,15 +765,19 @@ const makePublicApiPostRepository = Effect.gen(function* () {
      * so an API-created post is not a second-class kind of post.
      */
     createPost: ({
+      author,
       boardId,
       content,
+      createdAt,
       etaQuarter,
       organizationId,
       statusId,
       title,
     }: {
+      author?: TPublicApiOnBehalfAuthor | undefined;
       boardId: string;
       content: string;
+      createdAt?: Date | undefined;
       etaQuarter: string | null;
       organizationId: string;
       statusId: string;
@@ -771,8 +793,10 @@ const makePublicApiPostRepository = Effect.gen(function* () {
         yield* writes.create(
           {
             assetIds: [],
+            ...(author !== undefined && { author }),
             boardId,
             content,
+            ...(createdAt !== undefined && { createdAt }),
             etaQuarter,
             id: postId,
             organizationId,
@@ -802,6 +826,7 @@ const makePublicApiPostRepository = Effect.gen(function* () {
      * dashboard's single-field RPCs do.
      */
     updatePost: ({
+      author,
       boardId,
       content,
       etaQuarter,
@@ -810,6 +835,7 @@ const makePublicApiPostRepository = Effect.gen(function* () {
       statusId,
       title,
     }: {
+      author?: TPublicApiOnBehalfAuthor | undefined;
       boardId: string | undefined;
       content: string | undefined;
       etaQuarter: string | null | undefined;
@@ -826,6 +852,7 @@ const makePublicApiPostRepository = Effect.gen(function* () {
         // is not registered — see `docs/public-api.md`.
         yield* writes.update(
           {
+            ...(author !== undefined && { author }),
             boardId,
             content,
             etaQuarter,

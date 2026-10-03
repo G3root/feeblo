@@ -41,6 +41,9 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 | `comments.update` | Replace a comment's body, and its visibility when the request names one. |
 | `comments.delete` | Delete a comment and every reply beneath it. |
 | `comments.pin` | Pin a comment to the top of its post, or unpin it. A post has at most one pinned comment. |
+| `votes.read` | Read a post's votes through `/posts/{postId}/votes`. Every key receives it. |
+| `votes.create` | Add a vote on a customer's behalf. The vote is attributed to the customer the request names. |
+| `votes.delete` | Remove one vote from a post. The vote is named by its own id, never by the account behind it. |
 | `tags.read` | Read the workspace's tags through the `/tags` endpoints. A post's embedded tags come with the post, under `posts.read`. |
 | `tags.create` | Create a tag. |
 | `tags.update` | Rename a tag. |
@@ -57,7 +60,7 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 | `companies.delete` | Delete a company, which detaches it from the contacts that belonged to it. |
 | `boards.read` | Read the workspace's boards through the `/boards` endpoints. Required by every board endpoint, and every key receives it. |
 
-A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above except the `companies` ones; the `posts`, `comments`, `tags`, and `changelog` write scopes, and all four `companies` scopes, are granted only when the key is created with them — so a key that was minted to read feedback cannot delete a workspace's posts, comments, or tags, broadcast a release note, or learn the customer roster. The CRM grant is opt-in as a whole, read included, because a company is a record about the workspace's own customers rather than the workspace's content. That is also why a key created before a scope existed keeps its narrower grant: rotate the key if an integration needs more than it was issued.
+A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above except the `companies` ones; the `posts`, `comments`, `votes`, `tags`, and `changelog` write scopes, and all four `companies` scopes, are granted only when the key is created with them — so a key that was minted to read feedback cannot delete a workspace's posts, comments, or tags, remove its votes, broadcast a release note, or learn the customer roster. The CRM grant is opt-in as a whole, read included, because a company is a record about the workspace's own customers rather than the workspace's content. That is also why a key created before a scope existed keeps its narrower grant: rotate the key if an integration needs more than it was issued.
 
 `comments.pin` is separate from `comments.update` for the same reason the dashboard keeps moderation apart from authorship: editing a comment's words and deciding which one sits at the top of a post are different authorities.
 
@@ -246,7 +249,8 @@ Content-Type: application/json
   "boardId": "brd_feedback",
   "title": "Dark mode",
   "content": "Please add a dark theme.",
-  "statusId": "pss_open"
+  "statusId": "pss_open",
+  "author": { "email": "jamie@example.com", "name": "Jamie" }
 }
 ```
 
@@ -261,8 +265,10 @@ The `id` is assigned by the server. The title is trimmed, the body is sanitized 
 | `content` | — | Required. Markdown; sanitized before it is stored. |
 | `statusId` | — | Required. A status id of the workspace, as returned inside a post's `status`. |
 | `etaQuarter` | `null` | `2026-Q3`-style, or omitted. |
+| `author` | omitted | The customer the post is attributed to, with the same identifiers and priority order a comment's author uses. Omitted, the post has no author. |
+| `createdAt` | write time | Backdates the post, for an import. The list orders by it; `updatedAt` stays the write's clock so a sync still sees the row. |
 
-The post carries `source: API`, and reaches the workspace's integrations, notifications, and search exactly like a submission made in the dashboard. It has **no author**: a machine key is not a member, so `author.displayName` and `author.avatarUrl` are `null` and nobody is subscribed to it as its creator. The workspace's admins and owners are notified of the submission the same way a widget submission notifies them. A body may embed the URL of media already in the workspace, but the post is not recorded as referencing it — see [Data exposure](#data-exposure).
+The post carries `source: API`, and reaches the workspace's integrations, notifications, and search exactly like a submission made in the dashboard. With no `author`, it has **no author**: a machine key is not a member, so `author.displayName` and `author.avatarUrl` are `null` and nobody is subscribed to it as its creator. With an `author`, the post is attributed to the resolved customer — the same on-behalf resolution a comment uses — and that customer is subscribed as its creator; a customer with no account is not provisioned one, because a post needs none. The workspace's admins and owners are notified of the submission the same way a widget submission notifies them. A body may embed the URL of media already in the workspace, but the post is not recorded as referencing it — see [Data exposure](#data-exposure).
 
 ### Update a post
 
@@ -278,17 +284,18 @@ Content-Type: application/json
 
 Responds `200` with the post afterwards. Requires `posts.update`.
 
-An omitted field is left as it is and an explicit `null` clears a nullable one, so `"etaQuarter": null` removes the estimate. A body that names no field at all is answered with `400 INVALID_REQUEST` rather than as a write that changed nothing. The `id`, `slug`, author, vote and comment counts, and timestamps are not writable; changing the title does not change the `slug`, so a link a reader already has keeps working.
+An omitted field is left as it is and an explicit `null` clears a nullable one, so `"etaQuarter": null` removes the estimate. A body that names no field at all is answered with `400 INVALID_REQUEST` rather than as a write that changed nothing. The `id`, `slug`, vote and comment counts, and timestamps are not writable; changing the title does not change the `slug`, so a link a reader already has keeps working.
 
-| Field        | Notes                                        |
-| ------------ | -------------------------------------------- |
-| `title`      | Trimmed; must not be empty.                  |
-| `content`    | Markdown; sanitized before it is stored.     |
-| `statusId`   | A status id of the workspace.                |
-| `boardId`    | A board id of the workspace; moves the post. |
-| `etaQuarter` | `2026-Q3`-style, or `null` to clear.         |
+| Field | Notes |
+| --- | --- |
+| `title` | Trimmed; must not be empty. |
+| `content` | Markdown; sanitized before it is stored. |
+| `statusId` | A status id of the workspace. |
+| `boardId` | A board id of the workspace; moves the post. |
+| `etaQuarter` | `2026-Q3`-style, or `null` to clear. |
+| `author` | Re-attributes the post to the resolved customer, with the same identifiers and priority order a create uses. |
 
-Every change is recorded in the post's timeline, with no actor, and a status change notifies the post's subscribers exactly as the same change from the dashboard would — including the coalescing window, so several quick status changes send one email rather than one each. An image the post already referenced keeps its reference while the body still shows it, and loses it when the body stops; a URL the update introduces is not recorded as a reference, for the same reason a create's is not ([Data exposure](#data-exposure)). A post that has been merged into another is answered with `400 INVALID_REQUEST`: it is still readable, but it is superseded and its changes belong on the survivor.
+Every change is recorded in the post's timeline, with no actor, and a status change notifies the post's subscribers exactly as the same change from the dashboard would — including the coalescing window, so several quick status changes send one email rather than one each. An author change records `AUTHOR_CHANGED`, retires the previous author's subscription, and subscribes the new author. An image the post already referenced keeps its reference while the body still shows it, and loses it when the body stops; a URL the update introduces is not recorded as a reference, for the same reason a create's is not ([Data exposure](#data-exposure)). A post that has been merged into another is answered with `400 INVALID_REQUEST`: it is still readable, but it is superseded and its changes belong on the survivor.
 
 ### Set a post's tags
 
@@ -542,6 +549,64 @@ POST /api/v1/comments/{commentId}/unpin
 ```
 
 Responds `200` with the comment and a `null` `pinnedAt`. Requires `comments.pin`. Unpinning a comment that is not pinned changes nothing and is answered with the comment as it stands, so a retried request does not fail merely because the pin was already released; a comment that has been deleted is still the documented `404 NOT_FOUND`.
+
+### List a post's votes
+
+```http
+GET /api/v1/posts/{postId}/votes
+```
+
+| Query parameter | Default | Notes |
+| --- | --- | --- |
+| `limit` | `25` | 1–100. |
+| `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
+
+```json
+{
+  "data": [
+    {
+      "id": "upv_example",
+      "postId": "pst_example",
+      "author": {
+        "type": "end_user",
+        "displayName": "Jamie",
+        "avatarUrl": null
+      },
+      "createdAt": "2026-08-11T00:00:00.000Z"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+Requires `votes.read`. Votes are returned newest first, on the same cursor as every other list. `author.type` is `member` for a vote cast by a workspace member and `end_user` for everyone else; the account identifier behind the vote is never returned. A post that does not exist in the workspace, or belongs to another one, is `404 NOT_FOUND` rather than an empty page.
+
+A vote belongs to the post it currently lives on. When a post is merged into another, its votes move to the survivor, so ask the survivor for them; the source reports none of its own.
+
+### Vote on a post
+
+```http
+POST /api/v1/posts/{postId}/votes
+Content-Type: application/json
+
+{
+  "author": { "email": "jamie@example.com", "name": "Jamie" }
+}
+```
+
+Responds `201` with the vote it added. Requires `votes.create`.
+
+`author` is required and names the customer the vote is attributed to, with the same identifiers and priority order as a comment's author: `userId`, then `contactId`, then `externalId`, then `email`; `name` and `avatarUrl` only enrich the resolved contact. A customer with no account is provisioned a shadow one so the vote has an account behind it, and an email that matches no contact creates one. A subject that resolves to nothing is `400 INVALID_REQUEST`.
+
+Adding a vote the same customer already has is a success no-op that returns the existing vote, so a retried request does not create a duplicate; the vote's id is stable across the retry. A vote records the `VOTE_ADDED` entry in the post's timeline with no actor and subscribes the voter, exactly as adding a voter from the dashboard does. A post that is locked, or that was merged into another, refuses the vote with `409 CONFLICT`.
+
+### Remove a vote
+
+```http
+DELETE /api/v1/posts/{postId}/votes/{voteId}
+```
+
+Responds `204` with no body. Requires `votes.delete`. The vote is named by its own `id`, not by the voter's account: the account identifier behind a vote is never published, so naming it would require the caller to know an identifier this API deliberately withholds. A vote that is already gone is `404 NOT_FOUND`, and a locked or merged post refuses the removal with `409 CONFLICT`. Removing a vote never touches the voter's email subscription.
 
 ### List changelog entries
 
@@ -801,13 +866,15 @@ The Public API never returns:
 
 `author` is always `{ type, displayName, avatarUrl }`: `type` is `member` or `end_user` and distinguishes workspace staff from end users. Display names are included because the workspace already sees them on public boards and the dashboard; they are the workspace's own data. Emails are deliberately excluded — a key travels into third-party infrastructure (an integration platform, a partner's backend, a CI log), and that is a different blast radius from a signed-in session.
 
-A post created, changed, or deleted with an API key has **no author and no actor**: a machine key is not a member, so the post's `author` has `null` display name and avatar, and the entries the API writes to the post's timeline have no actor. The dashboard shows those entries as "Someone", which is true and better than a post whose history silently changes.
+A post created or changed with an API key has **no actor**: a machine key is not a member, so the entries the API writes to the post's timeline have no actor, and the dashboard shows them as "Someone". A post created or re-attributed with an `author` carries the resolved customer's display name and avatar — the same identity-only `{ type, displayName, avatarUrl }` a comment and a vote carry — and never the account identifier behind it. Without an `author`, the post's `author` has `null` display name and avatar.
 
 Changelog entries carry no author at all: the dashboard's entry rows hold `creatorId` and `creatorMemberId`, and neither has a field in this API. Publishing through the API records the email intent and the in-app notification with no actor, exactly as a key's tag changes have no actor in a post's timeline.
 
 Post and changelog `content` is sanitized before it is stored, so the body the API returns is the same sanitized content the dashboard and the public portal render. Editor media is the one thing a body can name that the API does not manage: a dashboard editor submits the ids of the media it attached, and those ids are what record which posts and entries reference an asset, while a machine key has none to submit. A body may still embed a workspace media URL, but the resource is not recorded as referencing it, so media whose only remaining use is such a body can be removed by the workspace's own cleanup — keep the asset attached to a dashboard-authored post or entry, or host the image yourself. A changelog entry's `coverImage` is the exception: it is resolved by URL and does keep its asset. Tags carry a name and a slug, nothing else — a tag's creator is an internal identifier and is never returned.
 
 Comments follow the same rule. A comment payload carries its author as `{ type, displayName, avatarUrl }`, never the `userId` or `memberId` the dashboard's comment rows hold, and its `content` is the sanitized body the dashboard and portal render. A comment's merge and status-transition provenance (`mergedFromPostId`, `statusUpdateId`) is not part of the resource either: it describes internal bookkeeping, not the comment a caller reads. A comment created with a key is attributed to the resolved customer, so nothing in the payload points back at the key that wrote it.
+
+Votes follow the same rule. A vote payload carries its voter as `{ type, displayName, avatarUrl }`, never the `userId` or `memberId` behind it, and never the merge provenance a moved vote keeps. A vote added with a key is attributed to the resolved customer, so nothing in the payload points back at the key that wrote it.
 
 A company carries its name, avatar, your `externalId`, and `source`. Its contacts are not exposed and neither are the custom attribute values a workspace may have defined for companies: those definitions are a workspace-specific vocabulary, so they would need their own contract rather than a field on this one. The workspace is never named in a payload either — a key reads exactly one workspace, so an `organizationId` would be the same string on every response and would invite a filter parameter that would then have to be validated against the key. `source` is the exception that proves the rule: it is bookkeeping about where the row came from, not about who it belongs to, and it is what lets a sync tell its own records from the dashboard's.
 
@@ -830,6 +897,6 @@ Anything that cannot respect those rules ships as `/api/v2`. When a v2 exists, v
 
 Keys are managed in the dashboard under **Settings → Developers**, restricted to workspace admins and owners. The list shows a key's name and its first characters — `fbk_ab…` — which is enough to identify a key without exposing it. The plaintext value is displayed once, at creation. Revocation takes effect immediately and is not reversible.
 
-When a key is created you choose its capabilities with one checkbox each: **Manage posts**, **Manage comments**, **Manage tags**, **Manage changelog**, and **Manage companies**. Every key reads the workspace's posts, comments, tags, and changelog entries; a capability is the write half of one of those, and publishing is part of the changelog choice because it emails subscribers. The CRM capability is opt-in as a whole — reads included — because a company is a record about the workspace's own customers rather than the workspace's content. The choice fixes the key's scopes for its whole life, so pick the narrowest set the integration needs.
+When a key is created you choose its capabilities with one checkbox each: **Manage posts**, **Manage comments**, **Manage votes**, **Manage tags**, **Manage changelog**, and **Manage companies**. Every key reads the workspace's posts, comments, votes, tags, and changelog entries; a capability is the write half of one of those, and publishing is part of the changelog choice because it emails subscribers. The CRM capability is opt-in as a whole — reads included — because a company is a record about the workspace's own customers rather than the workspace's content. The choice fixes the key's scopes for its whole life, so pick the narrowest set the integration needs.
 
 Use one key per integration so that revoking one does not interrupt the others.

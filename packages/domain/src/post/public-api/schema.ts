@@ -7,7 +7,11 @@ import {
   POST_TITLE_MAX_LENGTH,
 } from "../../content-limits";
 import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
-import { PublicApiAuthor, PublicApiTag } from "../../public-api/common";
+import {
+  PublicApiAuthor,
+  PublicApiOnBehalfAuthor,
+  PublicApiTag,
+} from "../../public-api/common";
 
 /**
  * The post resource: what the post endpoints return, and the typed input every
@@ -251,6 +255,13 @@ const PostTitle = Schema.Trim.pipe(
  * The title is trimmed and the body sanitized before they are stored, exactly
  * as the dashboard does; the limits are the dashboard's own, imported rather
  * than restated so the two cannot disagree about how long a post may be.
+ *
+ * `author` is optional and names the customer the post is attributed to, with
+ * the same identifiers and priority order a comment's author uses. Absent, the
+ * post has no author: a machine key is not a member and has no identity to
+ * invent. `createdAt` is optional and backdates the post for an import; the
+ * list orders by it, while `updatedAt` stays the write's clock so a sync
+ * reading `updatedAfter` still sees the imported row.
  */
 export const CreatePostPayload = Schema.Struct({
   boardId: Schema.String,
@@ -260,6 +271,8 @@ export const CreatePostPayload = Schema.Struct({
   etaQuarter: Schema.optional(
     Schema.NullOr(Schema.String.check(Schema.isPattern(ETA_QUARTER_PATTERN)))
   ),
+  author: Schema.optional(PublicApiOnBehalfAuthor),
+  createdAt: Schema.optional(Schema.DateFromString),
 });
 
 export type TCreatePostPayload = Schema.Schema.Type<typeof CreatePostPayload>;
@@ -283,6 +296,7 @@ export const UpdatePostPayload = Schema.Struct({
   etaQuarter: Schema.optional(
     Schema.NullOr(Schema.String.check(Schema.isPattern(ETA_QUARTER_PATTERN)))
   ),
+  author: Schema.optional(PublicApiOnBehalfAuthor),
 });
 
 export type TUpdatePostPayload = Schema.Schema.Type<typeof UpdatePostPayload>;
@@ -377,6 +391,8 @@ export const CreatePostInput = Schema.Struct({
   ),
   statusId: Schema.String,
   title: Schema.String,
+  author: Schema.optional(PublicApiOnBehalfAuthor),
+  createdAt: Schema.optional(Schema.DateFromString),
 });
 
 /** Typed input for updating a post. */
@@ -391,6 +407,7 @@ export const UpdatePostInput = Schema.Struct({
   etaQuarter: Schema.optional(
     Schema.NullOr(Schema.String.check(Schema.isPattern(ETA_QUARTER_PATTERN)))
   ),
+  author: Schema.optional(PublicApiOnBehalfAuthor),
 });
 
 /** Typed input for deleting a post. */
