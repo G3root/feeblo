@@ -5,9 +5,9 @@ import { markdownToHtmlCached } from "@feeblo/utils/markdown";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import type {

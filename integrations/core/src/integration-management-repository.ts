@@ -3,7 +3,7 @@ import type { TIntegrationDeliveryState } from "@feeblo/db/validation-schema/int
 import { and, eq, inArray, lte } from "drizzle-orm";
 import type { EffectDrizzleQueryError } from "drizzle-orm/effect-core/errors";
 import * as Effect from "effect/Effect";
-import type { SqlError } from "effect/unstable/sql/SqlError";
+import type { SqlError } from "effect/sql/SqlError";
 
 /**
  * Terminal delivery states (per the schema's terminal timestamp check). Pending

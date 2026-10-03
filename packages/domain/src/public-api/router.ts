@@ -1,6 +1,6 @@
 import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { BoardRepository } from "../board/repository";
 import { PublicApiChangelogRepository } from "../changelog/public-api/repository";

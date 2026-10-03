@@ -1,8 +1,8 @@
 import * as Effect from "effect/Effect";
+import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware";
+import * as Multipart from "effect/http/Multipart";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import * as Multipart from "effect/unstable/http/Multipart";
-import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_FIELD_BYTES = 1 * 1024 * 1024;

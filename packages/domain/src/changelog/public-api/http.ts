@@ -1,9 +1,9 @@
 import * as Effect from "effect/Effect";
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
+import * as OpenApi from "effect/http-api/OpenApi";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
-import * as HttpApiSchema from "effect/unstable/httpapi/HttpApiSchema";
-import * as OpenApi from "effect/unstable/httpapi/OpenApi";
 
 import type { PublicApiChangelogGroup } from "../../public-api/api-contract";
 import {

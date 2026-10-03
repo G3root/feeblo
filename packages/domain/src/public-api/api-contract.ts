@@ -1,6 +1,6 @@
-import * as HttpApi from "effect/unstable/httpapi/HttpApi";
-import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
-import * as OpenApi from "effect/unstable/httpapi/OpenApi";
+import * as HttpApi from "effect/http-api/HttpApi";
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
+import * as OpenApi from "effect/http-api/OpenApi";
 
 import { boardEndpoints } from "../board/public-api/http";
 import { changelogEndpoints } from "../changelog/public-api/http";

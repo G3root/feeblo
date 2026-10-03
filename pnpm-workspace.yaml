@@ -20,12 +20,12 @@ catalog:
   "@dotenvx/dotenvx": ^1.75.1
   "@effect-aws/client-s3": 2.0.0-beta.6
   "@effect-aws/s3": 1.0.0-beta.5
-  "@effect/ai-openai": 4.0.0-rc.117
-  "@effect/atom-react": 4.0.0-rc.117
-  "@effect/platform-node": 4.0.0-rc.117
-  "@effect/sql-pg": 4.0.0-rc.117
-  "@effect/sql-pglite": 4.0.0-rc.117
-  "@effect/vitest": 4.0.0-rc.117
+  "@effect/ai-openai": 4.0.0
+  "@effect/atom-react": 4.0.0
+  "@effect/platform-node": 4.0.0
+  "@effect/sql-pg": 4.0.0
+  "@effect/sql-pglite": 4.0.0
+  "@effect/vitest": 4.0.0
   "@floating-ui/dom": ^1.8.0
   "@isaacs/ttlcache": ^2.1.5
   "@polar-sh/better-auth": ^1.8.3
@@ -53,7 +53,7 @@ catalog:
   drizzle-kit: 1.0.0-rc.4
   drizzle-orm: 1.0.0-rc.5-169397b
   drizzle-seed: 1.0.0-rc.4
-  effect: 4.0.0-rc.117
+  effect: 4.0.0
   jose: ^6.2.3
   postgres: ^3.4.7
   rangi: ^2.2.0
@@ -69,14 +69,14 @@ catalog:
   vite: ^8.0.16
   "vite-plugin-icons-spritesheet": ^3.1.0
   vite-plugin-solid: ^2.11.12
-  # `@effect/vitest` 4.0.0-rc.117 peers on vitest >=5.0.0 <6.0.0; keep the
+  # `@effect/vitest` 4.0.0 peers on vitest >=5.0.0 <6.0.0; keep the
   # two on the same major so the helper package is not running against an
   # unsupported vitest API.
   vitest: ^5.0.2
   zod: ^4.4.3
 nodeLinker: hoisted
 overrides:
-  "@effect/platform-node-shared": 4.0.0-rc.117
+  "@effect/platform-node-shared": 4.0.0
   prosemirror-model: ^1.25.9
 patchedDependencies:
   "@effect-aws/s3@1.0.0-beta.5": patches/@effect-aws__s3@1.0.0-beta.5.patch

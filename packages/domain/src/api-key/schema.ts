@@ -55,7 +55,7 @@ export type TApiKeyExpiration = S.Schema.Type<typeof ApiKeyExpiration>;
 
 export const ApiKeyCreate = S.Struct({
   organizationId: WorkspaceId.schema,
-  name: S.String.check(S.isLengthBetween(1, 32)),
+  name: S.String.check(S.isBetweenLength(1, 32)),
   /** How long the key stays valid; `never` is the plugin's null expiry. */
   expiration: ApiKeyExpiration,
   /**

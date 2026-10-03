@@ -1,9 +1,9 @@
 import * as Effect from "effect/Effect";
+import * as Headers from "effect/http/Headers";
+import * as HttpMiddleware from "effect/http/HttpMiddleware";
+import * as HttpServerRequest from "effect/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Option from "effect/Option";
-import * as Headers from "effect/unstable/http/Headers";
-import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
-import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 import type { AllowedOriginConfig } from "./cors";
 import { makeIsAllowedOrigin } from "./cors";

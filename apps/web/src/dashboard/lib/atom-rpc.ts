@@ -2,9 +2,9 @@ import { AllRpcs } from "@feeblo/domain/rpc-group";
 import { createRpcProtocolLive } from "@feeblo/rpc-client";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 import type * as Duration from "effect/Duration";
-import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import * as Atom from "effect/unstable/reactivity/Atom";
-import * as AtomRpc from "effect/unstable/reactivity/AtomRpc";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
+import * as Atom from "effect/reactivity/Atom";
+import * as AtomRpc from "effect/reactivity/AtomRpc";
 
 /** Shared Atom RPC client for dashboard queries and mutations. */
 export class DashboardClient extends AtomRpc.Service<DashboardClient>()(

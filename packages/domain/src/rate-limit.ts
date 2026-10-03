@@ -3,8 +3,8 @@ import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as RpcMiddleware from "effect/rpc/RpcMiddleware";
 import * as Schema from "effect/Schema";
-import * as RpcMiddleware from "effect/unstable/rpc/RpcMiddleware";
 
 import { ClientIp, type ClientIpValue } from "./client-ip";
 import { RateLimitService } from "./rate-limit/service";

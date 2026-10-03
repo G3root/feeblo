@@ -10,7 +10,7 @@ import { requirePublicApiScope } from "./middleware";
  *
  * The vocabulary is the MCP tool-annotation set — `readOnly`, `destructive`,
  * `idempotent`, `openWorld` — declared here rather than imported from
- * `effect/unstable/ai`, so this package does not depend on the AI surface for
+ * `effect/ai`, so this package does not depend on the AI surface for
  * HTTP to work. A projection reads them off the operation when it makes a tool.
  */
 export type PublicApiOperationAnnotations = {

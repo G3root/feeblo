@@ -2,11 +2,11 @@ import { isString } from "@feeblo/utils/runtime-kind";
 import { parseCookie } from "cookie-es";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware";
+import * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
-import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
-import * as RpcMiddleware from "effect/unstable/rpc/RpcMiddleware";
+import * as RpcMiddleware from "effect/rpc/RpcMiddleware";
 
 import { Auth, type AuthHandler, type Session } from "./auth-handler";
 import { UnauthorizedError } from "./rpc-errors";

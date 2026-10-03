@@ -1,12 +1,12 @@
 import { AllRpcs } from "@feeblo/domain/rpc-group";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
-import * as RpcClient from "effect/unstable/rpc/RpcClient";
-import type * as RpcClientError from "effect/unstable/rpc/RpcClientError";
-import * as RpcSerialization from "effect/unstable/rpc/RpcSerialization";
+import * as RpcClient from "effect/rpc/RpcClient";
+import type * as RpcClientError from "effect/rpc/RpcClientError";
+import * as RpcSerialization from "effect/rpc/RpcSerialization";
 
 /** Fetch client that sends cookies (needed for BetterAuth session) */
 export const FetchWithCredentials = FetchHttpClient.layer.pipe(

@@ -1,4 +1,4 @@
-import { recommended } from "@effect/tsgo/oxlint-presets";
+import { effectNative, recommended } from "@effect/tsgo/oxlint-presets";
 import { defineConfig } from "oxlint";
 
 /**
@@ -8,9 +8,19 @@ import { defineConfig } from "oxlint";
  * both places reports every finding twice, so `packages/config/tsconfig.base.json`
  * sets `diagnostics: false` and Oxlint owns them: one surface, one severity
  * per rule, cached, and fast enough to run on every commit.
+ *
+ * Both presets are extended on purpose. `@effect/tsgo@0.46` moved the twenty
+ * `global-*`, `crypto-*`, `process-env`, `new-promise`, `schema-sync` and
+ * `instance-of-schema` rules out of `recommended` and into the opt-in
+ * `effect-native` preset. Extending only `recommended` would therefore have
+ * dropped `global-date-in-effect` — the 372-finding defect ADR 0005 ranks
+ * first, and the rule this file's `off` entries below are written against —
+ * without a single test or type error to say so. The two presets together are
+ * exactly the rule set `0.45.0`'s `recommended` carried, plus the three rules
+ * 0.47 added.
  */
 export default defineConfig({
-  extends: [recommended],
+  extends: [recommended, effectNative],
   plugins: ["eslint", "oxc", "unicorn", "typescript", "vitest"],
   categories: {
     correctness: "warn",
@@ -131,6 +141,19 @@ export default defineConfig({
     // The widget, the SDK, and CLI entry points log to the console on purpose;
     // they have no logger to route through.
     "effecttsgo/global-console": "off",
+    // 928 findings, and every one of them is the same non-defect. Effect 4.0
+    // moved `http`, `http-api`, `rpc`, `sql`, `persistence`, `reactivity` and
+    // `workflow` out of `effect/unstable/*` into `effect/*` while keeping them
+    // `@stability unstable`, so the rule now fires on the imports this repo is
+    // built out of: `HttpApi`, `RpcGroup`, `Atom`, `PersistedQueue`. There is no
+    // stable alternative to move to — an Effect HTTP or RPC server has to use
+    // these — so the warning says "this dependency may break in a minor" about
+    // the dependency, not about this code. Flipping it to `error` would mean
+    // either suppressing it at every call site or freezing the Effect version,
+    // and leaving it as 928 warnings trains reviewers to skim the report. The
+    // upgrade itself is the control: the catalog pin is what decides when these
+    // APIs move.
+    "effecttsgo/unstable-api-usage": "off",
 
     // anti-slop
     "anti-slop/no-chained-type-assertions": "error",

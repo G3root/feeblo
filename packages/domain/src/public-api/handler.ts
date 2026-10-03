@@ -1,4 +1,4 @@
-import type * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
+import type * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 
 /**
  * The HTTP implementation of one endpoint of a composed group, typed by the

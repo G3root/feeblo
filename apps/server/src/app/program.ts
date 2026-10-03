@@ -22,8 +22,8 @@ import {
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as HttpRouter from "effect/http/HttpRouter";
 import * as Layer from "effect/Layer";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
 
 import { ServerConfig } from "../config";
 import { makeSentryLayer } from "../infra/sentry";

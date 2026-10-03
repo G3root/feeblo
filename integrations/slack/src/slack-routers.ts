@@ -15,10 +15,10 @@ import {
 } from "@feeblo/integration-core/http-inbound";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as HttpRouter from "effect/http/HttpRouter";
+import type * as HttpServerRequest from "effect/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Layer from "effect/Layer";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
-import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 import { ParsedSlackInboundRequest } from "./slack-inbound-schema";
 import {

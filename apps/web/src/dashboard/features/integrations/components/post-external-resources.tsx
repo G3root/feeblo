@@ -4,7 +4,7 @@ import { Menu, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { Link03Icon, LinkSquare02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import * as Option from "effect/Option";
-import * as Result from "effect/unstable/reactivity/AsyncResult";
+import * as Result from "effect/reactivity/AsyncResult";
 import type { ReactNode } from "react";
 
 import {
