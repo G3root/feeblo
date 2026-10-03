@@ -216,6 +216,19 @@ export const emailDeliveryMessageId = (
 const makeEmailOutboxRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
 
+  /**
+   * Locks the organization row until the caller's transaction ends.
+   *
+   * The same device the roadmap repository uses for its per-organization
+   * invariants: a condition that spans rows cannot be enforced by row locks on
+   * those rows, because a lookup that matches nothing proves nothing. See
+   * `upsertPendingSubmissionWindow` for what it serializes here.
+   */
+  const lockOrganization = (organizationId: string) =>
+    db.execute(
+      sql`SELECT id FROM ${schema.organizationTable} WHERE id = ${organizationId} FOR UPDATE`
+    );
+
   const recordIntent = Effect.fn("EmailOutboxRepository.recordIntent")(
     function* (input: RecordEmailIntentInput) {
       const payload = yield* decodeIntentPayload(
@@ -415,6 +428,16 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
   )(function* ({ now, organizationId, postId }: RecordSubmissionWindowInput) {
     const nowInstant = DateTime.fromDateUnsafe(now);
     const burstAt = DateTime.addDuration(nowInstant, submissionWindowBurst);
+
+    // Serializes window creation per workspace across transactions. Two posts
+    // created together otherwise race past the pending-window lookup below —
+    // which locks nothing when no window exists — and can each open their own
+    // window across a burst-boundary instant, doubling the workspace's email
+    // rate. The organization row is the same lock the roadmap repository uses
+    // for its per-organization invariants; taken here it holds to the end of
+    // the caller's transaction, so the second submission's lookup sees the
+    // first one's window and appends instead of opening another.
+    yield* lockOrganization(organizationId);
 
     /**
      * Appends this submission to a locked window row.

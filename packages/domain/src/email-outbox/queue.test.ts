@@ -2309,6 +2309,64 @@ describe("EmailOutbox workflows", () => {
     );
 
     it.effect(
+      "does not admit a global recipient after the window's only post is deleted",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { intentId, organizationId, postId } = yield* fixture;
+          const db = yield* Database.Database;
+          const globalUserId = yield* UserId.generate;
+          const globalEmail = `gone-public-${organizationId}@example.test`;
+          yield* db.insert(schema.userTable).values({
+            id: globalUserId,
+            email: globalEmail,
+            name: "Global user",
+            emailVerified: true,
+          });
+          yield* addSubscriptionContact({
+            email: globalEmail,
+            organizationId,
+            state: "active",
+            topicId: null,
+            topicType: "submission",
+            userId: globalUserId,
+          });
+          yield* TestClock.adjust("5 minutes");
+
+          // Rendered while the post was public, so the stored payload proves
+          // the mail named a public post and nothing more.
+          const deliveryIds = yield* materializeEmailIntent(intentId);
+          expect(deliveryIds).toHaveLength(1);
+          const [rendered] = yield* db
+            .select({
+              templatePayload: schema.emailDeliveryTable.templatePayload,
+            })
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+          expect(rendered?.templatePayload).toMatchObject({
+            notifiedBoardVisibility: "PUBLIC",
+            posts: [{ label: "Ship email outbox" }],
+          });
+
+          // The post is gone by the time the delivery is attempted, so no row
+          // is left to prove the mail's content is still public.
+          yield* db
+            .delete(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            deliverEmailDelivery({ deliveryId })
+          );
+
+          const [delivery] = yield* db
+            .select()
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+          expect(delivery?.state).toBe("no_organization_access");
+          expect((yield* testMailerState).sentMessages).toHaveLength(0);
+        })
+    );
+
+    it.effect(
       "delivers a submission window whose posts are all on public boards",
       () =>
         Effect.gen(function* () {

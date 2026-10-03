@@ -49,11 +49,14 @@ describe("evaluateNotifiedBoardVisibility", () => {
     ).toBe("PUBLIC");
   });
 
-  it("admits on the snapshot alone once every named post is gone", () => {
-    // The mail can only name what it was rendered from, and that was public.
+  it("fails closed once every named post is gone", () => {
+    // The mail named a post that was public at render and is deleted now, so
+    // nothing is left proving the content stayed public. Deletion is the
+    // strongest removal action; it must not be the one that still ships the
+    // title to a recipient without workspace membership.
     expect(
       evaluateNotifiedBoardVisibility({ captured: "PUBLIC", current: null })
-    ).toBe("PUBLIC");
+    ).toBe(null);
   });
 
   it("leaves an unproven snapshot to the current rows", () => {
