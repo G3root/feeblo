@@ -298,38 +298,66 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       ? yield* hashEmailSubscriptionToken(verificationToken.value)
       : null;
 
-    const subscription = priorSubscription
-      ? yield* Effect.gen(function* () {
-          const [updated] = yield* db
-            .update(schema.emailSubscriptionTable)
-            .set({
-              source: input.source,
-              state,
-              verificationTokenHash,
-              verificationExpiresAt:
-                state === "pending_verification"
-                  ? input.verificationExpiresAt
-                  : null,
-              verifiedAt:
-                state === "active" && priorSubscription.verifiedAt === null
-                  ? input.now
-                  : priorSubscription.verifiedAt,
-              unsubscribedAt: state === "unsubscribed" ? input.now : null,
-              updatedAt: input.now,
-            })
-            .where(eq(schema.emailSubscriptionTable.id, priorSubscription.id))
-            .returning();
-          if (updated === undefined) {
-            return yield* dataError(
-              "requestSubscription.updateSubscription",
-              "Email subscription update did not return a row"
-            );
-          }
-          return yield* decodeSubscription(
-            updated,
-            "requestSubscription.updateSubscription"
+    /**
+     * Writes the consent state a stored subscription converges on.
+     *
+     * The state and the verification-token hash are parameters rather than
+     * values from this request's pre-insert computation: the create-race
+     * recovery re-reads the winner, which may have been unsubscribed in
+     * between, and applying the stale pair would revive that row and store a
+     * hash for a token derived from the id this request never inserted.
+     */
+    const applySubscriptionState = (
+      prior: Subscription,
+      next: {
+        readonly state: Subscription["state"];
+        readonly verificationTokenHash: string | null;
+      }
+    ) =>
+      Effect.gen(function* () {
+        const [updated] = yield* db
+          .update(schema.emailSubscriptionTable)
+          .set({
+            source: input.source,
+            state: next.state,
+            verificationTokenHash: next.verificationTokenHash,
+            verificationExpiresAt:
+              next.state === "pending_verification"
+                ? input.verificationExpiresAt
+                : null,
+            verifiedAt:
+              next.state === "active" && prior.verifiedAt === null
+                ? input.now
+                : prior.verifiedAt,
+            unsubscribedAt: next.state === "unsubscribed" ? input.now : null,
+            updatedAt: input.now,
+          })
+          .where(eq(schema.emailSubscriptionTable.id, prior.id))
+          .returning();
+        if (updated === undefined) {
+          return yield* dataError(
+            "requestSubscription.updateSubscription",
+            "Email subscription update did not return a row"
           );
-        })
+        }
+        return yield* decodeSubscription(
+          updated,
+          "requestSubscription.updateSubscription"
+        );
+      });
+
+    // The resolved row and the tokens this request may hand back. The create
+    // branch can override the tokens because a lost race converges on the
+    // winner's row, whose tokens are the winner's to issue.
+    const resolved = priorSubscription
+      ? {
+          subscription: yield* applySubscriptionState(priorSubscription, {
+            state,
+            verificationTokenHash,
+          }),
+          unsubscribeToken,
+          verificationToken,
+        }
       : yield* Effect.gen(function* () {
           const [created] = yield* db
             .insert(schema.emailSubscriptionTable)
@@ -352,24 +380,101 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
               createdAt: input.now,
               updatedAt: input.now,
             })
+            // Two concurrent requests for the same (contact, topic) can both
+            // see no prior row above; the unique index decides the winner and
+            // the loser re-reads it and applies the same state write, so the
+            // duplicate stays idempotent instead of aborting the caller's
+            // transaction with a unique violation.
+            .onConflictDoNothing({
+              target: [
+                schema.emailSubscriptionTable.contactId,
+                schema.emailSubscriptionTable.topicType,
+                schema.emailSubscriptionTable.topicId,
+              ],
+            })
             .returning();
-          if (created === undefined) {
-            return yield* dataError(
-              "requestSubscription.createSubscription",
-              "Email subscription insert did not return a row"
-            );
+          if (created !== undefined) {
+            return {
+              subscription: yield* decodeSubscription(
+                created,
+                "requestSubscription.createSubscription"
+              ),
+              unsubscribeToken,
+              verificationToken,
+            };
           }
-          return yield* decodeSubscription(
-            created,
-            "requestSubscription.createSubscription"
+          const winner = yield* findSubscriptionForContact(
+            persistedContact.id,
+            input.topic
           );
+          return yield* Option.match(winner, {
+            onNone: () =>
+              dataError(
+                "requestSubscription.createSubscription",
+                "Email subscription conflict did not resolve to a stored row"
+              ),
+            onSome: (winner) =>
+              Effect.gen(function* () {
+                // The persisted winner is the authority, not the state this
+                // request computed before the losing insert: a concurrent
+                // request may have unsubscribed the row in between, and the
+                // earlier guard left such a row untouched for an unverified
+                // request, so the recovery must too.
+                if (winner.state === "unsubscribed" && !alreadyVerified) {
+                  return {
+                    subscription: winner,
+                    unsubscribeToken: Option.none<EmailSubscriptionToken>(),
+                    verificationToken: Option.none<EmailSubscriptionToken>(),
+                  };
+                }
+                const winnerState = verifiedStateFor(
+                  winner,
+                  alreadyVerified,
+                  deferredNoAccess
+                );
+                // A fresh verification token is derived from the winner's own
+                // id and its hash is what the row stores, so the token this
+                // request returns names the stored row — never the losing
+                // request's generated id, which no row holds. No unsubscribe
+                // token is issued: the winner's creator already got one, and
+                // overwriting its hash would invalidate that link.
+                const winnerVerificationToken =
+                  winnerState === "pending_verification"
+                    ? Option.some(
+                        yield* tokenService.deriveToken({
+                          purpose: "verification",
+                          subscriptionId: winner.id,
+                        })
+                      )
+                    : Option.none<EmailSubscriptionToken>();
+                const winnerVerificationTokenHash = Option.isSome(
+                  winnerVerificationToken
+                )
+                  ? yield* hashEmailSubscriptionToken(
+                      winnerVerificationToken.value
+                    )
+                  : null;
+                const updatedSubscription = yield* applySubscriptionState(
+                  winner,
+                  {
+                    state: winnerState,
+                    verificationTokenHash: winnerVerificationTokenHash,
+                  }
+                );
+                return {
+                  subscription: updatedSubscription,
+                  unsubscribeToken: Option.none<EmailSubscriptionToken>(),
+                  verificationToken: winnerVerificationToken,
+                };
+              }),
+          });
         });
 
     return {
       contact: persistedContact,
-      subscription,
-      unsubscribeToken,
-      verificationToken,
+      subscription: resolved.subscription,
+      unsubscribeToken: resolved.unsubscribeToken,
+      verificationToken: resolved.verificationToken,
     };
   });
 

@@ -16,6 +16,8 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { EmailOutboxConfig } from "../email-outbox/config";
+import { EmailOutboxRepository } from "../email-outbox/repository";
+import { EntitlementPolicy } from "../entitlement/policies";
 import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
 import { PostActivityRepository } from "../post-activity/repository";
@@ -26,6 +28,7 @@ import {
   type Session,
 } from "../session-middleware";
 import { UserRepository } from "../user/repository";
+import { WorkspaceRepository } from "../workspace/repository";
 import { CommentRpcHandlersEffect } from "./handlers";
 import { CommentPolicy } from "./policies";
 import { CommentRepository } from "./repository";
@@ -183,12 +186,18 @@ describe("CommentRpcHandlers on-behalf", () => {
     PostRepository.layer,
     CommentRepository.layer,
     PostActivityRepository.layer,
+    EmailOutboxRepository.layer,
     // The shared comment write service fans out notifications, so the suite
     // supplies the real one rather than a composition production never has.
     NotificationService.layer,
     ResolvePrincipalService.layer,
     UserRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
+  const EntitlementsTest = EntitlementPolicy.layer.pipe(
+    Layer.provide(WorkspaceRepository.layer),
+    Layer.provide(Database.PgliteDatabaseLive)
+  );
 
   const HandlerTest = Layer.mergeAll(
     CommentPolicy.layer,
@@ -207,6 +216,8 @@ describe("CommentRpcHandlers on-behalf", () => {
     Database.PgliteDatabaseLive,
     NodeCrypto.layer,
     EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
+    EntitlementsTest,
+    WorkspaceRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Layer.succeed(
       IntegrationEventRecorder,
       IntegrationEventRecorder.of({

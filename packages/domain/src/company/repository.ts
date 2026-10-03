@@ -1,7 +1,8 @@
-import { currentDb, schema } from "@feeblo/db";
+import { currentDb, Database, schema } from "@feeblo/db";
 import type { TEntitySource } from "@feeblo/domain-contracts/entity-source";
 import { CompanyId } from "@feeblo/id";
-import { and, count, desc, eq, ne, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ne, sql } from "drizzle-orm";
+import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -177,24 +178,72 @@ const makeCompanyRepository = Effect.gen(function* () {
 
     upsertCompany: (args: TCompanyUpsert) =>
       Effect.gen(function* () {
-        const existing = yield* db
-          .select({ id: schema.companyTable.id })
-          .from(schema.companyTable)
-          .where(
-            and(
-              eq(schema.companyTable.organizationId, args.organizationId),
-              args.externalId
-                ? or(
-                    eq(schema.companyTable.name, args.name),
+        /**
+         * The match is deterministic, not an `OR`: the external id wins when
+         * the caller supplies one — it is the sync's own identity for the
+         * company — and the name match is the fallback. Both keys matching
+         * different rows is refused below rather than guessed at, because
+         * updating either row would re-write a key the other holds (a unique
+         * violation with no recovery inside this upsert).
+         */
+        const findByKey = (): Effect.Effect<
+          typeof schema.companyTable.$inferSelect | undefined,
+          EffectDrizzleQueryError,
+          Database.Database
+        > =>
+          Effect.gen(function* () {
+            if (args.externalId) {
+              const [byExternalId] = yield* db
+                .select()
+                .from(schema.companyTable)
+                .where(
+                  and(
+                    eq(schema.companyTable.organizationId, args.organizationId),
                     eq(schema.companyTable.externalId, args.externalId)
                   )
-                : eq(schema.companyTable.name, args.name)
-            )
-          )
-          .limit(1)
-          .pipe(Effect.map((rows) => rows[0]));
+                )
+                .limit(1);
+              if (byExternalId !== undefined) {
+                return byExternalId;
+              }
+            }
+            const [byName] = yield* db
+              .select()
+              .from(schema.companyTable)
+              .where(
+                and(
+                  eq(schema.companyTable.organizationId, args.organizationId),
+                  eq(schema.companyTable.name, args.name)
+                )
+              )
+              .limit(1);
+            return byName;
+          });
+
+        const existing = yield* findByKey();
 
         if (existing) {
+          // A foreign external id held by a different row is the ambiguous
+          // state above: refuse rather than write a key collision. The row
+          // may have been matched by name and hold `null` here, so the probe
+          // runs whenever the update would write a different value, over null
+          // included.
+          if (args.externalId && existing.externalId !== args.externalId) {
+            const [other] = yield* db
+              .select({ id: schema.companyTable.id })
+              .from(schema.companyTable)
+              .where(
+                and(
+                  eq(schema.companyTable.organizationId, args.organizationId),
+                  eq(schema.companyTable.externalId, args.externalId)
+                )
+              )
+              .limit(1);
+            if (other !== undefined && other.id !== existing.id) {
+              return yield* new FailedToUpdateCompanyError();
+            }
+          }
+
           const now = yield* DateTime.nowAsDate;
           const [updated = null] = yield* db
             .update(schema.companyTable)
@@ -229,11 +278,20 @@ const makeCompanyRepository = Effect.gen(function* () {
             createdAt: now,
             updatedAt: now,
           })
+          // A concurrent SSO login for the same company loses the unique
+          // (organization, name) or (organization, external id) race here;
+          // the winner is re-read through the same lookup rather than a
+          // unique violation failing the caller's transaction.
+          .onConflictDoNothing()
           .returning();
-        if (!created) {
-          return yield* new FailedToCreateCompanyError();
+        if (created) {
+          return created;
         }
-        return created;
+        const winner = yield* findByKey();
+        if (winner) {
+          return winner;
+        }
+        return yield* new FailedToCreateCompanyError();
       }),
 
     findManyCompanies: (organizationId: string) =>

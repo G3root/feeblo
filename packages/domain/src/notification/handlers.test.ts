@@ -15,6 +15,7 @@ import * as Layer from "effect/Layer";
 import { CurrentSession, type Session } from "../session-middleware";
 import { NotificationRpcHandlersEffect } from "./handlers";
 import { NotificationPolicy } from "./policies";
+import { encodeNotificationCursor } from "./schema";
 import { NotificationService } from "./service";
 
 describe("NotificationRpcHandlers", () => {
@@ -259,11 +260,106 @@ describe("NotificationRpcHandlers", () => {
             const secondPage = yield* scoped(
               handlers.NotificationList({
                 organizationId: fixture.organizationId,
-                cursor: firstPage[0]!.createdAt,
+                cursor: encodeNotificationCursor({
+                  createdAt: firstPage[0]!.createdAt,
+                  id: firstPage[0]!.id,
+                }),
                 limit: 1,
               })
             );
             expect(secondPage).toMatchObject([{ id: oldest }]);
+          })
+      );
+
+      it.effect(
+        "does not skip rows a fan-out batch inserted at one shared instant",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* NotificationRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const sharedInstant = new Date("2026-01-01T00:01:00.000Z");
+            // A fan-out writes every recipient row in one statement, so every
+            // row of the batch carries one `createdAt`. Legid ids are random,
+            // so the expected order comes from the composite sort key (id
+            // descending breaks the shared instant) rather than insert order.
+            const batch = [
+              yield* insertNotification(fixture, { createdAt: sharedInstant }),
+              yield* insertNotification(fixture, { createdAt: sharedInstant }),
+              yield* insertNotification(fixture, { createdAt: sharedInstant }),
+            ];
+            const expectedOrder = [...batch].sort((left, right) =>
+              left > right ? -1 : left < right ? 1 : 0
+            );
+            const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+              effect.pipe(
+                Effect.provideService(CurrentSession, session(fixture))
+              );
+
+            const firstPage = yield* scoped(
+              handlers.NotificationList({
+                organizationId: fixture.organizationId,
+                limit: 2,
+              })
+            );
+            expect(firstPage.map((row) => row.id)).toEqual(
+              expectedOrder.slice(0, 2)
+            );
+            const secondPage = yield* scoped(
+              handlers.NotificationList({
+                organizationId: fixture.organizationId,
+                cursor: encodeNotificationCursor({
+                  createdAt: firstPage[1]!.createdAt,
+                  id: firstPage[1]!.id,
+                }),
+                limit: 2,
+              })
+            );
+            expect(secondPage.map((row) => row.id)).toEqual(
+              expectedOrder.slice(2)
+            );
+          })
+      );
+
+      it.effect(
+        "answers a malformed cursor with a request error instead of the first page",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* NotificationRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            yield* insertNotification(fixture);
+            const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+              effect.pipe(
+                Effect.provideService(CurrentSession, session(fixture))
+              );
+
+            const malformed = yield* Effect.flip(
+              scoped(
+                handlers.NotificationList({
+                  organizationId: fixture.organizationId,
+                  cursor: "not-a-cursor",
+                })
+              )
+            );
+            expect(malformed._tag).toBe("BadRequestError");
+
+            // An empty string is a supplied value that does not decode, not
+            // an absent cursor; an absent one still starts at the newest row.
+            const empty = yield* Effect.flip(
+              scoped(
+                handlers.NotificationList({
+                  organizationId: fixture.organizationId,
+                  cursor: "",
+                })
+              )
+            );
+            expect(empty._tag).toBe("BadRequestError");
+            expect(
+              yield* scoped(
+                handlers.NotificationList({
+                  organizationId: fixture.organizationId,
+                })
+              )
+            ).toHaveLength(1);
           })
       );
 

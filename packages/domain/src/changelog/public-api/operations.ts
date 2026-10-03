@@ -29,7 +29,7 @@ import {
   ListChangelogInput,
   PublicApiChangelog,
   PublicApiChangelogPage,
-  type TPublicApiChangelogStatus,
+  type TPublicApiChangelogWriteStatus,
   UpdateChangelogInput,
 } from "./schema";
 
@@ -65,10 +65,12 @@ const CHANGELOG_DELETE_FAILURES = Schema.Union([
  * space that survives into a slug is a URL a reader cannot type back. The slug
  * is always the one `slugify` produced, from the supplied value or the title,
  * so `UI Kit` and `ui-kit` cannot become two entries that look identical in a
- * feed. The timestamps are only validated against the status that selects
- * them: a publish that carried no `publishedAt` would have the server invent a
- * date that decides an ordering readers see, and a schedule with no
- * `scheduledAt` says nothing at all.
+ * feed. `publishedAt` is the only timestamp validated against its status: a
+ * publish that carried no date would have the server invent one that decides
+ * an ordering readers see. `scheduledAt` rides along and is stored (always
+ * cleared by a write today — see `PublicApiChangelogWriteStatus`), so a
+ * scheduled-publishing future can pick the field up without another wire
+ * change.
  */
 const parseChangelogWrite = (write: {
   readonly content: string;
@@ -76,7 +78,7 @@ const parseChangelogWrite = (write: {
   readonly publishedAt?: Date | null | undefined;
   readonly scheduledAt?: Date | null | undefined;
   readonly slug?: string | undefined;
-  readonly status: TPublicApiChangelogStatus;
+  readonly status: TPublicApiChangelogWriteStatus;
   readonly title: string;
 }) =>
   Effect.gen(function* () {
@@ -95,12 +97,6 @@ const parseChangelogWrite = (write: {
     if (write.status === "published" && write.publishedAt == null) {
       return yield* invalidRequestError(
         "publishedAt is required when status is published."
-      );
-    }
-
-    if (write.status === "scheduled" && write.scheduledAt == null) {
-      return yield* invalidRequestError(
-        "scheduledAt is required when status is scheduled."
       );
     }
 

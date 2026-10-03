@@ -24,6 +24,8 @@ import type {
 export const CompanyRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CompanyRepository;
   const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
+  const workspaceRepository = yield* WorkspaceRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
   const companyPolicy = yield* CompanyPolicy;
 
   return {
@@ -37,6 +39,17 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
     CompanyCreate: (args: TCompanyCreate) =>
       transaction(
         Effect.gen(function* () {
+          // First lock, first: the workspace row is held for the whole write,
+          // and the CRM plan count below is only authoritative while it is —
+          // two creates arriving near the cap cannot both see room. The
+          // Public API's company create takes the same lock in the same
+          // position, so the two surfaces enforce one limit the same way.
+          yield* workspaceRepository.lockOrganization(args.organizationId);
+          yield* entitlementPolicy.canCreateCrmEntry({
+            organizationId: args.organizationId,
+            crmEntryCount: repository.countCrmEntries(args.organizationId),
+          });
+
           const attributeValues = args.attributeValues ?? [];
           const definitions =
             yield* attributeDefinitionRepository.findCompanyAttributeDefinitions(

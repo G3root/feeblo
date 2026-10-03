@@ -10,7 +10,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { PolicyDeniedError } from "../policy";
-import { FailedToCreateTagError } from "./errors";
+import { FailedToCreateTagError, PostIsMergedError } from "./errors";
 import type { TPostTagList } from "./schema";
 
 /**
@@ -416,7 +416,10 @@ const makeTagRepository = Effect.gen(function* () {
         const wanted = [...new Set(tagIds)];
 
         const post = yield* db
-          .select({ id: schema.postTable.id })
+          .select({
+            id: schema.postTable.id,
+            mergedIntoPostId: schema.postTable.mergedIntoPostId,
+          })
           .from(schema.postTable)
           .where(
             and(
@@ -430,6 +433,16 @@ const makeTagRepository = Effect.gen(function* () {
           return yield* new PolicyDeniedError({
             reason: "Post does not belong to this organization",
           });
+        }
+
+        // Merged posts are read-only until they are unmerged — the same rule
+        // the post's title, content, status, and admin writes enforce under
+        // this same lock. A tag change here would persist past the unmerge
+        // (only `mergedFromPostId`-tagged rows move back), so it is refused
+        // with its own tag, which the Public API maps to the merged refusal
+        // its PATCH publishes.
+        if (post[0]!.mergedIntoPostId !== null) {
+          return yield* new PostIsMergedError();
         }
 
         // Sampled inside the post's lock, not before it: a concurrent
