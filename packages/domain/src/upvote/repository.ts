@@ -31,6 +31,12 @@ interface TUpvoteAs {
   userId: string;
 }
 
+interface TUpvoteRemoveById {
+  organizationId: string;
+  postId: string;
+  voteId: string;
+}
+
 const makeUpvoteRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
@@ -194,6 +200,34 @@ const makeUpvoteRepository = Effect.gen(function* () {
         // success, but it must not report as a fresh add.
         return { added: inserted.length > 0 };
       }),
+
+    /**
+     * Deletes exactly the given vote row. Answers `Option.none()` when the row
+     * is already gone, so a caller can report the missing resource rather than
+     * a success.
+     *
+     * Unlike `removeAs`, the row is named by its own id: a delete that races a
+     * removal and a fresh vote for the same account removes the row it was
+     * asked for, or nothing — never the newer vote.
+     */
+    removeById: ({ organizationId, postId, voteId }: TUpvoteRemoveById) =>
+      db
+        .delete(schema.upvoteTable)
+        .where(
+          and(
+            eq(schema.upvoteTable.id, voteId),
+            eq(schema.upvoteTable.postId, postId),
+            eq(schema.upvoteTable.organizationId, organizationId)
+          )
+        )
+        .returning({ userId: schema.upvoteTable.userId })
+        .pipe(
+          Effect.map((rows) =>
+            Option.fromNullishOr(rows.at(0)).pipe(
+              Option.map((row) => ({ userId: row.userId }))
+            )
+          )
+        ),
 
     /**
      * Deletes exactly the given subject's vote. Removing a non-voter is a

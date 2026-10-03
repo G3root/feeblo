@@ -12,6 +12,7 @@ import {
   ListCompaniesInput,
   ListPostCommentsInput,
   ListPostActivityInput,
+  ListPostVotesInput,
   ListPostsInput,
   ListTagsInput,
   PublicApiBoardPage,
@@ -21,6 +22,7 @@ import {
   PublicApiPostActivityPage,
   PublicApiPostPage,
   PublicApiTagPage,
+  PublicApiVotePage,
 } from "./schema";
 
 /**
@@ -67,6 +69,7 @@ describe("public API operations registry", () => {
       ListPostsInput,
       ListPostActivityInput,
       ListPostCommentsInput,
+      ListPostVotesInput,
       ListTagsInput,
       ListCompaniesInput,
       ListChangelogInput,
@@ -76,6 +79,7 @@ describe("public API operations registry", () => {
       PublicApiPostActivityPage,
       PublicApiPostPage,
       PublicApiCommentPage,
+      PublicApiVotePage,
       PublicApiTagPage,
       PublicApiCompanyPage,
       PublicApiChangelogPage,

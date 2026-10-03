@@ -507,6 +507,7 @@ describe("api-key plugin wiring", () => {
         comments: ["read"],
         posts: ["read"],
         tags: ["read"],
+        votes: ["read"],
       });
     },
     perTestTimeout

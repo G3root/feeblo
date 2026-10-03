@@ -1,9 +1,12 @@
 import * as Schema from "effect/Schema";
-import { regexes } from "zod/v4/core";
 
 import { COMMENT_CONTENT_MAX_LENGTH } from "../../content-limits";
 import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
-import { PublicApiAuthor } from "../../public-api/common";
+import {
+  PublicApiAuthor,
+  PublicApiOnBehalfAuthor,
+  type TPublicApiOnBehalfAuthor,
+} from "../../public-api/common";
 
 /**
  * The comment resource: what the comment endpoints return, and the typed input
@@ -76,36 +79,15 @@ export const GetCommentParams = Schema.Struct({
 /**
  * The customer a comment is attributed to.
  *
- * Required, not optional: an API key is a machine credential with no user
- * behind it, so the request has to say whose name the comment carries. The
- * identifiers are consulted in the same strict priority order the dashboard's
- * on-behalf payload uses (`userId` > `contactId` > `externalId` > `email`),
- * and `name`/`avatarUrl` only enrich the resolved contact.
- *
- * The email rule is restated from the dashboard's `AuthorEmail` filter
- * (`post/schema.ts`) rather than imported, because this module may not import
- * a dashboard schema. Both feed `ResolvePrincipalService`, so a junk address
- * accepted here would persist a contact the dashboard refuses; the check is
- * the same Zod-core pattern on purpose.
+ * The shared on-behalf subject under the name this resource reads it by; the
+ * shape and its rules live in `public-api/common.ts` because a vote is
+ * attributed by the same rules. Required, not optional: an API key is a machine
+ * credential with no user behind it, so the request has to say whose name the
+ * comment carries.
  */
-export const PublicApiCommentAuthorSubject = Schema.Struct({
-  userId: Schema.optional(Schema.String),
-  contactId: Schema.optional(Schema.String),
-  externalId: Schema.optional(Schema.String),
-  email: Schema.optional(
-    Schema.String.check(
-      Schema.makeFilter((email: string) => regexes.email.test(email), {
-        message: "author.email must be a valid email address",
-      })
-    )
-  ),
-  name: Schema.optional(Schema.String),
-  avatarUrl: Schema.optional(Schema.String),
-});
+export const PublicApiCommentAuthorSubject = PublicApiOnBehalfAuthor;
 
-export type TPublicApiCommentAuthorSubject = Schema.Schema.Type<
-  typeof PublicApiCommentAuthorSubject
->;
+export type TPublicApiCommentAuthorSubject = TPublicApiOnBehalfAuthor;
 
 /**
  * The comment a request creates.

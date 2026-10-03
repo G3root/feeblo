@@ -118,6 +118,8 @@ const POST_COMMENTS_PATH = "/api/v1/posts/{postId}/comments";
 const COMMENT_PATH = "/api/v1/comments/{commentId}";
 const PIN_COMMENT_PATH = "/api/v1/comments/{commentId}/pin";
 const UNPIN_COMMENT_PATH = "/api/v1/comments/{commentId}/unpin";
+const POST_VOTES_PATH = "/api/v1/posts/{postId}/votes";
+const VOTE_PATH = "/api/v1/posts/{postId}/votes/{voteId}";
 
 /** The statuses every endpoint of the API can answer with, as the base set. */
 const READ_RESPONSE_CODES = [
@@ -154,6 +156,8 @@ describe("PublicApi contract", () => {
         TAG_PATH,
         COMPANIES_PATH,
         COMPANY_PATH,
+        POST_VOTES_PATH,
+        VOTE_PATH,
       ].sort()
     );
   });
@@ -173,6 +177,7 @@ describe("PublicApi contract", () => {
       "Posts",
       "Statuses",
       "Tags",
+      "Votes",
     ]);
 
     for (const { method, operation, path } of operations) {
@@ -194,6 +199,7 @@ describe("PublicApi contract", () => {
       "Posts",
       "Statuses",
       "Tags",
+      "Votes",
     ]);
   });
 
@@ -488,7 +494,14 @@ describe("PublicApi contract", () => {
     // A create names the board, the title, the body, and the status it starts
     // in; an update may name any of the writable fields.
     const createRequest = JSON.stringify(document.paths[POSTS_PATH]?.post);
-    for (const field of ["boardId", "title", "content", "statusId"]) {
+    for (const field of [
+      "boardId",
+      "title",
+      "content",
+      "statusId",
+      "author",
+      "createdAt",
+    ]) {
       expect(createRequest).toContain(field);
     }
 
@@ -499,6 +512,7 @@ describe("PublicApi contract", () => {
       "statusId",
       "boardId",
       "etaQuarter",
+      "author",
     ]) {
       expect(updateRequest).toContain(field);
     }
@@ -854,5 +868,66 @@ describe("PublicApi contract", () => {
     expect(JSON.stringify(getResponses)).not.toContain("CONFLICT");
     expect(JSON.stringify(pinResponses)).not.toContain("CONFLICT");
     expect(JSON.stringify(updateResponses)).not.toContain("CONFLICT");
+  });
+
+  it("documents the vote resource without an internal identifier", () => {
+    const listResponses = document.paths[POST_VOTES_PATH]?.get?.responses ?? {};
+    const createOperation = document.paths[POST_VOTES_PATH]?.post;
+    const createResponses = createOperation?.responses ?? {};
+    const deleteResponses = document.paths[VOTE_PATH]?.delete?.responses ?? {};
+
+    // The list is a read; the create and the delete can both be refused by the
+    // post's state — locked or merged — so both publish the conflict status,
+    // and both can miss the post or the vote.
+    expect(Object.keys(listResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(JSON.stringify(listResponses)).not.toContain("CONFLICT");
+    expect(Object.keys(createResponses).sort()).toEqual([
+      "201",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "429",
+      "500",
+      "503",
+    ]);
+    expect(JSON.stringify(createResponses["409"])).toContain("CONFLICT");
+    expect(Object.keys(deleteResponses).sort()).toEqual([
+      "204",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "429",
+      "500",
+      "503",
+    ]);
+
+    const body = JSON.stringify(createResponses["201"]);
+    for (const field of ["id", "postId", "author", "createdAt"]) {
+      expect(body).toContain(field);
+    }
+
+    // `upvote` also carries `userId`, `memberId`, and `mergedFromPostId`.
+    // None of them has a name in this contract: the list returns the vote's
+    // own id, so a delete never needs the account identifier behind it.
+    for (const forbidden of [
+      "userId",
+      "memberId",
+      "organizationId",
+      "mergedFromPostId",
+    ]) {
+      expect(body).not.toContain(forbidden);
+    }
+
+    // The create names the customer the vote is attributed to; an API key has
+    // no user of its own, so the field is required rather than optional.
+    const requestBody = JSON.stringify(createOperation?.requestBody);
+    expect(requestBody).toContain("author");
+
+    const listBody = JSON.stringify(listResponses["200"]);
+    expect(listBody).toContain("nextCursor");
   });
 });

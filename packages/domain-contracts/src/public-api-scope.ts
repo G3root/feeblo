@@ -44,6 +44,9 @@ export const PUBLIC_API_SCOPES = [
   "comments.update",
   "comments.delete",
   "comments.pin",
+  "votes.read",
+  "votes.create",
+  "votes.delete",
   "tags.read",
   "tags.create",
   "tags.update",
@@ -80,6 +83,7 @@ export const PUBLIC_API_DEFAULT_SCOPES = [
   "boards.read",
   "posts.read",
   "comments.read",
+  "votes.read",
   "tags.read",
   "changelog.read",
 ] as const satisfies readonly PublicApiScope[];
@@ -118,6 +122,25 @@ export const PUBLIC_API_COMMENT_MANAGEMENT_SCOPES = [
   "comments.update",
   "comments.delete",
   "comments.pin",
+] as const satisfies readonly PublicApiScope[];
+
+/**
+ * Vote writes, granted explicitly at key creation and never by default.
+ *
+ * A vote is a statement a customer made, so adding and removing one are the
+ * same on-behalf act the dashboard's voter management performs: the request
+ * names the customer, and the key never votes as itself. Reading votes is part
+ * of the default grant, like reading comments, because a vote's published
+ * payload is the same author classification a comment carries — a display
+ * name and an avatar, never the account behind them.
+ *
+ * `votes.create` and `votes.delete` are separate scopes because the two are
+ * separate acts: an integration that imports historical votes should not also
+ * be able to remove the votes a workspace collected afterwards.
+ */
+export const PUBLIC_API_VOTE_MANAGEMENT_SCOPES = [
+  "votes.create",
+  "votes.delete",
 ] as const satisfies readonly PublicApiScope[];
 
 /**

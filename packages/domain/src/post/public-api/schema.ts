@@ -1,13 +1,19 @@
 import { PostActivityKind } from "@feeblo/domain-contracts/activity-kind";
 import { PostStatusType } from "@feeblo/domain-contracts/post-status-type";
 import * as Schema from "effect/Schema";
+import * as SchemaTransformation from "effect/SchemaTransformation";
 
 import {
   POST_CONTENT_MAX_LENGTH,
   POST_TITLE_MAX_LENGTH,
 } from "../../content-limits";
 import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
-import { PublicApiAuthor, PublicApiTag } from "../../public-api/common";
+import {
+  PublicApiAuthor,
+  PublicApiOnBehalfAuthor,
+  PublicApiTag,
+} from "../../public-api/common";
+import { isIsoDateOrTimestamp } from "../../public-api/parse";
 
 /**
  * The post resource: what the post endpoints return, and the typed input every
@@ -27,6 +33,21 @@ export const PublicApiPostStatus = Schema.Struct({
 });
 
 const ETA_QUARTER_PATTERN = /^[0-9]{4}-Q[1-4]$/;
+
+/**
+ * A raw date string that names a real instant.
+ *
+ * `Schema.DateFromString` alone is too permissive: it accepts host formats
+ * like `August 11, 2026` and rolls a day that does not exist (`2026-02-30`)
+ * over into the next month. The shape and calendar checks are the same ones
+ * the post list's `updatedAfter` filter uses, so the two date parameters
+ * cannot disagree about which strings are real dates.
+ */
+const IsoInstant = Schema.String.check(
+  Schema.makeFilter(isIsoDateOrTimestamp, {
+    message: "must be an ISO 8601 date or timestamp naming a real date",
+  })
+).pipe(Schema.decodeTo(Schema.Date, SchemaTransformation.dateFromString));
 
 /** List projection: everything except the post body. */
 export const PublicApiPostSummary = Schema.Struct({
@@ -251,6 +272,13 @@ const PostTitle = Schema.Trim.pipe(
  * The title is trimmed and the body sanitized before they are stored, exactly
  * as the dashboard does; the limits are the dashboard's own, imported rather
  * than restated so the two cannot disagree about how long a post may be.
+ *
+ * `author` is optional and names the customer the post is attributed to, with
+ * the same identifiers and priority order a comment's author uses. Absent, the
+ * post has no author: a machine key is not a member and has no identity to
+ * invent. `createdAt` is optional and backdates the post for an import; the
+ * list orders by it, while `updatedAt` stays the write's clock so a sync
+ * reading `updatedAfter` still sees the imported row.
  */
 export const CreatePostPayload = Schema.Struct({
   boardId: Schema.String,
@@ -260,6 +288,8 @@ export const CreatePostPayload = Schema.Struct({
   etaQuarter: Schema.optional(
     Schema.NullOr(Schema.String.check(Schema.isPattern(ETA_QUARTER_PATTERN)))
   ),
+  author: Schema.optional(PublicApiOnBehalfAuthor),
+  createdAt: Schema.optional(IsoInstant),
 });
 
 export type TCreatePostPayload = Schema.Schema.Type<typeof CreatePostPayload>;
@@ -283,6 +313,7 @@ export const UpdatePostPayload = Schema.Struct({
   etaQuarter: Schema.optional(
     Schema.NullOr(Schema.String.check(Schema.isPattern(ETA_QUARTER_PATTERN)))
   ),
+  author: Schema.optional(PublicApiOnBehalfAuthor),
 });
 
 export type TUpdatePostPayload = Schema.Schema.Type<typeof UpdatePostPayload>;
@@ -377,6 +408,8 @@ export const CreatePostInput = Schema.Struct({
   ),
   statusId: Schema.String,
   title: Schema.String,
+  author: Schema.optional(PublicApiOnBehalfAuthor),
+  createdAt: Schema.optional(IsoInstant),
 });
 
 /** Typed input for updating a post. */
@@ -391,6 +424,7 @@ export const UpdatePostInput = Schema.Struct({
   etaQuarter: Schema.optional(
     Schema.NullOr(Schema.String.check(Schema.isPattern(ETA_QUARTER_PATTERN)))
   ),
+  author: Schema.optional(PublicApiOnBehalfAuthor),
 });
 
 /** Typed input for deleting a post. */

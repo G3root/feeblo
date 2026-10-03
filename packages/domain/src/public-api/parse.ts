@@ -125,8 +125,11 @@ const daysInMonth = (year: number, month: number): number => {
  * so a caller with a typo in a sync cursor would silently filter from the
  * wrong day. The shape check keeps the value ISO (the contract the document
  * promises) and the component check keeps it a real calendar date.
+ *
+ * Shared with the post `createdAt` codec, which decodes a raw date string the
+ * same way: the two must not disagree about which strings are real dates.
  */
-const isIsoDateOrTimestamp = (value: string): boolean => {
+export const isIsoDateOrTimestamp = (value: string): boolean => {
   const match = ISO_DATE_OR_DATETIME.exec(value);
   if (match === null) {
     return false;

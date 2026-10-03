@@ -97,6 +97,8 @@ interface TPostCreate {
   boardId: string;
   contactId?: string | null;
   content: string;
+  /** Backdated creation instant, for an import. Defaults to the write clock. */
+  createdAt?: Date | undefined;
   creatorId?: string | null;
   creatorMemberId?: string | null;
   etaQuarter?: string | null | undefined;
@@ -1139,6 +1141,7 @@ const makePostRepository = Effect.gen(function* () {
       creatorId,
       creatorMemberId,
       contactId,
+      createdAt: inputCreatedAt,
       metadata,
       source,
       excerpt: inputExcerpt,
@@ -1187,7 +1190,10 @@ const makePostRepository = Effect.gen(function* () {
                     contactId: contactId ?? null,
                     source: source ?? "DASHBOARD",
                     metadata: metadata ?? {},
-                    createdAt: now,
+                    // A backdated import keeps its own `createdAt` while
+                    // `updatedAt` stays the write's clock, so a sync reading
+                    // `updatedAfter` sees the import rather than missing it.
+                    createdAt: inputCreatedAt ?? now,
                     slug,
                     updatedAt: now,
                     etaQuarter: etaQuarter ?? null,

@@ -9,6 +9,7 @@ import { companyEndpoints } from "../company/public-api/http";
 import { statusEndpoints } from "../post-status/public-api/http";
 import { postEndpoints } from "../post/public-api/http";
 import { tagEndpoints } from "../tag/public-api/http";
+import { voteEndpoints } from "../upvote/public-api/http";
 import {
   ApiKeyAuthMiddleware,
   PublicApiSchemaErrorHandler,
@@ -36,7 +37,7 @@ import {
  * implements — `HandlerOf` reads the failures of a group's middleware from the
  * group's own endpoints, and every operation is wrapped in
  * `requirePublicApiScope`, which fails with the key middleware's
- * `FORBIDDEN_SCOPE`. The price is that a seventh group has to repeat the two
+ * `FORBIDDEN_SCOPE`. The price is that an eighth group has to repeat the two
  * lines; `api-contract.test.ts` fails if it does not.
  *
  * Each group also carries a `Description` annotation. The document derives a
@@ -107,6 +108,15 @@ export class PublicApiTagGroup extends HttpApiGroup.make("Tags")
   .middleware(PublicApiSchemaErrorHandler)
   .middleware(ApiKeyAuthMiddleware) {}
 
+export class PublicApiVoteGroup extends HttpApiGroup.make("Votes")
+  .annotate(
+    OpenApi.Description,
+    "List a post's votes, and add or remove one on a customer's behalf."
+  )
+  .add(...voteEndpoints)
+  .middleware(PublicApiSchemaErrorHandler)
+  .middleware(ApiKeyAuthMiddleware) {}
+
 /**
  * Every resource group, in document order.
  *
@@ -122,6 +132,7 @@ export const PublicApiGroups = [
   PublicApiPostGroup,
   PublicApiPostStatusGroup,
   PublicApiTagGroup,
+  PublicApiVoteGroup,
 ] as const;
 
 /**
@@ -143,7 +154,7 @@ export class PublicApi extends HttpApi.make("PublicApi")
   .annotate(OpenApi.Title, "Feeblo Public API")
   .annotate(
     OpenApi.Description,
-    "Read and manage a workspace's posts, comments, tags, changelog entries, and companies. Every request is authenticated with an API key presented in the x-api-key header; the response is always JSON and errors carry a machine-readable code in `_tag`."
+    "Read and manage a workspace's posts, comments, votes, tags, changelog entries, and companies. Every request is authenticated with an API key presented in the x-api-key header; the response is always JSON and errors carry a machine-readable code in `_tag`."
   )
   .annotate(OpenApi.Version, "1.0.0")
   .add(...PublicApiGroups)

@@ -117,7 +117,7 @@ export const postEndpoints = [
     .annotate(OpenApi.Summary, "Create a post")
     .annotate(
       OpenApi.Description,
-      "Creates a post on a board of the calling workspace and returns it. The id is assigned by the server, the title is trimmed, the slug is derived from it and deduplicated, and the body is sanitized before it is stored. A `boardId` or `statusId` that does not exist in the workspace is an invalid request. The post is recorded with `API` as its source and reaches the workspace's integrations and notifications like any other submission, but it has no author: a machine key is not a member."
+      "Creates a post on a board of the calling workspace and returns it. The id is assigned by the server, the title is trimmed, the slug is derived from it and deduplicated, and the body is sanitized before it is stored. A `boardId` or `statusId` that does not exist in the workspace is an invalid request. The post is recorded with `API` as its source and reaches the workspace's integrations and notifications like any other submission. `author` optionally attributes the post to a customer — an API key has no user of its own — resolved by userId, contactId, externalId, or email, in that order; absent, the post has no author. `createdAt` optionally backdates the post for an import: the list orders by it, while `updatedAt` stays the time of the write so a sync reading `updatedAfter` still sees the row."
     ),
   HttpApiEndpoint.patch("updatePost", "/posts/:postId", {
     params: UpdatePostParams,
@@ -129,7 +129,7 @@ export const postEndpoints = [
     .annotate(OpenApi.Summary, "Update a post")
     .annotate(
       OpenApi.Description,
-      "Updates the fields the request names and returns the post afterwards. An omitted field is left as it is and an explicit null clears a nullable one, so `etaQuarter: null` removes the estimate. A body that names no field is rejected as an invalid request. Moving the post to another board or status records the change in its timeline and, for a status change, notifies its subscribers exactly as the dashboard does. A post merged into another post is refused."
+      "Updates the fields the request names and returns the post afterwards. An omitted field is left as it is and an explicit null clears a nullable one, so `etaQuarter: null` removes the estimate. A body that names no field is rejected as an invalid request. Moving the post to another board or status records the change in its timeline and, for a status change, notifies its subscribers exactly as the dashboard does. `author` re-attributes the post to the customer the request names, resolved the same way a create resolves it, and retires the previous author's subscription. A post merged into another post is refused."
     ),
   HttpApiEndpoint.put("setPostTags", "/posts/:postId/tags", {
     params: SetPostTagsParams,
@@ -220,8 +220,10 @@ export const postHandlers = {
 
   createPost: (({ payload }) =>
     createPostOperation.handler({
+      author: payload.author,
       boardId: payload.boardId,
       content: payload.content,
+      createdAt: payload.createdAt,
       etaQuarter: payload.etaQuarter,
       statusId: payload.statusId,
       title: payload.title,
@@ -229,6 +231,7 @@ export const postHandlers = {
 
   updatePost: (({ params, payload }) =>
     updatePostOperation.handler({
+      author: payload.author,
       boardId: payload.boardId,
       content: payload.content,
       etaQuarter: payload.etaQuarter,

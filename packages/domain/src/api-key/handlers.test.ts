@@ -254,6 +254,7 @@ describe("ApiKeyRpcHandlers", () => {
               "boards.read",
               "posts.read",
               "comments.read",
+              "votes.read",
               "tags.read",
               "changelog.read",
             ],
@@ -291,6 +292,7 @@ describe("ApiKeyRpcHandlers", () => {
             "boards.read",
             "posts.read",
             "comments.read",
+            "votes.read",
             "tags.read",
             "changelog.read",
           ]);

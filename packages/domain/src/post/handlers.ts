@@ -1,6 +1,5 @@
-import { currentDb, schema, transaction } from "@feeblo/db";
+import { transaction } from "@feeblo/db";
 import * as Permissions from "@feeblo/permissions";
-import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -13,11 +12,6 @@ import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
-import {
-  resolveOnBehalfSubject,
-  subscribeOnBehalfSubject,
-  toOnBehalfMetadata,
-} from "../identity/on-behalf";
 import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
@@ -71,10 +65,8 @@ import { postLexicalSimilarity, SUGGESTION_MAX_DISTANCE } from "./suggestions";
 import { makePostWrites, type PostWriteActor } from "./write";
 
 export const PostRpcHandlersEffect = Effect.gen(function* () {
-  const db = yield* currentDb;
   const repository = yield* PostRepository;
   const emailOutbox = yield* EmailOutboxRepository;
-  const emailSubscriptions = yield* EmailSubscriptionRepository;
   const entitlementPolicy = yield* EntitlementPolicy;
   const activityRepository = yield* PostActivityRepository;
   const postPolicy = yield* PostPolicy;
@@ -191,109 +183,31 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         .map(({ post }) => post);
     });
 
+  /**
+   * Re-attributes a post to a resolved on-behalf subject.
+   *
+   * The resolution, the author columns, the timeline entry, and the
+   * subscription move are the shared write path's `author` branch
+   * (`post/write.ts`), so the Public API's `PATCH` performs exactly this and
+   * the two cannot drift.
+   */
   const updatePostAuthorEffect = (args: TPostUpdateAuthor) =>
     Effect.gen(function* () {
       const session = yield* CurrentSession;
-      const membership = Policy.getMembership(session, args.organizationId);
-      const subscriptionRepository = yield* PostSubscriptionRepository;
-      // Reassignment find-or-creates contacts like on-behalf creation, so
-      // it shares the same per-member abuse bound (see plan-on-behalf.md).
+      // Reassignment find-or-creates contacts like on-behalf creation, so it
+      // shares the same per-member abuse bound (see plan-on-behalf.md).
       yield* RateLimit.consumeOnBehalfWriteLimit({
         organizationId: args.organizationId,
         userId: session.session.userId,
       });
-      yield* transaction(
-        Effect.gen(function* () {
-          const previous = yield* requireNotMergedActivityState(args);
-          // Attribution resolves inside the same transaction as the
-          // mutation, exactly like on-behalf creation. Posts carry no
-          // user-keyed rows of their own, so no shadow user is needed.
-          const subject = yield* resolveOnBehalfSubject({
-            organizationId: args.organizationId,
-            needsUser: false,
-            subject: args.author,
-            action: "post author",
-          });
-          if (
-            previous.contactId === subject.contactId &&
-            previous.creatorId === subject.userId
-          ) {
-            return;
-          }
-          const onBehalfMetadata = toOnBehalfMetadata(subject);
-          yield* repository.updateAuthor({
-            id: args.id,
-            organizationId: args.organizationId,
-            creatorId: subject.userId,
-            // On-behalf posts keep staff attribution out of the author
-            // fields, matching the create path.
-            creatorMemberId: null,
-            contactId: subject.contactId,
-          });
-          yield* activityRepository.create({
-            actorId: session.session.userId,
-            actorMemberId: membership?.membershipId ?? null,
-            organizationId: args.organizationId,
-            postId: args.id,
-            kind: "AUTHOR_CHANGED",
-            ...(onBehalfMetadata && { metadata: onBehalfMetadata }),
-          });
-          // The new author inherits the creator subscription exactly as if
-          // the post had been created on their behalf: a verified account
-          // is trusted, everyone else defers until identity linking grants
-          // them access. The previous author is unsubscribed first —
-          // otherwise they keep receiving status mail for a post no longer
-          // attributed to them. Only identifiers that differ from the new
-          // subject's are retired, so a shared address survives for the
-          // fresh subscribe below.
-          const subscriptionNow = yield* DateTime.nowAsDate;
-          const retiredUserId =
-            previous.creatorId !== null && previous.creatorId !== subject.userId
-              ? previous.creatorId
-              : null;
-          if (retiredUserId !== null) {
-            yield* subscriptionRepository.unsubscribe({
-              postId: args.id,
-              userId: retiredUserId,
-            });
-          }
-          let retiredContactEmail: string | null = null;
-          if (
-            previous.contactId !== null &&
-            previous.contactId !== subject.contactId
-          ) {
-            const [previousContact] = yield* db
-              .select({ email: schema.contactTable.email })
-              .from(schema.contactTable)
-              .where(eq(schema.contactTable.id, previous.contactId))
-              .limit(1);
-            retiredContactEmail = previousContact?.email ?? null;
-          }
-          if (retiredUserId !== null || retiredContactEmail !== null) {
-            yield* emailSubscriptions.unsubscribePreviousAuthorTopic({
-              contactEmail: retiredContactEmail,
-              now: subscriptionNow,
-              organizationId: args.organizationId,
-              topic: { topicId: args.id, topicType: "post" },
-              userId: retiredUserId,
-            });
-          }
-          if (subject.userId !== null) {
-            yield* subscriptionRepository.subscribe({
-              organizationId: args.organizationId,
-              postId: args.id,
-              userId: subject.userId,
-            });
-          }
-          yield* subscribeOnBehalfSubject({
-            organizationId: args.organizationId,
-            topicId: args.id,
-            subject,
-            source: "post_creator",
-            subjectKind: "post author",
-            now: subscriptionNow,
-          });
-        })
+
+      yield* writes.update(
+        {
+          author: args.author,
+          id: args.id,
+          organizationId: args.organizationId,
+        },
+        memberActor(session, args.organizationId)
       );
     });
 
