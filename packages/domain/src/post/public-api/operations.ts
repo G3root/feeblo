@@ -616,6 +616,10 @@ const POST_MERGE_FAILURES = Schema.Union([
 export const mergePostOperation = defineOperation(
   "mergePost",
   {
+    // Consequential rather than purely additive: the source is archived and
+    // its comments and votes move to another post, so a client should confirm
+    // it even though `unmergePost` can undo it.
+    annotations: { destructive: true },
     description:
       "Merge this post into another: the named post is archived and its comments and votes move to the post the request names. Reversible with unmergePost.",
     failure: POST_MERGE_FAILURES,

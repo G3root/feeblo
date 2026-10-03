@@ -9,6 +9,7 @@ import {
   InternalError,
   InvalidRequestError,
   NotFoundError,
+  PlanRequiresUpgradeError,
   invalidRequestError,
   notFoundError,
 } from "../../public-api/errors";
@@ -32,12 +33,14 @@ const END_USER_READ_FAILURES = Schema.Union([
 ]);
 
 /**
- * A write can be refused by an identifier that names a different end user, so
- * it publishes the conflict alongside the base vocabulary.
+ * A write can be refused by an identifier that names a different end user or
+ * by a plan with no room left for another CRM entry, so it publishes the
+ * conflict and the plan refusal alongside the base vocabulary.
  */
 const END_USER_WRITE_FAILURES = Schema.Union([
   InvalidRequestError,
   ConflictError,
+  PlanRequiresUpgradeError,
   InternalError,
 ]);
 

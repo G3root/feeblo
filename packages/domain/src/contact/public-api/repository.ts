@@ -8,6 +8,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import type { Cursor } from "../../public-api/cursor";
+import { requireCrmEntryAllowance } from "../../public-api/entitlement";
 import {
   conflictError,
   invalidRequestError,
@@ -101,6 +102,48 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
       // case-insensitively so one human still resolves to one contact.
       sql`lower(${schema.contactTable.email}) = ${normalizeEmail(email)}`
     );
+
+  /**
+   * The record each identifier names, read independently.
+   *
+   * Kept apart from the conflict decision so the create-race recovery can ask
+   * the same question again: a concurrent request may have claimed one of the
+   * identifiers between the first read and the insert, and the winner has to
+   * satisfy the same "both identifiers name one person" rule as the pre-check.
+   */
+  const findByIdentifiers = (args: {
+    readonly email: string | null | undefined;
+    readonly externalId: string | null;
+    readonly organizationId: string;
+  }) =>
+    Effect.gen(function* () {
+      const byExternalId =
+        args.externalId === null
+          ? Option.none<ContactRow>()
+          : yield* findContactByExternalId(
+              args.organizationId,
+              args.externalId
+            );
+      const byEmail =
+        args.email === null || args.email === undefined
+          ? Option.none<ContactRow>()
+          : yield* findContactByEmail(args.organizationId, args.email);
+      return { byEmail, byExternalId };
+    });
+
+  /**
+   * Whether the two identifiers name different people.
+   *
+   * The caller's own data disagreeing with itself: picking one would fold two
+   * customers into one record, so the request is refused rather than guessed.
+   */
+  const identifiersDisagree = (found: {
+    readonly byEmail: Option.Option<ContactRow>;
+    readonly byExternalId: Option.Option<ContactRow>;
+  }) =>
+    Option.isSome(found.byExternalId) &&
+    Option.isSome(found.byEmail) &&
+    found.byExternalId.value.id !== found.byEmail.value.id;
 
   return {
     /**
@@ -246,30 +289,31 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
           }
         }
 
-        const byExternalId =
-          wantedExternalId === null
-            ? Option.none<ContactRow>()
-            : yield* findContactByExternalId(organizationId, wantedExternalId);
-        const byEmail =
-          wantedEmail === null || wantedEmail === undefined
-            ? Option.none<ContactRow>()
-            : yield* findContactByEmail(organizationId, wantedEmail);
+        const found = yield* findByIdentifiers({
+          email: wantedEmail,
+          externalId: wantedExternalId,
+          organizationId,
+        });
 
         // Two identifiers that name different records: the caller's own data
         // disagrees with itself, and picking one would merge two customers.
-        if (
-          Option.isSome(byExternalId) &&
-          Option.isSome(byEmail) &&
-          byExternalId.value.id !== byEmail.value.id
-        ) {
+        if (identifiersDisagree(found)) {
           return yield* conflictError(
             "The external id and email belong to different end users."
           );
         }
 
-        const existing = Option.isSome(byExternalId) ? byExternalId : byEmail;
+        const existing = Option.isSome(found.byExternalId)
+          ? found.byExternalId
+          : found.byEmail;
 
         if (Option.isNone(existing)) {
+          // Companies and contacts count together as CRM entries, and the
+          // dashboard's own create is gated on the same number; without this
+          // the endpoint would be a way around a plan limit. Only the create
+          // is checked — an update adds nothing to the count.
+          yield* requireCrmEntryAllowance(organizationId);
+
           const id = yield* ContactId.generate;
           const now = yield* DateTime.nowAsDate;
           const [created = null] = yield* db
@@ -293,24 +337,25 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
             return toEndUserSource(created);
           }
 
-          // Lost a race against a concurrent create: the winner is readable
-          // by one of the identifiers, or the request cannot be answered.
-          const winner = yield* Effect.gen(function* () {
-            if (wantedExternalId !== null) {
-              const found = yield* findContactByExternalId(
-                organizationId,
-                wantedExternalId
-              );
-              if (Option.isSome(found)) {
-                return found;
-              }
-            }
-            if (wantedEmail !== null && wantedEmail !== undefined) {
-              return yield* findContactByEmail(organizationId, wantedEmail);
-            }
-            return Option.none<ContactRow>();
+          // Lost a race against a concurrent create. The winner is re-read by
+          // both identifiers and put through the same disagreement rule as
+          // the pre-check: a concurrent request may have claimed the supplied
+          // external id and email for two different people, and reporting one
+          // of them as this request's result would hide that.
+          const again = yield* findByIdentifiers({
+            email: wantedEmail,
+            externalId: wantedExternalId,
+            organizationId,
           });
+          if (identifiersDisagree(again)) {
+            return yield* conflictError(
+              "The external id and email belong to different end users."
+            );
+          }
 
+          const winner = Option.isSome(again.byExternalId)
+            ? again.byExternalId
+            : again.byEmail;
           return yield* Option.match(winner, {
             onNone: () =>
               Effect.fail(
@@ -318,7 +363,7 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
                   "The end user could not be read after it was created."
                 )
               ),
-            onSome: (found) => Effect.succeed(toEndUserSource(found)),
+            onSome: (contact) => Effect.succeed(toEndUserSource(contact)),
           });
         }
 
@@ -342,7 +387,20 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
           );
         }
         return toEndUserSource(updated);
-      }).pipe(withRemapDbErrors("PublicApiEndUser", "update")),
+      }).pipe(
+        withRemapDbErrors({
+          action: "update",
+          entity: "PublicApiEndUser",
+          // The pre-check answers the identifiers a request names, but a
+          // concurrent upsert can claim the email or external id between that
+          // read and this write. The index is the authority, and a violation
+          // is the documented conflict rather than an internal failure.
+          onUniqueViolation: () =>
+            conflictError(
+              "The external id or email already belongs to a different end user."
+            ),
+        })
+      ),
   };
 });
 export class PublicApiEndUserRepository extends Context.Service<PublicApiEndUserRepository>()(

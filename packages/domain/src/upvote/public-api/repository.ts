@@ -60,6 +60,14 @@ export type PublicApiVotePage = {
  * TypeScript, so neither can leak through a mapper. `voterId` is the
  * end-user record's own id — null when a member cast the vote — which is the
  * one identifier this resource publishes and the one its voter filter matches.
+ *
+ * It is read through a correlated subquery rather than a join because
+ * `contact.user_id` is indexed but not unique per workspace: a voter with two
+ * contact rows would make a join emit the vote twice, once per contact and
+ * with two different `voterId` values, and the page cursor — which is the
+ * vote's own `(createdAt, id)` — could then skip a duplicate. The subquery
+ * picks the oldest contact for the account, so a vote appears exactly once and
+ * always with the same record.
  */
 const VOTE_COLUMNS = {
   id: schema.upvoteTable.id,
@@ -72,7 +80,14 @@ const VOTE_COLUMNS = {
   authorAvatarUrl: schema.userTable.image,
   voterId: sql<
     string | null
-  >`case when ${schema.upvoteTable.memberId} is null then ${schema.contactTable.id} else null end`,
+  >`case when ${schema.upvoteTable.memberId} is null then (
+    select ${schema.contactTable.id}
+    from ${schema.contactTable}
+    where ${schema.contactTable.organizationId} = ${schema.upvoteTable.organizationId}
+      and ${schema.contactTable.userId} = ${schema.upvoteTable.userId}
+    order by ${schema.contactTable.createdAt}, ${schema.contactTable.id}
+    limit 1
+  ) else null end`,
 } as const;
 
 type VoteRow = {
@@ -187,9 +202,14 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
    * yields an empty set and the caller gets an empty page. A contact's linked
    * account is what `upvote.userId` points at; the user table is consulted too
    * because a member's vote has no contact row and their email is still a
-   * meaningful way to name them. The contact identifiers are matched together,
-   * so naming two that belong to different people matches nobody — the same
+   * meaningful way to name them. The identifiers are matched together, so
+   * naming two that belong to different people matches nobody — the same
    * "every identifier present must match" rule the post retrieve endpoint uses.
+   *
+   * That is also why the user-table leg runs only when the email is the sole
+   * identifier: it exists for a member, who has no contact to match an id or
+   * an external id against, so combining it with either would let the email
+   * alone satisfy a filter the contact identifiers already refused.
    */
   const resolveVoterUserIds = (args: {
     readonly organizationId: string;
@@ -231,7 +251,12 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
         .from(schema.contactTable)
         .where(and(...contactConditions));
 
-      const emailUsers = hasEmail
+      // The user-table leg is for a member, who has no contact row: it runs
+      // only when the email is the sole identifier, so it can never widen a
+      // filter that also names an id or an external id.
+      const emailOnly =
+        hasEmail && voter?.id === undefined && voter?.externalId === undefined;
+      const emailUsers = emailOnly
         ? yield* db
             .select({ id: schema.userTable.id })
             .from(schema.userTable)
@@ -268,22 +293,12 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
         .select(VOTE_COLUMNS)
         .from(schema.upvoteTable)
         // The voter is joined rather than left-joined: `upvote.userId` is not
-        // null, so a vote always has an account behind it.
+        // null, so a vote always has an account behind it. The end-user record
+        // is read by `VOTE_COLUMNS`' own subquery, not a join, so a voter with
+        // two contacts cannot duplicate the vote.
         .innerJoin(
           schema.userTable,
           eq(schema.userTable.id, schema.upvoteTable.userId)
-        )
-        // The end-user record is left-joined: a member's vote has none, so
-        // `voterId` is null rather than the vote disappearing.
-        .leftJoin(
-          schema.contactTable,
-          and(
-            eq(
-              schema.contactTable.organizationId,
-              schema.upvoteTable.organizationId
-            ),
-            eq(schema.contactTable.userId, schema.upvoteTable.userId)
-          )
         )
         .where(and(...args.conditions))
         .orderBy(
@@ -499,16 +514,6 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
           .innerJoin(
             schema.userTable,
             eq(schema.userTable.id, schema.upvoteTable.userId)
-          )
-          .leftJoin(
-            schema.contactTable,
-            and(
-              eq(
-                schema.contactTable.organizationId,
-                schema.upvoteTable.organizationId
-              ),
-              eq(schema.contactTable.userId, schema.upvoteTable.userId)
-            )
           )
           .where(
             and(

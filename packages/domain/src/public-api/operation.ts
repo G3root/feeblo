@@ -16,7 +16,12 @@ import { requirePublicApiScope } from "./middleware";
 export type PublicApiOperationAnnotations = {
   /** The operation reads; it never changes stored state. */
   readonly readOnly: boolean;
-  /** The operation can destroy data and cannot be undone. */
+  /**
+   * The operation can destroy data or move it between records, so a client
+   * should confirm before running it. A write a companion operation can undo
+   * still sets this: the hint it becomes is "not purely additive", and a merge
+   * archives a post and reassigns its comments and votes.
+   */
   readonly destructive: boolean;
   /** Repeating the same call has the same effect as calling it once. */
   readonly idempotent: boolean;

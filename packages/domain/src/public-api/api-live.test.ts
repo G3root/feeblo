@@ -4771,6 +4771,41 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect("returns a vote once when the voter has two contact records", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace({ withVotesAndComments: true });
+      const db = yield* currentDb;
+      registerKey("fbk_votes_dupe", workspace.organizationId);
+
+      // `contact.user_id` is indexed but not unique per workspace, so a voter
+      // can have more than one contact row. The list must still report the
+      // vote once, with a deterministic record, rather than duplicating it and
+      // letting the page cursor skip one of the copies.
+      const now = new Date();
+      const userId = `user_voter_${workspace.organizationId}`;
+      for (const id of ["cnt_dupe_a", "cnt_dupe_b"]) {
+        yield* db.insert(schema.contactTable).values({
+          id,
+          organizationId: workspace.organizationId,
+          userId,
+          email: `${id}@example.com`,
+          name: "Voter",
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+
+      const response = yield* executeRequest(
+        `/api/v1/posts/${workspace.postId}/votes`,
+        "fbk_votes_dupe"
+      );
+      expect(response.status).toBe(200);
+      const page = decodeVotePage(responseBody(response));
+      expect(page.data).toHaveLength(1);
+      expect(page.data[0]?.voterId).toBe("cnt_dupe_a");
+    })
+  );
+
   it.effect(
     "merges a post into another, moves its engagement, and unmerges it",
     () =>
@@ -5952,6 +5987,56 @@ layer(
         );
         expect(listed.status).toBe(200);
         expect(decodeCompanyPage(responseBody(listed)).data).toHaveLength(0);
+      })
+  );
+
+  it.effect(
+    "refuses an end-user create the plan has no room for, and still allows updates",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const db = yield* currentDb;
+        registerKey(
+          "fbk_crm_denied_users",
+          workspace.organizationId,
+          END_USER_MANAGEMENT_KEY_SCOPES
+        );
+
+        const created = yield* executeWrite("POST", "/api/v1/end-users", {
+          apiKey: "fbk_crm_denied_users",
+          body: { externalId: "crm-1", email: "ada@example.com" },
+        });
+        expect(created.status).toBe(403);
+        expect(decodeError(responseBody(created))._tag).toBe(
+          "PLAN_REQUIRES_UPGRADE"
+        );
+
+        // Nothing was written.
+        const rows = yield* db
+          .select()
+          .from(schema.contactTable)
+          .where(
+            eq(schema.contactTable.organizationId, workspace.organizationId)
+          );
+        expect(rows).toHaveLength(0);
+
+        // An update adds nothing to the count the plan caps, so it is not
+        // blocked by a workspace already at the limit.
+        const now = new Date();
+        yield* db.insert(schema.contactTable).values({
+          id: "cnt_existing",
+          organizationId: workspace.organizationId,
+          email: "grace@example.com",
+          name: "Grace",
+          createdAt: now,
+          updatedAt: now,
+        });
+        const updated = yield* executeWrite("POST", "/api/v1/end-users", {
+          apiKey: "fbk_crm_denied_users",
+          body: { email: "grace@example.com", name: "Grace Hopper" },
+        });
+        expect(updated.status).toBe(200);
+        expect(decodeEndUser(responseBody(updated)).name).toBe("Grace Hopper");
       })
   );
 });
