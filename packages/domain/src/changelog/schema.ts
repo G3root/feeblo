@@ -5,6 +5,17 @@ import * as S from "effect/Schema";
 
 export const ChangelogStatus = S.Literals(["draft", "scheduled", "published"]);
 
+/**
+ * The statuses a write may set.
+ *
+ * `scheduled` is deliberately absent: scheduled publishing is unimplemented —
+ * the status exists in the database and in the response vocabulary, but no
+ * worker publishes an entry when its time arrives, so accepting it on a write
+ * would file an entry that never goes live and never tells anyone. Writes
+ * accept only draft and published until the scheduler ships.
+ */
+export const ChangelogWriteStatus = S.Literals(["draft", "published"]);
+
 export const Changelog = S.Struct({
   assetIds: S.optional(S.Array(S.String)),
   coverImage: S.NullOr(S.String),
@@ -87,7 +98,7 @@ export const ChangelogCreate = S.Struct({
   title: S.String,
   slug: S.String,
   content: S.String,
-  status: ChangelogStatus,
+  status: ChangelogWriteStatus,
   scheduledAt: S.NullOr(S.DateFromString),
   publishedAt: S.NullOr(S.DateFromString),
   organizationId: WorkspaceId.schema,
@@ -105,7 +116,7 @@ export const ChangelogUpdate = S.Struct({
   title: S.String,
   slug: S.String,
   content: S.String,
-  status: ChangelogStatus,
+  status: ChangelogWriteStatus,
   scheduledAt: S.NullOr(S.DateFromString),
   publishedAt: S.NullOr(S.DateFromString),
   organizationId: WorkspaceId.schema,

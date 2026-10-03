@@ -211,12 +211,28 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               id: args.id,
               organizationId: args.organizationId,
             });
-            yield* repository.update({
+            // The pre-transaction policy saw the row exist, so a `undefined`
+            // here means it was deleted while this request was in flight.
+            // Failing now (rather than letting the no-op update "succeed")
+            // also keeps a publish that names a deleted entry from recording
+            // a publication intent and notifying subscribers about a
+            // changelog that is no longer there.
+            if (previousStatus === undefined) {
+              return yield* new ChangelogNotFoundError({
+                message: "Changelog entry not found",
+              });
+            }
+            const updated = yield* repository.update({
               ...args,
               content: prepared.content,
               coverImage: prepared.coverImage,
               excerpt: htmlToExcerpt(sanitizedHtml),
             });
+            if (updated === undefined) {
+              return yield* new ChangelogNotFoundError({
+                message: "Changelog entry not found",
+              });
+            }
             const publishedNow =
               previousStatus !== "published" && args.status === "published";
             const createdOutboxId = publishedNow

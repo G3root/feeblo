@@ -9,7 +9,7 @@ import {
 import { createChangelogEmail } from "@feeblo/transactional/templates/changelog";
 import { createEmailSubscriptionVerificationEmail } from "@feeblo/transactional/templates/email-subscription-verification";
 import { createNotificationEmail } from "@feeblo/transactional/templates/notification";
-import { and, eq, gte, inArray, isNull, sql, sum } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, sql, sum } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -436,7 +436,11 @@ export const materializeEmailIntent = (outboxId: string) =>
                 eq(schema.emailSubscriptionTable.state, "active"),
                 eq(schema.emailContactTable.verificationState, "verified")
               )
-            );
+            )
+            // The free plan's single-recipient pick reads the first row; an
+            // explicit order makes that pick deterministic across
+            // materializations.
+            .orderBy(asc(schema.emailContactTable.email));
           const privilegedUserIds = new Set(
             members.flatMap((member) =>
               member.role === "owner" || member.role === "admin"
@@ -446,7 +450,16 @@ export const materializeEmailIntent = (outboxId: string) =>
           );
           const ownerEmail = members.find((member) => member.role === "owner")
             ?.user?.email;
-          const configuredFreeRecipient = optedInContacts[0]?.email;
+          // Deterministic single-recipient pick: a privileged staff inbox that
+          // opted in first (the workspace's own admins), else the
+          // alphabetically first opted-in address. The query is ordered, so
+          // two materializations of the same window cannot pick different
+          // recipients on the planner's whim.
+          const configuredFreeRecipient =
+            optedInContacts.find(
+              (contact) =>
+                contact.userId !== null && privilegedUserIds.has(contact.userId)
+            )?.email ?? optedInContacts[0]?.email;
           const recipients =
             recipientLimit === 1
               ? [configuredFreeRecipient ?? ownerEmail].filter(

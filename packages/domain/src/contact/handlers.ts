@@ -27,6 +27,9 @@ import type {
 export const ContactRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* ContactRepository;
   const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
+  const companyRepository = yield* CompanyRepository;
+  const workspaceRepository = yield* WorkspaceRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
   const contactPolicy = yield* ContactPolicy;
 
   return {
@@ -73,6 +76,22 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
     ContactCreate: (args: TContactCreate) =>
       transaction(
         Effect.gen(function* () {
+          // First lock, first: the workspace row is held for the whole write,
+          // and the CRM plan count below is only authoritative while it is —
+          // two creates arriving near the cap cannot both see room. The Public
+          // API's company create takes the same lock in the same position, so
+          // the two surfaces enforce one limit the same way. The lock comes
+          // before any child insert because each insert's foreign-key check
+          // holds a key-share on this row that would otherwise deadlock
+          // against it.
+          yield* workspaceRepository.lockOrganization(args.organizationId);
+          yield* entitlementPolicy.canCreateCrmEntry({
+            organizationId: args.organizationId,
+            crmEntryCount: companyRepository.countCrmEntries(
+              args.organizationId
+            ),
+          });
+
           const attributeValues = args.attributeValues ?? [];
           const definitions =
             yield* attributeDefinitionRepository.findContactAttributeDefinitions(

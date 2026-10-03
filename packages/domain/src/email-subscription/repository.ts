@@ -298,38 +298,42 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       ? yield* hashEmailSubscriptionToken(verificationToken.value)
       : null;
 
-    const subscription = priorSubscription
-      ? yield* Effect.gen(function* () {
-          const [updated] = yield* db
-            .update(schema.emailSubscriptionTable)
-            .set({
-              source: input.source,
-              state,
-              verificationTokenHash,
-              verificationExpiresAt:
-                state === "pending_verification"
-                  ? input.verificationExpiresAt
-                  : null,
-              verifiedAt:
-                state === "active" && priorSubscription.verifiedAt === null
-                  ? input.now
-                  : priorSubscription.verifiedAt,
-              unsubscribedAt: state === "unsubscribed" ? input.now : null,
-              updatedAt: input.now,
-            })
-            .where(eq(schema.emailSubscriptionTable.id, priorSubscription.id))
-            .returning();
-          if (updated === undefined) {
-            return yield* dataError(
-              "requestSubscription.updateSubscription",
-              "Email subscription update did not return a row"
-            );
-          }
-          return yield* decodeSubscription(
-            updated,
-            "requestSubscription.updateSubscription"
+    // The stored state a concurrent duplicate subscribe converges on.
+    const applySubscriptionState = (prior: Subscription) =>
+      Effect.gen(function* () {
+        const [updated] = yield* db
+          .update(schema.emailSubscriptionTable)
+          .set({
+            source: input.source,
+            state,
+            verificationTokenHash,
+            verificationExpiresAt:
+              state === "pending_verification"
+                ? input.verificationExpiresAt
+                : null,
+            verifiedAt:
+              state === "active" && prior.verifiedAt === null
+                ? input.now
+                : prior.verifiedAt,
+            unsubscribedAt: state === "unsubscribed" ? input.now : null,
+            updatedAt: input.now,
+          })
+          .where(eq(schema.emailSubscriptionTable.id, prior.id))
+          .returning();
+        if (updated === undefined) {
+          return yield* dataError(
+            "requestSubscription.updateSubscription",
+            "Email subscription update did not return a row"
           );
-        })
+        }
+        return yield* decodeSubscription(
+          updated,
+          "requestSubscription.updateSubscription"
+        );
+      });
+
+    const subscription = priorSubscription
+      ? yield* applySubscriptionState(priorSubscription)
       : yield* Effect.gen(function* () {
           const [created] = yield* db
             .insert(schema.emailSubscriptionTable)
@@ -352,17 +356,37 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
               createdAt: input.now,
               updatedAt: input.now,
             })
+            // Two concurrent requests for the same (contact, topic) can both
+            // see no prior row above; the unique index decides the winner and
+            // the loser re-reads it and applies the same state write, so the
+            // duplicate stays idempotent instead of aborting the caller's
+            // transaction with a unique violation.
+            .onConflictDoNothing({
+              target: [
+                schema.emailSubscriptionTable.contactId,
+                schema.emailSubscriptionTable.topicType,
+                schema.emailSubscriptionTable.topicId,
+              ],
+            })
             .returning();
-          if (created === undefined) {
-            return yield* dataError(
-              "requestSubscription.createSubscription",
-              "Email subscription insert did not return a row"
+          if (created !== undefined) {
+            return yield* decodeSubscription(
+              created,
+              "requestSubscription.createSubscription"
             );
           }
-          return yield* decodeSubscription(
-            created,
-            "requestSubscription.createSubscription"
+          const winner = yield* findSubscriptionForContact(
+            persistedContact.id,
+            input.topic
           );
+          return yield* Option.match(winner, {
+            onNone: () =>
+              dataError(
+                "requestSubscription.createSubscription",
+                "Email subscription conflict did not resolve to a stored row"
+              ),
+            onSome: applySubscriptionState,
+          });
         });
 
     return {

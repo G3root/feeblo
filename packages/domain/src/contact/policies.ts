@@ -2,16 +2,12 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { CompanyRepository } from "../company/repository";
-import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { ContactRepository } from "./repository";
 import type { TContactCreate, TContactDelete, TContactUpdate } from "./schema";
 
 const makeContactPolicy = Effect.gen(function* () {
   const repository = yield* ContactRepository;
-  const companyRepository = yield* CompanyRepository;
-  const entitlementPolicy = yield* EntitlementPolicy;
 
   const belongsToOrganization = (args: TContactDelete) =>
     Policy.policy(() => repository.exists(args));
@@ -57,19 +53,11 @@ const makeContactPolicy = Effect.gen(function* () {
         organizationId: args.organizationId,
         userId: args.userId,
       }),
-      companyBelongsToOrganization(args),
-      entitlementPolicy.canCreateCrmEntry({
-        organizationId: args.organizationId,
-        crmEntryCount: Effect.gen(function* () {
-          const contactCount = yield* repository.countByOrganizationId(
-            args.organizationId
-          );
-          const companyCount = yield* companyRepository.countByOrganizationId(
-            args.organizationId
-          );
-          return contactCount + companyCount;
-        }),
-      })
+      companyBelongsToOrganization(args)
+      // The plan's CRM-entry cap is enforced inside the create's transaction
+      // (`ContactCreate`), after the workspace row is locked: the count is
+      // only meaningful under that lock, and a policy running outside it
+      // would let two concurrent creates both see room past the cap.
     );
 
   const canUpdate = (args: TContactUpdate) =>

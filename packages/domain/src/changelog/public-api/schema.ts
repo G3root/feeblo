@@ -29,6 +29,25 @@ export type TPublicApiChangelogStatus = Schema.Schema.Type<
 >;
 
 /**
+ * The statuses a write may set.
+ *
+ * Narrower than the response vocabulary above: scheduled publishing is
+ * unimplemented — the status exists in the database and in the response
+ * vocabulary, but no worker publishes an entry when its time arrives, so
+ * accepting it on a write would file an entry that never goes live and never
+ * tells anyone. Writes accept only draft and published until the scheduler
+ * ships.
+ */
+export const PublicApiChangelogWriteStatus = Schema.Literals([
+  "draft",
+  "published",
+]);
+
+export type TPublicApiChangelogWriteStatus = Schema.Schema.Type<
+  typeof PublicApiChangelogWriteStatus
+>;
+
+/**
  * A label on an entry.
  *
  * The workspace's own vocabulary: a category is named, and `iconType` says how
@@ -133,9 +152,11 @@ const COVER_IMAGE_URL_MAX_LENGTH = 2048;
  * remain one slug rather than two entries that look identical to a reader.
  *
  * The timestamps are only meaningful next to the status that selects them, so
- * a publish must carry `publishedAt` and a schedule must carry `scheduledAt`;
- * the handler rejects the request otherwise instead of inventing a date that
- * would decide a reader's ordering.
+ * a publish must carry `publishedAt`; the handler rejects the request
+ * otherwise instead of inventing a date that would decide a reader's
+ * ordering. `scheduledAt` is accepted on the wire and stored, but `scheduled`
+ * is not a status a write may set (see `PublicApiChangelogWriteStatus`), so
+ * today every write clears it.
  */
 export const CreateChangelogPayload = Schema.Struct({
   title: Schema.String,
@@ -149,7 +170,7 @@ export const CreateChangelogPayload = Schema.Struct({
       )
     )
   ),
-  status: Schema.optional(PublicApiChangelogStatus),
+  status: Schema.optional(PublicApiChangelogWriteStatus),
   scheduledAt: Schema.optional(Schema.NullOr(Schema.DateFromString)),
   publishedAt: Schema.optional(Schema.NullOr(Schema.DateFromString)),
 });
@@ -182,7 +203,7 @@ export const UpdateChangelogPayload = Schema.Struct({
       )
     )
   ),
-  status: PublicApiChangelogStatus,
+  status: PublicApiChangelogWriteStatus,
   scheduledAt: Schema.optional(Schema.NullOr(Schema.DateFromString)),
   publishedAt: Schema.optional(Schema.NullOr(Schema.DateFromString)),
 });

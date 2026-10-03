@@ -344,19 +344,30 @@ const makeCommentService = Effect.gen(function* () {
     readonly draft: CommentDraft;
     /**
      * The dashboard's status transition, run inside the create's transaction
-     * when the request asked for one, and returning the id to store on the
-     * comment. Absent for a machine key, which does not move a post's status
-     * through a comment — see `status-update.ts` for why that effect lives
-     * outside this service.
+     * when the request asked for one, returning the id to store on the
+     * comment and the outbox intent recorded beside the move (so the handler
+     * can wake the dispatcher after the transaction commits, exactly as the
+     * post editor's own status write does). Absent for a machine key, which
+     * does not move a post's status through a comment — see `status-update.ts`
+     * for why that effect lives outside this service.
      */
     readonly statusUpdate?:
-      | Effect.Effect<string | null, FailedToCreateCommentError, R>
+      | Effect.Effect<
+          {
+            readonly outboxId: string | undefined;
+            readonly statusUpdateId: string | null;
+          },
+          FailedToCreateCommentError,
+          R
+        >
       | undefined;
   }) =>
     Effect.gen(function* () {
       const sanitizedMarkdown = yield* sanitizeCommentBody(args.draft.content);
 
-      yield* transaction(
+      // The status intent's outbox id rides out to the caller, which wakes
+      // the dispatcher after this transaction commits.
+      return yield* transaction(
         Effect.gen(function* () {
           yield* assertPostAcceptsComments(args.draft);
 
@@ -367,8 +378,11 @@ const makeCommentService = Effect.gen(function* () {
 
           yield* assertParentBelongsToPost(args.draft);
 
-          const statusUpdateId =
-            args.statusUpdate === undefined ? null : yield* args.statusUpdate;
+          const statusUpdate =
+            args.statusUpdate === undefined
+              ? { outboxId: undefined, statusUpdateId: null }
+              : yield* args.statusUpdate;
+          const statusUpdateId = statusUpdate.statusUpdateId;
 
           yield* repository.create({
             id: args.draft.id,
@@ -395,7 +409,9 @@ const makeCommentService = Effect.gen(function* () {
 
           // Ordinary comments — including on-behalf ones — record no email
           // intents and subscribe nobody; the in-app notification keeps its
-          // member-only recipients with the acting member as actor.
+          // member-only recipients with the acting member as actor. The
+          // status intent a status-update comment recorded (below, in the
+          // status effect) is the one email side effect a comment makes.
           yield* notifications.notifyComment({
             organizationId: args.draft.organizationId,
             postId: args.draft.postId,
@@ -404,6 +420,8 @@ const makeCommentService = Effect.gen(function* () {
             visibility: args.draft.visibility,
             actorUserId: args.actor.userId,
           });
+
+          return statusUpdate.outboxId;
         })
       );
     }).pipe(

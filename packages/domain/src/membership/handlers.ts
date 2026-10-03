@@ -19,6 +19,7 @@ import type {
 
 export const MembershipRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* MembershipRepository;
+  const workspaceRepository = yield* WorkspaceRepository;
   const membershipPolicy = yield* MembershipPolicy;
 
   return {
@@ -61,6 +62,12 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
     }: TUpdateMemberRole) =>
       transaction(
         Effect.gen(function* () {
+          // The workspace row is locked before the plan check below so two
+          // promotions arriving near the privileged-member cap cannot both
+          // see room: the count is only meaningful while this transaction
+          // holds the lock.
+          yield* workspaceRepository.lockOrganization(organizationId);
+
           yield* membershipPolicy.canAssignRoleWithinPlan({
             organizationId,
             memberId,

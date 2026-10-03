@@ -282,6 +282,17 @@ postStatusCollection.createIndex((row) => row.id, {
   indexType: BasicIndex,
 });
 
+/**
+ * The changelog write endpoints accept only the statuses a write may set:
+ * `scheduled` is a future feature (the scheduler does not exist), so a row
+ * read back as scheduled — filed before scheduling was disabled — is saved as
+ * the draft it effectively is. The wire type is the source of truth; this
+ * keeps an old row editable without a second request.
+ */
+const toWritableChangelogStatus = (
+  status: "draft" | "published" | "scheduled"
+): "draft" | "published" => (status === "scheduled" ? "draft" : status);
+
 export const changelogCollection = createCollection(
   queryCollectionOptions({
     id: "changelogCollection",
@@ -316,7 +327,7 @@ export const changelogCollection = createCollection(
           content: updatedChangelog.content,
           assetIds: updatedChangelog.assetIds ?? [],
           coverImage: updatedChangelog.coverImage ?? null,
-          status: updatedChangelog.status,
+          status: toWritableChangelogStatus(updatedChangelog.status),
           scheduledAt: updatedChangelog.scheduledAt,
           publishedAt: updatedChangelog.publishedAt,
           organizationId: updatedChangelog.organizationId,
@@ -346,7 +357,7 @@ export const changelogCollection = createCollection(
           content: newChangelog.content,
           assetIds: newChangelog.assetIds ?? [],
           coverImage: newChangelog.coverImage ?? null,
-          status: newChangelog.status,
+          status: toWritableChangelogStatus(newChangelog.status),
           scheduledAt: newChangelog.scheduledAt,
           publishedAt: newChangelog.publishedAt,
           organizationId: newChangelog.organizationId,

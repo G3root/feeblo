@@ -24,32 +24,57 @@ import type {
 
 type AttributeValue = Parameters<typeof buildAttributeValueColumns>[0];
 
+type AttributeValueMap = ReturnType<typeof buildAttributeValueColumns>;
+
+/**
+ * Shared update for one attribute value row.
+ *
+ * `update` must scope by every column the caller names (row id, owner,
+ * attribute, organization), because the value was validated against that
+ * attribute's definition — writing a different attribute's row would store a
+ * value the validation did not check.
+ *
+ * `strict` marks the Update RPC's integral semantics: a miss means the named
+ * row does not exist for this (owner, attribute) pair — a stale or mismatched
+ * caller id — and the write fails rather than settling a different row
+ * quietly. The upsert entry points pass `strict: false`: the miss then falls
+ * to `insert`, whose (owner, attribute) pair is unique, so the insert is
+ * written with an upsert that updates the winning row in place rather than
+ * surfacing a unique violation.
+ */
 const upsertAttributeValue = <T, E1, R1, E2, R2, E3, R3>(
   args: { id?: string | undefined; value: AttributeValue | undefined },
   options: {
+    /** Called only when the caller named a row id; it is the narrowed id. */
     update: (
-      id: string,
-      valueMap: ReturnType<typeof buildAttributeValueColumns>
+      rowId: string,
+      valueMap: AttributeValueMap
     ) => Effect.Effect<T | undefined, E1, R1>;
-    create: (
+    insert: (
       id: string,
-      valueMap: ReturnType<typeof buildAttributeValueColumns>
+      valueMap: AttributeValueMap
     ) => Effect.Effect<T | undefined, E2, R2>;
     generateId: Effect.Effect<string, E3, R3>;
+    readonly strict: boolean;
   }
 ) =>
   Effect.gen(function* () {
     const valueMap = buildAttributeValueColumns(args.value);
 
-    if (args.id) {
+    if (args.id !== undefined) {
       const updated = yield* options.update(args.id, valueMap);
-      if (updated) {
+      if (updated !== undefined) {
         return updated;
       }
+      if (options.strict) {
+        return yield* new FailedToUpsertAttributeValueError();
+      }
+    } else if (options.strict) {
+      return yield* new FailedToUpsertAttributeValueError();
     }
 
     const id = args.id ?? (yield* options.generateId);
-    const created = yield* options.create(id, valueMap);
+    const created = yield* options.insert(id, valueMap);
     if (!created) {
       return yield* new FailedToUpsertAttributeValueError();
     }
@@ -297,7 +322,8 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
 
     updateContactAttributeValue: (args: TContactAttributeValueUpdate) =>
       upsertAttributeValue(args, {
-        update: (id, valueMap) =>
+        strict: true,
+        update: (rowId, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
             return yield* db
@@ -305,7 +331,14 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
               .set({ ...valueMap, updatedAt: now })
               .where(
                 and(
-                  eq(schema.contactAttributeValueTable.id, id),
+                  eq(schema.contactAttributeValueTable.id, rowId),
+                  // The row must be the named attribute's: the value was
+                  // validated against that definition, so a mismatched id
+                  // must not silently write another attribute's row.
+                  eq(
+                    schema.contactAttributeValueTable.attributeId,
+                    args.attributeId
+                  ),
                   eq(
                     schema.contactAttributeValueTable.contactId,
                     args.contactId
@@ -319,7 +352,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
               .returning()
               .pipe(Effect.map(([updated]) => updated));
           }),
-        create: (id, valueMap) =>
+        insert: (id, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
             return yield* db
@@ -333,6 +366,16 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
                 createdAt: now,
                 updatedAt: now,
               })
+              // The (contact, attribute) pair is unique: a row that already
+              // exists for this pair — raced or pre-existing — is updated in
+              // place rather than surfacing a unique violation.
+              .onConflictDoUpdate({
+                target: [
+                  schema.contactAttributeValueTable.contactId,
+                  schema.contactAttributeValueTable.attributeId,
+                ],
+                set: { ...valueMap, updatedAt: now },
+              })
               .returning()
               .pipe(Effect.map(([created]) => created));
           }),
@@ -341,7 +384,8 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
 
     upsertContactAttributeValue: (args: TContactAttributeValueUpsert) =>
       upsertAttributeValue(args, {
-        update: (id, valueMap) =>
+        strict: false,
+        update: (rowId, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
             return yield* db
@@ -349,7 +393,13 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
               .set({ ...valueMap, updatedAt: now })
               .where(
                 and(
-                  eq(schema.contactAttributeValueTable.id, id),
+                  eq(schema.contactAttributeValueTable.id, rowId),
+                  // Same scope rule as the update path: the named attribute
+                  // must own the row the id points at.
+                  eq(
+                    schema.contactAttributeValueTable.attributeId,
+                    args.attributeId
+                  ),
                   eq(
                     schema.contactAttributeValueTable.contactId,
                     args.contactId
@@ -363,7 +413,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
               .returning()
               .pipe(Effect.map(([updated]) => updated));
           }),
-        create: (id, valueMap) =>
+        insert: (id, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
             return yield* db
@@ -376,6 +426,13 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
                 ...valueMap,
                 createdAt: now,
                 updatedAt: now,
+              })
+              .onConflictDoUpdate({
+                target: [
+                  schema.contactAttributeValueTable.contactId,
+                  schema.contactAttributeValueTable.attributeId,
+                ],
+                set: { ...valueMap, updatedAt: now },
               })
               .returning()
               .pipe(Effect.map(([created]) => created));
@@ -406,7 +463,8 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
 
     updateCompanyAttributeValue: (args: TCompanyAttributeValueUpdate) =>
       upsertAttributeValue(args, {
-        update: (id, valueMap) =>
+        strict: true,
+        update: (rowId, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
             return yield* db
@@ -414,7 +472,14 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
               .set({ ...valueMap, updatedAt: now })
               .where(
                 and(
-                  eq(schema.companyAttributeValueTable.id, id),
+                  eq(schema.companyAttributeValueTable.id, rowId),
+                  // The row must be the named attribute's: the value was
+                  // validated against that definition, so a mismatched id
+                  // must not silently write another attribute's row.
+                  eq(
+                    schema.companyAttributeValueTable.attributeId,
+                    args.attributeId
+                  ),
                   eq(
                     schema.companyAttributeValueTable.companyId,
                     args.companyId
@@ -428,7 +493,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
               .returning()
               .pipe(Effect.map(([updated]) => updated));
           }),
-        create: (id, valueMap) =>
+        insert: (id, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
             return yield* db
@@ -442,6 +507,16 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
                 createdAt: now,
                 updatedAt: now,
               })
+              // The (company, attribute) pair is unique: a row that already
+              // exists for this pair — raced or pre-existing — is updated in
+              // place rather than surfacing a unique violation.
+              .onConflictDoUpdate({
+                target: [
+                  schema.companyAttributeValueTable.companyId,
+                  schema.companyAttributeValueTable.attributeId,
+                ],
+                set: { ...valueMap, updatedAt: now },
+              })
               .returning()
               .pipe(Effect.map(([created]) => created));
           }),
@@ -450,7 +525,8 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
 
     upsertCompanyAttributeValue: (args: TCompanyAttributeValueUpsert) =>
       upsertAttributeValue(args, {
-        update: (id, valueMap) =>
+        strict: false,
+        update: (rowId, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
             return yield* db
@@ -458,7 +534,13 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
               .set({ ...valueMap, updatedAt: now })
               .where(
                 and(
-                  eq(schema.companyAttributeValueTable.id, id),
+                  eq(schema.companyAttributeValueTable.id, rowId),
+                  // Same scope rule as the update path: the named attribute
+                  // must own the row the id points at.
+                  eq(
+                    schema.companyAttributeValueTable.attributeId,
+                    args.attributeId
+                  ),
                   eq(
                     schema.companyAttributeValueTable.companyId,
                     args.companyId
@@ -472,7 +554,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
               .returning()
               .pipe(Effect.map(([updated]) => updated));
           }),
-        create: (id, valueMap) =>
+        insert: (id, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
             return yield* db
@@ -485,6 +567,13 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
                 ...valueMap,
                 createdAt: now,
                 updatedAt: now,
+              })
+              .onConflictDoUpdate({
+                target: [
+                  schema.companyAttributeValueTable.companyId,
+                  schema.companyAttributeValueTable.attributeId,
+                ],
+                set: { ...valueMap, updatedAt: now },
               })
               .returning()
               .pipe(Effect.map(([created]) => created));

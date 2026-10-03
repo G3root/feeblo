@@ -1,11 +1,15 @@
-import { transaction } from "@feeblo/db";
-import { asLegid, type LegidOf, PostId, PostStatusId } from "@feeblo/id";
-import { htmlToExcerpt } from "@feeblo/utils/html";
+import { Database, transaction } from "@feeblo/db";
+import { PostId } from "@feeblo/id";
+import {
+  IntegrationEventRecorder,
+  IntegrationEventRecorderLive,
+} from "@feeblo/integration-core";
 import { markdownToHtmlCached } from "@feeblo/utils/markdown";
-import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
@@ -21,8 +25,10 @@ import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
 import { parsePersonAttributes } from "../contact/utils";
 import { EmailOutboxConfig } from "../email-outbox/config";
+import { EmailOutboxRepository } from "../email-outbox/repository";
+import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { Api } from "../http/api";
-import { recordPostIntegrationEvent } from "../integration/post-event-recording";
+import { ResolvePrincipalService } from "../identity/service";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import {
   maxTokenLifetimeFromMinutes,
@@ -33,13 +39,13 @@ import { PostStatusRepository } from "../post-status/repository";
 import {
   PostEmbeddingService,
   postEmbeddingInput,
-  schedulePostEmbeddingBestEffort,
 } from "../post/embedding-service";
 import { PostRepository } from "../post/repository";
 import {
   postLexicalSimilarity,
   SUGGESTION_MAX_DISTANCE,
 } from "../post/suggestions";
+import { makePostWrites, PostWriteInternals } from "../post/write";
 import * as RateLimit from "../rate-limit";
 import {
   InternalServerError,
@@ -47,6 +53,8 @@ import {
   UnauthorizedError,
   withRemapDbErrors,
 } from "../rpc-errors";
+import { S3UploadService } from "../services/s3";
+import { UserRepository } from "../user/repository";
 import {
   type TWidgetFeedbackMetadata,
   WidgetFeedbackMetadataValue,
@@ -84,270 +92,312 @@ export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
   });
 });
 
+/**
+ * The widget HTTP surface, composed once.
+ *
+ * The feedback write is the shared post write path (`post/write.ts`), built
+ * here at group construction so a widget submission lands in the same
+ * timeline, webhook, staff notification, submission email window, and search
+ * embedding as a dashboard or Public API create. The group provides the
+ * environment that path reads — the repositories it coordinates through
+ * `PostWriteInternals`, plus the pieces only this surface's handlers touch.
+ */
 export const WidgetApiLive = HttpApiBuilder.group(
   Api,
   "WidgetApiGroup",
   (handlers) =>
-    handlers
-      .handle("listUpdates", ({ payload }) =>
-        listWidgetUpdates(payload).pipe(
-          RateLimit.withPublicHttpRateLimit({
-            name: "WidgetListUpdates",
-            level: "read",
-          }),
-          Effect.provide(ChangelogRepository.layer),
-          withRemapDbErrors("Changelog", "select")
-        )
-      )
-      .handle("suggestPosts", ({ payload }) =>
-        Effect.gen(function* () {
-          const repository = yield* PostRepository;
-          const embeddings = yield* PostEmbeddingService;
-          const input = postEmbeddingInput(payload);
-          const queryEmbedding = yield* embeddings
-            .embed(input)
-            .pipe(
-              Effect.catchCause((cause) =>
-                Effect.logWarning(
-                  "Failed to generate widget suggestion embedding",
-                  cause
-                ).pipe(Effect.as(Option.none()))
-              )
-            );
-          const candidates = yield* repository.findSuggestionCandidates({
-            boardId: payload.boardId,
-            organizationId: payload.organizationId,
-            publicOnly: true,
-            limit: Option.isSome(queryEmbedding) ? 5 : 25,
-            ...(Option.isSome(queryEmbedding) && {
-              embedding: queryEmbedding.value.vector,
-              embeddingModel: queryEmbedding.value.model,
+    Effect.gen(function* () {
+      const db = yield* Database.Database;
+      // The shared post write path reads its collaborators from the running
+      // fiber's context, so the group keeps a handle on each and provides the
+      // same instances around the feedback handler. The layer build above
+      // supplies them; this is the request-time half of the same environment.
+      const crypto = yield* Crypto.Crypto;
+      const attributeDefinitionRepository =
+        yield* AttributeDefinitionRepository;
+      const boardRepository = yield* BoardRepository;
+      const companyRepository = yield* CompanyRepository;
+      const contactRepository = yield* ContactRepository;
+      const emailOutboxConfig = yield* EmailOutboxConfig;
+      const emailOutboxRepository = yield* EmailOutboxRepository;
+      const emailSubscriptions = yield* EmailSubscriptionRepository;
+      const integrationEventRecorder = yield* IntegrationEventRecorder;
+      const jwtSecretRepository = yield* JwtSecretRepository;
+      const organizationRepository = yield* OrganizationRepository;
+      const postRepository = yield* PostRepository;
+      const postStatusRepository = yield* PostStatusRepository;
+      const resolvePrincipal = yield* ResolvePrincipalService;
+      const s3 = yield* S3UploadService;
+      const userRepository = yield* UserRepository;
+      const writes = yield* makePostWrites;
+
+      /** The runtime context the feedback handler's writes read. */
+      const provideFeedbackEnvironment = <A, E, R>(
+        effect: Effect.Effect<A, E, R>
+      ) =>
+        effect.pipe(
+          Effect.provideService(Crypto.Crypto, crypto),
+          Effect.provideService(Database.Database, db),
+          Effect.provideService(
+            AttributeDefinitionRepository,
+            attributeDefinitionRepository
+          ),
+          Effect.provideService(BoardRepository, boardRepository),
+          Effect.provideService(CompanyRepository, companyRepository),
+          Effect.provideService(ContactRepository, contactRepository),
+          Effect.provideService(EmailOutboxConfig, emailOutboxConfig),
+          Effect.provideService(EmailOutboxRepository, emailOutboxRepository),
+          Effect.provideService(
+            EmailSubscriptionRepository,
+            emailSubscriptions
+          ),
+          Effect.provideService(
+            IntegrationEventRecorder,
+            integrationEventRecorder
+          ),
+          Effect.provideService(JwtSecretRepository, jwtSecretRepository),
+          Effect.provideService(OrganizationRepository, organizationRepository),
+          Effect.provideService(PostRepository, postRepository),
+          Effect.provideService(PostStatusRepository, postStatusRepository),
+          Effect.provideService(ResolvePrincipalService, resolvePrincipal),
+          Effect.provideService(S3UploadService, s3),
+          Effect.provideService(UserRepository, userRepository)
+        );
+
+      return handlers
+        .handle("listUpdates", ({ payload }) =>
+          listWidgetUpdates(payload).pipe(
+            RateLimit.withPublicHttpRateLimit({
+              name: "WidgetListUpdates",
+              level: "read",
             }),
-          });
-          if (Option.isSome(queryEmbedding)) {
-            const matches = candidates
-              .filter(
-                (candidate) =>
-                  candidate.distance !== null &&
-                  candidate.distance <= SUGGESTION_MAX_DISTANCE
-              )
-              .map(({ id, title, excerpt, slug }) => ({
+            Effect.provide(ChangelogRepository.layer),
+            withRemapDbErrors("Changelog", "select")
+          )
+        )
+        .handle("suggestPosts", ({ payload }) =>
+          Effect.gen(function* () {
+            const repository = yield* PostRepository;
+            const embeddings = yield* PostEmbeddingService;
+            const input = postEmbeddingInput(payload);
+            const queryEmbedding = yield* embeddings
+              .embed(input)
+              .pipe(
+                Effect.catchCause((cause) =>
+                  Effect.logWarning(
+                    "Failed to generate widget suggestion embedding",
+                    cause
+                  ).pipe(Effect.as(Option.none()))
+                )
+              );
+            const candidates = yield* repository.findSuggestionCandidates({
+              boardId: payload.boardId,
+              organizationId: payload.organizationId,
+              publicOnly: true,
+              limit: Option.isSome(queryEmbedding) ? 5 : 25,
+              ...(Option.isSome(queryEmbedding) && {
+                embedding: queryEmbedding.value.vector,
+                embeddingModel: queryEmbedding.value.model,
+              }),
+            });
+            if (Option.isSome(queryEmbedding)) {
+              const matches = candidates
+                .filter(
+                  (candidate) =>
+                    candidate.distance !== null &&
+                    candidate.distance <= SUGGESTION_MAX_DISTANCE
+                )
+                .map(({ id, title, excerpt, slug }) => ({
+                  id,
+                  title,
+                  excerpt,
+                  slug,
+                }));
+              if (matches.length > 0) {
+                return matches;
+              }
+            }
+
+            const lexicalCandidates = Option.isSome(queryEmbedding)
+              ? yield* repository.findSuggestionCandidates({
+                  boardId: payload.boardId,
+                  organizationId: payload.organizationId,
+                  publicOnly: true,
+                  limit: 25,
+                })
+              : candidates;
+
+            return lexicalCandidates
+              .map((post) => ({
+                post,
+                score: postLexicalSimilarity(input, post),
+              }))
+              .filter(({ score }) => score > 0)
+              .sort((left, right) => right.score - left.score)
+              .slice(0, 5)
+              .map(({ post: { id, title, excerpt, slug } }) => ({
                 id,
                 title,
                 excerpt,
                 slug,
               }));
-            if (matches.length > 0) {
-              return matches;
-            }
-          }
-
-          const lexicalCandidates = Option.isSome(queryEmbedding)
-            ? yield* repository.findSuggestionCandidates({
-                boardId: payload.boardId,
-                organizationId: payload.organizationId,
-                publicOnly: true,
-                limit: 25,
-              })
-            : candidates;
-
-          return lexicalCandidates
-            .map((post) => ({
-              post,
-              score: postLexicalSimilarity(input, post),
-            }))
-            .filter(({ score }) => score > 0)
-            .sort((left, right) => right.score - left.score)
-            .slice(0, 5)
-            .map(({ post: { id, title, excerpt, slug } }) => ({
-              id,
-              title,
-              excerpt,
-              slug,
-            }));
-        }).pipe(
-          Effect.provide([PostEmbeddingService.layer, PostRepository.layer]),
-          Effect.mapError(
-            () =>
-              new InternalServerError({
-                message: "Failed to find similar posts",
-              })
-          ),
-          withRemapDbErrors("Post", "select"),
-          RateLimit.withPublicHttpRateLimit({
-            name: "WidgetSuggestPosts",
-            level: "expensive",
-          })
+          }).pipe(
+            Effect.provide([PostEmbeddingService.layer, PostRepository.layer]),
+            Effect.mapError(
+              () =>
+                new InternalServerError({
+                  message: "Failed to find similar posts",
+                })
+            ),
+            withRemapDbErrors("Post", "select"),
+            RateLimit.withPublicHttpRateLimit({
+              name: "WidgetSuggestPosts",
+              level: "expensive",
+            })
+          )
         )
-      )
-      .handle("listBoards", ({ payload }) =>
-        Effect.gen(function* () {
-          const { organizationId } = payload;
-          const repository = yield* BoardRepository;
-          const boards = yield* repository.findMany({
-            organizationId,
-            visibility: "PUBLIC",
-          });
+        .handle("listBoards", ({ payload }) =>
+          Effect.gen(function* () {
+            const repository = yield* BoardRepository;
+            const boards = yield* repository.findMany({
+              organizationId: payload.organizationId,
+              visibility: "PUBLIC",
+            });
 
-          return boards.map(({ visibility: _visibility, ...board }) => board);
-        }).pipe(
-          RateLimit.withPublicHttpRateLimit({
-            name: "WidgetListBoards",
-            level: "read",
-          }),
-          Effect.provide(BoardRepository.layer),
-          withRemapDbErrors("Boards", "select")
+            return boards.map(({ visibility: _visibility, ...board }) => board);
+          }).pipe(
+            RateLimit.withPublicHttpRateLimit({
+              name: "WidgetListBoards",
+              level: "read",
+            }),
+            Effect.provide(BoardRepository.layer),
+            withRemapDbErrors("Boards", "select")
+          )
         )
-      )
-      .handle("createFeedback", ({ payload }) => {
-        const { boardId, organizationId, title, content, metadata, token } =
-          payload;
+        .handle("createFeedback", ({ payload }) => {
+          const { boardId, organizationId, title, content, metadata, token } =
+            payload;
 
-        return Effect.gen(function* () {
-          const boardRepository = yield* BoardRepository;
-          const postStatusRepository = yield* PostStatusRepository;
-          const jwtSecretRepository = yield* JwtSecretRepository;
-          const attributeDefinitionRepository =
-            yield* AttributeDefinitionRepository;
-          const postRepository = yield* PostRepository;
+          return Effect.gen(function* () {
+            const boardRepository = yield* BoardRepository;
+            const postStatusRepository = yield* PostStatusRepository;
+            const jwtSecretRepository = yield* JwtSecretRepository;
+            const attributeDefinitionRepository =
+              yield* AttributeDefinitionRepository;
 
-          // Defense-in-depth re-validation of the public request metadata
-          // before it is stored / delivered downstream (webhooks, email,
-          // embeddings). The endpoint schema already bounds this at the wire,
-          // but re-applying the same limits here guarantees the persisted
-          // JSONB and every derived payload stay bounded even if the endpoint
-          // schema is ever widened.
-          const validatedMetadata: TWidgetFeedbackMetadata | undefined =
-            metadata === undefined
-              ? undefined
-              : yield* Schema.decodeEffect(WidgetFeedbackMetadataValue)(
-                  metadata
-                ).pipe(
-                  Effect.mapError(
-                    () =>
-                      new DataValidationError({
-                        message: "Invalid feedback metadata",
-                      })
-                  )
-                );
-
-          const recordWidgetPostCreatedEvent = ({
-            postSlug,
-            statusId,
-          }: {
-            postSlug: string;
-            statusId: LegidOf<"PostStatusId">;
-          }) =>
-            recordPostIntegrationEvent({
-              actor: { kind: "end_user" },
-              boardId,
-              description: sanitizedContent,
-              eventType: "feedback.post.created",
-              organizationId,
-              postId: id,
-              ...(validatedMetadata === undefined
+            // Defense-in-depth re-validation of the public request metadata
+            // before it is stored / delivered downstream (webhooks, email,
+            // embeddings). The endpoint schema already bounds this at the
+            // wire, but re-applying the same limits here guarantees the
+            // persisted JSONB and every derived payload stay bounded even if
+            // the endpoint schema is ever widened.
+            const validatedMetadata: TWidgetFeedbackMetadata | undefined =
+              metadata === undefined
                 ? undefined
-                : { metadata: validatedMetadata }),
-              postSlug,
-              statusId,
-              title,
-            }).pipe(
-              Effect.mapError(
-                () =>
-                  new InternalServerError({
-                    message: "Could not record widget integration event.",
-                  })
-              )
-            );
+                : yield* Schema.decodeEffect(WidgetFeedbackMetadataValue)(
+                    metadata
+                  ).pipe(
+                    Effect.mapError(
+                      () =>
+                        new DataValidationError({
+                          message: "Invalid feedback metadata",
+                        })
+                    )
+                  );
 
-          const board = yield* boardRepository.getById({
-            id: boardId,
-            organizationId,
-          });
-
-          if (Option.isNone(board)) {
-            return yield* new NotFoundError({ message: "Board not found" });
-          }
-
-          if (board.value.visibility !== "PUBLIC") {
-            return yield* new DataValidationError({
-              message: "Board is not public",
-            });
-          }
-
-          const statuses = yield* postStatusRepository.findMany({
-            organizationId,
-          });
-          const defaultStatus = statuses[0];
-
-          if (!defaultStatus) {
-            return yield* new InternalServerError({
-              message: "Organization has no post statuses configured",
-            });
-          }
-
-          const { sanitizedMarkdown: sanitizedContent, sanitizedHtml } =
-            sanitizeMarkdown(content);
-          const id = yield* PostId.generate;
-          const now = yield* DateTime.nowAsDate;
-          const excerpt = htmlToExcerpt(sanitizedHtml);
-
-          let contactId: string | undefined;
-          let slug: string | undefined;
-
-          if (token) {
-            const secrets = yield* jwtSecretRepository.getSecretsForOrg({
+            const board = yield* boardRepository.getById({
+              id: boardId,
               organizationId,
             });
 
-            if (secrets.length === 0) {
-              return yield* new UnauthorizedError({
-                message: "Organization has no JWT secret configured",
+            if (Option.isNone(board)) {
+              return yield* new NotFoundError({ message: "Board not found" });
+            }
+
+            if (board.value.visibility !== "PUBLIC") {
+              return yield* new DataValidationError({
+                message: "Board is not public",
               });
             }
 
-            // Per-workspace lifetime cap tightens (never loosens) the 24h
-            // default; invalid stored values fall back to the default.
-            const organizationRepository = yield* OrganizationRepository;
-            const maxTokenLifetimeMinutes =
-              yield* organizationRepository.findJwtMaxTokenLifetimeMinutes({
-                organizationId,
-              });
-            const maxTokenLifetime = maxTokenLifetimeFromMinutes(
-              maxTokenLifetimeMinutes
-            );
-
-            const contactDefs =
-              // SAFETY: the repository contract returns contact attribute definitions
-              // in the canonical domain shape; the cast bridges the DB-row encoding.
-              (yield* attributeDefinitionRepository.findContactAttributeDefinitions(
-                organizationId
-              )) as readonly TContactAttributeDefinition[];
-            const companyDefs =
-              // SAFETY: the repository contract returns company attribute definitions
-              // in the canonical domain shape; the cast bridges the DB-row encoding.
-              (yield* attributeDefinitionRepository.findCompanyAttributeDefinitions(
-                organizationId
-              )) as readonly TCompanyAttributeDefinition[];
-
-            const jwtPayload = yield* verifyJwt(
-              token,
-              secrets.map((s) => s.secret),
+            const statuses = yield* postStatusRepository.findMany({
               organizationId,
-              { maxTokenLifetime }
-            );
+            });
+            const defaultStatus = statuses[0];
 
-            const parsedContact = yield* parsePersonAttributes(
-              jwtPayload,
-              contactDefs,
-              companyDefs
-            );
+            if (!defaultStatus) {
+              return yield* new InternalServerError({
+                message: "Organization has no post statuses configured",
+              });
+            }
 
-            yield* transaction(
-              Effect.gen(function* () {
-                contactId = yield* upsertContactFromParsed(
-                  organizationId,
-                  parsedContact
+            // The write path sanitizes and owns the transaction; the
+            // attribution subject is resolved inside it from the customer
+            // record this upsert files. The upsert joins its own transaction
+            // first: the contact is a durable customer record, and a failed
+            // feedback write leaves it in place rather than rolling back a
+            // customer the workspace knows about.
+            const contactId = token
+              ? yield* transaction(
+                  Effect.gen(function* () {
+                    const secrets = yield* jwtSecretRepository.getSecretsForOrg(
+                      {
+                        organizationId,
+                      }
+                    );
+
+                    if (secrets.length === 0) {
+                      return yield* new UnauthorizedError({
+                        message: "Organization has no JWT secret configured",
+                      });
+                    }
+
+                    // Per-workspace lifetime cap tightens (never loosens) the
+                    // 24h default; invalid stored values fall back to the
+                    // default.
+                    const organizationRepository =
+                      yield* OrganizationRepository;
+                    const maxTokenLifetimeMinutes =
+                      yield* organizationRepository.findJwtMaxTokenLifetimeMinutes(
+                        {
+                          organizationId,
+                        }
+                      );
+                    const maxTokenLifetime = maxTokenLifetimeFromMinutes(
+                      maxTokenLifetimeMinutes
+                    );
+
+                    const contactDefs =
+                      // SAFETY: the repository contract returns contact attribute definitions
+                      // in the canonical domain shape; the cast bridges the DB-row encoding.
+                      (yield* attributeDefinitionRepository.findContactAttributeDefinitions(
+                        organizationId
+                      )) as readonly TContactAttributeDefinition[];
+                    const companyDefs =
+                      // SAFETY: the repository contract returns company attribute definitions
+                      // in the canonical domain shape; the cast bridges the DB-row encoding.
+                      (yield* attributeDefinitionRepository.findCompanyAttributeDefinitions(
+                        organizationId
+                      )) as readonly TCompanyAttributeDefinition[];
+
+                    const jwtPayload = yield* verifyJwt(
+                      token,
+                      secrets.map((s) => s.secret),
+                      organizationId,
+                      { maxTokenLifetime }
+                    );
+
+                    const parsedContact = yield* parsePersonAttributes(
+                      jwtPayload,
+                      contactDefs,
+                      companyDefs
+                    );
+
+                    return yield* upsertContactFromParsed(
+                      organizationId,
+                      parsedContact
+                    );
+                  })
                 ).pipe(
                   Effect.mapError(
                     () =>
@@ -355,114 +405,84 @@ export const WidgetApiLive = HttpApiBuilder.group(
                         message: "Failed to create feedback contact",
                       })
                   )
-                );
-
-                slug = yield* postRepository.create({
-                  id,
-                  boardId,
-                  organizationId,
-                  title,
-                  content: sanitizedContent,
-                  statusId: defaultStatus.id,
-                  excerpt,
-                  contactId: contactId ?? null,
-                  metadata: validatedMetadata ?? {},
-                  source: "WIDGET",
-                });
-                yield* recordWidgetPostCreatedEvent({
-                  postSlug: slug,
-                  statusId: asLegid(PostStatusId)(defaultStatus.id),
-                });
-              })
-            );
-          } else {
-            slug = yield* transaction(
-              postRepository
-                .create({
-                  id,
-                  boardId,
-                  organizationId,
-                  title,
-                  content: sanitizedContent,
-                  statusId: defaultStatus.id,
-                  excerpt,
-                  contactId: null,
-                  metadata: validatedMetadata ?? {},
-                  source: "WIDGET",
-                })
-                .pipe(
-                  Effect.tap((postSlug) =>
-                    recordWidgetPostCreatedEvent({
-                      postSlug,
-                      statusId: asLegid(PostStatusId)(defaultStatus.id),
-                    })
-                  )
                 )
+              : undefined;
+
+            const id = yield* PostId.generate;
+            const now = yield* DateTime.nowAsDate;
+            const slug = yield* writes.create(
+              {
+                assetIds: [],
+                // An SSO-attributed submission names its customer; an
+                // anonymous one has nobody to attribute to.
+                ...(contactId !== undefined && { author: { contactId } }),
+                boardId,
+                content,
+                id,
+                metadata: validatedMetadata ?? {},
+                organizationId,
+                source: "WIDGET",
+                statusId: defaultStatus.id,
+                title,
+              },
+              { kind: "api_key" }
             );
-          }
 
-          yield* schedulePostEmbeddingBestEffort({
-            content: sanitizedContent,
-            postId: id,
-            organizationId,
-            title,
-          });
-
-          // The post repository always assigns a slug (an empty title yields
-          // an empty slug that is still persisted); only the "no create ran"
-          // case leaves the variable unassigned.
-          if (slug === undefined) {
-            return yield* new InternalServerError({
-              message: "Failed to create feedback",
-            });
-          }
-
-          return {
-            id,
-            slug,
-            title,
-            boardId,
-            organizationId,
-            createdAt: now,
-          };
-        }).pipe(
-          RateLimit.withPublicHttpRateLimit({
-            name: "WidgetCreateFeedback",
-            level: "write",
-          }),
-          Effect.provide([
-            AttributeDefinitionRepository.layer,
-            BoardRepository.layer,
-            CompanyRepository.layer,
-            ContactRepository.layer,
-            JwtSecretRepository.layer,
-            OrganizationRepository.layer,
-            EmailOutboxConfig.layer,
-            PostRepository.layer,
-            PostStatusRepository.layer,
-          ]),
-          Effect.catchTags({
-            ConfigError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Missing APP_URL for widget integration events",
-                })
-              ),
-            PostAlreadyExistsError: () =>
-              Effect.logWarning(
-                "Exhausted post slug candidates while creating widget feedback; post was not stored",
-                { organizationId, boardId }
-              ).pipe(
-                Effect.andThen(
-                  Effect.fail(
-                    new InternalServerError({
-                      message: "Failed to create feedback",
-                    })
+            return {
+              id,
+              slug,
+              title,
+              boardId,
+              organizationId,
+              createdAt: now,
+            };
+          }).pipe(
+            RateLimit.withPublicHttpRateLimit({
+              name: "WidgetCreateFeedback",
+              level: "write",
+            }),
+            // `HttpApiBuilder` computes a handler's requirements from its own
+            // effect, so the environment the handler's reads and the write
+            // path share is provided here.
+            provideFeedbackEnvironment,
+            Effect.catchTags({
+              ConfigError: () =>
+                Effect.fail(
+                  new InternalServerError({
+                    message: "Missing APP_URL for widget integration events",
+                  })
+                ),
+              PostAlreadyExistsError: () =>
+                Effect.logWarning(
+                  "Exhausted post slug candidates while creating widget feedback; post was not stored",
+                  { organizationId, boardId }
+                ).pipe(
+                  Effect.andThen(
+                    Effect.fail(
+                      new InternalServerError({
+                        message: "Failed to create feedback",
+                      })
+                    )
                   )
-                )
-              ),
-          }),
-          withRemapDbErrors("Feedback", "create")
-        );
-      })
+                ),
+            }),
+            withRemapDbErrors("Feedback", "create")
+          );
+        });
+    })
+).pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      AttributeDefinitionRepository.layer,
+      BoardRepository.layer,
+      CompanyRepository.layer,
+      ContactRepository.layer,
+      EmailOutboxConfig.layer,
+      IntegrationEventRecorderLive,
+      JwtSecretRepository.layer,
+      OrganizationRepository.layer,
+      PostStatusRepository.layer,
+      PostWriteInternals
+    )
+  )
 );

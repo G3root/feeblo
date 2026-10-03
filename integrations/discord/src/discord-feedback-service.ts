@@ -1,26 +1,21 @@
 import { currentDb, Database, schema } from "@feeblo/db";
 import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
+import { EmailOutboxRepository } from "@feeblo/domain/email-outbox/repository";
+import { EmailSubscriptionRepository } from "@feeblo/domain/email-subscription/repository";
+import { ResolvePrincipalService } from "@feeblo/domain/identity/service";
 import { DiscordInboundFailure } from "@feeblo/domain/integration/discord/errors";
-import { recordPostIntegrationEvent } from "@feeblo/domain/integration/post-event-recording";
 import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
-import { PostSubscriptionRepository } from "@feeblo/domain/post-subscription/repository";
-import {
-  PostEmbeddingService,
-  schedulePostEmbeddingBestEffort,
-} from "@feeblo/domain/post/embedding-service";
+import { InvalidPostEmbeddingConfigurationError } from "@feeblo/domain/post/embedding-service";
 import { PostRepository } from "@feeblo/domain/post/repository";
-import {
-  asLegid,
-  BoardId,
-  PostId,
-  PostStatusId,
-  WorkspaceId,
-} from "@feeblo/id";
+import { makePostWrites, PostWriteInternals } from "@feeblo/domain/post/write";
+import { S3UploadService } from "@feeblo/domain/services/s3";
+import { UserRepository } from "@feeblo/domain/user/repository";
+import { PostId } from "@feeblo/id";
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
-import { htmlToExcerpt } from "@feeblo/utils/html";
-import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { and, eq } from "drizzle-orm";
+import * as Config from "effect/Config";
 import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -46,9 +41,11 @@ export interface DiscordPostInput {
 }
 
 /**
- * Creates a feedback post from an inbound Discord submission: sanitizes the
- * content, records the integration event, subscribes the author, and schedules
- * best-effort embedding.
+ * Creates a feedback post from an inbound Discord submission through the
+ * shared post write path: the sanitizer, the timeline entry, the integration
+ * event, the staff notification, the submission email window, the creator's
+ * watch-list subscription, and the search embedding are one work whichever
+ * credential asked.
  */
 export interface DiscordFeedbackServiceContract {
   readonly createPost: (
@@ -63,23 +60,53 @@ export class DiscordFeedbackService extends Context.Service<
 
 export const DiscordFeedbackServiceLive: Layer.Layer<
   DiscordFeedbackService,
-  never,
+  Config.ConfigError | InvalidPostEmbeddingConfigurationError,
+  | Crypto.Crypto
   | Database.Database
   | EmailOutboxConfig
-  | IntegrationEventRecorder
-  | PostRepository
   | PostStatusRepository
-  | PostSubscriptionRepository
+  | S3UploadService
 > = Layer.effect(
   DiscordFeedbackService,
   Effect.gen(function* () {
     const db = yield* currentDb;
-    const postRepository = yield* PostRepository;
     const postStatusRepository = yield* PostStatusRepository;
-    const postSubscriptionRepository = yield* PostSubscriptionRepository;
     const emailOutboxConfig = yield* EmailOutboxConfig;
-    const eventRecorder = yield* IntegrationEventRecorder;
-    const embeddingService = yield* Effect.serviceOption(PostEmbeddingService);
+    // The shared post write path reads several services from the running
+    // fiber's context (the sanitizer's asset promotion, the integration event
+    // recorder, the on-behalf identity resolver). The composition provides
+    // the repositories through `PostWriteInternals`; this service closes over
+    // the runtime-context instances and provides them around the write, the
+    // way the Public API's own post repository does, so `createPost` carries
+    // no requirements of its own.
+    const crypto = yield* Crypto.Crypto;
+    const emailOutboxRepository = yield* EmailOutboxRepository;
+    const emailSubscriptions = yield* EmailSubscriptionRepository;
+    const integrationEventRecorder = yield* IntegrationEventRecorder;
+    const postRepository = yield* PostRepository;
+    const resolvePrincipal = yield* ResolvePrincipalService;
+    const s3 = yield* S3UploadService;
+    const userRepository = yield* UserRepository;
+    const writes = yield* makePostWrites;
+
+    const providePostWriteEnvironment = <A, E, R>(
+      effect: Effect.Effect<A, E, R>
+    ) =>
+      effect.pipe(
+        Effect.provideService(Crypto.Crypto, crypto),
+        Effect.provideService(Database.Database, db),
+        Effect.provideService(EmailOutboxConfig, emailOutboxConfig),
+        Effect.provideService(EmailOutboxRepository, emailOutboxRepository),
+        Effect.provideService(EmailSubscriptionRepository, emailSubscriptions),
+        Effect.provideService(
+          IntegrationEventRecorder,
+          integrationEventRecorder
+        ),
+        Effect.provideService(PostRepository, postRepository),
+        Effect.provideService(ResolvePrincipalService, resolvePrincipal),
+        Effect.provideService(S3UploadService, s3),
+        Effect.provideService(UserRepository, userRepository)
+      );
 
     const createPost = ({
       boardId,
@@ -99,9 +126,6 @@ export const DiscordFeedbackServiceLive: Layer.Layer<
             message: "Organization has no default post status",
           });
         }
-        const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(content);
-        const id = yield* PostId.generate;
-        const excerpt = htmlToExcerpt(sanitizedHtml);
         const [board] = yield* db
           .select({
             name: schema.boardTable.name,
@@ -120,68 +144,34 @@ export const DiscordFeedbackServiceLive: Layer.Layer<
             message: "Discord post board was not found",
           });
         }
-        const boardSlug = board.slug;
-        const slug = yield* db.transaction(() =>
-          Effect.gen(function* () {
-            const createdSlug = yield* postRepository.create({
+        // The write path sanitizes, owns the transaction, records the timeline
+        // entry and integration event, notifies staff, opens the submission
+        // email window, and schedules the embedding. The inbound author has no
+        // contact row to attribute through, so the write's creator option
+        // watch-lists them instead; a Discord user's feeblo inbox is
+        // synthetic, so no email subscription is requested from here.
+        const id = yield* PostId.generate;
+        const slug = yield* providePostWriteEnvironment(
+          writes.create(
+            {
+              assetIds: [],
               boardId,
-              content: sanitizedMarkdown,
-              creatorId: userId,
-              creatorMemberId: null,
-              excerpt,
+              content,
               id,
               metadata: { ...metadata },
               organizationId,
               source: "DISCORD",
               statusId: defaultStatus.id,
               title,
-            });
-            yield* recordPostIntegrationEvent({
-              actor: { kind: "end_user" },
-              boardId: asLegid(BoardId)(boardId),
-              description: sanitizedMarkdown,
-              eventType: "feedback.post.created",
-              organizationId: asLegid(WorkspaceId)(organizationId),
-              postId: id,
-              ...(Object.keys(metadata).length === 0
-                ? undefined
-                : { metadata }),
-              postSlug: createdSlug,
-              statusId: asLegid(PostStatusId)(defaultStatus.id),
-              title,
-            }).pipe(
-              Effect.provideService(Database.Database, db),
-              Effect.provideService(IntegrationEventRecorder, eventRecorder),
-              Effect.provideService(EmailOutboxConfig, emailOutboxConfig),
-              Effect.provideService(PostRepository, postRepository),
-              Effect.mapError(
-                () =>
-                  new DiscordInboundFailure({
-                    message: "Could not record post integration event",
-                  })
-              )
-            );
-            yield* postSubscriptionRepository.subscribe({
-              organizationId,
-              postId: id,
-              userId,
-            });
-            return createdSlug;
-          })
+            },
+            { kind: "api_key" },
+            { subscribeCreatorUserId: userId }
+          )
         );
-        yield* schedulePostEmbeddingBestEffort({
-          content: sanitizedMarkdown,
-          postId: id,
-          organizationId,
-          title,
-          ...(embeddingService._tag === "Some" && {
-            embeddingService: embeddingService.value,
-          }),
-        }).pipe(Effect.provideService(Database.Database, db));
         return {
           boardId,
           boardName: board.name,
-          boardSlug,
+          boardSlug: board.slug,
           id,
           metadata,
           slug,
@@ -200,4 +190,7 @@ export const DiscordFeedbackServiceLive: Layer.Layer<
 
     return DiscordFeedbackService.of({ createPost });
   })
+).pipe(
+  // Construction-time dependencies of the write environment above.
+  Layer.provide(PostWriteInternals)
 );
