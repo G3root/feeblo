@@ -18,6 +18,7 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { createContext, use, useCallback, useMemo } from "react";
 
+import { boardPaths } from "../../lib/board-links";
 import { m } from "../../paraglide/messages.js";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
@@ -89,19 +90,19 @@ function PublicRoadmapProvider({
   const primarySlug = allRoadmaps[0]?.slug;
 
   const openPost = useCallback(
-    (postSlug: string) => navigate({ to: `/p/${postSlug}` }),
+    (postSlug: string) => navigate({ to: boardPaths.post(postSlug) }),
     [navigate]
   );
 
   const switchRoadmap = useCallback(
     (nextSlug: string) => {
       if (nextSlug === primarySlug) {
-        navigate({ to: "/roadmap", replace: true });
+        navigate({ to: boardPaths.roadmap, replace: true });
       } else {
         navigate({
           params: { slug: nextSlug },
           replace: true,
-          to: "/roadmap/$slug",
+          to: "/s/roadmap/$slug",
         });
       }
     },

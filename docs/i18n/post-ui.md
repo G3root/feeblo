@@ -10,8 +10,8 @@
 
 The package never reads cookies, URLs, or storage. Each host injects its runtime through `initPostUiI18n({ getLocale, setLocale })` (`packages/post-ui/src/i18n.ts`), exported as `@feeblo/post-ui/i18n`:
 
-- Dashboard: `apps/web/src/dashboard/main.tsx`
-- Public board island: `apps/web/src/public-board/public-board-island.tsx`
+- Dashboard: `apps/web/src/routes/_dashboard.tsx`
+- Public board: `apps/web/src/routes/s/route.tsx` (the board's layout route, which server-renders)
 
 Both use `apps/web`'s cookie strategy (`["cookie","baseLocale"]`) as the single source of truth. The same wrapper also initializes `@feeblo/public-feature-board`; see `public-feature-board.md`.
 

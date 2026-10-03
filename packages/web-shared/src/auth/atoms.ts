@@ -1,4 +1,5 @@
 import type { AuthClientSession } from "@feeblo/auth/client";
+import { hasWindow } from "@feeblo/utils/runtime-kind";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
@@ -92,8 +93,19 @@ export const meAtom = Atom.make(
  */
 export const authAtomRegistry = AtomRegistry.make();
 
-/** Read the confirmed session currently held by the atom without fetching. */
+/**
+ * Read the confirmed session currently held by the atom without fetching.
+ *
+ * Server renders have no session: the atom's read path resolves the display
+ * hint from `window`, and the authoritative session is fetched client-side, so
+ * "not signed in" is the honest answer there (and the only one that keeps a
+ * shared document cacheable).
+ */
 export const getCachedAuthSession = (): AuthClientSession | null => {
+  if (!hasWindow()) {
+    return null;
+  }
+
   const result = authAtomRegistry.get(meAtom);
   return AsyncResult.isSuccess(result) ? result.value : null;
 };

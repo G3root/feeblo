@@ -5,8 +5,8 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { isLiveQueryPending } from "@feeblo/web-shared/collections";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { createLazyRoute, useParams } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { BoardListCard } from "../components/feedback/board-list-card";
@@ -53,25 +53,16 @@ function ListHeader({ count, title }: { count?: number; title: string }) {
   );
 }
 
-export const Route = createLazyRoute("/b/$boardSlug")({
-  component: BoardPage,
-});
-
-export function BoardPage() {
+export function BoardPage({ boardSlug }: { readonly boardSlug: string }) {
   const site = useSite();
   const organizationId = site.organizationId;
-  const { boardSlug } = useParams({ from: "/b/$boardSlug" });
   const {
     publicBoardCollection,
     publicPostCollection,
     publicPostStatusCollection,
   } = usePublicCollections();
 
-  const {
-    data: board,
-    isError: boardError,
-    isLoading: boardLoading,
-  } = useLiveQuery({
+  const boardQuery = useLiveQuery({
     query: (q) => {
       if (!(site.organizationId && boardSlug)) {
         return undefined;
@@ -90,11 +81,12 @@ export function BoardPage() {
     },
   });
 
-  const {
-    data: posts = [],
-    isError: postsError,
-    isLoading: postsLoading,
-  } = useLiveQuery({
+  // Resolved before the dependent query below: its callback runs during the
+  // hook call, so `board` has to be initialized by then.
+  const board = boardQuery.data;
+  const boardError = boardQuery.isError;
+
+  const postsQuery = useLiveQuery({
     query: (q) => {
       if (!board?.id) {
         return undefined;
@@ -125,6 +117,14 @@ export function BoardPage() {
         }));
     },
   });
+
+  const posts = postsQuery.data ?? [];
+  const postsError = postsQuery.isError;
+  // Hydration lands results before the first client render, so a query with a
+  // result (rows or an empty set) is never "loading" for rendering (see
+  // `isLiveQueryPending`).
+  const boardLoading = isLiveQueryPending(boardQuery);
+  const postsLoading = isLiveQueryPending(postsQuery);
 
   if (boardLoading || (board && postsLoading)) {
     return (

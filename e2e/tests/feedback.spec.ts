@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { expect, type Browser, type Page, test } from "@playwright/test";
 
 import { createWorkspace, signUpProgrammatically } from "../helpers/auth";
+import { waitForHydration } from "../helpers/hydration";
 import { assertNoPageErrors, trackPageErrors } from "../helpers/page-errors";
 import { createPost, fillEditor, openPost } from "../helpers/posts";
 import { waitForRpc } from "../helpers/rpc";
@@ -335,6 +336,7 @@ test.describe("feedback workflow", () => {
     // The archived source 301s to the survivor instead of 404ing.
     const boardUrl = publicBoardUrl(workspace.workspaceName);
     await page.goto(`${boardUrl}/p/${sourceSlug}`);
+    await waitForHydration(page);
     await expect(page).toHaveURL(`${boardUrl}/p/${targetSlug}`);
   });
 

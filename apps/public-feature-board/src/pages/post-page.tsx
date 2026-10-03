@@ -22,12 +22,9 @@ import {
 } from "@feeblo/ui/empty";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { isString } from "@feeblo/utils/runtime-kind";
+import { isLiveQueryPending } from "@feeblo/web-shared/collections";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import {
-  createLazyRoute,
-  useNavigate,
-  useParams,
-} from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import * as Result from "effect/unstable/reactivity/AsyncResult";
 import { type ReactNode, useEffect, useMemo } from "react";
 
@@ -35,7 +32,7 @@ import { BoardNavLink } from "../components/feedback/board-list-card";
 import { PostPageActions } from "../components/feedback/post-page-actions";
 import { PostVoterDialog } from "../components/feedback/post-voter-dialog";
 // import { useUpvote } from "../hooks/use-upvote";
-import { publicPostUpvoteCollection } from "../lib/collections";
+import { boardPaths } from "../lib/board-links";
 import { mergedPostTargetAtom } from "../lib/merged-post-atoms";
 import { formatPostStatus } from "../lib/utils";
 import { m } from "../paraglide/messages.js";
@@ -91,14 +88,9 @@ function formatPublishedDate(value: Date | string) {
   return getPublishedDateFormatter().format(date);
 }
 
-export const Route = createLazyRoute("/p/$slug")({
-  component: PostPage,
-});
-
-export function PostPage() {
+export function PostPage({ slug }: { readonly slug: string }) {
   const site = useSite();
   const organizationId = site.organizationId;
-  const { slug } = useParams({ from: "/p/$slug" });
   const {
     publicBoardCollection,
     publicPostDetailCollection,
@@ -112,11 +104,7 @@ export function PostPage() {
   // A missing or merged-away slug resolves to an empty result (the
   // collection translates `PostNotFoundError`), which falls through to the
   // merge resolver below.
-  const {
-    data: post,
-    isError: postError,
-    isLoading: postLoading,
-  } = useLiveQuery({
+  const postQuery = useLiveQuery({
     query: (q) => {
       if (!site.organizationId) {
         return undefined;
@@ -130,6 +118,9 @@ export function PostPage() {
         .findOne();
     },
   });
+
+  const post = postQuery.data;
+  const postError = postQuery.isError;
 
   // Board and status stay small org-scoped collections; look them up by the
   // detail row's ids instead of joining the full post list.
@@ -182,7 +173,9 @@ export function PostPage() {
         })),
   });
 
-  if (postLoading) {
+  // Hydration lands the detail row before the first client render (see
+  // `isLiveQueryPending`).
+  if (isLiveQueryPending(postQuery)) {
     return <RootLayout>{m.good_extra_giraffe()}</RootLayout>;
   }
 
@@ -200,7 +193,7 @@ export function PostPage() {
   }
 
   if (post && board) {
-    if (postTagsQuery.isLoading) {
+    if (isLiveQueryPending(postTagsQuery)) {
       return <RootLayout>{m.good_extra_giraffe()}</RootLayout>;
     }
     if (postTagsQuery.isError) {
@@ -257,6 +250,7 @@ export function PostPage() {
  */
 function ScopedPostUpvoteCollection({ children }: { children: ReactNode }) {
   const value = usePostCollections();
+  const { publicPostUpvoteCollection } = usePublicCollections();
   const collections = useMemo(
     () => ({
       ...value.collections,
@@ -316,7 +310,7 @@ function MergedPostResolver({
       void navigate({
         params: { slug: targetSlug },
         replace: true,
-        to: "/p/$slug",
+        to: "/s/p/$slug",
       });
     }
   }, [navigate, targetSlug]);
@@ -477,7 +471,7 @@ function PostMetaSidebarBoard() {
   return (
     <PostMetaSidebarSection title={m.full_new_vulture()}>
       <BoardNavLink
-        href={`/b/${board.slug ?? ""}`}
+        href={boardPaths.board(board.slug ?? "")}
         label={board.name}
         showActiveIndicator
       />

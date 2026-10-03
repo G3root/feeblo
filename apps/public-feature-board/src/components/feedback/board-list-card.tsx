@@ -2,6 +2,7 @@ import { cn } from "@feeblo/ui/utils";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Link, useLocation } from "@tanstack/react-router";
 
+import { boardPaths } from "../../lib/board-links";
 import { m } from "../../paraglide/messages.js";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
@@ -23,10 +24,10 @@ export function BoardListCard() {
         {m.happy_upper_firefox()}
       </h3>
       <nav className="flex flex-col gap-0.5">
-        <BoardNavLink href="/" label={m.day_key_tuna()} />
+        <BoardNavLink href={boardPaths.home} label={m.day_key_tuna()} />
         {data?.map((board) => (
           <BoardNavLink
-            href={`/b/${board.slug}`}
+            href={boardPaths.board(board.slug)}
             key={board.id}
             label={board.name}
           />

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from "./routes/__root"
 import { Route as DashboardRouteImport } from "./routes/_dashboard"
 import { Route as RobotsDottxtRouteImport } from "./routes/robots[.]txt"
+import { Route as SRouteRouteImport } from "./routes/s/route"
 import { Route as DashboardSplatRouteImport } from "./routes/_dashboard/$"
 import { Route as DashboardOrganizationIdRouteImport } from "./routes/_dashboard/$organizationId"
 import { Route as DashboardEmailVerifyRouteImport } from "./routes/_dashboard/email-verify"
@@ -20,12 +21,19 @@ import { Route as DashboardResetPasswordRouteImport } from "./routes/_dashboard/
 import { Route as DashboardSignInRouteImport } from "./routes/_dashboard/sign-in"
 import { Route as DashboardSignUpRouteImport } from "./routes/_dashboard/sign-up"
 import { Route as FeedbackWidgetOrganizationIdRouteImport } from "./routes/feedback-widget/$organizationId"
+import { Route as SIndexRouteImport } from "./routes/s/index"
 import { Route as SSplatRouteImport } from "./routes/s/$"
 import { Route as SRobotsDottxtRouteImport } from "./routes/s/robots[.]txt"
 import { Route as SSitemapDotxmlRouteImport } from "./routes/s/sitemap[.]xml"
 import { Route as DashboardOrganizationIdDashboardLayoutRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout"
 import { Route as DashboardOrganizationIdSettingsRouteImport } from "./routes/_dashboard/$organizationId/settings"
+import { Route as SBBoardSlugRouteImport } from "./routes/s/b/$boardSlug"
+import { Route as SChangelogIndexRouteImport } from "./routes/s/changelog/index"
+import { Route as SChangelogChangelogSlugRouteImport } from "./routes/s/changelog/$changelogSlug"
 import { Route as SChangelogRssDotxmlRouteImport } from "./routes/s/changelog/rss[.]xml"
+import { Route as SPSlugRouteImport } from "./routes/s/p/$slug"
+import { Route as SRoadmapIndexRouteImport } from "./routes/s/roadmap/index"
+import { Route as SRoadmapSlugRouteImport } from "./routes/s/roadmap/$slug"
 import { Route as DashboardOrganizationIdDashboardLayoutIndexRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/index"
 import { Route as DashboardOrganizationIdSettingsIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/index"
 import { Route as DashboardOrganizationIdSettingsBillingRouteImport } from "./routes/_dashboard/$organizationId/settings/billing"
@@ -70,6 +78,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   id: "/robots.txt",
   path: "/robots.txt",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SRouteRoute = SRouteRouteImport.update({
+  id: "/s",
+  path: "/s",
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardSplatRoute = DashboardSplatRouteImport.update({
@@ -118,20 +131,25 @@ const FeedbackWidgetOrganizationIdRoute =
     path: "/feedback-widget/$organizationId",
     getParentRoute: () => rootRouteImport,
   } as any)
+const SIndexRoute = SIndexRouteImport.update({
+  id: "/",
+  path: "/",
+  getParentRoute: () => SRouteRoute,
+} as any)
 const SSplatRoute = SSplatRouteImport.update({
-  id: "/s/$",
-  path: "/s/$",
-  getParentRoute: () => rootRouteImport,
+  id: "/$",
+  path: "/$",
+  getParentRoute: () => SRouteRoute,
 } as any)
 const SRobotsDottxtRoute = SRobotsDottxtRouteImport.update({
-  id: "/s/robots.txt",
-  path: "/s/robots.txt",
-  getParentRoute: () => rootRouteImport,
+  id: "/robots.txt",
+  path: "/robots.txt",
+  getParentRoute: () => SRouteRoute,
 } as any)
 const SSitemapDotxmlRoute = SSitemapDotxmlRouteImport.update({
-  id: "/s/sitemap.xml",
-  path: "/s/sitemap.xml",
-  getParentRoute: () => rootRouteImport,
+  id: "/sitemap.xml",
+  path: "/sitemap.xml",
+  getParentRoute: () => SRouteRoute,
 } as any)
 const DashboardOrganizationIdDashboardLayoutRoute =
   DashboardOrganizationIdDashboardLayoutRouteImport.update({
@@ -144,10 +162,40 @@ const DashboardOrganizationIdSettingsRoute =
     path: "/settings",
     getParentRoute: () => DashboardOrganizationIdRoute,
   } as any)
+const SBBoardSlugRoute = SBBoardSlugRouteImport.update({
+  id: "/b/$boardSlug",
+  path: "/b/$boardSlug",
+  getParentRoute: () => SRouteRoute,
+} as any)
+const SChangelogIndexRoute = SChangelogIndexRouteImport.update({
+  id: "/changelog/",
+  path: "/changelog/",
+  getParentRoute: () => SRouteRoute,
+} as any)
+const SChangelogChangelogSlugRoute = SChangelogChangelogSlugRouteImport.update({
+  id: "/changelog/$changelogSlug",
+  path: "/changelog/$changelogSlug",
+  getParentRoute: () => SRouteRoute,
+} as any)
 const SChangelogRssDotxmlRoute = SChangelogRssDotxmlRouteImport.update({
-  id: "/s/changelog/rss.xml",
-  path: "/s/changelog/rss.xml",
-  getParentRoute: () => rootRouteImport,
+  id: "/changelog/rss.xml",
+  path: "/changelog/rss.xml",
+  getParentRoute: () => SRouteRoute,
+} as any)
+const SPSlugRoute = SPSlugRouteImport.update({
+  id: "/p/$slug",
+  path: "/p/$slug",
+  getParentRoute: () => SRouteRoute,
+} as any)
+const SRoadmapIndexRoute = SRoadmapIndexRouteImport.update({
+  id: "/roadmap/",
+  path: "/roadmap/",
+  getParentRoute: () => SRouteRoute,
+} as any)
+const SRoadmapSlugRoute = SRoadmapSlugRouteImport.update({
+  id: "/roadmap/$slug",
+  path: "/roadmap/$slug",
+  getParentRoute: () => SRouteRoute,
 } as any)
 const DashboardOrganizationIdDashboardLayoutIndexRoute =
   DashboardOrganizationIdDashboardLayoutIndexRouteImport.update({
@@ -373,6 +421,7 @@ const DashboardOrganizationIdSettingsIntegrationsSlackIndexRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  "/s": typeof SRouteRouteWithChildren
   "/": typeof DashboardRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
   "/$": typeof DashboardSplatRoute
@@ -387,8 +436,15 @@ export interface FileRoutesByFullPath {
   "/s/$": typeof SSplatRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
+  "/s/": typeof SIndexRoute
   "/$organizationId/settings": typeof DashboardOrganizationIdSettingsRouteWithChildren
+  "/s/b/$boardSlug": typeof SBBoardSlugRoute
+  "/s/changelog/$changelogSlug": typeof SChangelogChangelogSlugRoute
   "/s/changelog/rss.xml": typeof SChangelogRssDotxmlRoute
+  "/s/p/$slug": typeof SPSlugRoute
+  "/s/roadmap/$slug": typeof SRoadmapSlugRoute
+  "/s/changelog/": typeof SChangelogIndexRoute
+  "/s/roadmap/": typeof SRoadmapIndexRoute
   "/$organizationId/settings/billing": typeof DashboardOrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-categories": typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   "/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
@@ -441,7 +497,14 @@ export interface FileRoutesByTo {
   "/s/$": typeof SSplatRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
+  "/s": typeof SIndexRoute
+  "/s/b/$boardSlug": typeof SBBoardSlugRoute
+  "/s/changelog/$changelogSlug": typeof SChangelogChangelogSlugRoute
   "/s/changelog/rss.xml": typeof SChangelogRssDotxmlRoute
+  "/s/p/$slug": typeof SPSlugRoute
+  "/s/roadmap/$slug": typeof SRoadmapSlugRoute
+  "/s/changelog": typeof SChangelogIndexRoute
+  "/s/roadmap": typeof SRoadmapIndexRoute
   "/$organizationId/settings/billing": typeof DashboardOrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-categories": typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   "/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
@@ -480,6 +543,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  "/s": typeof SRouteRouteWithChildren
   "/_dashboard": typeof DashboardRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
   "/_dashboard/$": typeof DashboardSplatRoute
@@ -494,9 +558,16 @@ export interface FileRoutesById {
   "/s/$": typeof SSplatRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
+  "/s/": typeof SIndexRoute
   "/_dashboard/$organizationId/_dashboard-layout": typeof DashboardOrganizationIdDashboardLayoutRouteWithChildren
   "/_dashboard/$organizationId/settings": typeof DashboardOrganizationIdSettingsRouteWithChildren
+  "/s/b/$boardSlug": typeof SBBoardSlugRoute
+  "/s/changelog/$changelogSlug": typeof SChangelogChangelogSlugRoute
   "/s/changelog/rss.xml": typeof SChangelogRssDotxmlRoute
+  "/s/p/$slug": typeof SPSlugRoute
+  "/s/roadmap/$slug": typeof SRoadmapSlugRoute
+  "/s/changelog/": typeof SChangelogIndexRoute
+  "/s/roadmap/": typeof SRoadmapIndexRoute
   "/_dashboard/$organizationId/settings/billing": typeof DashboardOrganizationIdSettingsBillingRoute
   "/_dashboard/$organizationId/settings/changelog-categories": typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   "/_dashboard/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
@@ -537,6 +608,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | "/s"
     | "/"
     | "/robots.txt"
     | "/$"
@@ -551,8 +623,15 @@ export interface FileRouteTypes {
     | "/s/$"
     | "/s/robots.txt"
     | "/s/sitemap.xml"
+    | "/s/"
     | "/$organizationId/settings"
+    | "/s/b/$boardSlug"
+    | "/s/changelog/$changelogSlug"
     | "/s/changelog/rss.xml"
+    | "/s/p/$slug"
+    | "/s/roadmap/$slug"
+    | "/s/changelog/"
+    | "/s/roadmap/"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-categories"
     | "/$organizationId/settings/changelog-privacy"
@@ -605,7 +684,14 @@ export interface FileRouteTypes {
     | "/s/$"
     | "/s/robots.txt"
     | "/s/sitemap.xml"
+    | "/s"
+    | "/s/b/$boardSlug"
+    | "/s/changelog/$changelogSlug"
     | "/s/changelog/rss.xml"
+    | "/s/p/$slug"
+    | "/s/roadmap/$slug"
+    | "/s/changelog"
+    | "/s/roadmap"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-categories"
     | "/$organizationId/settings/changelog-privacy"
@@ -643,6 +729,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/integrations/slack"
   id:
     | "__root__"
+    | "/s"
     | "/_dashboard"
     | "/robots.txt"
     | "/_dashboard/$"
@@ -657,9 +744,16 @@ export interface FileRouteTypes {
     | "/s/$"
     | "/s/robots.txt"
     | "/s/sitemap.xml"
+    | "/s/"
     | "/_dashboard/$organizationId/_dashboard-layout"
     | "/_dashboard/$organizationId/settings"
+    | "/s/b/$boardSlug"
+    | "/s/changelog/$changelogSlug"
     | "/s/changelog/rss.xml"
+    | "/s/p/$slug"
+    | "/s/roadmap/$slug"
+    | "/s/changelog/"
+    | "/s/roadmap/"
     | "/_dashboard/$organizationId/settings/billing"
     | "/_dashboard/$organizationId/settings/changelog-categories"
     | "/_dashboard/$organizationId/settings/changelog-privacy"
@@ -699,13 +793,10 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  SRouteRoute: typeof SRouteRouteWithChildren
   DashboardRoute: typeof DashboardRouteWithChildren
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   FeedbackWidgetOrganizationIdRoute: typeof FeedbackWidgetOrganizationIdRoute
-  SSplatRoute: typeof SSplatRoute
-  SRobotsDottxtRoute: typeof SRobotsDottxtRoute
-  SSitemapDotxmlRoute: typeof SSitemapDotxmlRoute
-  SChangelogRssDotxmlRoute: typeof SChangelogRssDotxmlRoute
 }
 
 declare module "@tanstack/react-router" {
@@ -722,6 +813,13 @@ declare module "@tanstack/react-router" {
       path: "/robots.txt"
       fullPath: "/robots.txt"
       preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/s": {
+      id: "/s"
+      path: "/s"
+      fullPath: "/s"
+      preLoaderRoute: typeof SRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/_dashboard/$": {
@@ -787,26 +885,33 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof FeedbackWidgetOrganizationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/s/": {
+      id: "/s/"
+      path: "/"
+      fullPath: "/s/"
+      preLoaderRoute: typeof SIndexRouteImport
+      parentRoute: typeof SRouteRoute
+    }
     "/s/$": {
       id: "/s/$"
-      path: "/s/$"
+      path: "/$"
       fullPath: "/s/$"
       preLoaderRoute: typeof SSplatRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof SRouteRoute
     }
     "/s/robots.txt": {
       id: "/s/robots.txt"
-      path: "/s/robots.txt"
+      path: "/robots.txt"
       fullPath: "/s/robots.txt"
       preLoaderRoute: typeof SRobotsDottxtRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof SRouteRoute
     }
     "/s/sitemap.xml": {
       id: "/s/sitemap.xml"
-      path: "/s/sitemap.xml"
+      path: "/sitemap.xml"
       fullPath: "/s/sitemap.xml"
       preLoaderRoute: typeof SSitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof SRouteRoute
     }
     "/_dashboard/$organizationId/_dashboard-layout": {
       id: "/_dashboard/$organizationId/_dashboard-layout"
@@ -822,12 +927,54 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DashboardOrganizationIdSettingsRouteImport
       parentRoute: typeof DashboardOrganizationIdRoute
     }
+    "/s/b/$boardSlug": {
+      id: "/s/b/$boardSlug"
+      path: "/b/$boardSlug"
+      fullPath: "/s/b/$boardSlug"
+      preLoaderRoute: typeof SBBoardSlugRouteImport
+      parentRoute: typeof SRouteRoute
+    }
+    "/s/changelog/": {
+      id: "/s/changelog/"
+      path: "/changelog"
+      fullPath: "/s/changelog/"
+      preLoaderRoute: typeof SChangelogIndexRouteImport
+      parentRoute: typeof SRouteRoute
+    }
+    "/s/changelog/$changelogSlug": {
+      id: "/s/changelog/$changelogSlug"
+      path: "/changelog/$changelogSlug"
+      fullPath: "/s/changelog/$changelogSlug"
+      preLoaderRoute: typeof SChangelogChangelogSlugRouteImport
+      parentRoute: typeof SRouteRoute
+    }
     "/s/changelog/rss.xml": {
       id: "/s/changelog/rss.xml"
-      path: "/s/changelog/rss.xml"
+      path: "/changelog/rss.xml"
       fullPath: "/s/changelog/rss.xml"
       preLoaderRoute: typeof SChangelogRssDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof SRouteRoute
+    }
+    "/s/p/$slug": {
+      id: "/s/p/$slug"
+      path: "/p/$slug"
+      fullPath: "/s/p/$slug"
+      preLoaderRoute: typeof SPSlugRouteImport
+      parentRoute: typeof SRouteRoute
+    }
+    "/s/roadmap/": {
+      id: "/s/roadmap/"
+      path: "/roadmap"
+      fullPath: "/s/roadmap/"
+      preLoaderRoute: typeof SRoadmapIndexRouteImport
+      parentRoute: typeof SRouteRoute
+    }
+    "/s/roadmap/$slug": {
+      id: "/s/roadmap/$slug"
+      path: "/roadmap/$slug"
+      fullPath: "/s/roadmap/$slug"
+      preLoaderRoute: typeof SRoadmapSlugRouteImport
+      parentRoute: typeof SRouteRoute
     }
     "/_dashboard/$organizationId/_dashboard-layout/": {
       id: "/_dashboard/$organizationId/_dashboard-layout/"
@@ -1084,6 +1231,37 @@ declare module "@tanstack/react-router" {
   }
 }
 
+interface SRouteRouteChildren {
+  SSplatRoute: typeof SSplatRoute
+  SRobotsDottxtRoute: typeof SRobotsDottxtRoute
+  SSitemapDotxmlRoute: typeof SSitemapDotxmlRoute
+  SIndexRoute: typeof SIndexRoute
+  SBBoardSlugRoute: typeof SBBoardSlugRoute
+  SChangelogChangelogSlugRoute: typeof SChangelogChangelogSlugRoute
+  SChangelogRssDotxmlRoute: typeof SChangelogRssDotxmlRoute
+  SPSlugRoute: typeof SPSlugRoute
+  SRoadmapSlugRoute: typeof SRoadmapSlugRoute
+  SChangelogIndexRoute: typeof SChangelogIndexRoute
+  SRoadmapIndexRoute: typeof SRoadmapIndexRoute
+}
+
+const SRouteRouteChildren: SRouteRouteChildren = {
+  SSplatRoute: SSplatRoute,
+  SRobotsDottxtRoute: SRobotsDottxtRoute,
+  SSitemapDotxmlRoute: SSitemapDotxmlRoute,
+  SIndexRoute: SIndexRoute,
+  SBBoardSlugRoute: SBBoardSlugRoute,
+  SChangelogChangelogSlugRoute: SChangelogChangelogSlugRoute,
+  SChangelogRssDotxmlRoute: SChangelogRssDotxmlRoute,
+  SPSlugRoute: SPSlugRoute,
+  SRoadmapSlugRoute: SRoadmapSlugRoute,
+  SChangelogIndexRoute: SChangelogIndexRoute,
+  SRoadmapIndexRoute: SRoadmapIndexRoute,
+}
+
+const SRouteRouteWithChildren =
+  SRouteRoute._addFileChildren(SRouteRouteChildren)
+
 interface DashboardOrganizationIdDashboardLayoutRouteChildren {
   DashboardOrganizationIdDashboardLayoutIndexRoute: typeof DashboardOrganizationIdDashboardLayoutIndexRoute
   DashboardOrganizationIdDashboardLayoutChangelogDraftRoute: typeof DashboardOrganizationIdDashboardLayoutChangelogDraftRoute
@@ -1261,13 +1439,10 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
 )
 
 const rootRouteChildren: RootRouteChildren = {
+  SRouteRoute: SRouteRouteWithChildren,
   DashboardRoute: DashboardRouteWithChildren,
   RobotsDottxtRoute: RobotsDottxtRoute,
   FeedbackWidgetOrganizationIdRoute: FeedbackWidgetOrganizationIdRoute,
-  SSplatRoute: SSplatRoute,
-  SRobotsDottxtRoute: SRobotsDottxtRoute,
-  SSitemapDotxmlRoute: SSitemapDotxmlRoute,
-  SChangelogRssDotxmlRoute: SChangelogRssDotxmlRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 
 import { createAuthenticatedWorkspace } from "../helpers/auth";
+import { waitForHydration } from "../helpers/hydration";
 import { createPost } from "../helpers/posts";
 import { organizationIdFromUrl, seedRoadmap } from "../helpers/seed-roadmap";
 import { createTestUser } from "../helpers/test-users";
@@ -97,6 +98,7 @@ test.describe("roadmap", () => {
 
       try {
         await visitorPage.goto(publicBoardUrl(user.workspaceName));
+        await waitForHydration(visitorPage);
         await visitorPage
           .getByRole("link", { name: "Roadmap", exact: true })
           .click();
@@ -170,6 +172,7 @@ test.describe("roadmap", () => {
 
       try {
         await visitorPage.goto(`${publicBoardUrl(user.workspaceName)}/roadmap`);
+        await waitForHydration(visitorPage);
 
         // The primary roadmap is selected by default.
         const roadmapSwitcher = visitorPage.getByRole("combobox");
@@ -247,6 +250,7 @@ test.describe("roadmap", () => {
 
     try {
       await visitorPage.goto(publicBoardUrl(user.workspaceName));
+      await waitForHydration(visitorPage);
       await expect(
         visitorPage.getByRole("link", { name: "Roadmap", exact: true })
       ).toBeVisible();

@@ -8,7 +8,7 @@ The public board (`apps/public-feature-board`) is a React SPA rendered inside As
 
 - Shared catalog: `project.inlang/` + `messages/{en,de,zh,es,fr,pt,ru,ar}.json` at the repo root.
 - The board compiles from the shared project with the `baseLocale` fallback strategy: `--project ../../project.inlang` → git-ignored `apps/public-feature-board/src/paraglide/`.
-- The host (`apps/web`) keeps the single locale strategy (`["cookie","baseLocale"]`) and injects its runtime once through `initPublicBoardI18n({ getLocale, setLocale })` in `apps/web/src/public-board/public-board-island.tsx`. The board never reads cookies, URLs, or storage itself.
+- The host (`apps/web`) keeps the single locale strategy (`["cookie","baseLocale"]`) and injects its runtime once through `initPublicBoardI18n({ getLocale, setLocale })` in the board's layout route, `apps/web/src/routes/s/route.tsx`, alongside `initPostUiI18n`. The board never reads cookies, URLs, or storage itself, so the same messages resolve identically in the server render and after hydration.
 
 ## Adding a message
 

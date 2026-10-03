@@ -5,6 +5,7 @@ import {
   CollapsibleTrigger,
 } from "@feeblo/ui/collapsible";
 import { cn } from "@feeblo/ui/utils";
+import { isLiveQueryPending } from "@feeblo/web-shared/collections";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { ChevronRightIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -178,7 +179,7 @@ export function CommentsList() {
   // it while it is merged (see `CommentRepository.findMany`), so a merged
   // post's page renders its comments from one slug-scoped subset and an
   // unmerge only changes the rows inside that same subset.
-  const { data: comments, isLoading: isCommentsLoading } = useLiveQuery({
+  const commentsQuery = useLiveQuery({
     query: (q) =>
       q
         .from({ comment: commentCollection })
@@ -200,9 +201,13 @@ export function CommentsList() {
         .orderBy(({ comment }) => comment.createdAt, "desc"),
   });
 
+  const comments = commentsQuery.data;
   const threads = useMemo(() => buildThreads(comments ?? []), [comments]);
 
-  if (isCommentsLoading) {
+  // Hydration lands the thread before the first client render; waiting for the
+  // source collection to report ready would blank the server-rendered thread
+  // (see `isLiveQueryPending`).
+  if (isLiveQueryPending(commentsQuery)) {
     return null;
   }
 

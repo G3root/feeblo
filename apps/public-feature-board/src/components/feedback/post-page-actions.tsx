@@ -11,6 +11,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 
+import { boardPaths } from "../../lib/board-links";
 import { m } from "../../paraglide/messages.js";
 
 export function PostPageActions() {
@@ -29,7 +30,7 @@ export function PostPageActions() {
           sort: undefined,
           status: undefined,
         }}
-        to="/"
+        to={boardPaths.home}
       >
         <HugeiconsIcon icon={ArrowLeft01Icon} />
       </Link>
