@@ -27,7 +27,23 @@ const PersistedDate = Schema.Union([Schema.Date, Schema.DateFromString]);
 
 export const SubmissionCreatedEmailIntentPayload = Schema.Struct({
   kind: Schema.tag("submission.created"),
-  postId: PostId.schema,
+  /**
+   * The post that opened this window, kept unchanged across every append. A
+   * worker from the release before windows existed decodes only this field, so
+   * its presence is what lets that worker send the window — about the opener —
+   * rather than fail on a payload it cannot read. If the opener itself is
+   * deleted first, that worker expires the window instead; accepted, because
+   * the overlap lasts only as long as the deploy. The full set is `postIds`.
+   */
+  postId: Schema.optionalKey(PostId.schema),
+  /**
+   * The window's posts, oldest first, capped at `submissionWindowMaxPosts`.
+   * Submissions past the cap are counted in `postCount` but not stored: the
+   * email could not have listed them anyway.
+   */
+  postIds: Schema.optionalKey(Schema.Array(PostId.schema)),
+  /** Submissions the window covers, including those past the stored id cap. */
+  postCount: Schema.optionalKey(Schema.Int),
 });
 
 export const ChangelogPublishedEmailIntentPayload = Schema.Struct({
@@ -93,6 +109,57 @@ export const EmailIntentPayload = Schema.Union([
 ]).pipe(Schema.toTaggedUnion("kind"));
 
 export type EmailIntentPayload = Schema.Schema.Type<typeof EmailIntentPayload>;
+
+/**
+ * Board visibility of one notified post, as captured with a rendered email.
+ *
+ * The send-time access gate reads current rows, but an email names the posts
+ * that resolved when it was rendered. A post deleted — or moved to a private
+ * board — since then is invisible to that read while its title is still in the
+ * mail, so what was captured is part of the proof. `undefined` means the
+ * delivery predates the capture, which leaves the current rows as the only
+ * input.
+ */
+export const DeliveryAccessSnapshot = Schema.Struct({
+  notifiedBoardVisibility: Schema.optionalKey(
+    Schema.NullOr(Schema.Literals(["PUBLIC", "PRIVATE"]))
+  ),
+  /**
+   * The posts the rendered email names, oldest first.
+   *
+   * Stored so the send-time gate resolves current rows over exactly the named
+   * set: a window may hold up to `submissionWindowMaxPosts` ids while the mail
+   * names at most twenty, so a deletion among the unlisted remainder must not
+   * deny a recipient the mail still admits.
+   */
+  notifiedPostIds: Schema.optionalKey(Schema.Array(PostId.schema)),
+});
+
+export type DeliveryAccessSnapshot = Schema.Schema.Type<
+  typeof DeliveryAccessSnapshot
+>;
+
+/**
+ * Post ids a submission notification covers.
+ *
+ * A window written before submissions coalesced carries a single `postId`; a
+ * window written since carries the ordered `postIds` it accumulated. Reading
+ * both here is what lets an intent that was pending across the deploy still
+ * materialize.
+ */
+export const submissionWindowPostIds = (
+  payload: Extract<EmailIntentPayload, { readonly kind: "submission.created" }>
+): readonly string[] =>
+  payload.postIds ?? (payload.postId === undefined ? [] : [payload.postId]);
+
+/**
+ * Submissions a window covers. Higher than `submissionWindowPostIds().length`
+ * only once a window has stored its id cap, which bounds the row's payload
+ * without stopping the count that the email renders.
+ */
+export const submissionWindowPostCount = (
+  payload: Extract<EmailIntentPayload, { readonly kind: "submission.created" }>
+): number => payload.postCount ?? submissionWindowPostIds(payload).length;
 
 export const EmailUnsubscribeTarget = Schema.Union([
   Schema.Struct({
