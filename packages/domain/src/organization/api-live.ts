@@ -4,8 +4,8 @@ import { eq } from "drizzle-orm";
 import * as ByteSize from "effect/ByteSize";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { AssetRepository } from "../asset/repository";
 import { replaceSingletonAsset } from "../asset/service";

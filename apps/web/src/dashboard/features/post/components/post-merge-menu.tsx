@@ -34,7 +34,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, isNull, not, useLiveQuery } from "@tanstack/react-db";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import * as Result from "effect/unstable/reactivity/AsyncResult";
+import * as Result from "effect/reactivity/AsyncResult";
 import { ArrowDownIcon, ArrowUpIcon, CornerDownLeftIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 

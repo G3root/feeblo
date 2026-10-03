@@ -2,9 +2,9 @@ import { TTLCache } from "@isaacs/ttlcache";
 import type { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import type * as HttpServerRequest from "effect/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Schema from "effect/Schema";
-import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 import { ClientIp } from "../client-ip";
 import * as RateLimit from "../rate-limit";

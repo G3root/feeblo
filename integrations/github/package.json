@@ -40,7 +40,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@distilled.cloud/github": "1.0.0-rc.12",
+    "@distilled.cloud/github": "1.0.0-rc.13",
     "@feeblo/db": "workspace:*",
     "@feeblo/domain": "workspace:*",
     "@feeblo/domain-contracts": "workspace:*",

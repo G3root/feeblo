@@ -11,10 +11,10 @@ import { makeSlackRouters } from "@feeblo/integration-slack/routers";
 import { SlackManagementRpcHandlers } from "@feeblo/integration-slack/rpc-handlers";
 import { WebhookManagementRpcHandlers } from "@feeblo/integration-webhook/rpc-handlers";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
+import * as HttpMiddleware from "effect/http/HttpMiddleware";
+import * as HttpRouter from "effect/http/HttpRouter";
 import * as Layer from "effect/Layer";
 import type * as Ref from "effect/Ref";
-import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
 
 import type { ServerConfigValue } from "../config";
 import { bodySizeLimitMiddleware } from "../http/body-limit";

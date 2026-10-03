@@ -35,7 +35,7 @@ import {
 } from "@tanstack/react-router";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import * as Option from "effect/Option";
-import * as Result from "effect/unstable/reactivity/AsyncResult";
+import * as Result from "effect/reactivity/AsyncResult";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { SettingsLayout } from "~/features/settings/components/settings-layout";

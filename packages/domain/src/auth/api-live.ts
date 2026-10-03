@@ -1,9 +1,9 @@
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
-import * as HttpEffect from "effect/unstable/http/HttpEffect";
-import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+import * as HttpEffect from "effect/http/HttpEffect";
+import * as HttpServerRequest from "effect/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 
 import { Api } from "../http/api";
 import * as RateLimit from "../rate-limit";

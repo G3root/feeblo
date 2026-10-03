@@ -47,10 +47,10 @@ import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import type { ManagedRuntime as ManagedRuntimeType } from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
+import type * as Redis from "effect/persistence/Redis";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
-import type * as Redis from "effect/unstable/persistence/Redis";
-import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
+import { WorkflowEngine } from "effect/workflow/WorkflowEngine";
 
 import { drizzleAdapter } from "./adapter/drizzle-adapter";
 import { enforcePublicApiKeyPlan, publicApiKeyPlugin } from "./api-key-config";

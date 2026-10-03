@@ -5,13 +5,13 @@ import { EmailProviderFeedbackConfig } from "@feeblo/domain/email-provider-feedb
 import { SesEmailFeedbackWebhook } from "@feeblo/domain/email-provider-feedback/ses-webhook";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
 import * as Effect from "effect/Effect";
+import * as Headers from "effect/http/Headers";
+import * as HttpRouter from "effect/http/HttpRouter";
+import type * as HttpServerRequest from "effect/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
-import * as Headers from "effect/unstable/http/Headers";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
-import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 /** Per-client bound for the unauthenticated SES feedback ingress. */
 const SES_FEEDBACK_RATE_LIMIT = {

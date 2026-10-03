@@ -6,7 +6,7 @@ import * as S from "effect/Schema";
 export const RoadmapVisibility = S.Literals(["public", "private"]);
 export type TRoadmapVisibility = S.Schema.Type<typeof RoadmapVisibility>;
 
-const FilterValue = S.Array(S.String).check(S.isLengthBetween(1, 50));
+const FilterValue = S.Array(S.String).check(S.isBetweenLength(1, 50));
 
 export const BoardRoadmapFilterCondition = S.Struct({
   field: S.Literal("boardId"),
@@ -60,8 +60,8 @@ export type TRoadmap = S.Schema.Type<typeof Roadmap>;
 const RoadmapCreateFields = {
   id: RoadmapId.schema,
   organizationId: WorkspaceId.schema,
-  name: S.String.check(S.isLengthBetween(1, 120)),
-  slug: S.String.check(S.isLengthBetween(1, 120)),
+  name: S.String.check(S.isBetweenLength(1, 120)),
+  slug: S.String.check(S.isBetweenLength(1, 120)),
   description: S.optional(S.NullOr(S.String.check(S.isMaxLength(2000)))),
   isPrimary: S.optional(S.Boolean),
   visibility: RoadmapVisibility,

@@ -49,12 +49,12 @@ import { SlackUserServiceLive } from "@feeblo/integration-slack/slack-user-servi
 import type { Mailer } from "@feeblo/transactional/mailer";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
 import * as Effect from "effect/Effect";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Layer from "effect/Layer";
+import * as RateLimiter from "effect/persistence/RateLimiter";
+import type * as Redis from "effect/persistence/Redis";
 import * as Redacted from "effect/Redacted";
 import type * as Ref from "effect/Ref";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
-import * as RateLimiter from "effect/unstable/persistence/RateLimiter";
-import type * as Redis from "effect/unstable/persistence/Redis";
 
 import type { ServerConfigValue } from "../config";
 import { redisOptions } from "../infra/redis";

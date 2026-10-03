@@ -1,10 +1,10 @@
 import type { AuthClientSession } from "@feeblo/auth/client";
 import { hasWindow } from "@feeblo/utils/runtime-kind";
 import * as Effect from "effect/Effect";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
+import * as Atom from "effect/reactivity/Atom";
+import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import * as Schema from "effect/Schema";
-import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import * as Atom from "effect/unstable/reactivity/Atom";
-import * as AtomRegistry from "effect/unstable/reactivity/AtomRegistry";
 
 import { authClient } from "../lib/auth-client";
 import { clearAuthHintCookie, writeAuthHintToCookie } from "./hint-cookie";

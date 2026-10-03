@@ -25,7 +25,7 @@ import { isString } from "@feeblo/utils/runtime-kind";
 import { isLiveQueryPending } from "@feeblo/web-shared/collections";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
-import * as Result from "effect/unstable/reactivity/AsyncResult";
+import * as Result from "effect/reactivity/AsyncResult";
 import { type ReactNode, useEffect, useMemo } from "react";
 
 import { BoardNavLink } from "../components/feedback/board-list-card";

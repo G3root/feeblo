@@ -4,11 +4,11 @@ import {
 } from "@feeblo/integration-core";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as HttpHeaders from "effect/http/Headers";
+import type * as HttpServerRequest from "effect/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import * as HttpHeaders from "effect/unstable/http/Headers";
-import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 /**
  * Shared plumbing for provider webhook routes (Slack, Discord, GitHub): header

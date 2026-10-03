@@ -6,13 +6,13 @@ import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import type { HttpApiSchemaError } from "effect/http-api/HttpApiError";
+import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware";
+import * as HttpApiSecurity from "effect/http-api/HttpApiSecurity";
+import * as OpenApi from "effect/http-api/OpenApi";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
-import type { HttpApiSchemaError } from "effect/unstable/httpapi/HttpApiError";
-import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
-import * as HttpApiSecurity from "effect/unstable/httpapi/HttpApiSecurity";
-import * as OpenApi from "effect/unstable/httpapi/OpenApi";
 
 import { Auth } from "../auth-handler";
 import { EntitlementPolicy } from "../entitlement/policies";

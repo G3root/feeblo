@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
-import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
-import * as HttpApiSchema from "effect/unstable/httpapi/HttpApiSchema";
-import * as OpenApi from "effect/unstable/httpapi/OpenApi";
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
+import * as OpenApi from "effect/http-api/OpenApi";
 
 import type { PublicApiCommentGroup } from "../../public-api/api-contract";
 import {

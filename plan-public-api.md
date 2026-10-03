@@ -173,7 +173,7 @@ The plugin's `list`, `get`, and `delete` endpoints require a session (`use: [ses
 
 ## Framework notes (learned the hard way)
 
-Three behaviours of `effect/unstable/httpapi` in this version are load-bearing for the Public API, and each was found by a failing test rather than by reading:
+Three behaviours of `effect/http-api` (spelled `effect/unstable/httpapi` when these notes were written; Effect 4.0 dropped the `unstable` segment) are load-bearing for the Public API, and each was found by a failing test rather than by reading:
 
 1. **Declare error schemas as an array, never as one `Schema.Union`.** `HttpApiEndpoint.getErrorSchemas` treats each declared entry as one schema and resolves `httpApiStatus` from its own AST; a union is a single entry carrying no status, so every error it contains is answered as `500` and the published document lists only `200` and `500`. Declaring `error: PUBLIC_API_ERROR_SCHEMAS` fixes both. The dashboard's other HTTP APIs still declare unions, so they still answer errors as `500` — worth fixing when each is next touched.
 2. **A handler's service requirements are not satisfied by providing to the route layer.** They surface as `Request<"Requires", …>` and must be provided where the server is assembled (`makeServiceLayers`). Handlers therefore read their services from the fiber context (`currentPublicApiRepository`, `currentPublicApiConfig`, mirroring `currentHttpApiSession`), which keeps the route layer free of unsatisfiable requirements.

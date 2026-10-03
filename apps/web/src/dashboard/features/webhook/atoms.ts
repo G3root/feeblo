@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Atom from "effect/reactivity/Atom";
 import * as Stream from "effect/Stream";
-import * as Atom from "effect/unstable/reactivity/Atom";
 
 import { DashboardClient, dashboardSWR } from "~/lib/atom-rpc";
 

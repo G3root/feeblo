@@ -5,17 +5,17 @@ import {
   schema,
 } from "@feeblo/db";
 import { and, eq } from "drizzle-orm";
+import { EmbeddingModel } from "effect/ai";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
-import { EmbeddingModel } from "effect/unstable/ai";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
 export interface PostEmbedding {
   readonly model: string;

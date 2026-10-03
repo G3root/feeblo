@@ -1,13 +1,13 @@
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServerRequest from "effect/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Rpc from "effect/rpc/Rpc";
+import * as RpcMessage from "effect/rpc/RpcMessage";
 import * as Schema from "effect/Schema";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
-import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
-import * as Rpc from "effect/unstable/rpc/Rpc";
-import * as RpcMessage from "effect/unstable/rpc/RpcMessage";
 
 import {
   makeClientIpGlobalMiddleware,

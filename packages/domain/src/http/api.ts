@@ -1,4 +1,4 @@
-import * as HttpApi from "effect/unstable/httpapi/HttpApi";
+import * as HttpApi from "effect/http-api/HttpApi";
 
 import { AuthApiGroup } from "../auth/api-contract";
 import { EmailSubscriptionApiGroup } from "../email-subscription/api-contract";
