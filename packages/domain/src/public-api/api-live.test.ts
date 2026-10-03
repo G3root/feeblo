@@ -4788,6 +4788,7 @@ layer(makeTestApp())("public api v1", (it) => {
           id,
           organizationId: workspace.organizationId,
           userId,
+          externalId: id === "cnt_dupe_a" ? "crm-a" : "crm-b",
           email: `${id}@example.com`,
           name: "Voter",
           createdAt: now,
@@ -4803,6 +4804,44 @@ layer(makeTestApp())("public api v1", (it) => {
       const page = decodeVotePage(responseBody(response));
       expect(page.data).toHaveLength(1);
       expect(page.data[0]?.voterId).toBe("cnt_dupe_a");
+
+      // A record identifier names the record a vote is published under: the
+      // canonical one matches, and the duplicate that is not that record owns
+      // no votes, so it is an empty page rather than the same vote under a
+      // different label.
+      const canonical = yield* executeRequest(
+        "/api/v1/votes?voterId=cnt_dupe_a",
+        "fbk_votes_dupe"
+      );
+      expect(decodeVotePage(responseBody(canonical)).data).toHaveLength(1);
+
+      const duplicate = yield* executeRequest(
+        "/api/v1/votes?voterId=cnt_dupe_b",
+        "fbk_votes_dupe"
+      );
+      expect(duplicate.status).toBe(200);
+      expect(decodeVotePage(responseBody(duplicate)).data).toHaveLength(0);
+
+      const duplicateExternalId = yield* executeRequest(
+        "/api/v1/votes?voterExternalId=crm-b",
+        "fbk_votes_dupe"
+      );
+      expect(duplicateExternalId.status).toBe(200);
+      expect(
+        decodeVotePage(responseBody(duplicateExternalId)).data
+      ).toHaveLength(0);
+
+      // An email is not a record identifier — it names the person — so it
+      // still finds the vote, reported under the record that owns it.
+      const byDuplicateEmail = yield* executeRequest(
+        "/api/v1/votes?voterEmail=cnt_dupe_b@example.com",
+        "fbk_votes_dupe"
+      );
+      const byDuplicateEmailPage = decodeVotePage(
+        responseBody(byDuplicateEmail)
+      );
+      expect(byDuplicateEmailPage.data).toHaveLength(1);
+      expect(byDuplicateEmailPage.data[0]?.voterId).toBe("cnt_dupe_a");
     })
   );
 

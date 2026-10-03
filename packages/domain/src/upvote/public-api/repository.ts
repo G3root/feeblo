@@ -1,5 +1,15 @@
 import { currentDb, Database, schema } from "@feeblo/db";
-import { and, desc, eq, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  getTableName,
+  inArray,
+  isNotNull,
+  sql,
+  type SQL,
+} from "drizzle-orm";
+import { alias, type AnyPgColumn } from "drizzle-orm/pg-core";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -52,6 +62,43 @@ export type PublicApiVotePage = {
 };
 
 /**
+ * The contact alias every "the record for this account" read uses.
+ *
+ * One account can have more than one contact row — `contact.user_id` is
+ * indexed but not unique per workspace — so the published `voterId` and the
+ * `voterId`/`voterExternalId` filter have to name the same record, or a
+ * caller could filter by one and be handed a vote labelled with the other.
+ * Both pick the workspace's oldest contact for the account through this alias
+ * and this ordering, so the label and the filter cannot disagree.
+ */
+const voterContact = alias(schema.contactTable, "voter_contact");
+
+/**
+ * The subquery's own FROM clause.
+ *
+ * `alias()` names the table in a column reference (`"voter_contact"."id"`),
+ * but interpolating the aliased table into a raw `sql` fragment renders only
+ * the alias name, and `from "voter_contact"` would read as a table of that
+ * name rather than an alias of `contact`. The base table is therefore spelled
+ * out beside the alias, the way the query builder's own FROM rendering does.
+ */
+const voterContactFrom = sql`${sql.identifier(
+  getTableName(schema.contactTable)
+)} as ${sql.identifier("voter_contact")}`;
+
+const oldestContactIdForAccount = (
+  organizationId: AnyPgColumn,
+  userId: AnyPgColumn
+) => sql<string | null>`(
+  select ${voterContact.id}
+  from ${voterContactFrom}
+  where ${voterContact.organizationId} = ${organizationId}
+    and ${voterContact.userId} = ${userId}
+  order by ${voterContact.createdAt}, ${voterContact.id}
+  limit 1
+)`;
+
+/**
  * The vote column list, and the only place a vote field is selected from.
  *
  * `userId` and `memberId` are deliberately absent: `userId` is the internal
@@ -66,8 +113,9 @@ export type PublicApiVotePage = {
  * contact rows would make a join emit the vote twice, once per contact and
  * with two different `voterId` values, and the page cursor — which is the
  * vote's own `(createdAt, id)` — could then skip a duplicate. The subquery
- * picks the oldest contact for the account, so a vote appears exactly once and
- * always with the same record.
+ * picks the oldest contact for the account, the same record the voter filter
+ * requires, so a vote appears exactly once and always under the record a
+ * filtered request asked for.
  */
 const VOTE_COLUMNS = {
   id: schema.upvoteTable.id,
@@ -80,14 +128,10 @@ const VOTE_COLUMNS = {
   authorAvatarUrl: schema.userTable.image,
   voterId: sql<
     string | null
-  >`case when ${schema.upvoteTable.memberId} is null then (
-    select ${schema.contactTable.id}
-    from ${schema.contactTable}
-    where ${schema.contactTable.organizationId} = ${schema.upvoteTable.organizationId}
-      and ${schema.contactTable.userId} = ${schema.upvoteTable.userId}
-    order by ${schema.contactTable.createdAt}, ${schema.contactTable.id}
-    limit 1
-  ) else null end`,
+  >`case when ${schema.upvoteTable.memberId} is null then ${oldestContactIdForAccount(
+    schema.upvoteTable.organizationId,
+    schema.upvoteTable.userId
+  )} else null end`,
 } as const;
 
 type VoteRow = {
@@ -243,6 +287,21 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
       if (hasEmail) {
         contactConditions.push(
           sql`lower(${schema.contactTable.email}) = ${email}`
+        );
+      }
+
+      // A record identifier names the record a vote is published under, not
+      // just any record linked to the same account: the label is always the
+      // account's oldest contact, so a filter naming a different one owns no
+      // votes and yields an empty page rather than a vote attributed to its
+      // twin. An email is not a record identifier — it names a person — so it
+      // keeps matching whichever record carries it.
+      if (voter?.id !== undefined || voter?.externalId !== undefined) {
+        contactConditions.push(
+          sql`${schema.contactTable.id} = ${oldestContactIdForAccount(
+            schema.contactTable.organizationId,
+            schema.contactTable.userId
+          )}`
         );
       }
 
