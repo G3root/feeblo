@@ -5,6 +5,7 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { ContactId, WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -79,6 +80,89 @@ describe("ResolvePrincipalService", () => {
         .limit(1);
       return rows[0];
     });
+
+  layer(TestLayer)("CRM entry allowance", (it) => {
+    // `free` is the only capped plan and allows 10 CRM entries, and a workspace
+    // with no subscription row resolves to it. A workspace at the cap must not
+    // be able to grow its contact table through on-behalf attribution.
+    const FREE_PLAN_CRM_LIMIT = 10;
+
+    const fillCrm = (organizationId: string, count: number) =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const now = yield* DateTime.nowAsDate;
+        yield* db.insert(schema.contactTable).values(
+          Array.from({ length: count }, (_, index) => ({
+            id: `contact_filler_${organizationId}_${index}`,
+            organizationId,
+            email: `filler-${index}@example.com`,
+            createdAt: now,
+            updatedAt: now,
+          }))
+        );
+      });
+
+    it.effect("refuses to create a contact once the plan is at its cap", () =>
+      Effect.gen(function* () {
+        const service = yield* ResolvePrincipalService;
+        const organizationId = yield* makeOrganization();
+        yield* fillCrm(organizationId, FREE_PLAN_CRM_LIMIT);
+
+        const error = yield* Effect.flip(
+          service.resolve({
+            organizationId,
+            needsUser: false,
+            subject: { email: "one-too-many@example.com" },
+          })
+        );
+
+        expect(error._tag).toBe("CrmEntryLimitReachedError");
+      })
+    );
+
+    // The check sits on the insert, not on the resolution: a write attributed to
+    // a customer who already has a contact consumes no room, so a full CRM must
+    // not refuse it.
+    it.effect(
+      "still resolves an existing contact when the plan is at its cap",
+      () =>
+        Effect.gen(function* () {
+          const service = yield* ResolvePrincipalService;
+          const organizationId = yield* makeOrganization();
+
+          const first = yield* service.resolve({
+            organizationId,
+            needsUser: false,
+            subject: { email: "existing@example.com" },
+          });
+          yield* fillCrm(organizationId, FREE_PLAN_CRM_LIMIT - 1);
+
+          const resolved = yield* service.resolve({
+            organizationId,
+            needsUser: false,
+            subject: { email: "existing@example.com" },
+          });
+
+          expect(resolved.contactId).toBe(first.contactId);
+        })
+    );
+
+    it.effect("allows one more contact while the plan has room", () =>
+      Effect.gen(function* () {
+        const service = yield* ResolvePrincipalService;
+        const organizationId = yield* makeOrganization();
+        yield* fillCrm(organizationId, FREE_PLAN_CRM_LIMIT - 1);
+
+        const resolved = yield* service.resolve({
+          organizationId,
+          needsUser: false,
+          subject: { email: "last-one@example.com" },
+        });
+
+        expect(resolved.contactId).not.toBe("");
+      })
+    );
+  });
 
   layer(TestLayer)("resolve", (it) => {
     it.effect(

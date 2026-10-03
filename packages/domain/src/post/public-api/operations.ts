@@ -12,6 +12,7 @@ import {
   InternalError,
   InvalidRequestError,
   NotFoundError,
+  PlanRequiresUpgradeError,
   invalidRequestError,
   notFoundError,
 } from "../../public-api/errors";
@@ -52,16 +53,23 @@ const POST_READ_FAILURES = Schema.Union([
   InternalError,
 ]);
 
-/** A create can collide on a slug, but cannot report a missing row. */
+/**
+ * A create can collide on a slug, but cannot report a missing row.
+ *
+ * It can also be refused because the author it names has no contact yet and the
+ * plan has no room for one.
+ */
 const POST_CREATE_FAILURES = Schema.Union([
   InvalidRequestError,
   ConflictError,
+  PlanRequiresUpgradeError,
   InternalError,
 ]);
 
 const POST_WRITE_FAILURES = Schema.Union([
   InvalidRequestError,
   NotFoundError,
+  PlanRequiresUpgradeError,
   InternalError,
 ]);
 

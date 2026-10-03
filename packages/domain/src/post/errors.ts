@@ -1,6 +1,10 @@
 import * as Schema from "effect/Schema";
 
-import { InvalidSubjectError, SubjectNotFoundError } from "../identity/errors";
+import {
+  CrmEntryLimitReachedError,
+  InvalidSubjectError,
+  SubjectNotFoundError,
+} from "../identity/errors";
 import { PolicyDeniedError } from "../policy";
 import {
   BadRequestError,
@@ -60,4 +64,7 @@ export const PostServiceErrors = Schema.Union([
   // identifiers with the shared identity failures.
   SubjectNotFoundError,
   InvalidSubjectError,
+  // Attributing to a subject that does not yet exist would create a contact,
+  // which the plan may have no room for.
+  CrmEntryLimitReachedError,
 ]);

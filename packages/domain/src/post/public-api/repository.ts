@@ -25,6 +25,7 @@ import * as Schema from "effect/Schema";
 import { EmailOutboxConfig } from "../../email-outbox/config";
 import { EmailSubscriptionRepository } from "../../email-subscription/repository";
 import {
+  CrmEntryLimitReachedError,
   InvalidSubjectError,
   SubjectNotFoundError,
 } from "../../identity/errors";
@@ -32,6 +33,7 @@ import { ResolvePrincipalService } from "../../identity/service";
 import * as Policy from "../../policy";
 import type { TPublicApiOnBehalfAuthor } from "../../public-api/common";
 import type { Cursor } from "../../public-api/cursor";
+import { crmLimitMessage } from "../../public-api/entitlement";
 import {
   ConflictError,
   conflictError,
@@ -41,6 +43,8 @@ import {
   invalidRequestError,
   NotFoundError,
   notFoundError,
+  PlanRequiresUpgradeError,
+  planRequiresUpgradeError,
 } from "../../public-api/errors";
 import { BadRequestError, withRemapDbErrors } from "../../rpc-errors";
 import { S3UploadService } from "../../services/s3";
@@ -211,11 +215,23 @@ const toSource = (
  */
 const toPublicPostWriteError = (
   cause: unknown
-): InternalError | InvalidRequestError | NotFoundError | ConflictError => {
+):
+  | InternalError
+  | InvalidRequestError
+  | NotFoundError
+  | ConflictError
+  | PlanRequiresUpgradeError => {
   if (Schema.is(NotFoundError)(cause)) return cause;
   if (Schema.is(InvalidRequestError)(cause)) return cause;
   if (Schema.is(ConflictError)(cause)) return cause;
   if (Schema.is(InternalError)(cause)) return cause;
+  if (Schema.is(PlanRequiresUpgradeError)(cause)) return cause;
+  // Naming an author with no contact yet makes the write provision one, which
+  // is a CRM entry like any other and is capped like any other. Same remedy as
+  // the company create's limit, so it answers with that code.
+  if (Schema.is(CrmEntryLimitReachedError)(cause)) {
+    return planRequiresUpgradeError(crmLimitMessage);
+  }
   if (Schema.is(BadRequestError)(cause)) {
     return invalidRequestError(cause.message ?? "The request is not valid.");
   }
