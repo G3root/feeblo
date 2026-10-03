@@ -358,16 +358,25 @@ const toPublicMergeFailure = (
  *
  * Neither writes a slug, so neither can collide on one, and every refusal the
  * shared path can produce is a state the public vocabulary already names.
+ *
+ * Neither resolves an on-behalf subject either — a merge moves an existing
+ * post's comments and votes, it does not attribute the write to a customer —
+ * so `PLAN_REQUIRES_UPGRADE` is unreachable here by construction and the
+ * endpoints publish no such status. The shared vocabulary allows the branch, so
+ * the mapping drops it, the same reasoning as `mapPostCreateFailure`: if it
+ * ever becomes reachable it is an internal failure, not a promise this API
+ * should have made.
  */
 const mapPostMergeFailure = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(
-    Effect.catch((cause) =>
-      Effect.fail(
-        Schema.is(FailedToMergePostError)(cause)
-          ? toPublicMergeFailure(cause)
-          : toPublicPostWriteError(cause)
-      )
-    )
+    Effect.catch((cause) => {
+      const mapped = Schema.is(FailedToMergePostError)(cause)
+        ? toPublicMergeFailure(cause)
+        : toPublicPostWriteError(cause);
+      return Effect.fail(
+        Schema.is(PlanRequiresUpgradeError)(mapped) ? internalError() : mapped
+      );
+    })
   );
 
 /**
