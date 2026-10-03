@@ -55,7 +55,7 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 | `companies.create` | Create a company. |
 | `companies.update` | Update a company's name, external id, avatar, or external creation date. |
 | `companies.delete` | Delete a company, which detaches it from the contacts that belonged to it. |
-| `boards.read` | Reserved for a future board-metadata endpoint. No v1 endpoint requires it, and every key receives it so that endpoint is additive when it ships. |
+| `boards.read` | Read the workspace's boards through the `/boards` endpoints. Required by every board endpoint, and every key receives it. |
 
 A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above except the `companies` ones; the `posts`, `comments`, `tags`, and `changelog` write scopes, and all four `companies` scopes, are granted only when the key is created with them — so a key that was minted to read feedback cannot delete a workspace's posts, comments, or tags, broadcast a release note, or learn the customer roster. The CRM grant is opt-in as a whole, read included, because a company is a record about the workspace's own customers rather than the workspace's content. That is also why a key created before a scope existed keeps its narrower grant: rotate the key if an integration needs more than it was issued.
 
@@ -81,6 +81,68 @@ Requests carrying an `Origin` header are rejected: the transport does not enable
 
 ## Endpoints
 
+### List boards
+
+```http
+GET /api/v1/boards
+```
+
+| Query parameter | Default | Notes |
+| --- | --- | --- |
+| `limit` | `25` | 1–100. |
+| `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
+
+```json
+{
+  "data": [
+    {
+      "id": "brd_feedback",
+      "name": "Feedback",
+      "slug": "feedback",
+      "visibility": "PUBLIC",
+      "url": "https://app.feeblo.com/org_example/board/feedback",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-12T09:30:00.000Z"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+Requires `boards.read`. Every board of the workspace is returned, private ones included: the key is the workspace's own credential, not a public visitor, so `visibility` tells an integration where its own records appear rather than gating the read. Use this endpoint to resolve the `boardId` a post needs, or the `slug` a public URL contains.
+
+### Get a board
+
+```http
+GET /api/v1/boards/{boardId}
+```
+
+Returns one board in the shape above. Requires `boards.read`. A board of another workspace is answered with `404 NOT_FOUND` rather than `403`, so an id cannot be used to probe another workspace.
+
+### List statuses
+
+```http
+GET /api/v1/statuses
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "pss_planned",
+      "name": "Planned",
+      "type": "PLANNED",
+      "orderIndex": 2,
+      "color": "oklch(0.7 0.15 250)"
+    }
+  ]
+}
+```
+
+Requires `posts.read`. Every status of the workspace is returned, in display order, so a caller that creates or moves a post knows the `statusId` to send and the name each one renders as. `name` is the workspace's label, falling back to a humanized `type` when the label is empty — the same rule a post's embedded `status` follows, so one status never has two names across endpoints.
+
+The catalog is the workspace's own: it may rename, recolor, and reorder its statuses, so a caller cannot hard-code them. This endpoint is **not paginated** — a workspace has a handful of statuses and they are ordered by `orderIndex` rather than by age, so there is no cursor and no `nextCursor`.
+
 ### List a board's posts
 
 ```http
@@ -93,6 +155,8 @@ GET /api/v1/boards/{boardId}/posts
 | `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
 | `status` | — | A status id. |
 | `includeArchived` | `false` | Archived posts are excluded by default. |
+| `tagIds` | — | Comma-separated tag ids; a post matches if it carries **at least one**. At least one id is required when the parameter is present. |
+| `updatedAfter` | — | An ISO 8601 date or timestamp; keeps posts changed after it. |
 
 ```json
 {
@@ -137,8 +201,15 @@ GET /api/v1/posts
 | `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
 | `status` | — | A status id. |
 | `includeArchived` | `false` | Archived posts are excluded by default. |
+| `boardId` | — | Only posts on this board. |
+| `tagIds` | — | Comma-separated tag ids; a post matches if it carries **at least one**. At least one id is required when the parameter is present. |
+| `updatedAfter` | — | An ISO 8601 date or timestamp; keeps posts changed after it. |
 
 Returns the same page shape as a board's list, across every board of the calling workspace, newest first. Private boards are included, for the same reason the board list includes them, and posts merged into another post are never listed. Use `GET /api/v1/boards/{boardId}/posts` to page a single board.
+
+To sync incrementally, page the workspace list with `updatedAfter` set to the instant of the last change you processed. It matches posts whose own record changed after it — title, body, status, board, ETA, lock or archive state, a merge, a tag assignment, or the deletion of a tag the post carried — so a caller re-reads each post it returns and gets the current values. Comments and votes are engagement rather than changes to the post, so they do not move `updatedAt`; read those counts from the post itself, or read [`GET /api/v1/posts/{postId}/activity`](#list-a-posts-activity) when the entries themselves are needed. A page is still ordered and cursored by `createdAt`, so an old post that changed recently appears in its original position rather than at the top — page the filtered list to the end, or read it again from the first page.
+
+A `tagIds` parameter that names no id — `?tagIds=`, `?tagIds=,,` — is `400 INVALID_REQUEST` rather than a page of everything: a caller that joins an empty list into the query asked for posts carrying one of nothing. An id that does not exist in the workspace is different: it matches no post rather than being rejected, because a typo should not cost a second request to diagnose.
 
 ### Get a post
 
@@ -258,6 +329,44 @@ Responds `204` with no body. Requires `posts.delete`.
 The post is gone immediately and cannot be restored; its comments, votes, tags, and activity go with it. Unlike the dashboard, a key holding this scope deletes without the creator and engagement restriction — it is the workspace's own credential, not a member acting on their own posts. Deleting a post that had absorbed merged duplicates restores those duplicates to the board first, exactly as the dashboard does.
 
 A post that has been merged into another is answered with `400 INVALID_REQUEST` rather than being deleted, and a post that is already gone is answered with `404 NOT_FOUND` rather than a success that deleted nothing.
+
+### List a post's activity
+
+```http
+GET /api/v1/posts/{postId}/activity
+```
+
+| Query parameter | Default | Notes |
+| --- | --- | --- |
+| `limit` | `25` | 1–100. |
+| `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
+
+```json
+{
+  "data": [
+    {
+      "id": "act_example",
+      "kind": "STATUS_CHANGED",
+      "actor": {
+        "type": "member",
+        "displayName": "Morgan",
+        "avatarUrl": null
+      },
+      "previousValue": "pss_open",
+      "nextValue": "pss_planned",
+      "commentId": null,
+      "createdAt": "2026-08-12T09:30:00.000Z"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+Requires `posts.read`. The post's own history, newest first, so an integration can tell what happened to a post without diffing snapshots. The timeline is append-only: entries are never edited or deleted, and deleting the post takes them with it.
+
+`kind` is the vocabulary that names what happened, and `previousValue` and `nextValue` are the values the entry moved between. What they name depends on `kind`: a status id for `STATUS_CHANGED`, a board id for `BOARD_CHANGED`, a tag id for `TAG_ADDED` and `TAG_REMOVED`, a post id for `POST_MERGED`, `POST_MERGED_INTO`, and `POST_UNMERGED`. `commentId` is set on the comment entries, so a caller can resolve them through `GET /api/v1/comments/{commentId}`.
+
+`actor` is the same `{ type, displayName, avatarUrl }` shape a post's author uses, never an internal identifier. It is `null` when the entry was written by an API key: a machine credential has no member identity, so the alternative would be to invent one. (The dashboard shows the same entry as "Someone".) A post merged into another is still readable and reports its own timeline, including the entry that says where it went.
 
 ### List tags
 
@@ -459,7 +568,18 @@ GET /api/v1/changelog
       "scheduledAt": null,
       "publishedAt": "2026-09-01T00:00:00.000Z",
       "createdAt": "2026-08-30T10:00:00.000Z",
-      "updatedAt": "2026-09-01T00:00:00.000Z"
+      "updatedAt": "2026-09-01T00:00:00.000Z",
+      "categories": [
+        {
+          "id": "chc_new",
+          "name": "New",
+          "iconType": "color",
+          "icon": "oklch(0.7 0.15 250)"
+        }
+      ],
+      "linkedPosts": [
+        { "id": "pst_dark_mode", "title": "Dark mode", "slug": "dark-mode" }
+      ]
     }
   ],
   "nextCursor": null
@@ -467,6 +587,8 @@ GET /api/v1/changelog
 ```
 
 Requires `changelog.read`. Entries of every status are returned, newest first — the key is the workspace's own credential, so an integration that syncs release notes sees what has not shipped yet. Pass `status=published` to list only what readers can already see.
+
+`categories` are the entry's labels: the workspace's own vocabulary, each with a name and an `iconType` of `color`, `emoji`, or `icon` that says how to read `icon`. `linkedPosts` are the posts the entry announces, as `{ id, title, slug }` references — read the post itself through `GET /api/v1/posts/{postId}` when the body is needed. Both are set in the dashboard, not through this API, and both are ordered by when they were attached.
 
 ### Get a changelog entry
 
@@ -619,6 +741,8 @@ The company's contacts are **not** deleted: they keep their own records and simp
 
 Pagination is cursor-based. A response carries `nextCursor`; `null` means the last page. Cursors are opaque — do not construct or parse them — and are invalidated by the API without notice if they are malformed, in which case the API returns `400 INVALID_REQUEST`. Do not poll with offsets: posts, comments, tags, changelog entries, and companies are inserted continuously and offset paging skips and repeats rows.
 
+The one list that is not a page is [`GET /statuses`](#list-statuses): the status catalog is small and ordered by the workspace's own `orderIndex`, so it is returned whole, with no cursor.
+
 ## Errors
 
 Every error uses one envelope, where `_tag` is the machine-readable code and `message` is for humans:
@@ -632,14 +756,14 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 
 | Status | `_tag` | Meaning |
 | --- | --- | --- |
-| 400 | `INVALID_REQUEST` | Malformed parameter, cursor, or limit; a body the endpoint cannot decode; a comment body that is empty or sanitizes to nothing; a name or title that is only whitespace; an update that names no field; a board or status id that is not in the workspace; a post that has been merged into another; a reply whose parent is not a comment on the same post; a reply widened to public beneath an internal parent; an author subject that resolves to no account. |
+| 400 | `INVALID_REQUEST` | Malformed parameter, cursor, limit, `tagIds` list (empty or malformed), or `updatedAfter` instant (not an ISO 8601 date or timestamp naming a real day); a body the endpoint cannot decode; a comment body that is empty or sanitizes to nothing; a name or title that is only whitespace; an update that names no field; a board or status id that is not in the workspace; a post that has been merged into another; a reply whose parent is not a comment on the same post; a reply widened to public beneath an internal parent; an author subject that resolves to no account. |
 | 401 | `MISSING_API_KEY` | No `x-api-key` header was sent, or its value was empty. |
 | 401 | `INVALID_API_KEY` | The key is unknown, revoked, expired, or disabled. |
 | 403 | `FORBIDDEN_SCOPE` | The key lacks the scope the endpoint requires. |
 | 403 | `PLAN_REQUIRES_UPGRADE` | The workspace plan does not include the Public API, or has no room left in a limit it sets — such as CRM entries. |
 | 404 | `NOT_FOUND` | The resource does not exist in this workspace. |
 | 409 | `CONFLICT` | A write collided with something that already exists, such as a tag name or a company name or external id already in use, a changelog slug already taken, a post title whose slug suffixes are all taken, or comments on a post whose conversation is locked. |
-| 429 | `RATE_LIMITED` | Per-key rate limit exceeded. Carries `Retry-After` in seconds. |
+| 429 | `RATE_LIMITED` | Per-key rate limit exceeded. Carries `Retry-After` in seconds, and the `X-RateLimit-*` headers described under [Rate limits](#rate-limits). |
 | 500 | `INTERNAL_ERROR` | Unexpected server failure. |
 | 503 | `SERVICE_UNAVAILABLE` | A required dependency is unavailable; requests fail closed. |
 
@@ -649,7 +773,17 @@ Switch on `_tag`. Codes are append-only within v1 — a new one may appear, an e
 
 Limits are per key, not per IP, and are shared across server instances: **300 requests per minute**, shared by reads and writes. Limits may increase without notice; decreases are announced in advance.
 
-The per-key bucket means a customer behind a shared NAT is not throttled by their neighbours, and a leaked key cannot escape its limit by rotating source IPs. When the limit is exceeded the API returns `429 RATE_LIMITED` with `Retry-After`. If the rate limiter itself is unavailable, requests fail closed with `503 SERVICE_UNAVAILABLE` rather than being admitted unlimited.
+Every successful response, and every `429`, carries the state of the caller's budget:
+
+| Header | Meaning |
+| --- | --- |
+| `X-RateLimit-Limit` | Requests allowed in the current window. |
+| `X-RateLimit-Remaining` | Requests left in the window after this one. |
+| `X-RateLimit-Reset` | When this budget next allows a request, as a Unix timestamp in seconds. |
+
+A request refused before it spends a budget — a missing or invalid key, or a workspace whose plan does not include the API — has no window to describe and carries none of them. The same three headers are sent on the `/mcp` transport.
+
+The per-key bucket means a customer behind a shared NAT is not throttled by their neighbours, and a leaked key cannot escape its limit by rotating source IPs. When the limit is exceeded the API returns `429 RATE_LIMITED` with `Retry-After` and the three headers above. If the rate limiter itself is unavailable, requests fail closed with `503 SERVICE_UNAVAILABLE` rather than being admitted unlimited.
 
 ## Plans
 

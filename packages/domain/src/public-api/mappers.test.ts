@@ -100,6 +100,15 @@ const changelogSource: PublicApiChangelogSource = {
   publishedAt: new Date("2026-08-12T00:00:00.000Z"),
   createdAt: new Date("2026-08-11T00:00:00.000Z"),
   updatedAt: new Date("2026-08-12T09:30:00.000Z"),
+  categories: [
+    {
+      icon: "oklch(0.7 0.15 250)",
+      iconType: "color",
+      id: "chc_new",
+      name: "New",
+    },
+  ],
+  linkedPosts: [{ id: "pst_dark_mode", slug: "dark-mode", title: "Dark mode" }],
 };
 
 const changelogDetail: PublicApiChangelogDetail = {
@@ -108,10 +117,12 @@ const changelogDetail: PublicApiChangelogDetail = {
 };
 
 const CHANGELOG_LIST_KEYS = [
+  "categories",
   "coverImage",
   "createdAt",
   "excerpt",
   "id",
+  "linkedPosts",
   "publishedAt",
   "scheduledAt",
   "slug",
@@ -280,6 +291,20 @@ describe("public API mappers", () => {
     );
 
     expect(Object.keys(encoded).sort()).toEqual(CHANGELOG_LIST_KEYS);
+
+    // A label is named and renderable, and a linked post is a reference: the
+    // full post is the post endpoint.
+    expect(encoded.categories).toEqual([
+      {
+        icon: "oklch(0.7 0.15 250)",
+        iconType: "color",
+        id: "chc_new",
+        name: "New",
+      },
+    ]);
+    expect(encoded.linkedPosts).toEqual([
+      { id: "pst_dark_mode", slug: "dark-mode", title: "Dark mode" },
+    ]);
   });
 
   it("adds only the body on the changelog detail projection", () => {

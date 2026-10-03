@@ -99,11 +99,15 @@ const operations = Object.entries(document.paths).flatMap(([path, item]) =>
   })
 );
 
+const BOARDS_PATH = "/api/v1/boards";
+const BOARD_PATH = "/api/v1/boards/{boardId}";
 const LIST_PATH = "/api/v1/boards/{boardId}/posts";
 const POSTS_PATH = "/api/v1/posts";
 const RETRIEVE_PATH = "/api/v1/posts/retrieve";
 const DETAIL_PATH = "/api/v1/posts/{postId}";
+const POST_ACTIVITY_PATH = "/api/v1/posts/{postId}/activity";
 const SET_POST_TAGS_PATH = "/api/v1/posts/{postId}/tags";
+const STATUSES_PATH = "/api/v1/statuses";
 const TAGS_PATH = "/api/v1/tags";
 const TAG_PATH = "/api/v1/tags/{tagId}";
 const COMPANIES_PATH = "/api/v1/companies";
@@ -131,13 +135,17 @@ describe("PublicApi contract", () => {
   it("publishes exactly the documented endpoints", () => {
     expect(Object.keys(document.paths).sort()).toEqual(
       [
+        BOARDS_PATH,
+        BOARD_PATH,
         LIST_PATH,
         POSTS_PATH,
         RETRIEVE_PATH,
         CHANGELOG_PATH,
         CHANGELOG_ENTRY_PATH,
         DETAIL_PATH,
+        POST_ACTIVITY_PATH,
         SET_POST_TAGS_PATH,
+        STATUSES_PATH,
         POST_COMMENTS_PATH,
         COMMENT_PATH,
         PIN_COMMENT_PATH,
@@ -158,10 +166,12 @@ describe("PublicApi contract", () => {
     // what puts the sections in a deliberate order rather than the order the
     // endpoints happen to be declared in.
     expect(document.tags.map((tag) => tag.name)).toEqual([
+      "Boards",
       "Changelog",
       "Comments",
       "Companies",
       "Posts",
+      "Statuses",
       "Tags",
     ]);
 
@@ -170,13 +180,21 @@ describe("PublicApi contract", () => {
     }
 
     // Every tag an operation carries is one of the sections above: a group
-    // added to the API without being named there would be a sixth section that
-    // this list does not describe.
+    // added to the API without being named there would be a seventh section
+    // that this list does not describe.
     expect(
       [
         ...new Set(operations.flatMap(({ operation }) => operation.tags ?? [])),
       ].sort()
-    ).toEqual(["Changelog", "Comments", "Companies", "Posts", "Tags"]);
+    ).toEqual([
+      "Boards",
+      "Changelog",
+      "Comments",
+      "Companies",
+      "Posts",
+      "Statuses",
+      "Tags",
+    ]);
   });
 
   it("gates every published endpoint on a key and a plan", () => {
@@ -245,12 +263,25 @@ describe("PublicApi contract", () => {
     // The `Retry-After` header is promised by `docs/public-api.md` and asserted
     // at runtime in `api-live.test.ts`; the middleware attaches it through
     // `HttpApiSchema.WithHeaders`, and the document reflects it, so a caller
-    // can see it before it happens.
+    // can see it before it happens. The budget headers travel with it, so a
+    // client generated from this document can pace itself on a success and a
+    // refusal alike.
     expect(JSON.stringify(responses["429"])).toContain("RATE_LIMITED");
     expect(responses["429"]?.headers?.["retry-after"]).toEqual({
       schema: { type: "string" },
       required: true,
     });
+
+    for (const header of [
+      "x-ratelimit-limit",
+      "x-ratelimit-remaining",
+      "x-ratelimit-reset",
+    ]) {
+      expect(responses["429"]?.headers?.[header]).toEqual({
+        schema: { type: "string" },
+        required: true,
+      });
+    }
   });
 
   it("promises a conflict only from the endpoints that write", () => {
@@ -348,16 +379,35 @@ describe("PublicApi contract", () => {
     expect(Object.keys(retrieveResponses).sort()).toEqual(READ_RESPONSE_CODES);
     expect(JSON.stringify(retrieveResponses)).not.toContain("CONFLICT");
 
-    // The list is the workspace-wide page: same query parameters as a board's
-    // list, which is what lets a caller page both with one rule.
+    // The list is the workspace-wide page: the board's list plus the board
+    // filter itself, and the filters an integration syncs with.
     const listParameters = (
       document.paths[POSTS_PATH]?.get?.parameters ?? []
     ).map((parameter) => parameter.name);
     expect(listParameters.sort()).toEqual([
+      "boardId",
       "cursor",
       "includeArchived",
       "limit",
       "status",
+      "tagIds",
+      "updatedAfter",
+    ]);
+
+    // A board's list names its board through the path rather than a query
+    // parameter, and takes the same filters otherwise; the document reports
+    // both forms as parameters, which is why the two name lists agree.
+    const boardListParameters = (
+      document.paths[LIST_PATH]?.get?.parameters ?? []
+    ).map((parameter) => parameter.name);
+    expect(boardListParameters.sort()).toEqual([
+      "boardId",
+      "cursor",
+      "includeArchived",
+      "limit",
+      "status",
+      "tagIds",
+      "updatedAfter",
     ]);
 
     // The retrieve lookup accepts an id, a board, and a slug, all optional;
@@ -477,6 +527,102 @@ describe("PublicApi contract", () => {
     expect(body).not.toContain("createdAt");
   });
 
+  it("documents the status catalog as a complete ordered list", () => {
+    const responses = document.paths[STATUSES_PATH]?.get?.responses ?? {};
+
+    // A status read has no input to get wrong and nothing to collide with, so
+    // it answers the read vocabulary and never a conflict.
+    expect(Object.keys(responses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(JSON.stringify(responses)).not.toContain("CONFLICT");
+
+    const body = JSON.stringify(responses["200"]);
+    for (const field of ["id", "name", "type", "orderIndex", "color"]) {
+      expect(body).toContain(field);
+    }
+
+    // `post_status` also carries the workspace; the key already names it.
+    expect(body).not.toContain("organizationId");
+
+    // Deliberately not a page: a workspace has a handful of statuses, ordered
+    // by the workspace's own `orderIndex` rather than by age, so a cursor on
+    // the shared `(createdAt, id)` tuple would order them the wrong way.
+    expect(body).not.toContain("nextCursor");
+  });
+
+  it("documents the post timeline without an internal actor identifier", () => {
+    const responses = document.paths[POST_ACTIVITY_PATH]?.get?.responses ?? {};
+
+    // Reading a post's history is a read: it cannot collide with anything, and
+    // it can report a missing post.
+    expect(Object.keys(responses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(JSON.stringify(responses)).not.toContain("CONFLICT");
+
+    const body = JSON.stringify(responses["200"]);
+    for (const field of [
+      "id",
+      "kind",
+      "actor",
+      "previousValue",
+      "nextValue",
+      "commentId",
+      "createdAt",
+      "nextCursor",
+    ]) {
+      expect(body).toContain(field);
+    }
+
+    // `post_activity` also carries the workspace, the actor's user and member
+    // ids, and the on-behalf metadata; none of them has a name in this
+    // contract, and the key already names the workspace.
+    for (const forbidden of [
+      "organizationId",
+      "actorId",
+      "actorMemberId",
+      "metadata",
+      "postId",
+    ]) {
+      expect(body).not.toContain(forbidden);
+    }
+  });
+
+  it("documents the board resource without an internal identifier", () => {
+    const listResponses = document.paths[BOARDS_PATH]?.get?.responses ?? {};
+    const getResponses = document.paths[BOARD_PATH]?.get?.responses ?? {};
+
+    // Both read a board, so neither promises a conflict and neither can answer
+    // a missing-resource status it never returns.
+    expect(Object.keys(listResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(Object.keys(getResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(JSON.stringify(listResponses)).not.toContain("CONFLICT");
+    expect(JSON.stringify(getResponses)).not.toContain("CONFLICT");
+
+    const listBody = JSON.stringify(listResponses["200"]);
+    expect(listBody).toContain("nextCursor");
+
+    const body = JSON.stringify(getResponses["200"]);
+    for (const field of [
+      "id",
+      "name",
+      "slug",
+      "visibility",
+      "url",
+      "createdAt",
+      "updatedAt",
+    ]) {
+      expect(body).toContain(field);
+    }
+
+    // `board` also carries the workspace and the member who created it; the
+    // key already names the workspace, so neither has a name in this contract.
+    for (const forbidden of [
+      "organizationId",
+      "creatorId",
+      "creatorMemberId",
+    ]) {
+      expect(body).not.toContain(forbidden);
+    }
+  });
+
   it("documents the tag resource without an internal identifier", () => {
     const createResponses = document.paths[TAGS_PATH]?.post?.responses ?? {};
     const body = JSON.stringify(createResponses["201"]);
@@ -587,17 +733,20 @@ describe("PublicApi contract", () => {
       "createdAt",
       "updatedAt",
       "content",
+      "categories",
+      "linkedPosts",
     ]) {
       expect(createBody).toContain(field);
     }
 
     // The dashboard's `Changelog` carries actor identifiers and the workspace
-    // id; none of them has a name in this contract.
+    // id; neither the entry nor its labels and linked posts may name them.
     for (const forbidden of [
       "creatorId",
       "creatorMemberId",
       "organizationId",
       "userId",
+      "categoryId",
     ]) {
       expect(createBody).not.toContain(forbidden);
     }

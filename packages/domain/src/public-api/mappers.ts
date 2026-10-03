@@ -6,8 +6,10 @@
  * that want the whole set at once.
  */
 
+export * from "../board/public-api/mappers";
 export * from "../changelog/public-api/mappers";
 export * from "../comments/public-api/mappers";
 export * from "../company/public-api/mappers";
 export * from "../post/public-api/mappers";
+export * from "../post-status/public-api/mappers";
 export * from "../tag/public-api/mappers";

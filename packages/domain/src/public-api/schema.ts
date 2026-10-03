@@ -16,8 +16,10 @@
  */
 
 export * from "./common";
+export * from "../board/public-api/schema";
 export * from "../changelog/public-api/schema";
 export * from "../comments/public-api/schema";
 export * from "../company/public-api/schema";
 export * from "../post/public-api/schema";
+export * from "../post-status/public-api/schema";
 export * from "../tag/public-api/schema";

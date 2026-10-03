@@ -2,11 +2,13 @@ import {
   hasPublicApiScope,
   type PublicApiScope,
 } from "@feeblo/domain-contracts/public-api-scope";
+import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
+import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 import type { HttpApiSchemaError } from "effect/unstable/httpapi/HttpApiError";
 import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
 import * as HttpApiSecurity from "effect/unstable/httpapi/HttpApiSecurity";
@@ -15,7 +17,11 @@ import * as OpenApi from "effect/unstable/httpapi/OpenApi";
 import { Auth } from "../auth-handler";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { RateLimitService } from "../rate-limit/service";
-import { authenticatePublicApiKey, type PublicApiCall } from "./api-key-auth";
+import {
+  authenticatePublicApiKey,
+  type PublicApiCall,
+  publicApiRateLimitHeaders,
+} from "./api-key-auth";
 import {
   forbiddenScopeError,
   invalidRequestError,
@@ -145,9 +151,18 @@ export const makeApiKeyAuthMiddlewareLive = (
             );
 
             // The effect is the endpoint this middleware wraps; give it the
-            // caller now that the key is verified and paid for.
+            // caller now that the key is verified and paid for, and describe
+            // the budget that request spent on the response it produced.
+            // `X-RateLimit-Reset` is derived from the clock at response time,
+            // not at consume time, so a slow handler still reports a reset
+            // instant that is still ahead of the caller.
+            const now = yield* Clock.currentTimeMillis;
+            const headers = publicApiRateLimitHeaders(call.rateLimit, now);
             return yield* effect.pipe(
-              Effect.provideService(PublicApiCaller, call)
+              Effect.provideService(PublicApiCaller, call),
+              Effect.map((response) =>
+                HttpServerResponse.setHeaders(response, headers)
+              )
             );
           }),
       });

@@ -1,3 +1,4 @@
+import * as Clock from "effect/Clock";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -22,6 +23,7 @@ import {
   authenticatePublicApiKey,
   type PublicApiAuthenticationFailure,
   type PublicApiKeyBudget,
+  publicApiRateLimitHeaders,
 } from "./api-key-auth";
 import {
   InternalError,
@@ -298,7 +300,22 @@ const makePublicApiMcpKeyMiddleware = (budget: PublicApiKeyBudget) =>
               onFailure: (failure) =>
                 Effect.succeed(publicApiFailureResponse(failure)),
               onSuccess: (call) =>
-                Effect.provideService(httpEffect, PublicApiCaller, call),
+                Effect.gen(function* () {
+                  // The same `X-RateLimit-*` headers the HTTP surface sends,
+                  // for the same reason: a client pacing itself should not
+                  // have to learn the budget from a 429.
+                  const now = yield* Clock.currentTimeMillis;
+                  const headers = publicApiRateLimitHeaders(
+                    call.rateLimit,
+                    now
+                  );
+                  return yield* httpEffect.pipe(
+                    Effect.provideService(PublicApiCaller, call),
+                    Effect.map((response) =>
+                      HttpServerResponse.setHeaders(response, headers)
+                    )
+                  );
+                }),
             })
           );
         });
