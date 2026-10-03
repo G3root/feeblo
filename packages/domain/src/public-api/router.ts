@@ -9,6 +9,7 @@ import { PublicApiCommentRepository } from "../comments/public-api/repository";
 import { CommentRepository } from "../comments/repository";
 import { CommentService } from "../comments/service";
 import { CompanyRepository } from "../company/repository";
+import { PublicApiEndUserRepository } from "../contact/public-api/repository";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
@@ -139,6 +140,7 @@ export const makePublicApiRoute = <E, R>(
         PublicApiCommentRepository.layer.pipe(
           Layer.provide(PublicApiInternals)
         ),
+        PublicApiEndUserRepository.layer,
         PublicApiPostRepository.layer.pipe(Layer.provide(PublicApiInternals)),
         PublicApiVoteRepository.layer.pipe(Layer.provide(PublicApiInternals))
       )

@@ -53,6 +53,8 @@ import {
   PublicApiCommentPage,
   PublicApiCompany,
   PublicApiCompanyPage,
+  PublicApiEndUser,
+  PublicApiEndUserPage,
   PublicApiPost,
   PublicApiPostActivityPage,
   PublicApiPostPage,
@@ -162,6 +164,12 @@ const decodeVote = Schema.decodeUnknownSync(
 );
 const decodeVotePage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiVotePage)
+);
+const decodeEndUser = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiEndUser)
+);
+const decodeEndUserPage = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiEndUserPage)
 );
 const decodeDocument = Schema.decodeUnknownSync(
   Schema.fromJsonString(OpenApiDocument)
@@ -679,10 +687,10 @@ const COMPANY_MANAGEMENT_KEY_SCOPES = {
   companies: ["read", "create", "update", "delete"],
 };
 
-/** The post reads plus every post write. */
+/** The post reads plus every post write, merge included. */
 const POST_MANAGEMENT_KEY_SCOPES = {
   boards: ["read"],
-  posts: ["read", "create", "update", "delete"],
+  posts: ["read", "create", "update", "delete", "merge"],
   tags: ["read"],
 };
 
@@ -710,6 +718,16 @@ const VOTE_MANAGEMENT_KEY_SCOPES = {
   boards: ["read"],
   posts: ["read"],
   votes: ["read", "create", "delete"],
+};
+
+/**
+ * The end-user capability, which is not implied by the read scopes: a key
+ * minted to read feedback does not learn the workspace's customers.
+ */
+const END_USER_MANAGEMENT_KEY_SCOPES = {
+  boards: ["read"],
+  posts: ["read"],
+  end_users: ["read", "write"],
 };
 
 const registerKey = (
@@ -4646,6 +4664,458 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect("filters votes by voter and lists them across the workspace", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace({ postCount: 2 });
+      const targetPostId = `${workspace.postId}_1`;
+      registerKey(
+        "fbk_votes_filter",
+        workspace.organizationId,
+        VOTE_MANAGEMENT_KEY_SCOPES
+      );
+
+      const vera = yield* executeWrite(
+        "POST",
+        `/api/v1/posts/${workspace.postId}/votes`,
+        {
+          apiKey: "fbk_votes_filter",
+          body: {
+            author: {
+              email: "Vera@Example.com",
+              externalId: "crm-vera",
+              name: "Vera",
+            },
+          },
+        }
+      );
+      expect(vera.status).toBe(201);
+      const veraVote = decodeVote(responseBody(vera));
+      // The voter's end-user record is what the workspace can join on.
+      expect(veraVote.voterId).not.toBeNull();
+
+      const sam = yield* executeWrite(
+        "POST",
+        `/api/v1/posts/${targetPostId}/votes`,
+        {
+          apiKey: "fbk_votes_filter",
+          body: { author: { email: "sam@example.com", name: "Sam" } },
+        }
+      );
+      expect(sam.status).toBe(201);
+
+      // A post's list narrowed to one customer: the read-back a reconcile
+      // pass needs, matched case-insensitively.
+      const filtered = yield* executeRequest(
+        `/api/v1/posts/${workspace.postId}/votes?voterEmail=VERA@example.com`,
+        "fbk_votes_filter"
+      );
+      expect(filtered.status).toBe(200);
+      const filteredPage = decodeVotePage(responseBody(filtered));
+      expect(filteredPage.data).toHaveLength(1);
+      expect(filteredPage.data[0]?.author.displayName).toBe("Vera");
+
+      // The same customer by the end-user record id, and by the caller's own
+      // external id.
+      const byContactId = yield* executeRequest(
+        `/api/v1/votes?voterId=${veraVote.voterId}`,
+        "fbk_votes_filter"
+      );
+      expect(decodeVotePage(responseBody(byContactId)).data).toHaveLength(1);
+
+      const byExternalId = yield* executeRequest(
+        "/api/v1/votes?voterExternalId=crm-vera",
+        "fbk_votes_filter"
+      );
+      expect(decodeVotePage(responseBody(byExternalId)).data).toHaveLength(1);
+
+      // The workspace-wide list sees both; the post and board filters narrow
+      // it without a second endpoint.
+      const all = yield* executeRequest("/api/v1/votes", "fbk_votes_filter");
+      expect(decodeVotePage(responseBody(all)).data).toHaveLength(2);
+
+      const onTarget = yield* executeRequest(
+        `/api/v1/votes?postId=${targetPostId}`,
+        "fbk_votes_filter"
+      );
+      expect(decodeVotePage(responseBody(onTarget)).data).toHaveLength(1);
+
+      const onBoard = yield* executeRequest(
+        `/api/v1/votes?boardId=${workspace.boardId}`,
+        "fbk_votes_filter"
+      );
+      expect(decodeVotePage(responseBody(onBoard)).data).toHaveLength(2);
+
+      // A voter nobody matches is an empty page, not an error; an id that
+      // names nothing in the workspace is not found, exactly as the per-post
+      // list answers.
+      const nobody = yield* executeRequest(
+        "/api/v1/votes?voterEmail=nobody@example.com",
+        "fbk_votes_filter"
+      );
+      expect(nobody.status).toBe(200);
+      expect(decodeVotePage(responseBody(nobody)).data).toHaveLength(0);
+
+      const missingPost = yield* executeRequest(
+        "/api/v1/votes?postId=pst_missing",
+        "fbk_votes_filter"
+      );
+      expect(missingPost.status).toBe(404);
+      expect(decodeError(responseBody(missingPost))._tag).toBe("NOT_FOUND");
+
+      const missingBoard = yield* executeRequest(
+        "/api/v1/votes?boardId=brd_missing",
+        "fbk_votes_filter"
+      );
+      expect(missingBoard.status).toBe(404);
+      expect(decodeError(responseBody(missingBoard))._tag).toBe("NOT_FOUND");
+    })
+  );
+
+  it.effect("returns a vote once when the voter has two contact records", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace({ withVotesAndComments: true });
+      const db = yield* currentDb;
+      registerKey("fbk_votes_dupe", workspace.organizationId);
+
+      // `contact.user_id` is indexed but not unique per workspace, so a voter
+      // can have more than one contact row. The list must still report the
+      // vote once, with a deterministic record, rather than duplicating it and
+      // letting the page cursor skip one of the copies.
+      const now = new Date();
+      const userId = `user_voter_${workspace.organizationId}`;
+      for (const id of ["cnt_dupe_a", "cnt_dupe_b"]) {
+        yield* db.insert(schema.contactTable).values({
+          id,
+          organizationId: workspace.organizationId,
+          userId,
+          externalId: id === "cnt_dupe_a" ? "crm-a" : "crm-b",
+          email: `${id}@example.com`,
+          name: "Voter",
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+
+      const response = yield* executeRequest(
+        `/api/v1/posts/${workspace.postId}/votes`,
+        "fbk_votes_dupe"
+      );
+      expect(response.status).toBe(200);
+      const page = decodeVotePage(responseBody(response));
+      expect(page.data).toHaveLength(1);
+      expect(page.data[0]?.voterId).toBe("cnt_dupe_a");
+
+      // A record identifier names the record a vote is published under: the
+      // canonical one matches, and the duplicate that is not that record owns
+      // no votes, so it is an empty page rather than the same vote under a
+      // different label.
+      const canonical = yield* executeRequest(
+        "/api/v1/votes?voterId=cnt_dupe_a",
+        "fbk_votes_dupe"
+      );
+      expect(decodeVotePage(responseBody(canonical)).data).toHaveLength(1);
+
+      const duplicate = yield* executeRequest(
+        "/api/v1/votes?voterId=cnt_dupe_b",
+        "fbk_votes_dupe"
+      );
+      expect(duplicate.status).toBe(200);
+      expect(decodeVotePage(responseBody(duplicate)).data).toHaveLength(0);
+
+      const duplicateExternalId = yield* executeRequest(
+        "/api/v1/votes?voterExternalId=crm-b",
+        "fbk_votes_dupe"
+      );
+      expect(duplicateExternalId.status).toBe(200);
+      expect(
+        decodeVotePage(responseBody(duplicateExternalId)).data
+      ).toHaveLength(0);
+
+      // An email is not a record identifier — it names the person — so it
+      // still finds the vote, reported under the record that owns it.
+      const byDuplicateEmail = yield* executeRequest(
+        "/api/v1/votes?voterEmail=cnt_dupe_b@example.com",
+        "fbk_votes_dupe"
+      );
+      const byDuplicateEmailPage = decodeVotePage(
+        responseBody(byDuplicateEmail)
+      );
+      expect(byDuplicateEmailPage.data).toHaveLength(1);
+      expect(byDuplicateEmailPage.data[0]?.voterId).toBe("cnt_dupe_a");
+    })
+  );
+
+  it.effect(
+    "merges a post into another, moves its engagement, and unmerges it",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace({
+          postCount: 2,
+          withVotesAndComments: true,
+        });
+        const db = yield* currentDb;
+        const targetPostId = `${workspace.postId}_1`;
+        registerKey(
+          "fbk_merge",
+          workspace.organizationId,
+          POST_MANAGEMENT_KEY_SCOPES
+        );
+
+        const merged = yield* executeWrite(
+          "POST",
+          `/api/v1/posts/${workspace.postId}/merge`,
+          { apiKey: "fbk_merge", body: { intoPostId: targetPostId } }
+        );
+        expect(merged.status).toBe(204);
+
+        // The source is archived and points at the survivor, and the engagement
+        // moved with it.
+        const [source] = yield* db
+          .select()
+          .from(schema.postTable)
+          .where(eq(schema.postTable.id, workspace.postId));
+        expect(source?.mergedIntoPostId).toBe(targetPostId);
+        expect(source?.archivedAt).not.toBeNull();
+
+        const movedVotes = yield* db
+          .select()
+          .from(schema.upvoteTable)
+          .where(eq(schema.upvoteTable.postId, targetPostId));
+        expect(movedVotes).toHaveLength(1);
+
+        // Both timelines explain the merge, and a machine key has no actor.
+        const targetActivity = yield* executeRequest(
+          `/api/v1/posts/${targetPostId}/activity`,
+          "fbk_merge"
+        );
+        expect(
+          decodeActivityPage(responseBody(targetActivity)).data[0]
+        ).toMatchObject({ actor: null, kind: "POST_MERGED" });
+        const sourceActivity = yield* executeRequest(
+          `/api/v1/posts/${workspace.postId}/activity`,
+          "fbk_merge"
+        );
+        expect(
+          decodeActivityPage(responseBody(sourceActivity)).data[0]
+        ).toMatchObject({ kind: "POST_MERGED_INTO" });
+
+        // A second merge of the same source is a state conflict, not a silent
+        // success; merging a post into itself is the caller's mistake; an id
+        // that names nothing here is not found.
+        const again = yield* executeWrite(
+          "POST",
+          `/api/v1/posts/${workspace.postId}/merge`,
+          { apiKey: "fbk_merge", body: { intoPostId: targetPostId } }
+        );
+        expect(again.status).toBe(409);
+        expect(decodeError(responseBody(again))._tag).toBe("CONFLICT");
+
+        const self = yield* executeWrite(
+          "POST",
+          `/api/v1/posts/${targetPostId}/merge`,
+          { apiKey: "fbk_merge", body: { intoPostId: targetPostId } }
+        );
+        expect(self.status).toBe(400);
+        expect(decodeError(responseBody(self))._tag).toBe("INVALID_REQUEST");
+
+        const missing = yield* executeWrite(
+          "POST",
+          `/api/v1/posts/${workspace.postId}/merge`,
+          { apiKey: "fbk_merge", body: { intoPostId: "pst_missing" } }
+        );
+        expect(missing.status).toBe(404);
+        expect(decodeError(responseBody(missing))._tag).toBe("NOT_FOUND");
+
+        // Unmerge restores the source, and the engagement returns with it.
+        const unmerged = yield* executeWrite(
+          "POST",
+          `/api/v1/posts/${workspace.postId}/unmerge`,
+          { apiKey: "fbk_merge" }
+        );
+        expect(unmerged.status).toBe(204);
+
+        const [restored] = yield* db
+          .select()
+          .from(schema.postTable)
+          .where(eq(schema.postTable.id, workspace.postId));
+        expect(restored?.mergedIntoPostId).toBeNull();
+        expect(restored?.archivedAt).toBeNull();
+
+        const restoredVotes = yield* db
+          .select()
+          .from(schema.upvoteTable)
+          .where(eq(schema.upvoteTable.postId, workspace.postId));
+        expect(restoredVotes).toHaveLength(1);
+
+        const notMerged = yield* executeWrite(
+          "POST",
+          `/api/v1/posts/${workspace.postId}/unmerge`,
+          { apiKey: "fbk_merge" }
+        );
+        expect(notMerged.status).toBe(409);
+        expect(decodeError(responseBody(notMerged))._tag).toBe("CONFLICT");
+      })
+  );
+
+  it.effect("refuses a merge to a key without the merge scope", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace({ postCount: 2 });
+      registerKey(
+        "fbk_merge_editor",
+        workspace.organizationId,
+        POST_EDITOR_KEY_SCOPES
+      );
+
+      const response = yield* executeWrite(
+        "POST",
+        `/api/v1/posts/${workspace.postId}/merge`,
+        {
+          apiKey: "fbk_merge_editor",
+          body: { intoPostId: `${workspace.postId}_1` },
+        }
+      );
+
+      expect(response.status).toBe(403);
+      expect(decodeError(responseBody(response))._tag).toBe("FORBIDDEN_SCOPE");
+    })
+  );
+
+  it.effect(
+    "creates, reads, and updates end users without returning an email",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        registerKey(
+          "fbk_end_users",
+          workspace.organizationId,
+          END_USER_MANAGEMENT_KEY_SCOPES
+        );
+
+        const created = yield* executeWrite("POST", "/api/v1/end-users", {
+          apiKey: "fbk_end_users",
+          body: {
+            externalId: "crm-1",
+            email: "Ada@Example.com",
+            name: "Ada",
+            avatarUrl: "https://example.com/ada.png",
+          },
+        });
+        expect(created.status).toBe(200);
+        const user = decodeEndUser(responseBody(created));
+        expect(user).toMatchObject({
+          externalId: "crm-1",
+          name: "Ada",
+          avatarUrl: "https://example.com/ada.png",
+        });
+        expect(user.id.startsWith("cnt_")).toBe(true);
+
+        // The email is an input, never an output: a key travels into
+        // third-party infrastructure, and the workspace addresses the person by
+        // the external id it supplied.
+        for (const forbidden of [
+          "email",
+          "phone",
+          "userId",
+          "organizationId",
+        ]) {
+          expect(responseBody(created)).not.toContain(forbidden);
+        }
+
+        // A second upsert by the same email updates the same record rather than
+        // making a second person, whatever case the address is in.
+        const updated = yield* executeWrite("POST", "/api/v1/end-users", {
+          apiKey: "fbk_end_users",
+          body: { email: "ada@example.com", name: "Ada Lovelace" },
+        });
+        expect(updated.status).toBe(200);
+        const updatedUser = decodeEndUser(responseBody(updated));
+        expect(updatedUser.id).toBe(user.id);
+        expect(updatedUser.name).toBe("Ada Lovelace");
+
+        // Read back by id and by the email filter.
+        const byId = yield* executeRequest(
+          `/api/v1/end-users/${user.id}`,
+          "fbk_end_users"
+        );
+        expect(byId.status).toBe(200);
+        expect(decodeEndUser(responseBody(byId)).externalId).toBe("crm-1");
+
+        const list = yield* executeRequest(
+          "/api/v1/end-users?email=ADA@example.com",
+          "fbk_end_users"
+        );
+        expect(list.status).toBe(200);
+        expect(decodeEndUserPage(responseBody(list)).data).toHaveLength(1);
+
+        // An external id and an email that name two different people is the
+        // caller's data disagreeing with itself: refused rather than merged
+        // into one record.
+        const grace = yield* executeWrite("POST", "/api/v1/end-users", {
+          apiKey: "fbk_end_users",
+          body: { email: "grace@example.com", name: "Grace" },
+        });
+        expect(grace.status).toBe(200);
+
+        const conflict = yield* executeWrite("POST", "/api/v1/end-users", {
+          apiKey: "fbk_end_users",
+          body: { externalId: "crm-1", email: "grace@example.com" },
+        });
+        expect(conflict.status).toBe(409);
+        expect(decodeError(responseBody(conflict))._tag).toBe("CONFLICT");
+
+        // Without an identifier there is nothing to match on, and a companyId
+        // that does not exist in the workspace is the caller's input.
+        const anonymous = yield* executeWrite("POST", "/api/v1/end-users", {
+          apiKey: "fbk_end_users",
+          body: { name: "Nobody" },
+        });
+        expect(anonymous.status).toBe(400);
+
+        const badCompany = yield* executeWrite("POST", "/api/v1/end-users", {
+          apiKey: "fbk_end_users",
+          body: { externalId: "crm-2", companyId: "cmp_missing" },
+        });
+        expect(badCompany.status).toBe(400);
+
+        // An end user of another workspace is not found, so an id cannot probe.
+        const other = yield* seedWorkspace();
+        registerKey(
+          "fbk_end_users_other",
+          other.organizationId,
+          END_USER_MANAGEMENT_KEY_SCOPES
+        );
+        const foreign = yield* executeRequest(
+          `/api/v1/end-users/${user.id}`,
+          "fbk_end_users_other"
+        );
+        expect(foreign.status).toBe(404);
+        expect(decodeError(responseBody(foreign))._tag).toBe("NOT_FOUND");
+      })
+  );
+
+  it.effect("refuses end-user reads to a key without the capability", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      // The default grant reads feedback; the customer roster is opt-in, like
+      // companies.
+      registerKey("fbk_end_users_default", workspace.organizationId);
+
+      const list = yield* executeRequest(
+        "/api/v1/end-users",
+        "fbk_end_users_default"
+      );
+      expect(list.status).toBe(403);
+      expect(decodeError(responseBody(list))._tag).toBe("FORBIDDEN_SCOPE");
+
+      const upsert = yield* executeWrite("POST", "/api/v1/end-users", {
+        apiKey: "fbk_end_users_default",
+        body: { email: "ada@example.com" },
+      });
+      expect(upsert.status).toBe(403);
+      expect(decodeError(responseBody(upsert))._tag).toBe("FORBIDDEN_SCOPE");
+    })
+  );
+
   it.effect("serves its own OpenAPI document without a key", () =>
     Effect.gen(function* () {
       const response = yield* executeRequest("/api/v1/openapi.json");
@@ -4665,17 +5135,22 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/{commentId}/unpin",
         "/api/v1/companies",
         "/api/v1/companies/{companyId}",
+        "/api/v1/end-users",
+        "/api/v1/end-users/{endUserId}",
         "/api/v1/posts",
         "/api/v1/posts/retrieve",
         "/api/v1/posts/{postId}",
         "/api/v1/posts/{postId}/activity",
         "/api/v1/posts/{postId}/comments",
+        "/api/v1/posts/{postId}/merge",
         "/api/v1/posts/{postId}/tags",
+        "/api/v1/posts/{postId}/unmerge",
         "/api/v1/posts/{postId}/votes",
         "/api/v1/posts/{postId}/votes/{voteId}",
         "/api/v1/statuses",
         "/api/v1/tags",
         "/api/v1/tags/{tagId}",
+        "/api/v1/votes",
       ]);
     })
   );
@@ -5551,6 +6026,56 @@ layer(
         );
         expect(listed.status).toBe(200);
         expect(decodeCompanyPage(responseBody(listed)).data).toHaveLength(0);
+      })
+  );
+
+  it.effect(
+    "refuses an end-user create the plan has no room for, and still allows updates",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const db = yield* currentDb;
+        registerKey(
+          "fbk_crm_denied_users",
+          workspace.organizationId,
+          END_USER_MANAGEMENT_KEY_SCOPES
+        );
+
+        const created = yield* executeWrite("POST", "/api/v1/end-users", {
+          apiKey: "fbk_crm_denied_users",
+          body: { externalId: "crm-1", email: "ada@example.com" },
+        });
+        expect(created.status).toBe(403);
+        expect(decodeError(responseBody(created))._tag).toBe(
+          "PLAN_REQUIRES_UPGRADE"
+        );
+
+        // Nothing was written.
+        const rows = yield* db
+          .select()
+          .from(schema.contactTable)
+          .where(
+            eq(schema.contactTable.organizationId, workspace.organizationId)
+          );
+        expect(rows).toHaveLength(0);
+
+        // An update adds nothing to the count the plan caps, so it is not
+        // blocked by a workspace already at the limit.
+        const now = new Date();
+        yield* db.insert(schema.contactTable).values({
+          id: "cnt_existing",
+          organizationId: workspace.organizationId,
+          email: "grace@example.com",
+          name: "Grace",
+          createdAt: now,
+          updatedAt: now,
+        });
+        const updated = yield* executeWrite("POST", "/api/v1/end-users", {
+          apiKey: "fbk_crm_denied_users",
+          body: { email: "grace@example.com", name: "Grace Hopper" },
+        });
+        expect(updated.status).toBe(200);
+        expect(decodeEndUser(responseBody(updated)).name).toBe("Grace Hopper");
       })
   );
 });

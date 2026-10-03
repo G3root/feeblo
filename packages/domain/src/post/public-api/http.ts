@@ -7,6 +7,7 @@ import type { PublicApiPostGroup } from "../../public-api/api-contract";
 import {
   PUBLIC_API_CREATE_ERROR_SCHEMAS,
   PUBLIC_API_ERROR_SCHEMAS,
+  PUBLIC_API_WRITE_ERROR_SCHEMAS,
 } from "../../public-api/errors";
 import type { HandlerOf } from "../../public-api/handler";
 import {
@@ -22,8 +23,10 @@ import {
   listBoardPostsOperation,
   listPostActivityOperation,
   listPostsOperation,
+  mergePostOperation,
   retrievePostOperation,
   setPostTagsOperation,
+  unmergePostOperation,
   updatePostOperation,
 } from "./operations";
 import {
@@ -35,6 +38,8 @@ import {
   ListPostActivityParams,
   ListPostActivityQuery,
   ListPostsQuery,
+  MergePostParams,
+  MergePostPayload,
   PublicApiPost,
   PublicApiPostActivityPage,
   PublicApiPostPage,
@@ -42,6 +47,7 @@ import {
   RetrievePostQuery,
   SetPostTagsParams,
   SetPostTagsPayload,
+  UnmergePostParams,
   UpdatePostParams,
   UpdatePostPayload,
 } from "./schema";
@@ -154,6 +160,29 @@ export const postEndpoints = [
       OpenApi.Description,
       "Deletes a post and cannot be undone. A key holding this scope deletes without the dashboard's creator and engagement restriction: it is the workspace's own credential, not a member acting on their own posts. Deleting a post that absorbed merged duplicates restores those duplicates to the board rather than orphaning them. A merged post is refused, and a post that is already gone is reported as not found."
     ),
+  HttpApiEndpoint.post("mergePost", "/posts/:postId/merge", {
+    params: MergePostParams,
+    payload: MergePostPayload,
+    success: HttpApiSchema.NoContent,
+    error: PUBLIC_API_WRITE_ERROR_SCHEMAS,
+  })
+    .annotate(OpenApi.Title, "Merge Post")
+    .annotate(OpenApi.Summary, "Merge a post into another post")
+    .annotate(
+      OpenApi.Description,
+      "Archives this post and moves its comments, votes, tags, and subscriptions to the post named by `intoPostId`. Both posts' timelines record the merge, the voters and subscribers of both are notified, and the archived post stays readable — its timeline says where it went. Reversible with unmerge. A post of another workspace, an archived post, a post that has already been merged, and a post that has itself absorbed a duplicate are all refused, the last three with `CONFLICT`."
+    ),
+  HttpApiEndpoint.post("unmergePost", "/posts/:postId/unmerge", {
+    params: UnmergePostParams,
+    success: HttpApiSchema.NoContent,
+    error: PUBLIC_API_WRITE_ERROR_SCHEMAS,
+  })
+    .annotate(OpenApi.Title, "Unmerge Post")
+    .annotate(OpenApi.Summary, "Restore a merged post")
+    .annotate(
+      OpenApi.Description,
+      "Restores a post that was merged into another: its comments, votes, tags, subscriptions, and changelog links return to it and it reappears on its board. The post named by the path is the archived source, so a caller that merged `A` into `B` unmerges by naming `A`. A post that is not merged is refused with `CONFLICT`."
+    ),
 ] as const;
 
 export const postHandlers = {
@@ -250,4 +279,15 @@ export const postHandlers = {
     deletePostOperation.handler({
       postId: params.postId,
     })) satisfies HandlerOf<PublicApiGroup, "deletePost">,
+
+  mergePost: (({ params, payload }) =>
+    mergePostOperation.handler({
+      intoPostId: payload.intoPostId,
+      postId: params.postId,
+    })) satisfies HandlerOf<PublicApiGroup, "mergePost">,
+
+  unmergePost: (({ params }) =>
+    unmergePostOperation.handler({
+      postId: params.postId,
+    })) satisfies HandlerOf<PublicApiGroup, "unmergePost">,
 };

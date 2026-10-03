@@ -120,6 +120,11 @@ const PIN_COMMENT_PATH = "/api/v1/comments/{commentId}/pin";
 const UNPIN_COMMENT_PATH = "/api/v1/comments/{commentId}/unpin";
 const POST_VOTES_PATH = "/api/v1/posts/{postId}/votes";
 const VOTE_PATH = "/api/v1/posts/{postId}/votes/{voteId}";
+const VOTES_PATH = "/api/v1/votes";
+const MERGE_PATH = "/api/v1/posts/{postId}/merge";
+const UNMERGE_PATH = "/api/v1/posts/{postId}/unmerge";
+const END_USERS_PATH = "/api/v1/end-users";
+const END_USER_PATH = "/api/v1/end-users/{endUserId}";
 
 /** The statuses every endpoint of the API can answer with, as the base set. */
 const READ_RESPONSE_CODES = [
@@ -156,8 +161,13 @@ describe("PublicApi contract", () => {
         TAG_PATH,
         COMPANIES_PATH,
         COMPANY_PATH,
+        END_USERS_PATH,
+        END_USER_PATH,
         POST_VOTES_PATH,
         VOTE_PATH,
+        VOTES_PATH,
+        MERGE_PATH,
+        UNMERGE_PATH,
       ].sort()
     );
   });
@@ -174,6 +184,7 @@ describe("PublicApi contract", () => {
       "Changelog",
       "Comments",
       "Companies",
+      "End users",
       "Posts",
       "Statuses",
       "Tags",
@@ -196,6 +207,7 @@ describe("PublicApi contract", () => {
       "Changelog",
       "Comments",
       "Companies",
+      "End users",
       "Posts",
       "Statuses",
       "Tags",
@@ -906,7 +918,7 @@ describe("PublicApi contract", () => {
     ]);
 
     const body = JSON.stringify(createResponses["201"]);
-    for (const field of ["id", "postId", "author", "createdAt"]) {
+    for (const field of ["id", "postId", "voterId", "author", "createdAt"]) {
       expect(body).toContain(field);
     }
 
@@ -929,5 +941,164 @@ describe("PublicApi contract", () => {
 
     const listBody = JSON.stringify(listResponses["200"]);
     expect(listBody).toContain("nextCursor");
+  });
+
+  it("documents the workspace vote list and its voter filter", () => {
+    const listOperation = document.paths[VOTES_PATH]?.get;
+    const listResponses = listOperation?.responses ?? {};
+
+    // The list is a read: it cannot collide with anything, and a missing post
+    // or board is reported as not found rather than as an empty page.
+    expect(Object.keys(listResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(JSON.stringify(listResponses)).not.toContain("CONFLICT");
+
+    const names = (listOperation?.parameters ?? []).map(
+      (parameter) => parameter.name
+    );
+    for (const name of [
+      "limit",
+      "cursor",
+      "postId",
+      "boardId",
+      "voterId",
+      "voterExternalId",
+      "voterEmail",
+    ]) {
+      expect(names).toContain(name);
+    }
+
+    // The vote carries the end-user record it belongs to — null for a
+    // member's vote — and still no account identifier or email.
+    const body = JSON.stringify(listResponses["200"]);
+    expect(body).toContain("voterId");
+    for (const forbidden of [
+      "userId",
+      "memberId",
+      "mergedFromPostId",
+      "email",
+    ]) {
+      expect(body).not.toContain(forbidden);
+    }
+  });
+
+  it("documents the merge endpoints and their state conflicts", () => {
+    const mergeResponses = document.paths[MERGE_PATH]?.post?.responses ?? {};
+    const unmergeResponses =
+      document.paths[UNMERGE_PATH]?.post?.responses ?? {};
+
+    // Both answer 204: the source is archived rather than removed, and the
+    // resource a caller would read next is the survivor. Both can be refused
+    // by either post's state, so both publish the conflict.
+    expect(Object.keys(mergeResponses).sort()).toEqual([
+      "204",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "429",
+      "500",
+      "503",
+    ]);
+    expect(Object.keys(unmergeResponses).sort()).toEqual([
+      "204",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "429",
+      "500",
+      "503",
+    ]);
+    expect(JSON.stringify(mergeResponses["409"])).toContain("CONFLICT");
+    expect(JSON.stringify(unmergeResponses["409"])).toContain("CONFLICT");
+
+    // The survivor is named in the body and the source in the path, so the
+    // two can never disagree about which post is being archived.
+    const requestBody = JSON.stringify(
+      document.paths[MERGE_PATH]?.post?.requestBody
+    );
+    expect(requestBody).toContain("intoPostId");
+  });
+
+  it("documents the end-user resource without an email or account identifier", () => {
+    const listOperation = document.paths[END_USERS_PATH]?.get;
+    const listResponses = listOperation?.responses ?? {};
+    const getResponses = document.paths[END_USER_PATH]?.get?.responses ?? {};
+    const upsertOperation = document.paths[END_USERS_PATH]?.post;
+    const upsertResponses = upsertOperation?.responses ?? {};
+
+    expect(Object.keys(listResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(Object.keys(getResponses).sort()).toEqual(READ_RESPONSE_CODES);
+    // An upsert answers 200 whether it created or updated: the caller cannot
+    // know which it will be, and the record it asked for is the answer either
+    // way. A conflict is possible because an identifier may already belong to
+    // a different end user.
+    expect(Object.keys(upsertResponses).sort()).toEqual([
+      "200",
+      "400",
+      "401",
+      "403",
+      "409",
+      "429",
+      "500",
+      "503",
+    ]);
+
+    const body = JSON.stringify(upsertResponses["200"]);
+    for (const field of [
+      "id",
+      "externalId",
+      "name",
+      "avatarUrl",
+      "companyId",
+      "createdAt",
+      "updatedAt",
+    ]) {
+      expect(body).toContain(field);
+    }
+
+    // The email is an input and a filter, never a response field: a key
+    // travels into third-party infrastructure, and the workspace can address
+    // the person by the external id it supplied. The account behind the
+    // record is an internal actor identifier and has no name here at all.
+    for (const forbidden of [
+      "email",
+      "phone",
+      "userId",
+      "organizationId",
+      "source",
+    ]) {
+      expect(body).not.toContain(forbidden);
+    }
+
+    const requestBody = JSON.stringify(upsertOperation?.requestBody);
+    for (const field of [
+      "externalId",
+      "email",
+      "name",
+      "avatarUrl",
+      "companyId",
+    ]) {
+      expect(requestBody).toContain(field);
+    }
+
+    const names = (listOperation?.parameters ?? []).map(
+      (parameter) => parameter.name
+    );
+    for (const name of [
+      "limit",
+      "cursor",
+      "externalId",
+      "email",
+      "companyId",
+    ]) {
+      expect(names).toContain(name);
+    }
+
+    const listBody = JSON.stringify(listResponses["200"]);
+    expect(listBody).toContain("nextCursor");
+    expect(listBody).not.toContain("email");
   });
 });

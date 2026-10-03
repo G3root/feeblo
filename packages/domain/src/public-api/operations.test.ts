@@ -10,15 +10,18 @@ import {
   ListBoardsInput,
   ListChangelogInput,
   ListCompaniesInput,
+  ListEndUsersInput,
   ListPostCommentsInput,
   ListPostActivityInput,
   ListPostVotesInput,
   ListPostsInput,
   ListTagsInput,
+  ListVotesInput,
   PublicApiBoardPage,
   PublicApiChangelogPage,
   PublicApiCommentPage,
   PublicApiCompanyPage,
+  PublicApiEndUserPage,
   PublicApiPostActivityPage,
   PublicApiPostPage,
   PublicApiTagPage,
@@ -73,6 +76,8 @@ describe("public API operations registry", () => {
       ListTagsInput,
       ListCompaniesInput,
       ListChangelogInput,
+      ListEndUsersInput,
+      ListVotesInput,
     ];
     const pageOutputs = [
       PublicApiBoardPage,
@@ -83,6 +88,7 @@ describe("public API operations registry", () => {
       PublicApiTagPage,
       PublicApiCompanyPage,
       PublicApiChangelogPage,
+      PublicApiEndUserPage,
     ];
 
     for (const input of listInputs) {

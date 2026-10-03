@@ -49,6 +49,7 @@ import { UserRepository } from "../../user/repository";
 import {
   FailedToCreatePostError,
   FailedToDeletePostError,
+  FailedToMergePostError,
   FailedToUpdatePostError,
   PostAlreadyExistsError,
   PostNotFoundError,
@@ -294,6 +295,63 @@ const mapPostWriteFailure = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
         Schema.is(ConflictError)(mapped) ? internalError() : mapped
       );
     })
+  );
+
+/**
+ * Why a merge or an unmerge was refused, on the published vocabulary.
+ *
+ * The repository reports the state in `reason` rather than only in prose, so a
+ * missing post is a `NOT_FOUND` and an archived or already-merged one is a
+ * `CONFLICT` without this mapping having to read the message.
+ */
+const toPublicMergeFailure = (
+  cause: FailedToMergePostError
+): NotFoundError | InvalidRequestError | ConflictError => {
+  switch (cause.reason) {
+    case "post_not_found":
+      return notFoundError("Post not found.");
+    case "same_post":
+      return invalidRequestError("A post cannot be merged into itself.");
+    case "post_not_merged":
+      return conflictError("This post is not merged into another post.");
+    case "source_merged":
+      return conflictError(
+        "This post has already been merged into another post."
+      );
+    case "target_merged":
+      return conflictError(
+        "The post to merge into has already been merged into another post."
+      );
+    case "source_archived":
+      return conflictError(
+        "This post is archived and cannot be merged into another post."
+      );
+    case "target_archived":
+      return conflictError(
+        "The post to merge into is archived and cannot absorb a duplicate."
+      );
+    case "source_has_children":
+      return conflictError(
+        "This post has absorbed another post and cannot be merged again."
+      );
+  }
+};
+
+/**
+ * The merge and unmerge endpoints' failures.
+ *
+ * Neither writes a slug, so neither can collide on one, and every refusal the
+ * shared path can produce is a state the public vocabulary already names.
+ */
+const mapPostMergeFailure = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  effect.pipe(
+    Effect.catch((cause) =>
+      Effect.fail(
+        Schema.is(FailedToMergePostError)(cause)
+          ? toPublicMergeFailure(cause)
+          : toPublicPostWriteError(cause)
+      )
+    )
   );
 
 /**
@@ -938,6 +996,58 @@ const makePublicApiPostRepository = Effect.gen(function* () {
           providePostWriteEnvironment
         );
       }),
+
+    /**
+     * Folds one post into another, and reverts that.
+     *
+     * The move, the two timeline entries, the notification fan-out, and the
+     * email intent are the dashboard's own shared write path
+     * (`post/write.ts`) with an `api_key` actor: a key has no member identity,
+     * so the timeline entries it writes have no actor and the merge email is
+     * the only one sent. Nothing about the merge is reimplemented here, which
+     * is what keeps an API merge and a dashboard merge from diverging.
+     */
+    mergePost: ({
+      intoPostId,
+      organizationId,
+      postId,
+    }: {
+      intoPostId: string;
+      organizationId: string;
+      postId: string;
+    }) =>
+      writes
+        .merge(
+          { organizationId, sourcePostId: postId, targetPostId: intoPostId },
+          { kind: "api_key" }
+        )
+        .pipe(
+          providePostWriteEnvironment,
+          withRemapDbErrors("PublicApiPost", "update"),
+          mapPostMergeFailure
+        ),
+
+    /**
+     * Restores a merged post to its board, the inverse of `mergePost`.
+     *
+     * The post named by the path is the archived source, so a caller that
+     * merged `A` into `B` unmerges by naming `A` and never has to remember
+     * `B` — the source row is what records where it went.
+     */
+    unmergePost: ({
+      organizationId,
+      postId,
+    }: {
+      organizationId: string;
+      postId: string;
+    }) =>
+      writes
+        .unmerge({ organizationId, sourcePostId: postId }, { kind: "api_key" })
+        .pipe(
+          providePostWriteEnvironment,
+          withRemapDbErrors("PublicApiPost", "update"),
+          mapPostMergeFailure
+        ),
   };
 });
 

@@ -70,7 +70,6 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   const entitlementPolicy = yield* EntitlementPolicy;
   const activityRepository = yield* PostActivityRepository;
   const postPolicy = yield* PostPolicy;
-  const notifications = yield* Effect.serviceOption(NotificationService);
   const embeddingService = yield* Effect.serviceOption(PostEmbeddingService);
   // const sitePolicy = yield* SitePolicy;
 
@@ -807,82 +806,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           });
         }
         const session = yield* CurrentSession;
-        const membership = Policy.getMembership(session, args.organizationId);
-        const outboxId = yield* transaction(
-          Effect.gen(function* () {
-            yield* repository.merge(args);
-            // Record both directions of the merge: the survivor's timeline
-            // shows which duplicate was folded in, and the archived source's
-            // timeline explains where it went (so the source is not just a
-            // silent tombstone).
-            yield* activityRepository.create({
-              actorId: session.session.userId,
-              actorMemberId: membership?.membershipId ?? null,
-              kind: "POST_MERGED",
-              mergedPostId: args.sourcePostId,
-              organizationId: args.organizationId,
-              postId: args.targetPostId,
-            });
-            yield* activityRepository.create({
-              actorId: session.session.userId,
-              actorMemberId: membership?.membershipId ?? null,
-              kind: "POST_MERGED_INTO",
-              organizationId: args.organizationId,
-              postId: args.sourcePostId,
-              targetPostId: args.targetPostId,
-            });
-            // In-app notification: subscribers and voters of both posts learn
-            // where the duplicate went. Runs after the repository move so the
-            // survivor queries include the carried-over source rows.
-            yield* Option.match(notifications, {
-              onNone: () => Effect.void,
-              onSome: (service) =>
-                service.notifyPostMerged({
-                  actorUserId: session.session.userId,
-                  organizationId: args.organizationId,
-                  sourcePostId: args.sourcePostId,
-                  targetPostId: args.targetPostId,
-                }),
-            });
-            if (
-              !(yield* entitlementPolicy.mayMaterializeEmailIntent({
-                organizationId: args.organizationId,
-                kind: "post.merged",
-              }))
-            ) {
-              return undefined;
-            }
-            const now = yield* DateTime.nowAsDate;
-            const result = yield* emailOutbox
-              .recordIntent({
-                aggregateId: args.sourcePostId,
-                aggregateType: "post",
-                deduplicationKey: `post.merged:${args.organizationId}:${args.sourcePostId}:${args.targetPostId}:${now.getTime()}`,
-                expiresAt: DateTime.fromDateUnsafe(now).pipe(
-                  DateTime.addDuration(Duration.days(7)),
-                  DateTime.toDate
-                ),
-                kind: "post.merged",
-                organizationId: args.organizationId,
-                payload: {
-                  kind: "post.merged",
-                  postId: args.sourcePostId,
-                  targetPostId: args.targetPostId,
-                },
-                scheduledAt: now,
-              })
-              .pipe(
-                Effect.mapError(
-                  () =>
-                    new InternalServerError({
-                      message: "Could not record post merge email intent.",
-                    })
-                )
-              );
-            return result._tag === "Inserted" ? result.intent.id : undefined;
-          })
-        );
-        yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
+        // The move, the two timeline entries, the notification, and the email
+        // intent are the shared write path (`post/write.ts`), so a merge
+        // performed from the dashboard and one performed with an API key
+        // cannot drift; only the actor differs.
+        yield* writes.merge(args, memberActor(session, args.organizationId));
       }).pipe(
         Policy.withPolicy(postPolicy.canMerge(args.organizationId)),
         withRemapDbErrors("Post", "update")
@@ -891,73 +819,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     PostUnmerge: (args: TPostUnmerge) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
-        const membership = Policy.getMembership(session, args.organizationId);
-        const outboxId = yield* transaction(
-          Effect.gen(function* () {
-            const targetPostId = yield* repository.unmerge(args);
-            // Restoring a post reverses the tombstone, so the source timeline
-            // records which post it was detached from.
-            yield* activityRepository.create({
-              actorId: session.session.userId,
-              actorMemberId: membership?.membershipId ?? null,
-              kind: "POST_UNMERGED",
-              organizationId: args.organizationId,
-              postId: args.sourcePostId,
-              targetPostId,
-            });
-            // Mirror the merge announcement: everyone told the post moved
-            // learns it is back, after the engagement returned to the source.
-            yield* Option.match(notifications, {
-              onNone: () => Effect.void,
-              onSome: (service) =>
-                service.notifyPostUnmerged({
-                  actorUserId: session.session.userId,
-                  organizationId: args.organizationId,
-                  sourcePostId: args.sourcePostId,
-                  targetPostId,
-                }),
-            });
-            if (
-              !(yield* entitlementPolicy.mayMaterializeEmailIntent({
-                organizationId: args.organizationId,
-                kind: "post.unmerged",
-              }))
-            ) {
-              return undefined;
-            }
-            const now = yield* DateTime.nowAsDate;
-            const result = yield* emailOutbox
-              .recordIntent({
-                aggregateId: args.sourcePostId,
-                aggregateType: "post",
-                // Timestamped so a post merged, unmerged, and merged again
-                // sends a fresh email instead of matching the first attempt.
-                deduplicationKey: `post.unmerged:${args.organizationId}:${args.sourcePostId}:${targetPostId}:${now.getTime()}`,
-                expiresAt: DateTime.fromDateUnsafe(now).pipe(
-                  DateTime.addDuration(Duration.days(7)),
-                  DateTime.toDate
-                ),
-                kind: "post.unmerged",
-                organizationId: args.organizationId,
-                payload: {
-                  kind: "post.unmerged",
-                  postId: args.sourcePostId,
-                  targetPostId,
-                },
-                scheduledAt: now,
-              })
-              .pipe(
-                Effect.mapError(
-                  () =>
-                    new InternalServerError({
-                      message: "Could not record post unmerge email intent.",
-                    })
-                )
-              );
-            return result._tag === "Inserted" ? result.intent.id : undefined;
-          })
-        );
-        yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
+        yield* writes.unmerge(args, memberActor(session, args.organizationId));
       }).pipe(
         Policy.withPolicy(postPolicy.canMerge(args.organizationId)),
         withRemapDbErrors("Post", "update")

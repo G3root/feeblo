@@ -14,6 +14,7 @@ import type { TPublicApiVote } from "./schema";
 export const toPublicApiVote = (vote: PublicApiVoteSource): TPublicApiVote => ({
   id: vote.id,
   postId: vote.postId,
+  voterId: vote.voterId,
   author: {
     type: vote.author.type,
     displayName: vote.author.displayName,

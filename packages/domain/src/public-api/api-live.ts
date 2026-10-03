@@ -5,6 +5,7 @@ import { boardHandlers } from "../board/public-api/http";
 import { changelogHandlers } from "../changelog/public-api/http";
 import { commentHandlers } from "../comments/public-api/http";
 import { companyHandlers } from "../company/public-api/http";
+import { endUserHandlers } from "../contact/public-api/http";
 import { statusHandlers } from "../post-status/public-api/http";
 import { postHandlers } from "../post/public-api/http";
 import { tagHandlers } from "../tag/public-api/http";
@@ -16,7 +17,7 @@ import { PublicApi } from "./api-contract";
  *
  * One group per resource, because a group is what carries the resource's tag
  * and its middleware; `HttpApiBuilder.group` is per-group, so this is the one
- * place that names all eight. A handler added to `post` is an edit to
+ * place that names all nine. A handler added to `post` is an edit to
  * `post/http.ts` and nothing else, so two changes to different resources do
  * not collide; a whole resource is one entry per list below.
  *
@@ -36,6 +37,9 @@ export const PublicApiLive = Layer.mergeAll(
   ),
   HttpApiBuilder.group(PublicApi, "Companies", (handlers) =>
     handlers.handleAll(companyHandlers)
+  ),
+  HttpApiBuilder.group(PublicApi, "End users", (handlers) =>
+    handlers.handleAll(endUserHandlers)
   ),
   HttpApiBuilder.group(PublicApi, "Posts", (handlers) =>
     handlers.handleAll(postHandlers)

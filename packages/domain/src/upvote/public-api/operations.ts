@@ -27,6 +27,7 @@ import {
   CreateVoteInput,
   DeleteVoteInput,
   ListPostVotesInput,
+  ListVotesInput,
   PublicApiVote,
   PublicApiVotePage,
   type TPublicApiVote,
@@ -113,13 +114,13 @@ export const listPostVotesOperation = defineOperation(
   {
     annotations: { idempotent: true, readOnly: true },
     description:
-      "List a post's votes, newest first, as a cursor-paginated page. Each vote carries the voter's display identity — a classification and a display name, never an account identifier.",
+      "List a post's votes, newest first, as a cursor-paginated page. Each vote carries the voter's display identity — a classification and a display name, never an account identifier — and the end-user record id when a customer cast it. A voter filter narrows the page to one customer.",
     failure: VOTE_READ_FAILURES,
     input: ListPostVotesInput,
     output: PublicApiVotePage,
     scope: "votes.read",
   },
-  ({ cursor, limit, postId }) =>
+  ({ cursor, limit, postId, voter }) =>
     Effect.gen(function* () {
       const caller = yield* currentPublicApiCaller;
       const repository = yield* currentPublicApiVoteRepository;
@@ -132,6 +133,7 @@ export const listPostVotesOperation = defineOperation(
           limit: limit ?? PUBLIC_API_PAGE_DEFAULT_LIMIT,
           organizationId: caller.organizationId,
           postId,
+          voter,
         })
         .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
 
@@ -141,6 +143,63 @@ export const listPostVotesOperation = defineOperation(
         // workspace's post is reported as missing so the id cannot probe at
         // all.
         onNone: () => Effect.fail(notFoundError("Post not found.")),
+        onSome: (found) => {
+          return Effect.succeed({
+            data: found.votes.map(toPublicApiVote),
+            nextCursor:
+              found.nextCursor === null ? null : encodeCursor(found.nextCursor),
+          });
+        },
+      });
+    })
+);
+
+/**
+ * The workspace-wide vote list.
+ *
+ * The per-post list with the post left optional, so "has this customer voted,
+ * and where" is one call rather than a page of posts. `postId` and `boardId`
+ * are existence-checked exactly as they are elsewhere, so neither can probe
+ * another workspace.
+ */
+export const listVotesOperation = defineOperation(
+  "listVotes",
+  {
+    annotations: { idempotent: true, readOnly: true },
+    description:
+      "List the workspace's votes, newest first, as a cursor-paginated page. `postId`, `boardId`, and the voter filter narrow it — the last by the voter's end-user record id, the caller's own external id, or email.",
+    failure: VOTE_READ_FAILURES,
+    input: ListVotesInput,
+    output: PublicApiVotePage,
+    scope: "votes.read",
+  },
+  ({ boardId, cursor, limit, postId, voter }) =>
+    Effect.gen(function* () {
+      const caller = yield* currentPublicApiCaller;
+      const repository = yield* currentPublicApiVoteRepository;
+
+      const after = yield* decodeCursorOrFail(cursor);
+
+      const page = yield* repository
+        .listVotes({
+          boardId: boardId ?? null,
+          cursor: after,
+          limit: limit ?? PUBLIC_API_PAGE_DEFAULT_LIMIT,
+          organizationId: caller.organizationId,
+          postId: postId ?? null,
+          voter,
+        })
+        .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
+
+      return yield* Option.match(page, {
+        // The id named something is absent from this workspace: report which
+        // kind of resource it was, never that it exists elsewhere.
+        onNone: () =>
+          Effect.fail(
+            notFoundError(
+              postId === undefined ? "Board not found." : "Post not found."
+            )
+          ),
         onSome: (found) => {
           return Effect.succeed({
             data: found.votes.map(toPublicApiVote),
@@ -241,6 +300,7 @@ export const deleteVoteOperation = defineOperation(
 
 export const voteOperations = [
   listPostVotesOperation,
+  listVotesOperation,
   createVoteOperation,
   deleteVoteOperation,
 ] as const;

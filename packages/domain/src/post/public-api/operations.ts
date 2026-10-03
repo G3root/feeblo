@@ -37,12 +37,14 @@ import {
   ListBoardPostsInput,
   ListPostActivityInput,
   ListPostsInput,
+  MergePostInput,
   PublicApiPost,
   PublicApiPostActivityPage,
   PublicApiPostPage,
   PublicApiPostTags,
   RetrievePostInput,
   SetPostTagsInput,
+  UnmergePostInput,
   UpdatePostInput,
 } from "./schema";
 
@@ -591,6 +593,75 @@ export const deletePostOperation = defineOperation(
     })
 );
 
+/**
+ * A merge moves engagement between two posts, so it can be refused by either
+ * post's state: absent, archived, or already merged.
+ */
+const POST_MERGE_FAILURES = Schema.Union([
+  InvalidRequestError,
+  NotFoundError,
+  ConflictError,
+  InternalError,
+]);
+
+/**
+ * The merge operations.
+ *
+ * Both are `POST` on an existing post rather than a `DELETE`/`PATCH`: the
+ * duplicate is archived, not removed, and the source remains readable so its
+ * own timeline can say where it went. Both go through the dashboard's shared
+ * write path, so the timeline entries, the notification, and the email are
+ * the same a member's merge produces.
+ */
+export const mergePostOperation = defineOperation(
+  "mergePost",
+  {
+    // Consequential rather than purely additive: the source is archived and
+    // its comments and votes move to another post, so a client should confirm
+    // it even though `unmergePost` can undo it.
+    annotations: { destructive: true },
+    description:
+      "Merge this post into another: the named post is archived and its comments and votes move to the post the request names. Reversible with unmergePost.",
+    failure: POST_MERGE_FAILURES,
+    input: MergePostInput,
+    output: Schema.Void,
+    scope: "posts.merge",
+  },
+  ({ intoPostId, postId }) =>
+    Effect.gen(function* () {
+      const caller = yield* currentPublicApiCaller;
+      const repository = yield* currentPublicApiPostRepository;
+
+      yield* repository.mergePost({
+        intoPostId,
+        organizationId: caller.organizationId,
+        postId,
+      });
+    })
+);
+
+export const unmergePostOperation = defineOperation(
+  "unmergePost",
+  {
+    description:
+      "Restore a post that was merged into another: its comments and votes return to it and it reappears on its board.",
+    failure: POST_MERGE_FAILURES,
+    input: UnmergePostInput,
+    output: Schema.Void,
+    scope: "posts.merge",
+  },
+  ({ postId }) =>
+    Effect.gen(function* () {
+      const caller = yield* currentPublicApiCaller;
+      const repository = yield* currentPublicApiPostRepository;
+
+      yield* repository.unmergePost({
+        organizationId: caller.organizationId,
+        postId,
+      });
+    })
+);
+
 export const postOperations = [
   listBoardPostsOperation,
   listPostsOperation,
@@ -601,4 +672,6 @@ export const postOperations = [
   updatePostOperation,
   setPostTagsOperation,
   deletePostOperation,
+  mergePostOperation,
+  unmergePostOperation,
 ] as const;
