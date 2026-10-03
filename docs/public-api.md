@@ -36,6 +36,7 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 | `posts.create` | Create a post on a board of the calling workspace. |
 | `posts.update` | Update a post's title, body, status, board, or ETA quarter. |
 | `posts.delete` | Delete a post. Deleting cannot be undone. |
+| `posts.merge` | Merge a post into another, or restore a merged post. |
 | `comments.read` | Read a post's comments through `/posts/{postId}/comments`, internal notes included. Every key receives it. |
 | `comments.create` | Comment on a post. The comment is attributed to the customer the request names — an API key has no user of its own. |
 | `comments.update` | Replace a comment's body, and its visibility when the request names one. |
@@ -58,15 +59,19 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 | `companies.create` | Create a company. |
 | `companies.update` | Update a company's name, external id, avatar, or external creation date. |
 | `companies.delete` | Delete a company, which detaches it from the contacts that belonged to it. |
+| `end_users.read` | Read the workspace's end users through the `/end-users` endpoints. |
+| `end_users.write` | Create or update an end user. The upsert is keyed by the workspace's own `externalId` or by email. |
 | `boards.read` | Read the workspace's boards through the `/boards` endpoints. Required by every board endpoint, and every key receives it. |
 
-A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above except the `companies` ones; the `posts`, `comments`, `votes`, `tags`, and `changelog` write scopes, and all four `companies` scopes, are granted only when the key is created with them — so a key that was minted to read feedback cannot delete a workspace's posts, comments, or tags, remove its votes, broadcast a release note, or learn the customer roster. The CRM grant is opt-in as a whole, read included, because a company is a record about the workspace's own customers rather than the workspace's content. That is also why a key created before a scope existed keeps its narrower grant: rotate the key if an integration needs more than it was issued.
+A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above except the `companies` and `end_users` ones; the `posts`, `comments`, `votes`, `tags`, and `changelog` write scopes, and all four `companies` scopes and both `end_users` scopes, are granted only when the key is created with them — so a key that was minted to read feedback cannot delete a workspace's posts, comments, or tags, remove its votes, broadcast a release note, or learn the customer roster. The CRM and end-user grants are opt-in as a whole, reads included, because a company and an end user are records about the workspace's own customers rather than the workspace's content. That is also why a key created before a scope existed keeps its narrower grant: rotate the key if an integration needs more than it was issued.
 
 `comments.pin` is separate from `comments.update` for the same reason the dashboard keeps moderation apart from authorship: editing a comment's words and deciding which one sits at the top of a post are different authorities.
 
 `changelog.publish` is separate from `changelog.update` because publishing is not reversible in the way an edit is: it emails every subscriber. A key that syncs drafts from a CMS can hold `changelog.create` and `changelog.update` and still be unable to broadcast.
 
-`end_users.read` is reserved for a future release.
+`posts.merge` is separate from `posts.update` for the same reason the dashboard keeps a distinct authority for a merge: merging archives a post and moves another post's comments and votes onto a third, which is more than editing one post's fields. It is granted with the other post writes under the dashboard's **Manage posts** choice, so it does not add a checkbox — the scope exists so the vocabulary can split the two later without a breaking change.
+
+`end_users.read` and `end_users.write` are one opt-in capability, **Manage end users**. An end user is the workspace's record of one of its customers, so — like a company — a key minted to read feedback does not learn the roster by default. Reading is part of the same grant because the write is an upsert: a sync needs to see which record it is about to change.
 
 ## Model Context Protocol (MCP)
 
@@ -337,6 +342,31 @@ The post is gone immediately and cannot be restored; its comments, votes, tags, 
 
 A post that has been merged into another is answered with `400 INVALID_REQUEST` rather than being deleted, and a post that is already gone is answered with `404 NOT_FOUND` rather than a success that deleted nothing.
 
+### Merge a post
+
+```http
+POST /api/v1/posts/{postId}/merge
+Content-Type: application/json
+
+{ "intoPostId": "pst_survivor" }
+```
+
+Responds `204` with no body. Requires `posts.merge`.
+
+The post named by the path is archived and its engagement — comments, votes, reactions, tags, followers, and email subscriptions — moves to the post named by `intoPostId`. The archived source stays readable through `GET /api/v1/posts/{postId}` so an integration holding its id can follow it to the survivor, and both timelines record the merge: `POST_MERGED` on the survivor, `POST_MERGED_INTO` on the source. The voters and subscribers of both posts are notified, and the merge email is sent exactly as the dashboard's merge sends it. Both entries have no actor, because a key is not a member.
+
+Both posts must exist in the calling workspace, be different, and be neither archived nor already merged. A source that has itself absorbed a duplicate is refused as well, because chained merges would strand the oldest post. A post of another workspace is `404 NOT_FOUND`; the other refusals are `409 CONFLICT`, except merging a post into itself, which is `400 INVALID_REQUEST`.
+
+### Unmerge a post
+
+```http
+POST /api/v1/posts/{postId}/unmerge
+```
+
+Responds `204` with no body. Requires `posts.merge`.
+
+The post named by the path is the archived source, so a caller that merged `A` into `B` unmerges by naming `A` and never has to remember `B` — the source row is what records where it went. Its engagement returns with it and it reappears on its board, and the source's timeline records `POST_UNMERGED`. A post that is not merged is `409 CONFLICT`.
+
 ### List a post's activity
 
 ```http
@@ -550,6 +580,26 @@ POST /api/v1/comments/{commentId}/unpin
 
 Responds `200` with the comment and a `null` `pinnedAt`. Requires `comments.pin`. Unpinning a comment that is not pinned changes nothing and is answered with the comment as it stands, so a retried request does not fail merely because the pin was already released; a comment that has been deleted is still the documented `404 NOT_FOUND`.
 
+### List the workspace's votes
+
+```http
+GET /api/v1/votes
+```
+
+| Query parameter | Default | Notes |
+| --- | --- | --- |
+| `limit` | `25` | 1–100. |
+| `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
+| `postId` | — | Only votes on this post. |
+| `boardId` | — | Only votes on posts of this board. |
+| `voterId` | — | The end-user record the vote belongs to, as returned in `voterId`. |
+| `voterExternalId` | — | Your own identifier for the voter, as set through `/end-users`. |
+| `voterEmail` | — | The voter's email address, matched case-insensitively. |
+
+Responds with the same page shape and the same vote object as a post's list, across every board of the calling workspace. Requires `votes.read`.
+
+The three voter parameters are matched **together**: a request that names an external id and an email returns the votes of a voter that satisfies both, and a voter that satisfies no identifier yields an empty page rather than an error — a filter that matches nothing is not a malformed request. This is how a caller answers "has this customer voted, and on what" in one request, and how a vote is found again for deletion without paging every post. A `postId` or `boardId` that does not exist in the workspace is `404 NOT_FOUND` rather than an empty page, so neither id can probe another workspace.
+
 ### List a post's votes
 
 ```http
@@ -560,6 +610,9 @@ GET /api/v1/posts/{postId}/votes
 | --- | --- | --- |
 | `limit` | `25` | 1–100. |
 | `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
+| `voterId` | — | The end-user record the vote belongs to, as returned in `voterId`. |
+| `voterExternalId` | — | Your own identifier for the voter, as set through `/end-users`. |
+| `voterEmail` | — | The voter's email address, matched case-insensitively. |
 
 ```json
 {
@@ -567,6 +620,7 @@ GET /api/v1/posts/{postId}/votes
     {
       "id": "upv_example",
       "postId": "pst_example",
+      "voterId": "cnt_example",
       "author": {
         "type": "end_user",
         "displayName": "Jamie",
@@ -579,7 +633,9 @@ GET /api/v1/posts/{postId}/votes
 }
 ```
 
-Requires `votes.read`. Votes are returned newest first, on the same cursor as every other list. `author.type` is `member` for a vote cast by a workspace member and `end_user` for everyone else; the account identifier behind the vote is never returned. A post that does not exist in the workspace, or belongs to another one, is `404 NOT_FOUND` rather than an empty page.
+Requires `votes.read`. Votes are returned newest first, on the same cursor as every other list. `author.type` is `member` for a vote cast by a workspace member and `end_user` for everyone else; the account identifier behind the vote is never returned.
+
+`voterId` is the workspace's own end-user record for the voter, and it is `null` when there is none: a member's vote always, because members are staff rather than customers, and an end-user vote only when the voter never went through a resolution that created a contact. It is the id `GET /api/v1/end-users/{endUserId}` addresses, so a caller holding both `votes.read` and `end_users.read` can join a vote to the customer behind it. The record itself, and the email on it, still require `end_users.read`. The three voter parameters narrow the page the same way the workspace-wide list does. A post that does not exist in the workspace, or belongs to another one, is `404 NOT_FOUND` rather than an empty page.
 
 A vote belongs to the post it currently lives on. When a post is merged into another, its votes move to the survivor, so ask the survivor for them. The exception is a voter who had already voted on the survivor: their original vote stays on the source — it is what a later unmerge restores — and is not an additional vote on the survivor, so the source can still report that vote.
 
@@ -802,9 +858,73 @@ Responds `204` with no body. Requires `companies.delete`.
 
 The company's contacts are **not** deleted: they keep their own records and simply stop naming a company, exactly as when a company is deleted in the dashboard. The company's custom attribute values are removed with it, and the deletion cannot be undone.
 
+### List end users
+
+```http
+GET /api/v1/end-users
+```
+
+| Query parameter | Default | Notes |
+| --- | --- | --- |
+| `limit` | `25` | 1–100. |
+| `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
+| `externalId` | — | Only the customer with this external id. |
+| `email` | — | Only the customer with this email, matched case-insensitively. |
+| `companyId` | — | Only customers belonging to this company. |
+
+```json
+{
+  "data": [
+    {
+      "id": "cnt_example",
+      "externalId": "crm-42",
+      "name": "Ada",
+      "avatarUrl": null,
+      "companyId": "cmp_example",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+Requires `end_users.read`. An end user is the workspace's own record of one of its customers — the person behind a post, a comment, or a vote. Newest first, on the same cursor as every other list.
+
+The **email address is never returned**, and neither is the account behind the record: a key travels into third-party infrastructure (an integration platform, a partner's backend, a CI log), and the workspace can address the person by the `externalId` it supplied. Email is accepted as a lookup key and as an upsert key, never as a response field. `companyId` is an opaque handle; reading the company itself needs `companies.read`.
+
+### Get an end user
+
+```http
+GET /api/v1/end-users/{endUserId}
+```
+
+Responds `200` with one end user, in the same shape as the list. Requires `end_users.read`. An end user of another workspace is `404 NOT_FOUND` rather than `403 FORBIDDEN`, so an id cannot be used to probe another workspace.
+
+### Create or update an end user
+
+```http
+POST /api/v1/end-users
+Content-Type: application/json
+
+{
+  "externalId": "crm-42",
+  "email": "ada@example.com",
+  "name": "Ada",
+  "avatarUrl": "https://example.com/ada.png",
+  "companyId": "cmp_example"
+}
+```
+
+Responds `200` with the end user afterwards. Requires `end_users.write`.
+
+The record is looked up by `externalId` and by `email` — the two identifiers a sync has — and created when neither matches, so the same request can be replayed without making a second person. **At least one of `externalId` and `email` is required**: without one there is nothing to match on and a retry would silently create a duplicate. An absent field is left alone, and an explicit `null` clears a nullable one. A `companyId` that does not name a company in the workspace is `400 INVALID_REQUEST`.
+
+When `externalId` and `email` name **different** end users, the request is `409 CONFLICT` rather than a silent merge: the caller's own data disagrees with itself, and picking one would fold two customers into one record. An `externalId` or `email` already held by a different end user is refused the same way. A record created here is written with `API` as its source, and it is the customer a later post, comment, or vote on their behalf attaches to — the two write paths share one row.
+
 ## Pagination
 
-Pagination is cursor-based. A response carries `nextCursor`; `null` means the last page. Cursors are opaque — do not construct or parse them — and are invalidated by the API without notice if they are malformed, in which case the API returns `400 INVALID_REQUEST`. Do not poll with offsets: posts, comments, tags, changelog entries, and companies are inserted continuously and offset paging skips and repeats rows.
+Pagination is cursor-based. A response carries `nextCursor`; `null` means the last page. Cursors are opaque — do not construct or parse them — and are invalidated by the API without notice if they are malformed, in which case the API returns `400 INVALID_REQUEST`. Do not poll with offsets: posts, comments, tags, changelog entries, companies, and end users are inserted continuously and offset paging skips and repeats rows.
 
 The one list that is not a page is [`GET /statuses`](#list-statuses): the status catalog is small and ordered by the workspace's own `orderIndex`, so it is returned whole, with no cursor.
 
@@ -821,13 +941,13 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 
 | Status | `_tag` | Meaning |
 | --- | --- | --- |
-| 400 | `INVALID_REQUEST` | Malformed parameter, cursor, limit, `tagIds` list (empty or malformed), or `updatedAfter` instant (not an ISO 8601 date or timestamp naming a real day); a body the endpoint cannot decode; a comment body that is empty or sanitizes to nothing; a name or title that is only whitespace; an update that names no field; a board or status id that is not in the workspace; a post that has been merged into another; a reply whose parent is not a comment on the same post; a reply widened to public beneath an internal parent; an author subject that resolves to no account. |
+| 400 | `INVALID_REQUEST` | Malformed parameter, cursor, limit, `tagIds` list (empty or malformed), or `updatedAfter` instant (not an ISO 8601 date or timestamp naming a real day); a body the endpoint cannot decode; a comment body that is empty or sanitizes to nothing; a name or title that is only whitespace; an update that names no field; an end-user upsert that names neither an `externalId` nor an email; a board, status, or company id that is not in the workspace; a post that has been merged into another; merging a post into itself; a reply whose parent is not a comment on the same post; a reply widened to public beneath an internal parent; an author subject that resolves to no account. |
 | 401 | `MISSING_API_KEY` | No `x-api-key` header was sent, or its value was empty. |
 | 401 | `INVALID_API_KEY` | The key is unknown, revoked, expired, or disabled. |
 | 403 | `FORBIDDEN_SCOPE` | The key lacks the scope the endpoint requires. |
 | 403 | `PLAN_REQUIRES_UPGRADE` | The workspace plan does not include the Public API, or has no room left in a limit it sets — such as CRM entries. |
 | 404 | `NOT_FOUND` | The resource does not exist in this workspace. |
-| 409 | `CONFLICT` | A write collided with something that already exists, such as a tag name or a company name or external id already in use, a changelog slug already taken, a post title whose slug suffixes are all taken, or comments on a post whose conversation is locked. |
+| 409 | `CONFLICT` | A write collided with something that already exists, such as a tag name or a company name or external id already in use, a changelog slug already taken, a post title whose slug suffixes are all taken, or comments on a post whose conversation is locked; or the resource's state cannot satisfy the request, such as merging an archived or already-merged post, unmerging one that is not merged, or an end-user upsert whose identifiers name two different people. |
 | 429 | `RATE_LIMITED` | Per-key rate limit exceeded. Carries `Retry-After` in seconds, and the `X-RateLimit-*` headers described under [Rate limits](#rate-limits). |
 | 500 | `INTERNAL_ERROR` | Unexpected server failure. |
 | 503 | `SERVICE_UNAVAILABLE` | A required dependency is unavailable; requests fail closed. |
@@ -860,9 +980,11 @@ On downgrade, keys are **kept and not disabled**. They start working again when 
 
 The Public API never returns:
 
-- end-user email addresses, phone numbers, or contact records;
-- internal actor identifiers — `usr_*`, `mem_*`, `cnt_*`;
+- end-user email addresses or phone numbers;
+- account identifiers — `usr_*` and `mem_*`;
 - IP addresses, credentials, webhook secrets, or API keys.
+
+The one identifier that is published is a contact id (`cnt_*`), and only where it addresses a customer: the `id` of an end user and the `voterId` on a vote. It is an opaque handle to the workspace's own record of one of its customers — the same kind of handle as a `boardId` or a `statusId` — and it grants nothing on its own: the record behind it, and the email on it, still need `end_users.read`. Account identifiers are a different thing: they are shared across the workspaces an account can reach, which is why they stay out of every payload.
 
 `author` is always `{ type, displayName, avatarUrl }`: `type` is `member` or `end_user` and distinguishes workspace staff from end users. Display names are included because the workspace already sees them on public boards and the dashboard; they are the workspace's own data. Emails are deliberately excluded — a key travels into third-party infrastructure (an integration platform, a partner's backend, a CI log), and that is a different blast radius from a signed-in session.
 
@@ -874,9 +996,11 @@ Post and changelog `content` is sanitized before it is stored, so the body the A
 
 Comments follow the same rule. A comment payload carries its author as `{ type, displayName, avatarUrl }`, never the `userId` or `memberId` the dashboard's comment rows hold, and its `content` is the sanitized body the dashboard and portal render. A comment's merge and status-transition provenance (`mergedFromPostId`, `statusUpdateId`) is not part of the resource either: it describes internal bookkeeping, not the comment a caller reads. A comment created with a key is attributed to the resolved customer, so nothing in the payload points back at the key that wrote it.
 
-Votes follow the same rule. A vote payload carries its voter as `{ type, displayName, avatarUrl }`, never the `userId` or `memberId` behind it, and never the merge provenance a moved vote keeps. A vote added with a key is attributed to the resolved customer, so nothing in the payload points back at the key that wrote it.
+Votes follow the same rule. A vote payload carries its voter as `{ type, displayName, avatarUrl }`, never the `userId` or `memberId` behind it, and never the merge provenance a moved vote keeps. It also carries `voterId`, the end-user record the vote belongs to, which is `null` for a member's vote and needs `end_users.read` to resolve into a record. A vote added with a key is attributed to the resolved customer, so nothing in the payload points back at the key that wrote it.
 
 A company carries its name, avatar, your `externalId`, and `source`. Its contacts are not exposed and neither are the custom attribute values a workspace may have defined for companies: those definitions are a workspace-specific vocabulary, so they would need their own contract rather than a field on this one. The workspace is never named in a payload either — a key reads exactly one workspace, so an `organizationId` would be the same string on every response and would invite a filter parameter that would then have to be validated against the key. `source` is the exception that proves the rule: it is bookkeeping about where the row came from, not about who it belongs to, and it is what lets a sync tell its own records from the dashboard's.
+
+An end user carries the contact id, your `externalId`, the display name and avatar, the company it belongs to, and its timestamps. The email and phone it may hold are accepted as filters and as upsert keys and are never echoed back; the linked account has no field at all. An end user is returned only to a key holding `end_users.read`, so the roster is opt-in in the same way the company roster is.
 
 ## Which posts are visible
 
@@ -897,6 +1021,6 @@ Anything that cannot respect those rules ships as `/api/v2`. When a v2 exists, v
 
 Keys are managed in the dashboard under **Settings → Developers**, restricted to workspace admins and owners. The list shows a key's name and its first characters — `fbk_ab…` — which is enough to identify a key without exposing it. The plaintext value is displayed once, at creation. Revocation takes effect immediately and is not reversible.
 
-When a key is created you choose its capabilities with one checkbox each: **Manage posts**, **Manage comments**, **Manage votes**, **Manage tags**, **Manage changelog**, and **Manage companies**. Every key reads the workspace's posts, comments, votes, tags, and changelog entries; a capability is the write half of one of those, and publishing is part of the changelog choice because it emails subscribers. The CRM capability is opt-in as a whole — reads included — because a company is a record about the workspace's own customers rather than the workspace's content. The choice fixes the key's scopes for its whole life, so pick the narrowest set the integration needs.
+When a key is created you choose its capabilities with one checkbox each: **Manage posts**, **Manage comments**, **Manage votes**, **Manage tags**, **Manage changelog**, **Manage companies**, and **Manage end users**. Every key reads the workspace's posts, comments, votes, tags, and changelog entries; a capability is the write half of one of those, and publishing is part of the changelog choice because it emails subscribers. The CRM and end-user capabilities are opt-in as a whole — reads included — because a company and an end user are records about the workspace's own customers rather than the workspace's content. The choice fixes the key's scopes for its whole life, so pick the narrowest set the integration needs.
 
 Use one key per integration so that revoking one does not interrupt the others.

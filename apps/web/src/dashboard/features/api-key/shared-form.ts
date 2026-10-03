@@ -3,6 +3,7 @@ import {
   PUBLIC_API_COMMENT_MANAGEMENT_SCOPES,
   PUBLIC_API_COMPANY_MANAGEMENT_SCOPES,
   PUBLIC_API_DEFAULT_SCOPES,
+  PUBLIC_API_END_USER_MANAGEMENT_SCOPES,
   PUBLIC_API_POST_MANAGEMENT_SCOPES,
   PUBLIC_API_TAG_MANAGEMENT_SCOPES,
   PUBLIC_API_VOTE_MANAGEMENT_SCOPES,
@@ -59,6 +60,7 @@ export const API_KEY_CAPABILITY_GROUPS = [
   "tags",
   "changelog",
   "companies",
+  "end-users",
 ] as const;
 
 export type ApiKeyCapabilityGroup = (typeof API_KEY_CAPABILITY_GROUPS)[number];
@@ -75,6 +77,7 @@ export const API_KEY_CAPABILITY_GROUP_SCOPES = {
   tags: PUBLIC_API_TAG_MANAGEMENT_SCOPES,
   changelog: PUBLIC_API_CHANGELOG_MANAGEMENT_SCOPES,
   companies: PUBLIC_API_COMPANY_MANAGEMENT_SCOPES,
+  "end-users": PUBLIC_API_END_USER_MANAGEMENT_SCOPES,
 } satisfies Record<ApiKeyCapabilityGroup, readonly PublicApiScope[]>;
 
 export const API_KEY_CAPABILITY_GROUP_LABELS = {
@@ -84,6 +87,7 @@ export const API_KEY_CAPABILITY_GROUP_LABELS = {
   tags: "Manage tags",
   changelog: "Manage changelog",
   companies: "Manage companies",
+  "end-users": "Manage end users",
 } satisfies Record<ApiKeyCapabilityGroup, string>;
 
 export const API_KEY_CAPABILITY_GROUP_DESCRIPTIONS = {
@@ -98,6 +102,8 @@ export const API_KEY_CAPABILITY_GROUP_DESCRIPTIONS = {
     "Create, edit, and delete changelog entries, and publish them. Publishing emails everyone subscribed to the changelog.",
   companies:
     "Read, create, update, and delete this workspace's companies. The contacts who belong to a company are not exposed, and deleting one leaves those contacts in place.",
+  "end-users":
+    "Read this workspace's end users and create or update them by email or your own external id. Emails are accepted to identify a customer but never returned.",
 } satisfies Record<ApiKeyCapabilityGroup, string>;
 
 export const API_KEY_CAPABILITY_GROUP_ITEMS = API_KEY_CAPABILITY_GROUPS.map(

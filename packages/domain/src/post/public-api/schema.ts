@@ -236,6 +236,25 @@ export const DeletePostParams = Schema.Struct({
   postId: Schema.String,
 });
 
+export const MergePostParams = Schema.Struct({
+  postId: Schema.String,
+});
+
+/**
+ * The post the archived duplicate is folded into.
+ *
+ * `sourcePostId` is the path's `postId`, so the body names only the survivor:
+ * a merge is "this post into that one", and repeating the source in the body
+ * would give two places to disagree about which post is being archived.
+ */
+export const MergePostPayload = Schema.Struct({
+  intoPostId: Schema.String,
+});
+
+export const UnmergePostParams = Schema.Struct({
+  postId: Schema.String,
+});
+
 export const SetPostTagsParams = Schema.Struct({
   postId: Schema.String,
 });
@@ -431,6 +450,21 @@ export const UpdatePostInput = Schema.Struct({
 export const DeletePostInput = Schema.Struct({
   postId: Schema.String,
 });
+
+/** Typed input for merging one post into another. */
+export const MergePostInput = Schema.Struct({
+  postId: Schema.String,
+  intoPostId: Schema.String,
+});
+
+export type TMergePostInput = Schema.Schema.Type<typeof MergePostInput>;
+
+/** Typed input for reverting a merge. */
+export const UnmergePostInput = Schema.Struct({
+  postId: Schema.String,
+});
+
+export type TUnmergePostInput = Schema.Schema.Type<typeof UnmergePostInput>;
 
 /** Typed input for replacing the tags a post carries. */
 export const SetPostTagsInput = Schema.Struct({

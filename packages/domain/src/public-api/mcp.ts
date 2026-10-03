@@ -16,6 +16,7 @@ import { Auth } from "../auth-handler";
 import { PublicApiChangelogRepository } from "../changelog/public-api/repository";
 import { PublicApiCommentRepository } from "../comments/public-api/repository";
 import { CommentService } from "../comments/service";
+import { PublicApiEndUserRepository } from "../contact/public-api/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { PublicApiPostRepository } from "../post/public-api/repository";
 import { RateLimitService } from "../rate-limit/service";
@@ -73,7 +74,7 @@ const MCP_SERVER_NAME = "feeblo";
  * missing capability.
  */
 const MCP_SERVER_INSTRUCTIONS =
-  "Read and write the calling workspace's Feeblo posts, comments, votes, tags, companies, and changelog entries. Every tool is scoped to the workspace that owns the presented API key, and a tool the key's scopes do not cover answers FORBIDDEN_SCOPE.";
+  "Read and write the calling workspace's Feeblo posts, comments, votes, tags, companies, changelog entries, and end users. Every tool is scoped to the workspace that owns the presented API key, and a tool the key's scopes do not cover answers FORBIDDEN_SCOPE.";
 
 /**
  * The protocol revisions the transport serves.
@@ -336,6 +337,7 @@ const makePublicApiMcpKeyMiddleware = (budget: PublicApiKeyBudget) =>
 const PublicApiMcpRepositories = Layer.mergeAll(
   PublicApiChangelogRepository.layer,
   PublicApiCommentRepository.layer,
+  PublicApiEndUserRepository.layer,
   PublicApiPostRepository.layer,
   PublicApiVoteRepository.layer,
   CommentService.layer

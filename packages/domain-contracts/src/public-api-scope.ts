@@ -39,6 +39,7 @@ export const PUBLIC_API_SCOPES = [
   "posts.create",
   "posts.update",
   "posts.delete",
+  "posts.merge",
   "comments.read",
   "comments.create",
   "comments.update",
@@ -56,6 +57,8 @@ export const PUBLIC_API_SCOPES = [
   "companies.create",
   "companies.update",
   "companies.delete",
+  "end_users.read",
+  "end_users.write",
   "changelog.read",
   "changelog.create",
   "changelog.update",
@@ -100,11 +103,18 @@ export const PUBLIC_API_DEFAULT_SCOPES = [
  * (`posts.status`, `posts.move`), but a key holds no permissions and has no
  * membership to derive them from, so splitting the scope would only force a
  * customer to grant two scopes to do one thing.
+ *
+ * `posts.merge` is its own statement even though the dashboard offers the
+ * same "Manage posts" choice: it archives a post and moves another post's
+ * comments and votes onto a third, which is a different authority from
+ * editing one post's fields, and keeping it separate lets the scope vocabulary
+ * split the two later without a breaking change.
  */
 export const PUBLIC_API_POST_MANAGEMENT_SCOPES = [
   "posts.create",
   "posts.update",
   "posts.delete",
+  "posts.merge",
 ] as const satisfies readonly PublicApiScope[];
 
 /**
@@ -185,6 +195,26 @@ export const PUBLIC_API_COMPANY_MANAGEMENT_SCOPES = [
   "companies.create",
   "companies.update",
   "companies.delete",
+] as const satisfies readonly PublicApiScope[];
+
+/**
+ * The end-user grant, made explicitly at key creation and never by default.
+ *
+ * An end user is the workspace's record of one of its customers: the person
+ * behind a post, comment, or vote, with the workspace's own `externalId` for
+ * them. Like a company, that is a record about the workspace's customers
+ * rather than the workspace's content, so a key minted to read feedback does
+ * not learn the roster by default.
+ *
+ * `end_users.read` and `end_users.write` are one capability because the write
+ * is an upsert: an integration that syncs people needs to see which record it
+ * is about to change, and a key that may create a customer can already guess
+ * whether one exists only by creating it. They are separate statements so the
+ * read-only half can be granted on its own later without a breaking change.
+ */
+export const PUBLIC_API_END_USER_MANAGEMENT_SCOPES = [
+  "end_users.read",
+  "end_users.write",
 ] as const satisfies readonly PublicApiScope[];
 
 /**

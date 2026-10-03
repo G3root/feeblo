@@ -152,6 +152,19 @@ export type PostRemoveWrite = {
   readonly organizationId: string;
 };
 
+/** What a merge needs: the duplicate, and the post that survives it. */
+export type PostMergeWrite = {
+  readonly organizationId: string;
+  readonly sourcePostId: string;
+  readonly targetPostId: string;
+};
+
+/** What an unmerge needs: the archived source to restore. */
+export type PostUnmergeWrite = {
+  readonly organizationId: string;
+  readonly sourcePostId: string;
+};
+
 /**
  * The post write path, shared by the dashboard RPCs and the Public API.
  *
@@ -1026,5 +1039,174 @@ export const makePostWrites = Effect.gen(function* () {
       )
     );
 
-  return { create, remove, update };
+  /**
+   * Merges one post into another, and reverts a merge.
+   *
+   * The move itself is `PostRepository`'s: the locked rows, the chained-merge
+   * and archived refusals, and the engagement reassignment are one
+   * implementation the dashboard and the Public API share. What this adds is
+   * what every write path adds — the timeline entries that record both
+   * directions of a merge, the in-app notification, and the durable email
+   * intent — with the actor the caller supplies, so a merge performed with a
+   * machine key lands in the same timeline and the same inbox as one a member
+   * performs.
+   */
+  const merge = (args: PostMergeWrite, actor: PostWriteActor) =>
+    Effect.gen(function* () {
+      const columns = actorColumns(actor);
+      const member = actor.kind === "member" ? actor : null;
+
+      const outboxId = yield* transaction(
+        Effect.gen(function* () {
+          yield* repository.merge(args);
+          // Both directions: the survivor's timeline shows which duplicate it
+          // absorbed, and the archived source's explains where it went, so the
+          // source is not a silent tombstone.
+          yield* activityRepository.create({
+            ...columns,
+            kind: "POST_MERGED",
+            mergedPostId: args.sourcePostId,
+            organizationId: args.organizationId,
+            postId: args.targetPostId,
+          });
+          yield* activityRepository.create({
+            ...columns,
+            kind: "POST_MERGED_INTO",
+            organizationId: args.organizationId,
+            postId: args.sourcePostId,
+            targetPostId: args.targetPostId,
+          });
+          // Subscribers and voters of both posts learn where the duplicate
+          // went. Runs after the repository move so the survivor's queries
+          // include the carried-over source rows.
+          yield* Option.match(notifications, {
+            onNone: () => Effect.void,
+            onSome: (service) =>
+              service.notifyPostMerged({
+                actorUserId: member?.userId ?? null,
+                organizationId: args.organizationId,
+                sourcePostId: args.sourcePostId,
+                targetPostId: args.targetPostId,
+              }),
+          });
+          if (
+            !(yield* entitlementPolicy.mayMaterializeEmailIntent({
+              kind: "post.merged",
+              organizationId: args.organizationId,
+            }))
+          ) {
+            return undefined;
+          }
+          const now = yield* DateTime.nowAsDate;
+          const result = yield* emailOutbox
+            .recordIntent({
+              aggregateId: args.sourcePostId,
+              aggregateType: "post",
+              deduplicationKey: `post.merged:${args.organizationId}:${args.sourcePostId}:${args.targetPostId}:${now.getTime()}`,
+              expiresAt: DateTime.fromDateUnsafe(now).pipe(
+                DateTime.addDuration(Duration.days(7)),
+                DateTime.toDate
+              ),
+              kind: "post.merged",
+              organizationId: args.organizationId,
+              payload: {
+                kind: "post.merged",
+                postId: args.sourcePostId,
+                targetPostId: args.targetPostId,
+              },
+              scheduledAt: now,
+            })
+            .pipe(
+              Effect.mapError(
+                () =>
+                  new InternalServerError({
+                    message: "Could not record post merge email intent.",
+                  })
+              )
+            );
+          return result._tag === "Inserted" ? result.intent.id : undefined;
+        })
+      );
+      yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
+    });
+
+  /**
+   * Restores an archived source post to the board it was merged away from.
+   *
+   * The inverse of `merge`, and the same shape: the repository moves the
+   * engagement back and this records the reversal on the source's timeline,
+   * tells the people who were told about the merge, and leaves the durable
+   * email intent.
+   */
+  const unmerge = (args: PostUnmergeWrite, actor: PostWriteActor) =>
+    Effect.gen(function* () {
+      const columns = actorColumns(actor);
+      const member = actor.kind === "member" ? actor : null;
+
+      const outboxId = yield* transaction(
+        Effect.gen(function* () {
+          const targetPostId = yield* repository.unmerge(args);
+          // Restoring reverses the tombstone, so the source's timeline records
+          // which post it was detached from.
+          yield* activityRepository.create({
+            ...columns,
+            kind: "POST_UNMERGED",
+            organizationId: args.organizationId,
+            postId: args.sourcePostId,
+            targetPostId,
+          });
+          yield* Option.match(notifications, {
+            onNone: () => Effect.void,
+            onSome: (service) =>
+              service.notifyPostUnmerged({
+                actorUserId: member?.userId ?? null,
+                organizationId: args.organizationId,
+                sourcePostId: args.sourcePostId,
+                targetPostId,
+              }),
+          });
+          if (
+            !(yield* entitlementPolicy.mayMaterializeEmailIntent({
+              kind: "post.unmerged",
+              organizationId: args.organizationId,
+            }))
+          ) {
+            return undefined;
+          }
+          const now = yield* DateTime.nowAsDate;
+          const result = yield* emailOutbox
+            .recordIntent({
+              aggregateId: args.sourcePostId,
+              aggregateType: "post",
+              // Timestamped so a post merged, unmerged, and merged again sends
+              // a fresh email instead of matching the first attempt.
+              deduplicationKey: `post.unmerged:${args.organizationId}:${args.sourcePostId}:${targetPostId}:${now.getTime()}`,
+              expiresAt: DateTime.fromDateUnsafe(now).pipe(
+                DateTime.addDuration(Duration.days(7)),
+                DateTime.toDate
+              ),
+              kind: "post.unmerged",
+              organizationId: args.organizationId,
+              payload: {
+                kind: "post.unmerged",
+                postId: args.sourcePostId,
+                targetPostId,
+              },
+              scheduledAt: now,
+            })
+            .pipe(
+              Effect.mapError(
+                () =>
+                  new InternalServerError({
+                    message: "Could not record post unmerge email intent.",
+                  })
+              )
+            );
+          return result._tag === "Inserted" ? result.intent.id : undefined;
+        })
+      );
+      yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
+    });
+
+  return { create, merge, remove, unmerge, update };
 });
