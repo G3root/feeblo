@@ -111,6 +111,50 @@ const makeChangelogCategoryRepository = Effect.gen(function* () {
         .where(eq(schema.changelogCategoryTable.organizationId, organizationId))
         .orderBy(asc(schema.changelogCategoryTable.createdAt)),
 
+    /**
+     * Only the categories a published entry is actually filed under.
+     *
+     * `findMany` is the dashboard's read and must keep listing categories that
+     * have no published entry yet. The public read cannot: a category whose
+     * every entry is still a draft names unreleased work, so serving it publicly
+     * would disclose the draft pipeline even though each entry inside stays
+     * unpublished. Same rule as `findLinksPublished`.
+     */
+    findManyPublished: ({ organizationId }: TFindMany) =>
+      db
+        .select({
+          id: schema.changelogCategoryTable.id,
+          name: schema.changelogCategoryTable.name,
+          iconType: schema.changelogCategoryTable.iconType,
+          icon: schema.changelogCategoryTable.icon,
+          organizationId: schema.changelogCategoryTable.organizationId,
+          createdAt: schema.changelogCategoryTable.createdAt,
+          updatedAt: schema.changelogCategoryTable.updatedAt,
+        })
+        .from(schema.changelogCategoryTable)
+        .innerJoin(
+          schema.changelogCategoryLinkTable,
+          eq(
+            schema.changelogCategoryLinkTable.categoryId,
+            schema.changelogCategoryTable.id
+          )
+        )
+        .innerJoin(
+          schema.changelogTable,
+          eq(
+            schema.changelogCategoryLinkTable.changelogId,
+            schema.changelogTable.id
+          )
+        )
+        .where(
+          and(
+            eq(schema.changelogCategoryTable.organizationId, organizationId),
+            eq(schema.changelogTable.status, "published")
+          )
+        )
+        .groupBy(schema.changelogCategoryTable.id)
+        .orderBy(asc(schema.changelogCategoryTable.createdAt)),
+
     countByOrganizationId: ({ organizationId }: TCountByOrganizationId) =>
       db
         .select({ count: count() })
