@@ -15,6 +15,7 @@ import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { ScrollArea } from "@feeblo/ui/scroll-area";
 import { Separator } from "@feeblo/ui/separator";
 import { cn } from "@feeblo/ui/utils";
+import { isLiveQueryPending } from "@feeblo/web-shared/collections";
 import {
   Cancel01Icon,
   RssIcon,
@@ -22,7 +23,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, ilike, inArray, useLiveQuery } from "@tanstack/react-db";
-import { createLazyRoute, Link } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 import { useMemo } from "react";
 
@@ -45,15 +46,15 @@ import { m } from "../paraglide/messages.js";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
-export const Route = createLazyRoute("/changelog")({
-  component: () => (
-    <ChangelogFilterProvider>
-      <ChangelogPage />
-    </ChangelogFilterProvider>
-  ),
-});
-
 export function ChangelogPage() {
+  return (
+    <ChangelogFilterProvider>
+      <ChangelogContent />
+    </ChangelogFilterProvider>
+  );
+}
+
+function ChangelogContent() {
   const site = useSite();
   const { publicChangelogCategoryLinkCollection, publicChangelogCollection } =
     usePublicCollections();
@@ -84,11 +85,7 @@ export function ChangelogPage() {
     [matchingLinks]
   );
 
-  const {
-    data: changelogs = [],
-    isLoading,
-    isError,
-  } = useLiveQuery({
+  const changelogsQuery = useLiveQuery({
     query: (q) =>
       q
         .from({ changelog: publicChangelogCollection })
@@ -126,6 +123,12 @@ export function ChangelogPage() {
     ids.push(link.categoryId);
     categoryIdsByChangelog.set(link.changelogId, ids);
   }
+
+  const changelogs = changelogsQuery.data ?? [];
+  const isError = changelogsQuery.isError;
+  // Hydration lands rows — or an empty set — before the first client render
+  // (see `isLiveQueryPending`).
+  const isLoading = isLiveQueryPending(changelogsQuery);
 
   if (isLoading) {
     return <ChangelogPageLayout>{m.loud_patchy_liger()}</ChangelogPageLayout>;
@@ -219,7 +222,7 @@ export function ChangelogPage() {
                       <Link
                         className="block w-fit transition-opacity hover:opacity-80"
                         params={{ changelogSlug: item.slug }}
-                        to="/changelog/$changelogSlug"
+                        to="/s/changelog/$changelogSlug"
                       >
                         <h3 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                           {item.title}

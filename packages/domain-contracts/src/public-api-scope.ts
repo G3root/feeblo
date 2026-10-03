@@ -72,8 +72,9 @@ export const PublicApiScopeSchema = Schema.Literals(PUBLIC_API_SCOPES);
 /**
  * The scopes every new key receives: reads only.
  *
- * `boards.read` is granted although no v1 endpoint requires it yet, so the
- * board-metadata endpoint is additive when it ships.
+ * `boards.read` guards the workspace's board reads, so a key can resolve the
+ * board a post is filed under — including private boards, which the key may
+ * read because it belongs to the workspace.
  */
 export const PUBLIC_API_DEFAULT_SCOPES = [
   "boards.read",

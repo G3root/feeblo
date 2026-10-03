@@ -1,5 +1,7 @@
-import { getRouteApi, useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useCallback } from "react";
+
+import { boardPaths } from "../lib/board-links";
 
 export type HomePageSortOption = "upvotes" | "newest" | "oldest";
 type FilterValue = "all" | string;
@@ -10,7 +12,13 @@ const SORT_OPTIONS: Set<HomePageSortOption> = new Set([
   "oldest",
 ]);
 
-const homeRouteApi = getRouteApi("/");
+/**
+ * The board's home route owns the search-param schema; this hook only reads it,
+ * so it stays untyped here rather than depending on the host's route ids.
+ */
+function useHomeSearch(): { board?: string; sort?: string; status?: string } {
+  return useSearch({ strict: false });
+}
 
 function normalizeFilterValue(value: string | undefined): FilterValue {
   return value?.trim() || "all";
@@ -30,7 +38,7 @@ export function useHomePageFilters({
   boardSlugs: string[];
   statusIds: string[];
 }) {
-  const search = homeRouteApi.useSearch();
+  const search = useHomeSearch();
   const navigate = useNavigate();
   const selectedStatusFromUrl = normalizeFilterValue(search.status);
   const selectedBoardFromUrl = normalizeFilterValue(search.board);
@@ -73,7 +81,11 @@ export function useHomePageFilters({
       }
 
       navigate({
-        to: "/",
+        // Board navigation uses the host router's internal `/s` spelling
+        // everywhere (`lib/board-links.ts`); the host rewrite hides it from
+        // visitors, and it stays correct on a host that also serves the board
+        // under `/s/...`.
+        to: boardPaths.home,
         search: nextSearch,
         replace: true,
       });

@@ -1,6 +1,7 @@
 import { PostSubscriptionId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
 import { anchoredToastManager, toastManager } from "@feeblo/ui/toast";
+import { isLiveQueryPending } from "@feeblo/web-shared/collections";
 import { getPostSubscriptionCollectionKey } from "@feeblo/web-shared/reaction-keys";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { BellIcon, BellOffIcon } from "@hugeicons/core-free-icons";
@@ -43,31 +44,33 @@ export function SubscribeButton() {
   // would never deliver updates, so the toggle stays disabled until unmerge.
   const disabled = isLocked || isMerged;
 
-  const { data: hasUserSubscribed, isLoading: isSubscriptionLoading } =
-    useLiveQuery({
-      query: (q) => {
-        if (!(postId && session)) {
-          return undefined;
-        }
-        return q
-          .from({ subscription: postSubscriptionCollection })
-          .where(({ subscription }) =>
-            and(
-              eq(subscription.organizationId, organizationId),
-              eq(subscription.postId, postId),
-              eq(subscription.userId, session.user.id)
-            )
+  const subscriptionQuery = useLiveQuery({
+    query: (q) => {
+      if (!(postId && session)) {
+        return undefined;
+      }
+      return q
+        .from({ subscription: postSubscriptionCollection })
+        .where(({ subscription }) =>
+          and(
+            eq(subscription.organizationId, organizationId),
+            eq(subscription.postId, postId),
+            eq(subscription.userId, session.user.id)
           )
-          .select(({ subscription }) => ({ id: subscription.id }))
-          .findOne();
-      },
-    });
+        )
+        .select(({ subscription }) => ({ id: subscription.id }))
+        .findOne();
+    },
+  });
 
-  if (isSubscriptionLoading) {
+  // Hydration lands the row before the first client render; a signed-in
+  // visitor's own subscription still resolves after mount (see
+  // `isLiveQueryPending`).
+  if (isLiveQueryPending(subscriptionQuery)) {
     return null;
   }
 
-  const isSubscribed = Boolean(hasUserSubscribed);
+  const isSubscribed = Boolean(subscriptionQuery.data);
 
   const onToggle = async () => {
     if (disabled) {

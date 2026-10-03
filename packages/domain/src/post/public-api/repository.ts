@@ -8,6 +8,8 @@ import {
   count,
   desc,
   eq,
+  exists,
+  gt,
   inArray,
   isNull,
   sql,
@@ -392,17 +394,28 @@ const makePublicApiPostRepository = Effect.gen(function* () {
    * same rule as the portal, and it keeps `mergedIntoPostId` meaningful rather
    * than listing duplicates. Archived posts are excluded unless asked for, and
    * the cursor walks the `(createdAt, id)` tuple the page is ordered by.
+   *
+   * The optional filters are the ones an integration syncs with: a board, a set
+   * of tags, and a change time. `tagIds` is an `exists` rather than a join, so a
+   * post carrying two of the requested tags is one row rather than two, which
+   * is what keeps the page size and the cursor honest.
    */
   const postPageConditions = ({
+    boardId,
     cursor,
     includeArchived,
     organizationId,
     statusId,
+    tagIds,
+    updatedAfter,
   }: {
+    readonly boardId: string | null;
     readonly cursor: Cursor | null;
     readonly includeArchived: boolean;
     readonly organizationId: string;
     readonly statusId: string | null;
+    readonly tagIds: readonly string[] | null;
+    readonly updatedAfter: Date | null;
   }): SQL[] => {
     const conditions: SQL[] = [
       eq(schema.postTable.organizationId, organizationId),
@@ -411,8 +424,32 @@ const makePublicApiPostRepository = Effect.gen(function* () {
     if (!includeArchived) {
       conditions.push(isNull(schema.postTable.archivedAt));
     }
+    if (boardId !== null) {
+      conditions.push(eq(schema.postTable.boardId, boardId));
+    }
     if (statusId !== null) {
       conditions.push(eq(schema.postTable.statusId, statusId));
+    }
+    if (tagIds !== null && tagIds.length > 0) {
+      conditions.push(
+        exists(
+          db
+            .select({ id: schema.postTagTable.id })
+            .from(schema.postTagTable)
+            .where(
+              and(
+                eq(schema.postTagTable.postId, schema.postTable.id),
+                inArray(schema.postTagTable.tagId, tagIds)
+              )
+            )
+        )
+      );
+    }
+    // `>` rather than `>=`: a caller polls with the timestamp of the last row
+    // it saw, and a row it has already read must not come back and be applied
+    // twice.
+    if (updatedAfter !== null) {
+      conditions.push(gt(schema.postTable.updatedAt, updatedAfter));
     }
     if (cursor !== null) {
       conditions.push(
@@ -602,6 +639,8 @@ const makePublicApiPostRepository = Effect.gen(function* () {
       limit,
       organizationId,
       statusId,
+      tagIds,
+      updatedAfter,
     }: {
       boardId: string;
       cursor: Cursor | null;
@@ -609,6 +648,8 @@ const makePublicApiPostRepository = Effect.gen(function* () {
       limit: number;
       organizationId: string;
       statusId: string | null;
+      tagIds: readonly string[] | null;
+      updatedAfter: Date | null;
     }) =>
       Effect.gen(function* () {
         const board = yield* db
@@ -629,11 +670,14 @@ const makePublicApiPostRepository = Effect.gen(function* () {
         return Option.some(
           yield* pagePosts({
             conditions: postPageConditions({
+              boardId,
               cursor,
               includeArchived,
               organizationId,
               statusId,
-            }).concat(eq(schema.postTable.boardId, boardId)),
+              tagIds,
+              updatedAfter,
+            }),
             limit,
           })
         );
@@ -649,24 +693,33 @@ const makePublicApiPostRepository = Effect.gen(function* () {
      * learned one paging rule has learned both.
      */
     listPosts: ({
+      boardId,
       cursor,
       includeArchived,
       limit,
       organizationId,
       statusId,
+      tagIds,
+      updatedAfter,
     }: {
+      boardId: string | null;
       cursor: Cursor | null;
       includeArchived: boolean;
       limit: number;
       organizationId: string;
       statusId: string | null;
+      tagIds: readonly string[] | null;
+      updatedAfter: Date | null;
     }) =>
       pagePosts({
         conditions: postPageConditions({
+          boardId,
           cursor,
           includeArchived,
           organizationId,
           statusId,
+          tagIds,
+          updatedAfter,
         }),
         limit,
       }).pipe(withRemapDbErrors("PublicApiPost", "select")),

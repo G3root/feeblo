@@ -1,3 +1,4 @@
+import { PostActivityKind } from "@feeblo/domain-contracts/activity-kind";
 import { PostStatusType } from "@feeblo/domain-contracts/post-status-type";
 import * as Schema from "effect/Schema";
 
@@ -82,6 +83,74 @@ export const PublicApiPostTags = Schema.Struct({
 export type TPublicApiPostTags = Schema.Schema.Type<typeof PublicApiPostTags>;
 
 /**
+ * One entry of a post's timeline.
+ *
+ * The timeline is the post's own history — created, status changed, tags
+ * added, merged — so an integration can tell what happened to a post without
+ * diffing snapshots. `previousValue` and `nextValue` are the values the entry
+ * moved between, and what they name depends on `kind`: a status id for
+ * `STATUS_CHANGED`, a tag id for `TAG_ADDED`, a post id for `POST_MERGED`.
+ *
+ * `actor` is `null` when a machine key wrote the entry, because an API key is
+ * not a member and has no identity to attribute; the alternative would be to
+ * invent one. The entry's internal identifiers — the actor's user and member
+ * ids, and the on-behalf metadata — are not part of the payload
+ * (see `docs/adr/0004`).
+ */
+export const PublicApiPostActivity = Schema.Struct({
+  id: Schema.String,
+  kind: PostActivityKind,
+  actor: Schema.NullOr(PublicApiAuthor),
+  previousValue: Schema.NullOr(Schema.String),
+  nextValue: Schema.NullOr(Schema.String),
+  commentId: Schema.NullOr(Schema.String),
+  createdAt: Schema.DateFromString,
+});
+
+export type TPublicApiPostActivity = Schema.Schema.Type<
+  typeof PublicApiPostActivity
+>;
+
+export const PublicApiPostActivityPage = Schema.Struct({
+  data: Schema.Array(PublicApiPostActivity),
+  nextCursor: Schema.NullOr(Schema.String),
+});
+
+export type TPublicApiPostActivityPage = Schema.Schema.Type<
+  typeof PublicApiPostActivityPage
+>;
+
+export const ListPostActivityParams = Schema.Struct({
+  postId: Schema.String,
+});
+
+export const ListPostActivityQuery = Schema.Struct({
+  limit: Schema.optional(Schema.String),
+  cursor: Schema.optional(Schema.String),
+});
+
+/** Typed input for a page of a post's timeline. */
+export const ListPostActivityInput = Schema.Struct({
+  postId: Schema.String,
+  cursor: Schema.optional(
+    Schema.String.annotate({ description: "Opaque page cursor" })
+  ),
+  limit: Schema.optional(
+    Schema.Finite.check(
+      Schema.isInt(),
+      Schema.isGreaterThan(0),
+      Schema.isLessThanOrEqualTo(PUBLIC_API_PAGE_MAX_LIMIT)
+    ).annotate({
+      description: "Page size, 1–100",
+    })
+  ),
+});
+
+export type TListPostActivityInput = Schema.Schema.Type<
+  typeof ListPostActivityInput
+>;
+
+/**
  * Query parameters are declared as strings and validated in the handler.
  *
  * A typed parameter would make the framework reject a malformed request with
@@ -97,6 +166,8 @@ export const ListBoardPostsQuery = Schema.Struct({
   cursor: Schema.optional(Schema.String),
   status: Schema.optional(Schema.String),
   includeArchived: Schema.optional(Schema.String),
+  tagIds: Schema.optional(Schema.String),
+  updatedAfter: Schema.optional(Schema.String),
 });
 
 /**
@@ -112,6 +183,9 @@ export const ListPostsQuery = Schema.Struct({
   cursor: Schema.optional(Schema.String),
   status: Schema.optional(Schema.String),
   includeArchived: Schema.optional(Schema.String),
+  boardId: Schema.optional(Schema.String),
+  tagIds: Schema.optional(Schema.String),
+  updatedAfter: Schema.optional(Schema.String),
 });
 
 /**
@@ -243,10 +317,22 @@ export const ListBoardPostsInput = Schema.Struct({
     })
   ),
   statusId: Schema.optional(Schema.NullOr(Schema.String)),
+  tagIds: Schema.optional(Schema.NonEmptyArray(Schema.String)).annotate({
+    description:
+      "Keep posts carrying at least one of these tag ids; at least one id is required",
+  }),
+  // A string rather than a `Schema.DateFromString`: the operation validates
+  // the ISO shape and the calendar itself, so the HTTP query parameter and the
+  // MCP tool argument are checked by the same code and an MCP caller cannot
+  // send a day that does not exist while an HTTP caller cannot.
+  updatedAfter: Schema.optional(Schema.String).annotate({
+    description: "Keep posts changed after this ISO 8601 instant",
+  }),
 });
 
 /** Typed input for a page of the workspace's posts. */
 export const ListPostsInput = Schema.Struct({
+  boardId: Schema.optional(Schema.String),
   cursor: Schema.optional(
     Schema.String.annotate({ description: "Opaque page cursor" })
   ),
@@ -261,6 +347,13 @@ export const ListPostsInput = Schema.Struct({
     })
   ),
   statusId: Schema.optional(Schema.NullOr(Schema.String)),
+  tagIds: Schema.optional(Schema.NonEmptyArray(Schema.String)).annotate({
+    description:
+      "Keep posts carrying at least one of these tag ids; at least one id is required",
+  }),
+  updatedAfter: Schema.optional(Schema.String).annotate({
+    description: "Keep posts changed after this ISO 8601 instant",
+  }),
 });
 
 /** Typed input for finding a post by id, or by board and slug. */

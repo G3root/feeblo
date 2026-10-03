@@ -7,7 +7,7 @@ import { expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { McpSchema } from "effect/ai";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
@@ -43,6 +43,8 @@ import {
 import { PublicApiOperations } from "./operations";
 import { makePublicApiRoute } from "./router";
 import {
+  PublicApiBoard,
+  PublicApiBoardPage,
   PublicApiChangelog,
   PublicApiChangelogPage,
   PublicApiComment,
@@ -50,8 +52,10 @@ import {
   PublicApiCompany,
   PublicApiCompanyPage,
   PublicApiPost,
+  PublicApiPostActivityPage,
   PublicApiPostPage,
   PublicApiPostTags,
+  PublicApiStatusList,
   PublicApiTagDetail,
   PublicApiTagPage,
 } from "./schema";
@@ -106,6 +110,18 @@ const decodeError = Schema.decodeUnknownSync(
 );
 const decodePage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiPostPage)
+);
+const decodeBoard = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiBoard)
+);
+const decodeBoardPage = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiBoardPage)
+);
+const decodeStatuses = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiStatusList)
+);
+const decodeActivityPage = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiPostActivityPage)
 );
 const decodePost = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiPost)
@@ -871,6 +887,21 @@ layer(makeTestApp())("public api v1", (it) => {
 
       expect(response.status).toBe(200);
       const body = decodePage(responseBody(response));
+
+      // The published production budget, as the headers report it: the first
+      // request against a fresh key leaves one less than the limit.
+      expect(response.headers["x-ratelimit-limit"]).toBe(
+        String(PUBLIC_API_KEY_RATE_LIMIT.limit)
+      );
+      expect(response.headers["x-ratelimit-remaining"]).toBe(
+        String(PUBLIC_API_KEY_RATE_LIMIT.limit - 1)
+      );
+      // Under the test clock the epoch is small, so the reset instant is not
+      // necessarily past the first second: what matters is that it is present
+      // and numeric rather than absent or `NaN`.
+      expect(Number.isNaN(Number(response.headers["x-ratelimit-reset"]))).toBe(
+        false
+      );
 
       expect(body.data).toHaveLength(2);
       expect(body.nextCursor).toBeTypeOf("string");
@@ -2379,6 +2410,66 @@ layer(makeTestApp())("public api v1", (it) => {
       );
       expect(malformed.status).toBe(400);
       expect(decodeError(responseBody(malformed))._tag).toBe("INVALID_REQUEST");
+    })
+  );
+
+  it.effect("returns a changelog entry's labels and linked posts", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      registerKey("fbk_changelog_labels", workspace.organizationId);
+      const changelogId = yield* seedChangelog(workspace.organizationId, {
+        id: "chg_labelled",
+        status: "published",
+        title: "Dark mode shipped",
+      });
+
+      yield* db.insert(schema.changelogCategoryTable).values({
+        id: "chc_new",
+        name: "New",
+        iconType: "color",
+        icon: "oklch(0.7 0.15 250)",
+        organizationId: workspace.organizationId,
+      });
+      yield* db.insert(schema.changelogCategoryLinkTable).values({
+        id: "chcl_new",
+        changelogId,
+        categoryId: "chc_new",
+        organizationId: workspace.organizationId,
+      });
+      yield* db.insert(schema.changelogPostTable).values({
+        changelogId,
+        postId: workspace.postId,
+        organizationId: workspace.organizationId,
+      });
+
+      const response = yield* executeRequest(
+        `/api/v1/changelog/${changelogId}`,
+        "fbk_changelog_labels"
+      );
+      expect(response.status).toBe(200);
+
+      const entry = decodeChangelog(responseBody(response));
+      expect(entry.categories).toEqual([
+        {
+          icon: "oklch(0.7 0.15 250)",
+          iconType: "color",
+          id: "chc_new",
+          name: "New",
+        },
+      ]);
+
+      // A linked post is a reference: the fields a reader needs to follow the
+      // link, not a second copy of the post.
+      expect(entry.linkedPosts).toEqual([
+        { id: workspace.postId, slug: "post-0", title: "Post 0" },
+      ]);
+
+      // The link rows carry the workspace and the linked ids; neither is a
+      // field of the payload.
+      const raw = responseBody(response);
+      expect(raw).not.toContain("organizationId");
+      expect(raw).not.toContain("categoryId");
     })
   );
 
@@ -4016,6 +4107,8 @@ layer(makeTestApp())("public api v1", (it) => {
       expect(response.status).toBe(200);
       const document = decodeDocument(responseBody(response));
       expect(Object.keys(document.paths).sort()).toEqual([
+        "/api/v1/boards",
+        "/api/v1/boards/{boardId}",
         "/api/v1/boards/{boardId}/posts",
         "/api/v1/changelog",
         "/api/v1/changelog/{changelogId}",
@@ -4027,11 +4120,727 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/posts",
         "/api/v1/posts/retrieve",
         "/api/v1/posts/{postId}",
+        "/api/v1/posts/{postId}/activity",
         "/api/v1/posts/{postId}/comments",
         "/api/v1/posts/{postId}/tags",
+        "/api/v1/statuses",
         "/api/v1/tags",
         "/api/v1/tags/{tagId}",
       ]);
+    })
+  );
+
+  it.effect("lists the workspace's boards, private ones included", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      const privateBoardId = yield* BoardId.generate;
+      const now = yield* DateTime.nowAsDate;
+
+      yield* db.insert(schema.boardTable).values({
+        id: privateBoardId,
+        name: "Internal",
+        slug: "internal",
+        visibility: "PRIVATE",
+        organizationId: workspace.organizationId,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      registerKey("fbk_board_reader", workspace.organizationId);
+
+      // One page at a time, so the cursor is exercised rather than assumed:
+      // the two boards are one page of one with a cursor to the other.
+      const firstResponse = yield* executeRequest(
+        "/api/v1/boards?limit=1",
+        "fbk_board_reader"
+      );
+      expect(firstResponse.status).toBe(200);
+
+      const first = decodeBoardPage(responseBody(firstResponse));
+      expect(first.data).toHaveLength(1);
+      expect(first.nextCursor).not.toBeNull();
+
+      const secondResponse = yield* executeRequest(
+        `/api/v1/boards?cursor=${encodeURIComponent(first.nextCursor ?? "")}`,
+        "fbk_board_reader"
+      );
+      expect(secondResponse.status).toBe(200);
+
+      const second = decodeBoardPage(responseBody(secondResponse));
+      expect(second.data).toHaveLength(1);
+      expect(second.nextCursor).toBeNull();
+
+      const byId = new Map(
+        [...first.data, ...second.data].map((board) => [board.id, board])
+      );
+      expect([...byId.keys()].sort()).toEqual(
+        [privateBoardId, workspace.boardId].sort()
+      );
+
+      // A key reads private boards too, and the field says which is which
+      // rather than gating the read.
+      expect(byId.get(privateBoardId)?.visibility).toBe("PRIVATE");
+      const publicBoard = byId.get(workspace.boardId);
+      expect(publicBoard?.visibility).toBe("PUBLIC");
+      expect(publicBoard?.name).toBe("Feedback");
+      expect(publicBoard?.slug).toBe("feedback");
+      expect(publicBoard?.url).toBe(
+        `https://app.feeblo.test/${workspace.organizationId}/board/feedback`
+      );
+
+      // The board row carries the workspace; the key already names it.
+      expect(responseBody(secondResponse)).not.toContain("organizationId");
+    })
+  );
+
+  it.effect("reads one board and hides another workspace's", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const other = yield* seedWorkspace();
+      registerKey("fbk_board_getter", workspace.organizationId);
+
+      const found = yield* executeRequest(
+        `/api/v1/boards/${workspace.boardId}`,
+        "fbk_board_getter"
+      );
+      expect(found.status).toBe(200);
+
+      const board = decodeBoard(responseBody(found));
+      expect(board.id).toBe(workspace.boardId);
+      expect(board.slug).toBe("feedback");
+      expect(board.visibility).toBe("PUBLIC");
+
+      // A board of another workspace is not found rather than forbidden, so
+      // the id cannot be used to probe another workspace.
+      const foreign = yield* executeRequest(
+        `/api/v1/boards/${other.boardId}`,
+        "fbk_board_getter"
+      );
+      expect(foreign.status).toBe(404);
+      expect(decodeError(responseBody(foreign))._tag).toBe("NOT_FOUND");
+
+      const unknown = yield* executeRequest(
+        "/api/v1/boards/brd_does_not_exist",
+        "fbk_board_getter"
+      );
+      expect(unknown.status).toBe(404);
+      expect(decodeError(responseBody(unknown))._tag).toBe("NOT_FOUND");
+    })
+  );
+
+  it.effect("filters the post lists by board, tag, and change time", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace({ postCount: 2 });
+      const db = yield* currentDb;
+      const now = DateTime.toDate(yield* DateTime.now);
+      const earlier = DateTime.toDate(
+        DateTime.subtract(yield* DateTime.now, { minutes: 30 })
+      );
+      const cutoff = DateTime.toDate(
+        DateTime.subtract(yield* DateTime.now, { minutes: 15 })
+      );
+      const longAgo = DateTime.toDate(
+        DateTime.subtract(yield* DateTime.now, { days: 1 })
+      ).toISOString();
+
+      // A second board with one recent post, so the board filter has two
+      // boards to choose between and `updatedAfter` has something to keep.
+      const otherBoardId = yield* BoardId.generate;
+      yield* db.insert(schema.boardTable).values({
+        id: otherBoardId,
+        name: "Bugs",
+        slug: "bugs",
+        visibility: "PUBLIC",
+        organizationId: workspace.organizationId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const otherPostId = yield* PostId.generate;
+      yield* db.insert(schema.postTable).values({
+        id: otherPostId,
+        title: "Crash on save",
+        slug: "crash-on-save",
+        content: "<p>Body</p>",
+        excerpt: "Crash on save",
+        boardId: otherBoardId,
+        statusId: workspace.statusId,
+        organizationId: workspace.organizationId,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // The two seeded posts changed half an hour ago; the new one stays
+      // recent, so `updatedAfter` has exactly one row to keep.
+      yield* db
+        .update(schema.postTable)
+        .set({ updatedAt: earlier })
+        .where(
+          inArray(schema.postTable.id, [
+            workspace.postId,
+            `${workspace.postId}_1`,
+          ])
+        );
+
+      yield* seedTag(workspace.organizationId, "tag_filter", "Filter me");
+      yield* db.insert(schema.postTagTable).values({
+        id: "ptag_filter",
+        postId: workspace.postId,
+        tagId: "tag_filter",
+        organizationId: workspace.organizationId,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      registerKey("fbk_post_filter", workspace.organizationId);
+
+      const byBoard = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts?boardId=${otherBoardId}`,
+            "fbk_post_filter"
+          )
+        )
+      );
+      expect(byBoard.data.map((post) => post.id)).toEqual([otherPostId]);
+
+      const byTag = decodePage(
+        responseBody(
+          yield* executeRequest(
+            "/api/v1/posts?tagIds=tag_filter",
+            "fbk_post_filter"
+          )
+        )
+      );
+      expect(byTag.data.map((post) => post.id)).toEqual([workspace.postId]);
+
+      // An id that does not exist is a filter that matches nothing, not an
+      // error: filtering is a read.
+      const byUnknownTag = decodePage(
+        responseBody(
+          yield* executeRequest(
+            "/api/v1/posts?tagIds=tag_missing",
+            "fbk_post_filter"
+          )
+        )
+      );
+      expect(byUnknownTag.data).toEqual([]);
+
+      const byChangeTime = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts?updatedAfter=${encodeURIComponent(cutoff.toISOString())}`,
+            "fbk_post_filter"
+          )
+        )
+      );
+      expect(byChangeTime.data.map((post) => post.id)).toEqual([otherPostId]);
+
+      // A bare date is accepted, and a cutoff older than every row keeps the
+      // whole workspace.
+      const wholeWorkspace = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts?updatedAfter=${encodeURIComponent(longAgo)}`,
+            "fbk_post_filter"
+          )
+        )
+      );
+      expect(wholeWorkspace.data.map((post) => post.id).sort()).toEqual(
+        [workspace.postId, `${workspace.postId}_1`, otherPostId].sort()
+      );
+
+      // The filters compose, and the board list takes the same ones.
+      const composed = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/boards/${workspace.boardId}/posts?tagIds=tag_filter&updatedAfter=${encodeURIComponent(longAgo)}`,
+            "fbk_post_filter"
+          )
+        )
+      );
+      expect(composed.data.map((post) => post.id)).toEqual([workspace.postId]);
+
+      // A malformed filter is the caller's mistake, reported as one rather
+      // than silently ignored as an unfiltered list.
+      for (const query of [
+        "updatedAfter=yesterday",
+        // A day that does not exist: the host's date parsing would roll this
+        // into March 2 and filter from the wrong day.
+        "updatedAfter=2026-02-30",
+        // A date the host parses but ISO 8601 does not describe.
+        `updatedAfter=${encodeURIComponent("August 11, 2026")}`,
+      ]) {
+        const malformed = yield* executeRequest(
+          `/api/v1/posts?${query}`,
+          "fbk_post_filter"
+        );
+        expect(malformed.status, query).toBe(400);
+        expect(decodeError(responseBody(malformed))._tag, query).toBe(
+          "INVALID_REQUEST"
+        );
+      }
+
+      // A `tagIds` parameter that names no id is refused rather than widened
+      // into a page of everything: an empty value is present but asks for
+      // nothing.
+      for (const query of ["tagIds=", "tagIds=,,", "tagIds=%20"]) {
+        const emptyTags = yield* executeRequest(
+          `/api/v1/posts?${query}`,
+          "fbk_post_filter"
+        );
+        expect(emptyTags.status, query).toBe(400);
+        expect(decodeError(responseBody(emptyTags))._tag, query).toBe(
+          "INVALID_REQUEST"
+        );
+      }
+
+      // The ISO shape check still accepts what ISO 8601 describes: a bare
+      // date, and a timestamp whose offset is written with or without the
+      // colon.
+      for (const value of [
+        "2026-08-11",
+        "2026-08-11T00:00:00+05:30",
+        "2026-08-11T00:00:00+0530",
+      ]) {
+        const accepted = yield* executeRequest(
+          `/api/v1/posts?updatedAfter=${encodeURIComponent(value)}`,
+          "fbk_post_filter"
+        );
+        expect(accepted.status, value).toBe(200);
+      }
+    })
+  );
+
+  it.effect("moves a post's updatedAt when its tags change", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      const nowDateTime = yield* DateTime.now;
+      const earlier = DateTime.toDate(
+        DateTime.subtract(nowDateTime, { minutes: 30 })
+      );
+      const cutoff = DateTime.toDate(
+        DateTime.subtract(nowDateTime, { minutes: 15 })
+      );
+
+      // The post's record is old, so only a tag write can bring it into the
+      // window the poll below asks for.
+      yield* db
+        .update(schema.postTable)
+        .set({ updatedAt: earlier })
+        .where(eq(schema.postTable.id, workspace.postId));
+
+      yield* seedTag(workspace.organizationId, "tag_sync", "Sync");
+      registerKey(
+        "fbk_tag_sync",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      // Before the assignment the post is outside the window.
+      const before = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts?updatedAfter=${encodeURIComponent(cutoff.toISOString())}`,
+            "fbk_tag_sync"
+          )
+        )
+      );
+      expect(before.data.map((post) => post.id)).toEqual([]);
+
+      const assigned = yield* executeWrite(
+        "PUT",
+        `/api/v1/posts/${workspace.postId}/tags`,
+        { apiKey: "fbk_tag_sync", body: { tagIds: ["tag_sync"] } }
+      );
+      expect(assigned.status).toBe(200);
+
+      // The tags are part of the post, so the assignment moved its
+      // `updatedAt`: a caller polling for changes sees the post instead of a
+      // stale tag list.
+      const after = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts?updatedAfter=${encodeURIComponent(cutoff.toISOString())}`,
+            "fbk_tag_sync"
+          )
+        )
+      );
+      expect(after.data.map((post) => post.id)).toEqual([workspace.postId]);
+      expect(after.data[0]?.tags).toEqual([{ id: "tag_sync", name: "Sync" }]);
+    })
+  );
+
+  it.effect("moves a post's updatedAt when a tag is deleted from it", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      const nowDateTime = yield* DateTime.now;
+      const earlier = DateTime.toDate(
+        DateTime.subtract(nowDateTime, { minutes: 30 })
+      );
+      const cutoff = DateTime.toDate(
+        DateTime.subtract(nowDateTime, { minutes: 15 })
+      );
+
+      yield* seedTag(workspace.organizationId, "tag_doomed", "Doomed");
+      yield* db.insert(schema.postTagTable).values({
+        id: "ptag_doomed",
+        postId: workspace.postId,
+        tagId: "tag_doomed",
+        organizationId: workspace.organizationId,
+      });
+
+      // The link exists and the post looks old, so only the deletion can
+      // bring it into the poll's window.
+      yield* db
+        .update(schema.postTable)
+        .set({ updatedAt: earlier })
+        .where(eq(schema.postTable.id, workspace.postId));
+
+      registerKey(
+        "fbk_tag_delete_sync",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const before = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts?updatedAfter=${encodeURIComponent(cutoff.toISOString())}`,
+            "fbk_tag_delete_sync"
+          )
+        )
+      );
+      expect(before.data.map((post) => post.id)).toEqual([]);
+
+      const deleted = yield* executeWrite("DELETE", "/api/v1/tags/tag_doomed", {
+        apiKey: "fbk_tag_delete_sync",
+      });
+      expect(deleted.status).toBe(204);
+
+      // Deleting the tag removed it from the post, which changes the post's
+      // payload: a caller polling for changes sees it instead of a stale tag
+      // list.
+      const after = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts?updatedAfter=${encodeURIComponent(cutoff.toISOString())}`,
+            "fbk_tag_delete_sync"
+          )
+        )
+      );
+      expect(after.data.map((post) => post.id)).toEqual([workspace.postId]);
+      expect(after.data[0]?.tags).toEqual([]);
+    })
+  );
+
+  it.effect("never rewinds a post's updatedAt when deleting a tag", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      const nowDateTime = yield* DateTime.now;
+      // Stands in for a concurrent writer that committed a later timestamp
+      // than the delete samples: the write must keep the later value, because
+      // a caller may already have synced through it.
+      const committed = DateTime.toDate(
+        DateTime.add(nowDateTime, { hours: 1 })
+      );
+
+      yield* seedTag(workspace.organizationId, "tag_rewind", "Rewind");
+      yield* db.insert(schema.postTagTable).values({
+        id: "ptag_rewind",
+        postId: workspace.postId,
+        tagId: "tag_rewind",
+        organizationId: workspace.organizationId,
+      });
+      yield* db
+        .update(schema.postTable)
+        .set({ updatedAt: committed })
+        .where(eq(schema.postTable.id, workspace.postId));
+
+      registerKey(
+        "fbk_tag_rewind",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const deleted = yield* executeWrite("DELETE", "/api/v1/tags/tag_rewind", {
+        apiKey: "fbk_tag_rewind",
+      });
+      expect(deleted.status).toBe(204);
+
+      const post = decodePost(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts/${workspace.postId}`,
+            "fbk_tag_rewind"
+          )
+        )
+      );
+      expect(post.updatedAt.getTime()).toBe(committed.getTime());
+      expect(post.tags).toEqual([]);
+    })
+  );
+
+  it.effect(
+    "lists a post's timeline newest first, with actors classified",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const db = yield* currentDb;
+        const nowDateTime = yield* DateTime.now;
+        const now = DateTime.toDate(nowDateTime);
+        const atMinutesAgo = (count: number) =>
+          DateTime.toDate(DateTime.subtract(nowDateTime, { minutes: count }));
+        const threeMinutesAgo = atMinutesAgo(3);
+        const twoMinutesAgo = atMinutesAgo(2);
+        const oneMinuteAgo = atMinutesAgo(1);
+
+        // A member and an end user, each with a user row so the timeline can
+        // name them; the member row is what distinguishes the two.
+        const memberUserId = `user_activity_member_${workspace.organizationId}`;
+        const endUserId = `user_activity_end_${workspace.organizationId}`;
+        yield* db.insert(schema.userTable).values([
+          {
+            id: memberUserId,
+            email: `${memberUserId}@example.com`,
+            name: "Morgan Staff",
+          },
+          {
+            id: endUserId,
+            email: `${endUserId}@example.com`,
+            name: "Jamie Customer",
+          },
+        ]);
+        yield* db.insert(schema.memberTable).values({
+          id: `mem_activity_${workspace.organizationId}`,
+          organizationId: workspace.organizationId,
+          userId: memberUserId,
+          role: "admin",
+          createdAt: now,
+        });
+
+        yield* db.insert(schema.postActivityTable).values([
+          {
+            id: "act_created",
+            organizationId: workspace.organizationId,
+            postId: workspace.postId,
+            actorId: endUserId,
+            actorMemberId: null,
+            kind: "POST_CREATED",
+            createdAt: threeMinutesAgo,
+          },
+          {
+            id: "act_status",
+            organizationId: workspace.organizationId,
+            postId: workspace.postId,
+            actorId: memberUserId,
+            actorMemberId: `mem_activity_${workspace.organizationId}`,
+            kind: "STATUS_CHANGED",
+            previousValue: "pss_open",
+            nextValue: "pss_planned",
+            // Internal provenance that must not reach the payload.
+            metadata: { onBehalfOf: { contactId: "cnt_secret" } },
+            createdAt: twoMinutesAgo,
+          },
+          {
+            id: "act_tag",
+            organizationId: workspace.organizationId,
+            postId: workspace.postId,
+            actorId: null,
+            actorMemberId: null,
+            kind: "TAG_ADDED",
+            nextValue: "tag_dark_mode",
+            createdAt: oneMinuteAgo,
+          },
+        ]);
+
+        registerKey("fbk_activity", workspace.organizationId);
+
+        // One page at a time, so the cursor is exercised on the same ordering
+        // the response uses.
+        const firstResponse = yield* executeRequest(
+          `/api/v1/posts/${workspace.postId}/activity?limit=2`,
+          "fbk_activity"
+        );
+        expect(firstResponse.status).toBe(200);
+
+        const first = decodeActivityPage(responseBody(firstResponse));
+        expect(first.data.map((entry) => entry.id)).toEqual([
+          "act_tag",
+          "act_status",
+        ]);
+        expect(first.nextCursor).not.toBeNull();
+
+        const secondResponse = yield* executeRequest(
+          `/api/v1/posts/${workspace.postId}/activity?cursor=${encodeURIComponent(first.nextCursor ?? "")}`,
+          "fbk_activity"
+        );
+        expect(secondResponse.status).toBe(200);
+        const second = decodeActivityPage(responseBody(secondResponse));
+        expect(second.data.map((entry) => entry.id)).toEqual(["act_created"]);
+        expect(second.nextCursor).toBeNull();
+
+        const [tagEntry, statusEntry] = first.data;
+        const [createdEntry] = second.data;
+
+        // A machine key is not an actor: the entry reports nobody rather than
+        // inventing an identity.
+        expect(tagEntry?.actor).toBeNull();
+        expect(tagEntry?.kind).toBe("TAG_ADDED");
+        expect(tagEntry?.nextValue).toBe("tag_dark_mode");
+
+        expect(statusEntry?.actor).toEqual({
+          avatarUrl: null,
+          displayName: "Morgan Staff",
+          type: "member",
+        });
+        expect(statusEntry?.previousValue).toBe("pss_open");
+        expect(statusEntry?.nextValue).toBe("pss_planned");
+
+        expect(createdEntry?.actor).toEqual({
+          avatarUrl: null,
+          displayName: "Jamie Customer",
+          type: "end_user",
+        });
+
+        // The internal provenance and the actor's member id stay internal.
+        const raw = responseBody(firstResponse) + responseBody(secondResponse);
+        expect(raw).not.toContain("metadata");
+        expect(raw).not.toContain("actorMemberId");
+        expect(raw).not.toContain("cnt_secret");
+        expect(raw).not.toContain("mem_activity");
+      })
+  );
+
+  it.effect(
+    "reports another workspace's post as not found on its timeline",
+    () =>
+      Effect.gen(function* () {
+        const workspace = yield* seedWorkspace();
+        const other = yield* seedWorkspace();
+        registerKey("fbk_activity_scoped", workspace.organizationId);
+
+        const foreign = yield* executeRequest(
+          `/api/v1/posts/${other.postId}/activity`,
+          "fbk_activity_scoped"
+        );
+        expect(foreign.status).toBe(404);
+        expect(decodeError(responseBody(foreign))._tag).toBe("NOT_FOUND");
+
+        const unknown = yield* executeRequest(
+          "/api/v1/posts/pst_does_not_exist/activity",
+          "fbk_activity_scoped"
+        );
+        expect(unknown.status).toBe(404);
+        expect(decodeError(responseBody(unknown))._tag).toBe("NOT_FOUND");
+      })
+  );
+
+  it.effect("refuses the board reads without the boards.read scope", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_no_boards", workspace.organizationId, {
+        posts: ["read"],
+      });
+
+      const list = yield* executeRequest("/api/v1/boards", "fbk_no_boards");
+      expect(list.status).toBe(403);
+      expect(decodeError(responseBody(list))._tag).toBe("FORBIDDEN_SCOPE");
+
+      const get = yield* executeRequest(
+        `/api/v1/boards/${workspace.boardId}`,
+        "fbk_no_boards"
+      );
+      expect(get.status).toBe(403);
+      expect(decodeError(responseBody(get)).message).toContain("boards.read");
+    })
+  );
+
+  it.effect("lists the workspace's statuses in display order", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      const customStatusId = yield* PostStatusId.generate;
+      const now = yield* DateTime.nowAsDate;
+
+      yield* db.insert(schema.postStatusTable).values({
+        id: customStatusId,
+        type: "COMPLETED",
+        // A workspace that has not customized the status leaves the label
+        // empty; the name falls back to the humanized type, exactly as it does
+        // inside a post payload.
+        label: "",
+        // Before the seeded status, so the order is observable.
+        orderIndex: -1,
+        organizationId: workspace.organizationId,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      registerKey("fbk_status_reader", workspace.organizationId);
+
+      const response = yield* executeRequest(
+        "/api/v1/statuses",
+        "fbk_status_reader"
+      );
+      expect(response.status).toBe(200);
+
+      const list = decodeStatuses(responseBody(response));
+      expect(list.data.map((status) => status.id)).toEqual([
+        customStatusId,
+        workspace.statusId,
+      ]);
+      expect(list.data[0]?.name).toBe("Completed");
+      expect(list.data[1]?.name).toBe("Planned");
+      expect(list.data[1]?.type).toBe("PLANNED");
+
+      // The status row carries the workspace; the key already names it.
+      expect(responseBody(response)).not.toContain("organizationId");
+    })
+  );
+
+  it.effect("keeps the status list inside the calling workspace", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const other = yield* seedWorkspace();
+      registerKey("fbk_status_scoped", workspace.organizationId);
+
+      const response = yield* executeRequest(
+        "/api/v1/statuses",
+        "fbk_status_scoped"
+      );
+      expect(response.status).toBe(200);
+
+      const list = decodeStatuses(responseBody(response));
+      expect(list.data.map((status) => status.id)).toEqual([
+        workspace.statusId,
+      ]);
+      expect(list.data.map((status) => status.id)).not.toContain(
+        other.statusId
+      );
+    })
+  );
+
+  it.effect("refuses the status read without the posts.read scope", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_status_no_posts", workspace.organizationId, {
+        boards: ["read"],
+        tags: ["read"],
+      });
+
+      const response = yield* executeRequest(
+        "/api/v1/statuses",
+        "fbk_status_no_posts"
+      );
+      expect(response.status).toBe(403);
+      expect(decodeError(responseBody(response))._tag).toBe("FORBIDDEN_SCOPE");
+      expect(decodeError(responseBody(response)).message).toContain(
+        "posts.read"
+      );
     })
   );
 });
@@ -4056,6 +4865,12 @@ layer(makeTestApp({ limit: 1, window: Duration.minutes(1) }))(
           );
           expect(first.status).toBe(200);
 
+          // Every response that reports a budget describes the window it is
+          // counting, on the success as well as the refusal.
+          expect(first.headers["x-ratelimit-limit"]).toBe("1");
+          expect(first.headers["x-ratelimit-remaining"]).toBe("0");
+          expect(Number(first.headers["x-ratelimit-reset"])).toBeGreaterThan(0);
+
           const second = yield* executeRequest(
             `/api/v1/posts/${workspace.postId}`,
             "fbk_limited"
@@ -4063,6 +4878,11 @@ layer(makeTestApp({ limit: 1, window: Duration.minutes(1) }))(
           expect(second.status).toBe(429);
           expect(decodeError(responseBody(second))._tag).toBe("RATE_LIMITED");
           expect(second.headers["retry-after"]).toBeDefined();
+          expect(second.headers["x-ratelimit-limit"]).toBe("1");
+          expect(second.headers["x-ratelimit-remaining"]).toBe("0");
+          expect(Number(second.headers["x-ratelimit-reset"])).toBeGreaterThan(
+            0
+          );
 
           // A different key has its own budget.
           const other = yield* seedWorkspace();
@@ -4565,6 +5385,55 @@ layer(
     })
   );
 
+  it.effect("calls a tool that takes no parameters", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_mcp_statuses", workspace.organizationId);
+
+      const sessionId = yield* openMcpSession("fbk_mcp_statuses");
+      const result = yield* callTool(
+        sessionId,
+        "fbk_mcp_statuses",
+        "listStatuses",
+        {}
+      );
+      expect(result.isError).toBe(false);
+
+      // The empty input is an object schema rather than an empty struct: the
+      // tool's `inputSchema` has to carry `type: "object"` for the transport
+      // to accept the descriptor at all.
+      const statuses = yield* Schema.decodeUnknownEffect(PublicApiStatusList)(
+        result.structuredContent
+      );
+      expect(statuses.data.map((status) => status.id)).toEqual([
+        workspace.statusId,
+      ]);
+      expect(statuses.data[0]?.name).toBe("Planned");
+    })
+  );
+
+  it.effect("refuses a rolled-over date the same way HTTP does", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_mcp_date", workspace.organizationId);
+
+      const sessionId = yield* openMcpSession("fbk_mcp_date");
+      const result = yield* callTool(sessionId, "fbk_mcp_date", "listPosts", {
+        updatedAfter: "2026-02-30",
+      });
+      expect(result.isError).toBe(true);
+
+      // The operation validates the instant, not the HTTP projection, so the
+      // tool refuses what the query parameter refuses: a date that does not
+      // exist cannot be rolled into March on one surface and not the other.
+      const [content] = result.content;
+      if (content?.type !== "text") {
+        return yield* Effect.die("the refusal carried no text content");
+      }
+      expect(content.text).toContain("ISO 8601");
+    })
+  );
+
   it.effect("refuses a request with no key", () =>
     Effect.gen(function* () {
       const response = yield* executeMcp({ body: MCP_INITIALIZE });
@@ -4618,6 +5487,11 @@ layer(
       expect(refused.status).toBe(429);
       expect(decodeError(responseBody(refused))._tag).toBe("RATE_LIMITED");
       expect(Number(refused.headers["retry-after"])).toBeGreaterThan(0);
+
+      // The MCP surface resolves the same key and publishes the same budget
+      // headers, so a client pacing itself reads one contract on both.
+      expect(refused.headers["x-ratelimit-limit"]).toBe("1");
+      expect(refused.headers["x-ratelimit-remaining"]).toBe("0");
     })
   );
 });

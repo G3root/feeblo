@@ -3,6 +3,7 @@ import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import type { TPost } from "@feeblo/domain/post/schema";
 import type { TStatusRoadmapColumn } from "@feeblo/domain/roadmap-column/schema";
 import type { TRoadmap } from "@feeblo/domain/roadmap/schema";
+import { isLiveQueryPending } from "@feeblo/web-shared/collections";
 import type { Collection, UtilsRecord } from "@tanstack/db";
 import { and, eq, isNull, useLiveQuery } from "@tanstack/react-db";
 import { useCallback, useMemo } from "react";
@@ -265,11 +266,15 @@ export function useRoadmapData<
     allRoadmapsQuery.isError ||
     columnsQuery.isError ||
     postsQuery.isError;
+  // A query with a result — including an empty roadmap — is content, not a
+  // loading state: hydration lands results before the first client render and
+  // a skeleton gated on `isLoading` would replace them (see
+  // `isLiveQueryPending`).
   const isLoading =
-    roadmapsQuery.isLoading ||
-    allRoadmapsQuery.isLoading ||
-    columnsQuery.isLoading ||
-    postsQuery.isLoading;
+    isLiveQueryPending(roadmapsQuery) ||
+    isLiveQueryPending(allRoadmapsQuery) ||
+    isLiveQueryPending(columnsQuery) ||
+    isLiveQueryPending(postsQuery);
 
   const lanesByRoadmap = useMemo(() => {
     const posts = postsQuery.data ?? [];

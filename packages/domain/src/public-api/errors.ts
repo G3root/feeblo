@@ -167,10 +167,30 @@ export class ServiceUnavailableError extends Schema.TaggedError<ServiceUnavailab
   }
 ) {}
 
+/**
+ * The budget headers a 429 carries beside `Retry-After`.
+ *
+ * Named keys rather than a `Record<string, string>` so a value built from it
+ * is statically the same shape `RateLimitedErrorWithHeaders` declares: a spread
+ * of an open record infers only the keys written in the literal, and the
+ * encoded response then fails to type-check against the schema it is declared
+ * with.
+ */
+export type PublicApiRateLimitHeaders = {
+  readonly "x-ratelimit-limit": string;
+  readonly "x-ratelimit-remaining": string;
+  readonly "x-ratelimit-reset": string;
+};
+
 /** 429 with the `Retry-After` header the contract promises. */
 export const RateLimitedErrorWithHeaders = HttpApiSchema.WithHeaders(
   RateLimitedError,
-  { "retry-after": Schema.String }
+  {
+    "retry-after": Schema.String,
+    "x-ratelimit-limit": Schema.String,
+    "x-ratelimit-remaining": Schema.String,
+    "x-ratelimit-reset": Schema.String,
+  }
 );
 
 /**
@@ -269,12 +289,18 @@ export const notFoundError = (
 export const conflictError = (message: string) =>
   new ConflictError({ message });
 
-export const rateLimitedError = (retryAfterSeconds: number) =>
+export const rateLimitedError = (
+  retryAfterSeconds: number,
+  limitHeaders: PublicApiRateLimitHeaders
+) =>
   HttpApiSchema.withHeaders({
     body: new RateLimitedError({
       message: "Rate limit exceeded for this API key.",
     }),
-    headers: { "retry-after": String(retryAfterSeconds) },
+    headers: {
+      "retry-after": String(retryAfterSeconds),
+      ...limitHeaders,
+    },
   });
 
 export const internalError = (

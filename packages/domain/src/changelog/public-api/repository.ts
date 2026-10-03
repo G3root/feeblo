@@ -1,5 +1,6 @@
 import { currentDb, Database, schema } from "@feeblo/db";
-import { and, desc, eq, sql, type SQL } from "drizzle-orm";
+import type { TChangelogCategoryIconType } from "@feeblo/domain-contracts/changelog-category-icon-type";
+import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -29,6 +30,19 @@ import type { TPublicApiChangelogStatus } from "./schema";
  * here has no way into a public response. The status vocabulary is the closed
  * literal union from `./schema`, not the dashboard's schema module.
  */
+export type PublicApiChangelogCategoryEntry = {
+  readonly id: string;
+  readonly name: string;
+  readonly iconType: TChangelogCategoryIconType;
+  readonly icon: string;
+};
+
+export type PublicApiChangelogLinkedPostEntry = {
+  readonly id: string;
+  readonly title: string;
+  readonly slug: string;
+};
+
 export type PublicApiChangelogSource = {
   readonly id: string;
   readonly title: string;
@@ -40,6 +54,8 @@ export type PublicApiChangelogSource = {
   readonly publishedAt: Date | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
+  readonly categories: readonly PublicApiChangelogCategoryEntry[];
+  readonly linkedPosts: readonly PublicApiChangelogLinkedPostEntry[];
 };
 
 export type PublicApiChangelogDetail = PublicApiChangelogSource & {
@@ -89,7 +105,13 @@ type ChangelogRow = {
   updatedAt: Date;
 };
 
-const toChangelogSource = (row: ChangelogRow): PublicApiChangelogSource => ({
+const toChangelogSource = (
+  row: ChangelogRow,
+  collections: {
+    readonly categories: readonly PublicApiChangelogCategoryEntry[];
+    readonly linkedPosts: readonly PublicApiChangelogLinkedPostEntry[];
+  }
+): PublicApiChangelogSource => ({
   id: row.id,
   title: row.title,
   slug: row.slug,
@@ -100,12 +122,18 @@ const toChangelogSource = (row: ChangelogRow): PublicApiChangelogSource => ({
   publishedAt: row.publishedAt,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
+  categories: collections.categories,
+  linkedPosts: collections.linkedPosts,
 });
 
 const toChangelogDetail = (
-  row: ChangelogRow & { content: string }
+  row: ChangelogRow & { content: string },
+  collections: {
+    readonly categories: readonly PublicApiChangelogCategoryEntry[];
+    readonly linkedPosts: readonly PublicApiChangelogLinkedPostEntry[];
+  }
 ): PublicApiChangelogDetail => ({
-  ...toChangelogSource(row),
+  ...toChangelogSource(row, collections),
   content: row.content,
 });
 
@@ -125,6 +153,109 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
   const changelogs = yield* ChangelogRepository;
   const s3 = yield* S3UploadService;
   const publication = yield* makeChangelogPublication;
+
+  /**
+   * The labels and linked posts of a page of entries, in one query each.
+   *
+   * Batched by the page's ids rather than fetched per entry, so a page of
+   * twenty entries is three queries rather than forty-one. Both collections
+   * are ordered by their link's creation time and then by the link's own
+   * identifier — the category link's id, the post link's post id — so two
+   * labels or posts attached at the same instant still read in one stable
+   * order rather than whatever the planner returns.
+   */
+  const collectionsByChangelogId = (
+    changelogIds: readonly string[],
+    organizationId: string
+  ) =>
+    Effect.gen(function* () {
+      const empty = {
+        categories: new Map<string, PublicApiChangelogCategoryEntry[]>(),
+        linkedPosts: new Map<string, PublicApiChangelogLinkedPostEntry[]>(),
+      };
+      if (changelogIds.length === 0) {
+        return empty;
+      }
+
+      const categoryRows = yield* db
+        .select({
+          changelogId: schema.changelogCategoryLinkTable.changelogId,
+          id: schema.changelogCategoryTable.id,
+          name: schema.changelogCategoryTable.name,
+          iconType: schema.changelogCategoryTable.iconType,
+          icon: schema.changelogCategoryTable.icon,
+        })
+        .from(schema.changelogCategoryLinkTable)
+        .innerJoin(
+          schema.changelogCategoryTable,
+          eq(
+            schema.changelogCategoryTable.id,
+            schema.changelogCategoryLinkTable.categoryId
+          )
+        )
+        .where(
+          and(
+            eq(
+              schema.changelogCategoryLinkTable.organizationId,
+              organizationId
+            ),
+            inArray(schema.changelogCategoryLinkTable.changelogId, changelogIds)
+          )
+        )
+        .orderBy(
+          asc(schema.changelogCategoryLinkTable.createdAt),
+          asc(schema.changelogCategoryLinkTable.id)
+        );
+
+      const postRows = yield* db
+        .select({
+          changelogId: schema.changelogPostTable.changelogId,
+          id: schema.postTable.id,
+          title: schema.postTable.title,
+          slug: schema.postTable.slug,
+        })
+        .from(schema.changelogPostTable)
+        .innerJoin(
+          schema.postTable,
+          eq(schema.postTable.id, schema.changelogPostTable.postId)
+        )
+        .where(
+          and(
+            eq(schema.changelogPostTable.organizationId, organizationId),
+            inArray(schema.changelogPostTable.changelogId, changelogIds)
+          )
+        )
+        .orderBy(
+          asc(schema.changelogPostTable.createdAt),
+          // The table's key is `(changelogId, postId)`, so the post id is the
+          // unique tiebreaker a link created in the same instant needs.
+          asc(schema.changelogPostTable.postId)
+        );
+
+      const categories = new Map<string, PublicApiChangelogCategoryEntry[]>();
+      for (const row of categoryRows) {
+        const entries = categories.get(row.changelogId) ?? [];
+        entries.push({
+          icon: row.icon,
+          iconType: row.iconType,
+          id: row.id,
+          name: row.name,
+        });
+        categories.set(row.changelogId, entries);
+      }
+
+      const linkedPosts = new Map<
+        string,
+        PublicApiChangelogLinkedPostEntry[]
+      >();
+      for (const row of postRows) {
+        const entries = linkedPosts.get(row.changelogId) ?? [];
+        entries.push({ id: row.id, slug: row.slug, title: row.title });
+        linkedPosts.set(row.changelogId, entries);
+      }
+
+      return { categories, linkedPosts };
+    });
 
   /**
    * Keeps an entry's editor-asset references in step with its content.
@@ -221,8 +352,18 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
         const pageRows = hasMore ? rows.slice(0, limit) : rows;
         const lastRow = pageRows.at(-1);
 
+        const collections = yield* collectionsByChangelogId(
+          pageRows.map((row) => row.id),
+          organizationId
+        );
+
         return {
-          entries: pageRows.map(toChangelogSource),
+          entries: pageRows.map((row) =>
+            toChangelogSource(row, {
+              categories: collections.categories.get(row.id) ?? [],
+              linkedPosts: collections.linkedPosts.get(row.id) ?? [],
+            })
+          ),
           nextCursor:
             hasMore && lastRow !== undefined
               ? { createdAt: lastRow.createdAt, id: lastRow.id }
@@ -250,8 +391,21 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
           )
           .limit(1);
 
-        return Option.fromNullishOr(rows.at(0)).pipe(
-          Option.map(toChangelogDetail)
+        const row = rows.at(0);
+        if (row === undefined) {
+          return Option.none();
+        }
+
+        const collections = yield* collectionsByChangelogId(
+          [row.id],
+          organizationId
+        );
+
+        return Option.some(
+          toChangelogDetail(row, {
+            categories: collections.categories.get(row.id) ?? [],
+            linkedPosts: collections.linkedPosts.get(row.id) ?? [],
+          })
         );
       }).pipe(withRemapDbErrors("PublicApiChangelog", "select")),
 
@@ -353,7 +507,15 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
               });
             }
 
-            return { entry: toChangelogDetail(created), outboxId };
+            return {
+              entry: toChangelogDetail(created, {
+                // A create cannot set labels or links; they are the
+                // dashboard's, and a create has none yet.
+                categories: [],
+                linkedPosts: [],
+              }),
+              outboxId,
+            };
           })
         )
         .pipe(
@@ -468,7 +630,21 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
               });
             }
 
-            return { entry: toChangelogDetail(updated), outboxId };
+            // An update does not touch labels or links, but the entry may
+            // already carry either from the dashboard, so the response
+            // reports what the entry has now rather than an empty pair.
+            const collections = yield* collectionsByChangelogId(
+              [updated.id],
+              organizationId
+            );
+
+            return {
+              entry: toChangelogDetail(updated, {
+                categories: collections.categories.get(updated.id) ?? [],
+                linkedPosts: collections.linkedPosts.get(updated.id) ?? [],
+              }),
+              outboxId,
+            };
           })
         )
         .pipe(

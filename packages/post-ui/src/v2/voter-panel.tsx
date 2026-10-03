@@ -18,6 +18,7 @@ import { Popover, PopoverPopup, PopoverTrigger } from "@feeblo/ui/popover";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
+import { isLiveQueryPending } from "@feeblo/web-shared/collections";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
@@ -86,7 +87,7 @@ export function VoterPanel() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  const { data: upvotes = [], isLoading } = useLiveQuery({
+  const upvotesQuery = useLiveQuery({
     query: (q) =>
       q
         .from({ upvote: upvoteCollection })
@@ -97,6 +98,11 @@ export function VoterPanel() {
           )
         ),
   });
+
+  const upvotes = upvotesQuery.data ?? [];
+  // Hydration lands the voter list before the first client render; a skeleton
+  // gated on `isLoading` would replace it (see `isLiveQueryPending`).
+  const isLoading = isLiveQueryPending(upvotesQuery);
 
   // Plain async functions, deliberately NOT createOptimisticAction: that API
   // skips mutationFn entirely when onMutate stages zero collection

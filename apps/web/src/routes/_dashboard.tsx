@@ -30,8 +30,8 @@ import { dashboardAuthBeforeLoad } from "~/lib/auth-redirects";
  * The provider stack moved here from the deleted `dashboard/main.tsx`: it
  * renders on the client only, so the theme/toast/tooltip providers (which read
  * the DOM) and the auth/analytics providers (which read the browser session)
- * never run on the server. The public board has its own stack inside
- * `PublicBoardApp`.
+ * never run on the server. The public board has its own stack in the board's
+ * layout route (`routes/s/route.tsx`), which does server-render.
  */
 export const Route = createFileRoute("/_dashboard")({
   ssr: false,

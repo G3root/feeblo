@@ -8,6 +8,7 @@ import {
   REACTION_EMOJIS,
   type ReactionEmoji,
 } from "@feeblo/utils/reaction";
+import { isLiveQueryPending } from "@feeblo/web-shared/collections";
 import {
   getCommentReactionCollectionKey,
   getPostReactionCollectionKey,
@@ -258,28 +259,31 @@ export function PostReactionPicker() {
   } = usePostCollections();
   const { data: session } = useAuthState();
 
-  const { data: reactionCounts, isLoading: isReactionCountsLoading } =
-    useLiveQuery({
-      query: (q) => {
-        if (!postSlug) {
-          return undefined;
-        }
-        return q
-          .from({ postReaction: postReactionCollection })
-          .where(({ postReaction }) =>
-            and(
-              eq(postReaction.organizationId, organizationId),
-              eq(postReaction.postSlug, postSlug)
-            )
+  const reactionCountsQuery = useLiveQuery({
+    query: (q) => {
+      if (!postSlug) {
+        return undefined;
+      }
+      return q
+        .from({ postReaction: postReactionCollection })
+        .where(({ postReaction }) =>
+          and(
+            eq(postReaction.organizationId, organizationId),
+            eq(postReaction.postSlug, postSlug)
           )
-          .groupBy(({ postReaction }) => postReaction.emoji)
-          .select(({ postReaction }) => ({
-            emoji: postReaction.emoji,
-            count: count(postReaction.id),
-          }))
-          .orderBy(({ postReaction }) => postReaction.emoji, "asc");
-      },
-    });
+        )
+        .groupBy(({ postReaction }) => postReaction.emoji)
+        .select(({ postReaction }) => ({
+          emoji: postReaction.emoji,
+          count: count(postReaction.id),
+        }))
+        .orderBy(({ postReaction }) => postReaction.emoji, "asc");
+    },
+  });
+  const reactionCounts = reactionCountsQuery.data;
+  // Hydration lands the counts before the first client render; a skeleton
+  // gated on `isLoading` would replace them (see `isLiveQueryPending`).
+  const isReactionCountsLoading = isLiveQueryPending(reactionCountsQuery);
 
   const { data: userReactions } = useLiveQuery({
     query: (q) => {
@@ -413,28 +417,29 @@ export function CommentReactionPicker({
   } = usePostCollections();
   const { data: session } = useAuthState();
 
-  const { data: reactionCounts, isLoading: isReactionCountsLoading } =
-    useLiveQuery({
-      query: (q) => {
-        if (!postSlug) {
-          return undefined;
-        }
-        return q
-          .from({ commentReaction: commentReactionCollection })
-          .where(({ commentReaction }) =>
-            and(
-              eq(commentReaction.commentId, commentId),
-              eq(commentReaction.postSlug, postSlug)
-            )
+  const reactionCountsQuery = useLiveQuery({
+    query: (q) => {
+      if (!postSlug) {
+        return undefined;
+      }
+      return q
+        .from({ commentReaction: commentReactionCollection })
+        .where(({ commentReaction }) =>
+          and(
+            eq(commentReaction.commentId, commentId),
+            eq(commentReaction.postSlug, postSlug)
           )
-          .groupBy(({ commentReaction }) => commentReaction.emoji)
-          .select(({ commentReaction }) => ({
-            emoji: commentReaction.emoji,
-            count: count(commentReaction.id),
-          }))
-          .orderBy(({ commentReaction }) => commentReaction.emoji, "asc");
-      },
-    });
+        )
+        .groupBy(({ commentReaction }) => commentReaction.emoji)
+        .select(({ commentReaction }) => ({
+          emoji: commentReaction.emoji,
+          count: count(commentReaction.id),
+        }))
+        .orderBy(({ commentReaction }) => commentReaction.emoji, "asc");
+    },
+  });
+  const reactionCounts = reactionCountsQuery.data;
+  const isReactionCountsLoading = isLiveQueryPending(reactionCountsQuery);
 
   const { data: userReactions } = useLiveQuery({
     query: (q) => {

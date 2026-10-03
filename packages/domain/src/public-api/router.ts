@@ -13,6 +13,7 @@ import { EmailOutboxRepository } from "../email-outbox/repository";
 import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
 import { PostActivityRepository } from "../post-activity/repository";
+import { PostStatusRepository } from "../post-status/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { PostEmbeddingService } from "../post/embedding-service";
 import { PublicApiPostRepository } from "../post/public-api/repository";
@@ -75,6 +76,7 @@ export const PublicApiInternals = Layer.mergeAll(
   PostActivityRepository.layer,
   PostEmbeddingService.layer,
   PostRepository.layer,
+  PostStatusRepository.layer,
   PostSubscriptionRepository.layer,
   ResolvePrincipalService.layer,
   TagRepository.layer,

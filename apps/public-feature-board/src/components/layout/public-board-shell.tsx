@@ -11,42 +11,45 @@ import {
 import { PostCreateDialog } from "@feeblo/post-ui/post-create-dialog";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import type { ReactNode } from "react";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
+import { boardPaths } from "../../lib/board-links";
 import {
-  publicBoardCollection,
-  publicCommentCollection,
-  publicCommentReactionCollection,
-  publicDeleteEligibilityCollection,
-  publicPostCollection,
-  publicPostDetailCollection,
-  publicPostReactionCollection,
-  publicPostStatusCollection,
-  publicPostSubscriptionCollection,
-  publicUpvoteCollection,
-  getMutationOrganizationId,
-} from "../../lib/collections";
+  useBoardMutationOrganizationId,
+  usePublicCollections,
+} from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
 import { Navbar } from "../common/navbar";
 import { PoweredByTag } from "./powered-by-tag";
 
-const collections: PostCollections = {
-  boardCollection: publicBoardCollection,
-  postCollection: publicPostCollection,
-  postDetailCollection: publicPostDetailCollection,
-  postStatusCollection: publicPostStatusCollection,
-  upvoteCollection: publicUpvoteCollection,
-  commentCollection: publicCommentCollection,
-  deleteEligibilityCollection: publicDeleteEligibilityCollection,
-  postReactionCollection: publicPostReactionCollection,
-  commentReactionCollection: publicCommentReactionCollection,
-  postSubscriptionCollection: publicPostSubscriptionCollection,
-  //todo add member collection
-};
-
 export function PublicBoardShell({ children }: { children: ReactNode }) {
   const site = useSite();
   const authDialogStore = useAuthDialogContext();
+  const publicCollections = usePublicCollections();
+  const getMutationOrganizationId = useBoardMutationOrganizationId();
+
+  // `post-ui` receives instances, not descriptors: resolving them from this
+  // document's DB client (rather than module-level singletons) is what keeps a
+  // server render and a browser document from sharing collection state.
+  const collections = useMemo<PostCollections>(
+    () => ({
+      boardCollection: publicCollections.publicBoardCollection,
+      postCollection: publicCollections.publicPostCollection,
+      postDetailCollection: publicCollections.publicPostDetailCollection,
+      postStatusCollection: publicCollections.publicPostStatusCollection,
+      upvoteCollection: publicCollections.publicUpvoteCollection,
+      commentCollection: publicCollections.publicCommentCollection,
+      deleteEligibilityCollection:
+        publicCollections.publicDeleteEligibilityCollection,
+      postReactionCollection: publicCollections.publicPostReactionCollection,
+      commentReactionCollection:
+        publicCollections.publicCommentReactionCollection,
+      postSubscriptionCollection:
+        publicCollections.publicPostSubscriptionCollection,
+      //todo add member collection
+    }),
+    [publicCollections]
+  );
 
   const handleAuthRequired = useCallback(() => {
     authDialogStore.send({
@@ -58,7 +61,7 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
 
   const getPostHref = useCallback<
     NonNullable<PostCollectionsValue["getPostHref"]>
-  >((post) => `/p/${post.slug}`, []);
+  >((post) => boardPaths.post(post.slug), []);
 
   const suggestPosts = useCallback<
     NonNullable<PostCollectionsValue["suggestPosts"]>
@@ -87,7 +90,7 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
           organizationId: getMutationOrganizationId(),
         })
       ),
-    []
+    [getMutationOrganizationId]
   );
 
   return (

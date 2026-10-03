@@ -11,6 +11,7 @@ import {
   openChangelogPage,
   publishOpenChangelogEntry,
 } from "../helpers/changelog";
+import { waitForHydration } from "../helpers/hydration";
 import { setPlan } from "../helpers/set-plan";
 import {
   invitationIdFromEmail,
@@ -384,6 +385,7 @@ test.describe("changelog notifications", () => {
       await visitorPage.goto(
         `${publicBoardUrl(owner.workspaceName)}/changelog`
       );
+      await waitForHydration(visitorPage);
       await expect(
         visitorPage.getByRole("button", { name: "Subscribe", exact: true })
       ).toBeVisible();
@@ -471,6 +473,7 @@ test.describe("changelog notifications", () => {
       await visitorPage.goto(
         `${publicBoardUrl(ownerA.workspaceName)}/changelog`
       );
+      await waitForHydration(visitorPage);
       await visitorPage
         .getByRole("button", { name: "Subscribe", exact: true })
         .click();
@@ -542,6 +545,7 @@ test.describe("changelog notifications", () => {
       await visitorPage.goto(
         `${publicBoardUrl(ownerB.workspaceName)}/changelog`
       );
+      await waitForHydration(visitorPage);
       await visitorPage
         .getByRole("button", { name: "Subscribe", exact: true })
         .click();

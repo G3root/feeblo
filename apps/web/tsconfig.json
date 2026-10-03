@@ -31,8 +31,7 @@
     "paths": {
       "~/*": ["./src/dashboard/*"],
       "@/*": ["./src/*"],
-      "@/paraglide/*": ["./src/paraglide/*"],
-      "@feeblo/public-feature-board": ["./types/public-feature-board.d.ts"]
+      "@/paraglide/*": ["./src/paraglide/*"]
     },
     "plugins": [
       {

@@ -12,6 +12,7 @@ import type { HandlerOf } from "../../public-api/handler";
 import {
   parseIncludeArchived,
   parseLimit,
+  parseTagIds,
   providedQueryParam,
 } from "../../public-api/parse";
 import {
@@ -19,6 +20,7 @@ import {
   deletePostOperation,
   getPostOperation,
   listBoardPostsOperation,
+  listPostActivityOperation,
   listPostsOperation,
   retrievePostOperation,
   setPostTagsOperation,
@@ -30,8 +32,11 @@ import {
   GetPostParams,
   ListBoardPostsParams,
   ListBoardPostsQuery,
+  ListPostActivityParams,
+  ListPostActivityQuery,
   ListPostsQuery,
   PublicApiPost,
+  PublicApiPostActivityPage,
   PublicApiPostPage,
   PublicApiPostTags,
   RetrievePostQuery,
@@ -56,7 +61,7 @@ export const postEndpoints = [
     .annotate(OpenApi.Summary, "List a board's posts")
     .annotate(
       OpenApi.Description,
-      "Returns the posts on one board of the calling workspace, newest first, as a cursor-paginated page. Private boards are included: the key belongs to the workspace, so board visibility does not restrict it. Archived posts appear only with includeArchived=true, and posts merged into another post are never listed."
+      "Returns the posts on one board of the calling workspace, newest first, as a cursor-paginated page. Private boards are included: the key belongs to the workspace, so board visibility does not restrict it. Archived posts appear only with includeArchived=true, and posts merged into another post are never listed. `tagIds` is a comma-separated list and keeps posts carrying at least one of the tags; `updatedAfter` keeps posts changed after the given instant, which is how a sync catches up without re-reading everything."
     ),
   HttpApiEndpoint.get("listPosts", "/posts", {
     query: ListPostsQuery,
@@ -67,7 +72,7 @@ export const postEndpoints = [
     .annotate(OpenApi.Summary, "List the workspace's posts")
     .annotate(
       OpenApi.Description,
-      "Returns the posts of the calling workspace across every board, newest first, as a cursor-paginated page. Private boards are included: the key belongs to the workspace, so board visibility does not restrict it. Archived posts appear only with includeArchived=true, and posts merged into another post are never listed. Use `GET /boards/{boardId}/posts` to page one board."
+      "Returns the posts of the calling workspace across every board, newest first, as a cursor-paginated page. Private boards are included: the key belongs to the workspace, so board visibility does not restrict it. Archived posts appear only with includeArchived=true, and posts merged into another post are never listed. `boardId`, `tagIds`, and `updatedAfter` narrow the page, so one endpoint serves both a filtered read and a sync that only wants what changed. Use `GET /boards/{boardId}/posts` to page one board."
     ),
   HttpApiEndpoint.get("retrievePost", "/posts/retrieve", {
     query: RetrievePostQuery,
@@ -90,6 +95,18 @@ export const postEndpoints = [
     .annotate(
       OpenApi.Description,
       "Returns one post with its sanitized body. Posts of other workspaces are reported as not found rather than forbidden, so an id cannot be used to probe another workspace."
+    ),
+  HttpApiEndpoint.get("listPostActivity", "/posts/:postId/activity", {
+    params: ListPostActivityParams,
+    query: ListPostActivityQuery,
+    success: PublicApiPostActivityPage,
+    error: PUBLIC_API_ERROR_SCHEMAS,
+  })
+    .annotate(OpenApi.Title, "List Post Activity")
+    .annotate(OpenApi.Summary, "List a post's timeline")
+    .annotate(
+      OpenApi.Description,
+      'Returns one post\'s history, newest first, as a cursor-paginated page: creation, status and board moves, tag changes, merges, and comment entries. `kind` names what happened and `previousValue`/`nextValue` are the values it moved between — a status id for STATUS_CHANGED, a tag id for TAG_ADDED, a post id for POST_MERGED. `actor` is null when the entry was written by an API key, which has no member identity; the dashboard shows the same entry as "Someone". A post merged into another is readable and reports its own history, including the merge.'
     ),
   HttpApiEndpoint.post("createPost", "/posts", {
     payload: CreatePostPayload,
@@ -146,12 +163,17 @@ export const postHandlers = {
       const includeArchived = yield* parseIncludeArchived(
         query.includeArchived
       );
+      const tagIds = yield* parseTagIds(query.tagIds);
       return yield* listBoardPostsOperation.handler({
         boardId: params.boardId,
         cursor: query.cursor,
         includeArchived,
         limit,
         statusId: query.status ?? null,
+        tagIds: tagIds ?? undefined,
+        // Passed through raw: the operation validates the ISO shape and the
+        // calendar, so the HTTP and MCP surfaces share one check.
+        updatedAfter: query.updatedAfter,
       });
     })) satisfies HandlerOf<PublicApiGroup, "listBoardPosts">,
 
@@ -161,11 +183,16 @@ export const postHandlers = {
       const includeArchived = yield* parseIncludeArchived(
         query.includeArchived
       );
+      const tagIds = yield* parseTagIds(query.tagIds);
       return yield* listPostsOperation.handler({
+        boardId: providedQueryParam(query.boardId),
         cursor: query.cursor,
         includeArchived,
         limit,
         statusId: query.status ?? null,
+        tagIds: tagIds ?? undefined,
+        // Passed through raw: see the board list above.
+        updatedAfter: query.updatedAfter,
       });
     })) satisfies HandlerOf<PublicApiGroup, "listPosts">,
 
@@ -180,6 +207,16 @@ export const postHandlers = {
     getPostOperation.handler({
       postId: params.postId,
     })) satisfies HandlerOf<PublicApiGroup, "getPost">,
+
+  listPostActivity: (({ params, query }) =>
+    Effect.gen(function* () {
+      const limit = yield* parseLimit(query.limit);
+      return yield* listPostActivityOperation.handler({
+        cursor: query.cursor,
+        limit,
+        postId: params.postId,
+      });
+    })) satisfies HandlerOf<PublicApiGroup, "listPostActivity">,
 
   createPost: (({ payload }) =>
     createPostOperation.handler({

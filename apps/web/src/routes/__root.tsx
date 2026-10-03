@@ -1,12 +1,12 @@
 import { getClientHintCheckScript } from "@feeblo/web-shared/client-hints";
 import {
-  createRootRoute,
+  createRootRouteWithContext,
   HeadContent,
   ScriptOnce,
   Scripts,
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import {
   envScript,
@@ -19,6 +19,8 @@ import {
   getBrowserPublicEnv,
   getPublicEnvServer,
 } from "~/lib/server-runtime-public-env";
+
+import type { RouterContext } from "../router";
 
 import "../styles/global.css";
 
@@ -36,6 +38,13 @@ import "../styles/global.css";
  * server function — on Workers env is request-scoped, so it cannot be read at
  * module scope.
  *
+ * In dev the stylesheet is linked directly: Vite serves the compiled sheet at
+ * `/src/styles/global.css` for a plain `<link>` request, so the first paint is
+ * fully styled and stable. This replaces Start's `dev.ssrStyles` aggregation,
+ * which served a nondeterministic blend that broke the responsive cascade (see
+ * `vite.config.ts`); in production the bundler emits the same sheet as an
+ * asset linked by `HeadContent`.
+ *
  * The dashboard is client-only (`/_dashboard` is `ssr: false`), so its routes
  * render after hydration behind `DashboardPendingShell`. The public board
  * renders its metadata on the server and hands the SPA over to the client.
@@ -46,7 +55,7 @@ const getRootDocumentData = createServerFn({ method: "GET" }).handler(() => ({
   preconnectOrigins: apiPreconnectOrigins(),
 }));
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<RouterContext>()({
   loader: () => getRootDocumentData(),
   head: ({ loaderData }) => ({
     meta: [
@@ -72,9 +81,21 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   const { env } = Route.useLoaderData();
   const clientHintCheckScript = getClientHintCheckScript();
 
+  // `suppressHydrationWarning` covers this element only: the inline
+  // pre-hydration scripts below (theme, locale) write `class`/`lang`/`dir` on
+  // `<html>` while the document parses, so React's client render — whose
+  // `<html>` carries no `className` — must not diff the server's HTML against
+  // them. The alternative (server-rendering those attributes) is impossible:
+  // `prefers-color-scheme` and the locale cookie are browser-only, and the
+  // document is CDN-cached precisely because of that. Every deeper mismatch
+  // (route content) still fails loudly; this suppresses the one element the
+  // scripts legitimately mutate before React hydrates.
   return (
-    <html lang={getLocale()} dir={getTextDirection()}>
+    <html lang={getLocale()} dir={getTextDirection()} suppressHydrationWarning>
       <head>
+        {import.meta.env.DEV ? (
+          <link rel="stylesheet" href="/src/styles/global.css" />
+        ) : null}
         <HeadContent />
         <ScriptOnce children={clientHintCheckScript} />
         <ScriptOnce children={envScript(env)} />
@@ -83,8 +104,24 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
       </head>
       <body>
         {children}
+        <HydrationMarker />
         <Scripts />
       </body>
     </html>
   );
+}
+
+/**
+ * Marks the document as hydrated.
+ *
+ * React runs effects only after its hydration pass, so this attribute flips
+ * exactly when the server-rendered tree became interactive. The e2e suite
+ * waits on it instead of racing the first click; nothing in the app reads it.
+ */
+function HydrationMarker() {
+  useEffect(() => {
+    document.documentElement.dataset.hydrated = "true";
+  }, []);
+
+  return null;
 }

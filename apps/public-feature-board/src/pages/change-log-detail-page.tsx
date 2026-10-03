@@ -7,10 +7,11 @@ import {
 } from "@feeblo/ui/empty";
 import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { cn } from "@feeblo/ui/utils";
+import { isLiveQueryPending } from "@feeblo/web-shared/collections";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { createLazyRoute, Link, useParams } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 
 import { ChangelogCategoryBadges } from "../components/changelog/changelog-category-badge";
 import {
@@ -26,22 +27,17 @@ import { m } from "../paraglide/messages.js";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
-export const Route = createLazyRoute("/changelog/$changelogSlug")({
-  component: ChangeLogDetailPage,
-});
-
-export function ChangeLogDetailPage() {
+export function ChangelogDetailPage({
+  changelogSlug,
+}: {
+  readonly changelogSlug: string;
+}) {
   const site = useSite();
-  const { changelogSlug } = useParams({ from: "/changelog/$changelogSlug" });
   const {
     publicChangelogCategoryLinkCollection,
     publicChangelogDetailCollection,
   } = usePublicCollections();
-  const {
-    data: changelog,
-    isLoading,
-    isError,
-  } = useLiveQuery({
+  const changelogQuery = useLiveQuery({
     query: (q) =>
       q
         .from({ changelog: publicChangelogDetailCollection })
@@ -53,6 +49,10 @@ export function ChangeLogDetailPage() {
         )
         .findOne(),
   });
+  // Resolved before the dependent query below: its callback runs during the
+  // hook call, so `changelog` has to be initialized by then.
+  const changelog = changelogQuery.data;
+  const isError = changelogQuery.isError;
 
   const { data: categoryLinks = [] } = useLiveQuery({
     query: (q) => {
@@ -77,6 +77,9 @@ export function ChangeLogDetailPage() {
   // so the page never syncs every post, status, or changelog link in the
   // organization just to render this section.
   const linkedPosts = changelog?.posts ?? [];
+  // Hydration lands the entry before the first client render (see
+  // `isLiveQueryPending`).
+  const isLoading = isLiveQueryPending(changelogQuery);
 
   if (isLoading) {
     return <ChangelogPageLayout>{m.quick_tidy_javelina()}</ChangelogPageLayout>;
@@ -117,7 +120,7 @@ export function ChangeLogDetailPage() {
               buttonVariants({ size: "sm", variant: "ghost" }),
               "w-fit"
             )}
-            to="/changelog"
+            to="/s/changelog"
           >
             <HugeiconsIcon icon={ArrowLeft01Icon} />
             {m.polite_level_octopus()}
@@ -174,7 +177,7 @@ export function ChangeLogDetailPage() {
                     className="hover:bg-muted/40 flex items-center justify-between gap-4 px-4 py-3 transition-colors"
                     key={post.id}
                     params={{ slug: post.slug }}
-                    to="/p/$slug"
+                    to="/s/p/$slug"
                   >
                     <span className="min-w-0 truncate text-sm font-medium">
                       {post.title}

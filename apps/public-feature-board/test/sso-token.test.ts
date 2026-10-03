@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   getSsoTokenFromHash,
   removeSsoTokenFromHash,
-} from "../src/app/sso-token";
+} from "../src/lib/sso-token";
 
 describe("getSsoTokenFromHash", () => {
   it("reads the token from a bare fragment", () => {

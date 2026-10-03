@@ -3,11 +3,10 @@ import { Spinner } from "@feeblo/ui/spinner";
 /**
  * Route-level pending fallback for the public board.
  *
- * Every public route preloads RPC-backed collections in `beforeLoad`, so a
- * pending phase is the common case whenever the query cache is cold. A
- * centered spinner is all it needs: the shell (navbar, dialogs) is already
- * mounted around it on child routes, and the server-rendered fallback paints
- * the same spinner before hydration, so the handoff is invisible.
+ * Server-rendered board pages arrive with their collections already hydrated,
+ * so this is what a *client-side* navigation between board routes shows while
+ * the target route's preloads are in flight. A centered spinner is all it
+ * needs: the shell (navbar, dialogs) stays mounted around it.
  */
 export function PublicBoardPending() {
   return (

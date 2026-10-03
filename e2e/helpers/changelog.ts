@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 
+import { waitForHydration } from "./hydration";
 import { fillEditor } from "./posts";
 import { publicBoardUrl } from "./urls";
 
@@ -50,6 +51,7 @@ export async function publishOpenChangelogEntry(page: Page, slug: string) {
  */
 export async function openChangelogPage(page: Page, workspaceName: string) {
   await page.goto(`${publicBoardUrl(workspaceName)}/changelog`);
+  await waitForHydration(page);
   await expect(
     page.getByRole("link", { name: "Subscribe to the changelog RSS feed" })
   ).toBeVisible();

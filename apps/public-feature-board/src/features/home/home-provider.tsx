@@ -2,6 +2,7 @@ import {
   useAuthDialogContext,
   usePostCreateDialogContext,
 } from "@feeblo/post-ui/dialog-stores";
+import { isLiveQueryPending } from "@feeblo/web-shared/collections";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   and,
@@ -51,28 +52,24 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     publicUpvoteCollection,
   } = usePublicCollections();
 
-  const {
-    data: statuses = [],
-    isError: statusError,
-    isLoading: statusLoading,
-  } = useLiveQuery({
+  const statusesQuery = useLiveQuery({
     query: (q) =>
       q
         .from({ status: publicPostStatusCollection })
         .where(({ status }) => eq(status.organizationId, site.organizationId)),
   });
+  const statuses = statusesQuery.data ?? [];
+  const statusError = statusesQuery.isError;
 
-  const {
-    data: boards = [],
-    isError: boardError,
-    isLoading: boardLoading,
-  } = useLiveQuery({
+  const boardsQuery = useLiveQuery({
     query: (q) =>
       q
         .from({ board: publicBoardCollection })
         .where(({ board }) => eq(board.organizationId, site.organizationId))
         .orderBy(({ board }) => board.name, "asc"),
   });
+  const boards = boardsQuery.data ?? [];
+  const boardError = boardsQuery.isError;
 
   const { data: statusCounts = [] } = useLiveQuery({
     query: (q) =>
@@ -98,17 +95,23 @@ export function HomeProvider({ children }: { children: ReactNode }) {
         })),
   });
 
+  // Resolved before the dependent query below: its callback runs during the
+  // hook call, so these have to be initialized by then.
+  //
+  // A query is only "loading" for rendering purposes while it has no result at
+  // all (see `isLiveQueryPending`). Hydration lands rows — or an empty set —
+  // before the first client render, so gating a skeleton on `isLoading`
+  // instead would replace the server-rendered board on that render.
+  const statusLoading = isLiveQueryPending(statusesQuery);
+  const boardLoading = isLiveQueryPending(boardsQuery);
+
   const { selectedBoard, selectedStatus, sortBy, updateFilters } =
     useHomePageFilters({
       boardSlugs: boards.map((board) => board.slug),
       statusIds: statuses.map((status) => status.id),
     });
 
-  const {
-    data: filteredPosts = [],
-    isError: filteredPostsError,
-    isLoading: filteredPostsLoading,
-  } = useLiveQuery({
+  const filteredPostsQuery = useLiveQuery({
     query: (q) => {
       if (
         !site.organizationId ||
@@ -262,8 +265,10 @@ export function HomeProvider({ children }: { children: ReactNode }) {
       ? ""
       : (boards.find((board) => board.slug === selectedBoard)?.id ?? "");
 
+  const filteredPosts = filteredPostsQuery.data ?? [];
+  const filteredPostsLoading = isLiveQueryPending(filteredPostsQuery);
   const isLoading = statusLoading || boardLoading || filteredPostsLoading;
-  const isError = statusError || boardError || filteredPostsError;
+  const isError = statusError || boardError || filteredPostsQuery.isError;
 
   const openGiveFeedback = useCallback(() => {
     if (session) {

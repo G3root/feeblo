@@ -1,7 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import type { LegidOf } from "@feeblo/id";
 import { PostActivityId } from "@feeblo/id";
-import { and, asc, eq, gte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -306,6 +306,65 @@ const makePostActivityRepository = Effect.gen(function* () {
             }))
           )
         ),
+
+    /**
+     * A page of one post's timeline, newest first.
+     *
+     * The same rows `findMany` returns, ordered and bounded for the Public
+     * API's cursor paging. The actor is reduced to a classification in SQL —
+     * `member` when the entry was made by workspace staff, `end_user` when it
+     * was made on a customer's behalf, and `null` when a machine key made it —
+     * so the internal actor identifiers are never selected and a public payload
+     * cannot carry them by accident.
+     */
+    findPage: ({
+      after,
+      limit,
+      organizationId,
+      postId,
+    }: {
+      after: { readonly createdAt: Date; readonly id: string } | null;
+      limit: number;
+      organizationId: string;
+      postId: string;
+    }) =>
+      db
+        .select({
+          id: schema.postActivityTable.id,
+          kind: schema.postActivityTable.kind,
+          previousValue: schema.postActivityTable.previousValue,
+          nextValue: schema.postActivityTable.nextValue,
+          commentId: schema.postActivityTable.commentId,
+          createdAt: schema.postActivityTable.createdAt,
+          actorName: schema.userTable.name,
+          actorImage: schema.userTable.image,
+          actorType: sql<"member" | "end_user" | null>`case
+            when ${schema.postActivityTable.actorMemberId} is not null then 'member'
+            when ${schema.postActivityTable.actorId} is not null then 'end_user'
+            else null
+          end`,
+        })
+        .from(schema.postActivityTable)
+        .leftJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.postActivityTable.actorId)
+        )
+        .where(
+          and(
+            eq(schema.postActivityTable.organizationId, organizationId),
+            eq(schema.postActivityTable.postId, postId),
+            ...(after === null
+              ? []
+              : [
+                  sql`(${schema.postActivityTable.createdAt}, ${schema.postActivityTable.id}) < (${after.createdAt}, ${after.id})`,
+                ])
+          )
+        )
+        .orderBy(
+          desc(schema.postActivityTable.createdAt),
+          desc(schema.postActivityTable.id)
+        )
+        .limit(limit + 1),
   };
 });
 
