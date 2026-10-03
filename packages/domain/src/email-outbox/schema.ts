@@ -124,6 +124,15 @@ export const DeliveryAccessSnapshot = Schema.Struct({
   notifiedBoardVisibility: Schema.optionalKey(
     Schema.NullOr(Schema.Literals(["PUBLIC", "PRIVATE"]))
   ),
+  /**
+   * The posts the rendered email names, oldest first.
+   *
+   * Stored so the send-time gate resolves current rows over exactly the named
+   * set: a window may hold up to `submissionWindowMaxPosts` ids while the mail
+   * names at most twenty, so a deletion among the unlisted remainder must not
+   * deny a recipient the mail still admits.
+   */
+  notifiedPostIds: Schema.optionalKey(Schema.Array(PostId.schema)),
 });
 
 export type DeliveryAccessSnapshot = Schema.Schema.Type<

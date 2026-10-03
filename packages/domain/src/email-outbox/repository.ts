@@ -221,8 +221,15 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
    *
    * The same device the roadmap repository uses for its per-organization
    * invariants: a condition that spans rows cannot be enforced by row locks on
-   * those rows, because a lookup that matches nothing proves nothing. See
-   * `upsertPendingSubmissionWindow` for what it serializes here.
+   * those rows, because a lookup that matches nothing proves nothing. It
+   * serializes submission-window creation per workspace.
+   *
+   * It must be taken before the transaction's first child insert. An insert
+   * into a table referencing the organization holds a key-share on the org row,
+   * and a key-share conflicts with this lock: a transaction that inserts first
+   * and locks second deadlocks against a concurrent one doing the same, and
+   * Postgres aborts one of the two creates. See `post/write.ts` for the call
+   * that puts it first.
    */
   const lockOrganization = (organizationId: string) =>
     db.execute(
@@ -433,10 +440,12 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     // created together otherwise race past the pending-window lookup below —
     // which locks nothing when no window exists — and can each open their own
     // window across a burst-boundary instant, doubling the workspace's email
-    // rate. The organization row is the same lock the roadmap repository uses
-    // for its per-organization invariants; taken here it holds to the end of
-    // the caller's transaction, so the second submission's lookup sees the
-    // first one's window and appends instead of opening another.
+    // rate. The create path takes this lock before its first child insert (see
+    // `post/write.ts`), which is what keeps it deadlock-free: taken only here,
+    // after that insert, the lock would conflict with the other transaction's
+    // org key-share and abort one of the two creates. This re-lock is a no-op
+    // round trip when the caller already holds it, and it serializes standalone
+    // callers that have not inserted a child row.
     yield* lockOrganization(organizationId);
 
     /**
@@ -1187,6 +1196,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
 
   return {
     recordIntent,
+    lockOrganization,
     upsertPendingStatusChange,
     upsertPendingSubmissionWindow,
     findPending,

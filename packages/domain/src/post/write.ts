@@ -383,6 +383,16 @@ export const makePostWrites = Effect.gen(function* () {
 
       const persisted = yield* transaction(
         Effect.gen(function* () {
+          // First lock, first: the submission window is created later in this
+          // transaction, and its per-workspace serialization holds the
+          // organization row. Taking it before the post insert keeps two
+          // concurrent creates from deadlocking — each insert's foreign-key
+          // check holds a key-share on the org row that conflicts with this
+          // lock, so locking after the insert would make each transaction wait
+          // for the other and Postgres would abort one of them. The
+          // roadmap repository takes the same lock in the same position.
+          yield* emailOutbox.lockOrganization(args.organizationId);
+
           // On-behalf attribution resolves the customer inside the same
           // transaction as the mutation (see plan-on-behalf.md). Absent
           // `author`, everything below behaves exactly as before.

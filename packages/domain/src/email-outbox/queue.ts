@@ -379,6 +379,7 @@ export const materializeEmailIntent = (outboxId: string) =>
                             slug: row.boardSlug,
                             visibility: row.boardVisibility,
                           },
+                    id: row.id,
                     slug: row.slug,
                     title: row.title,
                   },
@@ -907,8 +908,20 @@ const sendDeliveryAttempt = (
           intent.payload.kind === "submission.created"
             ? submissionWindowPostIds(intent.payload)
             : [intent.aggregateId];
+        // The rendered email is what the gate proves, and it names fewer posts
+        // than a window may hold: the snapshot carries the render-time named
+        // set, so a deletion among the unlisted remainder cannot deny a
+        // delivery the mail still admits. A delivery written before the
+        // snapshot falls back to the intent's stored set.
+        const accessSnapshot = Schema.decodeUnknownOption(
+          DeliveryAccessSnapshot
+        )(delivery.templatePayload);
+        const snapshot = Option.isSome(accessSnapshot)
+          ? accessSnapshot.value
+          : undefined;
+        const namedPostIds = snapshot?.notifiedPostIds ?? notifiedPostIds;
         const boardRows =
-          notifiedPostIds.length === 0
+          namedPostIds.length === 0
             ? []
             : yield* db
                 .select({ visibility: schema.boardTable.visibility })
@@ -921,26 +934,18 @@ const sendDeliveryAttempt = (
                 )
                 .where(
                   and(
-                    inArray(schema.postTable.id, [...notifiedPostIds]),
+                    inArray(schema.postTable.id, [...namedPostIds]),
                     eq(schema.postTable.organizationId, intent.organizationId)
                   )
                 );
         const currentBoardVisibility =
-          boardRows.length === 0 || boardRows.length < notifiedPostIds.length
+          boardRows.length === 0 || boardRows.length < namedPostIds.length
             ? null
             : boardRows.every((row) => row.visibility === "PUBLIC")
               ? "PUBLIC"
               : "PRIVATE";
-        // A post deleted since the email was rendered is absent from the rows
-        // above while its title is still in the mail, so the visibility
-        // captured with the payload is part of the answer.
-        const accessSnapshot = Schema.decodeUnknownOption(
-          DeliveryAccessSnapshot
-        )(delivery.templatePayload);
         const boardVisibility = evaluateNotifiedBoardVisibility({
-          captured: Option.isSome(accessSnapshot)
-            ? accessSnapshot.value.notifiedBoardVisibility
-            : undefined,
+          captured: snapshot?.notifiedBoardVisibility,
           current: currentBoardVisibility,
         });
 

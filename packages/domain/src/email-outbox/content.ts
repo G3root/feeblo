@@ -39,6 +39,8 @@ const submissionNotificationMaxListed = 20;
  */
 export type SubmissionNotificationPayload = NotificationTemplatePayload & {
   readonly notifiedBoardVisibility: PostBoardVisibility | null;
+  /** The posts the email names, oldest first — the gate's proof set. */
+  readonly notifiedPostIds: readonly string[];
 };
 
 /**
@@ -51,6 +53,7 @@ export const makeSubmissionNotificationPayload = (
   appUrl: string,
   organizationId: string,
   posts: ReadonlyArray<{
+    readonly id: string;
     readonly slug: string;
     readonly title: string;
     readonly board: {
@@ -98,9 +101,12 @@ export const makeSubmissionNotificationPayload = (
     title: isSingle
       ? "New submission in your workspace"
       : `${submissionCount} new submissions in your workspace`,
-    // Only the listed posts are named in the mail, so only they need proving.
-    // An empty list (a capped window whose tracked posts were all deleted) has
-    // nothing to prove either way, which stays fail-closed for rule 3.
+    // Only the listed posts are named in the mail, so only they need proving —
+    // their ids ride along so the send-time gate resolves current rows over the
+    // named set rather than over the window's full stored list. An empty list
+    // (a capped window whose tracked posts were all deleted) has nothing to
+    // prove either way, which stays fail-closed for rule 3.
+    notifiedPostIds: listed.map((post) => post.id),
     notifiedBoardVisibility:
       listed.length === 0
         ? null

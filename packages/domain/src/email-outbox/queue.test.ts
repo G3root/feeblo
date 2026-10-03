@@ -22,6 +22,7 @@ import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
 import { TestClock } from "effect/testing";
 import * as PersistedQueue from "effect/unstable/persistence/PersistedQueue";
 
@@ -43,6 +44,7 @@ import {
   reconcileEmailOutbox,
 } from "./queue";
 import { EmailOutboxRepository } from "./repository";
+import { DeliveryAccessSnapshot } from "./schema";
 
 // The worker layer runs for real: `waitForDelivery` polls with `yieldNow`, so
 // it depends on the take loops progressing concurrently, exactly as the
@@ -2435,6 +2437,105 @@ describe("EmailOutbox workflows", () => {
           expect(delivery?.state).toBe("no_organization_access");
           expect((yield* testMailerState).sentMessages).toHaveLength(0);
         })
+    );
+
+    it.effect("delivers when a post the email does not name is deleted", () =>
+      Effect.gen(function* () {
+        yield* resetTestMailer();
+        const {
+          boardId,
+          intentId,
+          organizationId,
+          ownerMemberId,
+          postId,
+          statusId,
+          userId,
+        } = yield* fixture;
+        const db = yield* Database.Database;
+        const globalUserId = yield* UserId.generate;
+        const globalEmail = `unlisted-gone-${organizationId}@example.test`;
+        yield* db.insert(schema.userTable).values({
+          id: globalUserId,
+          email: globalEmail,
+          name: "Global user",
+          emailVerified: true,
+        });
+        yield* addSubscriptionContact({
+          email: globalEmail,
+          organizationId,
+          state: "active",
+          topicId: null,
+          topicType: "submission",
+          userId: globalUserId,
+        });
+
+        // Twenty-one submissions on top of the fixture's own, so the window
+        // holds twenty-two ids while the mail can name twenty.
+        const unlistedPostIds: string[] = [];
+        for (let index = 0; index < 21; index++) {
+          const unlistedPostId = yield* PostId.generate;
+          yield* addSubmissionPost({
+            boardId,
+            organizationId,
+            ownerMemberId,
+            postId: unlistedPostId,
+            slug: `unlisted-${index}`,
+            statusId,
+            title: `Unlisted submission ${index}`,
+            userId,
+          });
+          unlistedPostIds.push(unlistedPostId);
+        }
+        const storedPostIds = [postId, ...unlistedPostIds];
+        const unlistedDeletedPostId = unlistedPostIds[19];
+        if (unlistedDeletedPostId === undefined) {
+          return yield* Effect.die("Expected an unlisted submission");
+        }
+        yield* db
+          .update(schema.emailOutboxTable)
+          .set({
+            payload: {
+              kind: "submission.created",
+              postCount: storedPostIds.length,
+              postId,
+              postIds: storedPostIds,
+            },
+          })
+          .where(eq(schema.emailOutboxTable.id, intentId));
+        yield* TestClock.adjust("5 minutes");
+
+        const deliveryIds = yield* materializeEmailIntent(intentId);
+        expect(deliveryIds).toHaveLength(1);
+        const [rendered] = yield* db
+          .select({
+            templatePayload: schema.emailDeliveryTable.templatePayload,
+          })
+          .from(schema.emailDeliveryTable)
+          .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+        // The mail names the first twenty and leaves the rest to the count.
+        const snapshot = yield* Schema.decodeUnknownEffect(
+          DeliveryAccessSnapshot
+        )(rendered?.templatePayload);
+        expect(snapshot.notifiedBoardVisibility).toBe("PUBLIC");
+        expect(snapshot.notifiedPostIds).toHaveLength(20);
+        expect(snapshot.notifiedPostIds).not.toContain(unlistedDeletedPostId);
+
+        // A submission the mail never named is deleted before delivery; the
+        // named twenty are untouched, so the recipient still gets the mail.
+        yield* db
+          .delete(schema.postTable)
+          .where(eq(schema.postTable.id, unlistedDeletedPostId));
+        yield* Effect.forEach(deliveryIds, (deliveryId) =>
+          deliverEmailDelivery({ deliveryId })
+        );
+
+        const [delivery] = yield* db
+          .select()
+          .from(schema.emailDeliveryTable)
+          .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+        expect(delivery?.state).toBe("accepted");
+        expect((yield* testMailerState).sentMessages).toHaveLength(1);
+      })
     );
 
     it.effect(
