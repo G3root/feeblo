@@ -2367,6 +2367,77 @@ describe("EmailOutbox workflows", () => {
     );
 
     it.effect(
+      "fails closed when a named public post is deleted before delivery",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const {
+            boardId,
+            intentId,
+            organizationId,
+            ownerMemberId,
+            statusId,
+            userId,
+          } = yield* fixture;
+          const db = yield* Database.Database;
+          const globalUserId = yield* UserId.generate;
+          const globalEmail = `deleted-public-${organizationId}@example.test`;
+          yield* db.insert(schema.userTable).values({
+            id: globalUserId,
+            email: globalEmail,
+            name: "Global user",
+            emailVerified: true,
+          });
+          yield* addSubscriptionContact({
+            email: globalEmail,
+            organizationId,
+            state: "active",
+            topicId: null,
+            topicType: "submission",
+            userId: globalUserId,
+          });
+          const secondPostId = yield* PostId.generate;
+          yield* addSubmissionPost({
+            boardId,
+            organizationId,
+            ownerMemberId,
+            postId: secondPostId,
+            slug: "second-public-submission",
+            statusId,
+            title: "Second public submission",
+            userId,
+          });
+          yield* (yield* EmailOutboxRepository).upsertPendingSubmissionWindow({
+            now: yield* DateTime.nowAsDate,
+            organizationId,
+            postId: secondPostId,
+          });
+          yield* TestClock.adjust("5 minutes");
+
+          // Both posts are public when the mail is rendered, so the snapshot
+          // itself proves nothing was private at render time.
+          const deliveryIds = yield* materializeEmailIntent(intentId);
+          expect(deliveryIds).toHaveLength(1);
+
+          yield* db
+            .delete(schema.postTable)
+            .where(eq(schema.postTable.id, secondPostId));
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            deliverEmailDelivery({ deliveryId })
+          );
+
+          const [delivery] = yield* db
+            .select()
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+          // The surviving post is public, but it does not speak for the mail:
+          // one named post is gone and nothing proves it stayed public.
+          expect(delivery?.state).toBe("no_organization_access");
+          expect((yield* testMailerState).sentMessages).toHaveLength(0);
+        })
+    );
+
+    it.effect(
       "delivers a submission window whose posts are all on public boards",
       () =>
         Effect.gen(function* () {

@@ -899,9 +899,10 @@ const sendDeliveryAttempt = (
         // A submission window spans posts on possibly different boards, so the
         // gate resolves every notified post. PUBLIC requires all of them to be
         // public: the email carries each post's title, so admitting on one
-        // public board would leak the private ones beside it. A window whose
-        // posts have all been deleted keeps the fail-closed null. Every other
-        // post-attributed intent is about its aggregate.
+        // public board would leak the private ones beside it. Every named post
+        // must also still resolve — a survivor does not speak for the whole
+        // mail, so a missing one fails closed rather than being skipped. Every
+        // other post-attributed intent is about its aggregate.
         const notifiedPostIds =
           intent.payload.kind === "submission.created"
             ? submissionWindowPostIds(intent.payload)
@@ -925,7 +926,7 @@ const sendDeliveryAttempt = (
                   )
                 );
         const currentBoardVisibility =
-          boardRows.length === 0
+          boardRows.length === 0 || boardRows.length < notifiedPostIds.length
             ? null
             : boardRows.every((row) => row.visibility === "PUBLIC")
               ? "PUBLIC"
