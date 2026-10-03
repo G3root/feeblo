@@ -4472,6 +4472,70 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect("moves a post's updatedAt when a tag is deleted from it", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      const nowDateTime = yield* DateTime.now;
+      const earlier = DateTime.toDate(
+        DateTime.subtract(nowDateTime, { minutes: 30 })
+      );
+      const cutoff = DateTime.toDate(
+        DateTime.subtract(nowDateTime, { minutes: 15 })
+      );
+
+      yield* seedTag(workspace.organizationId, "tag_doomed", "Doomed");
+      yield* db.insert(schema.postTagTable).values({
+        id: "ptag_doomed",
+        postId: workspace.postId,
+        tagId: "tag_doomed",
+        organizationId: workspace.organizationId,
+      });
+
+      // The link exists and the post looks old, so only the deletion can
+      // bring it into the poll's window.
+      yield* db
+        .update(schema.postTable)
+        .set({ updatedAt: earlier })
+        .where(eq(schema.postTable.id, workspace.postId));
+
+      registerKey(
+        "fbk_tag_delete_sync",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const before = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts?updatedAfter=${encodeURIComponent(cutoff.toISOString())}`,
+            "fbk_tag_delete_sync"
+          )
+        )
+      );
+      expect(before.data.map((post) => post.id)).toEqual([]);
+
+      const deleted = yield* executeWrite("DELETE", "/api/v1/tags/tag_doomed", {
+        apiKey: "fbk_tag_delete_sync",
+      });
+      expect(deleted.status).toBe(204);
+
+      // Deleting the tag removed it from the post, which changes the post's
+      // payload: a caller polling for changes sees it instead of a stale tag
+      // list.
+      const after = decodePage(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts?updatedAfter=${encodeURIComponent(cutoff.toISOString())}`,
+            "fbk_tag_delete_sync"
+          )
+        )
+      );
+      expect(after.data.map((post) => post.id)).toEqual([workspace.postId]);
+      expect(after.data[0]?.tags).toEqual([]);
+    })
+  );
+
   it.effect(
     "lists a post's timeline newest first, with actors classified",
     () =>

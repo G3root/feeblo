@@ -225,18 +225,84 @@ const makeTagRepository = Effect.gen(function* () {
         return Option.fromNullishOr(updated);
       }),
 
-    /** Deletes a tag, reporting whether there was one to delete. */
+    /**
+     * Deletes a tag, reporting whether there was one to delete.
+     *
+     * Deleting a tag also removes it from every post that carried it, through
+     * the `post_tag` cascade — and that changes those posts' `tags` payload,
+     * so their `updatedAt` moves with it in the same transaction. A caller
+     * syncing on `updatedAt` therefore sees a post whose tags were deleted
+     * rather than a stale list. The affected posts are read before the cascade
+     * removes the rows that name them, under a lock on the tag row: a
+     * concurrent replacement's foreign-key check takes a `key share` lock on
+     * that row, so it either commits before this read (and is included) or
+     * waits here and finds the tag gone.
+     */
     delete: ({ id, organizationId }: TTagDelete) =>
-      db
-        .delete(schema.tagTable)
-        .where(
-          and(
-            eq(schema.tagTable.id, id),
-            eq(schema.tagTable.organizationId, organizationId)
-          )
-        )
-        .returning({ id: schema.tagTable.id })
-        .pipe(Effect.map((rows) => rows.length > 0)),
+      db.transaction((tx) =>
+        Effect.gen(function* () {
+          const tag = yield* tx
+            .select({ id: schema.tagTable.id })
+            .from(schema.tagTable)
+            .where(
+              and(
+                eq(schema.tagTable.id, id),
+                eq(schema.tagTable.organizationId, organizationId)
+              )
+            )
+            .for("update")
+            .limit(1);
+
+          // Missing rather than deleted: reported the same way the bare
+          // delete reported an empty `returning`.
+          if (tag.length === 0) {
+            return false;
+          }
+
+          const affected = yield* tx
+            .select({ postId: schema.postTagTable.postId })
+            .from(schema.postTagTable)
+            .where(
+              and(
+                eq(schema.postTagTable.tagId, id),
+                eq(schema.postTagTable.organizationId, organizationId)
+              )
+            );
+
+          const deleted = yield* tx
+            .delete(schema.tagTable)
+            .where(
+              and(
+                eq(schema.tagTable.id, id),
+                eq(schema.tagTable.organizationId, organizationId)
+              )
+            )
+            .returning({ id: schema.tagTable.id });
+
+          if (deleted.length === 0) {
+            return false;
+          }
+
+          if (affected.length > 0) {
+            const now = yield* DateTime.nowAsDate;
+            yield* tx
+              .update(schema.postTable)
+              .set({ updatedAt: now })
+              .where(
+                and(
+                  eq(schema.postTable.organizationId, organizationId),
+                  inArray(
+                    schema.postTable.id,
+                    affected.map((row) => row.postId)
+                  )
+                )
+              )
+              .pipe(Effect.asVoid);
+          }
+
+          return true;
+        })
+      ),
 
     /**
      * The tag that already holds this name or slug, if any.
@@ -332,7 +398,6 @@ const makeTagRepository = Effect.gen(function* () {
 
     setPostTags: ({ postId, organizationId, tagIds }: TPostTagSetInput) =>
       Effect.gen(function* () {
-        const now = yield* DateTime.nowAsDate;
         // Deduplicated here rather than by the caller: the diff below compares
         // sets, so the same id twice would otherwise look like two additions.
         const wanted = [...new Set(tagIds)];
@@ -353,6 +418,13 @@ const makeTagRepository = Effect.gen(function* () {
             reason: "Post does not belong to this organization",
           });
         }
+
+        // Sampled inside the post's lock, not before it: a concurrent
+        // replacement waits on this row, so its sample is necessarily later
+        // than this one's and `updatedAt` cannot move backwards on a
+        // contended post. A sample taken while waiting could be older than the
+        // write that released the lock.
+        const now = yield* DateTime.nowAsDate;
 
         const previous = yield* db
           .select({ tagId: schema.postTagTable.tagId })
