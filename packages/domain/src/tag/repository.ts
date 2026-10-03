@@ -237,6 +237,14 @@ const makeTagRepository = Effect.gen(function* () {
      * concurrent replacement's foreign-key check takes a `key share` lock on
      * that row, so it either commits before this read (and is included) or
      * waits here and finds the tag gone.
+     *
+     * The timestamp moves forward only: `greatest` against the row's current
+     * value, because this update takes each post's row lock when the statement
+     * runs, and a writer holding that lock may commit a later `updatedAt` than
+     * the instant sampled here — one already-synced by a caller, which this
+     * write must not rewind. The tag assignment path does not need it: it
+     * locks the post before sampling, so its sample is necessarily the later
+     * one.
      */
     delete: ({ id, organizationId }: TTagDelete) =>
       db.transaction((tx) =>
@@ -287,7 +295,12 @@ const makeTagRepository = Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
             yield* tx
               .update(schema.postTable)
-              .set({ updatedAt: now })
+              .set({
+                // Never earlier than what the row already carries: this
+                // statement may wait on a row another writer holds, and the
+                // writer's committed timestamp can be later than `now` here.
+                updatedAt: sql`greatest(${schema.postTable.updatedAt}, ${now})`,
+              })
               .where(
                 and(
                   eq(schema.postTable.organizationId, organizationId),

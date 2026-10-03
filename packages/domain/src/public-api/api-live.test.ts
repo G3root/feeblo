@@ -4536,6 +4536,54 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect("never rewinds a post's updatedAt when deleting a tag", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      const nowDateTime = yield* DateTime.now;
+      // Stands in for a concurrent writer that committed a later timestamp
+      // than the delete samples: the write must keep the later value, because
+      // a caller may already have synced through it.
+      const committed = DateTime.toDate(
+        DateTime.add(nowDateTime, { hours: 1 })
+      );
+
+      yield* seedTag(workspace.organizationId, "tag_rewind", "Rewind");
+      yield* db.insert(schema.postTagTable).values({
+        id: "ptag_rewind",
+        postId: workspace.postId,
+        tagId: "tag_rewind",
+        organizationId: workspace.organizationId,
+      });
+      yield* db
+        .update(schema.postTable)
+        .set({ updatedAt: committed })
+        .where(eq(schema.postTable.id, workspace.postId));
+
+      registerKey(
+        "fbk_tag_rewind",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const deleted = yield* executeWrite("DELETE", "/api/v1/tags/tag_rewind", {
+        apiKey: "fbk_tag_rewind",
+      });
+      expect(deleted.status).toBe(204);
+
+      const post = decodePost(
+        responseBody(
+          yield* executeRequest(
+            `/api/v1/posts/${workspace.postId}`,
+            "fbk_tag_rewind"
+          )
+        )
+      );
+      expect(post.updatedAt.getTime()).toBe(committed.getTime());
+      expect(post.tags).toEqual([]);
+    })
+  );
+
   it.effect(
     "lists a post's timeline newest first, with actors classified",
     () =>
