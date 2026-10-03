@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 
 import type { EmailSubscriptionTopic } from "../email-subscription/schema";
+import type { PostBoardVisibility } from "./access";
 import type {
   ChangelogTemplatePayload,
   EmailIntentPayload,
@@ -22,32 +23,102 @@ type PostNotificationContent = {
   readonly topic: EmailSubscriptionTopic;
 };
 
-/** Builds the immutable administrative submission-notification snapshot. */
+/**
+ * Most posts one notification email lists before it links to the dashboard.
+ *
+ * A window may cover more than it stores (`submissionWindowMaxPosts`); the
+ * email summarises the rest by count rather than rendering hundreds of rows.
+ */
+const submissionNotificationMaxListed = 20;
+
+/**
+ * A rendered submission notification plus the access proof it was rendered
+ * under. The proof rides in the delivery's stored payload so the send-time gate
+ * can see what the email names even after a post is gone; the template decoder
+ * ignores it.
+ */
+export type SubmissionNotificationPayload = NotificationTemplatePayload & {
+  readonly notifiedBoardVisibility: PostBoardVisibility | null;
+  /** The posts the email names, oldest first — the gate's proof set. */
+  readonly notifiedPostIds: readonly string[];
+};
+
+/**
+ * Builds the immutable administrative submission-notification snapshot.
+ *
+ * The payload covers every post in the window, so the title carries the count
+ * and the list is truncated with a link rather than one email per submission.
+ */
 export const makeSubmissionNotificationPayload = (
   appUrl: string,
   organizationId: string,
-  post: {
+  posts: ReadonlyArray<{
+    readonly id: string;
     readonly slug: string;
     readonly title: string;
-    readonly board: { readonly slug: string } | null;
-  }
-): NotificationTemplatePayload => ({
-  actionLabel: "View dashboard",
-  actionUrl: appUrl,
-  body: "A new post has been submitted.",
-  eyebrow: "Feedback",
-  posts: [
-    {
-      label: post.title,
-      url: `${appUrl}/${organizationId}/post/${post.board?.slug ?? ""}/${post.slug}`,
+    readonly board: {
+      readonly slug: string;
+      readonly visibility: PostBoardVisibility;
+    } | null;
+  }>,
+  /**
+   * Submissions the window covers. Larger than `posts.length` once a window
+   * stored its id cap or lost a post to deletion, so the copy counts what
+   * happened rather than what could still be rendered.
+   */
+  submissionCount: number
+): SubmissionNotificationPayload => {
+  const listed = posts.slice(0, submissionNotificationMaxListed);
+  const remaining = submissionCount - listed.length;
+  const isSingle = submissionCount === 1;
+
+  return {
+    actionLabel: "View dashboard",
+    actionUrl: appUrl,
+    // A single submission keeps the wording it had before windows existed; the
+    // count only appears once a window actually coalesced two or more.
+    body: isSingle
+      ? "A new post has been submitted."
+      : `${submissionCount} new posts have been submitted.`,
+    eyebrow: "Feedback",
+    posts: [
+      ...listed.map((post) => ({
+        label: post.title,
+        url: `${appUrl}/${organizationId}/post/${post.board?.slug ?? ""}/${post.slug}`,
+      })),
+      ...(remaining > 0
+        ? [
+            {
+              label:
+                remaining === 1
+                  ? "and 1 more submitted post"
+                  : `and ${remaining} more submitted posts`,
+              url: appUrl,
+            },
+          ]
+        : []),
+    ],
+    title: isSingle
+      ? "New submission in your workspace"
+      : `${submissionCount} new submissions in your workspace`,
+    // Only the listed posts are named in the mail, so only they need proving —
+    // their ids ride along so the send-time gate resolves current rows over the
+    // named set rather than over the window's full stored list. An empty list
+    // (a capped window whose tracked posts were all deleted) has nothing to
+    // prove either way, which stays fail-closed for rule 3.
+    notifiedPostIds: listed.map((post) => post.id),
+    notifiedBoardVisibility:
+      listed.length === 0
+        ? null
+        : listed.every((post) => post.board?.visibility === "PUBLIC")
+          ? "PUBLIC"
+          : "PRIVATE",
+    unsubscribe: {
+      kind: "settings",
+      url: `${appUrl}/settings/notifications`,
     },
-  ],
-  title: "New submission in your workspace",
-  unsubscribe: {
-    kind: "settings",
-    url: `${appUrl}/settings/notifications`,
-  },
-});
+  };
+};
 
 const titleCase = (value: string): string =>
   value

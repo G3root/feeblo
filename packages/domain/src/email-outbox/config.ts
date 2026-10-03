@@ -1,10 +1,41 @@
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
 const trailingSlashPattern = /\/$/;
+
+/**
+ * Submission-notification window bounds.
+ *
+ * New submissions do not each send an email. They accumulate in one pending
+ * outbox intent per workspace, whose `scheduledAt` slides on every append, so a
+ * burst of submissions produces a single email `submissionWindowBurst` after
+ * the last one. `submissionWindowCeiling` stops that slide, bounding a
+ * sustained flood to one email per workspace per hour instead of one per post.
+ *
+ * These are module constants rather than environment, and the window is
+ * maintained by `EmailOutboxRepository` rather than by `EmailOutboxConfig`:
+ * they are a safety property of the outbox, and keeping them out of the
+ * service keeps the repository free of a config requirement.
+ */
+export const submissionWindowBurst = Duration.minutes(5);
+/** Hard bound on how far one window's send may slide, from its creation. */
+export const submissionWindowCeiling = Duration.hours(1);
+/**
+ * Most posts one window stores. A window past this keeps counting without
+ * storing, so overflowing it cannot open a second window and double the rate.
+ */
+export const submissionWindowMaxPosts = 200;
+
+/**
+ * Monthly delivery attempts one workspace may spend before its own email is
+ * deferred (`EMAIL_OUTBOX_WORKSPACE_MONTHLY_SEND_LIMIT`). Shared by the config
+ * default and the test controls so the breaker's resting point has one name.
+ */
+export const workspaceMonthlySendLimitDefault = 25_000;
 
 const AppUrl = Config.schema(Schema.URLFromString, "APP_URL");
 const ApiUrl = Config.schema(Schema.URLFromString, "API_URL");
@@ -20,6 +51,9 @@ const MonthlySendLimit = Config.Number("EMAIL_OUTBOX_MONTHLY_SEND_LIMIT").pipe(
 const EstimatedSendCostMicros = Config.Number(
   "EMAIL_OUTBOX_ESTIMATED_SEND_COST_MICROS"
 ).pipe(Config.withDefault(100));
+const WorkspaceMonthlySendLimit = Config.Number(
+  "EMAIL_OUTBOX_WORKSPACE_MONTHLY_SEND_LIMIT"
+).pipe(Config.withDefault(workspaceMonthlySendLimitDefault));
 const PausedWorkspaceIds = Config.String(
   "EMAIL_OUTBOX_PAUSED_WORKSPACE_IDS"
 ).pipe(Config.withDefault(""));
@@ -49,6 +83,7 @@ export class EmailOutboxConfig extends Context.Service<EmailOutboxConfig>()(
       const monthlySendLimit = yield* MonthlySendLimit;
       const estimatedSendCostMicros = yield* EstimatedSendCostMicros;
       const pausedWorkspaceIds = yield* PausedWorkspaceIds;
+      const workspaceMonthlySendLimit = yield* WorkspaceMonthlySendLimit;
       return {
         apiUrl: apiUrl.href.replace(trailingSlashPattern, ""),
         appUrl: appUrl.href.replace(trailingSlashPattern, ""),
@@ -63,6 +98,7 @@ export class EmailOutboxConfig extends Context.Service<EmailOutboxConfig>()(
             .map((id) => id.trim())
             .filter((id) => id.length > 0)
         ),
+        workspaceMonthlySendLimit: Math.max(1, workspaceMonthlySendLimit),
       } as const;
     }),
   }
@@ -80,6 +116,7 @@ export class EmailOutboxConfig extends Context.Service<EmailOutboxConfig>()(
       readonly maxConcurrentSends?: number;
       readonly monthlySendLimit?: number;
       readonly pausedWorkspaceIds?: ReadonlySet<string>;
+      readonly workspaceMonthlySendLimit?: number;
     } = {}
   ) =>
     Layer.succeed(
@@ -96,6 +133,9 @@ export class EmailOutboxConfig extends Context.Service<EmailOutboxConfig>()(
         pausedWorkspaceIds: new Set(
           controls.pausedWorkspaceIds ?? new Set<string>()
         ),
+        workspaceMonthlySendLimit:
+          controls.workspaceMonthlySendLimit ??
+          workspaceMonthlySendLimitDefault,
       })
     );
 }

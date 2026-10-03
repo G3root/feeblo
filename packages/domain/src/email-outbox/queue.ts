@@ -9,7 +9,7 @@ import {
 import { createChangelogEmail } from "@feeblo/transactional/templates/changelog";
 import { createEmailSubscriptionVerificationEmail } from "@feeblo/transactional/templates/email-subscription-verification";
 import { createNotificationEmail } from "@feeblo/transactional/templates/notification";
-import { and, eq, gte, isNull, sql, sum } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, sql, sum } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -24,7 +24,10 @@ import * as Schema from "effect/Schema";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
-import { evaluateOrganizationAccess } from "./access";
+import {
+  evaluateNotifiedBoardVisibility,
+  evaluateOrganizationAccess,
+} from "./access";
 import { EmailOutboxConfig } from "./config";
 import {
   emailSubscriptionTopicForIntent,
@@ -35,9 +38,12 @@ import {
 import { EmailOutboxRepository, type ResumedEmailDelivery } from "./repository";
 import {
   ChangelogTemplatePayload,
+  DeliveryAccessSnapshot,
   EmailUnsubscribeTarget,
   NotificationTemplatePayload,
   SubscriptionVerificationTemplatePayload,
+  submissionWindowPostCount,
+  submissionWindowPostIds,
 } from "./schema";
 import {
   recordEmailDeliveryAccessSkip,
@@ -60,6 +66,14 @@ const DeliveryAttemptOutcomeSchema = Schema.TaggedUnion({
 type DeliveryAttemptOutcome = Schema.Schema.Type<
   typeof DeliveryAttemptOutcomeSchema
 >;
+
+/**
+ * Returned where an element completed without enqueuing a delivery.
+ *
+ * A materialization can legitimately produce none: the window was already sent
+ * by another worker, slid into the future, or lost all of its posts.
+ */
+const noDeliveryIds: readonly string[] = [];
 
 const maximumDeliveryAttempts = 5;
 const maximumInfrastructureFailures = 10;
@@ -296,90 +310,164 @@ export const materializeEmailIntent = (outboxId: string) =>
     }
 
     if (intent.payload.kind === "submission.created") {
-      const post = yield* db.query.postTable.findFirst({
-        where: {
-          id: intent.payload.postId,
-          organizationId: intent.organizationId,
-        },
-        columns: { slug: true, title: true },
-        with: { board: { columns: { slug: true } } },
-        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      });
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      if (!post) {
-        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-        yield* repository.markIntentState({ id: intent.id, state: "expired" });
-        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-        yield* recordEmailIntentTransition(intent.kind, "expired");
-        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-        return [] as readonly string[];
-      }
-
-      const recipientLimit = yield* policy.submissionNotificationRecipientLimit(
-        intent.organizationId
-      );
-      const members = yield* db.query.memberTable.findMany({
-        where: { organizationId: intent.organizationId },
-        columns: { role: true, userId: true },
-        with: { user: { columns: { email: true } } },
-      });
-      const optedInContacts = yield* db
-        .select({
-          email: schema.emailContactTable.email,
-          userId: schema.emailContactTable.userId,
-        })
-        .from(schema.emailSubscriptionTable)
-        .innerJoin(
-          schema.emailContactTable,
-          eq(
-            schema.emailContactTable.id,
-            schema.emailSubscriptionTable.contactId
-          )
-        )
-        .where(
-          and(
-            eq(
-              schema.emailSubscriptionTable.organizationId,
-              intent.organizationId
-            ),
-            eq(schema.emailSubscriptionTable.topicType, "submission"),
-            isNull(schema.emailSubscriptionTable.topicId),
-            eq(schema.emailSubscriptionTable.state, "active"),
-            eq(schema.emailContactTable.verificationState, "verified")
-          )
-        );
-      const privilegedUserIds = new Set(
-        members.flatMap((member) =>
-          member.role === "owner" || member.role === "admin"
-            ? [member.userId]
-            : []
-        )
-      );
-      const ownerEmail = members.find((member) => member.role === "owner")?.user
-        ?.email;
-      const configuredFreeRecipient = optedInContacts[0]?.email;
-      const recipients =
-        recipientLimit === 1
-          ? [configuredFreeRecipient ?? ownerEmail].filter(
-              (email): email is string => email !== undefined
-            )
-          : optedInContacts.flatMap((contact) =>
-              contact.userId !== null && privilegedUserIds.has(contact.userId)
-                ? [contact.email]
-                : []
-            );
-      const templatePayload = makeSubmissionNotificationPayload(
-        appUrl,
-        intent.organizationId,
-        post
-      );
-
       return yield* transaction(
         Effect.gen(function* () {
+          // Re-read under the row lock. `upsertPendingSubmissionWindow` appends
+          // to a pending window without waiting for this worker, so the payload
+          // the element was offered with may already be stale. Holding the lock
+          // through the state flip means a concurrent append either lands in
+          // this email or opens the next window; it is never dropped.
+          const window = yield* repository.findByIdForUpdate(intent.id);
+          if (window === undefined || window.state !== "pending") {
+            return noDeliveryIds;
+          }
+          if (window.payload.kind !== "submission.created") {
+            return noDeliveryIds;
+          }
+          // An append may have slid the window into the future while this
+          // element waited for the lock, which is the burst coalescing doing
+          // its job. Reconciliation re-offers the window when it comes due.
+          if (
+            yield* DateTime.isFuture(
+              DateTime.fromDateUnsafe(window.scheduledAt)
+            )
+          ) {
+            return noDeliveryIds;
+          }
+
+          const postIds = submissionWindowPostIds(window.payload);
+          const windowPostCount = submissionWindowPostCount(window.payload);
+          const rows =
+            postIds.length === 0
+              ? []
+              : yield* db
+                  .select({
+                    boardSlug: schema.boardTable.slug,
+                    boardVisibility: schema.boardTable.visibility,
+                    id: schema.postTable.id,
+                    slug: schema.postTable.slug,
+                    title: schema.postTable.title,
+                  })
+                  .from(schema.postTable)
+                  .leftJoin(
+                    schema.boardTable,
+                    eq(schema.boardTable.id, schema.postTable.boardId)
+                  )
+                  .where(
+                    and(
+                      inArray(schema.postTable.id, [...postIds]),
+                      eq(schema.postTable.organizationId, window.organizationId)
+                    )
+                  );
+          // Posts deleted between submission and send are dropped from the
+          // email; a window whose posts are all gone has nothing to say. The
+          // window's order is the submission order, so resolve through a map
+          // rather than relying on the query's row order.
+          const rowsById = new Map(rows.map((row) => [row.id, row]));
+          const posts = postIds.flatMap((postId) => {
+            const row = rowsById.get(postId);
+            return row === undefined
+              ? []
+              : [
+                  {
+                    // A post whose board no longer resolves cannot be proven
+                    // public, which the payload snapshot records.
+                    board:
+                      row.boardSlug === null || row.boardVisibility === null
+                        ? null
+                        : {
+                            slug: row.boardSlug,
+                            visibility: row.boardVisibility,
+                          },
+                    id: row.id,
+                    slug: row.slug,
+                    title: row.title,
+                  },
+                ];
+          });
+          // A stored post that no longer resolves was deleted, so it stops
+          // being a submission worth reporting. Ids the window never stored
+          // stay in the count: they are past its cap, and a window cannot
+          // observe a deletion it never tracked.
+          const submissionCount =
+            windowPostCount - (postIds.length - posts.length);
+          // Expire on the adjusted count, not on the rendered list: a capped
+          // window whose stored posts were all deleted still has submissions
+          // to report, and must not go silent about them.
+          if (submissionCount <= 0) {
+            yield* repository.markIntentState({
+              id: window.id,
+              state: "expired",
+            });
+            yield* recordEmailIntentTransition(window.kind, "expired");
+            return noDeliveryIds;
+          }
+
+          const recipientLimit =
+            yield* policy.submissionNotificationRecipientLimit(
+              window.organizationId
+            );
+          const members = yield* db.query.memberTable.findMany({
+            where: { organizationId: window.organizationId },
+            columns: { role: true, userId: true },
+            with: { user: { columns: { email: true } } },
+          });
+          const optedInContacts = yield* db
+            .select({
+              email: schema.emailContactTable.email,
+              userId: schema.emailContactTable.userId,
+            })
+            .from(schema.emailSubscriptionTable)
+            .innerJoin(
+              schema.emailContactTable,
+              eq(
+                schema.emailContactTable.id,
+                schema.emailSubscriptionTable.contactId
+              )
+            )
+            .where(
+              and(
+                eq(
+                  schema.emailSubscriptionTable.organizationId,
+                  window.organizationId
+                ),
+                eq(schema.emailSubscriptionTable.topicType, "submission"),
+                isNull(schema.emailSubscriptionTable.topicId),
+                eq(schema.emailSubscriptionTable.state, "active"),
+                eq(schema.emailContactTable.verificationState, "verified")
+              )
+            );
+          const privilegedUserIds = new Set(
+            members.flatMap((member) =>
+              member.role === "owner" || member.role === "admin"
+                ? [member.userId]
+                : []
+            )
+          );
+          const ownerEmail = members.find((member) => member.role === "owner")
+            ?.user?.email;
+          const configuredFreeRecipient = optedInContacts[0]?.email;
+          const recipients =
+            recipientLimit === 1
+              ? [configuredFreeRecipient ?? ownerEmail].filter(
+                  (email): email is string => email !== undefined
+                )
+              : optedInContacts.flatMap((contact) =>
+                  contact.userId !== null &&
+                  privilegedUserIds.has(contact.userId)
+                    ? [contact.email]
+                    : []
+                );
+          const templatePayload = makeSubmissionNotificationPayload(
+            appUrl,
+            window.organizationId,
+            posts,
+            submissionCount
+          );
+
           const created = yield* Effect.forEach(recipients, (recipientEmail) =>
             repository.createDelivery({
-              outboxId: intent.id,
+              outboxId: window.id,
               recipientEmail,
               template: "submission-notification",
               templateVersion: 1,
@@ -387,10 +475,10 @@ export const materializeEmailIntent = (outboxId: string) =>
             })
           );
           yield* repository.markIntentState({
-            id: intent.id,
+            id: window.id,
             state: "materialized",
           });
-          yield* recordEmailIntentTransition(intent.kind, "materialized");
+          yield* recordEmailIntentTransition(window.kind, "materialized");
           return created.flatMap((result) =>
             result._tag === "Inserted" ? [result.delivery.id] : []
           );
@@ -598,32 +686,82 @@ const sendDeliveryAttempt = (
       };
     }
     const monthStart = DateTime.toDateUtc(DateTime.startOf(now, "month"));
+    /**
+     * One volume guard, shared by both scopes: defer the delivery by the
+     * monthly retry delay when this month's attempt count reaches the limit,
+     * and record which guard spent it.
+     */
+    const deferOnVolumeLimit = (args: {
+      readonly attempts: number;
+      readonly limit: number;
+      readonly reason:
+        | "monthly_volume_limit"
+        | "workspace_monthly_volume_limit";
+    }) =>
+      Effect.gen(function* () {
+        if (args.attempts < args.limit) {
+          return undefined;
+        }
+        yield* recordEmailDeliveryThrottle(args.reason);
+        yield* Effect.logWarning(
+          "Email delivery paused by monthly volume limit"
+        ).pipe(
+          Effect.annotateLogs({
+            deliveryId,
+            organizationId: intent.organizationId,
+            reason: args.reason,
+          })
+        );
+        yield* repository.deferDeliveryForThrottle({
+          id: deliveryId,
+          nextAttemptAt: DateTime.toDateUtc(
+            DateTime.addDuration(now, monthlyVolumeRetryDelay)
+          ),
+          reason: args.reason,
+        });
+        return {
+          _tag: "retry" as const,
+          delay: monthlyVolumeRetryDelay,
+          infrastructureFailure: false,
+        } satisfies DeliveryAttemptOutcome;
+      });
+
+    // Per-workspace breaker first. The global allowance below is shared by every
+    // workspace, so without this one flooded workspace defers every other
+    // workspace's email until the month rolls over.
+    const [workspaceVolume] = yield* db
+      .select({ attempts: sum(schema.emailDeliveryTable.attemptCount) })
+      .from(schema.emailDeliveryTable)
+      .innerJoin(
+        schema.emailOutboxTable,
+        eq(schema.emailOutboxTable.id, schema.emailDeliveryTable.outboxId)
+      )
+      .where(
+        and(
+          gte(schema.emailDeliveryTable.createdAt, monthStart),
+          eq(schema.emailOutboxTable.organizationId, intent.organizationId)
+        )
+      );
+    const workspaceOutcome = yield* deferOnVolumeLimit({
+      attempts: Number(workspaceVolume?.attempts ?? 0),
+      limit: config.workspaceMonthlySendLimit,
+      reason: "workspace_monthly_volume_limit",
+    });
+    if (workspaceOutcome !== undefined) {
+      return workspaceOutcome;
+    }
+
     const [monthlyVolume] = yield* db
       .select({ attempts: sum(schema.emailDeliveryTable.attemptCount) })
       .from(schema.emailDeliveryTable)
       .where(gte(schema.emailDeliveryTable.createdAt, monthStart));
-    if (Number(monthlyVolume?.attempts ?? 0) >= config.monthlySendLimit) {
-      yield* recordEmailDeliveryThrottle("monthly_volume_limit");
-      yield* Effect.logWarning(
-        "Email delivery paused by monthly volume limit"
-      ).pipe(
-        Effect.annotateLogs({
-          deliveryId,
-          organizationId: intent.organizationId,
-        })
-      );
-      yield* repository.deferDeliveryForThrottle({
-        id: delivery.id,
-        nextAttemptAt: DateTime.toDateUtc(
-          DateTime.addDuration(now, monthlyVolumeRetryDelay)
-        ),
-        reason: "monthly_volume_limit",
-      });
-      return {
-        _tag: "retry" as const,
-        delay: monthlyVolumeRetryDelay,
-        infrastructureFailure: false,
-      };
+    const platformOutcome = yield* deferOnVolumeLimit({
+      attempts: Number(monthlyVolume?.attempts ?? 0),
+      limit: config.monthlySendLimit,
+      reason: "monthly_volume_limit",
+    });
+    if (platformOutcome !== undefined) {
+      return platformOutcome;
     }
     if (
       !(yield* policy.mayMaterializeEmailIntent({
@@ -759,20 +897,57 @@ const sendDeliveryAttempt = (
       // No resolvable account means the recipient is a pure external
       // subscriber; their consent was already proven above.
       if (account !== null) {
-        const [postBoard] = yield* db
-          .select({ visibility: schema.boardTable.visibility })
-          .from(schema.postTable)
-          .innerJoin(
-            schema.boardTable,
-            eq(schema.boardTable.id, schema.postTable.boardId)
-          )
-          .where(
-            and(
-              eq(schema.postTable.id, intent.aggregateId),
-              eq(schema.postTable.organizationId, intent.organizationId)
-            )
-          )
-          .limit(1);
+        // A submission window spans posts on possibly different boards, so the
+        // gate resolves every notified post. PUBLIC requires all of them to be
+        // public: the email carries each post's title, so admitting on one
+        // public board would leak the private ones beside it. Every named post
+        // must also still resolve — a survivor does not speak for the whole
+        // mail, so a missing one fails closed rather than being skipped. Every
+        // other post-attributed intent is about its aggregate.
+        const notifiedPostIds =
+          intent.payload.kind === "submission.created"
+            ? submissionWindowPostIds(intent.payload)
+            : [intent.aggregateId];
+        // The rendered email is what the gate proves, and it names fewer posts
+        // than a window may hold: the snapshot carries the render-time named
+        // set, so a deletion among the unlisted remainder cannot deny a
+        // delivery the mail still admits. A delivery written before the
+        // snapshot falls back to the intent's stored set.
+        const accessSnapshot = Schema.decodeUnknownOption(
+          DeliveryAccessSnapshot
+        )(delivery.templatePayload);
+        const snapshot = Option.isSome(accessSnapshot)
+          ? accessSnapshot.value
+          : undefined;
+        const namedPostIds = snapshot?.notifiedPostIds ?? notifiedPostIds;
+        const boardRows =
+          namedPostIds.length === 0
+            ? []
+            : yield* db
+                .select({ visibility: schema.boardTable.visibility })
+                .from(schema.postTable)
+                // LEFT JOIN so a post whose board row is gone still counts as
+                // unproven instead of vanishing from the proof.
+                .leftJoin(
+                  schema.boardTable,
+                  eq(schema.boardTable.id, schema.postTable.boardId)
+                )
+                .where(
+                  and(
+                    inArray(schema.postTable.id, [...namedPostIds]),
+                    eq(schema.postTable.organizationId, intent.organizationId)
+                  )
+                );
+        const currentBoardVisibility =
+          boardRows.length === 0 || boardRows.length < namedPostIds.length
+            ? null
+            : boardRows.every((row) => row.visibility === "PUBLIC")
+              ? "PUBLIC"
+              : "PRIVATE";
+        const boardVisibility = evaluateNotifiedBoardVisibility({
+          captured: snapshot?.notifiedBoardVisibility,
+          current: currentBoardVisibility,
+        });
 
         const [memberRow] = yield* db
           .select({ id: schema.memberTable.id })
@@ -788,9 +963,7 @@ const sendDeliveryAttempt = (
         const accessVerdict = evaluateOrganizationAccess({
           account,
           hasMembership: memberRow !== undefined,
-          // A post or board that no longer resolves fails rule 3 fail-closed
-          // without affecting rules 1–2.
-          boardVisibility: postBoard?.visibility ?? null,
+          boardVisibility,
           organizationId: intent.organizationId,
         });
         if (!accessVerdict.eligible) {
