@@ -224,12 +224,11 @@ const makeCompanyRepository = Effect.gen(function* () {
 
         if (existing) {
           // A foreign external id held by a different row is the ambiguous
-          // state above: refuse rather than write a key collision.
-          if (
-            args.externalId !== undefined &&
-            existing.externalId !== null &&
-            existing.externalId !== args.externalId
-          ) {
+          // state above: refuse rather than write a key collision. The row
+          // may have been matched by name and hold `null` here, so the probe
+          // runs whenever the update would write a different value, over null
+          // included.
+          if (args.externalId && existing.externalId !== args.externalId) {
             const [other] = yield* db
               .select({ id: schema.companyTable.id })
               .from(schema.companyTable)

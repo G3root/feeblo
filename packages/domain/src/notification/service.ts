@@ -9,6 +9,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { BadRequestError } from "../rpc-errors";
 import { decodeNotificationCursor } from "./schema";
 
 type NotificationInput = {
@@ -642,7 +643,16 @@ const makeNotificationService = Effect.gen(function* () {
         // instant alone: a fan-out writes every recipient row in one
         // statement, so they all share one `createdAt`, and paging on the
         // timestamp alone would skip the batch remainder past the boundary.
+        // An unreadable cursor is the caller's mistake, not "no cursor":
+        // answering it as a request error keeps a corrupt cursor from
+        // silently restarting the list. Only an absent cursor pages from the
+        // top.
         const after = decodeNotificationCursor(cursor);
+        if (after._tag === "Invalid") {
+          return yield* new BadRequestError({
+            message: "The notification cursor is invalid.",
+          });
+        }
         return yield* db
           .select({
             id: schema.notificationTable.id,
@@ -663,11 +673,11 @@ const makeNotificationService = Effect.gen(function* () {
             and(
               eq(schema.notificationTable.organizationId, organizationId),
               eq(schema.notificationTable.recipientUserId, recipientUserId),
-              ...(after === null
-                ? []
-                : [
+              ...(after._tag === "Decoded"
+                ? [
                     sql`(${schema.notificationTable.createdAt}, ${schema.notificationTable.id}) < (${after.createdAt}, ${after.id})`,
-                  ])
+                  ]
+                : [])
             )
           )
           // The id joins the sort key so rows inside one fan-out batch keep

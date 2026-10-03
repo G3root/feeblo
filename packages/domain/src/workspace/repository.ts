@@ -46,10 +46,16 @@ const makeWorkspaceRepository = Effect.gen(function* () {
      * insert into a table referencing the organization holds a key-share on
      * this row that conflicts with the lock, so locking after the insert
      * deadlocks two concurrent creates against each other.
+     *
+     * `no key update` rather than `update`: every table in the workspace
+     * references this row, and the stronger lock would block unrelated child
+     * inserts that merely take a key-share on it. The lock still serializes
+     * the count-and-write pairs, which are the only writers that touch the
+     * organization row's own columns.
      */
     lockOrganization: (organizationId: string) =>
       db.execute(
-        sql`SELECT id FROM ${schema.organizationTable} WHERE id = ${organizationId} FOR UPDATE`
+        sql`SELECT id FROM ${schema.organizationTable} WHERE id = ${organizationId} FOR NO KEY UPDATE`
       ),
 
     isSubdomainTaken: (subdomain: string) =>

@@ -64,6 +64,7 @@ export const SlackFeedbackServiceLive: Layer.Layer<
   | Crypto.Crypto
   | Database.Database
   | EmailOutboxConfig
+  | Layer.Success<typeof PostWriteInternals>
   | PostStatusRepository
   | S3UploadService
 > = Layer.effect(
@@ -187,9 +188,4 @@ export const SlackFeedbackServiceLive: Layer.Layer<
 
     return SlackFeedbackService.of({ createPost });
   })
-).pipe(
-  // Construction-time dependencies of the write environment above: the
-  // repositories the write path coordinates, plus the services its steps
-  // read at request time that the server does not provide ambiently.
-  Layer.provide(PostWriteInternals)
 );

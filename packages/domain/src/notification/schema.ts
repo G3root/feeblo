@@ -1,5 +1,6 @@
 import { NotificationEventType } from "@feeblo/db/validation-schema/notification-kind";
 import { NotificationId, WorkspaceId } from "@feeblo/id";
+import * as Option from "effect/Option";
 import * as S from "effect/Schema";
 
 export const Notification = S.Struct({
@@ -60,23 +61,36 @@ export const encodeNotificationCursor = (cursor: {
 }): string => Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
 
 /**
- * Decodes the opaque cursor a client passed back, or `null` when there is
- * none. `undefined` for a cursor the request did not carry; an unreadable
- * value is the caller's mistake and is answered with `null` only after the
- * decode fails — the list then restarts, which the malformed value has asked
- * for by sending a cursor it did not get from this endpoint.
+ * Decodes the opaque cursor a client passed back.
+ *
+ * `Absent` for a cursor the request did not carry, so the list starts from the
+ * newest row. Any other value that does not decode — including the empty
+ * string — is `Invalid`: an unreadable cursor is the caller's mistake and is
+ * answered with a request error, because treating it as absent would silently
+ * restart the list and make a corrupted cursor look like a successful
+ * continuation.
  */
 export const decodeNotificationCursor = (
   cursor: string | undefined
-): { readonly createdAt: Date; readonly id: string } | null => {
-  if (cursor === undefined || cursor.length === 0) {
-    return null;
+):
+  | { readonly _tag: "Absent" }
+  | { readonly _tag: "Invalid" }
+  | {
+      readonly _tag: "Decoded";
+      readonly createdAt: Date;
+      readonly id: string;
+    } => {
+  if (cursor === undefined) {
+    return { _tag: "Absent" };
   }
-  try {
-    return S.decodeSync(S.fromJsonString(NotificationCursorPayload))(
-      Buffer.from(cursor, "base64url").toString("utf8")
-    );
-  } catch {
-    return null;
-  }
+  const decoded = S.decodeUnknownOption(
+    S.fromJsonString(NotificationCursorPayload)
+  )(Buffer.from(cursor, "base64url").toString("utf8"));
+  return Option.isSome(decoded)
+    ? {
+        _tag: "Decoded",
+        createdAt: decoded.value.createdAt,
+        id: decoded.value.id,
+      }
+    : { _tag: "Invalid" };
 };

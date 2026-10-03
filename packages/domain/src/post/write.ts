@@ -382,13 +382,14 @@ export const makePostWrites = Effect.gen(function* () {
     options: {
       readonly source?: "PUBLIC_BOARD";
       /**
-       * The post creator to watch-list when the acting credential has no
-       * session of its own to subscribe from — an inbound end-user identity
-       * (Slack, Discord) whose feeblo user row the caller resolved. A member
-       * session subscribes through its own branch; a machine key creating on
-       * behalf of `author` subscribes the subject instead. No email
-       * subscription is requested from this option: inbound identities carry
-       * synthetic inboxes that must never enter the email pipeline.
+       * The post creator to attribute and watch-list when the acting
+       * credential has no session of its own to subscribe from — an inbound
+       * end-user identity (Slack, Discord) whose feeblo user row the caller
+       * resolved. A member session subscribes through its own branch; a
+       * machine key creating on behalf of `author` subscribes the subject
+       * instead. No email subscription is requested from this option:
+       * inbound identities carry synthetic inboxes that must never enter the
+       * email pipeline.
        */
       readonly subscribeCreatorUserId?: string;
     } = {}
@@ -474,7 +475,14 @@ export const makePostWrites = Effect.gen(function* () {
             ...write,
             content: prepared.content,
             excerpt: htmlToExcerpt(sanitizedHtml),
-            creatorId: subject ? subject.userId : userId,
+            // The resolved inbound end user is the creator even though the
+            // credential is a machine key: creator-based reads ("my posts")
+            // and the edit/delete permissions key off this column, so leaving
+            // it null would store the submitter's own post as unowned. A
+            // member's own id still wins when there is one.
+            creatorId: subject
+              ? subject.userId
+              : (userId ?? options.subscribeCreatorUserId ?? null),
             ...(writeSource !== undefined && { source: writeSource }),
             // On-behalf posts keep staff attribution out of the author fields.
             ...(member !== null &&

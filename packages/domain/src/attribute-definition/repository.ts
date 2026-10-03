@@ -41,8 +41,15 @@ type AttributeValueMap = ReturnType<typeof buildAttributeValueColumns>;
  * to `insert`, whose (owner, attribute) pair is unique, so the insert is
  * written with an upsert that updates the winning row in place rather than
  * surfacing a unique violation.
+ *
+ * `idExists` guards that fallback: `update` scopes by (owner, attribute), so
+ * its miss proves the pair has no row, not that the caller's id is free. An id
+ * that names another attribute's (or owner's) row would otherwise reach
+ * `insert` and hit its primary key, which the (owner, attribute) conflict
+ * target does not cover, so the caller would see a driver error instead of the
+ * controlled mismatch the strict path reports.
  */
-const upsertAttributeValue = <T, E1, R1, E2, R2, E3, R3>(
+const upsertAttributeValue = <T, E1, R1, E2, R2, E3, R3, E4, R4>(
   args: { id?: string | undefined; value: AttributeValue | undefined },
   options: {
     /** Called only when the caller named a row id; it is the narrowed id. */
@@ -54,6 +61,8 @@ const upsertAttributeValue = <T, E1, R1, E2, R2, E3, R3>(
       id: string,
       valueMap: AttributeValueMap
     ) => Effect.Effect<T | undefined, E2, R2>;
+    /** Whether a row already holds the id, in any owner or attribute. */
+    idExists: (id: string) => Effect.Effect<boolean, E4, R4>;
     generateId: Effect.Effect<string, E3, R3>;
     readonly strict: boolean;
   }
@@ -74,6 +83,9 @@ const upsertAttributeValue = <T, E1, R1, E2, R2, E3, R3>(
     }
 
     const id = args.id ?? (yield* options.generateId);
+    if (args.id !== undefined && (yield* options.idExists(id))) {
+      return yield* new FailedToUpsertAttributeValueError();
+    }
     const created = yield* options.insert(id, valueMap);
     if (!created) {
       return yield* new FailedToUpsertAttributeValueError();
@@ -83,6 +95,22 @@ const upsertAttributeValue = <T, E1, R1, E2, R2, E3, R3>(
 
 const makeAttributeDefinitionRepository = Effect.gen(function* () {
   const db = yield* currentDb;
+
+  const contactAttributeValueIdExists = (id: string) =>
+    db
+      .select({ id: schema.contactAttributeValueTable.id })
+      .from(schema.contactAttributeValueTable)
+      .where(eq(schema.contactAttributeValueTable.id, id))
+      .limit(1)
+      .pipe(Effect.map((rows) => rows[0] !== undefined));
+
+  const companyAttributeValueIdExists = (id: string) =>
+    db
+      .select({ id: schema.companyAttributeValueTable.id })
+      .from(schema.companyAttributeValueTable)
+      .where(eq(schema.companyAttributeValueTable.id, id))
+      .limit(1)
+      .pipe(Effect.map((rows) => rows[0] !== undefined));
 
   return {
     findContactAttributeDefinitions: (organizationId: string) =>
@@ -323,6 +351,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
     updateContactAttributeValue: (args: TContactAttributeValueUpdate) =>
       upsertAttributeValue(args, {
         strict: true,
+        idExists: contactAttributeValueIdExists,
         update: (rowId, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
@@ -385,6 +414,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
     upsertContactAttributeValue: (args: TContactAttributeValueUpsert) =>
       upsertAttributeValue(args, {
         strict: false,
+        idExists: contactAttributeValueIdExists,
         update: (rowId, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
@@ -464,6 +494,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
     updateCompanyAttributeValue: (args: TCompanyAttributeValueUpdate) =>
       upsertAttributeValue(args, {
         strict: true,
+        idExists: companyAttributeValueIdExists,
         update: (rowId, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
@@ -526,6 +557,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
     upsertCompanyAttributeValue: (args: TCompanyAttributeValueUpsert) =>
       upsertAttributeValue(args, {
         strict: false,
+        idExists: companyAttributeValueIdExists,
         update: (rowId, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;

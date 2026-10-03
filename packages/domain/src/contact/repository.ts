@@ -234,12 +234,11 @@ const makeContactRepository = Effect.gen(function* () {
           // key is what distinguishes that from the row matching itself.
           // Writing over another row's key is a unique violation with no
           // recovery inside this upsert, so the ambiguous state is refused
-          // deterministically rather than guessed at.
-          if (
-            args.email !== undefined &&
-            existing.email !== null &&
-            existing.email !== args.email
-          ) {
+          // deterministically rather than guessed at. A row matched by the
+          // other key may hold `null` here — an SSO contact with no email, or
+          // a widget contact with no external id — so the probe runs whenever
+          // the update would write a different value, over null included.
+          if (args.email && existing.email !== args.email) {
             const [emailHolder] = yield* db
               .select({ id: schema.contactTable.id })
               .from(schema.contactTable)
@@ -254,11 +253,7 @@ const makeContactRepository = Effect.gen(function* () {
               return yield* new FailedToUpdateContactError();
             }
           }
-          if (
-            args.externalId !== undefined &&
-            existing.externalId !== null &&
-            existing.externalId !== args.externalId
-          ) {
+          if (args.externalId && existing.externalId !== args.externalId) {
             const [externalIdHolder] = yield* db
               .select({ id: schema.contactTable.id })
               .from(schema.contactTable)

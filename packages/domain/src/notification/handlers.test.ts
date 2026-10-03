@@ -320,6 +320,49 @@ describe("NotificationRpcHandlers", () => {
           })
       );
 
+      it.effect(
+        "answers a malformed cursor with a request error instead of the first page",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* NotificationRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            yield* insertNotification(fixture);
+            const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+              effect.pipe(
+                Effect.provideService(CurrentSession, session(fixture))
+              );
+
+            const malformed = yield* Effect.flip(
+              scoped(
+                handlers.NotificationList({
+                  organizationId: fixture.organizationId,
+                  cursor: "not-a-cursor",
+                })
+              )
+            );
+            expect(malformed._tag).toBe("BadRequestError");
+
+            // An empty string is a supplied value that does not decode, not
+            // an absent cursor; an absent one still starts at the newest row.
+            const empty = yield* Effect.flip(
+              scoped(
+                handlers.NotificationList({
+                  organizationId: fixture.organizationId,
+                  cursor: "",
+                })
+              )
+            );
+            expect(empty._tag).toBe("BadRequestError");
+            expect(
+              yield* scoped(
+                handlers.NotificationList({
+                  organizationId: fixture.organizationId,
+                })
+              )
+            ).toHaveLength(1);
+          })
+      );
+
       it.effect("does not mark another member's notification as read", () =>
         Effect.gen(function* () {
           const handlers = yield* NotificationRpcHandlersEffect;
