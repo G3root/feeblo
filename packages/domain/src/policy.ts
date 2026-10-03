@@ -6,10 +6,10 @@ import * as Permissions from "@feeblo/permissions";
 import type { NonEmptyReadonlyArray } from "effect/Array";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
-import type * as Option from "effect/Option";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { CurrentSession } from "./session-middleware";
+import { CurrentSession, OptionalCurrentSession } from "./session-middleware";
 
 export type Policy<E = never, R = never> = Effect.Effect<
   void,
@@ -139,6 +139,53 @@ export const hasRestrictedOrganizationScope = (
         session.user.restrictedToOrganizationId === organizationId
     )
   );
+
+/**
+ * Session-optional form of {@link hasRestrictedOrganizationScope}, for routes
+ * that provide `OptionalCurrentSession` rather than `CurrentSession` — every
+ * route on `OptionalAuthMiddleware`.
+ *
+ * Reads whichever session service the route actually provides. Going through
+ * `publicPolicy` instead would not work: that reads `CurrentSession`, which
+ * `OptionalAuthMiddleware` does not provide, so it would always observe
+ * `Option.none()` and allow every caller — the policy would be a no-op that
+ * reads as a check.
+ *
+ * An absent session is allowed rather than denied: the caller is a guest with
+ * no organization to confine, and the handler decides separately whether a
+ * guest may proceed at all. Use this only where the handler takes
+ * `organizationId` from the caller.
+ */
+export const hasRestrictedOrganizationScopeIfPresent = (
+  organizationId: string
+): PublicPolicy =>
+  Effect.gen(function* () {
+    const optional = yield* Effect.serviceOption(OptionalCurrentSession);
+    // `OptionalCurrentSession`'s value is itself an `Option`, so looking it up
+    // yields `Option<Option<Session>>`; the inner value is the session.
+    const session = Option.isSome(optional)
+      ? optional.value
+      : yield* Effect.serviceOption(CurrentSession);
+
+    return yield* Option.match(session, {
+      onNone: () => Effect.void,
+      onSome: (authenticated) =>
+        Effect.flatMap(
+          Effect.succeed(
+            authenticated.user.restrictedToOrganizationId == null ||
+              authenticated.user.restrictedToOrganizationId === organizationId
+          ),
+          (allowed) =>
+            allowed
+              ? Effect.void
+              : Effect.fail(
+                  new PolicyDeniedError({
+                    reason: "Session is scoped to another organization.",
+                  })
+                )
+        ),
+    });
+  });
 
 export const isMember = (
   session: CurrentSession["Service"],

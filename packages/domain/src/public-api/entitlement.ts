@@ -24,8 +24,13 @@ export type CrmEntryAllowanceError = PlanRequiresUpgradeError | InternalError;
  * limit, which is the dashboard's wording for a member looking at their own
  * billing, while this message is the only human-facing explanation a machine
  * key's operator gets and is part of the published contract's vocabulary.
+ *
+ * Exported because on-behalf attribution discovers the limit deep in identity
+ * resolution rather than at the operation boundary, so the operation catches
+ * `CrmEntryLimitReachedError` and has to report it in these words rather than
+ * invent a second wording for the same limit.
  */
-const CRM_LIMIT_MESSAGE =
+export const crmLimitMessage =
   "This workspace's plan has no room for another CRM entry.";
 
 /**
@@ -78,7 +83,7 @@ export const requireCrmEntryAllowance = (
       })
       .pipe(
         Effect.catchTag("PolicyDenied", () =>
-          Effect.fail(planRequiresUpgradeError(CRM_LIMIT_MESSAGE))
+          Effect.fail(planRequiresUpgradeError(crmLimitMessage))
         ),
         // The plan lookup and the count both read the database; a driver
         // failure is a server problem, not a plan problem.

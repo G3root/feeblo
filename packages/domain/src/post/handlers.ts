@@ -431,6 +431,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           name: "PostDeleteEligibilityListPublic",
           level: "read",
         }),
+        // `organizationId` arrives from the caller, so a restricted widget-SSO
+        // session must not ask about a workspace it was not minted for. The
+        // repository's `creatorId` predicate is what limited the response to
+        // the caller's own posts; this is the control that says the caller may
+        // ask about this organization at all.
+        Policy.withPublicPolicy(
+          Policy.hasRestrictedOrganizationScopeIfPresent(args.organizationId)
+        ),
         withRemapDbErrors("Post", "select")
       ),
 

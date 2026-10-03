@@ -8,9 +8,16 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { CompanyRepository } from "../company/repository";
+import { EntitlementPolicy } from "../entitlement/policies";
 import { UserRepository } from "../user/repository";
+import { WorkspaceRepository } from "../workspace/repository";
 import { isSyntheticEmail } from "./emails";
-import { InvalidSubjectError, SubjectNotFoundError } from "./errors";
+import {
+  CrmEntryLimitReachedError,
+  InvalidSubjectError,
+  SubjectNotFoundError,
+} from "./errors";
 
 // Re-exported so existing importers keep a single identity entrypoint; the
 // predicates live in a dependency-free leaf module to avoid import cycles.
@@ -59,6 +66,8 @@ const normalizeEmail = (email: string | undefined): string | undefined => {
 const makeResolvePrincipalService = Effect.gen(function* () {
   const db = yield* currentDb;
   const userRepository = yield* UserRepository;
+  const companyRepository = yield* CompanyRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
 
   const getContactInOrganization = (id: string, organizationId: string) =>
     Effect.gen(function* () {
@@ -227,6 +236,21 @@ const makeResolvePrincipalService = Effect.gen(function* () {
    * Insert that tolerates losing a race against the `(organization_id, email)`
    * or `(organization_id, external_id)` unique indexes by re-reading the
    * winner.
+   *
+   * Every contact this service creates goes through here, which is what makes
+   * it the right place for the plan's CRM entry allowance: the check sits on the
+   * insert rather than on the resolution, so it consumes room only when a row
+   * would actually be written. An on-behalf write attributed to a customer who
+   * already has a contact is unaffected by a full CRM.
+   *
+   * Before this, the allowance was enforced only where a caller created a
+   * contact explicitly — the dashboard's contact create, and the Public API's
+   * company create. On-behalf attribution provisions contacts implicitly, from a
+   * subject in the request, and no surface checked the cap on that path: a key
+   * holding only `comments.create` could grow a workspace's contact table past
+   * its plan limit by naming a new email address per request. The count is read
+   * here, inside the caller's write transaction, for the same reason
+   * `CompanyRepository.countCrmEntries` documents.
    */
   function insertContactToleratingRace(
     values: Omit<ContactInsert, "id" | "createdAt" | "updatedAt">,
@@ -236,6 +260,24 @@ const makeResolvePrincipalService = Effect.gen(function* () {
     >
   ) {
     return Effect.gen(function* () {
+      yield* entitlementPolicy
+        .canCreateCrmEntry({
+          organizationId: values.organizationId,
+          crmEntryCount: companyRepository.countCrmEntries(
+            values.organizationId
+          ),
+        })
+        .pipe(
+          Effect.catchTag("PolicyDenied", () =>
+            Effect.fail(
+              new CrmEntryLimitReachedError({
+                message:
+                  "This workspace's plan has no room for another CRM entry.",
+              })
+            )
+          )
+        );
+
       const id = yield* ContactId.generate;
       const now = yield* DateTime.nowAsDate;
       const [created = null] = yield* db
@@ -502,6 +544,10 @@ export class ResolvePrincipalService extends Context.Service<ResolvePrincipalSer
   }
 ) {
   static readonly layer = Layer.effect(this, this.make).pipe(
-    Layer.provide(UserRepository.layer)
+    Layer.provide(UserRepository.layer),
+    Layer.provide(CompanyRepository.layer),
+    Layer.provide(
+      EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
+    )
   );
 }

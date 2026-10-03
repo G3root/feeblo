@@ -2,11 +2,13 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import {
   ChangelogCategoryId,
+  ChangelogCategoryLinkId,
   ChangelogId,
   SiteId,
   WorkspaceId,
 } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -110,7 +112,10 @@ describe("ChangelogCategoryRpcHandlers", () => {
       });
       return id;
     });
-  const insertChangelog = (fixture: Fixture) =>
+  const insertChangelog = (
+    fixture: Fixture,
+    status: "draft" | "published" = "draft"
+  ) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
       const id = yield* ChangelogId.generate;
@@ -121,13 +126,31 @@ describe("ChangelogCategoryRpcHandlers", () => {
         slug: `release-${id}`,
         content: "Release notes",
         excerpt: "Release notes",
-        status: "draft",
+        status,
         organizationId: fixture.organizationId,
         creatorId: fixture.userId,
         createdAt: now,
         updatedAt: now,
       });
       return id;
+    });
+  const linkCategory = (
+    fixture: Fixture,
+    categoryId: string,
+    changelogId: string
+  ) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const id = yield* ChangelogCategoryLinkId.generate;
+      const now = yield* DateTime.nowAsDate;
+      yield* db.insert(schema.changelogCategoryLinkTable).values({
+        id,
+        categoryId,
+        changelogId,
+        organizationId: fixture.organizationId,
+        createdAt: now,
+        updatedAt: now,
+      });
     });
   const Repositories = Layer.mergeAll(
     ChangelogCategoryRepository.layer,
@@ -265,21 +288,80 @@ describe("ChangelogCategoryRpcHandlers", () => {
       })
     );
 
-    it.effect("serves categories publicly when changelogs are public", () =>
+    it.effect(
+      "serves a category publicly once a published entry is filed under it",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* ChangelogCategoryRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          yield* makeSite(fixture, "PUBLIC");
+          const id = yield* insertCategory(fixture);
+          const changelogId = yield* insertChangelog(fixture, "published");
+          yield* linkCategory(fixture, id, changelogId);
+
+          const categories = yield* handlers.ChangelogCategoryListPublic({
+            organizationId: fixture.organizationId,
+          });
+
+          expect(categories).toMatchObject([
+            {
+              id,
+              organizationId: fixture.organizationId,
+            },
+          ]);
+        })
+    );
+
+    // A category whose entries are all drafts names unreleased work. Serving it
+    // would disclose the draft pipeline even though each entry inside stays
+    // unpublished.
+    it.effect("hides a category whose only entry is still a draft", () =>
       Effect.gen(function* () {
         const handlers = yield* ChangelogCategoryRpcHandlersEffect;
         const fixture = yield* makeFixture();
         yield* makeSite(fixture, "PUBLIC");
         const id = yield* insertCategory(fixture);
+        const changelogId = yield* insertChangelog(fixture, "draft");
+        yield* linkCategory(fixture, id, changelogId);
+
         const categories = yield* handlers.ChangelogCategoryListPublic({
           organizationId: fixture.organizationId,
         });
-        expect(categories).toMatchObject([
-          {
-            id,
-            organizationId: fixture.organizationId,
-          },
-        ]);
+
+        expect(categories).toEqual([]);
+      })
+    );
+
+    it.effect("hides a category no entry is filed under", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogCategoryRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        yield* makeSite(fixture, "PUBLIC");
+        yield* insertCategory(fixture);
+        yield* insertChangelog(fixture, "published");
+
+        const categories = yield* handlers.ChangelogCategoryListPublic({
+          organizationId: fixture.organizationId,
+        });
+
+        expect(categories).toEqual([]);
+      })
+    );
+
+    // The member read is unchanged: a member still sees the categories they are
+    // preparing, which is the whole point of the dashboard's list.
+    it.effect("still lists an unlinked category for members", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogCategoryRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        yield* makeSite(fixture, "PUBLIC");
+        const id = yield* insertCategory(fixture);
+
+        const categories = yield* handlers
+          .ChangelogCategoryList({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+        expect(categories).toMatchObject([{ id }]);
       })
     );
 
