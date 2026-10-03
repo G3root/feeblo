@@ -5,11 +5,9 @@ import * as Option from "effect/Option";
 
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import { validateAttributeValueEffect } from "../attribute-definition/validation";
-import { ContactRepository } from "../contact/repository";
-import { EntitlementPolicy } from "../entitlement/policies";
+import { CrmEntryGate } from "../entitlement/crm-allowance";
 import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
-import { WorkspaceRepository } from "../workspace/repository";
 import { CompanyNotFoundError, FailedToCreateCompanyError } from "./errors";
 import { CompanyPolicy } from "./policies";
 import { CompanyRepository } from "./repository";
@@ -25,6 +23,7 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CompanyRepository;
   const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
   const companyPolicy = yield* CompanyPolicy;
+  const crmEntryGate = yield* CrmEntryGate;
 
   return {
     CompanyList: (args: TCompanyList) =>
@@ -37,6 +36,12 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
     CompanyCreate: (args: TCompanyCreate) =>
       transaction(
         Effect.gen(function* () {
+          // The plan's CRM-entry gate runs inside the create's transaction,
+          // under the workspace row's lock, so concurrent creates cannot race
+          // the count past the cap (the policy outside checks permission
+          // only — see CompanyPolicy).
+          yield* crmEntryGate.ensureCapacity(args.organizationId);
+
           const attributeValues = args.attributeValues ?? [];
           const definitions =
             yield* attributeDefinitionRepository.findCompanyAttributeDefinitions(
@@ -130,9 +135,7 @@ export const CompanyRpcHandlers = CompanyRpcs.toLayer(
   CompanyRpcHandlersEffect
 ).pipe(
   Layer.provide(CompanyPolicy.layer),
-  Layer.provide(EntitlementPolicy.layer),
-  Layer.provide(WorkspaceRepository.layer),
-  Layer.provide(ContactRepository.layer),
+  Layer.provide(CrmEntryGate.layer),
   Layer.provide(CompanyRepository.layer),
   Layer.provide(AttributeDefinitionRepository.layer)
 );

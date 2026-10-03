@@ -10,7 +10,7 @@ import * as Layer from "effect/Layer";
 
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import { ContactRepository } from "../contact/repository";
-import { EntitlementPolicy } from "../entitlement/policies";
+import { CrmEntryGate } from "../entitlement/crm-allowance";
 import { CurrentSession, type Session } from "../session-middleware";
 import { WorkspaceRepository } from "../workspace/repository";
 import { CompanyRpcHandlersEffect } from "./handlers";
@@ -81,20 +81,13 @@ describe("CompanyRpcHandlers", () => {
     WorkspaceRepository.layer,
     AttributeDefinitionRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
-  const Entitlements = EntitlementPolicy.layer.pipe(
-    Layer.provide(WorkspaceRepository.layer),
-    Layer.provide(Database.PgliteDatabaseLive)
-  );
   const TestLayer = Layer.mergeAll(
     CompanyPolicy.layer.pipe(
-      Layer.provide(EntitlementPolicy.layer),
-      Layer.provide(WorkspaceRepository.layer),
-      Layer.provide(ContactRepository.layer),
       Layer.provide(CompanyRepository.layer),
       Layer.provide(Database.PgliteDatabaseLive)
     ),
+    CrmEntryGate.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Repositories,
-    Entitlements,
     Database.PgliteDatabaseLive
   );
 

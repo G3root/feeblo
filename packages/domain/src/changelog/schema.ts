@@ -3,6 +3,8 @@ import { ChangelogId, WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
 
+import { EDITOR_ASSET_IDS_MAX_COUNT } from "../content-limits";
+
 export const ChangelogStatus = S.Literals(["draft", "scheduled", "published"]);
 
 export const Changelog = S.Struct({
@@ -77,13 +79,25 @@ const coverImageWithDefault = S.NullOr(
   )
 ).pipe(S.withDecodingDefaultKey(Effect.succeed(null)));
 
+/**
+ * Editor asset references one write may carry, bounded so a crafted payload
+ * cannot force an arbitrarily large `IN (...)` query (see
+ * `EDITOR_ASSET_IDS_MAX_COUNT`).
+ */
+const AssetIds = S.Array(S.String).check(
+  S.isMaxLength(EDITOR_ASSET_IDS_MAX_COUNT)
+);
+
 export const ChangelogCreate = S.Struct({
-  assetIds: S.Array(S.String).pipe(
+  assetIds: AssetIds.pipe(
     // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
     S.withDecodingDefaultKey(Effect.succeed([] as string[]))
   ),
   coverImage: coverImageWithDefault,
-  id: ChangelogId.schema,
+  // Client-minted and persisted as the primary key, so the wire format is
+  // checked (see `LegidFactory.formatSchema`). The update payload below keeps
+  // the plain codec: its id references an existing row.
+  id: ChangelogId.formatSchema,
   title: S.String,
   slug: S.String,
   content: S.String,
@@ -96,11 +110,13 @@ export const ChangelogCreate = S.Struct({
 export type TChangelogCreate = S.Schema.Type<typeof ChangelogCreate>;
 
 export const ChangelogUpdate = S.Struct({
-  assetIds: S.Array(S.String).pipe(
+  assetIds: AssetIds.pipe(
     // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
     S.withDecodingDefaultKey(Effect.succeed([] as string[]))
   ),
   coverImage: coverImageWithDefault,
+  // References an existing row, so unlike the create it keeps the plain
+  // codec; only creates persist a client-minted id.
   id: ChangelogId.schema,
   title: S.String,
   slug: S.String,

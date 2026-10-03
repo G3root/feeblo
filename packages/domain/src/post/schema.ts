@@ -9,6 +9,7 @@ import * as S from "effect/Schema";
 import { regexes } from "zod/v4/core";
 
 import {
+  EDITOR_ASSET_IDS_MAX_COUNT,
   POST_CONTENT_MAX_LENGTH,
   POST_OFFICIAL_UPDATE_BODY_MAX_LENGTH,
   POST_SUGGESTIONS_LIMIT_MAX,
@@ -16,6 +17,16 @@ import {
   POST_TITLE_MAX_LENGTH,
   POST_TITLE_MIN_LENGTH,
 } from "../content-limits";
+
+/**
+ * Editor asset references one write may carry.
+ *
+ * Bounded so a crafted payload cannot force an arbitrarily large `IN (...)`
+ * query against the asset table (see `EDITOR_ASSET_IDS_MAX_COUNT`).
+ */
+const AssetIds = S.Array(S.String).check(
+  S.isMaxLength(EDITOR_ASSET_IDS_MAX_COUNT)
+);
 
 export const EtaQuarter = S.String.pipe(
   S.check(S.isPattern(/^[0-9]{4}-Q[1-4]$/))
@@ -181,7 +192,7 @@ export const PostUpdateEta = S.Struct({
 export type TPostUpdateEta = S.Schema.Type<typeof PostUpdateEta>;
 
 export const PostUpdateContent = S.Struct({
-  assetIds: S.Array(S.String),
+  assetIds: AssetIds,
   id: PostId.schema,
   content: S.String.check(S.isMaxLength(POST_CONTENT_MAX_LENGTH)),
   boardId: BoardId.schema,
@@ -302,8 +313,12 @@ export const PostCreateAuthor = S.Struct({
 export type TPostCreateAuthor = S.Schema.Type<typeof PostCreateAuthor>;
 
 export const PostCreate = S.Struct({
-  assetIds: S.Array(S.String),
-  id: PostId.schema,
+  assetIds: AssetIds,
+  // The client mints this id (`PostId.unsafeGenerate` in the dashboard), and
+  // it becomes the row's primary key — so the wire format is checked, not
+  // just the brand. Updates and lookups keep the plain `PostId.schema`:
+  // their ids reference existing rows.
+  id: PostId.formatSchema,
   boardId: BoardId.schema,
   // Same shape as PostUpdateTitle.title: trimmed, non-empty, and bounded so a
   // created post can never carry a whitespace/empty title that the update

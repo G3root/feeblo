@@ -8,16 +8,20 @@ import {
   SubjectNotFoundError,
 } from "../../identity/errors";
 import type { OnBehalfSubject } from "../../identity/service";
+import { PolicyDeniedError } from "../../policy";
 import { PUBLIC_API_PAGE_DEFAULT_LIMIT } from "../../public-api/common";
 import { decodeCursorOrFail, encodeCursor } from "../../public-api/cursor";
+import { CRM_LIMIT_MESSAGE } from "../../public-api/entitlement";
 import {
   ConflictError,
   InternalError,
   InvalidRequestError,
   NotFoundError,
+  PlanRequiresUpgradeError,
   conflictError,
   invalidRequestError,
   notFoundError,
+  planRequiresUpgradeError,
 } from "../../public-api/errors";
 import { onInternalError } from "../../public-api/failure";
 import { currentPublicApiCaller } from "../../public-api/middleware";
@@ -59,6 +63,11 @@ const COMMENT_CREATE_FAILURES = Schema.Union([
   InvalidRequestError,
   NotFoundError,
   ConflictError,
+  // The create attributes the comment to a customer, and a resolution that
+  // creates a contact is gated by the workspace's CRM entry limit — the same
+  // gate the company create publishes. Unreachable while no API-bearing plan
+  // has a cap, but part of the vocabulary so the surfaces cannot drift.
+  PlanRequiresUpgradeError,
   InternalError,
 ]);
 
@@ -137,13 +146,17 @@ const withCommentWriteFailures = <A, R>(
 const withCommentCreateFailures = <A, R>(
   effect: Effect.Effect<
     A,
-    CommentWriteFailure | PostDoesNotAcceptCommentsError,
+    CommentWriteFailure | PolicyDeniedError | PostDoesNotAcceptCommentsError,
     R
   >
 ) =>
   effect.pipe(
     Effect.catchTags({
       ...commentWriteFailureHandlers,
+      // The resolver's CRM-entry gate: answered on the same code the company
+      // create publishes, with the same fixed message.
+      PolicyDenied: () =>
+        Effect.fail(planRequiresUpgradeError(CRM_LIMIT_MESSAGE)),
       PostDoesNotAcceptCommentsError: (error: PostDoesNotAcceptCommentsError) =>
         Effect.fail(conflictError(error.message)),
     })

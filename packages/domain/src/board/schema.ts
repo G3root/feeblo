@@ -14,7 +14,10 @@ export const Board = S.Struct({
 export type TBoard = S.Schema.Type<typeof Board>;
 
 export const BoardCreate = S.Struct({
-  id: BoardId.schema,
+  // Client-minted and persisted as the primary key, so the wire format is
+  // checked (see `LegidFactory.formatSchema`); `BoardUpdate`/`BoardDelete`
+  // keep the plain `BoardId.schema` because their ids reference existing rows.
+  id: BoardId.formatSchema,
   name: S.String,
   visibility: S.Literals(["PUBLIC", "PRIVATE"]),
   organizationId: WorkspaceId.schema,

@@ -53,7 +53,10 @@ export type TContactAttributeDefinitionList = S.Schema.Type<
 >;
 
 export const ContactAttributeDefinitionCreate = S.Struct({
-  id: ContactAttributeDefinitionId.schema,
+  // Client-minted and persisted as the primary key, so the wire format is
+  // checked (see `LegidFactory.formatSchema`); the update/delete payloads
+  // keep the plain codec because their ids reference existing rows.
+  id: ContactAttributeDefinitionId.formatSchema,
   ...AttributeDefinitionFields,
 });
 
@@ -96,7 +99,8 @@ export type TCompanyAttributeDefinitionList = S.Schema.Type<
 >;
 
 export const CompanyAttributeDefinitionCreate = S.Struct({
-  id: CompanyAttributeDefinitionId.schema,
+  // Same create-payload rule as the contact definition above.
+  id: CompanyAttributeDefinitionId.formatSchema,
   ...AttributeDefinitionFields,
 });
 
@@ -149,7 +153,10 @@ const AttributeValueUpsertFields = {
 
 export const ContactAttributeValueUpsert = S.Struct({
   ...AttributeValueUpsertFields,
-  id: S.optional(ContactAttributeValueId.schema),
+  // Client-minted when present and persisted as the row's primary key, so
+  // the wire format is checked (see `LegidFactory.formatSchema`). The update
+  // payload keeps the plain codec because its id references an existing row.
+  id: S.optional(ContactAttributeValueId.formatSchema),
   attributeId: ContactAttributeDefinitionId.schema,
   contactId: S.String,
 });
@@ -189,7 +196,8 @@ export type TContactAttributeValue = S.Schema.Type<
 
 export const CompanyAttributeValueUpsert = S.Struct({
   ...AttributeValueUpsertFields,
-  id: S.optional(CompanyAttributeValueId.schema),
+  // Same create-payload rule as the contact value upsert above.
+  id: S.optional(CompanyAttributeValueId.formatSchema),
   attributeId: CompanyAttributeDefinitionId.schema,
   companyId: S.String,
 });

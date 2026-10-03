@@ -6,12 +6,11 @@ import * as Option from "effect/Option";
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import { validateAttributeValueEffect } from "../attribute-definition/validation";
 import { CompanyRepository } from "../company/repository";
-import { EntitlementPolicy } from "../entitlement/policies";
+import { CrmEntryGate } from "../entitlement/crm-allowance";
 import * as Policy from "../policy";
 import { consumeDashboardRateLimit } from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
-import { WorkspaceRepository } from "../workspace/repository";
 import { ContactNotFoundError, FailedToCreateContactError } from "./errors";
 import { ContactPolicy } from "./policies";
 import { type ContactSearchArgs, ContactRepository } from "./repository";
@@ -28,6 +27,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* ContactRepository;
   const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
   const contactPolicy = yield* ContactPolicy;
+  const crmEntryGate = yield* CrmEntryGate;
 
   return {
     ContactList: (args: TContactList) =>
@@ -73,6 +73,12 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
     ContactCreate: (args: TContactCreate) =>
       transaction(
         Effect.gen(function* () {
+          // The plan's CRM-entry gate runs inside the create's transaction,
+          // under the workspace row's lock, so concurrent creates cannot race
+          // the count past the cap (the policy outside checks permission,
+          // membership, and company ownership only — see ContactPolicy).
+          yield* crmEntryGate.ensureCapacity(args.organizationId);
+
           const attributeValues = args.attributeValues ?? [];
           const definitions =
             yield* attributeDefinitionRepository.findContactAttributeDefinitions(
@@ -160,8 +166,7 @@ export const ContactRpcHandlers = ContactRpcs.toLayer(
   ContactRpcHandlersEffect
 ).pipe(
   Layer.provide(ContactPolicy.layer),
-  Layer.provide(EntitlementPolicy.layer),
-  Layer.provide(WorkspaceRepository.layer),
+  Layer.provide(CrmEntryGate.layer),
   Layer.provide(CompanyRepository.layer),
   Layer.provide(ContactRepository.layer),
   Layer.provide(AttributeDefinitionRepository.layer)

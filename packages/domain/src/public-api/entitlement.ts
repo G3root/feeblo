@@ -24,8 +24,10 @@ export type CrmEntryAllowanceError = PlanRequiresUpgradeError | InternalError;
  * limit, which is the dashboard's wording for a member looking at their own
  * billing, while this message is the only human-facing explanation a machine
  * key's operator gets and is part of the published contract's vocabulary.
+ * Exported so the comment create maps the resolver's plan denial to the same
+ * sentence instead of growing a second one.
  */
-const CRM_LIMIT_MESSAGE =
+export const CRM_LIMIT_MESSAGE =
   "This workspace's plan has no room for another CRM entry.";
 
 /**

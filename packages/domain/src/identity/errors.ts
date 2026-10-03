@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 
+import { PolicyDeniedError } from "../policy";
 import { InternalServerError } from "../rpc-errors";
 
 /**
@@ -27,4 +28,7 @@ export const IdentityServiceErrors = Schema.Union([
   InternalServerError,
   SubjectNotFoundError,
   InvalidSubjectError,
+  // The resolver enforces the plan's CRM entry limit on contact creation, so
+  // a resolution can be denied by the workspace's plan.
+  PolicyDeniedError,
 ]);

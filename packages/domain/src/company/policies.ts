@@ -2,34 +2,23 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { ContactRepository } from "../contact/repository";
-import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { CompanyRepository } from "./repository";
 import type { TCompanyDelete } from "./schema";
 
 const makeCompanyPolicy = Effect.gen(function* () {
   const repository = yield* CompanyRepository;
-  const contactRepository = yield* ContactRepository;
-  const entitlementPolicy = yield* EntitlementPolicy;
 
   const belongsToOrganization = (args: TCompanyDelete) =>
     Policy.policy(() => repository.exists(args));
 
   const canCreate = (organizationId: string) =>
-    Policy.all(
-      Policy.canPermission(organizationId, "companies.create"),
-      entitlementPolicy.canCreateCrmEntry({
-        organizationId,
-        crmEntryCount: Effect.gen(function* () {
-          const companyCount =
-            yield* repository.countByOrganizationId(organizationId);
-          const contactCount =
-            yield* contactRepository.countByOrganizationId(organizationId);
-          return companyCount + contactCount;
-        }),
-      })
-    );
+    // The plan's CRM-entry limit is deliberately not checked here: the count
+    // is only exact inside the create's transaction, where
+    // `CrmEntryGate.ensureCapacity` runs it under the workspace row's lock
+    // (a policy runs before the transaction, so two concurrent creates could
+    // both see room). Permission stays here as the fast-fail pre-check.
+    Policy.canPermission(organizationId, "companies.create");
 
   const canUpdate = (args: TCompanyDelete) =>
     Policy.all(

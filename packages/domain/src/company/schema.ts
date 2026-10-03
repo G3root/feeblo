@@ -29,7 +29,11 @@ export const CompanyUpsert = S.Struct({
 export type TCompanyUpsert = S.Schema.Type<typeof CompanyUpsert>;
 
 export const CompanyCreate = S.Struct({
-  id: S.optional(CompanyId.schema),
+  // Client-minted when present and persisted as the primary key, so the wire
+  // format is checked (see `LegidFactory.formatSchema`); the update payload
+  // keeps the plain `CompanyId.schema` because its id references an existing
+  // row.
+  id: S.optional(CompanyId.formatSchema),
   organizationId: WorkspaceId.schema,
   externalId: S.optional(S.NullOr(S.String)),
   name: S.String,
@@ -38,7 +42,9 @@ export const CompanyCreate = S.Struct({
   attributeValues: S.optional(
     S.Array(
       S.Struct({
-        id: S.optional(CompanyAttributeValueId.schema),
+        // Same create-payload rule as `id` above: client-minted, so the wire
+        // format is checked.
+        id: S.optional(CompanyAttributeValueId.formatSchema),
         attributeId: CompanyAttributeDefinitionId.schema,
         value: S.NullOr(
           S.Union([S.String, S.Finite, S.Boolean, S.DateFromString])

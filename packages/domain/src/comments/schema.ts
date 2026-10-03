@@ -53,7 +53,10 @@ export const CommentList = S.Struct({
 export type TCommentList = S.Schema.Type<typeof CommentList>;
 
 export const CommentCreate = S.Struct({
-  id: CommentId.schema,
+  // Client-minted and persisted as the primary key, so the wire format is
+  // checked (see `LegidFactory.formatSchema`); `PostCreate.id` carries the
+  // fuller rationale.
+  id: CommentId.formatSchema,
   organizationId: WorkspaceId.schema,
   postId: PostId.schema,
   content: S.String.check(S.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)),

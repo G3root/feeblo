@@ -7,6 +7,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import { PolicyDeniedError } from "../policy";
 import type { PostActivityMetadata } from "../post-activity/repository";
 import { InternalServerError } from "../rpc-errors";
 import { UserRepository } from "../user/repository";
@@ -50,9 +51,15 @@ export const resolveOnBehalfSubject = (args: {
           ):
             | SubjectNotFoundError
             | InvalidSubjectError
+            | PolicyDeniedError
             | InternalServerError =>
             Schema.is(SubjectNotFoundError)(error) ||
-            Schema.is(InvalidSubjectError)(error)
+            Schema.is(InvalidSubjectError)(error) ||
+            // A plan denial is the workspace's state, not a resolution
+            // failure, so it reaches the caller untouched: the dashboard
+            // renders the policy reason and the Public API maps it to
+            // PLAN_REQUIRES_UPGRADE.
+            Schema.is(PolicyDeniedError)(error)
               ? error
               : new InternalServerError({
                   message: `Could not resolve the ${args.action}.`,

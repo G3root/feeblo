@@ -51,7 +51,11 @@ const ColumnInput = {
   config: RoadmapColumnConfig,
 };
 export const RoadmapColumnCreate = S.Struct({
-  id: RoadmapColumnId.schema,
+  // Client-minted and persisted as the primary key, so the wire format is
+  // checked (see `LegidFactory.formatSchema`); the update/delete payloads
+  // keep the plain `RoadmapColumnId.schema` because their ids reference
+  // existing rows.
+  id: RoadmapColumnId.formatSchema,
   ...ColumnInput,
 });
 export type TRoadmapColumnCreate = S.Schema.Type<typeof RoadmapColumnCreate>;
