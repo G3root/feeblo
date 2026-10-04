@@ -192,6 +192,17 @@ jobs:
     name: Docker Smoke Test
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # The self-hosted stack refuses to start without a media configuration:
+    # `docker-compose.yml` requires four `MEDIA_*` values, and the server
+    # rejects the `.env.example` development placeholders and any loopback
+    # public base URL in production. The smoke test only proves the stack
+    # boots and never contacts object storage, so these are shaped like a real
+    # R2 deployment without being one.
+    env:
+      MEDIA_PUBLIC_BASE_URL: https://media.example.test
+      MEDIA_UPLOAD_ACCESS_KEY_ID: smoke-test-access-key
+      MEDIA_UPLOAD_ENDPOINT: https://account.r2.cloudflarestorage.com
+      MEDIA_UPLOAD_SECRET_ACCESS_KEY: smoke-test-secret-key
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
