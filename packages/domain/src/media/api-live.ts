@@ -113,6 +113,9 @@ export const MediaApiLive = HttpApiBuilder.group(
         const uploaded = yield* s3Service
           .uploadEditorMedia({
             bytes,
+            // The sniffed type, not the client's declared one: the two were
+            // just proven equal, and this is what the object is stored as.
+            contentType: sniffedContentType,
             extension,
             kind,
             userId: session.user.id,
