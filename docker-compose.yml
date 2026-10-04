@@ -68,11 +68,20 @@ services:
       # Optional SES feedback webhook: leave unset to keep the route inert (404).
       EMAIL_PROVIDER_WEBHOOK_TOKEN: ${EMAIL_PROVIDER_WEBHOOK_TOKEN:-}
       EMAIL_PROVIDER_SNS_TOPIC_ARN: ${EMAIL_PROVIDER_SNS_TOPIC_ARN:-}
+      # REQUIRED: S3-compatible object storage. The production stack runs no
+      # MinIO, so these must point at real storage and compose fails fast
+      # instead of defaulting to the dev stack's credentials. See
+      # docs/r2-production-checklist.md.
+      # Cloudflare R2 also requires MEDIA_UPLOAD_REGION=auto.
       MEDIA_UPLOAD_REGION: ${MEDIA_UPLOAD_REGION:-us-east-1}
-      MEDIA_UPLOAD_ENDPOINT: ${MEDIA_UPLOAD_ENDPOINT:-http://127.0.0.1:9002}
-      MEDIA_UPLOAD_ACCESS_KEY_ID: ${MEDIA_UPLOAD_ACCESS_KEY_ID:-feeblo}
-      MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MEDIA_UPLOAD_SECRET_ACCESS_KEY:-password}
+      MEDIA_UPLOAD_ENDPOINT: "${MEDIA_UPLOAD_ENDPOINT:?MEDIA_UPLOAD_ENDPOINT is required - e.g. https://<account_id>.r2.cloudflarestorage.com}"
+      MEDIA_UPLOAD_ACCESS_KEY_ID: "${MEDIA_UPLOAD_ACCESS_KEY_ID:?MEDIA_UPLOAD_ACCESS_KEY_ID is required - an access key scoped to the media bucket}"
+      MEDIA_UPLOAD_SECRET_ACCESS_KEY: "${MEDIA_UPLOAD_SECRET_ACCESS_KEY:?MEDIA_UPLOAD_SECRET_ACCESS_KEY is required}"
       MEDIA_PUBLIC_BUCKET_NAME: ${MEDIA_PUBLIC_BUCKET_NAME:-feeblo-media-public}
+      # REQUIRED: the public origin objects are served from - the bucket's
+      # custom domain, never the S3 endpoint. Unset, uploads still succeed and
+      # return URLs that 403 for every browser.
+      MEDIA_PUBLIC_BASE_URL: "${MEDIA_PUBLIC_BASE_URL:?MEDIA_PUBLIC_BASE_URL is required - e.g. https://media.example.com}"
     ports:
       - "${SERVER_PORT:-8080}:8080"
 
