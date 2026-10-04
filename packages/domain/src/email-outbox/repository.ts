@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { Database, schema } from "@feeblo/db";
 import { EmailDeliveryId, EmailOutboxId } from "@feeblo/id";
+import { MESSAGE_ID_DOMAIN } from "@feeblo/transactional/config";
 import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -210,7 +211,7 @@ export const emailDeliveryMessageId = (
   const recipientHash = createHash("sha256")
     .update(`${outboxId}:${recipientEmail}`)
     .digest("hex");
-  return `<email.${recipientHash}@notifications.feeblo>`;
+  return `<email.${recipientHash}@${MESSAGE_ID_DOMAIN}>`;
 };
 
 const makeEmailOutboxRepository = Effect.gen(function* () {

@@ -11,7 +11,7 @@ import {
 import { EmailOutboxRepository } from "./repository";
 
 const deterministicMessageIdPattern =
-  /^<email\.[a-f0-9]{64}@notifications\.feeblo>$/;
+  /^<email\.[a-f0-9]{64}@notifications\.feeblo\.com>$/;
 
 describe("email delivery state", () => {
   const TestLayer = EmailOutboxRepository.layer.pipe(
