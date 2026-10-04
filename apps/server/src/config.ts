@@ -9,11 +9,19 @@ import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
 /**
+ * An IPv4 literal in the canonical form WHATWG URL parsing produces: it
+ * rejects anything out of range rather than passing it through, so a
+ * four-part numeric host that survives parsing is an address, not a name.
+ */
+const IPV4_LITERAL = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+
+/**
  * Whether `value` is an absolute http(s) URL a browser outside the deployment
  * can load. `MEDIA_PUBLIC_BASE_URL` is returned to clients verbatim, so a
- * relative path, a non-http scheme, or a loopback host is always a
- * misconfiguration. Any other host is accepted: nothing here resolves it, so
- * this answers "not obviously unreachable", not "publicly routable".
+ * relative path, a non-http scheme, an IP literal, or a loopback name is
+ * always a misconfiguration. Any other hostname is accepted: nothing here
+ * resolves it, so this answers "not obviously unreachable", not "publicly
+ * routable".
  */
 const isPubliclyReachableUrl = (value: string) => {
   let parsed: URL;
@@ -25,18 +33,18 @@ const isPubliclyReachableUrl = (value: string) => {
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     return false;
   }
-  // WHATWG URL parsing lowercases the host and canonicalizes IP literals
-  // (`127.1` and `0x7f.1` become `127.0.0.1`, `[0:0:0:0:0:0:0:1]` becomes
-  // `[::1]`), so these comparisons see the form a browser would resolve.
+  // WHATWG URL parsing canonicalizes IP literals, which is what makes these
+  // two tests reliable: IPv6 always arrives bracketed (`[::1]`, `[fe80::1]`,
+  // `[::ffff:a00:1]`) and IPv4 always arrives as a dotted quad, whatever the
+  // input form was (`127.1` and `0x7f.1` both become `127.0.0.1`). Rejecting
+  // every literal covers loopback, private, and link-local ranges at once, and
+  // keeps a bare address out of a value whose whole job is to be a public
+  // origin.
   const { hostname } = parsed;
-  return !(
-    hostname === "localhost" ||
-    hostname.endsWith(".localhost") ||
-    hostname === "0.0.0.0" ||
-    hostname.startsWith("127.") ||
-    hostname === "[::1]" ||
-    hostname === "[::]"
-  );
+  if (hostname.startsWith("[") || IPV4_LITERAL.test(hostname)) {
+    return false;
+  }
+  return !(hostname === "localhost" || hostname.endsWith(".localhost"));
 };
 
 export class ServerConfig extends Context.Service<ServerConfig>()(
@@ -228,7 +236,7 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
           return yield* Effect.fail(
             new Config.ConfigError(
               new ConfigProvider.SourceError({
-                message: `MEDIA_PUBLIC_BASE_URL must be the absolute public URL objects are served from, because uploads hand it to browsers verbatim. Use the bucket's custom domain, never the S3 endpoint or a loopback host. Received: ${mediaPublicBaseUrl ?? "(unset)"}`,
+                message: `MEDIA_PUBLIC_BASE_URL must be the absolute public URL objects are served from, because uploads hand it to browsers verbatim. Use the bucket's custom domain, never the S3 endpoint, a loopback host, or an IP address. Received: ${mediaPublicBaseUrl ?? "(unset)"}`,
               })
             )
           );

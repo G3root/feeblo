@@ -22,7 +22,7 @@ The code enforces what it can — the server refuses to start in production with
 
 ## 3. Public URLs
 
-- [ ] `MEDIA_PUBLIC_BASE_URL` is set on the **server** process. In production the server now refuses to start without it, and rejects a relative value or a loopback host, because without it `resolvePublicUrl` falls back to `${MEDIA_UPLOAD_ENDPOINT}/${bucket}` — the authenticated S3 endpoint — and every returned URL 403s for every browser.
+- [ ] `MEDIA_PUBLIC_BASE_URL` is set on the **server** process. In production the server now refuses to start without it, and rejects a relative value, an IP literal, or a loopback host, because without it `resolvePublicUrl` falls back to `${MEDIA_UPLOAD_ENDPOINT}/${bucket}` — the authenticated S3 endpoint — and every returned URL 403s for every browser.
 - [ ] In development the fallback is intentional and works only because the dev MinIO bucket allows anonymous download (`docker/docker-compose.dev.yml`).
 
 ## 4. Stored objects
