@@ -3,19 +3,23 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import {
+  CrmEntryLimitReachedError,
   InvalidSubjectError,
   SubjectNotFoundError,
 } from "../../identity/errors";
 import { PUBLIC_API_PAGE_DEFAULT_LIMIT } from "../../public-api/common";
 import { decodeCursorOrFail, encodeCursor } from "../../public-api/cursor";
+import { crmLimitMessage } from "../../public-api/entitlement";
 import {
   ConflictError,
   InternalError,
   InvalidRequestError,
   NotFoundError,
+  PlanRequiresUpgradeError,
   internalError,
   invalidRequestError,
   notFoundError,
+  planRequiresUpgradeError,
 } from "../../public-api/errors";
 import { onInternalError } from "../../public-api/failure";
 import { currentPublicApiCaller } from "../../public-api/middleware";
@@ -39,11 +43,15 @@ const VOTE_READ_FAILURES = Schema.Union([
   InternalError,
 ]);
 
-/** A create can be refused by the post's state — a locked or merged post. */
+/**
+ * A create can be refused by the post's state — a locked or merged post — and
+ * because attributing it to a voter with no contact yet would provision one.
+ */
 const VOTE_CREATE_FAILURES = Schema.Union([
   InvalidRequestError,
   NotFoundError,
   ConflictError,
+  PlanRequiresUpgradeError,
   InternalError,
 ]);
 
@@ -66,7 +74,49 @@ const VOTE_DELETE_FAILURES = Schema.Union([
  * race, a subscription write, a driver failure the remap did not name — has no
  * caller-actionable meaning and stays the documented internal failure.
  */
+const toPublicVoteFailure = (
+  cause: unknown
+): InvalidRequestError | NotFoundError | ConflictError | undefined => {
+  if (Schema.is(InvalidSubjectError)(cause)) {
+    return invalidRequestError(
+      "The vote's author could not be resolved in this workspace."
+    );
+  }
+  if (Schema.is(SubjectNotFoundError)(cause)) {
+    return invalidRequestError(
+      "The vote's author could not be found in this workspace."
+    );
+  }
+  if (
+    Schema.is(NotFoundError)(cause) ||
+    Schema.is(ConflictError)(cause) ||
+    Schema.is(InvalidRequestError)(cause)
+  ) {
+    return cause;
+  }
+  return undefined;
+};
+
 const withVoteWriteFailures = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  effect.pipe(
+    withRemapDbErrors("PublicApiVote", "update"),
+    Effect.mapError(
+      (cause) =>
+        toPublicVoteFailure(cause) ??
+        internalError("The request could not be completed.")
+    )
+  );
+
+/**
+ * A create additionally resolves the voter's subject, so it is the only vote
+ * write that can need room for a new CRM entry — and so the only one that
+ * publishes `PLAN_REQUIRES_UPGRADE`.
+ *
+ * Its own mapper rather than an extra branch on `withVoteWriteFailures`: that
+ * mapper's output union is fixed, so adding the status there would make
+ * `deleteVote` advertise a failure it cannot return.
+ */
+const withVoteCreateFailures = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(
     withRemapDbErrors("PublicApiVote", "update"),
     Effect.mapError(
@@ -76,25 +126,18 @@ const withVoteWriteFailures = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
         | InvalidRequestError
         | NotFoundError
         | ConflictError
+        | PlanRequiresUpgradeError
         | InternalError => {
-        if (Schema.is(InvalidSubjectError)(cause)) {
-          return invalidRequestError(
-            "The vote's author could not be resolved in this workspace."
-          );
+        // Naming a voter with no contact yet makes the write provision one,
+        // which is a CRM entry like any other and is capped like any other. Same
+        // remedy as the company create's limit, so it answers with that code.
+        if (Schema.is(CrmEntryLimitReachedError)(cause)) {
+          return planRequiresUpgradeError(crmLimitMessage);
         }
-        if (Schema.is(SubjectNotFoundError)(cause)) {
-          return invalidRequestError(
-            "The vote's author could not be found in this workspace."
-          );
-        }
-        if (
-          Schema.is(NotFoundError)(cause) ||
-          Schema.is(ConflictError)(cause) ||
-          Schema.is(InvalidRequestError)(cause)
-        ) {
-          return cause;
-        }
-        return internalError("The request could not be completed.");
+        return (
+          toPublicVoteFailure(cause) ??
+          internalError("The request could not be completed.")
+        );
       }
     )
   );
@@ -237,7 +280,7 @@ export const createVoteOperation = defineOperation(
           postId,
           subject: author,
         })
-        .pipe(withVoteWriteFailures);
+        .pipe(withVoteCreateFailures);
 
       // The vote is read back rather than returned from the write: the
       // repository's insert reports whether it added a row, not the row's

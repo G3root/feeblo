@@ -4,20 +4,24 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import {
+  CrmEntryLimitReachedError,
   InvalidSubjectError,
   SubjectNotFoundError,
 } from "../../identity/errors";
 import type { OnBehalfSubject } from "../../identity/service";
 import { PUBLIC_API_PAGE_DEFAULT_LIMIT } from "../../public-api/common";
 import { decodeCursorOrFail, encodeCursor } from "../../public-api/cursor";
+import { crmLimitMessage } from "../../public-api/entitlement";
 import {
   ConflictError,
   InternalError,
   InvalidRequestError,
   NotFoundError,
+  PlanRequiresUpgradeError,
   conflictError,
   invalidRequestError,
   notFoundError,
+  planRequiresUpgradeError,
 } from "../../public-api/errors";
 import { onInternalError } from "../../public-api/failure";
 import { currentPublicApiCaller } from "../../public-api/middleware";
@@ -54,11 +58,15 @@ const COMMENT_READ_FAILURES = Schema.Union([
   InternalError,
 ]);
 
-/** A create can be refused because the post no longer accepts comments. */
+/**
+ * A create can be refused because the post no longer accepts comments, and
+ * because attributing it to a subject with no contact yet would provision one.
+ */
 const COMMENT_CREATE_FAILURES = Schema.Union([
   InvalidRequestError,
   NotFoundError,
   ConflictError,
+  PlanRequiresUpgradeError,
   InternalError,
 ]);
 
@@ -137,7 +145,9 @@ const withCommentWriteFailures = <A, R>(
 const withCommentCreateFailures = <A, R>(
   effect: Effect.Effect<
     A,
-    CommentWriteFailure | PostDoesNotAcceptCommentsError,
+    | CommentWriteFailure
+    | CrmEntryLimitReachedError
+    | PostDoesNotAcceptCommentsError,
     R
   >
 ) =>
@@ -146,6 +156,11 @@ const withCommentCreateFailures = <A, R>(
       ...commentWriteFailureHandlers,
       PostDoesNotAcceptCommentsError: (error: PostDoesNotAcceptCommentsError) =>
         Effect.fail(conflictError(error.message)),
+      // Naming a subject that has no contact yet makes the write provision one,
+      // which is a CRM entry like any other and is capped like any other. Same
+      // remedy as the company create's limit, so it answers with that code.
+      CrmEntryLimitReachedError: () =>
+        Effect.fail(planRequiresUpgradeError(crmLimitMessage)),
     })
   );
 
