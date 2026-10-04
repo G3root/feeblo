@@ -23,8 +23,25 @@ export class InvalidSubjectError extends Schema.TaggedError<InvalidSubjectError>
   { httpApiStatus: 400, identifier: "InvalidSubjectError" }
 ) {}
 
+/**
+ * The subject resolves, but attributing the action to it would have to create a
+ * new contact row and the workspace's plan has no CRM entry room left.
+ *
+ * Separate from {@link InvalidSubjectError} because the subject is fine — the
+ * plan is the obstacle, and the two need different answers from a caller: this
+ * one is a plan limit to upgrade out of, the other is a request to fix. Raised
+ * at the insert itself rather than before resolution, so a write attributed to a
+ * customer who already exists is never refused by a full CRM.
+ */
+export class CrmEntryLimitReachedError extends Schema.TaggedError<CrmEntryLimitReachedError>()(
+  "CrmEntryLimitReachedError",
+  { message: Schema.optional(Schema.String) },
+  { httpApiStatus: 402, identifier: "CrmEntryLimitReachedError" }
+) {}
+
 export const IdentityServiceErrors = Schema.Union([
   InternalServerError,
   SubjectNotFoundError,
   InvalidSubjectError,
+  CrmEntryLimitReachedError,
 ]);

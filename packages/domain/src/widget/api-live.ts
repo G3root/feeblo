@@ -54,6 +54,7 @@ import {
   withRemapDbErrors,
 } from "../rpc-errors";
 import { S3UploadService } from "../services/s3";
+import { SitePolicy } from "../site/policies";
 import { UserRepository } from "../user/repository";
 import {
   type TWidgetFeedbackMetadata,
@@ -67,6 +68,29 @@ export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
   organizationId: string;
 }) {
   const repository = yield* ChangelogRepository;
+  const sitePolicy = yield* SitePolicy;
+
+  // This endpoint is unauthenticated and `organizationId` arrives in the query
+  // string, so the workspace's changelog privacy is the only thing standing
+  // between a caller and a changelog the owner chose to hide. `canViewChangelog`
+  // is the same policy `changelog/handlers.ts` and the email outbox apply; not
+  // applying it here is what let a hidden changelog be read by anyone who knew
+  // the org id.
+  const isChangelogPublic = yield* sitePolicy
+    .canViewChangelog(organizationId)
+    .pipe(
+      Effect.as(true),
+      Effect.catchTag("PolicyDenied", () => Effect.succeed(false))
+    );
+
+  // A hidden changelog answers `[]` rather than an error. The board app treats
+  // it as "no changelog" (`apps/web/src/lib/public-board-data.ts`), and an
+  // error status on an unauthenticated, caller-named organization would confirm
+  // that the workspace exists.
+  if (!isChangelogPublic) {
+    return [];
+  }
+
   const entries = yield* repository.findManyPublished({ organizationId });
 
   return entries.map((entry) => {
@@ -171,7 +195,9 @@ export const WidgetApiLive = HttpApiBuilder.group(
               name: "WidgetListUpdates",
               level: "read",
             }),
-            Effect.provide(ChangelogRepository.layer),
+            Effect.provide(
+              Layer.mergeAll(ChangelogRepository.layer, SitePolicy.layer)
+            ),
             withRemapDbErrors("Changelog", "select")
           )
         )

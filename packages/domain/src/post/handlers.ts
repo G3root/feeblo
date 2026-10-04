@@ -431,6 +431,18 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           name: "PostDeleteEligibilityListPublic",
           level: "read",
         }),
+        // No organization-scope policy here, because none can fire on this
+        // route: `OptionalAuthMiddlewareLive` reduces a restricted widget-SSO
+        // session to `Option.none()`, so the branch above already answers
+        // `eligibleIds: []` for one. A scope policy would read that same
+        // `None`, treat it as a guest, and allow.
+        //
+        // What bounds the response is that `creatorId` predicate: a caller only
+        // ever sees ids of posts they created, in whatever organization they
+        // name. A restricted session confined to its own workspace is therefore
+        // the middleware's job, and it is already doing it — if that ever
+        // changes to admit restricted sessions, this handler needs a
+        // `hasRestrictedOrganizationScope` check alongside the branch above.
         withRemapDbErrors("Post", "select")
       ),
 

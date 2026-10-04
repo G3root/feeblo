@@ -34,7 +34,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     ChangelogCategoryListPublic: (args: TChangelogCategoryList) =>
-      repository.findMany(args).pipe(
+      repository.findManyPublished(args).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "ChangelogCategoryListPublic",
           level: "read",

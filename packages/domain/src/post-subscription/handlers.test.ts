@@ -28,12 +28,16 @@ describe("PostSubscriptionRpcHandlers", () => {
     statusId: LegidOf<"PostStatusId">;
     userId: string;
   };
-  const session = (f: Fixture, member = true): Session => ({
+  const session = (
+    f: Fixture,
+    member = true,
+    restrictedToOrganizationId: string | null = null
+  ): Session => ({
     user: {
       id: f.userId,
       email: "user@example.com",
       name: "User",
-      restrictedToOrganizationId: null,
+      restrictedToOrganizationId,
     },
     session: { userId: f.userId, token: "token" },
     organizations: [{ id: f.organizationId }],
@@ -279,6 +283,67 @@ describe("PostSubscriptionRpcHandlers", () => {
           ).toHaveLength(1);
         })
       );
+      // This endpoint runs on `PublicAuthMiddleware`, which admits the
+      // restricted sessions widget SSO mints. Without the organization-scope
+      // policy a restricted session could name any workspace.
+      it.effect(
+        "refuses a restricted session asking about another organization",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostSubscriptionRpcHandlersEffect;
+            const f = yield* fixture();
+            const listInput = {
+              organizationId: f.organizationId,
+              slug: f.postSlug,
+            };
+
+            const error = yield* Effect.flip(
+              handlers
+                .PostSubscriptionListPublic(listInput)
+                .pipe(
+                  Effect.provideService(
+                    CurrentSession,
+                    session(f, true, "org_somewhere_else")
+                  )
+                )
+            );
+
+            expect(error._tag).toBe("PolicyDenied");
+          })
+      );
+
+      it.effect("allows a restricted session inside its own organization", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostSubscriptionRpcHandlersEffect;
+          const f = yield* fixture();
+          yield* handlers
+            .PostSubscriptionCreate({
+              organizationId: f.organizationId,
+              postId: f.postId,
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                session(f, true, f.organizationId)
+              )
+            );
+
+          expect(
+            yield* handlers
+              .PostSubscriptionListPublic({
+                organizationId: f.organizationId,
+                slug: f.postSlug,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  session(f, true, f.organizationId)
+                )
+              )
+          ).toHaveLength(1);
+        })
+      );
+
       it.effect(
         "hides subscribers of private board posts from the public endpoint",
         () =>

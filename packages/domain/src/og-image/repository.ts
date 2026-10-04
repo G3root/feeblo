@@ -1,5 +1,5 @@
 import { currentDb, schema } from "@feeblo/db";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -43,7 +43,14 @@ const makeOgImageRepository = Effect.gen(function* () {
             // The route is unauthenticated and slugs are slugified titles, so
             // never render metadata for posts on PRIVATE boards — only PUBLIC
             // boards are reachable through the public site anyway.
-            eq(schema.boardTable.visibility, "PUBLIC")
+            eq(schema.boardTable.visibility, "PUBLIC"),
+            // Same rule the public post reads apply (`findManyPublic`,
+            // `findPublicBySlug`, `isUnlockedPublic`): superseded content stays
+            // queryable internally but must not render for the public. Without
+            // these two an archived or merged post's title, board, status and
+            // upvote count were readable as a PNG by anyone with its slug.
+            sql`${schema.postTable.archivedAt} is null`,
+            sql`${schema.postTable.mergedIntoPostId} is null`
           )
         )
         .groupBy(

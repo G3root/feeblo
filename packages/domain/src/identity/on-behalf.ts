@@ -11,7 +11,11 @@ import type { PostActivityMetadata } from "../post-activity/repository";
 import { InternalServerError } from "../rpc-errors";
 import { UserRepository } from "../user/repository";
 import { isSyntheticEmail } from "./emails";
-import { InvalidSubjectError, SubjectNotFoundError } from "./errors";
+import {
+  CrmEntryLimitReachedError,
+  InvalidSubjectError,
+  SubjectNotFoundError,
+} from "./errors";
 import {
   type OnBehalfSubject,
   type ResolvedPrincipal,
@@ -50,9 +54,11 @@ export const resolveOnBehalfSubject = (args: {
           ):
             | SubjectNotFoundError
             | InvalidSubjectError
+            | CrmEntryLimitReachedError
             | InternalServerError =>
             Schema.is(SubjectNotFoundError)(error) ||
-            Schema.is(InvalidSubjectError)(error)
+            Schema.is(InvalidSubjectError)(error) ||
+            Schema.is(CrmEntryLimitReachedError)(error)
               ? error
               : new InternalServerError({
                   message: `Could not resolve the ${args.action}.`,

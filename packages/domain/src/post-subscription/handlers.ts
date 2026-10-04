@@ -134,6 +134,15 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
           name: "PostSubscriptionListPublic",
           level: "read",
         }),
+        // This route runs on `PublicAuthMiddleware`, which admits the restricted
+        // sessions that widget SSO mints — so it needs the same organization
+        // confinement as `PostSubscriptionCreatePublic` and
+        // `PostSubscriptionDeletePublic`. The repository's `userId` predicate is
+        // what kept the response to the caller's own rows; this is the control
+        // that says the caller may ask about this organization at all.
+        Policy.withPolicy(
+          Policy.hasRestrictedOrganizationScope(args.organizationId)
+        ),
         withRemapDbErrors("PostSubscription", "select")
       ),
 
