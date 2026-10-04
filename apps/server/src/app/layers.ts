@@ -1,4 +1,4 @@
-import { NodeRedis } from "@effect/platform-node";
+import { NodeCrypto, NodeRedis } from "@effect/platform-node";
 import { toAuthHandler } from "@feeblo/auth/auth-handler";
 import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
@@ -20,8 +20,8 @@ import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/confi
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import { NotificationService } from "@feeblo/domain/notification/service";
 import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
-import { PostSubscriptionRepository } from "@feeblo/domain/post-subscription/repository";
 import { PostRepository } from "@feeblo/domain/post/repository";
+import { PostWriteInternals } from "@feeblo/domain/post/write";
 import { PublicApiConfig } from "@feeblo/domain/public-api/config";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
 import { S3UploadServiceLive } from "@feeblo/domain/services/s3";
@@ -237,6 +237,11 @@ export const makeServiceLayers = ({
   const EntitlementPolicies = EntitlementPolicy.layer.pipe(
     Layer.provide(WorkspaceRepository.layer)
   );
+  // The shared post write path's own environment: the repositories it
+  // coordinates and the services its steps read from the running context.
+  // The widget feedback endpoint and the Slack and Discord inbound feedback
+  // services all build the path, so one merged layer serves the three.
+  const PostWrites = PostWriteInternals;
   return Layer.mergeAll(
     workflowLayer,
     SiteRepository.layer,
@@ -263,13 +268,20 @@ export const makeServiceLayers = ({
     SlackInboundServiceLive.pipe(
       Layer.provide(slackConfigLayer),
       Layer.provide(SlackUserServiceLive),
-      Layer.provide(SlackFeedbackServiceLive),
+      Layer.provide(
+        SlackFeedbackServiceLive.pipe(
+          Layer.provide(EmailOutboxConfig.layer),
+          Layer.provide(PostStatusRepository.layer),
+          Layer.provide(NodeCrypto.layer),
+          Layer.provide(S3UploadServiceLive),
+          Layer.provide(PostWrites)
+        )
+      ),
       Layer.provide(BoardRepository.layer),
       Layer.provide(EmailOutboxConfig.layer),
       Layer.provide(IntegrationEventRecorderLive),
       Layer.provide(PostRepository.layer),
       Layer.provide(PostStatusRepository.layer),
-      Layer.provide(PostSubscriptionRepository.layer),
       Layer.provide(Database.DatabaseContextLive)
     ),
     DiscordManagementServiceLive.pipe(
@@ -278,13 +290,20 @@ export const makeServiceLayers = ({
     ),
     DiscordInboundServiceLive.pipe(
       Layer.provide(DiscordUserServiceLive),
-      Layer.provide(DiscordFeedbackServiceLive),
+      Layer.provide(
+        DiscordFeedbackServiceLive.pipe(
+          Layer.provide(EmailOutboxConfig.layer),
+          Layer.provide(PostStatusRepository.layer),
+          Layer.provide(NodeCrypto.layer),
+          Layer.provide(S3UploadServiceLive),
+          Layer.provide(PostWrites)
+        )
+      ),
       Layer.provide(BoardRepository.layer),
       Layer.provide(EmailOutboxConfig.layer),
       Layer.provide(IntegrationEventRecorderLive),
       Layer.provide(PostRepository.layer),
       Layer.provide(PostStatusRepository.layer),
-      Layer.provide(PostSubscriptionRepository.layer),
       Layer.provide(Database.DatabaseContextLive)
     ),
     GitHubManagementServiceLive.pipe(

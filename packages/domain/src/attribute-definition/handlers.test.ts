@@ -3,8 +3,11 @@ import { currentDb, Database, schema } from "@feeblo/db";
 import {
   CompanyAttributeDefinitionId,
   ContactAttributeDefinitionId,
+  ContactAttributeValueId,
+  ContactId,
   WorkspaceId,
 } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -201,6 +204,186 @@ describe("AttributeDefinitionRpcHandlers", () => {
         );
         expect(deleteError._tag).toBe("PolicyDenied");
       })
+    );
+
+    it.effect(
+      "refuses an attribute value update whose id names another attribute's row",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* AttributeDefinitionRpcHandlersEffect;
+          const { organizationId, session } = yield* makeFixture();
+          const provideSession = Effect.provideService(CurrentSession, session);
+
+          const contactRowId = yield* ContactId.generate;
+          const now = new Date();
+          yield* db.insert(schema.contactTable).values({
+            id: contactRowId,
+            organizationId,
+            name: "Ada",
+            email: "ada@example.com",
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          const textId = yield* ContactAttributeDefinitionId.generate;
+          const numberId = yield* ContactAttributeDefinitionId.generate;
+          for (const [definitionId, name, key] of [
+            [textId, "Job title", "jobTitle"],
+            [numberId, "Report count", "reportCount"],
+          ] as const) {
+            yield* handlers
+              .ContactAttributeDefinitionCreate({
+                id: definitionId,
+                organizationId,
+                name,
+                key,
+                description: null,
+                type: "TEXT",
+                isRequired: false,
+              })
+              .pipe(provideSession);
+          }
+
+          // A value row under the TEXT attribute.
+          const valueRowId = yield* ContactAttributeValueId.generate;
+          yield* db.insert(schema.contactAttributeValueTable).values({
+            id: valueRowId,
+            organizationId,
+            contactId: contactRowId,
+            attributeId: textId,
+            valueText: "Engineer",
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          // Naming the INTEGER attribute with the TEXT row's id: the value is
+          // validated against the named definition, so the write must not
+          // land on another attribute's row - it is refused outright.
+          const error = yield* Effect.flip(
+            handlers
+              .ContactAttributeValueUpdate({
+                id: valueRowId,
+                organizationId,
+                contactId: contactRowId,
+                attributeId: numberId,
+                value: "Manager",
+              })
+              .pipe(provideSession)
+          );
+          expect(error._tag).toBe("BadRequestError");
+
+          const rows = yield* db
+            .select()
+            .from(schema.contactAttributeValueTable)
+            .where(eq(schema.contactAttributeValueTable.id, valueRowId));
+          expect(rows).toHaveLength(1);
+          expect(rows[0]?.attributeId).toBe(textId);
+          expect(rows[0]?.valueText).toBe("Engineer");
+        })
+    );
+
+    it.effect(
+      "refuses an upsert whose id is already another row's, and inserts an unused one",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const repository = yield* AttributeDefinitionRepository;
+          const handlers = yield* AttributeDefinitionRpcHandlersEffect;
+          const { organizationId, session } = yield* makeFixture();
+          const provideSession = Effect.provideService(CurrentSession, session);
+
+          const firstContactId = yield* ContactId.generate;
+          const secondContactId = yield* ContactId.generate;
+          const now = new Date();
+          yield* db.insert(schema.contactTable).values([
+            {
+              id: firstContactId,
+              organizationId,
+              name: "Ada",
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              id: secondContactId,
+              organizationId,
+              name: "Grace",
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]);
+
+          const textId = yield* ContactAttributeDefinitionId.generate;
+          const numberId = yield* ContactAttributeDefinitionId.generate;
+          for (const [definitionId, name, key] of [
+            [textId, "Job title", "jobTitle"],
+            [numberId, "Report count", "reportCount"],
+          ] as const) {
+            yield* handlers
+              .ContactAttributeDefinitionCreate({
+                id: definitionId,
+                organizationId,
+                name,
+                key,
+                description: null,
+                type: "TEXT",
+                isRequired: false,
+              })
+              .pipe(provideSession);
+          }
+
+          // The first contact owns a value row under the TEXT attribute.
+          const valueRowId = yield* ContactAttributeValueId.generate;
+          yield* db.insert(schema.contactAttributeValueTable).values({
+            id: valueRowId,
+            organizationId,
+            contactId: firstContactId,
+            attributeId: textId,
+            valueText: "Engineer",
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          // The upsert names the second contact's attribute with the first
+          // contact's row id. The row is not this (owner, attribute) pair's,
+          // so the fallback insert must be refused before it reaches the
+          // primary key the pair conflict target does not cover.
+          const error = yield* Effect.flip(
+            repository.upsertContactAttributeValue({
+              id: valueRowId,
+              organizationId,
+              contactId: secondContactId,
+              attributeId: numberId,
+              value: 3,
+            })
+          );
+          expect(error._tag).toBe("FailedToUpsertAttributeValueError");
+          expect(
+            yield* db
+              .select()
+              .from(schema.contactAttributeValueTable)
+              .where(
+                eq(schema.contactAttributeValueTable.contactId, secondContactId)
+              )
+          ).toHaveLength(0);
+          expect(
+            yield* db
+              .select()
+              .from(schema.contactAttributeValueTable)
+              .where(eq(schema.contactAttributeValueTable.id, valueRowId))
+          ).toHaveLength(1);
+
+          // An unused client id still inserts.
+          const unusedId = yield* ContactAttributeValueId.generate;
+          const inserted = yield* repository.upsertContactAttributeValue({
+            id: unusedId,
+            organizationId,
+            contactId: secondContactId,
+            attributeId: numberId,
+            value: 3,
+          });
+          expect(inserted?.id).toBe(unusedId);
+        })
     );
   });
 });

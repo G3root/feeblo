@@ -595,6 +595,16 @@ export const cleanupOrphanedEditorAssets = ({
         ORPHANED_EDITOR_ASSET_GRACE_PERIOD
       )
     );
+    /**
+     * Scoped to this workspace's own assets.
+     *
+     * A user-owned editor asset (`organizationId IS NULL`, uploaded by a
+     * signed-in visitor before the media is attached to a post) carries no
+     * workspace attribution, so sweeping it from a workspace's delete would
+     * let one workspace delete another user's in-progress upload. Those
+     * orphans need a global cleanup of their own; this one only touches rows
+     * the deleting workspace owns.
+     */
     const committedAssets = yield* transaction(
       Effect.gen(function* () {
         const db = yield* currentDb;

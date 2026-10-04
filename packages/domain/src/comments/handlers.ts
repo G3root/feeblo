@@ -3,6 +3,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { EmailOutboxConfig } from "../email-outbox/config";
+import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
@@ -101,7 +102,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
 
         const actor = actorOf(session, args.organizationId);
 
-        yield* comments.create({
+        const outboxId = yield* comments.create({
           actor,
           author:
             args.author === undefined
@@ -121,6 +122,9 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
           },
           statusUpdate: applyCommentStatusUpdate(args, actor),
         });
+        // Post-commit wake for the status email intent the status-update
+        // comment recorded; reconciliation closes any lost wake.
+        yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
 
         return {
           message: "Comment created successfully",

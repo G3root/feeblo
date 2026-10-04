@@ -385,6 +385,28 @@ export const makeIntegrationDeliveryWorkerRepository = (
           db.transaction(() =>
             Effect.gen(function* () {
               const now = yield* DateTime.nowAsDate;
+              // Lock the connection row first — the same first lock every
+              // lifecycle operation takes (pause, resume, disconnect, and the
+              // management writes all lock this row before touching routes or
+              // deliveries). The result write below updates the connection and,
+              // on the exhausted path, the connection's routes and pending
+              // deliveries; without this shared first lock, a lifecycle write
+              // holding the connection lock while waiting for a delivery lock
+              // would meet this write holding the delivery lock and waiting
+              // for the connection — a deadlock Postgres breaks by aborting
+              // one side. The lock order here matches theirs, so the two
+              // serialize instead.
+              yield* db
+                .select({ id: schema.integrationConnectionTable.id })
+                .from(schema.integrationConnectionTable)
+                .where(
+                  eq(
+                    schema.integrationConnectionTable.id,
+                    claimed.input.connection.id
+                  )
+                )
+                .for("update")
+                .limit(1);
               const [leased] = yield* db
                 .select({
                   attemptCount: schema.integrationDeliveryTable.attemptCount,

@@ -11,7 +11,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
-import { and, desc, eq, gt, inArray, or } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -35,6 +35,29 @@ const makeWorkspaceRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   return {
+    /**
+     * Locks the workspace row until the caller's transaction ends.
+     *
+     * The device the plan-limit checks lean on: a per-workspace condition
+     * (CRM entries, privileged roles) cannot be enforced by row locks on the
+     * rows it counts, because a lookup that matches nothing proves nothing.
+     * Locking the organization row serializes each count-and-write pair per
+     * workspace. Take it before the transaction's first child insert — an
+     * insert into a table referencing the organization holds a key-share on
+     * this row that conflicts with the lock, so locking after the insert
+     * deadlocks two concurrent creates against each other.
+     *
+     * `no key update` rather than `update`: every table in the workspace
+     * references this row, and the stronger lock would block unrelated child
+     * inserts that merely take a key-share on it. The lock still serializes
+     * the count-and-write pairs, which are the only writers that touch the
+     * organization row's own columns.
+     */
+    lockOrganization: (organizationId: string) =>
+      db.execute(
+        sql`SELECT id FROM ${schema.organizationTable} WHERE id = ${organizationId} FOR NO KEY UPDATE`
+      ),
+
     isSubdomainTaken: (subdomain: string) =>
       Effect.gen(function* () {
         const results = yield* db

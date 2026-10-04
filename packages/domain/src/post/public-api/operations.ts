@@ -553,7 +553,8 @@ export const setPostTagsOperation = defineOperation(
             // before, so the write and the timeline entry are decided from the
             // same snapshot. A post outside this workspace is reported on the
             // dashboard's policy vocabulary; the published answer is the
-            // missing resource.
+            // missing resource. A merged post is readable, so it is answered
+            // as the merged refusal the PATCH publishes rather than 404.
             const replaced = yield* tags
               .setPostTags({
                 organizationId: caller.organizationId,
@@ -563,6 +564,13 @@ export const setPostTagsOperation = defineOperation(
               .pipe(
                 Effect.catchTag("PolicyDenied", () =>
                   Effect.fail(notFoundError("Post not found."))
+                ),
+                Effect.catchTag("PostIsMergedError", () =>
+                  Effect.fail(
+                    invalidRequestError(
+                      "This post has been merged into another post and cannot be changed."
+                    )
+                  )
                 )
               );
 

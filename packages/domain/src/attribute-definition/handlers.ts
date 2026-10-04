@@ -117,7 +117,16 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           });
         }
         yield* validateAttributeValueEffect(definition, args.value);
-        return yield* repository.updateContactAttributeValue(args);
+        return yield* repository.updateContactAttributeValue(args).pipe(
+          // A strict update that matched nothing means the id names no value
+          // row of this contact under this attribute — a stale or mismatched
+          // caller id, not a server fault.
+          Effect.catchTag("FailedToUpsertAttributeValueError", () =>
+            Effect.fail(
+              new BadRequestError({ message: "Attribute value not found" })
+            )
+          )
+        );
       }).pipe(
         Policy.withPolicy(
           Policy.all(
@@ -156,7 +165,16 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           });
         }
         yield* validateAttributeValueEffect(definition, args.value);
-        return yield* repository.updateCompanyAttributeValue(args);
+        return yield* repository.updateCompanyAttributeValue(args).pipe(
+          // A strict update that matched nothing means the id names no value
+          // row of this company under this attribute — a stale or mismatched
+          // caller id, not a server fault.
+          Effect.catchTag("FailedToUpsertAttributeValueError", () =>
+            Effect.fail(
+              new BadRequestError({ message: "Attribute value not found" })
+            )
+          )
+        );
       }).pipe(
         Policy.withPolicy(
           Policy.all(

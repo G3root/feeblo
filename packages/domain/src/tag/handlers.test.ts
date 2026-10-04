@@ -361,6 +361,83 @@ describe("TagRpcHandlers", () => {
             ).toMatchObject([{ postId: f.postId, tagId }]);
           })
       );
+      it.effect(
+        "refuses tag assignment while the post is merged into another",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* TagRpcHandlersEffect;
+            const f = yield* fixture();
+            // Merge the fixture post into a survivor.
+            const survivorId = yield* PostId.generate;
+            const now = new Date();
+            const [postRow] = yield* db
+              .select({
+                boardId: schema.postTable.boardId,
+                statusId: schema.postTable.statusId,
+              })
+              .from(schema.postTable)
+              .where(
+                and(
+                  eq(schema.postTable.id, f.postId),
+                  eq(schema.postTable.organizationId, f.organizationId)
+                )
+              );
+            yield* db.insert(schema.postTable).values({
+              id: survivorId,
+              title: "Survivor",
+              slug: "survivor",
+              content: "Body",
+              excerpt: "",
+              boardId: postRow!.boardId,
+              statusId: postRow!.statusId,
+              organizationId: f.organizationId,
+              creatorId: f.userId,
+              creatorMemberId: f.membershipId,
+              createdAt: now,
+              updatedAt: now,
+            });
+            yield* db
+              .update(schema.postTable)
+              .set({
+                mergedIntoPostId: survivorId,
+                mergedAt: now,
+                archivedAt: now,
+                updatedAt: now,
+              })
+              .where(
+                and(
+                  eq(schema.postTable.id, f.postId),
+                  eq(schema.postTable.organizationId, f.organizationId)
+                )
+              );
+
+            const tagId = yield* TagId.generate;
+            yield* handlers
+              .TagCreate({
+                id: tagId,
+                name: "Feature",
+                organizationId: f.organizationId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session(f)));
+            const error = yield* Effect.flip(
+              handlers
+                .PostTagSet({
+                  organizationId: f.organizationId,
+                  postId: f.postId,
+                  tagIds: [tagId],
+                })
+                .pipe(Effect.provideService(CurrentSession, session(f)))
+            );
+            expect(error._tag).toBe("PostIsMergedError");
+            // No tag row was written under the read-only rule.
+            const rows = yield* db
+              .select({ id: schema.postTagTable.id })
+              .from(schema.postTagTable)
+              .where(eq(schema.postTagTable.postId, f.postId));
+            expect(rows).toHaveLength(0);
+          })
+      );
       it.effect("records add/remove activities when tags change", () =>
         Effect.gen(function* () {
           const db = yield* currentDb;

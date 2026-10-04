@@ -396,6 +396,56 @@ describe("registerUploadedAsset", () => {
       })
     );
 
+    it.effect(
+      "leaves a user-owned orphan another workspace's delete cannot attribute",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const nowUtc = yield* DateTime.now;
+          const now = DateTime.toDate(nowUtc);
+          const organizationId = "org_scoped_cleanup";
+          const deletedKeys = yield* Ref.make<string[]>([]);
+
+          yield* db.insert(schema.organizationTable).values({
+            id: organizationId,
+            name: "Scoped Cleanup",
+            slug: organizationId,
+            createdAt: now,
+          });
+          yield* db.insert(schema.userTable).values({
+            id: "user_other_workspace",
+            email: "other-workspace@example.com",
+            name: "Other Workspace",
+          });
+          // Uploaded without a workspace, so no organization column ties it to
+          // the deleting workspace; a workspace-triggered sweep must not touch
+          // it, or the uploader's later save finds the file gone.
+          yield* db.insert(schema.assetTable).values({
+            id: "asset_user_orphaned",
+            bucket: "test-bucket",
+            key: "editor-media/user/image/user-orphaned.png",
+            url: "https://assets.example/user-orphaned.png",
+            kind: "editor_image",
+            userId: "user_other_workspace",
+            createdAt: DateTime.toDate(
+              DateTime.subtractDuration(nowUtc, Duration.hours(2))
+            ),
+          });
+
+          const s3 = recordingS3(deletedKeys);
+          yield* cleanupOrphanedEditorAssets({ organizationId }).pipe(
+            Effect.provideService(S3UploadService, s3)
+          );
+
+          const assets = yield* db
+            .select({ id: schema.assetTable.id })
+            .from(schema.assetTable)
+            .where(eq(schema.assetTable.id, "asset_user_orphaned"));
+          expect(assets).toEqual([{ id: "asset_user_orphaned" }]);
+          expect(yield* Ref.get(deletedKeys)).toEqual([]);
+        })
+    );
+
     it.effect("replaces only the previous singleton asset", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;

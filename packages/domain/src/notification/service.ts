@@ -2,12 +2,15 @@ import { currentDb, schema } from "@feeblo/db";
 import type { TNotificationEventType } from "@feeblo/db/validation-schema/notification-kind";
 import { NotificationId } from "@feeblo/id";
 import { isString } from "@feeblo/utils/runtime-kind";
-import { and, count, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+
+import { BadRequestError } from "../rpc-errors";
+import { decodeNotificationCursor } from "./schema";
 
 type NotificationInput = {
   actorUserId?: string | null;
@@ -630,36 +633,61 @@ const makeNotificationService = Effect.gen(function* () {
       cursor,
       limit = 20,
     }: {
-      cursor?: Date;
-      limit?: number;
+      cursor?: string | undefined;
+      limit?: number | undefined;
       organizationId: string;
       recipientUserId: string;
     }) =>
-      db
-        .select({
-          id: schema.notificationTable.id,
-          organizationId: schema.notificationTable.organizationId,
-          recipientUserId: schema.notificationTable.recipientUserId,
-          actorUserId: schema.notificationTable.actorUserId,
-          kind: schema.notificationTable.kind,
-          resourceType: schema.notificationTable.resourceType,
-          resourceId: schema.notificationTable.resourceId,
-          title: schema.notificationTable.title,
-          body: schema.notificationTable.body,
-          href: schema.notificationTable.href,
-          readAt: schema.notificationTable.readAt,
-          createdAt: schema.notificationTable.createdAt,
-        })
-        .from(schema.notificationTable)
-        .where(
-          and(
-            eq(schema.notificationTable.organizationId, organizationId),
-            eq(schema.notificationTable.recipientUserId, recipientUserId),
-            ...(cursor ? [lt(schema.notificationTable.createdAt, cursor)] : [])
+      Effect.gen(function* () {
+        // The cursor names the last row by `(createdAt, id)`, not by the
+        // instant alone: a fan-out writes every recipient row in one
+        // statement, so they all share one `createdAt`, and paging on the
+        // timestamp alone would skip the batch remainder past the boundary.
+        // An unreadable cursor is the caller's mistake, not "no cursor":
+        // answering it as a request error keeps a corrupt cursor from
+        // silently restarting the list. Only an absent cursor pages from the
+        // top.
+        const after = decodeNotificationCursor(cursor);
+        if (after._tag === "Invalid") {
+          return yield* new BadRequestError({
+            message: "The notification cursor is invalid.",
+          });
+        }
+        return yield* db
+          .select({
+            id: schema.notificationTable.id,
+            organizationId: schema.notificationTable.organizationId,
+            recipientUserId: schema.notificationTable.recipientUserId,
+            actorUserId: schema.notificationTable.actorUserId,
+            kind: schema.notificationTable.kind,
+            resourceType: schema.notificationTable.resourceType,
+            resourceId: schema.notificationTable.resourceId,
+            title: schema.notificationTable.title,
+            body: schema.notificationTable.body,
+            href: schema.notificationTable.href,
+            readAt: schema.notificationTable.readAt,
+            createdAt: schema.notificationTable.createdAt,
+          })
+          .from(schema.notificationTable)
+          .where(
+            and(
+              eq(schema.notificationTable.organizationId, organizationId),
+              eq(schema.notificationTable.recipientUserId, recipientUserId),
+              ...(after._tag === "Decoded"
+                ? [
+                    sql`(${schema.notificationTable.createdAt}, ${schema.notificationTable.id}) < (${after.createdAt}, ${after.id})`,
+                  ]
+                : [])
+            )
           )
-        )
-        .orderBy(desc(schema.notificationTable.createdAt))
-        .limit(Math.min(Math.max(limit, 1), 50)),
+          // The id joins the sort key so rows inside one fan-out batch keep
+          // one order across refetches instead of shuffling every poll.
+          .orderBy(
+            desc(schema.notificationTable.createdAt),
+            desc(schema.notificationTable.id)
+          )
+          .limit(Math.min(Math.max(limit, 1), 50));
+      }),
 
     unreadCount: ({
       organizationId,

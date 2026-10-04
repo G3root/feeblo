@@ -104,7 +104,8 @@ interface TPostCreate {
   etaQuarter?: string | null | undefined;
   excerpt?: string;
   id: string;
-  metadata?: Record<string, string>;
+  /** Widenable to `undefined` because callers spread an optional property. */
+  metadata?: Record<string, string> | undefined;
   organizationId: string;
   source?:
     | "DASHBOARD"

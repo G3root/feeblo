@@ -175,6 +175,12 @@
     "./identity/linking": {
       "default": "./src/identity/linking.ts"
     },
+    "./identity/service": {
+      "default": "./src/identity/service.ts"
+    },
+    "./identity/on-behalf": {
+      "default": "./src/identity/on-behalf.ts"
+    },
     "./import-export/schema": {
       "default": "./src/import-export/schema.ts"
     },
@@ -360,6 +366,9 @@
     },
     "./post/embedding-service": {
       "default": "./src/post/embedding-service.ts"
+    },
+    "./post/write": {
+      "default": "./src/post/write.ts"
     },
     "./post/repository": {
       "default": "./src/post/repository.ts"

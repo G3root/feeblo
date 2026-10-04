@@ -1,26 +1,21 @@
 import { currentDb, Database, schema } from "@feeblo/db";
 import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
-import { recordPostIntegrationEvent } from "@feeblo/domain/integration/post-event-recording";
+import { EmailOutboxRepository } from "@feeblo/domain/email-outbox/repository";
+import { EmailSubscriptionRepository } from "@feeblo/domain/email-subscription/repository";
+import { ResolvePrincipalService } from "@feeblo/domain/identity/service";
 import { SlackInboundFailure } from "@feeblo/domain/integration/slack/errors";
 import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
-import { PostSubscriptionRepository } from "@feeblo/domain/post-subscription/repository";
-import {
-  PostEmbeddingService,
-  schedulePostEmbeddingBestEffort,
-} from "@feeblo/domain/post/embedding-service";
+import { InvalidPostEmbeddingConfigurationError } from "@feeblo/domain/post/embedding-service";
 import { PostRepository } from "@feeblo/domain/post/repository";
-import {
-  asLegid,
-  BoardId,
-  PostId,
-  PostStatusId,
-  WorkspaceId,
-} from "@feeblo/id";
+import { makePostWrites, PostWriteInternals } from "@feeblo/domain/post/write";
+import { S3UploadService } from "@feeblo/domain/services/s3";
+import { UserRepository } from "@feeblo/domain/user/repository";
+import { PostId } from "@feeblo/id";
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
-import { htmlToExcerpt } from "@feeblo/utils/html";
-import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { and, eq } from "drizzle-orm";
+import * as Config from "effect/Config";
 import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -46,9 +41,11 @@ export interface SlackPostInput {
 }
 
 /**
- * Creates a feedback post from an inbound Slack submission: sanitizes the
- * content, records the integration event, subscribes the author, and schedules
- * best-effort embedding.
+ * Creates a feedback post from an inbound Slack submission through the shared
+ * post write path: the sanitizer, the timeline entry, the integration event,
+ * the staff notification, the submission email window, the creator's
+ * watch-list subscription, and the search embedding are one work whichever
+ * credential asked.
  */
 export interface SlackFeedbackServiceContract {
   readonly createPost: (
@@ -63,23 +60,51 @@ export class SlackFeedbackService extends Context.Service<
 
 export const SlackFeedbackServiceLive: Layer.Layer<
   SlackFeedbackService,
-  never,
+  Config.ConfigError | InvalidPostEmbeddingConfigurationError,
+  | Crypto.Crypto
   | Database.Database
   | EmailOutboxConfig
-  | IntegrationEventRecorder
-  | PostRepository
+  | Layer.Success<typeof PostWriteInternals>
   | PostStatusRepository
-  | PostSubscriptionRepository
+  | S3UploadService
 > = Layer.effect(
   SlackFeedbackService,
   Effect.gen(function* () {
     const db = yield* currentDb;
-    const postRepository = yield* PostRepository;
     const postStatusRepository = yield* PostStatusRepository;
-    const postSubscriptionRepository = yield* PostSubscriptionRepository;
     const emailOutboxConfig = yield* EmailOutboxConfig;
-    const eventRecorder = yield* IntegrationEventRecorder;
-    const embeddingService = yield* Effect.serviceOption(PostEmbeddingService);
+    const crypto = yield* Crypto.Crypto;
+    const emailOutboxRepository = yield* EmailOutboxRepository;
+    const emailSubscriptions = yield* EmailSubscriptionRepository;
+    const integrationEventRecorder = yield* IntegrationEventRecorder;
+    const postRepository = yield* PostRepository;
+    const resolvePrincipal = yield* ResolvePrincipalService;
+    const s3 = yield* S3UploadService;
+    const userRepository = yield* UserRepository;
+    // Built once at construction. The write path's optional reads (staff
+    // notifications, search embeddings) resolve from the environment this
+    // layer is composed with — the server provides both; a minimal test
+    // composition may omit them.
+    const writes = yield* makePostWrites;
+
+    const providePostWriteEnvironment = <A, E, R>(
+      effect: Effect.Effect<A, E, R>
+    ) =>
+      effect.pipe(
+        Effect.provideService(Crypto.Crypto, crypto),
+        Effect.provideService(Database.Database, db),
+        Effect.provideService(EmailOutboxConfig, emailOutboxConfig),
+        Effect.provideService(EmailOutboxRepository, emailOutboxRepository),
+        Effect.provideService(EmailSubscriptionRepository, emailSubscriptions),
+        Effect.provideService(
+          IntegrationEventRecorder,
+          integrationEventRecorder
+        ),
+        Effect.provideService(PostRepository, postRepository),
+        Effect.provideService(ResolvePrincipalService, resolvePrincipal),
+        Effect.provideService(S3UploadService, s3),
+        Effect.provideService(UserRepository, userRepository)
+      );
 
     const createPost = ({
       boardId,
@@ -99,9 +124,6 @@ export const SlackFeedbackServiceLive: Layer.Layer<
             message: "Organization has no default post status",
           });
         }
-        const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(content);
-        const id = yield* PostId.generate;
-        const excerpt = htmlToExcerpt(sanitizedHtml);
         const [board] = yield* db
           .select({
             name: schema.boardTable.name,
@@ -120,68 +142,34 @@ export const SlackFeedbackServiceLive: Layer.Layer<
             message: "Slack post board was not found",
           });
         }
-        const boardSlug = board.slug;
-        const slug = yield* db.transaction(() =>
-          Effect.gen(function* () {
-            const createdSlug = yield* postRepository.create({
+        // The write path sanitizes, owns the transaction, records the timeline
+        // entry and integration event, notifies staff, opens the submission
+        // email window, and schedules the embedding. The inbound author has no
+        // contact row to attribute through, so the write's creator option
+        // watch-lists them instead; a Slack user's feeblo inbox is synthetic,
+        // so no email subscription is requested from here.
+        const id = yield* PostId.generate;
+        const slug = yield* providePostWriteEnvironment(
+          writes.create(
+            {
+              assetIds: [],
               boardId,
-              content: sanitizedMarkdown,
-              creatorId: userId,
-              creatorMemberId: null,
-              excerpt,
+              content,
               id,
               metadata: { ...metadata },
               organizationId,
               source: "SLACK",
               statusId: defaultStatus.id,
               title,
-            });
-            yield* recordPostIntegrationEvent({
-              actor: { kind: "end_user" },
-              boardId: asLegid(BoardId)(boardId),
-              description: sanitizedMarkdown,
-              eventType: "feedback.post.created",
-              organizationId: asLegid(WorkspaceId)(organizationId),
-              postId: id,
-              ...(Object.keys(metadata).length === 0
-                ? undefined
-                : { metadata }),
-              postSlug: createdSlug,
-              statusId: asLegid(PostStatusId)(defaultStatus.id),
-              title,
-            }).pipe(
-              Effect.provideService(Database.Database, db),
-              Effect.provideService(IntegrationEventRecorder, eventRecorder),
-              Effect.provideService(EmailOutboxConfig, emailOutboxConfig),
-              Effect.provideService(PostRepository, postRepository),
-              Effect.mapError(
-                () =>
-                  new SlackInboundFailure({
-                    message: "Could not record post integration event",
-                  })
-              )
-            );
-            yield* postSubscriptionRepository.subscribe({
-              organizationId,
-              postId: id,
-              userId,
-            });
-            return createdSlug;
-          })
+            },
+            { kind: "api_key" },
+            { subscribeCreatorUserId: userId }
+          )
         );
-        yield* schedulePostEmbeddingBestEffort({
-          content: sanitizedMarkdown,
-          postId: id,
-          organizationId,
-          title,
-          ...(embeddingService._tag === "Some" && {
-            embeddingService: embeddingService.value,
-          }),
-        }).pipe(Effect.provideService(Database.Database, db));
         return {
           boardId,
           boardName: board.name,
-          boardSlug,
+          boardSlug: board.slug,
           id,
           metadata,
           slug,

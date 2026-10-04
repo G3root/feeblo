@@ -1,11 +1,13 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
 import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
+import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 
@@ -27,6 +29,7 @@ import {
   subscribeOnBehalfSubject,
   toOnBehalfMetadata,
 } from "../identity/on-behalf";
+import { ResolvePrincipalService } from "../identity/service";
 import { recordPostIntegrationEvent as recordPostIntegrationEventShared } from "../integration/post-event-recording";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
@@ -37,6 +40,8 @@ import {
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import * as RateLimit from "../rate-limit";
 import { BadRequestError, InternalServerError } from "../rpc-errors";
+import { UserRepository } from "../user/repository";
+import { WorkspaceRepository } from "../workspace/repository";
 import {
   PostEmbeddingService,
   schedulePostEmbeddingBestEffort,
@@ -104,6 +109,12 @@ export type PostCreateWrite = {
   readonly createdAt?: Date | undefined;
   readonly etaQuarter?: string | null | undefined;
   readonly id: string;
+  /**
+   * Flat string map stored on the post row and carried verbatim on the
+   * post-created integration event. Only the widget's SSO payload supplies
+   * one today; every other surface leaves it absent.
+   */
+  readonly metadata?: Readonly<Record<string, string>> | undefined;
   readonly organizationId: string;
   readonly source?:
     | "DASHBOARD"
@@ -216,6 +227,8 @@ export const makePostWrites = Effect.gen(function* () {
     readonly eventType:
       | "feedback.post.created"
       | "feedback.post.status_changed";
+    /** Validated metadata the caller already vetted; forwarded verbatim. */
+    readonly metadata?: Readonly<Record<string, string>>;
     readonly organizationId: string;
     readonly postId: string;
     readonly postSlug: string;
@@ -228,6 +241,15 @@ export const makePostWrites = Effect.gen(function* () {
       const organizationId = yield* WorkspaceId.parse(args.organizationId);
       const postId = yield* PostId.parse(args.postId);
       const statusId = yield* PostStatusId.parse(args.statusId);
+      // The event carries the same metadata the post row stores, so a webhook
+      // consumer sees what the dashboard does. Empty objects stay absent, as
+      // the recorder itself decides.
+      const eventMetadata =
+        args.metadata === undefined
+          ? undefined
+          : Object.keys(args.metadata).length === 0
+            ? undefined
+            : args.metadata;
       const previousStatusId =
         args.previousStatusId === undefined
           ? undefined
@@ -250,6 +272,7 @@ export const makePostWrites = Effect.gen(function* () {
           description: args.description,
         }),
         eventType: args.eventType,
+        ...(eventMetadata !== undefined && { metadata: eventMetadata }),
         organizationId,
         postId,
         postSlug: args.postSlug,
@@ -356,7 +379,20 @@ export const makePostWrites = Effect.gen(function* () {
   const create = (
     args: PostCreateWrite,
     actor: PostWriteActor,
-    options: { readonly source?: "PUBLIC_BOARD" } = {}
+    options: {
+      readonly source?: "PUBLIC_BOARD";
+      /**
+       * The post creator to attribute and watch-list when the acting
+       * credential has no session of its own to subscribe from — an inbound
+       * end-user identity (Slack, Discord) whose feeblo user row the caller
+       * resolved. A member session subscribes through its own branch; a
+       * machine key creating on behalf of `author` subscribes the subject
+       * instead. No email subscription is requested from this option:
+       * inbound identities carry synthetic inboxes that must never enter the
+       * email pipeline.
+       */
+      readonly subscribeCreatorUserId?: string;
+    } = {}
   ) =>
     Effect.gen(function* () {
       const member = actor.kind === "member" ? actor : null;
@@ -439,7 +475,14 @@ export const makePostWrites = Effect.gen(function* () {
             ...write,
             content: prepared.content,
             excerpt: htmlToExcerpt(sanitizedHtml),
-            creatorId: subject ? subject.userId : userId,
+            // The resolved inbound end user is the creator even though the
+            // credential is a machine key: creator-based reads ("my posts")
+            // and the edit/delete permissions key off this column, so leaving
+            // it null would store the submitter's own post as unowned. A
+            // member's own id still wins when there is one.
+            creatorId: subject
+              ? subject.userId
+              : (userId ?? options.subscribeCreatorUserId ?? null),
             ...(writeSource !== undefined && { source: writeSource }),
             // On-behalf posts keep staff attribution out of the author fields.
             ...(member !== null &&
@@ -468,6 +511,7 @@ export const makePostWrites = Effect.gen(function* () {
             boardId: args.boardId,
             description: prepared.content,
             eventType: "feedback.post.created",
+            ...(args.metadata !== undefined && { metadata: args.metadata }),
             organizationId: args.organizationId,
             postId: args.id,
             postSlug: persistedSlug,
@@ -480,42 +524,60 @@ export const makePostWrites = Effect.gen(function* () {
           // staff actor, following the same notification-eligibility rules: a
           // verified account is trusted, everyone else is deferred until
           // identity linking grants them access. A machine key has no person
-          // behind it, so there is nobody to subscribe.
+          // behind it, so there is nobody to subscribe — unless the caller
+          // resolved the inbound end user for it (Slack, Discord).
           const subscriptionNow = yield* DateTime.nowAsDate;
           if (subject === undefined) {
-            if (member !== null) {
+            const inboundCreatorUserId = options.subscribeCreatorUserId;
+            const creator =
+              member !== null
+                ? {
+                    email: member.email,
+                    memberId: member.memberId,
+                    userId: member.userId,
+                  }
+                : inboundCreatorUserId !== undefined
+                  ? {
+                      email: undefined,
+                      memberId: null,
+                      userId: inboundCreatorUserId,
+                    }
+                  : undefined;
+            if (creator !== undefined) {
               yield* subscriptionRepository.subscribe({
                 organizationId: args.organizationId,
                 postId: args.id,
-                userId: member.userId,
-                ...(member.memberId !== null && {
-                  memberId: member.memberId,
+                userId: creator.userId,
+                ...(creator.memberId !== null && {
+                  memberId: creator.memberId,
                 }),
               });
-              yield* emailSubscriptions
-                .requestSubscription({
-                  alreadyVerifiedUser: { userId: member.userId },
-                  email: member.email,
-                  now: subscriptionNow,
-                  organizationId: args.organizationId,
-                  source: "post_creator",
-                  topic: { topicId: args.id, topicType: "post" },
-                  verificationExpiresAt: DateTime.fromDateUnsafe(
-                    subscriptionNow
-                  ).pipe(
-                    DateTime.addDuration(Duration.days(1)),
-                    DateTime.toDate
-                  ),
-                })
-                .pipe(
-                  Effect.mapError(
-                    () =>
-                      new InternalServerError({
-                        message:
-                          "Could not record the post creator email subscription.",
-                      })
-                  )
-                );
+              if (creator.email !== undefined) {
+                yield* emailSubscriptions
+                  .requestSubscription({
+                    alreadyVerifiedUser: { userId: creator.userId },
+                    email: creator.email,
+                    now: subscriptionNow,
+                    organizationId: args.organizationId,
+                    source: "post_creator",
+                    topic: { topicId: args.id, topicType: "post" },
+                    verificationExpiresAt: DateTime.fromDateUnsafe(
+                      subscriptionNow
+                    ).pipe(
+                      DateTime.addDuration(Duration.days(1)),
+                      DateTime.toDate
+                    ),
+                  })
+                  .pipe(
+                    Effect.mapError(
+                      () =>
+                        new InternalServerError({
+                          message:
+                            "Could not record the post creator email subscription.",
+                        })
+                    )
+                  );
+              }
             }
           } else {
             // In-app watch-list parity for the attributed author.
@@ -872,7 +934,10 @@ export const makePostWrites = Effect.gen(function* () {
                 .recordIntent({
                   aggregateId: args.id,
                   aggregateType: "post",
-                  deduplicationKey: `post.closed:${args.organizationId}:${args.id}:${args.statusId}`,
+                  // Timestamped like the merge and unmerge intents, so closing
+                  // a post, reopening it, and closing it again announces each
+                  // closure instead of matching the first attempt forever.
+                  deduplicationKey: `post.closed:${args.organizationId}:${args.id}:${args.statusId}:${now.getTime()}`,
                   expiresAt: DateTime.fromDateUnsafe(now).pipe(
                     DateTime.addDuration(Duration.days(7)),
                     DateTime.toDate
@@ -1210,3 +1275,31 @@ export const makePostWrites = Effect.gen(function* () {
 
   return { create, merge, remove, unmerge, update };
 });
+
+/**
+ * Every service the shared post write path reads, composed once.
+ *
+ * `makePostWrites` reads the repositories it coordinates from the context at
+ * construction, and its steps read further services from the running fiber's
+ * context (the identity resolver behind on-behalf attribution, the integration
+ * event recorder behind a webhook, the notification fan-out, the embedding
+ * scheduler). A caller that assembles the path — the dashboard handlers, the
+ * Public API's own repository, the widget feedback endpoint, or an integration
+ * provider's inbound feedback service — provides this layer instead of
+ * restating the same set, so a write keeps every consequence whichever
+ * credential asked for it.
+ */
+export const PostWriteInternals = Layer.mergeAll(
+  BoardRepository.layer,
+  EmailOutboxRepository.layer,
+  EmailSubscriptionRepository.layer,
+  EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
+  IntegrationEventRecorderLive,
+  NotificationService.layer,
+  PostActivityRepository.layer,
+  PostEmbeddingService.layer,
+  PostRepository.layer,
+  PostSubscriptionRepository.layer,
+  ResolvePrincipalService.layer,
+  UserRepository.layer
+);
