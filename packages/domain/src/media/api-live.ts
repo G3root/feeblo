@@ -6,6 +6,7 @@ import * as Layer from "effect/Layer";
 
 import { registerUploadedAsset } from "../asset/service";
 import { Api } from "../http/api";
+import { consumeDashboardRateLimit } from "../rate-limit";
 import {
   BadRequestError,
   InternalServerError,
@@ -40,6 +41,14 @@ export const MediaApiLive = HttpApiBuilder.group(
     handlers.handle("uploadMedia", ({ payload: { file, organizationId } }) =>
       Effect.gen(function* () {
         const session = yield* currentHttpApiSession;
+
+        // Editor uploads are the one dashboard write that stores bytes with no
+        // plan quota (10 MB per file), so they are bounded per member rather
+        // than per organization. Reject a burst before reading the file.
+        yield* consumeDashboardRateLimit({
+          key: `media-upload:${session.user.id}`,
+          name: "media-upload",
+        });
 
         const kind = getMediaKind(file.contentType);
         if (!kind) {
