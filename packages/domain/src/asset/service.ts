@@ -1,6 +1,6 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
 import { AssetId } from "@feeblo/id";
-import { and, eq, inArray, isNull, lt, notExists, or } from "drizzle-orm";
+import { and, eq, inArray, lt, notExists, or } from "drizzle-orm";
 import type * as PgDrizzle from "drizzle-orm/effect-postgres";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -596,25 +596,15 @@ export const cleanupOrphanedEditorAssets = ({
       )
     );
     /**
-     * The workspace's own orphans, plus any user-owned one past its grace.
+     * Scoped to this workspace's own assets.
      *
-     * An editor asset uploaded without a workspace (a signed-in public-board
-     * visitor's submission media) is user-owned; it can be orphaned by a
-     * post or changelog delete the same way an org-owned one can, and
-     * without this branch it is never swept — the row and its stored object
-     * leak. Scoped by the editor kinds and the same grace period so a
-     * transient unreferenced window (the TODO's lock race) stays protected.
+     * A user-owned editor asset (`organizationId IS NULL`, uploaded by a
+     * signed-in visitor before the media is attached to a post) carries no
+     * workspace attribution, so sweeping it from a workspace's delete would
+     * let one workspace delete another user's in-progress upload. Those
+     * orphans need a global cleanup of their own; this one only touches rows
+     * the deleting workspace owns.
      */
-    const sweepScope = or(
-      and(
-        eq(schema.assetTable.organizationId, organizationId),
-        inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS)
-      ),
-      and(
-        isNull(schema.assetTable.organizationId),
-        inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS)
-      )
-    );
     const committedAssets = yield* transaction(
       Effect.gen(function* () {
         const db = yield* currentDb;
@@ -623,7 +613,8 @@ export const cleanupOrphanedEditorAssets = ({
           .from(schema.assetTable)
           .where(
             and(
-              sweepScope,
+              eq(schema.assetTable.organizationId, organizationId),
+              inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
               lt(schema.assetTable.createdAt, createdBefore),
               unreferencedByPostOrChangelog(db)
             )

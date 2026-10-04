@@ -177,6 +177,39 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         : Option.some(yield* decodeSubscription(row, "findSubscription"));
     });
 
+  /**
+   * The same lookup, holding the row for the rest of the caller's transaction.
+   *
+   * `requestSubscription` decides a consent state from the row it reads and
+   * then writes that state back by id, so an unsubscribe landing between the
+   * two would be overwritten — silently restoring the consent the user just
+   * withdrew. The lock makes the read-check-write one atomic step: an
+   * unsubscribe that arrives mid-subscribe waits for this transaction and then
+   * applies after it, so the final state is still `unsubscribed`. Only
+   * meaningful inside a transaction, which is how every `requestSubscription`
+   * caller runs it.
+   */
+  const findSubscriptionForContactForUpdate = (
+    contactId: string,
+    topic: EmailSubscriptionTopicInput
+  ) =>
+    Effect.gen(function* () {
+      const [row] = yield* db
+        .select()
+        .from(schema.emailSubscriptionTable)
+        .where(
+          and(
+            eq(schema.emailSubscriptionTable.contactId, contactId),
+            topicCondition(schema.emailSubscriptionTable, topic)
+          )
+        )
+        .limit(1)
+        .for("update");
+      return row === undefined
+        ? Option.none<Subscription>()
+        : Option.some(yield* decodeSubscription(row, "findSubscription"));
+    });
+
   const requestSubscription = Effect.fn(
     "EmailSubscriptionRepository.requestSubscription"
   )(function* (input: RequestEmailSubscriptionInput) {
@@ -253,7 +286,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           })
         : contact;
 
-    const existingSubscription = yield* findSubscriptionForContact(
+    const existingSubscription = yield* findSubscriptionForContactForUpdate(
       persistedContact.id,
       input.topic
     );
@@ -403,7 +436,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
               verificationToken,
             };
           }
-          const winner = yield* findSubscriptionForContact(
+          const winner = yield* findSubscriptionForContactForUpdate(
             persistedContact.id,
             input.topic
           );
