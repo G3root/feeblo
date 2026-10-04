@@ -71,6 +71,19 @@ const POST_CREATE_FAILURES = Schema.Union([
 const POST_WRITE_FAILURES = Schema.Union([
   InvalidRequestError,
   NotFoundError,
+  InternalError,
+]);
+
+/**
+ * An update that names an author can also be refused for want of CRM room: the
+ * author may be a customer this workspace has no contact for yet, and
+ * attributing the post to them provisions one. Neither `setPostTags` nor
+ * `deletePost` resolves a subject, so neither can reach that limit and neither
+ * publishes the status.
+ */
+const POST_UPDATE_FAILURES = Schema.Union([
+  InvalidRequestError,
+  NotFoundError,
   PlanRequiresUpgradeError,
   InternalError,
 ]);
@@ -429,7 +442,7 @@ export const updatePostOperation = defineOperation(
   "updatePost",
   {
     description: "Update the fields a post request names.",
-    failure: POST_WRITE_FAILURES,
+    failure: POST_UPDATE_FAILURES,
     input: UpdatePostInput,
     output: PublicApiPost,
     scope: "posts.update",

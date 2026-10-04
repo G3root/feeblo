@@ -1013,9 +1013,15 @@ const makePublicApiPostRepository = Effect.gen(function* () {
             while: (error) => Schema.is(PostNotFoundError)(error),
           }),
           Effect.catch((cause) => {
+            // A delete resolves no on-behalf subject, so the CRM entry
+            // allowance is unreachable here and the endpoint publishes no such
+            // status — the same reasoning as `mapPostMergeFailure`.
             const mapped = toPublicPostWriteError(cause);
             return Effect.fail(
-              Schema.is(ConflictError)(mapped) ? internalError() : mapped
+              Schema.is(ConflictError)(mapped) ||
+                Schema.is(PlanRequiresUpgradeError)(mapped)
+                ? internalError()
+                : mapped
             );
           }),
           providePostWriteEnvironment

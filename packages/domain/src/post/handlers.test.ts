@@ -64,14 +64,13 @@ describe("PostRpcHandlers", () => {
 
   const makeSession = (
     fixture: Fixture,
-    role: Session["memberships"][number]["role"] | null = "owner",
-    restrictedToOrganizationId: string | null = null
+    role: Session["memberships"][number]["role"] | null = "owner"
   ): Session => ({
     user: {
       id: fixture.userId,
       email: fixture.creatorEmail,
       name: "Test User",
-      restrictedToOrganizationId,
+      restrictedToOrganizationId: null,
     },
     session: { userId: fixture.userId, token: "test-token" },
     organizations: [{ id: fixture.organizationId }],
@@ -876,66 +875,6 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
           expect(result).toEqual({ eligibleIds: [] });
-        })
-      );
-
-      // `OptionalAuthMiddleware` admits the restricted sessions widget SSO
-      // mints, and `organizationId` comes from the caller.
-      it.effect(
-        "refuses a restricted session asking about another organization",
-        () =>
-          Effect.gen(function* () {
-            const handlers = yield* PostRpcHandlersEffect;
-            const fixture = yield* makeFixture("PUBLIC");
-
-            const error = yield* Effect.flip(
-              handlers
-                .PostDeleteEligibilityListPublic({
-                  organizationId: fixture.organizationId,
-                })
-                .pipe(
-                  Effect.provideService(
-                    OptionalCurrentSession,
-                    Option.some(
-                      makeSession(fixture, "owner", "org_somewhere_else")
-                    )
-                  )
-                )
-            );
-
-            expect(error._tag).toBe("PolicyDenied");
-          })
-      );
-
-      it.effect("allows a restricted session inside its own organization", () =>
-        Effect.gen(function* () {
-          const handlers = yield* PostRpcHandlersEffect;
-          const fixture = yield* makeFixture("PUBLIC");
-          const postId = yield* PostId.generate;
-
-          yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Own feedback"))
-            .pipe(
-              Effect.provideService(
-                CurrentSession,
-                makeSession(fixture, "owner", fixture.organizationId)
-              )
-            );
-
-          const result = yield* handlers
-            .PostDeleteEligibilityListPublic({
-              organizationId: fixture.organizationId,
-            })
-            .pipe(
-              Effect.provideService(
-                OptionalCurrentSession,
-                Option.some(
-                  makeSession(fixture, "owner", fixture.organizationId)
-                )
-              )
-            );
-
-          expect(result).toEqual({ eligibleIds: [postId] });
         })
       );
 

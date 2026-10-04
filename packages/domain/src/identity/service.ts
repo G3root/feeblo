@@ -248,9 +248,21 @@ const makeResolvePrincipalService = Effect.gen(function* () {
    * company create. On-behalf attribution provisions contacts implicitly, from a
    * subject in the request, and no surface checked the cap on that path: a key
    * holding only `comments.create` could grow a workspace's contact table past
-   * its plan limit by naming a new email address per request. The count is read
-   * here, inside the caller's write transaction, for the same reason
-   * `CompanyRepository.countCrmEntries` documents.
+   * its plan limit by naming a new email address per request.
+   *
+   * The count and the insert are serialized on the workspace row, the same
+   * `SELECT ... FOR UPDATE` the company create takes (`company/public-api/
+   * operations.ts`). Without it two writes naming different emails both read
+   * the same available slot, both pass, and the workspace ends up over its cap.
+   * The lock is held by the caller's write transaction, which every on-behalf
+   * path opens around resolution, so it covers the insert too.
+   *
+   * The re-detect runs *inside* that lock and before the allowance is
+   * consumed. Two requests naming the same new email both find no contact on
+   * the way in, and the loser of the insert race reuses the winner's row; if
+   * the allowance were checked first, the second request would read a count
+   * that already included the first request's contact and be refused at the cap
+   * for a write that would have added no CRM entry at all.
    */
   function insertContactToleratingRace(
     values: Omit<ContactInsert, "id" | "createdAt" | "updatedAt">,
@@ -260,6 +272,21 @@ const makeResolvePrincipalService = Effect.gen(function* () {
     >
   ) {
     return Effect.gen(function* () {
+      yield* db
+        .select({ id: schema.organizationTable.id })
+        .from(schema.organizationTable)
+        .where(eq(schema.organizationTable.id, values.organizationId))
+        .for("no key update");
+
+      // A concurrent request may have created this contact between the
+      // resolution's own lookup and here. Reusing it is the same answer the
+      // post-conflict recovery below gives, reached earlier and without
+      // spending allowance.
+      const raced = yield* redetect();
+      if (Option.isSome(raced)) {
+        return raced.value;
+      }
+
       yield* entitlementPolicy
         .canCreateCrmEntry({
           organizationId: values.organizationId,
