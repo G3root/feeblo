@@ -11,14 +11,32 @@ import * as Schema from "effect/Schema";
 /**
  * Whether `value` is an absolute http(s) URL a browser outside the deployment
  * can load. `MEDIA_PUBLIC_BASE_URL` is returned to clients verbatim, so a
- * relative path or a loopback host is always a misconfiguration.
+ * relative path, a non-http scheme, or a loopback host is always a
+ * misconfiguration. Any other host is accepted: nothing here resolves it, so
+ * this answers "not obviously unreachable", not "publicly routable".
  */
 const isPubliclyReachableUrl = (value: string) => {
-  if (!/^https?:\/\//i.test(value)) {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
     return false;
   }
-  const host = value.replace(/^https?:\/\//i, "").split(/[/?#]/, 1)[0] ?? "";
-  return !/^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(host);
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return false;
+  }
+  // WHATWG URL parsing lowercases the host and canonicalizes IP literals
+  // (`127.1` and `0x7f.1` become `127.0.0.1`, `[0:0:0:0:0:0:0:1]` becomes
+  // `[::1]`), so these comparisons see the form a browser would resolve.
+  const { hostname } = parsed;
+  return !(
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname === "0.0.0.0" ||
+    hostname.startsWith("127.") ||
+    hostname === "[::1]" ||
+    hostname === "[::]"
+  );
 };
 
 export class ServerConfig extends Context.Service<ServerConfig>()(

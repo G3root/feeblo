@@ -267,9 +267,20 @@ describe("ServerConfig production media storage", () => {
   it.effect("rejects a media base URL a browser cannot reach", () =>
     Effect.gen(function* () {
       for (const baseUrl of [
+        // Loopback by name, by IPv4 (including a shorthand form and a
+        // non-`.1` address), and by IPv6, in both bracketed forms.
         "http://127.0.0.1:9002/feeblo-media-public",
+        "http://127.1.2.3:9000",
         "http://localhost:9000",
+        "http://board.localhost:3000",
+        "http://0.0.0.0:9000",
+        "http://[::1]:9000",
+        "http://[::]:9000",
+        // Relative, unparsable, and a scheme the browser will not load an
+        // image over.
         "/media",
+        "media.example.test",
+        "ftp://assets.example.test",
       ]) {
         const exit = yield* Effect.exit(
           loadServerConfig({
