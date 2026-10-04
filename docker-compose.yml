@@ -70,10 +70,9 @@ services:
       EMAIL_PROVIDER_SNS_TOPIC_ARN: ${EMAIL_PROVIDER_SNS_TOPIC_ARN:-}
       # REQUIRED: S3-compatible object storage. The production stack runs no
       # MinIO, so these must point at real storage and compose fails fast
-      # instead of defaulting to the dev stack's credentials. See
+      # instead of defaulting to the dev stack's credentials or region. See
       # docs/r2-production-checklist.md.
-      # Cloudflare R2 also requires MEDIA_UPLOAD_REGION=auto.
-      MEDIA_UPLOAD_REGION: ${MEDIA_UPLOAD_REGION:-us-east-1}
+      MEDIA_UPLOAD_REGION: "${MEDIA_UPLOAD_REGION:?MEDIA_UPLOAD_REGION is required - use auto for Cloudflare R2}"
       MEDIA_UPLOAD_ENDPOINT: "${MEDIA_UPLOAD_ENDPOINT:?MEDIA_UPLOAD_ENDPOINT is required - e.g. https://<account_id>.r2.cloudflarestorage.com}"
       MEDIA_UPLOAD_ACCESS_KEY_ID: "${MEDIA_UPLOAD_ACCESS_KEY_ID:?MEDIA_UPLOAD_ACCESS_KEY_ID is required - an access key scoped to the media bucket}"
       MEDIA_UPLOAD_SECRET_ACCESS_KEY: "${MEDIA_UPLOAD_SECRET_ACCESS_KEY:?MEDIA_UPLOAD_SECRET_ACCESS_KEY is required}"

@@ -40,8 +40,8 @@ The code enforces what it can — the server refuses to start in production with
 
 ## 6. Configuration plumbing
 
-- [ ] `docker-compose.yml` requires `MEDIA_UPLOAD_ENDPOINT`, `MEDIA_UPLOAD_ACCESS_KEY_ID`, `MEDIA_UPLOAD_SECRET_ACCESS_KEY`, and `MEDIA_PUBLIC_BASE_URL` (`:?`), so the self-hosted stack fails at `docker compose up` instead of at the first upload. The operator's `.env` must supply all four.
-- [ ] `MEDIA_UPLOAD_REGION` still defaults to `us-east-1` in compose and `.env.example`, which is correct for MinIO and wrong for R2. It is commented in both.
+- [ ] `docker-compose.yml` requires `MEDIA_UPLOAD_REGION`, `MEDIA_UPLOAD_ENDPOINT`, `MEDIA_UPLOAD_ACCESS_KEY_ID`, `MEDIA_UPLOAD_SECRET_ACCESS_KEY`, and `MEDIA_PUBLIC_BASE_URL` (`:?`), so the self-hosted stack fails at `docker compose up` instead of at the first upload. The operator's `.env` must supply all five; only `MEDIA_PUBLIC_BUCKET_NAME` keeps a default.
+- [ ] The region is the one value the server cannot sanity-check: `.env.example` ships `us-east-1` for the dev MinIO, so an operator who copies it into production keeps a value that is wrong for R2 and nothing fails. Set `auto`.
 
 ## 7. Abuse and limits
 
