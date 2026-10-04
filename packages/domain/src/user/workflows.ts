@@ -1,4 +1,4 @@
-import { MailerConfig } from "@feeblo/transactional/config";
+import { MailerConfig, MESSAGE_ID_DOMAIN } from "@feeblo/transactional/config";
 import {
   Mailer,
   MailProviderDeliveryError,
@@ -49,7 +49,7 @@ export const WelcomeUserWorkflowLayer = WelcomeUserWorkflow.toLayer(
             name: payload.name,
           }),
           ...(personalFrom._tag === "Some" && { from: personalFrom.value }),
-          messageId: `<welcome.${payload.userId}@notifications.feeblo>`,
+          messageId: `<welcome.${payload.userId}@${MESSAGE_ID_DOMAIN}>`,
           to: payload.email,
         });
       }),
@@ -83,7 +83,7 @@ export const WelcomeUserWorkflowLayer = WelcomeUserWorkflow.toLayer(
             name: payload.name,
           }),
           ...(personalFrom._tag === "Some" && { from: personalFrom.value }),
-          messageId: `<feedback-request.${payload.userId}@notifications.feeblo>`,
+          messageId: `<feedback-request.${payload.userId}@${MESSAGE_ID_DOMAIN}>`,
           to: payload.email,
         });
       }),

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as React from "react";
 
 import {
@@ -10,6 +11,7 @@ import {
   MailTemporaryDeliveryError,
   MailUncertainDeliveryError,
   makeMailerLayer,
+  makeNodemailerSendOptions,
 } from "./mailer";
 
 const messageId = "<delivery_123@notifications.feeblo>";
@@ -229,4 +231,88 @@ describe("Mailer", () => {
         expect(failure).toBeInstanceOf(MailUncertainDeliveryError);
       })
   );
+});
+
+const renderedMessage = {
+  html: "<div>rendered</div>",
+  subject: "A safe subject",
+  text: "rendered",
+  to: "recipient@example.com",
+} as const;
+
+const defaultFrom = "Feeblo <noreply@example.test>";
+
+describe("makeNodemailerSendOptions", () => {
+  it("defaults the sender and lets a message override it", () => {
+    const withoutOverride = makeNodemailerSendOptions({
+      defaultFrom,
+      defaultReplyTo: Option.none(),
+      message: renderedMessage,
+    });
+    const withOverride = makeNodemailerSendOptions({
+      defaultFrom,
+      defaultReplyTo: Option.none(),
+      message: { ...renderedMessage, from: "Nafees <nafees@example.test>" },
+    });
+
+    expect(withoutOverride.from).toBe(defaultFrom);
+    expect(withOverride.from).toBe("Nafees <nafees@example.test>");
+  });
+
+  it("applies the configured reply-to when the message sets none", () => {
+    const options = makeNodemailerSendOptions({
+      defaultFrom,
+      defaultReplyTo: Option.some("support@example.test"),
+      message: renderedMessage,
+    });
+
+    expect(options.replyTo).toBe("support@example.test");
+  });
+
+  it("lets a message-level reply-to override the configured default", () => {
+    const options = makeNodemailerSendOptions({
+      defaultFrom,
+      defaultReplyTo: Option.some("support@example.test"),
+      message: { ...renderedMessage, replyTo: "nafees@example.test" },
+    });
+
+    expect(options.replyTo).toBe("nafees@example.test");
+  });
+
+  it("omits the reply-to header when neither source provides one", () => {
+    const options = makeNodemailerSendOptions({
+      defaultFrom,
+      defaultReplyTo: Option.none(),
+      message: renderedMessage,
+    });
+
+    expect(options.replyTo).toBeUndefined();
+    expect(Object.keys(options)).not.toContain("replyTo");
+  });
+
+  it("treats a blank reply-to as unset rather than emitting an empty header", () => {
+    const fromMessage = makeNodemailerSendOptions({
+      defaultFrom,
+      defaultReplyTo: Option.some("support@example.test"),
+      message: { ...renderedMessage, replyTo: "   " },
+    });
+    const fromConfig = makeNodemailerSendOptions({
+      defaultFrom,
+      defaultReplyTo: Option.some("   "),
+      message: renderedMessage,
+    });
+
+    expect(fromMessage.replyTo).toBe("support@example.test");
+    expect(fromConfig.replyTo).toBeUndefined();
+  });
+
+  it("passes a supplied Message-ID through unchanged so delivery feedback still correlates", () => {
+    const options = makeNodemailerSendOptions({
+      defaultFrom,
+      defaultReplyTo: Option.none(),
+      message: { ...renderedMessage, messageId },
+    });
+
+    expect(options.messageId).toBe(messageId);
+  });
 });
