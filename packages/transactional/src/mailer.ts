@@ -6,7 +6,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
-import { createTransport } from "nodemailer";
+import { createTransport, type SendMailOptions } from "nodemailer";
 import type { ReactElement } from "react";
 import { render, toPlainText } from "react-email";
 
@@ -77,7 +77,8 @@ export interface MailTransportReceipt extends Schema.Schema.Type<
   typeof MailTransportReceipt
 > {}
 
-type RenderedMailMessage = Omit<MailMessage, "react"> & {
+/** The rendered message a transport submits, with the React element already resolved. */
+export type RenderedMailMessage = Omit<MailMessage, "react"> & {
   readonly html: string;
   readonly text: string;
 };
@@ -299,6 +300,37 @@ export const makeMailerLayer = (
 ): Layer.Layer<Mailer> =>
   Layer.succeed(Mailer, Mailer.of(makeMailerService(transport)));
 
+/**
+ * Folds deployment defaults onto one rendered message.
+ *
+ * Both defaults come from `MailerConfig` and a message-level value always wins,
+ * so a workflow can route one email's replies to a different inbox without
+ * changing the deployment-wide sender.
+ */
+export const makeNodemailerSendOptions = (args: {
+  readonly defaultFrom: string;
+  readonly defaultReplyTo: Option.Option<string>;
+  readonly message: RenderedMailMessage;
+}): SendMailOptions => {
+  const { message } = args;
+  const configuredReplyTo = Option.getOrUndefined(args.defaultReplyTo);
+  // Blank counts as unset: an empty header is not a reply address, and
+  // emitting one is worse than inheriting the configured default.
+  const replyTo =
+    message.replyTo?.trim() || configuredReplyTo?.trim() || undefined;
+
+  return {
+    to: message.to,
+    subject: message.subject,
+    html: message.html,
+    text: message.text,
+    from: message.from ?? args.defaultFrom,
+    ...(replyTo !== undefined && { replyTo }),
+    ...(message.headers && { headers: message.headers }),
+    ...(message.messageId && { messageId: message.messageId }),
+  };
+};
+
 const makeNodemailerTransport = Effect.gen(function* () {
   const {
     defaultFrom,
@@ -306,6 +338,7 @@ const makeNodemailerTransport = Effect.gen(function* () {
     ignoreTLS,
     password,
     port,
+    replyTo: defaultReplyTo,
     secure,
     service,
     username,
@@ -332,16 +365,9 @@ const makeNodemailerTransport = Effect.gen(function* () {
     (message: RenderedMailMessage) =>
       Effect.tryPromise({
         try: async () => {
-          const receipt = await transport.sendMail({
-            to: message.to,
-            subject: message.subject,
-            html: message.html,
-            text: message.text,
-            from: message.from ?? defaultFrom,
-            ...(message.replyTo && { replyTo: message.replyTo }),
-            ...(message.headers && { headers: message.headers }),
-            ...(message.messageId && { messageId: message.messageId }),
-          });
+          const receipt = await transport.sendMail(
+            makeNodemailerSendOptions({ defaultFrom, defaultReplyTo, message })
+          );
 
           return {
             acceptedRecipientCount: (receipt.accepted ?? []).length,

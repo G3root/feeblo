@@ -4,6 +4,7 @@ import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 import { render, toPlainText } from "react-email";
 
+import { MESSAGE_ID_DOMAIN } from "./config";
 import {
   Mailer,
   type MailMessage,
@@ -61,7 +62,7 @@ export class TestMailer extends Context.Service<TestMailer>()("TestMailer", {
 }
 
 const defaultMessageId = (attempt: number): string =>
-  `<test-mailer.${attempt}@notifications.feeblo>`;
+  `<test-mailer.${attempt}@${MESSAGE_ID_DOMAIN}>`;
 
 const resultForOutcome = (
   message: MailMessage,
