@@ -68,7 +68,11 @@ services:
       # Optional SES feedback webhook: leave unset to keep the route inert (404).
       EMAIL_PROVIDER_WEBHOOK_TOKEN: ${EMAIL_PROVIDER_WEBHOOK_TOKEN:-}
       EMAIL_PROVIDER_SNS_TOPIC_ARN: ${EMAIL_PROVIDER_SNS_TOPIC_ARN:-}
-      MEDIA_UPLOAD_REGION: ${MEDIA_UPLOAD_REGION:-us-east-1}
+      # REQUIRED: the region of the S3-compatible media store. No default: a
+      # wrong region (e.g. `us-east-1` for Cloudflare R2, which needs `auto`)
+      # fails at upload time with an opaque storage error. The `us-east-1` in
+      # .env.example is the bundled local development store's.
+      MEDIA_UPLOAD_REGION: "${MEDIA_UPLOAD_REGION:?MEDIA_UPLOAD_REGION is required - set your media store's region, or 'auto' for Cloudflare R2}"
       MEDIA_UPLOAD_ENDPOINT: ${MEDIA_UPLOAD_ENDPOINT:-http://127.0.0.1:9002}
       MEDIA_UPLOAD_ACCESS_KEY_ID: ${MEDIA_UPLOAD_ACCESS_KEY_ID:-feeblo}
       MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MEDIA_UPLOAD_SECRET_ACCESS_KEY:-password}
