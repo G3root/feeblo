@@ -8,6 +8,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -68,7 +69,7 @@ describe("UpvoteRpcHandlers", () => {
       const statusId = yield* PostStatusId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
@@ -139,7 +140,7 @@ describe("UpvoteRpcHandlers", () => {
     Effect.gen(function* () {
       const db = yield* currentDb;
       const id = yield* BoardId.generate;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.boardTable).values({
         id,
@@ -304,7 +305,7 @@ describe("UpvoteRpcHandlers", () => {
 
           // A merged source is archived and points at its survivor; the
           // `isUnlocked` gate denies votes until it is unmerged.
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
           yield* db
             .update(schema.postTable)
             .set({

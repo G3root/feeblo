@@ -2,6 +2,8 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { ChangelogId, WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as Clock from "effect/Clock";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
@@ -18,6 +20,10 @@ import { WorkspaceRepository } from "../workspace/repository";
 import { ChangelogRpcHandlersEffect } from "./handlers";
 import { ChangelogPolicy } from "./policies";
 import { ChangelogRepository } from "./repository";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 describe("ChangelogRpcHandlers", () => {
   type Fixture = {
@@ -50,7 +56,7 @@ describe("ChangelogRpcHandlers", () => {
       const organizationId = yield* WorkspaceId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
         name: "Test organization",
@@ -92,7 +98,7 @@ describe("ChangelogRpcHandlers", () => {
         recurringIntervalCount: 1,
         status: "active",
         currentPeriodStart: now,
-        currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+        currentPeriodEnd: dateAt(now.getTime() + 86_400_000),
         customerId: `customer_${organizationId}`,
         productId,
         createdAt: now,
@@ -166,8 +172,8 @@ describe("ChangelogRpcHandlers", () => {
           subdomain: `site-${id}`,
           changelogVisibility: "PUBLIC",
           organizationId: fixture.organizationId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
+          updatedAt: yield* DateTime.nowAsDate,
         });
         const create = (
           entryId: typeof id,
@@ -329,8 +335,8 @@ describe("ChangelogRpcHandlers", () => {
             subdomain: `site-${id}`,
             changelogVisibility: "PUBLIC",
             organizationId: fixture.organizationId,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: yield* DateTime.nowAsDate,
+            updatedAt: yield* DateTime.nowAsDate,
           });
 
           yield* handlers
@@ -344,7 +350,7 @@ describe("ChangelogRpcHandlers", () => {
               content: "Body",
               status: "published",
               scheduledAt: null,
-              publishedAt: new Date(),
+              publishedAt: yield* DateTime.nowAsDate,
             })
             .pipe(
               Effect.provideService(CurrentSession, makeSession(fixture)),
@@ -396,7 +402,7 @@ describe("ChangelogRpcHandlers", () => {
               content: "Body",
               status: "published",
               scheduledAt: null,
-              publishedAt: new Date(),
+              publishedAt: yield* DateTime.nowAsDate,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
@@ -418,7 +424,7 @@ describe("ChangelogRpcHandlers", () => {
               content: "Body",
               status: "published",
               scheduledAt: null,
-              publishedAt: new Date(),
+              publishedAt: yield* DateTime.nowAsDate,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
@@ -444,7 +450,7 @@ describe("ChangelogRpcHandlers", () => {
               content: "Body",
               status: "published",
               scheduledAt: null,
-              publishedAt: new Date(),
+              publishedAt: yield* DateTime.nowAsDate,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
@@ -564,12 +570,12 @@ describe("ChangelogRpcHandlers", () => {
               content: "First publication",
               status: "published",
               scheduledAt: null,
-              publishedAt: new Date(),
+              publishedAt: yield* DateTime.nowAsDate,
             })
             .pipe(Effect.provideService(CurrentSession, session));
 
           const intents = yield* outbox.findPending({
-            before: new Date(Date.now() + 60_000),
+            before: dateAt((yield* Clock.currentTimeMillis) + 60_000),
             organizationId: fixture.organizationId,
           });
           expect(intents.map(({ kind }) => kind)).toEqual([
@@ -587,7 +593,7 @@ describe("ChangelogRpcHandlers", () => {
           const fixture = yield* makeFixture();
           const id = yield* ChangelogId.generate;
           const session = makeSession(fixture);
-          const publishedAt = new Date();
+          const publishedAt = yield* DateTime.nowAsDate;
 
           yield* handlers
             .ChangelogCreate({
@@ -633,7 +639,7 @@ describe("ChangelogRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, session));
 
           const intents = yield* outbox.findPending({
-            before: new Date(Date.now() + 60_000),
+            before: dateAt((yield* Clock.currentTimeMillis) + 60_000),
             organizationId: fixture.organizationId,
           });
           expect(intents.map(({ kind }) => kind)).toEqual([
@@ -663,7 +669,7 @@ describe("ChangelogRpcHandlers", () => {
               content: "Published",
               status: "published",
               scheduledAt: null,
-              publishedAt: new Date(),
+              publishedAt: yield* DateTime.nowAsDate,
             })
             .pipe(Effect.provideService(CurrentSession, session));
 
@@ -681,7 +687,7 @@ describe("ChangelogRpcHandlers", () => {
           yield* sendUpdate("request-two");
 
           const intents = yield* outbox.findPending({
-            before: new Date(Date.now() + 60_000),
+            before: dateAt((yield* Clock.currentTimeMillis) + 60_000),
             organizationId: fixture.organizationId,
           });
           expect(intents.map(({ kind }) => kind)).toEqual([

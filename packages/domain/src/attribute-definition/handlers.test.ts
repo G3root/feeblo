@@ -8,6 +8,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -23,7 +24,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
       const organizationId = yield* WorkspaceId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
@@ -216,7 +217,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
           const provideSession = Effect.provideService(CurrentSession, session);
 
           const contactRowId = yield* ContactId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
           yield* db.insert(schema.contactTable).values({
             id: contactRowId,
             organizationId,
@@ -295,7 +296,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
 
           const firstContactId = yield* ContactId.generate;
           const secondContactId = yield* ContactId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
           yield* db.insert(schema.contactTable).values([
             {
               id: firstContactId,

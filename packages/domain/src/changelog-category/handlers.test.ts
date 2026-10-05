@@ -56,7 +56,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
       const organizationId = yield* WorkspaceId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
         name: "Test organization",
@@ -90,8 +90,8 @@ describe("ChangelogCategoryRpcHandlers", () => {
         name: "Test site",
         subdomain: `site-${fixture.organizationId}`,
         changelogVisibility,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: yield* DateTime.nowAsDate,
+        updatedAt: yield* DateTime.nowAsDate,
       });
     });
   const insertCategory = (
@@ -107,8 +107,8 @@ describe("ChangelogCategoryRpcHandlers", () => {
         name: overrides?.name ?? "New",
         iconType: "color",
         icon: overrides?.icon ?? "#22c55e",
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: yield* DateTime.nowAsDate,
+        updatedAt: yield* DateTime.nowAsDate,
       });
       return id;
     });
@@ -119,7 +119,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
     Effect.gen(function* () {
       const db = yield* currentDb;
       const id = yield* ChangelogId.generate;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* db.insert(schema.changelogTable).values({
         id,
         title: "Release",
@@ -483,7 +483,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const otherOrganizationId = yield* WorkspaceId.generate;
         const otherCategoryId = yield* ChangelogCategoryId.generate;
         const db = yield* currentDb;
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
         yield* db.insert(schema.organizationTable).values({
           id: otherOrganizationId,
           name: "Other organization",
@@ -547,7 +547,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const publishedChangelogId = yield* Effect.gen(function* () {
           const db = yield* currentDb;
           const id = yield* ChangelogId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
           yield* db.insert(schema.changelogTable).values({
             id,
             title: "Published",

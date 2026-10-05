@@ -11,6 +11,7 @@ import {
 } from "@feeblo/id";
 import type { Role } from "@feeblo/permissions";
 import { and, eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -91,7 +92,7 @@ describe("TagRpcHandlers", () => {
       const siteId = yield* SiteId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `member_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
         name: "Organization",
@@ -370,7 +371,7 @@ describe("TagRpcHandlers", () => {
             const f = yield* fixture();
             // Merge the fixture post into a survivor.
             const survivorId = yield* PostId.generate;
-            const now = new Date();
+            const now = yield* DateTime.nowAsDate;
             const [postRow] = yield* db
               .select({
                 boardId: schema.postTable.boardId,
@@ -560,8 +561,8 @@ describe("TagRpcHandlers", () => {
               organizationId: f.organizationId,
               creatorId: f.userId,
               creatorMemberId: f.membershipId,
-              createdAt: new Date(),
-              updatedAt: new Date(),
+              createdAt: yield* DateTime.nowAsDate,
+              updatedAt: yield* DateTime.nowAsDate,
             });
             yield* db.insert(schema.postTable).values({
               id: privatePostId,
@@ -574,8 +575,8 @@ describe("TagRpcHandlers", () => {
               statusId: f.statusId,
               creatorId: f.userId,
               creatorMemberId: f.membershipId,
-              createdAt: new Date(),
-              updatedAt: new Date(),
+              createdAt: yield* DateTime.nowAsDate,
+              updatedAt: yield* DateTime.nowAsDate,
             });
             yield* handlers
               .PostTagSet({

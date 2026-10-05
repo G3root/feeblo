@@ -1,11 +1,16 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import { WorkspaceRepository } from "../workspace/repository";
 import { EntitlementPolicy } from "./policies";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 const TestLayer = EntitlementPolicy.layer.pipe(
   Layer.provide(WorkspaceRepository.layer),
@@ -26,7 +31,7 @@ describe("email entitlement policy", () => {
             id: organizationId,
             name: "Free email policy workspace",
             slug: organizationId,
-            createdAt: new Date(),
+            createdAt: yield* DateTime.nowAsDate,
           });
 
           const recipientLimit =
@@ -56,7 +61,7 @@ describe("email entitlement policy", () => {
           const db = yield* currentDb;
           const policy = yield* EntitlementPolicy;
           const organizationId = yield* WorkspaceId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
 
           yield* db.insert(schema.organizationTable).values({
             id: organizationId,
@@ -86,7 +91,7 @@ describe("email entitlement policy", () => {
             recurringIntervalCount: 1,
             status: "active",
             currentPeriodStart: now,
-            currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+            currentPeriodEnd: dateAt(now.getTime() + 86_400_000),
             customerId: `customer_${organizationId}`,
             productId: `product_${organizationId}`,
             createdAt: now,

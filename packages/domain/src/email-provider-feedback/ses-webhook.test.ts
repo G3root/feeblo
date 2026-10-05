@@ -6,6 +6,7 @@ import { WorkspaceId } from "@feeblo/id";
 import { isString } from "@feeblo/utils/runtime-kind";
 import { eq } from "drizzle-orm";
 import * as Cause from "effect/Cause";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
@@ -285,7 +286,7 @@ describe("SesEmailFeedbackWebhook", () => {
     Effect.gen(function* () {
       const db = yield* currentDb;
       const organizationId = yield* WorkspaceId.generate;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       const outboxId = `eob_${organizationId}`;
       const deliveryId = `edl_${organizationId}`;
       const messageId = `<email.${organizationId}@notifications.feeblo>`;

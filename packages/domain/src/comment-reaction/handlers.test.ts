@@ -8,6 +8,7 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -66,7 +67,7 @@ describe("CommentReactionRpcHandlers", () => {
       const statusId = yield* PostStatusId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `member_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
         name: "Organization",
@@ -200,7 +201,7 @@ describe("CommentReactionRpcHandlers", () => {
           const handlers = yield* CommentReactionRpcHandlersEffect;
           const f = yield* fixture();
           const targetPostId = yield* PostId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
 
           yield* db.insert(schema.postTable).values({
             id: targetPostId,
