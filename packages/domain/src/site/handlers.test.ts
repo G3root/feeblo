@@ -2,6 +2,7 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { SiteId, WorkspaceId } from "@feeblo/id";
 import type { Role } from "@feeblo/permissions";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -50,7 +51,7 @@ describe("SiteRpcHandlers", () => {
       const siteId = yield* SiteId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       const subdomain = `test-${organizationId}`;
 
       yield* db.insert(schema.organizationTable).values({
@@ -98,7 +99,7 @@ describe("SiteRpcHandlers", () => {
       const db = yield* currentDb;
       const memberId = `member2_${fixture.organizationId}`;
       const secondUserId = `user2_${fixture.organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.userTable).values({
         id: secondUserId,

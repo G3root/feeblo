@@ -5,6 +5,7 @@ import {
   CompanyId,
   WorkspaceId,
 } from "@feeblo/id";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -53,7 +54,7 @@ describe("CompanyRpcHandlers", () => {
       const organizationId = yield* WorkspaceId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
         name: "Test organization",
@@ -108,8 +109,8 @@ describe("CompanyRpcHandlers", () => {
           id: `company_${fixture.organizationId}`,
           organizationId: fixture.organizationId,
           name: "Acme",
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
+          updatedAt: yield* DateTime.nowAsDate,
         });
 
         const companies = yield* handlers
@@ -186,8 +187,8 @@ describe("CompanyRpcHandlers", () => {
           id: companyId,
           organizationId: fixture.organizationId,
           name: "Acme",
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
+          updatedAt: yield* DateTime.nowAsDate,
         });
 
         const error = yield* Effect.flip(
@@ -221,8 +222,8 @@ describe("CompanyRpcHandlers", () => {
           key: "plan",
           type: "TEXT",
           isRequired: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
+          updatedAt: yield* DateTime.nowAsDate,
         });
 
         const error = yield* Effect.flip(
@@ -248,7 +249,7 @@ describe("CompanyRpcHandlers", () => {
         const handlers = yield* CompanyRpcHandlersEffect;
         const fixture = yield* makeFixture();
         const attributeId = yield* CompanyAttributeDefinitionId.generate;
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
 
         yield* db.insert(schema.companyAttributeDefinitionTable).values({
           id: attributeId,
@@ -289,7 +290,7 @@ describe("CompanyRpcHandlers", () => {
           const fixture = yield* makeFixture();
           const foreignOrganizationId = yield* WorkspaceId.generate;
           const attributeId = yield* CompanyAttributeDefinitionId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
 
           yield* db.insert(schema.organizationTable).values({
             id: foreignOrganizationId,

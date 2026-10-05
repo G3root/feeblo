@@ -20,6 +20,7 @@ import {
 } from "@feeblo/id";
 import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -53,7 +54,7 @@ const seedRuleScenario = ({
 }) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
-    const now = new Date();
+    const now = yield* DateTime.nowAsDate;
     const organizationId = yield* WorkspaceId.generate;
     const boardId = yield* BoardId.generate;
     const openStatusId = yield* PostStatusId.generate;
@@ -199,7 +200,7 @@ describe("GitHub inbound synchronization", () => {
           yield* IntegrationExternalResourceId.generate;
         const linkId = yield* PostExternalResourceLinkId.generate;
         const ruleId = yield* GitHubSyncRuleId.generate;
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
 
         yield* db.insert(schema.organizationTable).values({
           id: organizationId,

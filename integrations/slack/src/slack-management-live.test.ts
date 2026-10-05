@@ -15,6 +15,7 @@ import {
   SLACK_OAUTH_SCOPES,
 } from "@feeblo/integration-slack/manifest";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -167,7 +168,7 @@ const seedOrganization = Effect.gen(function* () {
   const db = yield* currentDb;
   const organizationId = yield* WorkspaceId.generate;
   yield* db.insert(schema.organizationTable).values({
-    createdAt: new Date(),
+    createdAt: yield* DateTime.nowAsDate,
     id: organizationId,
     name: "Slack management test",
     slug: organizationId,

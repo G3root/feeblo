@@ -13,6 +13,7 @@ import {
   type IntegrationProviderDeliveryInput,
   IntegrationProviderInvalidConfigurationError,
 } from "@feeblo/integration-core";
+import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -237,7 +238,9 @@ describe("slack provider registration", () => {
 
       const rawBody =
         "team_id=T123&user_id=U123&text=hello&command=%2Ffeeblo&channel_id=C1&channel_name=general&user_name=alice&token=token&trigger_id=trig&response_url=https%3A%2F%2Fhooks.slack.com%2Fx&team_domain=acme";
-      const timestamp = String(Math.floor(Date.now() / 1000));
+      const timestamp = String(
+        Math.floor((yield* Clock.currentTimeMillis) / 1000)
+      );
       const signature = `v0=${createHmac(
         "sha256",
         Redacted.value(signingSecret)
@@ -308,7 +311,9 @@ describe("slack provider registration", () => {
       };
       // Slack delivers interactive payloads as `payload=<urlencoded JSON>`.
       const rawBody = `payload=${encodeURIComponent(JSON.stringify(payload))}`;
-      const timestamp = String(Math.floor(Date.now() / 1000));
+      const timestamp = String(
+        Math.floor((yield* Clock.currentTimeMillis) / 1000)
+      );
       const signature = `v0=${createHmac(
         "sha256",
         Redacted.value(signingSecret)
@@ -357,7 +362,9 @@ describe("slack provider registration", () => {
         response_url: "https://hooks.slack.com/x",
       };
       const rawBody = JSON.stringify(payload);
-      const timestamp = String(Math.floor(Date.now() / 1000));
+      const timestamp = String(
+        Math.floor((yield* Clock.currentTimeMillis) / 1000)
+      );
       const signature = `v0=${createHmac(
         "sha256",
         Redacted.value(signingSecret)

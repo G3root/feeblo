@@ -2,6 +2,8 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as Clock from "effect/Clock";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -10,6 +12,10 @@ import { ReservedSubdomainError } from "../site/subdomain/errors";
 import { SubdomainValidationService } from "../site/subdomain/service";
 import { WorkspaceRpcHandlersEffect } from "./handlers";
 import { WorkspaceRepository } from "./repository";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 describe("WorkspaceRpcHandlers", () => {
   type Fixture = {
@@ -47,7 +53,7 @@ describe("WorkspaceRpcHandlers", () => {
       const organizationId = yield* WorkspaceId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
@@ -84,8 +90,8 @@ describe("WorkspaceRpcHandlers", () => {
         name: "Existing Site",
         subdomain,
         organizationId: orgId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: yield* DateTime.nowAsDate,
+        updatedAt: yield* DateTime.nowAsDate,
       });
     });
 
@@ -339,8 +345,8 @@ describe("WorkspaceRpcHandlers", () => {
             isArchived: false,
             externalOrganizationId: "ext_1",
             visibility: "PUBLIC",
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: yield* DateTime.nowAsDate,
+            updatedAt: yield* DateTime.nowAsDate,
           });
           yield* db.insert(schema.productTable).values({
             id: "prod_archived",
@@ -350,8 +356,8 @@ describe("WorkspaceRpcHandlers", () => {
             isArchived: true,
             externalOrganizationId: "ext_2",
             visibility: "PUBLIC",
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: yield* DateTime.nowAsDate,
+            updatedAt: yield* DateTime.nowAsDate,
           });
 
           const products = yield* handlers
@@ -414,8 +420,8 @@ describe("WorkspaceRpcHandlers", () => {
             externalOrganizationId: "ext_1",
             visibility: "PUBLIC",
             metadata: { plan: "starter", variant: "monthly" },
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: yield* DateTime.nowAsDate,
+            updatedAt: yield* DateTime.nowAsDate,
           });
           yield* db.insert(schema.subscriptionTable).values({
             id: "sub_active",
@@ -427,12 +433,14 @@ describe("WorkspaceRpcHandlers", () => {
             recurringInterval: "month",
             recurringIntervalCount: 1,
             status: "active",
-            currentPeriodStart: new Date(),
-            currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            currentPeriodStart: yield* DateTime.nowAsDate,
+            currentPeriodEnd: dateAt(
+              (yield* Clock.currentTimeMillis) + 30 * 24 * 60 * 60 * 1000
+            ),
             customerId: "cus_1",
             productId: "prod_starter",
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: yield* DateTime.nowAsDate,
+            updatedAt: yield* DateTime.nowAsDate,
           });
 
           const plan = yield* handlers
@@ -473,8 +481,10 @@ describe("WorkspaceRpcHandlers", () => {
               recurringInterval: "month",
               recurringIntervalCount: 1,
               status: "trialing",
-              currentPeriodStart: new Date(),
-              currentPeriodEnd: new Date(Date.now() + 30 * 86_400_000),
+              currentPeriodStart: yield* DateTime.nowAsDate,
+              currentPeriodEnd: dateAt(
+                (yield* Clock.currentTimeMillis) + 30 * 86_400_000
+              ),
               customerId: "cus_trialing",
               productId: "prod_trialing",
             });
@@ -515,8 +525,12 @@ describe("WorkspaceRpcHandlers", () => {
               recurringInterval: "month",
               recurringIntervalCount: 1,
               status: "past_due",
-              currentPeriodStart: new Date(Date.now() - 60 * 86_400_000),
-              currentPeriodEnd: new Date(Date.now() - 30 * 86_400_000),
+              currentPeriodStart: dateAt(
+                (yield* Clock.currentTimeMillis) - 60 * 86_400_000
+              ),
+              currentPeriodEnd: dateAt(
+                (yield* Clock.currentTimeMillis) - 30 * 86_400_000
+              ),
               customerId: "cus_past_due_expired",
               productId: "prod_past_due",
             },
@@ -530,8 +544,10 @@ describe("WorkspaceRpcHandlers", () => {
               recurringInterval: "month",
               recurringIntervalCount: 1,
               status: "past_due",
-              currentPeriodStart: new Date(),
-              currentPeriodEnd: new Date(Date.now() + 86_400_000),
+              currentPeriodStart: yield* DateTime.nowAsDate,
+              currentPeriodEnd: dateAt(
+                (yield* Clock.currentTimeMillis) + 86_400_000
+              ),
               customerId: "cus_past_due_current",
               productId: "prod_past_due",
             },

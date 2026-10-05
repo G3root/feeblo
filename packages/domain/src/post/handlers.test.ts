@@ -14,6 +14,7 @@ import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -50,6 +51,10 @@ import { FailedToMergePostError, PostNotFoundError } from "./errors";
 import { PostRpcHandlersEffect } from "./handlers";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 describe("PostRpcHandlers", () => {
   const recordedIntegrationEvents: unknown[] = [];
@@ -94,7 +99,7 @@ describe("PostRpcHandlers", () => {
       const userId = `user_${organizationId}`;
       const creatorEmail = `${organizationId}@example.com`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
@@ -161,7 +166,7 @@ describe("PostRpcHandlers", () => {
     Effect.gen(function* () {
       const db = yield* currentDb;
       const id = yield* BoardId.generate;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.boardTable).values({
         id,
@@ -199,7 +204,7 @@ describe("PostRpcHandlers", () => {
   const activateStarterPlan = (organizationId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       const productId = `product_${organizationId}`;
       yield* db.insert(schema.productTable).values({
         id: productId,
@@ -223,7 +228,7 @@ describe("PostRpcHandlers", () => {
         recurringIntervalCount: 1,
         status: "active",
         currentPeriodStart: now,
-        currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+        currentPeriodEnd: dateAt(now.getTime() + 86_400_000),
         customerId: `customer_${organizationId}`,
         productId,
         createdAt: now,
@@ -1333,9 +1338,7 @@ describe("PostRpcHandlers", () => {
         () =>
           Effect.gen(function* () {
             const db = yield* currentDb;
-            const firstChangeAt = new Date(
-              "2026-08-11T00:00:00.000Z"
-            ).getTime();
+            const firstChangeAt = dateAt("2026-08-11T00:00:00.000Z").getTime();
             yield* TestClock.setTime(firstChangeAt);
             const handlers = yield* PostRpcHandlersEffect;
             const fixture = yield* makeFixture();
@@ -1920,8 +1923,8 @@ describe("PostRpcHandlers", () => {
             userId: otherUserId,
             organizationId: fixture.organizationId,
             memberId: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: yield* DateTime.nowAsDate,
+            updatedAt: yield* DateTime.nowAsDate,
           });
 
           const error = yield* Effect.flip(
@@ -1961,8 +1964,8 @@ describe("PostRpcHandlers", () => {
             memberId: null,
             visibility: "PUBLIC",
             parentCommentId: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: yield* DateTime.nowAsDate,
+            updatedAt: yield* DateTime.nowAsDate,
           });
 
           const error = yield* Effect.flip(
@@ -2792,7 +2795,7 @@ describe("PostRpcHandlers", () => {
 
             const sourceCommentId = yield* CommentId.generate;
             const targetCommentId = yield* CommentId.generate;
-            const pinnedAt = new Date();
+            const pinnedAt = yield* DateTime.nowAsDate;
             yield* db.insert(schema.commentTable).values([
               {
                 id: sourceCommentId,
@@ -2962,7 +2965,7 @@ describe("PostRpcHandlers", () => {
                 );
             }
 
-            const now = new Date();
+            const now = yield* DateTime.nowAsDate;
             const tagId = `tag_${fixture.organizationId}`;
             yield* db.insert(schema.tagTable).values({
               id: tagId,
@@ -3270,7 +3273,7 @@ describe("PostRpcHandlers", () => {
               userId: fixture.userId,
             });
             const tagId = `tag_delete_parent_${fixture.organizationId}`;
-            const now = new Date();
+            const now = yield* DateTime.nowAsDate;
             yield* db.insert(schema.tagTable).values({
               id: tagId,
               name: "Restored tag",
@@ -3335,8 +3338,8 @@ describe("PostRpcHandlers", () => {
             });
             // The restored child is a fresh write: its timestamp moves so
             // list ordering and cache invalidation see the revert.
-            expect(new Date(sourcePost!.updatedAt).getTime()).toBeGreaterThan(
-              new Date(mergedSource!.updatedAt).getTime()
+            expect(dateAt(sourcePost!.updatedAt).getTime()).toBeGreaterThan(
+              dateAt(mergedSource!.updatedAt).getTime()
             );
 
             const [restoredTag] = yield* db
@@ -3523,7 +3526,7 @@ describe("PostRpcHandlers", () => {
           const sharedContactId = `email_contact_shared_${fixture.organizationId}`;
           const sharedContactEmail = `shared_sub_${fixture.organizationId}@example.com`;
           const sourceOnlyContactId = `email_contact_source_${fixture.organizationId}`;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
           yield* db.insert(schema.emailContactTable).values([
             {
               id: sharedContactId,
@@ -3760,7 +3763,7 @@ describe("PostRpcHandlers", () => {
           const fixture = yield* makeFixture();
           const sourcePostId = yield* PostId.generate;
           const targetPostId = yield* PostId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
 
           for (const [id, title] of [
             [sourcePostId, "Source feedback"],
@@ -3824,7 +3827,7 @@ describe("PostRpcHandlers", () => {
             const fixture = yield* makeFixture();
             const sourcePostId = yield* PostId.generate;
             const targetPostId = yield* PostId.generate;
-            const now = new Date();
+            const now = yield* DateTime.nowAsDate;
 
             for (const [id, title] of [
               [sourcePostId, "Source feedback"],
@@ -4042,7 +4045,7 @@ describe("PostRpcHandlers", () => {
                 organizationId: fixture.organizationId,
                 userId,
                 role: "contributor",
-                createdAt: new Date(),
+                createdAt: yield* DateTime.nowAsDate,
               });
             }
             // Both rows start on the source and are carried to the target
@@ -4159,7 +4162,7 @@ describe("PostRpcHandlers", () => {
               organizationId: fixture.organizationId,
               userId: followerUserId,
               role: "contributor",
-              createdAt: new Date(),
+              createdAt: yield* DateTime.nowAsDate,
             });
             yield* db.insert(schema.postSubscriptionTable).values({
               id: `post_sub_${sourcePostId}`,

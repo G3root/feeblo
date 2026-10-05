@@ -58,7 +58,7 @@ const makeDeliveryFixture = () =>
     const postId = yield* PostId.generate;
     const routeId = yield* IntegrationRouteId.generate;
     const statusId = yield* PostStatusId.generate;
-    const now = DateTime.makeUnsafe(new Date());
+    const now = DateTime.makeUnsafe(yield* DateTime.nowAsDate);
     const input: IntegrationProviderDeliveryInput = {
       connection: {
         credentialGeneration: 1,

@@ -5,6 +5,7 @@ import {
   ContactId,
   WorkspaceId,
 } from "@feeblo/id";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -53,7 +54,7 @@ describe("ContactRpcHandlers", () => {
       const organizationId = yield* WorkspaceId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
         name: "Test organization",
@@ -109,8 +110,8 @@ describe("ContactRpcHandlers", () => {
           organizationId: fixture.organizationId,
           name: "Ada",
           email: "ada@example.com",
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
+          updatedAt: yield* DateTime.nowAsDate,
         });
 
         const contacts = yield* handlers
@@ -206,8 +207,8 @@ describe("ContactRpcHandlers", () => {
           key: "plan",
           type: "TEXT",
           isRequired: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
+          updatedAt: yield* DateTime.nowAsDate,
         });
 
         const error = yield* Effect.flip(
@@ -243,8 +244,8 @@ describe("ContactRpcHandlers", () => {
           type: "INTEGER",
           config: { min: 18 },
           isRequired: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
+          updatedAt: yield* DateTime.nowAsDate,
         });
 
         const error = yield* Effect.flip(
@@ -275,7 +276,7 @@ describe("ContactRpcHandlers", () => {
           const fixture = yield* makeFixture();
           const foreignOrganizationId = yield* WorkspaceId.generate;
           const attributeId = yield* ContactAttributeDefinitionId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
 
           yield* db.insert(schema.organizationTable).values({
             id: foreignOrganizationId,
@@ -324,8 +325,8 @@ describe("ContactRpcHandlers", () => {
           organizationId: fixture.organizationId,
           name: "Ada",
           email: "ada@example.com",
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
+          updatedAt: yield* DateTime.nowAsDate,
         });
 
         const error = yield* Effect.flip(
@@ -355,7 +356,7 @@ describe("ContactRpcHandlers", () => {
           const foreignOrganizationId = yield* WorkspaceId.generate;
           const foreignUserId = `user_${foreignOrganizationId}`;
           const foreignMembershipId = `membership_${foreignOrganizationId}`;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
 
           yield* db.insert(schema.organizationTable).values({
             id: foreignOrganizationId,

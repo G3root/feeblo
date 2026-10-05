@@ -1,6 +1,8 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
+import * as Clock from "effect/Clock";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -18,6 +20,10 @@ import {
 } from "./handlers";
 import { EmailSubscriptionRepository } from "./repository";
 import { EmailSubscriptionTokenService } from "./tokens";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 describe("EmailSubscriptionConsentHandlers", () => {
   const Repositories = Layer.mergeAll(
@@ -60,7 +66,7 @@ describe("EmailSubscriptionConsentHandlers", () => {
     Effect.gen(function* () {
       const db = yield* currentDb;
       const organizationId = yield* WorkspaceId.generate;
-      const now = new Date("2026-08-09T00:00:00.000Z");
+      const now = dateAt("2026-08-09T00:00:00.000Z");
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
         name: "Subscription workspace",
@@ -105,7 +111,7 @@ describe("EmailSubscriptionConsentHandlers", () => {
         recurringIntervalCount: 1,
         status: "active",
         currentPeriodStart: now,
-        currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+        currentPeriodEnd: dateAt(now.getTime() + 86_400_000),
         customerId: `customer_${organizationId}`,
         productId,
         createdAt: now,
@@ -262,11 +268,13 @@ describe("EmailSubscriptionConsentHandlers", () => {
         });
         const post = yield* repository.requestSubscription({
           email: "subscriber@example.com",
-          now: new Date(),
+          now: yield* DateTime.nowAsDate,
           organizationId,
           source: "explicit",
           topic: { topicId: "pst_1", topicType: "post" },
-          verificationExpiresAt: new Date(Date.now() + 86_400_000),
+          verificationExpiresAt: dateAt(
+            (yield* Clock.currentTimeMillis) + 86_400_000
+          ),
         });
         yield* handlers.unsubscribe({
           unsubscribeToken: Redacted.value(accepted.unsubscribeToken.value),

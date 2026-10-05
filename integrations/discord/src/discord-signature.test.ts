@@ -1,6 +1,7 @@
 import { createPrivateKey, generateKeyPairSync, sign } from "node:crypto";
 
 import { describe, expect, it } from "@effect/vitest";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 
@@ -46,9 +47,11 @@ describe("verifyDiscordRequestSignature", () => {
   it.effect("accepts a valid signature", () =>
     Effect.gen(function* () {
       const rawBody = JSON.stringify({ type: 1 });
-      const timestamp = String(Math.floor(Date.now() / 1000));
+      const timestamp = String(
+        Math.floor((yield* Clock.currentTimeMillis) / 1000)
+      );
       const result = yield* verifyDiscordRequestSignature({
-        now: Date.now(),
+        now: yield* Clock.currentTimeMillis,
         publicKey: publicKeyHex,
         rawBody,
         signatureHeader: signBody(timestamp, rawBody),

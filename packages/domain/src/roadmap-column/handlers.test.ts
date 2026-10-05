@@ -7,6 +7,7 @@ import {
   SiteId,
   WorkspaceId,
 } from "@feeblo/id";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -37,7 +38,7 @@ describe("RoadmapColumnRpcHandlers", () => {
       const statusId = yield* PostStatusId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,

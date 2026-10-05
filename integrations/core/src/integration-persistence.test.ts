@@ -22,6 +22,10 @@ import {
 import { makeIntegrationDeliveryWorkerRepository } from "./integration-delivery-postgres-repository";
 import { IntegrationEventRecorderLive } from "./integration-event-recorder";
 
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
+
 const TestLayer = IntegrationEventRecorderLive.pipe(
   Layer.provideMerge(Database.PgliteDatabaseLive)
 );
@@ -37,7 +41,7 @@ const seedRoute = ({
     const connectionId = yield* IntegrationConnectionId.generate;
     const routeId = yield* IntegrationRouteId.generate;
     yield* db.insert(schema.organizationTable).values({
-      createdAt: new Date(),
+      createdAt: yield* DateTime.nowAsDate,
       id: organizationId,
       name: "Integration persistence test",
       slug: organizationId,
@@ -87,7 +91,7 @@ const makePostCreatedEvent = Effect.gen(function* () {
         },
       },
       id,
-      occurredAt: DateTime.makeUnsafe(new Date()),
+      occurredAt: DateTime.makeUnsafe(yield* DateTime.nowAsDate),
       organizationId,
       origin: { kind: "feeblo" as const },
       type: "feedback.post.created" as const,
@@ -316,7 +320,7 @@ describe("integration persistence", () => {
           yield* db
             .update(schema.integrationDeliveryTable)
             .set({
-              leaseExpiresAt: new Date(0),
+              leaseExpiresAt: dateAt(0),
             })
             .where(
               eq(schema.integrationDeliveryTable.id, claimed.input.delivery.id)
@@ -350,7 +354,7 @@ describe("integration persistence", () => {
             );
           yield* db
             .update(schema.integrationDeliveryTable)
-            .set({ leaseExpiresAt: new Date(0) })
+            .set({ leaseExpiresAt: dateAt(0) })
             .where(
               eq(
                 schema.integrationDeliveryTable.id,

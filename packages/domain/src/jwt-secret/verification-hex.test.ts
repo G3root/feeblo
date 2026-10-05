@@ -6,7 +6,14 @@ import * as jose from "jose";
 import { verifyJwt } from "./verification";
 
 const ORGANIZATION_ID = "org_test_hex";
-const nowSeconds = Math.floor(Date.now() / 1000);
+
+/**
+ * The instant every test pins `TestClock` to. Tokens are minted relative to it,
+ * so `verifyJwt`'s Clock read and the `exp`/`iat` claims agree without depending
+ * on the wall clock.
+ */
+const fixtureNow = new Date("2026-08-11T00:00:00.000Z");
+const nowSeconds = Math.floor(fixtureNow.getTime() / 1000);
 const futureExp = nowSeconds + 3600;
 
 // 32 random bytes as 64-char hex (the format JwtSecretRepository generates)
@@ -31,7 +38,7 @@ describe("verifyJwt hex secret handling", () => {
     "verifies token signed with raw hex bytes using 64-char hex secret",
     () =>
       Effect.gen(function* () {
-        yield* TestClock.setTime(Date.now());
+        yield* TestClock.setTime(fixtureNow.getTime());
         const token = yield* Effect.promise(() =>
           signWithHex(
             {
@@ -65,7 +72,7 @@ describe("verifyJwt hex secret handling", () => {
 
   it.effect("succeeds when one of multiple hex secrets matches", () =>
     Effect.gen(function* () {
-      yield* TestClock.setTime(Date.now());
+      yield* TestClock.setTime(fixtureNow.getTime());
       const token = yield* Effect.promise(() =>
         signWithHex(
           { aud: ORGANIZATION_ID, exp: futureExp, iat: nowSeconds, sub: "u2" },

@@ -16,6 +16,7 @@ import {
 } from "@feeblo/integration-discord/manifest";
 import { isString } from "@feeblo/utils/runtime-kind";
 import { and, eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -143,7 +144,7 @@ const seedOrganization = Effect.gen(function* () {
   const db = yield* currentDb;
   const organizationId = yield* WorkspaceId.generate;
   yield* db.insert(schema.organizationTable).values({
-    createdAt: new Date(),
+    createdAt: yield* DateTime.nowAsDate,
     id: organizationId,
     name: "Discord management test",
     slug: organizationId,
