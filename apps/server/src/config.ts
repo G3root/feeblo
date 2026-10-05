@@ -1,5 +1,3 @@
-import { isIP } from "node:net";
-
 import { parseClientIpProxyTrust } from "@feeblo/domain/client-ip";
 import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
@@ -9,40 +7,6 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
-
-/**
- * Whether `value` is an absolute http(s) URL a browser outside the deployment
- * can load. `MEDIA_PUBLIC_BASE_URL` is returned to clients verbatim, so a
- * relative path, a non-http scheme, an IP literal, or a loopback name is
- * always a misconfiguration. Any other hostname is accepted: nothing here
- * resolves it, so this answers "not obviously unreachable", not "publicly
- * routable".
- */
-const isPubliclyReachableUrl = (value: string) => {
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    return false;
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return false;
-  }
-  const { hostname } = parsed;
-  // `URL` brackets an IPv6 literal (`[::1]`, `[fe80::1]`, `[::ffff:a00:1]`)
-  // and `isIP` wants it bare, so strip the brackets before asking whether the
-  // host is an address at all. WHATWG parsing has already canonicalized the
-  // form — `127.1` and `0x7f.1` arrive as `127.0.0.1`, and an out-of-range part
-  // like `456.1.1.1` never parses — so this sees what a browser would resolve.
-  // Rejecting every literal covers loopback, private, and link-local ranges at
-  // once, and keeps a bare address out of a value whose whole job is to be a
-  // public origin.
-  const address = hostname.startsWith("[") ? hostname.slice(1, -1) : hostname;
-  if (isIP(address) !== 0) {
-    return false;
-  }
-  return !(hostname === "localhost" || hostname.endsWith(".localhost"));
-};
 
 export class ServerConfig extends Context.Service<ServerConfig>()(
   "ServerConfig",
@@ -187,8 +151,9 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       // Media upload storage is mandatory in production, and mandatory here
       // rather than in the S3 service because the service is built per request:
       // a missing value does not fail startup, it fails the first editor
-      // upload. The two checks after the missing-name list are the failure
-      // modes that do not fail at all — see docs/r2-production-checklist.md.
+      // upload — or, for a missing public base URL, succeeds while handing
+      // every client a URL on the authenticated S3 endpoint. The value's shape
+      // is the operator's call: see docs/r2-production-checklist.md.
       if (nodeEnv === "production") {
         const mediaVariables = [
           ["MEDIA_UPLOAD_REGION", mediaUploadRegion],
@@ -222,18 +187,6 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
               new ConfigProvider.SourceError({
                 message:
                   "MEDIA_UPLOAD_ACCESS_KEY_ID and MEDIA_UPLOAD_SECRET_ACCESS_KEY still hold the .env.example development placeholders. Issue a bucket-scoped access key pair for production.",
-              })
-            )
-          );
-        }
-        // Uploads return this URL to browsers. A relative value resolves
-        // against the dashboard, and loopback resolves for nobody else, so
-        // both look like success until an image fails to load.
-        if (!isPubliclyReachableUrl(mediaPublicBaseUrl ?? "")) {
-          return yield* Effect.fail(
-            new Config.ConfigError(
-              new ConfigProvider.SourceError({
-                message: `MEDIA_PUBLIC_BASE_URL must be the absolute public URL objects are served from, because uploads hand it to browsers verbatim. Use the bucket's custom domain, never the S3 endpoint, a loopback host, or an IP address. Received: ${mediaPublicBaseUrl ?? "(unset)"}`,
               })
             )
           );

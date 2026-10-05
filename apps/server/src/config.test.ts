@@ -264,55 +264,15 @@ describe("ServerConfig production media storage", () => {
     })
   );
 
-  it.effect("rejects a media base URL a browser cannot reach", () =>
+  it.effect("accepts any media base URL the operator supplies", () =>
     Effect.gen(function* () {
+      // Only presence is enforced: a loopback host, an address literal, and a
+      // relative path are all the operator's call. The fallback is what the
+      // check exists to prevent, not a shape.
       for (const baseUrl of [
-        // Loopback by name and by IPv4 (including a shorthand form and a
-        // non-`.1` address).
         "http://127.0.0.1:9002/feeblo-media-public",
-        "http://127.1.2.3:9000",
-        "http://localhost:9000",
-        "http://board.localhost:3000",
-        "http://0.0.0.0:9000",
-        // Any other address literal: private, link-local, and routable IPv4,
-        // then IPv6 in bracketed form including an IPv4-mapped address.
         "http://10.1.2.3:9000",
-        "http://192.168.1.10:9000",
-        "http://169.254.10.10:9000",
-        "http://203.0.113.5:9000",
-        "http://[::1]:9000",
-        "http://[::]:9000",
-        "http://[fe80::1]:9000",
-        "http://[fd00::1]:9000",
-        "http://[::ffff:10.0.0.1]:9000",
-        // Relative, unparsable, and a scheme the browser will not load an
-        // image over.
         "/media",
-        "media.example.test",
-        "ftp://assets.example.test",
-      ]) {
-        const exit = yield* Effect.exit(
-          loadServerConfig({
-            ...production,
-            ...productionMediaEnvironment,
-            MEDIA_PUBLIC_BASE_URL: baseUrl,
-          })
-        );
-
-        expect(Exit.isFailure(exit), `${baseUrl} should be rejected`).toBe(
-          true
-        );
-      }
-    })
-  );
-
-  it.effect("accepts a hostname that merely contains digits", () =>
-    Effect.gen(function* () {
-      // The IPv4 test is a full dotted quad, so a name with numeric labels is
-      // still a name.
-      for (const baseUrl of [
-        "https://media1.example.test",
-        "https://1.2.3.4.example.test",
       ]) {
         const exit = yield* Effect.exit(
           loadServerConfig({
