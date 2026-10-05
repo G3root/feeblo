@@ -1920,8 +1920,7 @@ describe("CommentRpcHandlers", () => {
             const event = recordedIntegrationEvents.slice(before).find(
               (candidate) =>
                 // SAFETY: The recorded envelope exposes `type` for the event.
-                (candidate as { type?: string }).type ===
-                "feedback.post.status_changed"
+                (candidate as { type?: string }).type === "post.status_changed"
             );
             expect(event).toBeDefined();
           })

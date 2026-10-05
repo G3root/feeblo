@@ -142,7 +142,7 @@ export const applyCommentStatusUpdate = (
           ? { kind: "end_user" }
           : { kind: "member", memberId: actor.memberId },
       boardId: yield* BoardId.parse(postRow.value.boardId),
-      eventType: "feedback.post.status_changed",
+      eventType: "post.status_changed",
       organizationId: args.organizationId,
       postId: args.postId,
       postSlug: postRow.value.slug,

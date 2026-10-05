@@ -115,7 +115,7 @@ const makeDeliveryFixture = () =>
         occurredAt: now,
         organizationId,
         origin: { kind: "feeblo" },
-        type: "feedback.post.created",
+        type: "post.created",
         version: 1,
       },
       route: {
@@ -123,7 +123,7 @@ const makeDeliveryFixture = () =>
         configVersion: 1,
         connectionId,
         enabled: true,
-        eventTypes: ["feedback.post.created"],
+        eventTypes: ["post.created"],
         id: routeId,
         provider: webhookProviderKey,
         providerConfig: {},
@@ -210,7 +210,7 @@ describe("webhook provider registration", () => {
           Schema.fromJsonString(WebhookExternalPayload)
         )(request.body);
         expect(request.headers["content-type"]).toBe("application/json");
-        expect(request.headers["x-feeblo-event"]).toBe("feedback.post.created");
+        expect(request.headers["x-feeblo-event"]).toBe("post.created");
         expect(decodedRequest).toEqual({
           actor: { displayName: "Ada", type: "member" },
           board: {
@@ -235,7 +235,7 @@ describe("webhook provider registration", () => {
           objectType: "post",
           occurredAt: now.toString(),
           organizationId: input.event.organizationId,
-          type: "feedback.post.created",
+          type: "post.created",
           version: 1,
         });
         expect(

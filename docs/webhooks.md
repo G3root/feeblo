@@ -1,6 +1,6 @@
 # Custom webhooks (V1)
 
-V1 emits `feedback.post.created` and `feedback.post.status_changed`. A dashboard test uses `webhook.test`; it follows the real delivery/signing path but cannot be selected by a route.
+V1 emits `post.created` and `post.status_changed`. A dashboard test uses `webhook.test`; it follows the real delivery/signing path but cannot be selected by a route.
 
 Each delivery is one versioned event. The envelope carries `id` (the event id, stable across routes), `organizationId`, `type`, `version`, and `occurredAt`. `objectType` names the subject and `object` is its snapshot: a post's title, sanitized content, absolute URL, status, author, and metadata. `board` and `actor` sit beside it as context — the board the post belongs to and the person who caused the event, which are not the same person on a status change.
 
@@ -12,7 +12,7 @@ Payloads never carry email addresses, credentials, account identifiers (`usr_*`,
 {
   "id": "iev_9f4c1e7a2b",
   "organizationId": "org_4k81mz",
-  "type": "feedback.post.created",
+  "type": "post.created",
   "version": 1,
   "occurredAt": "2026-08-11T00:00:00.000Z",
   "objectType": "post",
@@ -43,7 +43,7 @@ A status change uses the same envelope and adds `changes`; `object.status` is al
 {
   "id": "iev_a17d30c9e5",
   "organizationId": "org_4k81mz",
-  "type": "feedback.post.status_changed",
+  "type": "post.status_changed",
   "version": 1,
   "occurredAt": "2026-08-12T09:14:52.108Z",
   "objectType": "post",

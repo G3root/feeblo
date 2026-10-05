@@ -7,13 +7,19 @@ Every external custom-webhook delivery is one versioned event shaped as an envel
 - Envelope: `id` (the event id), `organizationId`, `type`, `version`, `occurredAt`.
 - `objectType` names the subject and `object` is its snapshot. For post events `object` carries `id`, `title`, `content` (sanitized markdown), `url`, `status` (`{ id, name, type }`), `author`, and optional `metadata`.
 - `board` and `actor` are context: the board the post is on, and the person who caused the event. They are not the same person on a status change.
-- `changes.status` carries `from` and `to` on `feedback.post.status_changed`; `object.status` is already `to`.
+- `changes.status` carries `from` and `to` on `post.status_changed`; `object.status` is already `to`.
 
 The payload is rendered from `integration_event.payload`, the snapshot recorded in the same transaction as the mutation — never by reading the post row at delivery time. The recorder (`packages/domain/src/integration/post-event-recording.ts`) therefore reads the post body, the author classification, and the status label when the event is recorded. `board.url` replaces `board.slug`, because a consumer links to a board rather than routing to it.
 
 Identity is minimised by construction. A member is `{ type: "member", displayName }` — `mem_*` is never published (ADR 0010). An end user is `{ type: "end_user", id: cnt_*, externalId? }`, where `externalId` is the key the workspace set. Email, phone, and account identifiers never appear. The classification is the Public API's: `post.creatorMemberId` present means staff, absent means an outside end user.
 
 `version` stays `1`. The product is not deployed, so this shape is the launch contract rather than a v2 over a shipped v1; from here, field additions are additive and only a breaking change would bump it.
+
+## Event type names
+
+Event types are `post.created` and `post.status_changed`, without a `feedback.` prefix. They match the names Canny publishes, so a consumer migrating between the two translates nothing, and the prefix carried no information — the event is about a post, and every provider, route and domain module already calls the object a post.
+
+`post.status_changed` already names an `email_outbox.kind` value. The two are separate vocabularies on separate tables and no code compares them, so the overlap is a search hazard rather than a coupling; it was preferred to inventing a third spelling for the same fact.
 
 ## Why
 

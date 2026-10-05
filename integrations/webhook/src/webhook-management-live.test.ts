@@ -84,7 +84,7 @@ const createEndpointInput = (
   endpointUrl: string
 ) => ({
   endpointUrl,
-  eventTypes: ["feedback.post.created"] as const,
+  eventTypes: ["post.created"] as const,
   name: "Product events",
   organizationId,
 });
@@ -135,7 +135,7 @@ describe("webhook management service", () => {
 
           expect(created.signingSecret).toMatch(signingSecretPattern);
           expect(created.endpoint).toMatchObject({
-            eventTypes: ["feedback.post.created"],
+            eventTypes: ["post.created"],
             health: "healthy",
             hostname: "127.0.0.1",
             lifecycle: "active",
@@ -159,7 +159,7 @@ describe("webhook management service", () => {
               eq(schema.integrationRouteTable.connectionId, created.endpoint.id)
             );
           expect(route?.enabled).toBe(true);
-          expect(route?.eventTypes).toEqual(["feedback.post.created"]);
+          expect(route?.eventTypes).toEqual(["post.created"]);
 
           const listed = yield* service.listEndpoints({ organizationId });
           expect(listed).toHaveLength(1);
@@ -186,12 +186,12 @@ describe("webhook management service", () => {
           const updated = yield* service.updateEndpoint({
             connectionId: created.endpoint.id,
             endpointUrl: "https://127.0.0.1:8080/moved",
-            eventTypes: ["feedback.post.status_changed"],
+            eventTypes: ["post.status_changed"],
             name: "Renamed endpoint",
             organizationId,
           });
           expect(updated.name).toBe("Renamed endpoint");
-          expect(updated.eventTypes).toEqual(["feedback.post.status_changed"]);
+          expect(updated.eventTypes).toEqual(["post.status_changed"]);
           expect(updated.hostname).toBe("127.0.0.1");
 
           const [connection] = yield* db
@@ -224,7 +224,7 @@ describe("webhook management service", () => {
             .where(
               eq(schema.integrationRouteTable.connectionId, created.endpoint.id)
             );
-          expect(route?.eventTypes).toEqual(["feedback.post.status_changed"]);
+          expect(route?.eventTypes).toEqual(["post.status_changed"]);
         })
     );
 

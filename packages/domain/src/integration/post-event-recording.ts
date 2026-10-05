@@ -41,7 +41,7 @@ export type PostIntegrationEventAuthor =
 export interface PostIntegrationEventInput {
   readonly actor: PostIntegrationEventActor;
   readonly boardId: LegidOf<"BoardId">;
-  readonly eventType: "feedback.post.created" | "feedback.post.status_changed";
+  readonly eventType: "post.created" | "post.status_changed";
   readonly metadata?: Readonly<Record<string, string>>;
   readonly organizationId: LegidOf<"WorkspaceId">;
   readonly postId: LegidOf<"PostId">;

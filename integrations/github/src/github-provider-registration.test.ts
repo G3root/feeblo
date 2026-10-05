@@ -84,7 +84,7 @@ const deliveryInput: IntegrationProviderDeliveryInput = {
     occurredAt: DateTime.makeUnsafe(new Date()),
     organizationId: asLegid(WorkspaceId)("org_1"),
     origin: { kind: "feeblo" },
-    type: "feedback.post.created",
+    type: "post.created",
     version: 1,
   },
   route: {
@@ -92,7 +92,7 @@ const deliveryInput: IntegrationProviderDeliveryInput = {
     configVersion: 1,
     connectionId: asLegid(IntegrationConnectionId)("conn_1"),
     enabled: true,
-    eventTypes: ["feedback.post.created"],
+    eventTypes: ["post.created"],
     id: asLegid(IntegrationRouteId)("route_1"),
     provider: githubProviderKey,
     providerConfig: {
@@ -505,7 +505,7 @@ describe("GitHub issue-create handler", () => {
           ...deliveryInput,
           event: {
             ...deliveryInput.event,
-            type: "feedback.post.status_changed",
+            type: "post.status_changed",
           },
         })
         .pipe(

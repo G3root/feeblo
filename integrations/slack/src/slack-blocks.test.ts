@@ -6,7 +6,7 @@ describe("renderChannelUpdateMessageBlocks", () => {
   const message = {
     actionUrl: "https://feeblo.example/org/post/board/slug",
     actorName: "Ada Lovelace",
-    eventType: "feedback.post.created",
+    eventType: "post.created",
     facts: [
       { label: "Board", value: "Product ideas" },
       { label: "Status", value: "PENDING" },

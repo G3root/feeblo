@@ -4,7 +4,7 @@
 
 **Date.** 2026-10-05. All web pages were fetched and read on this date (UTC); the repo was read at commit `8707a5fa` (branch `webhook-new`, working tree clean apart from this file).
 
-> **Update, same day.** Feeblo's payload was reshaped after this note was written: `post`/`status`/`previousStatus` became `objectType`/`object`/`changes`, `board.slug` became `board.url`, member `memberId` was dropped, and post content and author now travel on every event. See `docs/adr/0011-a-webhook-payload-is-a-safe-snapshot.md`. The Feeblo half below describes commit `8707a5fa`; the Canny facts are unaffected.
+> **Update, same day.** Feeblo's payload was reshaped after this note was written: `post`/`status`/`previousStatus` became `objectType`/`object`/`changes`, `board.slug` became `board.url`, member `memberId` was dropped, post content and author now travel on every event, and the event types dropped the `feedback.` prefix (`feedback.post.created` became `post.created`, `feedback.post.status_changed` became `post.status_changed`). See `docs/adr/0011-a-webhook-payload-is-a-safe-snapshot.md`. The Feeblo half below describes commit `8707a5fa`; the Canny facts are unaffected.
 
 **Sources and method.** Feeblo facts come from this repository's code and docs (refs `F*`, listed at the end). Canny facts come only from first-party pages — `developers.canny.io`, `help.canny.io`, `canny.io` (refs `C*`). `developers.canny.io/api-reference` is JS-rendered: pages were loaded in a browser and read from the rendered DOM (`document.body.innerText`), and the rendered text was cross-checked against the server HTML payload. Claims that exist only in a secondary source are not used; claims that no first-party page states are listed under [Not verified](#not-verified).
 

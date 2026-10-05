@@ -115,7 +115,7 @@ const deliveryInput = (
     occurredAt: DateTime.makeUnsafe(new Date("2026-08-12T00:00:00.000Z")),
     organizationId: asLegid(WorkspaceId)("org_1"),
     origin: { kind: "feeblo" },
-    type: "feedback.post.created",
+    type: "post.created",
     version: 1,
   },
   route: {
@@ -123,7 +123,7 @@ const deliveryInput = (
     configVersion: 1,
     connectionId: asLegid(IntegrationConnectionId)("conn_1"),
     enabled: true,
-    eventTypes: ["feedback.post.created"],
+    eventTypes: ["post.created"],
     id: asLegid(IntegrationRouteId)("route_1"),
     provider: discordProviderKey,
     providerConfig: { channelId: "123456789012345678", version: 1 },
@@ -171,41 +171,37 @@ const makePostMessageSpy = () => {
 };
 
 describe("discord provider registration", () => {
-  it.effect(
-    "posts a channel-update embed for feedback.post.created deliveries",
-    () =>
-      Effect.gen(function* () {
-        const spy = makePostMessageSpy();
-        const registration = makeDiscordProviderRegistration({
-          apiClient: spy.apiClient,
-          credentialResolver,
-          publicKey: publicKeyHex,
-        });
-        const handler = registration.handlers.find(
-          (candidate) => candidate.capabilityKey === "channel.notifications"
-        );
-        expect(handler).toBeDefined();
-        if (handler === undefined) {
-          return;
-        }
+  it.effect("posts a channel-update embed for post.created deliveries", () =>
+    Effect.gen(function* () {
+      const spy = makePostMessageSpy();
+      const registration = makeDiscordProviderRegistration({
+        apiClient: spy.apiClient,
+        credentialResolver,
+        publicKey: publicKeyHex,
+      });
+      const handler = registration.handlers.find(
+        (candidate) => candidate.capabilityKey === "channel.notifications"
+      );
+      expect(handler).toBeDefined();
+      if (handler === undefined) {
+        return;
+      }
 
-        const result = yield* Effect.exit(handler.deliver(deliveryInput()));
-        expect(Exit.isSuccess(result)).toBe(true);
+      const result = yield* Effect.exit(handler.deliver(deliveryInput()));
+      expect(Exit.isSuccess(result)).toBe(true);
 
-        const call = spy.getLastCall();
-        expect(call?.channelId).toBe("123456789012345678");
-        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-        const embed = call?.embeds[0] as {
-          description: string;
-          title: string;
-          url: string;
-        };
-        expect(embed.title).toBe("Dark mode please");
-        expect(embed.description).toContain("**Customer Tier:** Enterprise");
-        expect(embed.url).toBe(
-          "https://feeblo.example/org/post/ideas/dark-mode"
-        );
-      })
+      const call = spy.getLastCall();
+      expect(call?.channelId).toBe("123456789012345678");
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      const embed = call?.embeds[0] as {
+        description: string;
+        title: string;
+        url: string;
+      };
+      expect(embed.title).toBe("Dark mode please");
+      expect(embed.description).toContain("**Customer Tier:** Enterprise");
+      expect(embed.url).toBe("https://feeblo.example/org/post/ideas/dark-mode");
+    })
   );
 
   it.effect("rejects unsupported event types as invalid configuration", () =>
@@ -226,7 +222,7 @@ describe("discord provider registration", () => {
           deliveryInput({
             event: {
               ...deliveryInput().event,
-              type: "feedback.post.status_changed",
+              type: "post.status_changed",
             },
           })
         )

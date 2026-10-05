@@ -40,7 +40,7 @@ describe("WebhookManagementRpcHandlers", () => {
         const connectionId = yield* IntegrationConnectionId.generate;
         const forwardedOrganizationIds: string[] = [];
         const endpoint = {
-          eventTypes: ["feedback.post.created"] as const,
+          eventTypes: ["post.created"] as const,
           health: "healthy" as const,
           hostname: "hooks.example.test",
           id: connectionId,
@@ -135,7 +135,7 @@ describe("WebhookManagementRpcHandlers", () => {
   it("decodes endpoint and history reads without credential-bearing fields", () => {
     const endpoint = Schema.decodeUnknownSync(WebhookEndpoint)({
       endpointUrl: "https://secret.example.test/hook",
-      eventTypes: ["feedback.post.created"],
+      eventTypes: ["post.created"],
       health: "healthy",
       hostname: "hooks.example.test",
       id: "inc_safe",

@@ -216,7 +216,7 @@ export const makeSlackChannelServiceLive = (
                     configVersion: 1,
                     connectionId: input.connectionId,
                     enabled: true,
-                    eventTypes: ["feedback.post.created"],
+                    eventTypes: ["post.created"],
                     id: yield* IntegrationRouteId.generate,
                     organizationId: input.organizationId,
                     providerConfig: {
@@ -233,7 +233,7 @@ export const makeSlackChannelServiceLive = (
                     .update(schema.integrationRouteTable)
                     .set({
                       enabled: true,
-                      eventTypes: ["feedback.post.created"],
+                      eventTypes: ["post.created"],
                       providerConfig: {
                         channelId: input.channelId,
                         version: 1,

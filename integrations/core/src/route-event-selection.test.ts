@@ -8,21 +8,21 @@ import {
 describe("doesIntegrationRouteMatchEvent", () => {
   const route = {
     enabled: true,
-    eventTypes: ["feedback.post.created"] as const,
+    eventTypes: ["post.created"] as const,
   };
 
   it("matches selected events only while the connection is active", () => {
     expect(
       doesIntegrationRouteMatchEvent({
         connectionLifecycleStatus: "active",
-        event: { type: "feedback.post.created" },
+        event: { type: "post.created" },
         route,
       })
     ).toBe(true);
     expect(
       doesIntegrationRouteMatchEvent({
         connectionLifecycleStatus: "paused",
-        event: { type: "feedback.post.created" },
+        event: { type: "post.created" },
         route,
       })
     ).toBe(false);

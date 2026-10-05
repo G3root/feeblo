@@ -57,7 +57,7 @@ const seedRoute = ({
       configVersion: 1,
       connectionId,
       enabled: true,
-      eventTypes: ["feedback.post.created"],
+      eventTypes: ["post.created"],
       id: routeId,
       organizationId,
       providerConfig: {},
@@ -96,7 +96,7 @@ const makePostCreatedEvent = Effect.gen(function* () {
       occurredAt: DateTime.makeUnsafe(new Date()),
       organizationId,
       origin: { kind: "feeblo" as const },
-      type: "feedback.post.created" as const,
+      type: "post.created" as const,
       version: 1 as const,
     },
   };

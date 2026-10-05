@@ -223,9 +223,7 @@ export const makePostWrites = Effect.gen(function* () {
   const recordPostIntegrationEvent = (args: {
     readonly actor: PostWriteActor;
     readonly boardId: string;
-    readonly eventType:
-      | "feedback.post.created"
-      | "feedback.post.status_changed";
+    readonly eventType: "post.created" | "post.status_changed";
     /** Validated metadata the caller already vetted; forwarded verbatim. */
     readonly metadata?: Readonly<Record<string, string>>;
     readonly organizationId: string;
@@ -505,7 +503,7 @@ export const makePostWrites = Effect.gen(function* () {
           yield* recordPostIntegrationEvent({
             actor,
             boardId: args.boardId,
-            eventType: "feedback.post.created",
+            eventType: "post.created",
             ...(args.metadata !== undefined && { metadata: args.metadata }),
             organizationId: args.organizationId,
             postId: args.id,
@@ -909,7 +907,7 @@ export const makePostWrites = Effect.gen(function* () {
           yield* recordPostIntegrationEvent({
             actor,
             boardId: args.boardId ?? previous.boardId,
-            eventType: "feedback.post.status_changed",
+            eventType: "post.status_changed",
             organizationId: args.organizationId,
             postId: args.id,
             postSlug: previous.slug,

@@ -221,7 +221,7 @@ export const makeGitHubProviderRegistration = ({
     capabilityKey: githubIssueCreateCapabilityKey,
     deliver: (input: IntegrationProviderDeliveryInput) =>
       Effect.gen(function* () {
-        if (input.event.type !== "feedback.post.created") {
+        if (input.event.type !== "post.created") {
           return yield* new IntegrationProviderInvalidConfigurationError({
             message: "GitHub issue creation only supports new posts",
             provider: githubProviderKey,
