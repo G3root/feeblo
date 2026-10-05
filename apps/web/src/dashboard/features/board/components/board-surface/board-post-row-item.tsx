@@ -6,6 +6,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 
+import { m } from "@/paraglide/messages.js";
 import { useBoardStore } from "~/features/board/state/board-store-context";
 
 import { StatusIcon } from "./status-icon";
@@ -78,6 +79,8 @@ export function BoardPostRowItem({
             <UserAvatar
               className="size-5"
               image={post.user.image}
+              isMember={post.authorIsMember}
+              memberLabel={m.sad_soft_tadpole()}
               name={post.user.name}
               size="sm"
             />

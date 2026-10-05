@@ -10,6 +10,7 @@ import {
 export type CommentDisplayProviderProps = {
   children?: ReactNode;
   authorName: string;
+  authorIsMember?: boolean;
   commentId: string;
   postId: string;
   postSlug: string;
@@ -60,6 +61,7 @@ const defaultCallbacks = {
 export function CommentDisplayProvider({
   children,
   authorName,
+  authorIsMember = false,
   commentId,
   postId,
   postSlug,
@@ -112,6 +114,7 @@ export function CommentDisplayProvider({
       },
       state: {
         authorName,
+        authorIsMember,
         commentId,
         content,
         createdAt,
@@ -131,6 +134,7 @@ export function CommentDisplayProvider({
     }),
     [
       authorName,
+      authorIsMember,
       commentId,
       content,
       createdAt,

@@ -19,6 +19,7 @@ import { useSite } from "../../providers/site-provider";
 
 type PostVoter = {
   id: string;
+  voterIsMember: boolean;
   user: {
     image: string | null;
     name: string;
@@ -121,7 +122,9 @@ function PostVoterList() {
       {visibleVoters.map((voter) => (
         <UserAvatar
           image={voter.user.image}
+          isMember={voter.voterIsMember}
           key={voter.id}
+          memberLabel={m.sad_soft_tadpole()}
           name={voter.user.name}
         />
       ))}
@@ -150,7 +153,12 @@ function PostVoterDialogPopup() {
           {voters.map((voter) => (
             <li key={voter.id}>
               <div className="flex items-center gap-3 rounded-xl px-2 py-2">
-                <UserAvatar image={voter.user.image} name={voter.user.name} />
+                <UserAvatar
+                  image={voter.user.image}
+                  isMember={voter.voterIsMember}
+                  memberLabel={m.sad_soft_tadpole()}
+                  name={voter.user.name}
+                />
                 <span className="text-foreground text-sm font-medium">
                   {voter.user.name}
                 </span>

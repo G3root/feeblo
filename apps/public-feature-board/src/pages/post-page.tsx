@@ -524,7 +524,13 @@ function PostMetaSidebarAuthor() {
   return (
     <PostMetaSidebarSection title={m.great_trick_jay()}>
       <div className="flex items-center gap-2.5">
-        <UserAvatar className="size-8" image={authorImage} name={authorName} />
+        <UserAvatar
+          className="size-8"
+          image={authorImage}
+          isMember={post?.authorIsMember ?? false}
+          memberLabel={m.sad_soft_tadpole()}
+          name={authorName}
+        />
         <p className="text-foreground text-sm font-medium">{authorName}</p>
       </div>
     </PostMetaSidebarSection>

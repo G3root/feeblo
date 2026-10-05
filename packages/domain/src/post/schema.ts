@@ -36,6 +36,12 @@ export const Post = S.Struct({
   organizationId: S.String,
   creatorMemberId: S.NullOr(S.String),
   creatorId: S.NullOr(S.String),
+  /**
+   * Whether the author is a member of the workspace. Derived from
+   * `creatorMemberId` in SQL: public reads redact the identifier, and a
+   * boolean is not an identifier, so it survives the redaction.
+   */
+  authorIsMember: S.Boolean,
   lockedAt: S.NullOr(S.DateFromString),
   archivedAt: S.NullOr(S.DateFromString),
   mergedIntoPostId: S.NullOr(S.String),
@@ -71,6 +77,8 @@ export const PostListItem = S.Struct({
   organizationId: S.String,
   creatorMemberId: S.NullOr(S.String),
   creatorId: S.NullOr(S.String),
+  /** See {@link Post.authorIsMember}. */
+  authorIsMember: S.Boolean,
   lockedAt: S.NullOr(S.DateFromString),
   archivedAt: S.NullOr(S.DateFromString),
   mergedIntoPostId: S.NullOr(S.String),
