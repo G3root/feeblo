@@ -31,6 +31,8 @@ import {
 export interface AuthorPickerDisplay {
   readonly avatarUrl?: string | null;
   readonly email?: string | null;
+  /** Draws the member tick on the trigger avatar when true. */
+  readonly isMember?: boolean;
   readonly name?: string | null;
 }
 
@@ -109,6 +111,7 @@ export function AuthorPicker({
           name: displayValue.name ?? undefined,
         });
   const displayAvatarUrl = displayValue?.avatarUrl ?? null;
+  const displayIsMember = displayValue?.isMember ?? false;
   const displayNameAttr = displayValue?.name ?? null;
 
   const handleSelect = (selection: ContactComboboxSelection | null) => {
@@ -137,7 +140,13 @@ export function AuthorPicker({
   if (disabled) {
     return (
       <span className="flex min-w-0 items-center gap-2">
-        <UserAvatar image={displayAvatarUrl} name={displayNameAttr} size="sm" />
+        <UserAvatar
+          image={displayAvatarUrl}
+          isMember={displayIsMember}
+          memberLabel={m.sad_soft_tadpole()}
+          name={displayNameAttr}
+          size="sm"
+        />
         <span className="truncate font-medium">
           {displayName ?? placeholder}
         </span>
@@ -171,6 +180,8 @@ export function AuthorPicker({
                 <UserAvatar
                   className="size-5"
                   image={displayAvatarUrl}
+                  isMember={displayIsMember}
+                  memberLabel={m.sad_soft_tadpole()}
                   name={displayNameAttr}
                   size="sm"
                 />

@@ -207,6 +207,9 @@ const selectPostFields = (opts?: { contactFallback?: boolean }) => ({
   },
   creatorMemberId: schema.postTable.creatorMemberId,
   creatorId: schema.postTable.creatorId,
+  // The member tick the author's avatar draws. Derived here rather than in
+  // the client because the public selects redact `creatorMemberId`.
+  authorIsMember: sql<boolean>`${schema.postTable.creatorMemberId} is not null`,
   metadata: schema.postTable.metadata,
   lockedAt: schema.postTable.lockedAt,
   archivedAt: schema.postTable.archivedAt,

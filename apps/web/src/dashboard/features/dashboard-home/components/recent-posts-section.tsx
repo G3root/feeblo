@@ -30,6 +30,7 @@ interface Post {
   title: string;
   excerpt: string | null;
   createdAt: Date | string;
+  authorIsMember: boolean;
   user?: {
     name: string | null;
     image: string | null;
@@ -122,6 +123,7 @@ export function RecentPostsSection({
                   <PostCard.MobileMeta
                     boardName={board?.name ?? ""}
                     image={post.user?.image}
+                    isMember={post.authorIsMember}
                     name={post.user?.name}
                   />
                 </PostCard.Body>
@@ -137,6 +139,7 @@ export function RecentPostsSection({
                   )}
                   <PostCard.Author
                     image={post.user?.image}
+                    isMember={post.authorIsMember}
                     name={post.user?.name}
                   />
                 </PostCard.DesktopMeta>

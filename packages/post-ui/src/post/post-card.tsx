@@ -159,11 +159,13 @@ export function PostCardBoardBadge({
 
 export function PostCardAuthor({
   image,
+  isMember = false,
   name,
   className,
   ...props
 }: React.ComponentProps<"div"> & {
   image?: string | null;
+  isMember?: boolean;
   name?: string | null;
 }) {
   return (
@@ -172,7 +174,12 @@ export function PostCardAuthor({
       data-slot="post-card-author"
       {...props}
     >
-      <UserAvatar image={image} name={name} />
+      <UserAvatar
+        image={image}
+        isMember={isMember}
+        memberLabel={m.sad_soft_tadpole()}
+        name={name}
+      />
       <span
         className="text-muted-foreground truncate text-right text-xs"
         data-slot="post-card-author-name"
@@ -196,12 +203,14 @@ export function PostCardStatus({
 export function PostCardMobileMeta({
   boardName,
   image,
+  isMember = false,
   name,
   className,
   ...props
 }: React.ComponentProps<"div"> & {
   boardName: string;
   image?: string | null;
+  isMember?: boolean;
   name?: string | null;
 }) {
   return (
@@ -213,7 +222,12 @@ export function PostCardMobileMeta({
       data-slot="post-card-mobile-meta"
       {...props}
     >
-      <UserAvatar image={image} name={name} />
+      <UserAvatar
+        image={image}
+        isMember={isMember}
+        memberLabel={m.sad_soft_tadpole()}
+        name={name}
+      />
       <span className="truncate" data-slot="post-card-mobile-author">
         {name ?? m.active_equal_hedgehog()}
       </span>
