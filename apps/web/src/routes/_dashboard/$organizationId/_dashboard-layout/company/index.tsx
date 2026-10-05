@@ -21,8 +21,8 @@ import {
   Ellipsis,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
+import { useMemo } from "react";
 
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import { CompanyCreateDialog } from "~/features/contact/components/company-create-dialog";
@@ -42,13 +42,16 @@ import {
   type CustomAttributeValue,
   formatCustomAttributeValue,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
+import { useCompanyAttributeDefinitions } from "~/hooks/use-attribute-definitions";
+import { useCompanyAttributeValues } from "~/hooks/use-attribute-values";
 import { useEntitlements } from "~/hooks/use-entitlements";
+import { useOrgCompanies } from "~/hooks/use-org-companies";
+import { useOrgContacts } from "~/hooks/use-org-contacts";
 import {
   companyAttributeDefinitionCollection,
   companyAttributeValueCollection,
   companyCollection,
 } from "~/lib/collections";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/_dashboard-layout/company/"
@@ -81,37 +84,23 @@ function RouteComponent() {
 
 function CompanyPage() {
   const { organizationId } = Route.useParams();
-  const {
-    companyAttributeDefinitionCollection,
-    companyCollection,
-    contactCollection,
-  } = useDashboardCollections();
   const createDialogStore = useCompanyCreateDialogContext();
   const editDialogStore = useCompanyEditDialogContext();
   const deleteDialogStore = useCompanyDeleteDialogContext();
-  const companiesQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ company: companyCollection })
-        .where(({ company }) => eq(company.organizationId, organizationId))
-        .orderBy(({ company }) => company.updatedAt, "desc"),
-  });
-  const companies = companiesQuery.data ?? [];
-  const { data: contacts = [] } = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ contact: contactCollection })
-        .where(({ contact }) => eq(contact.organizationId, organizationId)),
-  });
-  const definitionsQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ definition: companyAttributeDefinitionCollection })
-        .where(({ definition }) =>
-          eq(definition.organizationId, organizationId)
-        )
-        .orderBy(({ definition }) => definition.createdAt, "asc"),
-  });
+  const companiesQuery = useOrgCompanies(organizationId);
+  // The shared org-companies query is unordered; this table keeps its
+  // most-recently-updated-first order locally.
+  const companies = useMemo(
+    () =>
+      companiesQuery.data.toSorted(
+        (left, right) =>
+          new Date(right.updatedAt).getTime() -
+          new Date(left.updatedAt).getTime()
+      ),
+    [companiesQuery.data]
+  );
+  const { data: contacts = [] } = useOrgContacts(organizationId);
+  const definitionsQuery = useCompanyAttributeDefinitions(organizationId);
   const definitions = definitionsQuery.data ?? [];
 
   const { entitlements } = useEntitlements();
@@ -340,13 +329,7 @@ function CompanyAttributeCells({
   companyId: string;
   definitions: CustomAttributeDefinition[];
 }) {
-  const { companyAttributeValueCollection } = useDashboardCollections();
-  const valuesQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ value: companyAttributeValueCollection })
-        .where(({ value }) => eq(value.companyId, companyId)),
-  });
+  const valuesQuery = useCompanyAttributeValues(companyId);
   const valuesByAttributeId = new Map(
     (valuesQuery.data ?? []).map((value) => [value.attributeId, value])
   );

@@ -25,6 +25,7 @@ import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
+import { useMemo } from "react";
 import { z } from "zod";
 
 import {
@@ -34,8 +35,11 @@ import {
   getCustomAttributeInputValues,
   hasMissingRequiredCustomAttributeValues,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
+import { useContactAttributeDefinitions } from "~/hooks/use-attribute-definitions";
+import { useContactAttributeValues } from "~/hooks/use-attribute-values";
+import { useOrgCompanies } from "~/hooks/use-org-companies";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+import { contactCollection } from "~/lib/collections";
 
 import { useContactEditDialogContext } from "../dialog-stores";
 
@@ -61,15 +65,15 @@ export function ContactEditDialog() {
 
 function ContactEditForm() {
   const organizationId = useOrganizationId();
-  const {
-    companyCollection,
-    contactAttributeDefinitionCollection,
-    contactAttributeValueCollection,
-    contactCollection,
-  } = useDashboardCollections();
   const store = useContactEditDialogContext();
   const contactId = useSelector(store, (state) => state.context.data.contactId);
   const { data } = useLiveQuery({
+    queryKey: [
+      "contact-by-id",
+      contactCollection.id,
+      contactId,
+      organizationId,
+    ],
     query: (q) =>
       q
         .from({ contact: contactCollection })
@@ -83,28 +87,17 @@ function ContactEditForm() {
         .limit(1),
   });
   const contact = data[0];
-  const definitionsQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ definition: contactAttributeDefinitionCollection })
-        .where(({ definition }) =>
-          eq(definition.organizationId, organizationId)
-        )
-        .orderBy(({ definition }) => definition.createdAt, "asc"),
-  });
-  const attributeValuesQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ value: contactAttributeValueCollection })
-        .where(({ value }) => eq(value.contactId, contactId)),
-  });
-  const companiesQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ company: companyCollection })
-        .where(({ company }) => eq(company.organizationId, organizationId))
-        .orderBy(({ company }) => company.name, "asc"),
-  });
+  const definitionsQuery = useContactAttributeDefinitions(organizationId);
+  const attributeValuesQuery = useContactAttributeValues(contactId);
+  const companiesQuery = useOrgCompanies(organizationId);
+  // The shared org-companies query is unordered; this picker orders by name.
+  const companies = useMemo(
+    () =>
+      companiesQuery.data.toSorted((left, right) =>
+        left.name.localeCompare(right.name)
+      ),
+    [companiesQuery.data]
+  );
 
   if (
     !contact ||
@@ -118,7 +111,7 @@ function ContactEditForm() {
   return (
     <ContactEditFormFields
       attributeValues={attributeValuesQuery.data ?? []}
-      companies={companiesQuery.data ?? []}
+      companies={companies}
       contact={contact}
       definitions={definitionsQuery.data ?? []}
     />

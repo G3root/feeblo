@@ -92,6 +92,9 @@ export function useDashboardHomeStats<
   TUpvote
 >): UseDashboardHomeStatsResult<TBoard, TPost, TPostStatus> {
   const boardsQuery = useLiveQuery({
+    // Shared home-page hook (dashboard and portal); the explicit keys skip
+    // re-deriving identity on every stats render.
+    queryKey: ["dashboard-home-boards", boardCollection.id, organizationId],
     query: (q) => {
       if (!organizationId) {
         return undefined;
@@ -104,6 +107,11 @@ export function useDashboardHomeStats<
   });
 
   const statusesQuery = useLiveQuery({
+    queryKey: [
+      "dashboard-home-statuses",
+      postStatusCollection.id,
+      organizationId,
+    ],
     query: (q) => {
       if (!organizationId) {
         return undefined;
@@ -118,6 +126,11 @@ export function useDashboardHomeStats<
   });
 
   const recentPostsQuery = useLiveQuery({
+    queryKey: [
+      "dashboard-home-recent-posts",
+      postCollection.id,
+      organizationId,
+    ],
     query: (q) => {
       if (!organizationId) {
         return undefined;
@@ -141,6 +154,12 @@ export function useDashboardHomeStats<
   const recentPostIds = (recentPostsQuery.data ?? []).map((post) => post.id);
 
   const upvoteCountsQuery = useLiveQuery({
+    queryKey: [
+      "dashboard-home-upvote-counts",
+      upvoteCollection.id,
+      organizationId,
+      recentPostIds,
+    ],
     query: (q) => {
       if (!organizationId || recentPostIds.length === 0) {
         return undefined;

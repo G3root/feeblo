@@ -12,6 +12,9 @@ export const useSite = () => {
   const { siteCollection } = useDashboardCollections();
 
   const { data: site } = useLiveQuery({
+    // Read by ~24 dashboard surfaces; the explicit key keeps the hook off the
+    // per-render identity path.
+    queryKey: ["site", siteCollection.id, organizationId],
     query: (q) =>
       q
         .from({ site: siteCollection })

@@ -55,6 +55,12 @@ function ChangelogCategoryRenameForm() {
   );
 
   const { data } = useLiveQuery({
+    queryKey: [
+      "changelog-category-by-id",
+      changelogCategoryCollection.id,
+      categoryId,
+      organizationId,
+    ],
     query: (q) =>
       q
         .from({ category: changelogCategoryCollection })

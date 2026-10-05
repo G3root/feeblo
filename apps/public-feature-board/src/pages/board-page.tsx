@@ -63,6 +63,14 @@ export function BoardPage({ boardSlug }: { readonly boardSlug: string }) {
   } = usePublicCollections();
 
   const boardQuery = useLiveQuery({
+    // Public board page (SSR + client); explicit keys skip rebuilding these
+    // lookups on re-renders.
+    queryKey: [
+      "portal-board",
+      publicBoardCollection.id,
+      site.organizationId,
+      boardSlug,
+    ],
     query: (q) => {
       if (!(site.organizationId && boardSlug)) {
         return undefined;
@@ -87,6 +95,13 @@ export function BoardPage({ boardSlug }: { readonly boardSlug: string }) {
   const boardError = boardQuery.isError;
 
   const postsQuery = useLiveQuery({
+    queryKey: [
+      "portal-board-posts",
+      publicPostCollection.id,
+      publicPostStatusCollection.id,
+      site.organizationId,
+      board?.id ?? null,
+    ],
     query: (q) => {
       if (!board?.id) {
         return undefined;

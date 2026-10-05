@@ -55,6 +55,15 @@ function useCanBulkDeleteSelectedPosts(): boolean {
     !canManageAllPosts && isMember && selectedPostIds.length > 0;
   const { deleteEligibilityCollection } = useDashboardCollections();
   const { data: eligibleRows } = useLiveQuery({
+    // The board surface re-renders on every keystroke/filter change, so this
+    // selection-scoped query takes the hot-path escape hatch.
+    queryKey: [
+      "board-bulk-delete-eligibility",
+      deleteEligibilityCollection?.id ?? null,
+      organizationId,
+      contributorCase,
+      selectedPostIds,
+    ],
     query: (q) => {
       if (!contributorCase || !deleteEligibilityCollection) {
         return undefined;

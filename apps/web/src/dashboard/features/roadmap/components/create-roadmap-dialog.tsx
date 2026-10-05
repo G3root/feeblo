@@ -51,6 +51,7 @@ function CreateRoadmapForm() {
   const store = useCreateRoadmapDialogContext();
 
   const { data: roadmaps, isLoading } = useLiveQuery({
+    queryKey: ["create-roadmap-list", roadmapCollection.id, organizationId],
     query: (q) =>
       q
         .from({ roadmap: roadmapCollection })

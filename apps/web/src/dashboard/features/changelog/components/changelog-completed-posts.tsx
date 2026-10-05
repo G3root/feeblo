@@ -23,6 +23,16 @@ export function ChangelogCompletedPosts({
     useDashboardCollections();
   const { changelog, isOwner } = useChangelogEditorContext();
   const completedPostsQuery = useLiveQuery({
+    // The heaviest IR in the changelog editor; keying it skips rebuilding the
+    // join/having shape on every editor render.
+    queryKey: [
+      "changelog-completed-posts",
+      postCollection.id,
+      postStatusCollection.id,
+      changelogPostCollection.id,
+      organizationId,
+      changelog.id,
+    ],
     query: (q) =>
       q
         .from({ post: postCollection })

@@ -18,8 +18,8 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
 import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import { UserAdd01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
+import { useMemo } from "react";
 
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import { CompanyEditDialog } from "~/features/contact/components/company-edit-dialog";
@@ -38,14 +38,16 @@ import {
   useContactDeleteDialogContext,
   useContactEditDialogContext,
 } from "~/features/contact/dialog-stores";
+import { useContactAttributeDefinitions } from "~/hooks/use-attribute-definitions";
 import { useEntitlements } from "~/hooks/use-entitlements";
+import { useOrgCompanies } from "~/hooks/use-org-companies";
+import { useOrgContacts } from "~/hooks/use-org-contacts";
 import {
   companyCollection,
   contactAttributeDefinitionCollection,
   contactAttributeValueCollection,
   contactCollection,
 } from "~/lib/collections";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/_dashboard-layout/contact/"
@@ -82,38 +84,25 @@ function RouteComponent() {
 
 function ContactPage() {
   const { organizationId } = Route.useParams();
-  const {
-    companyCollection,
-    contactAttributeDefinitionCollection,
-    contactCollection,
-  } = useDashboardCollections();
   const createDialogStore = useContactCreateDialogContext();
   const editDialogStore = useContactEditDialogContext();
   const deleteDialogStore = useContactDeleteDialogContext();
   const companyEditDialogStore = useCompanyEditDialogContext();
-  const contactsQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ contact: contactCollection })
-        .where(({ contact }) => eq(contact.organizationId, organizationId))
-        .orderBy(({ contact }) => contact.updatedAt, "desc"),
-  });
-  const contacts = contactsQuery.data ?? [];
-  const { data: definitions = [] } = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ definition: contactAttributeDefinitionCollection })
-        .where(({ definition }) =>
-          eq(definition.organizationId, organizationId)
-        )
-        .orderBy(({ definition }) => definition.createdAt, "asc"),
-  });
-  const { data: companies = [] } = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ company: companyCollection })
-        .where(({ company }) => eq(company.organizationId, organizationId)),
-  });
+  const contactsQuery = useOrgContacts(organizationId);
+  // The shared org-contacts query is unordered; this table keeps its
+  // most-recently-updated-first order locally.
+  const contacts = useMemo(
+    () =>
+      contactsQuery.data.toSorted(
+        (left, right) =>
+          new Date(right.updatedAt).getTime() -
+          new Date(left.updatedAt).getTime()
+      ),
+    [contactsQuery.data]
+  );
+  const { data: definitions = [] } =
+    useContactAttributeDefinitions(organizationId);
+  const { data: companies = [] } = useOrgCompanies(organizationId);
   const companiesById = new Map(companies.map((c) => [c.id, c]));
 
   const { entitlements } = useEntitlements();

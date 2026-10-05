@@ -88,6 +88,10 @@
       "types": "./src/v2/upvote-toggle.tsx",
       "default": "./src/v2/upvote-toggle.tsx"
     },
+    "./use-post-upvotes": {
+      "types": "./src/v2/use-post-upvotes.ts",
+      "default": "./src/v2/use-post-upvotes.ts"
+    },
     "./voter-panel": {
       "types": "./src/v2/voter-panel.tsx",
       "default": "./src/v2/voter-panel.tsx"

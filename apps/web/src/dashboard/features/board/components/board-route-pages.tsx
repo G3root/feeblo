@@ -34,6 +34,7 @@ function BoardFeedbackPage({
 }: BoardPageProps) {
   const { boardCollection } = useDashboardCollections();
   const { data: board } = useLiveQuery({
+    queryKey: ["board-route", boardCollection.id, boardSlug, organizationId],
     query: (q) =>
       q
         .from({ board: boardCollection })

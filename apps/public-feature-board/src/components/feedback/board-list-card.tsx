@@ -12,6 +12,11 @@ export function BoardListCard() {
   const { publicBoardCollection } = usePublicCollections();
 
   const { data } = useLiveQuery({
+    queryKey: [
+      "portal-board-list",
+      publicBoardCollection.id,
+      site.organizationId,
+    ],
     query: (q) =>
       q
         .from({ board: publicBoardCollection })

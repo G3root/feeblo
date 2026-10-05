@@ -295,8 +295,15 @@ const { data } = useLiveQuery({
 ```
 
 Before 1.0, opaque IR warns and keeps legacy mount-stable identity. Slow or
-repeated derived identity work also warns once. Both point to the same
-`queryKey` escape hatch; unhashable IR without a key will throw in 1.0.
+repeated derived identity work also warns once (≥16ms in one render, or ≥50ms
+across 10+ renders). Both point to the same `queryKey` escape hatch; unhashable
+IR without a key will throw in 1.0. Once provided, the key **is** the query
+identity — list every captured input and collection id that shapes the query,
+and give sibling queries over the same collection distinct keys.
+
+> **This repo keys every config.** Do not leave a structured query on derived
+> identity; see the top-level Repo Rules and the `~/hooks/use-org-*` and
+> `@feeblo/post-ui/use-post-*` shared hooks.
 
 ### Suspense + Error Boundary
 

@@ -38,6 +38,12 @@ export function ChangelogDetailPage({
     publicChangelogDetailCollection,
   } = usePublicCollections();
   const changelogQuery = useLiveQuery({
+    queryKey: [
+      "portal-changelog-detail",
+      publicChangelogDetailCollection.id,
+      site.organizationId,
+      changelogSlug,
+    ],
     query: (q) =>
       q
         .from({ changelog: publicChangelogDetailCollection })
@@ -55,6 +61,12 @@ export function ChangelogDetailPage({
   const isError = changelogQuery.isError;
 
   const { data: categoryLinks = [] } = useLiveQuery({
+    queryKey: [
+      "portal-changelog-detail-links",
+      publicChangelogCategoryLinkCollection.id,
+      changelog?.id ?? null,
+      site.organizationId,
+    ],
     query: (q) => {
       if (!changelog) {
         return undefined;

@@ -28,12 +28,11 @@ import {
   Plus,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 import type { ReactNode } from "react";
 
+import { useChangelogCategories } from "~/hooks/use-changelog-categories";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePlan } from "~/hooks/use-plan";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import {
   useChangelogCategoryCreateDialogContext,
@@ -43,19 +42,12 @@ import {
 
 export function ChangelogCategorySettingsTable() {
   const organizationId = useOrganizationId();
-  const { changelogCategoryCollection } = useDashboardCollections();
   const createDialogStore = useChangelogCategoryCreateDialogContext();
   const editDialogStore = useChangelogCategoryEditDialogContext();
   const deleteDialogStore = useChangelogCategoryDeleteDialogContext();
   const planQuery = usePlan();
 
-  const categoriesQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ category: changelogCategoryCollection })
-        .where(({ category }) => eq(category.organizationId, organizationId))
-        .orderBy(({ category }) => category.createdAt, "asc"),
-  });
+  const categoriesQuery = useChangelogCategories(organizationId);
 
   const categories = categoriesQuery?.data ?? [];
   const plan = planQuery.data?.plan;

@@ -43,12 +43,13 @@ import {
 } from "@feeblo/web-shared/use-policy";
 import { Delete02Icon, Plus, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import * as React from "react";
 import { z } from "zod";
 
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { MembersSettingsLayout } from "~/features/settings/components/settings-members-layout";
+import { useOrgInvitations } from "~/hooks/use-org-invitations";
+import { useOrgMembers } from "~/hooks/use-org-members";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePrivilegedMemberLimit } from "~/hooks/use-privileged-member-limit";
 import { invitationsCollection, membersCollection } from "~/lib/collections";
@@ -84,13 +85,7 @@ export function MembersSection() {
   const { atLimit: atPrivilegedLimit } = usePrivilegedMemberLimit();
   const [search, setSearch] = React.useState("");
 
-  const membersQuery = useLiveQuery({
-    query: (q) => {
-      return q
-        .from({ member: membersCollection })
-        .where(({ member }) => eq(member.organizationId, organizationId));
-    },
-  });
+  const membersQuery = useOrgMembers(organizationId);
   const membersData = membersQuery.data;
   const members = React.useMemo(() => {
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
@@ -240,20 +235,9 @@ export function InvitationsSection() {
   );
   const [search, setSearch] = React.useState("");
 
-  const invitationsQuery = useLiveQuery({
-    query: (q) => {
-      if (isPolicyPending || !canListInvitations) {
-        return undefined;
-      }
-      return q
-        .from({ invitation: invitationsCollection })
-        .where(({ invitation }) =>
-          and(
-            eq(invitation.organizationId, organizationId),
-            eq(invitation.status, "pending")
-          )
-        );
-    },
+  const invitationsQuery = useOrgInvitations({
+    organizationId,
+    enabled: !isPolicyPending && canListInvitations,
   });
   const invitationsData = invitationsQuery.data;
   const invitations = React.useMemo(() => {

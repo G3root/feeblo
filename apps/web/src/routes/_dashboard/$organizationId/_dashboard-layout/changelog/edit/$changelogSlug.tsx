@@ -63,6 +63,12 @@ function RouteComponent() {
   const { changelogCollection } = useDashboardCollections();
 
   const changelogQuery = useLiveQuery({
+    queryKey: [
+      "changelog-by-slug",
+      changelogCollection.id,
+      organizationId,
+      changelogSlug,
+    ],
     query: (q) =>
       q
         .from({ changelog: changelogCollection })

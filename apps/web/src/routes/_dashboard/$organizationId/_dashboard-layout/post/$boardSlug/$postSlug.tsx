@@ -159,6 +159,13 @@ function RouteComponent() {
   );
 
   const { data: postRow, isLoading: isPostLoading } = useLiveQuery({
+    queryKey: [
+      "post-by-slug-with-board",
+      postCollection.id,
+      boardCollection.id,
+      postSlug,
+      organizationId,
+    ],
     query: (q) => {
       return q
         .from({ post: postCollection })

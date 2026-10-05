@@ -260,6 +260,12 @@ export function PostReactionPicker() {
   const { data: session } = useAuthState();
 
   const reactionCountsQuery = useLiveQuery({
+    queryKey: [
+      "post-reaction-counts",
+      postReactionCollection.id,
+      organizationId,
+      postSlug,
+    ],
     query: (q) => {
       if (!postSlug) {
         return undefined;
@@ -286,6 +292,13 @@ export function PostReactionPicker() {
   const isReactionCountsLoading = isLiveQueryPending(reactionCountsQuery);
 
   const { data: userReactions } = useLiveQuery({
+    queryKey: [
+      "post-user-reactions",
+      postReactionCollection.id,
+      organizationId,
+      postSlug,
+      session?.user?.id ?? null,
+    ],
     query: (q) => {
       if (!(postSlug && session?.user?.id)) {
         return undefined;
@@ -418,6 +431,12 @@ export function CommentReactionPicker({
   const { data: session } = useAuthState();
 
   const reactionCountsQuery = useLiveQuery({
+    queryKey: [
+      "comment-reaction-counts",
+      commentReactionCollection.id,
+      commentId,
+      postSlug,
+    ],
     query: (q) => {
       if (!postSlug) {
         return undefined;
@@ -442,6 +461,13 @@ export function CommentReactionPicker({
   const isReactionCountsLoading = isLiveQueryPending(reactionCountsQuery);
 
   const { data: userReactions } = useLiveQuery({
+    queryKey: [
+      "comment-user-reactions",
+      commentReactionCollection.id,
+      commentId,
+      postSlug,
+      session?.user?.id ?? null,
+    ],
     query: (q) => {
       if (!(postSlug && session?.user?.id)) {
         return undefined;

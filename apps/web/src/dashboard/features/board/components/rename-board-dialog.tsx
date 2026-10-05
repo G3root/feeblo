@@ -48,6 +48,7 @@ function RenameBoardForm() {
   const boardId = useSelector(store, (state) => state.context.data.boardId);
 
   const { data } = useLiveQuery({
+    queryKey: ["board-by-id", boardCollection.id, boardId, organizationId],
     query: (q) =>
       q
         .from({ board: boardCollection })

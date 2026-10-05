@@ -47,6 +47,7 @@ import {
   postCreateFormOpts,
 } from "../forms/post-create-form-shared";
 import { usePostCollections } from "../providers/post-collections-provider";
+import { usePostStatuses } from "../use-post-statuses";
 
 const SUGGESTIONS_DEBOUNCE_MS = 450;
 
@@ -174,7 +175,6 @@ export function PostCreateForm() {
     deleteEligibilityCollection,
     membersCollection,
     postCollection,
-    postStatusCollection,
   } = collections;
   const { data: session } = useAuthState();
 
@@ -185,6 +185,14 @@ export function PostCreateForm() {
   );
 
   const { data: member } = useLiveQuery({
+    // The feedback dialog mounts on hot portal pages; the explicit keys list
+    // every captured input plus the collection each query reads.
+    queryKey: [
+      "post-create-member",
+      membersCollection?.id ?? null,
+      organizationId,
+      session?.user?.id ?? null,
+    ],
     query: (q) => {
       if (!(membersCollection && organizationId && session?.user?.id)) {
         return undefined;
@@ -202,6 +210,7 @@ export function PostCreateForm() {
   });
 
   const { data: boards = [] } = useLiveQuery({
+    queryKey: ["post-create-boards", boardCollection.id, organizationId],
     query: (q) => {
       if (!organizationId) {
         return undefined;
@@ -211,19 +220,7 @@ export function PostCreateForm() {
         .where(({ board }) => eq(board.organizationId, organizationId));
     },
   });
-  const { data: postStatuses = [] } = useLiveQuery({
-    query: (q) => {
-      if (!organizationId) {
-        return undefined;
-      }
-
-      return q
-        .from({ postStatus: postStatusCollection })
-        .where(({ postStatus }) =>
-          eq(postStatus.organizationId, organizationId)
-        );
-    },
-  });
+  const { data: postStatuses = [] } = usePostStatuses();
 
   const initialStatus =
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.

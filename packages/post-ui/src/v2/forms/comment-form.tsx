@@ -6,7 +6,6 @@ import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 import { formOptions } from "@tanstack/react-form";
 import {
   useCallback,
@@ -34,6 +33,7 @@ import {
 } from "../contact-combobox/contact-combobox";
 import { usePostCollectionData } from "../post-page-context";
 import { usePostCollections } from "../providers/post-collections-provider";
+import { usePostStatuses } from "../use-post-statuses";
 
 const CommentVisibilitySchema = z.enum(["PUBLIC", "INTERNAL"]);
 
@@ -94,19 +94,7 @@ export const commentCreateFormOpts = formOptions({
 
 /** Renders the org's post statuses as picker options for the composer. */
 export function useCommentComposerStatusOptions(): readonly TPostStatusOption[] {
-  const { organizationId } = usePostCollectionData();
-  const {
-    collections: { postStatusCollection },
-  } = usePostCollections();
-
-  const { data: postStatuses } = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ postStatus: postStatusCollection })
-        .where(({ postStatus }) =>
-          eq(postStatus.organizationId, organizationId)
-        ),
-  });
+  const { data: postStatuses } = usePostStatuses();
 
   return useMemo(
     () =>

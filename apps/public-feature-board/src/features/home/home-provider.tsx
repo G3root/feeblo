@@ -52,7 +52,17 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     publicUpvoteCollection,
   } = usePublicCollections();
 
+  // Explicit queryKey on these queries: this provider re-renders on every
+  // keystroke/filter change, and the deferred live queries below are hot
+  // enough that deriving identity from the structured IR each render shows up
+  // in profiles. The key lists every captured input plus the collection id, so
+  // an unchanged key skips re-running the callback and hashing the IR.
   const statusesQuery = useLiveQuery({
+    queryKey: [
+      "home-statuses",
+      publicPostStatusCollection.id,
+      site.organizationId,
+    ],
     query: (q) =>
       q
         .from({ status: publicPostStatusCollection })
@@ -62,6 +72,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   const statusError = statusesQuery.isError;
 
   const boardsQuery = useLiveQuery({
+    queryKey: ["home-boards", publicBoardCollection.id, site.organizationId],
     query: (q) =>
       q
         .from({ board: publicBoardCollection })
@@ -72,6 +83,11 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   const boardError = boardsQuery.isError;
 
   const { data: statusCounts = [] } = useLiveQuery({
+    queryKey: [
+      "home-status-counts",
+      publicPostCollection.id,
+      site.organizationId,
+    ],
     query: (q) =>
       q
         .from({ post: publicPostCollection })
@@ -84,6 +100,11 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   });
 
   const { data: boardCounts = [] } = useLiveQuery({
+    queryKey: [
+      "home-board-counts",
+      publicPostCollection.id,
+      site.organizationId,
+    ],
     query: (q) =>
       q
         .from({ post: publicPostCollection })
@@ -112,6 +133,24 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     });
 
   const filteredPostsQuery = useLiveQuery({
+    // The largest IR in this provider, on the search/filter hot path; every
+    // input the callback reads is part of the key.
+    queryKey: [
+      "home-filtered-posts",
+      publicPostCollection.id,
+      publicBoardCollection.id,
+      publicPostStatusCollection.id,
+      publicUpvoteCollection.id,
+      site.organizationId,
+      statusLoading,
+      boardLoading,
+      statusError,
+      boardError,
+      selectedBoard,
+      selectedStatus,
+      deferredSearch,
+      sortBy,
+    ],
     query: (q) => {
       if (
         !site.organizationId ||
