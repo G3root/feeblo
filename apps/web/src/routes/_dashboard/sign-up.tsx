@@ -48,6 +48,14 @@ function RouteComponent() {
       } catch {
         // Signed-in state lives in the HttpOnly cookie regardless.
       }
+      if (search.redirectTo !== undefined) {
+        // A deep link — an invitation — must survive sign-up and is already
+        // on the right host. `getSafeCallbackURL` rejects protocol-relative
+        // and absolute values, so an attacker-supplied search param cannot
+        // turn this into an open redirect.
+        window.location.assign(getSafeCallbackURL(search.redirectTo));
+        return;
+      }
       await navigate({
         to: "/register",
       });

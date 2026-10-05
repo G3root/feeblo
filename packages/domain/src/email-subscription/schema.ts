@@ -169,6 +169,24 @@ export type SubmissionNotificationPreferenceRequest = Schema.Schema.Type<
   typeof SubmissionNotificationPreferenceRequest
 >;
 
-export const SubmissionNotificationPreferenceAccepted = Schema.Struct({
+/** The workspace whose preference is read; the acting user comes from the session. */
+export const SubmissionNotificationPreferenceQuery = Schema.Struct({
+  organizationId: WorkspaceId.schema,
+});
+
+export type SubmissionNotificationPreferenceQuery = Schema.Schema.Type<
+  typeof SubmissionNotificationPreferenceQuery
+>;
+
+/**
+ * Whether the acting user currently receives submission notification email.
+ * The answer to both the read and the write, so a caller can reconcile a
+ * toggle from the mutation response alone.
+ */
+export const SubmissionNotificationPreferenceState = Schema.Struct({
   enabled: Schema.Boolean,
 });
+
+export type SubmissionNotificationPreferenceState = Schema.Schema.Type<
+  typeof SubmissionNotificationPreferenceState
+>;

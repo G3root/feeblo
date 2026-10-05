@@ -282,6 +282,73 @@ export const initAuthHandler = (
       );
     };
 
+    /**
+     * Deletes the workspaces a departing account is the only member of, and
+     * refuses the deletion while a workspace it owns still has teammates.
+     *
+     * A `member` row cascades with the user, but the organization does not: a
+     * workspace whose only owner deleted their account would keep its posts,
+     * integrations, and billing subscription with nobody able to reach it — or
+     * delete it. Deleting it along with the account is what makes the account
+     * deletion an actual erasure. A workspace with other members is the
+     * opposite case: deleting it would destroy their data as a side effect of
+     * one person leaving, so it blocks the deletion and names itself instead.
+     */
+    const deleteWorkspacesSolelyOwnedBy = async (userId: string) => {
+      const { blockingWorkspaceNames, ownedWorkspaces } =
+        await callbackRuntime.runPromise(
+          Effect.gen(function* () {
+            const memberships = yield* db
+              .select({
+                id: schema.organizationTable.id,
+                name: schema.organizationTable.name,
+                role: schema.memberTable.role,
+              })
+              .from(schema.memberTable)
+              .innerJoin(
+                schema.organizationTable,
+                eq(
+                  schema.organizationTable.id,
+                  schema.memberTable.organizationId
+                )
+              )
+              .where(eq(schema.memberTable.userId, userId));
+            const ownedWorkspaces = memberships.filter((membership) =>
+              membership.role.split(",").includes("owner")
+            );
+            const blockingWorkspaceNames: string[] = [];
+            for (const workspace of ownedWorkspaces) {
+              const teammates = yield* db
+                .select({ id: schema.memberTable.id })
+                .from(schema.memberTable)
+                .where(eq(schema.memberTable.organizationId, workspace.id));
+              if (teammates.length > 1) {
+                blockingWorkspaceNames.push(workspace.name);
+              }
+            }
+            return { blockingWorkspaceNames, ownedWorkspaces };
+          })
+        );
+      if (blockingWorkspaceNames.length > 0) {
+        throw new APIError("BAD_REQUEST", {
+          code: "WORKSPACE_OWNERSHIP_REQUIRED",
+          message: `${blockingWorkspaceNames.join(", ")} still has other members. Remove them in Members settings, or delete the workspace, before deleting your account.`,
+        });
+      }
+      for (const workspace of ownedWorkspaces) {
+        // Cancelled before the organization row (and its cascaded subscription
+        // rows) disappear, so the external subscription id is still queryable.
+        await cancelOrganizationSubscription(workspace.id);
+        await callbackRuntime.runPromise(
+          Effect.gen(function* () {
+            yield* db
+              .delete(schema.organizationTable)
+              .where(eq(schema.organizationTable.id, workspace.id));
+          })
+        );
+      }
+    };
+
     // Local OAuth emulator (vercel-labs/emulate) support.
     //
     // better-auth's built-in GitHub/Google providers hardcode the token and
@@ -854,6 +921,17 @@ export const initAuthHandler = (
           timezone: {
             type: "string",
             required: false,
+          },
+        },
+        // Better Auth registers /delete-user only when this is enabled; the
+        // dashboard's Danger Zone calls it. A password, when the account has
+        // one, or a session fresher than `session.freshAge` is required by
+        // better-auth itself, and `beforeDelete` cascades the workspaces the
+        // account is the only member of so erasure is actually complete.
+        deleteUser: {
+          enabled: true,
+          async beforeDelete(user) {
+            await deleteWorkspacesSolelyOwnedBy(user.id);
           },
         },
       },

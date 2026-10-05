@@ -1,4 +1,3 @@
-import { Button } from "@feeblo/ui/button";
 import { Input } from "@feeblo/ui/input";
 import { toastManager } from "@feeblo/ui/toast";
 import {
@@ -6,10 +5,9 @@ import {
   profilePictureUploadEndpoint,
 } from "@feeblo/web-shared/auth-client";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
-import { Delete02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useId, useRef } from "react";
 
+import { DeleteAccountDialog } from "~/features/settings/components/delete-account-dialog";
 import { SettingsAvatarControl } from "~/features/settings/components/settings-avatar-control";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 
@@ -86,9 +84,7 @@ export function DangerZone() {
               </SettingsItem.FieldDescription>
             </SettingsItem.FieldContent>
             <SettingsItem.ItemActions>
-              <Button size="sm" variant="destructive">
-                <HugeiconsIcon icon={Delete02Icon} /> Delete account
-              </Button>
+              <DeleteAccountDialog />
             </SettingsItem.ItemActions>
           </SettingsItem.Field>
         </SettingsItem.FieldGroup>

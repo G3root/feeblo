@@ -563,6 +563,15 @@ describe("EmailOutbox workflows", () => {
         expect(state.sentMessages[0]?.subject).toBe(
           "2 new submissions in your workspace"
         );
+        // A settings-kind unsubscribe is a navigable page, so it is advertised
+        // for the mail client's own affordance without claiming one-click
+        // POST support the page does not implement.
+        expect(state.sentMessages[0]?.headers?.["List-Unsubscribe"]).toBe(
+          `<https://test.feeblo.example/${organizationId}/settings/notifications>`
+        );
+        expect(
+          state.sentMessages[0]?.headers?.["List-Unsubscribe-Post"]
+        ).toBeUndefined();
         const [delivery] = yield* db
           .select({
             templatePayload: schema.emailDeliveryTable.templatePayload,
@@ -571,6 +580,10 @@ describe("EmailOutbox workflows", () => {
           .where(eq(schema.emailDeliveryTable.outboxId, intentId));
         expect(delivery?.templatePayload).toMatchObject({
           body: "2 new posts have been submitted.",
+          unsubscribe: {
+            kind: "settings",
+            url: `https://test.feeblo.example/${organizationId}/settings/notifications`,
+          },
           posts: [
             {
               label: "Ship email outbox",
@@ -1779,7 +1792,7 @@ describe("EmailOutbox workflows", () => {
       () =>
         Effect.gen(function* () {
           yield* resetTestMailer();
-          const { intentId } = yield* fixture;
+          const { intentId, organizationId } = yield* fixture;
           const repository = yield* EmailOutboxRepository;
           const db = yield* Database.Database;
           yield* db
@@ -1800,7 +1813,7 @@ describe("EmailOutbox workflows", () => {
               title: "New submission in your workspace",
               unsubscribe: {
                 kind: "settings",
-                url: "https://app.feeblo.com/settings/notifications",
+                url: `https://app.feeblo.com/${organizationId}/settings/notifications`,
               },
             },
           });
@@ -1822,7 +1835,7 @@ describe("EmailOutbox workflows", () => {
       () =>
         Effect.gen(function* () {
           yield* resetTestMailer();
-          const { intentId } = yield* fixture;
+          const { intentId, organizationId } = yield* fixture;
           const repository = yield* EmailOutboxRepository;
           const db = yield* Database.Database;
           yield* db
@@ -1843,7 +1856,7 @@ describe("EmailOutbox workflows", () => {
               title: "New submission in your workspace",
               unsubscribe: {
                 kind: "settings",
-                url: "https://app.feeblo.com/settings/notifications",
+                url: `https://app.feeblo.com/${organizationId}/settings/notifications`,
               },
             },
           });
@@ -1888,7 +1901,7 @@ describe("EmailOutbox workflows", () => {
       () =>
         Effect.gen(function* () {
           yield* resetTestMailer();
-          const { intentId } = yield* fixture;
+          const { intentId, organizationId } = yield* fixture;
           const repository = yield* EmailOutboxRepository;
           const db = yield* Database.Database;
           yield* db
@@ -1909,7 +1922,7 @@ describe("EmailOutbox workflows", () => {
               title: "New submission in your workspace",
               unsubscribe: {
                 kind: "settings",
-                url: "https://app.feeblo.com/settings/notifications",
+                url: `https://app.feeblo.com/${organizationId}/settings/notifications`,
               },
             },
           });

@@ -9,6 +9,7 @@ import * as Redacted from "effect/Redacted";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { RateLimitService } from "../rate-limit/service";
+import { CurrentSession, type Session } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -113,6 +114,26 @@ describe("EmailSubscriptionConsentHandlers", () => {
       });
       return organizationId;
     });
+
+  const makeSession = (
+    organizationId: string,
+    role: Session["memberships"][number]["role"]
+  ): Session => {
+    const userId = `user_${organizationId}`;
+    return {
+      user: {
+        id: userId,
+        email: `${userId}@example.com`,
+        name: "Test Owner",
+        restrictedToOrganizationId: null,
+      },
+      session: { userId, token: "test-token" },
+      organizations: [{ id: organizationId }],
+      memberships: [
+        { membershipId: `member_${organizationId}`, organizationId, role },
+      ],
+    };
+  };
 
   layer(TestLayer)("handlers", (it) => {
     it.effect(
@@ -281,6 +302,100 @@ describe("EmailSubscriptionConsentHandlers", () => {
         });
         expect(post.subscription.state).toBe("pending_verification");
       })
+    );
+
+    it.effect(
+      "reads and toggles the acting user's submission notification preference",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* EmailSubscriptionRpcHandlersEffect;
+          const organizationId = yield* createWorkspace({ paid: true });
+          const session = makeSession(organizationId, "owner");
+          // The subscription write is keyed to the acting user, so the row has
+          // to exist for the contact foreign key to resolve.
+          const db = yield* currentDb;
+          yield* db.insert(schema.userTable).values({
+            id: session.session.userId,
+            email: session.user.email,
+            name: session.user.name,
+          });
+          const withSession = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+            effect.pipe(Effect.provideService(CurrentSession, session));
+
+          expect(
+            yield* withSession(
+              handlers.EmailSubmissionNotificationPreferenceGet({
+                organizationId,
+              })
+            )
+          ).toEqual({ enabled: false });
+
+          expect(
+            yield* withSession(
+              handlers.EmailSubmissionNotificationPreferenceSet({
+                enabled: true,
+                organizationId,
+              })
+            )
+          ).toEqual({ enabled: true });
+          expect(
+            yield* withSession(
+              handlers.EmailSubmissionNotificationPreferenceGet({
+                organizationId,
+              })
+            )
+          ).toEqual({ enabled: true });
+
+          expect(
+            yield* withSession(
+              handlers.EmailSubmissionNotificationPreferenceSet({
+                enabled: false,
+                organizationId,
+              })
+            )
+          ).toEqual({ enabled: false });
+          expect(
+            yield* withSession(
+              handlers.EmailSubmissionNotificationPreferenceGet({
+                organizationId,
+              })
+            )
+          ).toEqual({ enabled: false });
+        })
+    );
+
+    it.effect(
+      "denies submission notification preferences to non-administrators",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* EmailSubscriptionRpcHandlersEffect;
+          const organizationId = yield* createWorkspace({ paid: true });
+
+          for (const role of ["manager", "contributor"] as const) {
+            const session = makeSession(organizationId, role);
+            const denied = yield* Effect.flip(
+              handlers
+                .EmailSubmissionNotificationPreferenceGet({ organizationId })
+                .pipe(Effect.provideService(CurrentSession, session))
+            );
+            expect(denied._tag).toBe("PolicyDenied");
+          }
+
+          // A session with no membership at all is refused the same way.
+          const outsider = {
+            ...makeSession(organizationId, "admin"),
+            memberships: [],
+          };
+          const denied = yield* Effect.flip(
+            handlers
+              .EmailSubmissionNotificationPreferenceSet({
+                enabled: true,
+                organizationId,
+              })
+              .pipe(Effect.provideService(CurrentSession, outsider))
+          );
+          expect(denied._tag).toBe("PolicyDenied");
+        })
     );
   });
 });

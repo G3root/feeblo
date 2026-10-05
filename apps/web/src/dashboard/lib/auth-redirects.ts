@@ -36,6 +36,7 @@ const AUTH_EMAIL_VERIFY_PATH = "/email-verify";
 const AUTH_FORGOT_PASSWORD_PATH = "/forgot-password";
 const AUTH_RESET_PASSWORD_PATH = "/reset-password";
 const REGISTER_PATH = "/register";
+const INVITATION_PATH_PREFIX = "/invitation/";
 const DASHBOARD_SUBDOMAIN = "app";
 
 const DASHBOARD_AUTH_PATHS = new Set([
@@ -53,6 +54,14 @@ const DASHBOARD_NON_ORG_PATHS = new Set([
   ...DASHBOARD_AUTH_PATHS,
   REGISTER_PATH,
 ]);
+
+/**
+ * An invitation is the one deep link that is valid for an account with no
+ * workspace yet: accepting it creates the membership, so it must not be
+ * canonicalized under a workspace id or redirected to registration.
+ */
+const isInvitationPath = (pathname: string) =>
+  pathname.startsWith(INVITATION_PATH_PREFIX);
 
 function normalizePathname(pathname: string) {
   if (pathname.length > 1 && pathname.endsWith("/")) {
@@ -148,7 +157,10 @@ export async function dashboardAuthBeforeLoad({
   const defaultOrganizationId = getDefaultOrganizationId(effectiveSession);
   const isRegisterPath = pathname === REGISTER_PATH;
 
-  if (!hasOrganizations && !(isAuthPath || isRegisterPath)) {
+  if (
+    !hasOrganizations &&
+    !(isAuthPath || isRegisterPath || isInvitationPath(pathname))
+  ) {
     redirectToRegister(location);
   }
 
@@ -162,7 +174,11 @@ export async function dashboardAuthBeforeLoad({
     });
   }
 
-  if (!defaultOrganizationId || DASHBOARD_NON_ORG_PATHS.has(pathname)) {
+  if (
+    !defaultOrganizationId ||
+    DASHBOARD_NON_ORG_PATHS.has(pathname) ||
+    isInvitationPath(pathname)
+  ) {
     return;
   }
 

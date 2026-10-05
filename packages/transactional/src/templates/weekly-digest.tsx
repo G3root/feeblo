@@ -57,7 +57,7 @@ export const createWeeklyDigestEmail = (props: WeeklyDigestEmailProps) => ({
 WeeklyDigestEmail.PreviewProps = {
   organizationName: "Acme",
   dashboardUrl: "https://app.feeblo.com/acme",
-  unsubscribeUrl: "https://app.feeblo.com/settings/notifications",
+  unsubscribeUrl: "https://app.feeblo.com/org_acme/settings/notifications",
   posts: [
     {
       label: "Add keyboard shortcuts to the dashboard",
