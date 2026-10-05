@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 import { parseClientIpProxyTrust } from "@feeblo/domain/client-ip";
 import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
@@ -7,13 +9,6 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
-
-/**
- * An IPv4 literal in the canonical form WHATWG URL parsing produces: it
- * rejects anything out of range rather than passing it through, so a
- * four-part numeric host that survives parsing is an address, not a name.
- */
-const IPV4_LITERAL = /^\d{1,3}(?:\.\d{1,3}){3}$/;
 
 /**
  * Whether `value` is an absolute http(s) URL a browser outside the deployment
@@ -33,15 +28,17 @@ const isPubliclyReachableUrl = (value: string) => {
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     return false;
   }
-  // WHATWG URL parsing canonicalizes IP literals, which is what makes these
-  // two tests reliable: IPv6 always arrives bracketed (`[::1]`, `[fe80::1]`,
-  // `[::ffff:a00:1]`) and IPv4 always arrives as a dotted quad, whatever the
-  // input form was (`127.1` and `0x7f.1` both become `127.0.0.1`). Rejecting
-  // every literal covers loopback, private, and link-local ranges at once, and
-  // keeps a bare address out of a value whose whole job is to be a public
-  // origin.
   const { hostname } = parsed;
-  if (hostname.startsWith("[") || IPV4_LITERAL.test(hostname)) {
+  // `URL` brackets an IPv6 literal (`[::1]`, `[fe80::1]`, `[::ffff:a00:1]`)
+  // and `isIP` wants it bare, so strip the brackets before asking whether the
+  // host is an address at all. WHATWG parsing has already canonicalized the
+  // form — `127.1` and `0x7f.1` arrive as `127.0.0.1`, and an out-of-range part
+  // like `456.1.1.1` never parses — so this sees what a browser would resolve.
+  // Rejecting every literal covers loopback, private, and link-local ranges at
+  // once, and keeps a bare address out of a value whose whole job is to be a
+  // public origin.
+  const address = hostname.startsWith("[") ? hostname.slice(1, -1) : hostname;
+  if (isIP(address) !== 0) {
     return false;
   }
   return !(hostname === "localhost" || hostname.endsWith(".localhost"));
