@@ -310,6 +310,9 @@
     "./membership/schema": {
       "default": "./src/membership/schema.ts"
     },
+    "./notification/schema": {
+      "default": "./src/notification/schema.ts"
+    },
     "./notification/service": {
       "default": "./src/notification/service.ts"
     },

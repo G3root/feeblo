@@ -659,6 +659,18 @@ const makeNotificationService = Effect.gen(function* () {
             organizationId: schema.notificationTable.organizationId,
             recipientUserId: schema.notificationTable.recipientUserId,
             actorUserId: schema.notificationTable.actorUserId,
+            // Left-joined so a row with no actor still lists. The user table's
+            // `name` is not-null, but a left join makes every selected column
+            // nullable, which is exactly the `null` the schema and the inbox
+            // fallback icon expect.
+            actorName: schema.userTable.name,
+            actorImage: schema.userTable.image,
+            // The member tick the inbox draws on an actor's face. The actor's
+            // membership is joined per organization, not carried on the
+            // notification, so it reflects their current membership. A
+            // non-member actor (a public-board commenter, say) has no joined
+            // row and reports `false`.
+            actorIsMember: sql<boolean>`${schema.memberTable.id} is not null`,
             kind: schema.notificationTable.kind,
             resourceType: schema.notificationTable.resourceType,
             resourceId: schema.notificationTable.resourceId,
@@ -669,6 +681,23 @@ const makeNotificationService = Effect.gen(function* () {
             createdAt: schema.notificationTable.createdAt,
           })
           .from(schema.notificationTable)
+          .leftJoin(
+            schema.userTable,
+            eq(schema.userTable.id, schema.notificationTable.actorUserId)
+          )
+          .leftJoin(
+            schema.memberTable,
+            and(
+              eq(
+                schema.memberTable.organizationId,
+                schema.notificationTable.organizationId
+              ),
+              eq(
+                schema.memberTable.userId,
+                schema.notificationTable.actorUserId
+              )
+            )
+          )
           .where(
             and(
               eq(schema.notificationTable.organizationId, organizationId),

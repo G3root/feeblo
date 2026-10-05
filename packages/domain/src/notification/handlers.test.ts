@@ -76,6 +76,7 @@ describe("NotificationRpcHandlers", () => {
   const insertNotification = (
     fixture: Fixture,
     options: {
+      actorUserId?: string | null;
       createdAt?: Date;
       recipientUserId?: string;
     } = {}
@@ -87,7 +88,7 @@ describe("NotificationRpcHandlers", () => {
         id,
         organizationId: fixture.organizationId,
         recipientUserId: options.recipientUserId ?? fixture.userId,
-        actorUserId: null,
+        actorUserId: options.actorUserId ?? null,
         kind: "feedback.commented",
         resourceType: "comment",
         resourceId: "comment_1",
@@ -165,6 +166,67 @@ describe("NotificationRpcHandlers", () => {
               })
             )
           ).toEqual({ count: 0 });
+        })
+      );
+
+      it.effect(
+        "resolves the actor's name, image, and membership for the inbox row",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* NotificationRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const actor = yield* addMember(fixture);
+            const id = yield* insertNotification(fixture, {
+              actorUserId: actor.userId,
+            });
+
+            expect(
+              yield* handlers
+                .NotificationList({
+                  organizationId: fixture.organizationId,
+                })
+                .pipe(Effect.provideService(CurrentSession, session(fixture)))
+            ).toMatchObject([
+              {
+                actorImage: null,
+                actorIsMember: true,
+                actorName: "Second user",
+                id,
+              },
+            ]);
+          })
+      );
+
+      it.effect("clears the member tick for a non-member actor", () =>
+        Effect.gen(function* () {
+          const handlers = yield* NotificationRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          // A signed-in visitor with no membership, like a public-board
+          // commenter whose comment notified the workspace.
+          const visitorId = `user_visitor_${fixture.organizationId}`;
+          yield* db.insert(schema.userTable).values({
+            id: visitorId,
+            email: `${visitorId}@example.com`,
+            name: "Public visitor",
+          });
+          const id = yield* insertNotification(fixture, {
+            actorUserId: visitorId,
+          });
+
+          expect(
+            yield* handlers
+              .NotificationList({
+                organizationId: fixture.organizationId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session(fixture)))
+          ).toMatchObject([
+            {
+              actorIsMember: false,
+              actorName: "Public visitor",
+              id,
+            },
+          ]);
         })
       );
 
