@@ -175,6 +175,12 @@ export function useCreateCommentAction() {
       const optimisticAuthorName = onBehalf
         ? (author?.name ?? author?.email ?? session.user.name)
         : session.user.name;
+      // Mirrors the server's `authorIsMember`, which the picker already
+      // knows for an on-behalf subject and the session's memberships give for
+      // a self-authored comment.
+      const optimisticAuthorIsMember = onBehalf
+        ? (author?.isMember ?? false)
+        : membership !== undefined;
 
       const tx = commentCollection.insert({
         id: await CommentId.unsafeGenerate(),
@@ -190,6 +196,7 @@ export function useCreateCommentAction() {
         organizationId,
         // On-behalf comments keep staff attribution out of the author fields.
         memberId: onBehalf ? null : (membership?.membershipId ?? null),
+        authorIsMember: optimisticAuthorIsMember,
         // Optimistic rows are authored on this post, never merged in.
         mergedFromPostId: null,
         postId,

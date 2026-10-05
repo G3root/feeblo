@@ -3,6 +3,11 @@ import { createContext, use } from "react";
 
 export type CommentDisplayState = {
   authorName: string;
+  /**
+   * Whether the comment's author is a workspace member. Draws the blue member
+   * tick on the avatar, telling a team reply from a customer's at a glance.
+   */
+  authorIsMember: boolean;
   commentId: string;
   postId: string;
   postSlug: string;

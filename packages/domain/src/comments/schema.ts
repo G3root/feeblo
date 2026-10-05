@@ -35,6 +35,14 @@ export const Comment = S.Struct({
    */
   resolvedParentCommentId: S.Union([S.String, S.Null]),
   memberId: S.Union([S.String, S.Null]),
+  /**
+   * Whether the author belonged to the workspace when the comment was read.
+   * Derived from `memberId` in SQL rather than branched on in TypeScript: the
+   * public list redacts the identifier for every comment but the session
+   * user's own, so a guest could never compute the member tick from it. The
+   * boolean is not an identifier and survives redaction.
+   */
+  authorIsMember: S.Boolean,
   /** Post status (org-scoped FK) this comment moved the post to, when posted as a status update. */
   statusUpdateId: S.NullOr(S.String),
   pinnedAt: S.NullOr(S.DateFromString),

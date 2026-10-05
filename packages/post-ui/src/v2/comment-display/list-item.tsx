@@ -130,6 +130,7 @@ export function CommentDisplayItem({
   return (
     <CommentDisplayComponent
       authorName={data.user.name}
+      authorIsMember={data.authorIsMember}
       commentId={data.id}
       content={data.content}
       createdAt={data.createdAt}
