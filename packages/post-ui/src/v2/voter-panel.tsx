@@ -1,12 +1,6 @@
 import type { TPostCreateAuthor } from "@feeblo/domain/post/schema";
 import type { TUpvote } from "@feeblo/domain/upvote/schema";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarGroup,
-  AvatarGroupCount,
-  AvatarImage,
-} from "@feeblo/ui/avatar";
+import { AvatarGroup, AvatarGroupCount } from "@feeblo/ui/avatar";
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
@@ -17,6 +11,7 @@ import {
 import { Popover, PopoverPopup, PopoverTrigger } from "@feeblo/ui/popover";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { cn } from "@feeblo/ui/utils";
 import { isLiveQueryPending } from "@feeblo/web-shared/collections";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
@@ -53,12 +48,14 @@ function VoterAvatar({
   upvote: TUpvote;
 }) {
   return (
-    <Avatar className={cn("shrink-0", className)} size="sm">
-      {upvote.user.image ? <AvatarImage src={upvote.user.image} /> : null}
-      <AvatarFallback>
-        {(upvote.user.name ?? "?").slice(0, 1).toUpperCase()}
-      </AvatarFallback>
-    </Avatar>
+    <UserAvatar
+      className={cn("shrink-0", className)}
+      image={upvote.user.image}
+      isMember={upvote.voterIsMember}
+      memberLabel={m.sad_soft_tadpole()}
+      name={upvote.user.name}
+      size="sm"
+    />
   );
 }
 
