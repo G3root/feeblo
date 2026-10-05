@@ -165,7 +165,13 @@ export function AuthorPicker({
         <PopoverTrigger
           render={
             <button
-              aria-label={displayName ? `${label}: ${displayName}` : label}
+              aria-label={
+                displayName
+                  ? `${label}: ${displayName}${
+                      displayIsMember ? `, ${m.sad_soft_tadpole()}` : ""
+                    }`
+                  : label
+              }
               className={cn(
                 selectTriggerVariants({ size: "sm" }),
                 "aria-expanded:bg-muted w-auto min-w-0"
