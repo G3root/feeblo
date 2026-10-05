@@ -8,6 +8,7 @@ import * as Multipart from "effect/http/Multipart";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
+import { RateLimitErrors } from "../rate-limit";
 import {
   BadRequestError,
   InternalServerError,
@@ -58,6 +59,7 @@ export class MediaApiGroup extends HttpApiGroup.make("MediaApiGroup")
         BadRequestError,
         UnauthorizedError,
         InternalServerError,
+        RateLimitErrors,
       ]),
       payload: Schema.Struct({
         file: Multipart.SingleFileSchema,

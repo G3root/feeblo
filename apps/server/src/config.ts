@@ -130,6 +130,68 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
           )
         );
       }
+      const mediaUploadRegion = yield* Config.String(
+        "MEDIA_UPLOAD_REGION"
+      ).pipe(Config.option, Effect.map(Option.getOrUndefined));
+      const mediaUploadEndpoint = yield* Config.String(
+        "MEDIA_UPLOAD_ENDPOINT"
+      ).pipe(Config.option, Effect.map(Option.getOrUndefined));
+      const mediaUploadAccessKeyId = yield* Config.String(
+        "MEDIA_UPLOAD_ACCESS_KEY_ID"
+      ).pipe(Config.option, Effect.map(Option.getOrUndefined));
+      const mediaUploadSecretAccessKey = yield* Config.String(
+        "MEDIA_UPLOAD_SECRET_ACCESS_KEY"
+      ).pipe(Config.option, Effect.map(Option.getOrUndefined));
+      const mediaPublicBucketName = yield* Config.String(
+        "MEDIA_PUBLIC_BUCKET_NAME"
+      ).pipe(Config.option, Effect.map(Option.getOrUndefined));
+      const mediaPublicBaseUrl = yield* Config.String(
+        "MEDIA_PUBLIC_BASE_URL"
+      ).pipe(Config.option, Effect.map(Option.getOrUndefined));
+      // Media upload storage is mandatory in production, and mandatory here
+      // rather than in the S3 service because the service is built per request:
+      // a missing value does not fail startup, it fails the first editor
+      // upload — or, for a missing public base URL, succeeds while handing
+      // every client a URL on the authenticated S3 endpoint. The value's shape
+      // is the operator's call: see docs/r2-production-checklist.md.
+      if (nodeEnv === "production") {
+        const mediaVariables = [
+          ["MEDIA_UPLOAD_REGION", mediaUploadRegion],
+          ["MEDIA_UPLOAD_ENDPOINT", mediaUploadEndpoint],
+          ["MEDIA_UPLOAD_ACCESS_KEY_ID", mediaUploadAccessKeyId],
+          ["MEDIA_UPLOAD_SECRET_ACCESS_KEY", mediaUploadSecretAccessKey],
+          ["MEDIA_PUBLIC_BUCKET_NAME", mediaPublicBucketName],
+          ["MEDIA_PUBLIC_BASE_URL", mediaPublicBaseUrl],
+        ] as const;
+        const missingMediaVariables = mediaVariables
+          .filter(([, value]) => value === undefined)
+          .map(([name]) => name);
+
+        if (missingMediaVariables.length > 0) {
+          return yield* Effect.fail(
+            new Config.ConfigError(
+              new ConfigProvider.SourceError({
+                message: `Media upload storage is required in production. Set ${missingMediaVariables.join(", ")}. See docs/r2-production-checklist.md.`,
+              })
+            )
+          );
+        }
+        // The `.env.example` values are development-only: the dev stack's
+        // MinIO uses this pair, and a production bucket must not.
+        if (
+          mediaUploadAccessKeyId === "feeblo" &&
+          mediaUploadSecretAccessKey === "password"
+        ) {
+          return yield* Effect.fail(
+            new Config.ConfigError(
+              new ConfigProvider.SourceError({
+                message:
+                  "MEDIA_UPLOAD_ACCESS_KEY_ID and MEDIA_UPLOAD_SECRET_ACCESS_KEY still hold the .env.example development placeholders. Issue a bucket-scoped access key pair for production.",
+              })
+            )
+          );
+        }
+      }
       const sentryEnvironment = yield* Config.String("SENTRY_ENVIRONMENT").pipe(
         Config.withDefault(nodeEnv)
       );

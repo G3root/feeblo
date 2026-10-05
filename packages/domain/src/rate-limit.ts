@@ -137,10 +137,15 @@ export const withPublicRpcRateLimit =
  * - `on-behalf-create`: deliberate admin writes (posts, voters, comments
  *   attributed to a customer); 60/minute is generous for bulk capture
  *   while bounding contact/shadow-user provisioning.
+ * - `media-upload`: editor uploads, 10 MB per file and the only dashboard
+ *   write that stores bytes with no plan quota. One save uploads every
+ *   pending image at once, so the cap has to clear a paste-burst; it bounds
+ *   sustained abuse, not the pace of editing.
  */
 const dashboardRateLimits = {
   "contact-search": { limit: 300, window: "1 minute" },
   "on-behalf-create": { limit: 60, window: "1 minute" },
+  "media-upload": { limit: 60, window: "1 minute" },
 } as const satisfies Record<
   string,
   { readonly limit: number; readonly window: Duration.Input }

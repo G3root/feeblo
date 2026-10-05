@@ -15,6 +15,17 @@ const requiredServerEnvironment = {
   API_URL: "https://api.example.test",
 };
 
+// A complete, non-placeholder media configuration, as a production deployment
+// must provide (see docs/r2-production-checklist.md).
+const productionMediaEnvironment = {
+  MEDIA_PUBLIC_BASE_URL: "https://media.example.test",
+  MEDIA_PUBLIC_BUCKET_NAME: "feeblo-media",
+  MEDIA_UPLOAD_ACCESS_KEY_ID: "r2-access-key",
+  MEDIA_UPLOAD_ENDPOINT: "https://account.r2.cloudflarestorage.com",
+  MEDIA_UPLOAD_REGION: "auto",
+  MEDIA_UPLOAD_SECRET_ACCESS_KEY: "r2-secret-key",
+};
+
 const loadServerConfig = (
   environment: Record<string, string | undefined> = {}
 ) =>
@@ -182,7 +193,11 @@ describe("ServerConfig production rate-limit store", () => {
   it.effect("fails startup in production without REDIS_URL", () =>
     Effect.gen(function* () {
       const exit = yield* Effect.exit(
-        loadServerConfig({ NODE_ENV: "production", REDIS_URL: undefined })
+        loadServerConfig({
+          ...productionMediaEnvironment,
+          NODE_ENV: "production",
+          REDIS_URL: undefined,
+        })
       );
 
       expect(Exit.isFailure(exit)).toBe(true);
@@ -192,11 +207,93 @@ describe("ServerConfig production rate-limit store", () => {
   it.effect("starts in production with REDIS_URL", () =>
     Effect.gen(function* () {
       const config = yield* loadServerConfig({
+        ...productionMediaEnvironment,
         NODE_ENV: "production",
         REDIS_URL: "redis://redis:6379/0",
       });
 
       expect(config.redisUrl).toBe("redis://redis:6379/0");
+    })
+  );
+});
+
+describe("ServerConfig production media storage", () => {
+  const production = {
+    NODE_ENV: "production",
+    REDIS_URL: "redis://redis:6379/0",
+  };
+
+  it.effect("starts in production with a complete media configuration", () =>
+    Effect.gen(function* () {
+      const exit = yield* Effect.exit(
+        loadServerConfig({ ...production, ...productionMediaEnvironment })
+      );
+
+      expect(Exit.isSuccess(exit)).toBe(true);
+    })
+  );
+
+  it.effect("fails startup when a media variable is missing", () =>
+    Effect.gen(function* () {
+      for (const name of Object.keys(productionMediaEnvironment)) {
+        const exit = yield* Effect.exit(
+          loadServerConfig({
+            ...production,
+            ...productionMediaEnvironment,
+            [name]: undefined,
+          })
+        );
+
+        expect(Exit.isFailure(exit), `${name} should be required`).toBe(true);
+      }
+    })
+  );
+
+  it.effect("rejects the .env.example credential placeholders", () =>
+    Effect.gen(function* () {
+      const exit = yield* Effect.exit(
+        loadServerConfig({
+          ...production,
+          ...productionMediaEnvironment,
+          MEDIA_UPLOAD_ACCESS_KEY_ID: "feeblo",
+          MEDIA_UPLOAD_SECRET_ACCESS_KEY: "password",
+        })
+      );
+
+      expect(Exit.isFailure(exit)).toBe(true);
+    })
+  );
+
+  it.effect("accepts any media base URL the operator supplies", () =>
+    Effect.gen(function* () {
+      // Only presence is enforced: a loopback host, an address literal, and a
+      // relative path are all the operator's call. The fallback is what the
+      // check exists to prevent, not a shape.
+      for (const baseUrl of [
+        "http://127.0.0.1:9002/feeblo-media-public",
+        "http://10.1.2.3:9000",
+        "/media",
+      ]) {
+        const exit = yield* Effect.exit(
+          loadServerConfig({
+            ...production,
+            ...productionMediaEnvironment,
+            MEDIA_PUBLIC_BASE_URL: baseUrl,
+          })
+        );
+
+        expect(Exit.isSuccess(exit), `${baseUrl} should be accepted`).toBe(
+          true
+        );
+      }
+    })
+  );
+
+  it.effect("accepts the development fallback outside production", () =>
+    Effect.gen(function* () {
+      const config = yield* loadServerConfig({});
+
+      expect(config.nodeEnv).toBe("development");
     })
   );
 });
