@@ -61,11 +61,21 @@ const deliveryInput: IntegrationProviderDeliveryInput = {
     correlationId: "corr_1",
     data: {
       actor: { kind: "end_user" },
-      board: { id: "brd_1", name: "Ideas", slug: "ideas" },
+      board: {
+        id: "brd_1",
+        name: "Ideas",
+        url: "https://feeblo.example/org/board/ideas",
+      },
       post: {
-        id: "pst_1",
+        author: {
+          displayName: "Sally",
+          externalId: "user_123",
+          id: "cnt_1",
+          type: "end_user",
+        },
         description: "Dark mode hurts my eyes at night.",
-        status: { id: "pss_1", type: "PENDING" },
+        id: "pst_1",
+        status: { id: "pss_1", name: "Open", type: "PENDING" },
         title: "Dark mode",
         url: "https://feeblo.example/org/post/ideas/dark-mode",
       },

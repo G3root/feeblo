@@ -24,6 +24,7 @@ import {
 import { PostStatusType } from "@feeblo/db/validation-schema/post-status-type";
 import {
   BoardId,
+  ContactId,
   IntegrationConnectionId,
   IntegrationDeliveryAttemptId,
   IntegrationDeliveryId,
@@ -125,6 +126,41 @@ export interface IntegrationEventEnvelopeV1 extends Schema.Schema.Type<
   typeof IntegrationEventEnvelopeV1
 > {}
 
+/**
+ * A person behind an event, reduced to a classification and safe identifiers.
+ *
+ * A member is only ever a display name: `mem_*` is an account identifier and
+ * is never published (see docs/adr/0010). An end user is the join key an
+ * integration needs, so it carries the contact id and the caller's own
+ * `externalId`; email and phone are never part of this shape.
+ */
+export const IntegrationEventIdentity = Schema.Union([
+  Schema.Struct({
+    type: Schema.Literal("member"),
+    displayName: Schema.NullOr(Schema.String),
+  }),
+  Schema.Struct({
+    type: Schema.Literal("end_user"),
+    displayName: Schema.optionalKey(Schema.NullOr(Schema.String)),
+    id: Schema.optionalKey(ContactId.schema),
+    externalId: Schema.optionalKey(Schema.String),
+  }),
+]);
+export type IntegrationEventIdentity = Schema.Schema.Type<
+  typeof IntegrationEventIdentity
+>;
+
+/** Post status as of the event: the stable type plus the workspace-facing label. */
+export const IntegrationPostStatus = Schema.Struct({
+  id: PostStatusId.schema,
+  /** Workspace label when it has one, otherwise the canonical type. */
+  name: Schema.String,
+  type: PostStatusType,
+});
+export interface IntegrationPostStatus extends Schema.Schema.Type<
+  typeof IntegrationPostStatus
+> {}
+
 /** Safe post snapshot used by post-created and post-status-changed envelopes. */
 export const IntegrationPostEventData = Schema.Struct({
   actor: Schema.Struct({
@@ -135,23 +171,20 @@ export const IntegrationPostEventData = Schema.Struct({
   board: Schema.Struct({
     id: BoardId.schema,
     name: Schema.String,
-    slug: Schema.String,
+    url: Schema.URLFromString,
   }),
   post: Schema.Struct({
     id: PostId.schema,
-    /** Post body (sanitized markdown) used as the provider issue body; absent for status-change events. */
-    description: Schema.optionalKey(Schema.String),
+    /** Post body (sanitized markdown) used as the provider issue body. */
+    description: Schema.String,
+    /** The post's author, classified the same way the Public API classifies it. */
+    author: IntegrationEventIdentity,
     metadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-    status: Schema.Struct({
-      id: PostStatusId.schema,
-      type: PostStatusType,
-    }),
+    status: IntegrationPostStatus,
     title: Schema.String,
     url: Schema.URLFromString,
   }),
-  previousStatus: Schema.optionalKey(
-    Schema.Struct({ id: PostStatusId.schema, type: PostStatusType })
-  ),
+  previousStatus: Schema.optionalKey(IntegrationPostStatus),
 });
 export interface IntegrationPostEventData extends Schema.Schema.Type<
   typeof IntegrationPostEventData

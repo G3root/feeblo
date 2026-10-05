@@ -56,11 +56,22 @@ const deliveryInput = (
     correlationId: "corr_1",
     data: {
       actor: { kind: "end_user" },
-      board: { id: "brd_1", name: "Ideas", slug: "ideas" },
+      board: {
+        id: "brd_1",
+        name: "Ideas",
+        url: "https://feeblo.example/org/board/ideas",
+      },
       post: {
+        author: {
+          displayName: "Sally",
+          externalId: "user_123",
+          id: "cnt_1",
+          type: "end_user",
+        },
+        description: "Dark mode hurts my eyes at night.",
         id: "pst_1",
         metadata: { customer_tier: "Enterprise" },
-        status: { id: "pss_1", type: "PENDING" },
+        status: { id: "pss_1", name: "Open", type: "PENDING" },
         title: "Dark mode please",
         url: "https://feeblo.example/org/post/ideas/dark-mode",
       },

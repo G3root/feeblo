@@ -1321,7 +1321,10 @@ describe("PostRpcHandlers", () => {
               expect.objectContaining({
                 type: "feedback.post.status_changed",
                 data: expect.objectContaining({
-                  previousStatus: { id: fixture.statusId, type: "PENDING" },
+                  previousStatus: expect.objectContaining({
+                    id: fixture.statusId,
+                    type: "PENDING",
+                  }),
                 }),
               }),
             ]);

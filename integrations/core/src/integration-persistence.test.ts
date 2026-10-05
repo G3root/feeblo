@@ -78,12 +78,18 @@ const makePostCreatedEvent = Effect.gen(function* () {
       correlationId: id,
       data: {
         actor: { kind: "end_user" as const },
-        board: { id: boardId, name: "Feedback", slug: "feedback" },
+        board: {
+          id: boardId,
+          name: "Feedback",
+          url: "https://app.example.test/org/board/feedback",
+        },
         post: {
+          author: { displayName: "Sally", type: "end_user" as const },
+          description: "Test post body.",
           id: postId,
-          status: { id: statusId, type: "PENDING" },
+          status: { id: statusId, name: "Open", type: "PENDING" },
           title: "Test post",
-          url: "https://app.example.test/post/test",
+          url: "https://app.example.test/org/post/feedback/test",
         },
       },
       id,

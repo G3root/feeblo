@@ -223,7 +223,6 @@ export const makePostWrites = Effect.gen(function* () {
   const recordPostIntegrationEvent = (args: {
     readonly actor: PostWriteActor;
     readonly boardId: string;
-    readonly description?: string;
     readonly eventType:
       | "feedback.post.created"
       | "feedback.post.status_changed";
@@ -268,9 +267,6 @@ export const makePostWrites = Effect.gen(function* () {
               }
             : { kind: "end_user" },
         boardId,
-        ...(args.description !== undefined && {
-          description: args.description,
-        }),
         eventType: args.eventType,
         ...(eventMetadata !== undefined && { metadata: eventMetadata }),
         organizationId,
@@ -364,16 +360,16 @@ export const makePostWrites = Effect.gen(function* () {
 
   const requireStatus = (args: { organizationId: string; statusId: string }) =>
     Effect.gen(function* () {
-      const statusType = yield* repository.findStatusType({
+      const status = yield* repository.findStatus({
         id: args.statusId,
         organizationId: args.organizationId,
       });
-      if (statusType === undefined) {
+      if (status === undefined) {
         return yield* new BadRequestError({
           message: "Post status not found",
         });
       }
-      return statusType;
+      return status;
     });
 
   const create = (
@@ -509,7 +505,6 @@ export const makePostWrites = Effect.gen(function* () {
           yield* recordPostIntegrationEvent({
             actor,
             boardId: args.boardId,
-            description: prepared.content,
             eventType: "feedback.post.created",
             ...(args.metadata !== undefined && { metadata: args.metadata }),
             organizationId: args.organizationId,
@@ -680,7 +675,7 @@ export const makePostWrites = Effect.gen(function* () {
       // read it again inside the transaction. A status's type is fixed when the
       // workspace is created — there is no RPC that changes it — so the value
       // cannot go stale between here and the write.
-      const nextStatusType =
+      const nextStatus =
         args.statusId === undefined
           ? undefined
           : yield* requireStatus({
@@ -929,7 +924,7 @@ export const makePostWrites = Effect.gen(function* () {
           });
           if (maySend) {
             const now = yield* DateTime.nowAsDate;
-            if (nextStatusType === "CLOSED") {
+            if (nextStatus?.type === "CLOSED") {
               const result = yield* emailOutbox
                 .recordIntent({
                   aggregateId: args.id,

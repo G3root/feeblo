@@ -2,23 +2,75 @@
 
 V1 emits `feedback.post.created` and `feedback.post.status_changed`. A dashboard test uses `webhook.test`; it follows the real delivery/signing path but cannot be selected by a route.
 
-Each external payload is versioned and includes `id`, `organizationId`, `type`, `version`, and `occurredAt`. It contains the post ID/title/absolute URL/current status, board ID/name/slug, optional previous status, and an actor classification. It excludes post content, email addresses, credentials, and private organization data.
+Each delivery is one versioned event. The envelope carries `id` (the event id, stable across routes), `organizationId`, `type`, `version`, and `occurredAt`. `objectType` names the subject and `object` is its snapshot: a post's title, sanitized content, absolute URL, status, author, and metadata. `board` and `actor` sit beside it as context — the board the post belongs to and the person who caused the event, which are not the same person on a status change.
+
+Every event is a snapshot taken when the event was recorded, so a retry up to 24 hours later delivers the values that were true at the time, not the row's current state. Consumers must ignore unknown fields and unknown event types: fields may be added within `version: 1`, and only a breaking change would bump the version.
+
+Payloads never carry email addresses, credentials, account identifiers (`usr_*`, `mem_*`), or other private organization data. An end user is identified by the workspace-scoped contact id (`cnt_*`) and the `externalId` the workspace set; a member is a display name only.
 
 ```json
 {
-  "id": "iev_example",
-  "organizationId": "org_example",
+  "id": "iev_9f4c1e7a2b",
+  "organizationId": "org_4k81mz",
   "type": "feedback.post.created",
   "version": 1,
   "occurredAt": "2026-08-11T00:00:00.000Z",
-  "post": {
+  "objectType": "post",
+  "object": {
     "id": "pst_example",
     "title": "Example",
-    "url": "https://app.feeblo.com/org_example/post/feedback/example"
+    "content": "We need to schedule the weekly report as CSV.",
+    "url": "https://app.feeblo.com/org_4k81mz/post/feedback/example",
+    "status": { "id": "pss_open", "name": "Open", "type": "PENDING" },
+    "author": {
+      "type": "end_user",
+      "id": "cnt_3b8e10",
+      "externalId": "user_8812"
+    }
   },
-  "board": { "id": "brd_feedback", "name": "Feedback", "slug": "feedback" },
-  "status": { "id": "pss_open", "type": "PENDING" },
+  "board": {
+    "id": "brd_feedback",
+    "name": "Feedback",
+    "url": "https://app.feeblo.com/org_4k81mz/board/feedback"
+  },
   "actor": { "type": "end_user" }
+}
+```
+
+A status change uses the same envelope and adds `changes`; `object.status` is already the next state, so the event needs no second fetch to see what moved:
+
+```json
+{
+  "id": "iev_a17d30c9e5",
+  "organizationId": "org_4k81mz",
+  "type": "feedback.post.status_changed",
+  "version": 1,
+  "occurredAt": "2026-08-12T09:14:52.108Z",
+  "objectType": "post",
+  "object": {
+    "id": "pst_example",
+    "title": "Example",
+    "content": "We need to schedule the weekly report as CSV.",
+    "url": "https://app.feeblo.com/org_4k81mz/post/feedback/example",
+    "status": { "id": "pss_planned", "name": "Planned", "type": "PLANNED" },
+    "author": {
+      "type": "end_user",
+      "id": "cnt_3b8e10",
+      "externalId": "user_8812"
+    }
+  },
+  "board": {
+    "id": "brd_feedback",
+    "name": "Feedback",
+    "url": "https://app.feeblo.com/org_4k81mz/board/feedback"
+  },
+  "actor": { "type": "member", "displayName": "Nafees" },
+  "changes": {
+    "status": {
+      "from": { "id": "pss_open", "name": "Open", "type": "PENDING" },
+      "to": { "id": "pss_planned", "name": "Planned", "type": "PLANNED" }
+    }
+  }
 }
 ```
 

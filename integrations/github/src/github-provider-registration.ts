@@ -262,7 +262,7 @@ export const makeGitHubProviderRegistration = ({
         const issue = yield* apiClient.createIssue({
           accessToken: credentials.accessToken,
           body: renderGitHubIssueBody({
-            description: eventData.post.description ?? null,
+            description: eventData.post.description,
             postUrl: eventData.post.url.toString(),
           }),
           repositoryName: routeConfig.repositoryName,
