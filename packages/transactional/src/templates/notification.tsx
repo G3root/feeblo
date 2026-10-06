@@ -48,7 +48,7 @@ NotificationEmail.PreviewProps = {
   body: "2 new posts have been submitted.",
   eyebrow: "Feedback",
   title: "New submissions in your workspace",
-  unsubscribeUrl: "https://app.feeblo.com/settings/notifications",
+  unsubscribeUrl: "https://app.feeblo.com/org_acme/settings/notifications",
   posts: [
     {
       label: "Add keyboard shortcuts to the dashboard",

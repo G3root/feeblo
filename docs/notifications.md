@@ -18,6 +18,8 @@ The existing submission-email workflow is independent. An in-app row is committe
 
 Submission email is not one email per post. Every submission joins the workspace's pending outbox window, and the window sends five minutes after its last post, at most once an hour per workspace — the amplification bound and the per-workspace volume breaker are recorded in [`docs/adr/0009`](./adr/0009-submission-notifications-coalesce-per-workspace.md). In-app is therefore the only channel that is per-post, which is why a workspace watching the dashboard sees a submission before its email arrives.
 
+A workspace owner or administrator opts their own address in or out of that email at `/{organizationId}/settings/notifications` — the page the email's unsubscribe link (and its `List-Unsubscribe` header) points at. The preference is per workspace and per account, so the same person can receive one workspace's submissions and not another's, and the link names the workspace it was sent for.
+
 | Event type | Trigger | Notified members | Excluded |
 | --- | --- | --- | --- |
 | `feedback.submitted` | A feedback post is created from the dashboard or public board | Workspace owners and admins | The post creator, if they are also an owner/admin |

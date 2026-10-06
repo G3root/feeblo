@@ -114,8 +114,12 @@ export const makeSubmissionNotificationPayload = (
           ? "PUBLIC"
           : "PRIVATE",
     unsubscribe: {
+      // The preference is per workspace and per user, so the link names the
+      // workspace whose settings page owns the toggle. The dashboard guard
+      // treats it as an ordinary deep link and only canonicalizes paths that
+      // do not already carry an organization id.
       kind: "settings",
-      url: `${appUrl}/settings/notifications`,
+      url: `${appUrl}/${organizationId}/settings/notifications`,
     },
   };
 };

@@ -25,7 +25,16 @@ export const getSafeCallbackURL = (redirectTo?: string) => {
     return safePath;
   }
 
-  return new URL(safePath, callbackBase).toString();
+  // The single-slash check above is not sufficient on its own: the URL parser
+  // strips tabs and newlines before parsing, so `"/\n/evil.example"` passes it
+  // and resolves to another origin. Only the resolved origin can be trusted, so
+  // a value that leaves it falls back to the app root instead.
+  const base = new URL(callbackBase);
+  const resolved = new URL(safePath, base);
+
+  return resolved.origin === base.origin
+    ? resolved.toString()
+    : new URL("/", base).toString();
 };
 
 export async function initializeEmailVerification(email: string) {

@@ -1,5 +1,5 @@
 import { NodeCrypto } from "@effect/platform-node";
-import { Database } from "@feeblo/db";
+import { Database, transaction } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { PolarService } from "@feeblo/domain/billing/service";
@@ -251,27 +251,42 @@ export const initAuthHandler = (
     };
 
     /**
-     * Best-effort cancellation of a deleted tenant's Polar subscription. Runs
-     * before the organization row (and its cascaded subscription rows) are
-     * deleted so the external subscription id is still queryable; a failure to
-     * reach Polar must never block the deletion.
+     * External subscription id of a workspace, when it has one.
+     *
+     * Separate from the revocation so a caller that is about to delete the
+     * organization row can capture the id first and revoke it afterwards, once
+     * the deletion has committed. Best-effort: a billing read that fails must
+     * not block the deletion, so it logs and reports "no subscription".
      */
-    const cancelOrganizationSubscription = async (organizationId: string) => {
-      await callbackRuntime.runPromise(
+    const findOrganizationSubscriptionId = (organizationId: string) =>
+      callbackRuntime.runPromise(
         BillingRepository.use((billingRepository) =>
           billingRepository.findSubscriptionByOrganizationId({
             organizationId,
           })
         ).pipe(
-          Effect.flatMap((subscription) =>
-            Option.match(subscription, {
-              onNone: () => Effect.void,
-              onSome: (sub) =>
-                PolarService.use((polarService) =>
-                  polarService.revokeSubscription({ id: sub.externalId })
-                ),
-            })
-          ),
+          Effect.map(Option.map((subscription) => subscription.externalId)),
+          Effect.catchCause((cause) =>
+            Effect.logWarning(
+              "Failed to read billing for a deleted organization",
+              cause
+            ).pipe(
+              Effect.annotateLogs({ organizationId }),
+              Effect.map(() => Option.none<string>())
+            )
+          )
+        )
+      );
+
+    /** Best-effort revocation of one already-resolved external subscription. */
+    const revokeOrganizationSubscription = (
+      organizationId: string,
+      subscriptionId: string
+    ) =>
+      callbackRuntime.runPromise(
+        PolarService.use((polarService) =>
+          polarService.revokeSubscription({ id: subscriptionId })
+        ).pipe(
           Effect.catchCause((cause) =>
             Effect.logWarning(
               "Failed to cancel billing for deleted organization",
@@ -280,6 +295,156 @@ export const initAuthHandler = (
           )
         )
       );
+
+    /**
+     * Best-effort cancellation of a deleted tenant's Polar subscription. Runs
+     * before the organization row (and its cascaded subscription rows) are
+     * deleted so the external subscription id is still queryable; a failure to
+     * reach Polar must never block the deletion.
+     */
+    const cancelOrganizationSubscription = async (organizationId: string) => {
+      const subscriptionId =
+        await findOrganizationSubscriptionId(organizationId);
+      if (Option.isSome(subscriptionId)) {
+        await revokeOrganizationSubscription(
+          organizationId,
+          subscriptionId.value
+        );
+      }
+    };
+
+    /**
+     * Deletes the workspaces a departing account is the only member of, and
+     * refuses the deletion while a workspace it owns still has teammates.
+     *
+     * A `member` row cascades with the user, but the organization does not: a
+     * workspace whose only owner deleted their account would keep its posts,
+     * integrations, and billing subscription with nobody able to reach it — or
+     * delete it. Deleting it along with the account is what makes the account
+     * deletion an actual erasure. A workspace with other members is the
+     * opposite case: deleting it would destroy their data as a side effect of
+     * one person leaving, so it blocks the deletion and names itself instead.
+     */
+    const deleteWorkspacesSolelyOwnedBy = async (userId: string) => {
+      const ownershipRequiredError = (workspaceNames: readonly string[]) =>
+        new APIError("BAD_REQUEST", {
+          code: "WORKSPACE_OWNERSHIP_REQUIRED",
+          message: `${workspaceNames.join(", ")} still has other members. Remove them in Members settings, or delete the workspace, before deleting your account.`,
+        });
+
+      const countMembers = (organizationId: string, lock: boolean) =>
+        Effect.gen(function* () {
+          const members = db
+            .select({ id: schema.memberTable.id })
+            .from(schema.memberTable)
+            .where(eq(schema.memberTable.organizationId, organizationId));
+          if (!lock) {
+            return (yield* members).length;
+          }
+          // `FOR UPDATE` only means anything inside the deletion transaction.
+          return (yield* members.for("update")).length;
+        });
+
+      const ownedWorkspaces = await callbackRuntime.runPromise(
+        Effect.gen(function* () {
+          const memberships = yield* db
+            .select({
+              id: schema.organizationTable.id,
+              name: schema.organizationTable.name,
+              role: schema.memberTable.role,
+            })
+            .from(schema.memberTable)
+            .innerJoin(
+              schema.organizationTable,
+              eq(schema.organizationTable.id, schema.memberTable.organizationId)
+            )
+            .where(eq(schema.memberTable.userId, userId));
+          return memberships.filter((membership) =>
+            membership.role.split(",").includes("owner")
+          );
+        })
+      );
+      if (ownedWorkspaces.length === 0) {
+        return;
+      }
+
+      // Checked before anything is revoked or deleted: a refusal must not
+      // touch the billing of a workspace that is staying.
+      const blockingWorkspaceNames = await callbackRuntime.runPromise(
+        Effect.gen(function* () {
+          const blocking: string[] = [];
+          for (const workspace of ownedWorkspaces) {
+            if ((yield* countMembers(workspace.id, false)) > 1) {
+              blocking.push(workspace.name);
+            }
+          }
+          return blocking;
+        })
+      );
+      if (blockingWorkspaceNames.length > 0) {
+        throw ownershipRequiredError(blockingWorkspaceNames);
+      }
+
+      // Captured before the transaction: the subscription rows cascade away
+      // with the organization row, and the ids are revoked only once the
+      // deletion has committed, so a rollback can never leave a live workspace
+      // without its subscription.
+      const subscriptionIds = new Map<string, string>();
+      for (const workspace of ownedWorkspaces) {
+        const subscriptionId = await findOrganizationSubscriptionId(
+          workspace.id
+        );
+        if (Option.isSome(subscriptionId)) {
+          subscriptionIds.set(workspace.id, subscriptionId.value);
+        }
+      }
+
+      // Every deletion commits or none does, and the membership count is
+      // re-checked under a lock: an invitation accepted between the check above
+      // and here must fail the whole deletion rather than take a workspace away
+      // from the member who just joined.
+      const deletedWorkspaceIds = await callbackRuntime.runPromise(
+        transaction(
+          Effect.gen(function* () {
+            const nowBlocking: string[] = [];
+            const deletable: string[] = [];
+            for (const workspace of ownedWorkspaces) {
+              const [locked] = yield* db
+                .select({ id: schema.organizationTable.id })
+                .from(schema.organizationTable)
+                .where(eq(schema.organizationTable.id, workspace.id))
+                .for("update");
+              if (locked === undefined) {
+                continue;
+              }
+              if ((yield* countMembers(workspace.id, true)) > 1) {
+                nowBlocking.push(workspace.name);
+              } else {
+                deletable.push(workspace.id);
+              }
+            }
+            if (nowBlocking.length > 0) {
+              return yield* Effect.fail(ownershipRequiredError(nowBlocking));
+            }
+            for (const workspaceId of deletable) {
+              yield* db
+                .delete(schema.organizationTable)
+                .where(eq(schema.organizationTable.id, workspaceId));
+            }
+            return deletable;
+          })
+        )
+      );
+
+      // Revoked after the commit, best-effort: an external call must not hold
+      // the transaction's row locks, and a workspace the re-check spared keeps
+      // the subscription it still needs.
+      for (const workspaceId of deletedWorkspaceIds) {
+        const subscriptionId = subscriptionIds.get(workspaceId);
+        if (subscriptionId !== undefined) {
+          await revokeOrganizationSubscription(workspaceId, subscriptionId);
+        }
+      }
     };
 
     // Local OAuth emulator (vercel-labs/emulate) support.
@@ -854,6 +1019,17 @@ export const initAuthHandler = (
           timezone: {
             type: "string",
             required: false,
+          },
+        },
+        // Better Auth registers /delete-user only when this is enabled; the
+        // dashboard's Danger Zone calls it. A password, when the account has
+        // one, or a session fresher than `session.freshAge` is required by
+        // better-auth itself, and `beforeDelete` cascades the workspaces the
+        // account is the only member of so erasure is actually complete.
+        deleteUser: {
+          enabled: true,
+          async beforeDelete(user) {
+            await deleteWorkspacesSolelyOwnedBy(user.id);
           },
         },
       },

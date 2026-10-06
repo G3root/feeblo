@@ -1017,7 +1017,14 @@ const sendDeliveryAttempt = (
     ) =>
       Effect.gen(function* () {
         if (unsubscribe.kind === "settings") {
-          return createEmail(unsubscribe.url);
+          // The settings page is a normal navigable URL, not a one-click
+          // endpoint: advertise it for a mail client's own unsubscribe
+          // affordance, but never claim `List-Unsubscribe-Post` support the
+          // page does not have.
+          return {
+            ...createEmail(unsubscribe.url),
+            headers: { "List-Unsubscribe": `<${unsubscribe.url}>` },
+          };
         }
         const token = yield* subscriptions.deriveLinkToken({
           purpose: "unsubscribe",
