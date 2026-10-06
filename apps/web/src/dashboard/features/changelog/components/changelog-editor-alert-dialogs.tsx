@@ -8,6 +8,7 @@ import {
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
+import { ConfirmDialog } from "@feeblo/ui/confirm-dialog";
 import { useSelector } from "@xstate/store-react";
 
 import {
@@ -22,33 +23,16 @@ export function ChangelogDeleteDialog() {
   const { changelog, handleDelete } = useChangelogEditorContext();
 
   return (
-    <AlertDialog
-      onOpenChange={() => store.send({ type: "toggle" })}
+    <ConfirmDialog
+      description={`This action cannot be undone. This will permanently delete "${changelog.title || "this changelog"}".`}
+      onConfirm={async () => {
+        await handleDelete();
+        store.send({ type: "setOpen", open: false });
+      }}
+      onOpenChange={(open) => store.send({ type: "setOpen", open })}
       open={open}
-    >
-      <AlertDialogPopup>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete Changelog</AlertDialogTitle>
-          <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete
-            {` "${changelog.title || "this changelog"}".`}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-
-          <Button
-            onClick={async () => {
-              await handleDelete();
-              store.send({ type: "toggle" });
-            }}
-            variant="destructive"
-          >
-            Continue
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogPopup>
-    </AlertDialog>
+      title="Delete Changelog"
+    />
   );
 }
 
