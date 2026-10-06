@@ -1,5 +1,4 @@
 import { Badge } from "@feeblo/ui/badge";
-import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import {
   CircleLockIcon,
   GitMergeIcon,
@@ -9,6 +8,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 
 import { m } from "../../paraglide/messages.js";
+import { formatPostStatus } from "../../post-status";
 import { useCommentDisplay } from "./context";
 import { formatRelativeTime } from "./utils";
 

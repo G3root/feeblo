@@ -1,3 +1,4 @@
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import { Button } from "@feeblo/ui/button";
 import { Group, GroupText } from "@feeblo/ui/group";
 import {
@@ -13,10 +14,7 @@ import {
   MenuTrigger,
 } from "@feeblo/ui/menu";
 import { cn } from "@feeblo/ui/utils";
-import {
-  type BoardPostStatus,
-  formatPostStatus,
-} from "@feeblo/web-shared/board/constants";
+import { type BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import {
   Cancel01Icon,
   DashedLineCircleIcon,

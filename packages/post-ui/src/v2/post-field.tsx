@@ -15,12 +15,12 @@ import {
   BOARD_LANE_COLOR_MAP,
   BoardIconMap,
   type BoardPostStatus,
-  formatPostStatus,
 } from "@feeblo/web-shared/board/constants";
 import { DashedLine02Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
 import { m } from "../paraglide/messages.js";
+import { formatPostStatus } from "../post-status";
 
 export function FieldRow({
   label,
