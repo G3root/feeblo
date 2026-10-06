@@ -135,7 +135,9 @@ jobs:
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Serialized below, so the budget is the sum of every suite rather than the
+    # longest four; 30 minutes leaves headroom on a cold runner.
+    timeout-minutes: 30
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
@@ -185,8 +187,14 @@ jobs:
       # scheduling new tasks after the first failure, and with nineteen suites
       # behind a ten-slot scheduler that meant a single failure reported as
       # "1 failed" while nine suites had never run at all.
+      #
+      # `--concurrency=1` because the browser-mode suites contend when several
+      # Vitest pools share the runner: a concurrent run here flaked in
+      # `@feeblo/post-ui` while the same tree passed every package serially.
+      # One at a time is slower and cannot report that class of flake as a
+      # product failure.
       - name: Unit tests
-        run: pnpm exec turbo run test --continue --filter=!@feeblo/e2e --concurrency=4
+        run: pnpm exec turbo run test --continue --filter=!@feeblo/e2e --concurrency=1
 
   docker_smoke_test:
     name: Docker Smoke Test
