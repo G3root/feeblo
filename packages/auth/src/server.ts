@@ -251,27 +251,42 @@ export const initAuthHandler = (
     };
 
     /**
-     * Best-effort cancellation of a deleted tenant's Polar subscription. Runs
-     * before the organization row (and its cascaded subscription rows) are
-     * deleted so the external subscription id is still queryable; a failure to
-     * reach Polar must never block the deletion.
+     * External subscription id of a workspace, when it has one.
+     *
+     * Separate from the revocation so a caller that is about to delete the
+     * organization row can capture the id first and revoke it afterwards, once
+     * the deletion has committed. Best-effort: a billing read that fails must
+     * not block the deletion, so it logs and reports "no subscription".
      */
-    const cancelOrganizationSubscription = async (organizationId: string) => {
-      await callbackRuntime.runPromise(
+    const findOrganizationSubscriptionId = (organizationId: string) =>
+      callbackRuntime.runPromise(
         BillingRepository.use((billingRepository) =>
           billingRepository.findSubscriptionByOrganizationId({
             organizationId,
           })
         ).pipe(
-          Effect.flatMap((subscription) =>
-            Option.match(subscription, {
-              onNone: () => Effect.void,
-              onSome: (sub) =>
-                PolarService.use((polarService) =>
-                  polarService.revokeSubscription({ id: sub.externalId })
-                ),
-            })
-          ),
+          Effect.map(Option.map((subscription) => subscription.externalId)),
+          Effect.catchCause((cause) =>
+            Effect.logWarning(
+              "Failed to read billing for a deleted organization",
+              cause
+            ).pipe(
+              Effect.annotateLogs({ organizationId }),
+              Effect.map(() => Option.none<string>())
+            )
+          )
+        )
+      );
+
+    /** Best-effort revocation of one already-resolved external subscription. */
+    const revokeOrganizationSubscription = (
+      organizationId: string,
+      subscriptionId: string
+    ) =>
+      callbackRuntime.runPromise(
+        PolarService.use((polarService) =>
+          polarService.revokeSubscription({ id: subscriptionId })
+        ).pipe(
           Effect.catchCause((cause) =>
             Effect.logWarning(
               "Failed to cancel billing for deleted organization",
@@ -280,6 +295,22 @@ export const initAuthHandler = (
           )
         )
       );
+
+    /**
+     * Best-effort cancellation of a deleted tenant's Polar subscription. Runs
+     * before the organization row (and its cascaded subscription rows) are
+     * deleted so the external subscription id is still queryable; a failure to
+     * reach Polar must never block the deletion.
+     */
+    const cancelOrganizationSubscription = async (organizationId: string) => {
+      const subscriptionId =
+        await findOrganizationSubscriptionId(organizationId);
+      if (Option.isSome(subscriptionId)) {
+        await revokeOrganizationSubscription(
+          organizationId,
+          subscriptionId.value
+        );
+      }
     };
 
     /**
@@ -307,8 +338,11 @@ export const initAuthHandler = (
             .select({ id: schema.memberTable.id })
             .from(schema.memberTable)
             .where(eq(schema.memberTable.organizationId, organizationId));
-          const rows = yield* lock ? members.for("update") : members;
-          return rows.length;
+          if (!lock) {
+            return (yield* members).length;
+          }
+          // `FOR UPDATE` only means anything inside the deletion transaction.
+          return (yield* members.for("update")).length;
         });
 
       const ownedWorkspaces = await callbackRuntime.runPromise(
@@ -334,8 +368,8 @@ export const initAuthHandler = (
         return;
       }
 
-      // Checked before the subscriptions are cancelled: a refusal must not
-      // revoke the billing of a workspace that is staying.
+      // Checked before anything is revoked or deleted: a refusal must not
+      // touch the billing of a workspace that is staying.
       const blockingWorkspaceNames = await callbackRuntime.runPromise(
         Effect.gen(function* () {
           const blocking: string[] = [];
@@ -351,21 +385,25 @@ export const initAuthHandler = (
         throw ownershipRequiredError(blockingWorkspaceNames);
       }
 
-      // Cancelled before the rows (and their cascaded subscription rows)
-      // disappear, so the external subscription id is still queryable. It is
-      // best-effort and stays outside the transaction below, which must not
-      // hold row locks across a call to another service.
+      // Captured before the transaction: the subscription rows cascade away
+      // with the organization row, and the ids are revoked only once the
+      // deletion has committed, so a rollback can never leave a live workspace
+      // without its subscription.
+      const subscriptionIds = new Map<string, string>();
       for (const workspace of ownedWorkspaces) {
-        await cancelOrganizationSubscription(workspace.id);
+        const subscriptionId = await findOrganizationSubscriptionId(
+          workspace.id
+        );
+        if (Option.isSome(subscriptionId)) {
+          subscriptionIds.set(workspace.id, subscriptionId.value);
+        }
       }
 
       // Every deletion commits or none does, and the membership count is
       // re-checked under a lock: an invitation accepted between the check above
       // and here must fail the whole deletion rather than take a workspace away
-      // from the member who just joined. The subscription of a workspace the
-      // re-check refuses was already cancelled by the best-effort pass above;
-      // that is the cost of keeping the external call out of the transaction.
-      await callbackRuntime.runPromise(
+      // from the member who just joined.
+      const deletedWorkspaceIds = await callbackRuntime.runPromise(
         transaction(
           Effect.gen(function* () {
             const nowBlocking: string[] = [];
@@ -393,9 +431,20 @@ export const initAuthHandler = (
                 .delete(schema.organizationTable)
                 .where(eq(schema.organizationTable.id, workspaceId));
             }
+            return deletable;
           })
         )
       );
+
+      // Revoked after the commit, best-effort: an external call must not hold
+      // the transaction's row locks, and a workspace the re-check spared keeps
+      // the subscription it still needs.
+      for (const workspaceId of deletedWorkspaceIds) {
+        const subscriptionId = subscriptionIds.get(workspaceId);
+        if (subscriptionId !== undefined) {
+          await revokeOrganizationSubscription(workspaceId, subscriptionId);
+        }
+      }
     };
 
     // Local OAuth emulator (vercel-labs/emulate) support.
