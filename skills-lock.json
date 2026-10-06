@@ -13,6 +13,12 @@
       "skillPath": "skills/engineering/codebase-design/SKILL.md",
       "computedHash": "b2888e4f4e8c0af3bfd557575a64b905c44e6248c3101d72077816882b3a92b9"
     },
+    "copy-editing": {
+      "source": "coreyhaines31/marketingskills",
+      "sourceType": "github",
+      "skillPath": "skills/copy-editing/SKILL.md",
+      "computedHash": "501b6af6bd7408f9be3f983b697e19d5f7791d8b0fba8b2860f641c78546aad1"
+    },
     "coss": {
       "source": "cosscom/coss",
       "sourceType": "github",
