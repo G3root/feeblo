@@ -6,6 +6,8 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { currentService } from "../current-service";
+
 /**
  * Structured provenance stored beside an activity. On-behalf actions record
  * the customer subject distinct from the staff actor, e.g.
@@ -377,13 +379,6 @@ export class PostActivityRepository extends Context.Service<PostActivityReposito
   static readonly layer = Layer.effect(this, this.make);
 }
 
-/**
- * Reads the repository from the fiber context.
- *
- * `HttpApiBuilder` does not thread a handler's service requirements through the
- * route layer, so the Public API's tag assignment takes it from the context the
- * composition provides — the same shape as `currentCommentService`.
- */
-export const currentPostActivityRepository = Effect.context<never>().pipe(
-  Effect.map((context) => Context.getUnsafe(context, PostActivityRepository))
+export const currentPostActivityRepository = currentService(
+  PostActivityRepository
 );

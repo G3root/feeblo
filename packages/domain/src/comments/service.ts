@@ -7,6 +7,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { currentService } from "../current-service";
 import { InvalidSubjectError } from "../identity/errors";
 import {
   resolveOnBehalfSubject,
@@ -588,13 +589,4 @@ export class CommentService extends Context.Service<CommentService>()(
   static readonly layer = Layer.effect(this, this.make);
 }
 
-/**
- * Reads the service from the fiber context.
- *
- * `HttpApiBuilder` does not thread a handler's service requirements through
- * the route layer, so the Public API's handlers take it from the context the
- * composition provides — the same shape as `currentPublicApiCaller`.
- */
-export const currentCommentService = Effect.context<never>().pipe(
-  Effect.map((context) => Context.getUnsafe(context, CommentService))
-);
+export const currentCommentService = currentService(CommentService);

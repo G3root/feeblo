@@ -9,6 +9,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { currentService } from "../current-service";
 import { PolicyDeniedError } from "../policy";
 import { FailedToCreateTagError, PostIsMergedError } from "./errors";
 import type { TPostTagList } from "./schema";
@@ -631,13 +632,4 @@ export class TagRepository extends Context.Service<TagRepository>()(
   static readonly layer = Layer.effect(this, this.make);
 }
 
-/**
- * Reads the repository from the fiber context.
- *
- * `HttpApiBuilder` does not thread a handler's service requirements through the
- * route layer, so the Public API's operations take it from the context the
- * composition provides — the same shape as `currentCommentService`.
- */
-export const currentTagRepository = Effect.context<never>().pipe(
-  Effect.map((context) => Context.getUnsafe(context, TagRepository))
-);
+export const currentTagRepository = currentService(TagRepository);

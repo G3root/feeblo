@@ -16,6 +16,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { currentService } from "../../current-service";
 import { EmailSubscriptionRepository } from "../../email-subscription/repository";
 import {
   ResolvePrincipalService,
@@ -666,13 +667,6 @@ export class PublicApiVoteRepository extends Context.Service<PublicApiVoteReposi
   static readonly layer = Layer.effect(this, this.make);
 }
 
-/**
- * Reads the repository from the fiber context.
- *
- * `HttpApiBuilder` does not thread a handler's service requirements through the
- * route layer, so handlers take services from the context the composition
- * provides — the same shape as `currentPublicApiCaller`.
- */
-export const currentPublicApiVoteRepository = Effect.context<never>().pipe(
-  Effect.map((context) => Context.getUnsafe(context, PublicApiVoteRepository))
+export const currentPublicApiVoteRepository = currentService(
+  PublicApiVoteRepository
 );

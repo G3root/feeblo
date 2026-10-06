@@ -10,6 +10,7 @@ import {
   cleanupOrphanedEditorAssets,
   syncChangelogAssetReferences,
 } from "../../asset/service";
+import { currentService } from "../../current-service";
 import type { Cursor } from "../../public-api/cursor";
 import {
   conflictError,
@@ -699,15 +700,6 @@ export class PublicApiChangelogRepository extends Context.Service<PublicApiChang
   static readonly layer = Layer.effect(this, this.make);
 }
 
-/**
- * Reads the repository from the fiber context.
- *
- * `HttpApiBuilder` does not thread a handler's service requirements through the
- * route layer, so handlers take services from the context the composition
- * provides — the same shape as `currentPublicApiCaller`.
- */
-export const currentPublicApiChangelogRepository = Effect.context<never>().pipe(
-  Effect.map((context) =>
-    Context.getUnsafe(context, PublicApiChangelogRepository)
-  )
+export const currentPublicApiChangelogRepository = currentService(
+  PublicApiChangelogRepository
 );

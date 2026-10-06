@@ -4,6 +4,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
+import { currentService } from "../current-service";
+
 const trailingSlashPattern = /\/$/;
 
 /**
@@ -31,13 +33,4 @@ export class PublicApiConfig extends Context.Service<PublicApiConfig>()(
     );
 }
 
-/**
- * Reads the config from the fiber context.
- *
- * `HttpApiBuilder` does not thread a handler's service requirements through the
- * route layer, so handlers take services from the context the composition
- * provides — the same shape as `currentHttpApiSession`.
- */
-export const currentPublicApiConfig = Effect.context<never>().pipe(
-  Effect.map((context) => Context.getUnsafe(context, PublicApiConfig))
-);
+export const currentPublicApiConfig = currentService(PublicApiConfig);

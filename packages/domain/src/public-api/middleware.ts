@@ -15,6 +15,7 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 
 import { Auth } from "../auth-handler";
+import { currentService } from "../current-service";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { RateLimitService } from "../rate-limit/service";
 import {
@@ -94,15 +95,10 @@ export const requirePublicApiScope = (scope: PublicApiScope) =>
   });
 
 /**
- * Reads the caller from the fiber context.
- *
- * `HttpApiBuilder` does not thread group-middleware services through a
- * handler's type-level requirements, so this mirrors `currentHttpApiSession`:
- * the middleware has already provided the value by the time a handler runs.
+ * Mirrors `currentHttpApiSession`: the middleware already provided the value by
+ * the time a handler runs.
  */
-export const currentPublicApiCaller = Effect.context<never>().pipe(
-  Effect.map((context) => Context.getUnsafe(context, PublicApiCaller))
-);
+export const currentPublicApiCaller = currentService(PublicApiCaller);
 
 /**
  * Builds the key middleware for one composition.

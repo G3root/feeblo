@@ -1,7 +1,7 @@
-import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 
 import { currentCompanyRepository } from "../company/repository";
+import { currentService } from "../current-service";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { withRemapDbErrors } from "../rpc-errors";
 import {
@@ -34,17 +34,10 @@ export const crmLimitMessage =
   "This workspace's plan has no room for another CRM entry.";
 
 /**
- * Reads the plan policy from the fiber context.
- *
- * `HttpApiBuilder` does not thread a handler's service requirements through the
- * route layer, so handlers take services from the context the composition
- * provides — the same shape as `currentPublicApiCaller` and
- * `currentPublicApiConfig`. `EntitlementPolicy` is already in that context
- * because the key middleware requires it for the plan gate.
+ * `EntitlementPolicy` is already in the context because the key middleware
+ * requires it for the plan gate.
  */
-export const currentEntitlementPolicy = Effect.context<never>().pipe(
-  Effect.map((context) => Context.getUnsafe(context, EntitlementPolicy))
-);
+export const currentEntitlementPolicy = currentService(EntitlementPolicy);
 
 /**
  * Refuses a company create the workspace's plan has no room for.
