@@ -136,9 +136,11 @@ export const voteHandlers = {
       });
     })) satisfies HandlerOf<PublicApiGroup, "listVotes">,
 
+  // The body is the operation's own input minus the path, so handing it over
+  // cannot drop a field the operation gains.
   createVote: (({ params, payload }) =>
     createVoteOperation.handler({
-      author: payload.author,
+      ...payload,
       postId: params.postId,
     })) satisfies HandlerOf<PublicApiGroup, "createVote">,
 

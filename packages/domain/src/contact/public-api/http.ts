@@ -83,12 +83,11 @@ export const endUserHandlers = {
       endUserId: params.endUserId,
     })) satisfies HandlerOf<PublicApiGroup, "getEndUser">,
 
+  // The body is the operation's own input, so handing it over cannot drop a
+  // field the operation gains.
   upsertEndUser: (({ payload }) =>
-    upsertEndUserOperation.handler({
-      avatarUrl: payload.avatarUrl,
-      companyId: payload.companyId,
-      email: payload.email,
-      externalId: payload.externalId,
-      name: payload.name,
-    })) satisfies HandlerOf<PublicApiGroup, "upsertEndUser">,
+    upsertEndUserOperation.handler(payload)) satisfies HandlerOf<
+    PublicApiGroup,
+    "upsertEndUser"
+  >,
 };

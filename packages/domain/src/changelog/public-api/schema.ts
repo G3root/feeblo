@@ -2,14 +2,15 @@ import { ChangelogCategoryIconType } from "@feeblo/domain-contracts/changelog-ca
 import * as Schema from "effect/Schema";
 
 import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
+import { payloadOf } from "../../public-api/payload";
 
 /**
  * The changelog resource: what the changelog endpoints return, and the typed
  * input every changelog operation takes.
  *
- * The `*Query`/`*Params` schemas describe the HTTP projection; the `*Input`
- * schemas are what an operation receives. Create and update reuse their payload
- * schemas as inputs because a JSON body is already the typed shape.
+ * The `*Input` schemas are the authority for the writable fields and their
+ * constraints; a `*Payload` is the HTTP body projected from its operation
+ * input, and the `*Query`/`*Params` schemas describe the URL.
  */
 
 /**
@@ -158,7 +159,7 @@ const COVER_IMAGE_URL_MAX_LENGTH = 2048;
  * is not a status a write may set (see `PublicApiChangelogWriteStatus`), so
  * today every write clears it.
  */
-export const CreateChangelogPayload = Schema.Struct({
+export const CreateChangelogInput = Schema.Struct({
   title: Schema.String,
   slug: Schema.optional(Schema.String),
   content: Schema.String,
@@ -175,10 +176,6 @@ export const CreateChangelogPayload = Schema.Struct({
   publishedAt: Schema.optional(Schema.NullOr(Schema.DateFromString)),
 });
 
-export type TCreateChangelogPayload = Schema.Schema.Type<
-  typeof CreateChangelogPayload
->;
-
 export const UpdateChangelogParams = Schema.Struct({
   changelogId: Schema.String,
 });
@@ -191,7 +188,8 @@ export const UpdateChangelogParams = Schema.Struct({
  * publishing a draft or reverting a published entry — by leaving a field out.
  * The caller has to say which status it intends.
  */
-export const UpdateChangelogPayload = Schema.Struct({
+export const UpdateChangelogInput = Schema.Struct({
+  changelogId: Schema.String,
   title: Schema.String,
   slug: Schema.optional(Schema.String),
   content: Schema.String,
@@ -207,10 +205,6 @@ export const UpdateChangelogPayload = Schema.Struct({
   scheduledAt: Schema.optional(Schema.NullOr(Schema.DateFromString)),
   publishedAt: Schema.optional(Schema.NullOr(Schema.DateFromString)),
 });
-
-export type TUpdateChangelogPayload = Schema.Schema.Type<
-  typeof UpdateChangelogPayload
->;
 
 export const DeleteChangelogParams = Schema.Struct({
   changelogId: Schema.String,
@@ -238,14 +232,21 @@ export const GetChangelogInput = Schema.Struct({
   changelogId: Schema.String,
 });
 
-/** The create body is already the typed input. */
-export const CreateChangelogInput = CreateChangelogPayload;
+/** The create body: the operation input with no path field to remove. */
+export const CreateChangelogPayload = payloadOf(CreateChangelogInput, []);
 
-/** The update body plus the entry it replaces. */
-export const UpdateChangelogInput = Schema.Struct({
-  ...UpdateChangelogPayload.fields,
-  changelogId: Schema.String,
-});
+export type TCreateChangelogPayload = Schema.Schema.Type<
+  typeof CreateChangelogPayload
+>;
+
+/** The update body: the operation input without the entry the URL names. */
+export const UpdateChangelogPayload = payloadOf(UpdateChangelogInput, [
+  "changelogId",
+]);
+
+export type TUpdateChangelogPayload = Schema.Schema.Type<
+  typeof UpdateChangelogPayload
+>;
 
 /** Typed input for deleting a changelog entry. */
 export const DeleteChangelogInput = DeleteChangelogParams;

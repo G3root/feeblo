@@ -14,16 +14,19 @@ import {
   PublicApiTag,
 } from "../../public-api/common";
 import { isIsoDateOrTimestamp } from "../../public-api/parse";
+import { payloadOf } from "../../public-api/payload";
 
 /**
  * The post resource: what the post endpoints return, and the typed input every
  * post operation takes.
  *
- * The `*Query`/`*Params`/`*Payload` schemas describe the HTTP projection:
- * query parameters are strings validated in the endpoint's handler so a
- * malformed request stays on the published error envelope. The `*Input`
- * schemas are what an operation actually receives — typed values, so a surface
- * that already has types (MCP, a CLI) has nothing to parse.
+ * The `*Input` schemas are what an operation receives — typed values, so a
+ * surface that already has types (MCP, a CLI) has nothing to parse — and they
+ * are the authority for the constraints a request obeys. A `*Payload` is the
+ * HTTP body projected from its operation input: the `*Query`/`*Params`
+ * schemas still describe the URL, and query parameters are strings validated
+ * in the endpoint's handler so a malformed request stays on the published
+ * error envelope.
  */
 
 export const PublicApiPostStatus = Schema.Struct({
@@ -240,17 +243,6 @@ export const MergePostParams = Schema.Struct({
   postId: Schema.String,
 });
 
-/**
- * The post the archived duplicate is folded into.
- *
- * `sourcePostId` is the path's `postId`, so the body names only the survivor:
- * a merge is "this post into that one", and repeating the source in the body
- * would give two places to disagree about which post is being archived.
- */
-export const MergePostPayload = Schema.Struct({
-  intoPostId: Schema.String,
-});
-
 export const UnmergePostParams = Schema.Struct({
   postId: Schema.String,
 });
@@ -268,7 +260,7 @@ export const SetPostTagsParams = Schema.Struct({
  *
  * Emptiness is deliberately not checked here. The handler reports it
  * (`parseTitle`) so the answer names the field — the same split the tag and
- * changelog payloads use for a required name, whose schemas carry no minimum
+ * changelog inputs use for a required name, whose schemas carry no minimum
  * either. Nothing between the two can be written: a title the schema accepts
  * is trimmed, and the handler refuses it when nothing is left.
  */
@@ -290,7 +282,9 @@ const PostTitle = Schema.Trim.pipe(
  *
  * The title is trimmed and the body sanitized before they are stored, exactly
  * as the dashboard does; the limits are the dashboard's own, imported rather
- * than restated so the two cannot disagree about how long a post may be.
+ * than restated so the two cannot disagree about how long a post may be. The
+ * constraints sit on this input, which the operation receives, so the HTTP
+ * body and the MCP tool validate against the same title and body lengths.
  *
  * `author` is optional and names the customer the post is attributed to, with
  * the same identifiers and priority order a comment's author uses. Absent, the
@@ -299,7 +293,7 @@ const PostTitle = Schema.Trim.pipe(
  * list orders by it, while `updatedAt` stays the write's clock so a sync
  * reading `updatedAfter` still sees the imported row.
  */
-export const CreatePostPayload = Schema.Struct({
+export const CreatePostInput = Schema.Struct({
   boardId: Schema.String,
   title: PostTitle,
   content: Schema.String.check(Schema.isMaxLength(POST_CONTENT_MAX_LENGTH)),
@@ -310,6 +304,16 @@ export const CreatePostPayload = Schema.Struct({
   author: Schema.optional(PublicApiOnBehalfAuthor),
   createdAt: Schema.optional(IsoInstant),
 });
+
+/**
+ * The create body: the operation input with no path field to remove.
+ *
+ * Derived rather than restated, so a field the operation accepts is a field
+ * the HTTP body accepts — with the same constraints the MCP tool advertises —
+ * and a new field cannot be published on one surface and dropped by the
+ * other.
+ */
+export const CreatePostPayload = payloadOf(CreatePostInput, []);
 
 export type TCreatePostPayload = Schema.Schema.Type<typeof CreatePostPayload>;
 
@@ -322,7 +326,8 @@ export type TCreatePostPayload = Schema.Schema.Type<typeof CreatePostPayload>;
  * may move it. A body that names no field at all is rejected in the handler
  * rather than answered as a write that changed only `updatedAt`.
  */
-export const UpdatePostPayload = Schema.Struct({
+export const UpdatePostInput = Schema.Struct({
+  postId: Schema.String,
   title: Schema.optional(PostTitle),
   content: Schema.optional(
     Schema.String.check(Schema.isMaxLength(POST_CONTENT_MAX_LENGTH))
@@ -335,20 +340,10 @@ export const UpdatePostPayload = Schema.Struct({
   author: Schema.optional(PublicApiOnBehalfAuthor),
 });
 
+/** The update body: the operation input without the post the URL names. */
+export const UpdatePostPayload = payloadOf(UpdatePostInput, ["postId"]);
+
 export type TUpdatePostPayload = Schema.Schema.Type<typeof UpdatePostPayload>;
-
-/**
- * The complete set of tags a post should carry.
- *
- * A replacement rather than add and remove calls: the dashboard's own tag
- * picker works this way, and a caller that states the final set cannot leave a
- * tag behind by forgetting to remove it. An empty array clears the post.
- */
-export const SetPostTagsPayload = Schema.Struct({
-  tagIds: Schema.Array(Schema.String),
-});
-
-export type TSetPostTagsPayload = Schema.Schema.Type<typeof SetPostTagsPayload>;
 
 /** Typed input for a page of a board's posts. */
 export const ListBoardPostsInput = Schema.Struct({
@@ -418,34 +413,6 @@ export const GetPostInput = Schema.Struct({
   postId: Schema.String,
 });
 
-/** Typed input for creating a post. */
-export const CreatePostInput = Schema.Struct({
-  boardId: Schema.String,
-  content: Schema.String.check(Schema.isMaxLength(POST_CONTENT_MAX_LENGTH)),
-  etaQuarter: Schema.optional(
-    Schema.NullOr(Schema.String.check(Schema.isPattern(ETA_QUARTER_PATTERN)))
-  ),
-  statusId: Schema.String,
-  title: Schema.String,
-  author: Schema.optional(PublicApiOnBehalfAuthor),
-  createdAt: Schema.optional(IsoInstant),
-});
-
-/** Typed input for updating a post. */
-export const UpdatePostInput = Schema.Struct({
-  postId: Schema.String,
-  title: Schema.optional(Schema.String),
-  content: Schema.optional(
-    Schema.String.check(Schema.isMaxLength(POST_CONTENT_MAX_LENGTH))
-  ),
-  statusId: Schema.optional(Schema.String),
-  boardId: Schema.optional(Schema.String),
-  etaQuarter: Schema.optional(
-    Schema.NullOr(Schema.String.check(Schema.isPattern(ETA_QUARTER_PATTERN)))
-  ),
-  author: Schema.optional(PublicApiOnBehalfAuthor),
-});
-
 /** Typed input for deleting a post. */
 export const DeletePostInput = Schema.Struct({
   postId: Schema.String,
@@ -456,6 +423,15 @@ export const MergePostInput = Schema.Struct({
   postId: Schema.String,
   intoPostId: Schema.String,
 });
+
+/**
+ * The post the archived duplicate is folded into.
+ *
+ * The source is the path's `postId`, so the body names only the survivor: a
+ * merge is "this post into that one", and repeating the source in the body
+ * would give two places to disagree about which post is being archived.
+ */
+export const MergePostPayload = payloadOf(MergePostInput, ["postId"]);
 
 export type TMergePostInput = Schema.Schema.Type<typeof MergePostInput>;
 
@@ -473,3 +449,14 @@ export const SetPostTagsInput = Schema.Struct({
     description: "The complete set of tag ids the post should carry",
   }),
 });
+
+/**
+ * The complete set of tags a post should carry.
+ *
+ * A replacement rather than add and remove calls: the dashboard's own tag
+ * picker works this way, and a caller that states the final set cannot leave a
+ * tag behind by forgetting to remove it. An empty array clears the post.
+ */
+export const SetPostTagsPayload = payloadOf(SetPostTagsInput, ["postId"]);
+
+export type TSetPostTagsPayload = Schema.Schema.Type<typeof SetPostTagsPayload>;

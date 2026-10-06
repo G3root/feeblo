@@ -7,6 +7,7 @@ import {
   PublicApiOnBehalfAuthor,
   type TPublicApiOnBehalfAuthor,
 } from "../../public-api/common";
+import { payloadOf } from "../../public-api/payload";
 
 /**
  * The comment resource: what the comment endpoints return, and the typed input
@@ -110,7 +111,8 @@ export const CreateCommentParams = Schema.Struct({
  * `visibility` defaults to `PUBLIC`; an INTERNAL comment is a workspace note,
  * visible to keys but not on the public board.
  */
-export const CreateCommentPayload = Schema.Struct({
+export const CreateCommentInput = Schema.Struct({
+  postId: Schema.String,
   content: Schema.String.check(
     Schema.isMinLength(1),
     Schema.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)
@@ -119,6 +121,9 @@ export const CreateCommentPayload = Schema.Struct({
   parentCommentId: Schema.optional(Schema.NullOr(Schema.String)),
   author: PublicApiCommentAuthorSubject,
 });
+
+/** The create body: the operation input without the post the URL names. */
+export const CreateCommentPayload = payloadOf(CreateCommentInput, ["postId"]);
 
 export type TCreateCommentPayload = Schema.Schema.Type<
   typeof CreateCommentPayload
@@ -137,13 +142,19 @@ export const UpdateCommentParams = Schema.Struct({
  * renders as nothing. `visibility` is optional: omitting it leaves the stored
  * visibility alone, which is the one field an update may leave untouched.
  */
-export const UpdateCommentPayload = Schema.Struct({
+export const UpdateCommentInput = Schema.Struct({
+  commentId: Schema.String,
   content: Schema.String.check(
     Schema.isMinLength(1),
     Schema.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)
   ),
   visibility: Schema.optional(PublicApiCommentVisibility),
 });
+
+/** The update body: the operation input without the comment the URL names. */
+export const UpdateCommentPayload = payloadOf(UpdateCommentInput, [
+  "commentId",
+]);
 
 export type TUpdateCommentPayload = Schema.Schema.Type<
   typeof UpdateCommentPayload
@@ -181,28 +192,6 @@ export const ListPostCommentsInput = Schema.Struct({
 /** Typed input for reading one comment. */
 export const GetCommentInput = Schema.Struct({
   commentId: Schema.String,
-});
-
-/** Typed input for commenting on a post. */
-export const CreateCommentInput = Schema.Struct({
-  postId: Schema.String,
-  content: Schema.String.check(
-    Schema.isMinLength(1),
-    Schema.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)
-  ),
-  visibility: Schema.optional(PublicApiCommentVisibility),
-  parentCommentId: Schema.optional(Schema.NullOr(Schema.String)),
-  author: PublicApiCommentAuthorSubject,
-});
-
-/** Typed input for editing a comment. */
-export const UpdateCommentInput = Schema.Struct({
-  commentId: Schema.String,
-  content: Schema.String.check(
-    Schema.isMinLength(1),
-    Schema.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)
-  ),
-  visibility: Schema.optional(PublicApiCommentVisibility),
 });
 
 /** Typed input for deleting a comment and its replies. */

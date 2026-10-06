@@ -5,6 +5,7 @@ import {
   PublicApiAuthor,
   PublicApiOnBehalfAuthor,
 } from "../../public-api/common";
+import { payloadOf } from "../../public-api/payload";
 
 /**
  * The vote resource: what the vote endpoints return, and the typed input every
@@ -125,9 +126,13 @@ export const CreateVoteParams = Schema.Struct({
  * `email`, with `name`/`avatarUrl` only enriching the resolved contact — so one
  * customer resolved by two resources cannot become two contact rows.
  */
-export const CreateVotePayload = Schema.Struct({
+export const CreateVoteInput = Schema.Struct({
+  postId: Schema.String,
   author: PublicApiOnBehalfAuthor,
 });
+
+/** The create body: the operation input without the post the URL names. */
+export const CreateVotePayload = payloadOf(CreateVoteInput, ["postId"]);
 
 export type TCreateVotePayload = Schema.Schema.Type<typeof CreateVotePayload>;
 
@@ -189,12 +194,6 @@ export const ListVotesInput = Schema.Struct({
 });
 
 export type TListVotesInput = Schema.Schema.Type<typeof ListVotesInput>;
-
-/** Typed input for adding a vote to a post. */
-export const CreateVoteInput = Schema.Struct({
-  postId: Schema.String,
-  author: PublicApiOnBehalfAuthor,
-});
 
 export type TCreateVoteInput = Schema.Schema.Type<typeof CreateVoteInput>;
 

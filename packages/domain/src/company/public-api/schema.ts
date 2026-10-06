@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
+import { payloadOf } from "../../public-api/payload";
 
 /**
  * Where a company record came from.
@@ -80,12 +81,22 @@ export const GetCompanyParams = Schema.Struct({
  * created. It is stored beside `createdAt` rather than replacing it, the same
  * way the dashboard records it.
  */
-export const CreateCompanyPayload = Schema.Struct({
-  name: Schema.String,
-  externalId: Schema.optional(Schema.NullOr(Schema.String)),
+export const CreateCompanyInput = Schema.Struct({
+  name: Schema.String.annotate({ description: "The company's name" }),
+  externalId: Schema.optional(
+    Schema.NullOr(Schema.String).annotate({
+      description: "The caller's own identifier for the company",
+    })
+  ),
   avatar: Schema.optional(Schema.NullOr(Schema.String)),
   externalCreatedAt: Schema.optional(Schema.NullOr(Schema.DateFromString)),
 });
+
+/**
+ * The create body: the operation input with no path field to remove, so the
+ * two share every constraint the operation declares.
+ */
+export const CreateCompanyPayload = payloadOf(CreateCompanyInput, []);
 
 export type TCreateCompanyPayload = Schema.Schema.Type<
   typeof CreateCompanyPayload
@@ -103,12 +114,18 @@ export const UpdateCompanyParams = Schema.Struct({
  * no field at all is rejected rather than being answered as a successful write
  * that changed nothing.
  */
-export const UpdateCompanyPayload = Schema.Struct({
+export const UpdateCompanyInput = Schema.Struct({
+  companyId: Schema.String,
   name: Schema.optional(Schema.String),
   externalId: Schema.optional(Schema.NullOr(Schema.String)),
   avatar: Schema.optional(Schema.NullOr(Schema.String)),
   externalCreatedAt: Schema.optional(Schema.NullOr(Schema.DateFromString)),
 });
+
+/** The update body: the operation input without the company the URL names. */
+export const UpdateCompanyPayload = payloadOf(UpdateCompanyInput, [
+  "companyId",
+]);
 
 export type TUpdateCompanyPayload = Schema.Schema.Type<
   typeof UpdateCompanyPayload
@@ -137,27 +154,6 @@ export const ListCompaniesInput = Schema.Struct({
 /** Typed input for reading one company. */
 export const GetCompanyInput = Schema.Struct({
   companyId: Schema.String,
-});
-
-/** Typed input for creating a company. */
-export const CreateCompanyInput = Schema.Struct({
-  name: Schema.String.annotate({ description: "The company's name" }),
-  externalId: Schema.optional(
-    Schema.NullOr(Schema.String).annotate({
-      description: "The caller's own identifier for the company",
-    })
-  ),
-  avatar: Schema.optional(Schema.NullOr(Schema.String)),
-  externalCreatedAt: Schema.optional(Schema.NullOr(Schema.DateFromString)),
-});
-
-/** Typed input for updating a company. */
-export const UpdateCompanyInput = Schema.Struct({
-  companyId: Schema.String,
-  name: Schema.optional(Schema.String),
-  externalId: Schema.optional(Schema.NullOr(Schema.String)),
-  avatar: Schema.optional(Schema.NullOr(Schema.String)),
-  externalCreatedAt: Schema.optional(Schema.NullOr(Schema.DateFromString)),
 });
 
 /** Typed input for deleting a company. */

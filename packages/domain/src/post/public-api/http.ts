@@ -247,32 +247,24 @@ export const postHandlers = {
       });
     })) satisfies HandlerOf<PublicApiGroup, "listPostActivity">,
 
+  // The body is the operation's own input minus the path, so handing it over
+  // cannot drop a field the operation gains.
   createPost: (({ payload }) =>
-    createPostOperation.handler({
-      author: payload.author,
-      boardId: payload.boardId,
-      content: payload.content,
-      createdAt: payload.createdAt,
-      etaQuarter: payload.etaQuarter,
-      statusId: payload.statusId,
-      title: payload.title,
-    })) satisfies HandlerOf<PublicApiGroup, "createPost">,
+    createPostOperation.handler(payload)) satisfies HandlerOf<
+    PublicApiGroup,
+    "createPost"
+  >,
 
   updatePost: (({ params, payload }) =>
     updatePostOperation.handler({
-      author: payload.author,
-      boardId: payload.boardId,
-      content: payload.content,
-      etaQuarter: payload.etaQuarter,
+      ...payload,
       postId: params.postId,
-      statusId: payload.statusId,
-      title: payload.title,
     })) satisfies HandlerOf<PublicApiGroup, "updatePost">,
 
   setPostTags: (({ params, payload }) =>
     setPostTagsOperation.handler({
+      ...payload,
       postId: params.postId,
-      tagIds: payload.tagIds,
     })) satisfies HandlerOf<PublicApiGroup, "setPostTags">,
 
   deletePost: (({ params }) =>
@@ -282,7 +274,7 @@ export const postHandlers = {
 
   mergePost: (({ params, payload }) =>
     mergePostOperation.handler({
-      intoPostId: payload.intoPostId,
+      ...payload,
       postId: params.postId,
     })) satisfies HandlerOf<PublicApiGroup, "mergePost">,
 

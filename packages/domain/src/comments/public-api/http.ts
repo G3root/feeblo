@@ -138,13 +138,12 @@ export const commentHandlers = {
       });
     })) satisfies HandlerOf<PublicApiGroup, "listPostComments">,
 
+  // The body is the operation's own input minus the path, so handing it over
+  // cannot drop a field the operation gains.
   createComment: (({ params, payload }) =>
     createCommentOperation.handler({
-      author: payload.author,
-      content: payload.content,
-      parentCommentId: payload.parentCommentId,
+      ...payload,
       postId: params.postId,
-      visibility: payload.visibility,
     })) satisfies HandlerOf<PublicApiGroup, "createComment">,
 
   getComment: (({ params }) =>
@@ -154,9 +153,8 @@ export const commentHandlers = {
 
   updateComment: (({ params, payload }) =>
     updateCommentOperation.handler({
+      ...payload,
       commentId: params.commentId,
-      content: payload.content,
-      visibility: payload.visibility,
     })) satisfies HandlerOf<PublicApiGroup, "updateComment">,
 
   deleteComment: (({ params }) =>

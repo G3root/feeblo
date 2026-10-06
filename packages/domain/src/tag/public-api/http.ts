@@ -111,8 +111,10 @@ export const tagHandlers = {
       });
     })) satisfies HandlerOf<PublicApiGroup, "listTags">,
 
+  // The body is the operation's own input, so handing it over cannot drop a
+  // field the operation gains.
   createTag: (({ payload }) =>
-    createTagOperation.handler({ name: payload.name })) satisfies HandlerOf<
+    createTagOperation.handler(payload)) satisfies HandlerOf<
     PublicApiGroup,
     "createTag"
   >,
@@ -125,7 +127,7 @@ export const tagHandlers = {
 
   updateTag: (({ params, payload }) =>
     updateTagOperation.handler({
-      name: payload.name,
+      ...payload,
       tagId: params.tagId,
     })) satisfies HandlerOf<PublicApiGroup, "updateTag">,
 
