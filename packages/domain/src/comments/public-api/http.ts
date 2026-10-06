@@ -132,9 +132,9 @@ export const commentHandlers = {
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
       return yield* listPostCommentsOperation.handler({
+        ...params,
         cursor: query.cursor,
         limit,
-        postId: params.postId,
       });
     })) satisfies HandlerOf<PublicApiGroup, "listPostComments">,
 
@@ -143,32 +143,36 @@ export const commentHandlers = {
   createComment: (({ params, payload }) =>
     createCommentOperation.handler({
       ...payload,
-      postId: params.postId,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "createComment">,
 
   getComment: (({ params }) =>
-    getCommentOperation.handler({
-      commentId: params.commentId,
-    })) satisfies HandlerOf<PublicApiGroup, "getComment">,
+    getCommentOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "getComment"
+  >,
 
   updateComment: (({ params, payload }) =>
     updateCommentOperation.handler({
       ...payload,
-      commentId: params.commentId,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "updateComment">,
 
   deleteComment: (({ params }) =>
-    deleteCommentOperation.handler({
-      commentId: params.commentId,
-    })) satisfies HandlerOf<PublicApiGroup, "deleteComment">,
+    deleteCommentOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "deleteComment"
+  >,
 
   pinComment: (({ params }) =>
-    pinCommentOperation.handler({
-      commentId: params.commentId,
-    })) satisfies HandlerOf<PublicApiGroup, "pinComment">,
+    pinCommentOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "pinComment"
+  >,
 
   unpinComment: (({ params }) =>
-    unpinCommentOperation.handler({
-      commentId: params.commentId,
-    })) satisfies HandlerOf<PublicApiGroup, "unpinComment">,
+    unpinCommentOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "unpinComment"
+  >,
 };

@@ -2,15 +2,16 @@ import { ChangelogCategoryIconType } from "@feeblo/domain-contracts/changelog-ca
 import * as Schema from "effect/Schema";
 
 import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
-import { payloadOf } from "../../public-api/payload";
+import { paramsOf, payloadOf } from "../../public-api/http-input";
 
 /**
  * The changelog resource: what the changelog endpoints return, and the typed
  * input every changelog operation takes.
  *
  * The `*Input` schemas are the authority for the writable fields and their
- * constraints; a `*Payload` is the HTTP body projected from its operation
- * input, and the `*Query`/`*Params` schemas describe the URL.
+ * constraints; a `*Payload` and a `*Params` are the HTTP body and path
+ * projected from that input, and the `*Query` schemas describe the URL's
+ * filters.
  */
 
 /**
@@ -137,10 +138,6 @@ export const ListChangelogQuery = Schema.Struct({
   status: Schema.optional(Schema.String),
 });
 
-export const GetChangelogParams = Schema.Struct({
-  changelogId: Schema.String,
-});
-
 const COVER_IMAGE_URL_PATTERN = /^https?:\/\/[^\s]+$/i;
 const COVER_IMAGE_URL_MAX_LENGTH = 2048;
 
@@ -176,10 +173,6 @@ export const CreateChangelogInput = Schema.Struct({
   publishedAt: Schema.optional(Schema.NullOr(Schema.DateFromString)),
 });
 
-export const UpdateChangelogParams = Schema.Struct({
-  changelogId: Schema.String,
-});
-
 /**
  * A full replacement of the writable fields.
  *
@@ -206,10 +199,6 @@ export const UpdateChangelogInput = Schema.Struct({
   publishedAt: Schema.optional(Schema.NullOr(Schema.DateFromString)),
 });
 
-export const DeleteChangelogParams = Schema.Struct({
-  changelogId: Schema.String,
-});
-
 /** Typed input for a page of the workspace's changelog. */
 export const ListChangelogInput = Schema.Struct({
   cursor: Schema.optional(
@@ -232,12 +221,20 @@ export const GetChangelogInput = Schema.Struct({
   changelogId: Schema.String,
 });
 
+/** The entry the URL names, taken from the operation input. */
+export const GetChangelogParams = paramsOf(GetChangelogInput, ["changelogId"]);
+
 /** The create body: the operation input with no path field to remove. */
 export const CreateChangelogPayload = payloadOf(CreateChangelogInput, []);
 
 export type TCreateChangelogPayload = Schema.Schema.Type<
   typeof CreateChangelogPayload
 >;
+
+/** The entry the URL names, taken from the operation input. */
+export const UpdateChangelogParams = paramsOf(UpdateChangelogInput, [
+  "changelogId",
+]);
 
 /** The update body: the operation input without the entry the URL names. */
 export const UpdateChangelogPayload = payloadOf(UpdateChangelogInput, [
@@ -249,4 +246,11 @@ export type TUpdateChangelogPayload = Schema.Schema.Type<
 >;
 
 /** Typed input for deleting a changelog entry. */
-export const DeleteChangelogInput = DeleteChangelogParams;
+export const DeleteChangelogInput = Schema.Struct({
+  changelogId: Schema.String,
+});
+
+/** The entry the URL names, taken from the operation input. */
+export const DeleteChangelogParams = paramsOf(DeleteChangelogInput, [
+  "changelogId",
+]);

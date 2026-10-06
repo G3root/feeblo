@@ -194,7 +194,7 @@ export const postHandlers = {
       );
       const tagIds = yield* parseTagIds(query.tagIds);
       return yield* listBoardPostsOperation.handler({
-        boardId: params.boardId,
+        ...params,
         cursor: query.cursor,
         includeArchived,
         limit,
@@ -232,18 +232,21 @@ export const postHandlers = {
       slug: providedQueryParam(query.slug),
     })) satisfies HandlerOf<PublicApiGroup, "retrievePost">,
 
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
   getPost: (({ params }) =>
-    getPostOperation.handler({
-      postId: params.postId,
-    })) satisfies HandlerOf<PublicApiGroup, "getPost">,
+    getPostOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "getPost"
+  >,
 
   listPostActivity: (({ params, query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
       return yield* listPostActivityOperation.handler({
+        ...params,
         cursor: query.cursor,
         limit,
-        postId: params.postId,
       });
     })) satisfies HandlerOf<PublicApiGroup, "listPostActivity">,
 
@@ -258,28 +261,30 @@ export const postHandlers = {
   updatePost: (({ params, payload }) =>
     updatePostOperation.handler({
       ...payload,
-      postId: params.postId,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "updatePost">,
 
   setPostTags: (({ params, payload }) =>
     setPostTagsOperation.handler({
       ...payload,
-      postId: params.postId,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "setPostTags">,
 
   deletePost: (({ params }) =>
-    deletePostOperation.handler({
-      postId: params.postId,
-    })) satisfies HandlerOf<PublicApiGroup, "deletePost">,
+    deletePostOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "deletePost"
+  >,
 
   mergePost: (({ params, payload }) =>
     mergePostOperation.handler({
       ...payload,
-      postId: params.postId,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "mergePost">,
 
   unmergePost: (({ params }) =>
-    unmergePostOperation.handler({
-      postId: params.postId,
-    })) satisfies HandlerOf<PublicApiGroup, "unmergePost">,
+    unmergePostOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "unmergePost"
+  >,
 };

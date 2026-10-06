@@ -62,8 +62,10 @@ export const boardHandlers = {
       });
     })) satisfies HandlerOf<PublicApiGroup, "listBoards">,
 
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
   getBoard: (({ params }) =>
-    getBoardOperation.handler({ boardId: params.boardId })) satisfies HandlerOf<
+    getBoardOperation.handler(params)) satisfies HandlerOf<
     PublicApiGroup,
     "getBoard"
   >,

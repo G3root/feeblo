@@ -130,10 +130,13 @@ export const changelogHandlers = {
       });
     })) satisfies HandlerOf<PublicApiGroup, "listChangelog">,
 
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
   getChangelog: (({ params }) =>
-    getChangelogOperation.handler({
-      changelogId: params.changelogId,
-    })) satisfies HandlerOf<PublicApiGroup, "getChangelog">,
+    getChangelogOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "getChangelog"
+  >,
 
   createChangelog: (({ payload }) =>
     createChangelogOperation.handler(payload)) satisfies HandlerOf<
@@ -144,11 +147,12 @@ export const changelogHandlers = {
   updateChangelog: (({ params, payload }) =>
     updateChangelogOperation.handler({
       ...payload,
-      changelogId: params.changelogId,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "updateChangelog">,
 
   deleteChangelog: (({ params }) =>
-    deleteChangelogOperation.handler({
-      changelogId: params.changelogId,
-    })) satisfies HandlerOf<PublicApiGroup, "deleteChangelog">,
+    deleteChangelogOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "deleteChangelog"
+  >,
 };

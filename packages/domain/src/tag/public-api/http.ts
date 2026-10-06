@@ -119,8 +119,9 @@ export const tagHandlers = {
     "createTag"
   >,
 
-  getTag: (({ params }) =>
-    getTagOperation.handler({ tagId: params.tagId })) satisfies HandlerOf<
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
+  getTag: (({ params }) => getTagOperation.handler(params)) satisfies HandlerOf<
     PublicApiGroup,
     "getTag"
   >,
@@ -128,11 +129,11 @@ export const tagHandlers = {
   updateTag: (({ params, payload }) =>
     updateTagOperation.handler({
       ...payload,
-      tagId: params.tagId,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "updateTag">,
 
   deleteTag: (({ params }) =>
-    deleteTagOperation.handler({ tagId: params.tagId })) satisfies HandlerOf<
+    deleteTagOperation.handler(params)) satisfies HandlerOf<
     PublicApiGroup,
     "deleteTag"
   >,

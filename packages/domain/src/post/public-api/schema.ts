@@ -13,8 +13,8 @@ import {
   PublicApiOnBehalfAuthor,
   PublicApiTag,
 } from "../../public-api/common";
+import { paramsOf, payloadOf } from "../../public-api/http-input";
 import { isIsoDateOrTimestamp } from "../../public-api/parse";
-import { payloadOf } from "../../public-api/payload";
 
 /**
  * The post resource: what the post endpoints return, and the typed input every
@@ -22,9 +22,9 @@ import { payloadOf } from "../../public-api/payload";
  *
  * The `*Input` schemas are what an operation receives — typed values, so a
  * surface that already has types (MCP, a CLI) has nothing to parse — and they
- * are the authority for the constraints a request obeys. A `*Payload` is the
- * HTTP body projected from its operation input: the `*Query`/`*Params`
- * schemas still describe the URL, and query parameters are strings validated
+ * are the authority for the constraints a request obeys. A `*Payload` and a
+ * `*Params` are the HTTP body and path projected from that input; the `*Query`
+ * schemas describe the URL's filters, where parameters are strings validated
  * in the endpoint's handler so a malformed request stays on the published
  * error envelope.
  */
@@ -144,10 +144,6 @@ export type TPublicApiPostActivityPage = Schema.Schema.Type<
   typeof PublicApiPostActivityPage
 >;
 
-export const ListPostActivityParams = Schema.Struct({
-  postId: Schema.String,
-});
-
 export const ListPostActivityQuery = Schema.Struct({
   limit: Schema.optional(Schema.String),
   cursor: Schema.optional(Schema.String),
@@ -174,6 +170,11 @@ export type TListPostActivityInput = Schema.Schema.Type<
   typeof ListPostActivityInput
 >;
 
+/** The post the URL names, taken from the operation input. */
+export const ListPostActivityParams = paramsOf(ListPostActivityInput, [
+  "postId",
+]);
+
 /**
  * Query parameters are declared as strings and validated in the handler.
  *
@@ -181,10 +182,6 @@ export type TListPostActivityInput = Schema.Schema.Type<
  * its own error body, which is not this API's documented envelope; validating
  * here keeps every failure on the published vocabulary (`INVALID_REQUEST`).
  */
-export const ListBoardPostsParams = Schema.Struct({
-  boardId: Schema.String,
-});
-
 export const ListBoardPostsQuery = Schema.Struct({
   limit: Schema.optional(Schema.String),
   cursor: Schema.optional(Schema.String),
@@ -225,30 +222,6 @@ export const RetrievePostQuery = Schema.Struct({
   id: Schema.optional(Schema.String),
   boardId: Schema.optional(Schema.String),
   slug: Schema.optional(Schema.String),
-});
-
-export const GetPostParams = Schema.Struct({
-  postId: Schema.String,
-});
-
-export const UpdatePostParams = Schema.Struct({
-  postId: Schema.String,
-});
-
-export const DeletePostParams = Schema.Struct({
-  postId: Schema.String,
-});
-
-export const MergePostParams = Schema.Struct({
-  postId: Schema.String,
-});
-
-export const UnmergePostParams = Schema.Struct({
-  postId: Schema.String,
-});
-
-export const SetPostTagsParams = Schema.Struct({
-  postId: Schema.String,
 });
 
 /**
@@ -340,6 +313,9 @@ export const UpdatePostInput = Schema.Struct({
   author: Schema.optional(PublicApiOnBehalfAuthor),
 });
 
+/** The post the URL names, taken from the operation input. */
+export const UpdatePostParams = paramsOf(UpdatePostInput, ["postId"]);
+
 /** The update body: the operation input without the post the URL names. */
 export const UpdatePostPayload = payloadOf(UpdatePostInput, ["postId"]);
 
@@ -374,6 +350,9 @@ export const ListBoardPostsInput = Schema.Struct({
     description: "Keep posts changed after this ISO 8601 instant",
   }),
 });
+
+/** The board the URL names, taken from the operation input. */
+export const ListBoardPostsParams = paramsOf(ListBoardPostsInput, ["boardId"]);
 
 /** Typed input for a page of the workspace's posts. */
 export const ListPostsInput = Schema.Struct({
@@ -413,16 +392,25 @@ export const GetPostInput = Schema.Struct({
   postId: Schema.String,
 });
 
+/** The post the URL names, taken from the operation input. */
+export const GetPostParams = paramsOf(GetPostInput, ["postId"]);
+
 /** Typed input for deleting a post. */
 export const DeletePostInput = Schema.Struct({
   postId: Schema.String,
 });
+
+/** The post the URL names, taken from the operation input. */
+export const DeletePostParams = paramsOf(DeletePostInput, ["postId"]);
 
 /** Typed input for merging one post into another. */
 export const MergePostInput = Schema.Struct({
   postId: Schema.String,
   intoPostId: Schema.String,
 });
+
+/** The post the URL names, taken from the operation input. */
+export const MergePostParams = paramsOf(MergePostInput, ["postId"]);
 
 /**
  * The post the archived duplicate is folded into.
@@ -440,6 +428,9 @@ export const UnmergePostInput = Schema.Struct({
   postId: Schema.String,
 });
 
+/** The post the URL names, taken from the operation input. */
+export const UnmergePostParams = paramsOf(UnmergePostInput, ["postId"]);
+
 export type TUnmergePostInput = Schema.Schema.Type<typeof UnmergePostInput>;
 
 /** Typed input for replacing the tags a post carries. */
@@ -449,6 +440,9 @@ export const SetPostTagsInput = Schema.Struct({
     description: "The complete set of tag ids the post should carry",
   }),
 });
+
+/** The post the URL names, taken from the operation input. */
+export const SetPostTagsParams = paramsOf(SetPostTagsInput, ["postId"]);
 
 /**
  * The complete set of tags a post should carry.

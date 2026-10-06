@@ -117,9 +117,9 @@ export const voteHandlers = {
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
       return yield* listPostVotesOperation.handler({
+        ...params,
         cursor: query.cursor,
         limit,
-        postId: params.postId,
         voter: voterFilterFromQuery(query),
       });
     })) satisfies HandlerOf<PublicApiGroup, "listPostVotes">,
@@ -141,12 +141,12 @@ export const voteHandlers = {
   createVote: (({ params, payload }) =>
     createVoteOperation.handler({
       ...payload,
-      postId: params.postId,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "createVote">,
 
   deleteVote: (({ params }) =>
-    deleteVoteOperation.handler({
-      postId: params.postId,
-      voteId: params.voteId,
-    })) satisfies HandlerOf<PublicApiGroup, "deleteVote">,
+    deleteVoteOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "deleteVote"
+  >,
 };

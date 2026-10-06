@@ -110,19 +110,23 @@ export const companyHandlers = {
     "createCompany"
   >,
 
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
   getCompany: (({ params }) =>
-    getCompanyOperation.handler({
-      companyId: params.companyId,
-    })) satisfies HandlerOf<PublicApiGroup, "getCompany">,
+    getCompanyOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "getCompany"
+  >,
 
   updateCompany: (({ params, payload }) =>
     updateCompanyOperation.handler({
       ...payload,
-      companyId: params.companyId,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "updateCompany">,
 
   deleteCompany: (({ params }) =>
-    deleteCompanyOperation.handler({
-      companyId: params.companyId,
-    })) satisfies HandlerOf<PublicApiGroup, "deleteCompany">,
+    deleteCompanyOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "deleteCompany"
+  >,
 };

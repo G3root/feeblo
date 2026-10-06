@@ -142,4 +142,35 @@ describe("public API operations registry", () => {
       )
     ).toBe(true);
   });
+
+  it("names every URL parameter on the operation's input", () => {
+    // The params schema is derived from the operation input, so a path
+    // segment the input does not declare is the one thing the derivation
+    // cannot catch: the URL would name a field no operation receives. The
+    // endpoint path is the only place that name is written, so it is checked
+    // against the input here.
+    for (const group of PublicApiGroups) {
+      for (const [identifier, endpoint] of Object.entries(group.endpoints)) {
+        const operation = PublicApiOperations.find(
+          (candidate) => candidate.name === identifier
+        );
+        if (operation === undefined) {
+          return expect.fail(`no operation named ${identifier}`);
+        }
+
+        for (const match of endpoint.path.matchAll(/:([^/]+)/g)) {
+          const name = match[1];
+          if (name === undefined) {
+            return expect.fail(`${endpoint.path} has an unnamed segment`);
+          }
+          if (!("fields" in operation.input)) {
+            return expect.fail(
+              `${identifier} has a path parameter but no typed input fields`
+            );
+          }
+          expect(name in operation.input.fields).toBe(true);
+        }
+      }
+    }
+  });
 });

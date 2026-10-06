@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
-import { payloadOf } from "../../public-api/payload";
+import { paramsOf, payloadOf } from "../../public-api/http-input";
 
 /**
  * Where a company record came from.
@@ -65,10 +65,6 @@ export const ListCompaniesQuery = Schema.Struct({
   cursor: Schema.optional(Schema.String),
 });
 
-export const GetCompanyParams = Schema.Struct({
-  companyId: Schema.String,
-});
-
 /**
  * The id is minted by the server, never chosen by the caller.
  *
@@ -102,10 +98,6 @@ export type TCreateCompanyPayload = Schema.Schema.Type<
   typeof CreateCompanyPayload
 >;
 
-export const UpdateCompanyParams = Schema.Struct({
-  companyId: Schema.String,
-});
-
 /**
  * A partial update: an absent field is left alone, `null` clears it.
  *
@@ -122,6 +114,9 @@ export const UpdateCompanyInput = Schema.Struct({
   externalCreatedAt: Schema.optional(Schema.NullOr(Schema.DateFromString)),
 });
 
+/** The company the URL names, taken from the operation input. */
+export const UpdateCompanyParams = paramsOf(UpdateCompanyInput, ["companyId"]);
+
 /** The update body: the operation input without the company the URL names. */
 export const UpdateCompanyPayload = payloadOf(UpdateCompanyInput, [
   "companyId",
@@ -130,10 +125,6 @@ export const UpdateCompanyPayload = payloadOf(UpdateCompanyInput, [
 export type TUpdateCompanyPayload = Schema.Schema.Type<
   typeof UpdateCompanyPayload
 >;
-
-export const DeleteCompanyParams = Schema.Struct({
-  companyId: Schema.String,
-});
 
 /** Typed input for a page of the workspace's companies. */
 export const ListCompaniesInput = Schema.Struct({
@@ -156,7 +147,13 @@ export const GetCompanyInput = Schema.Struct({
   companyId: Schema.String,
 });
 
+/** The company the URL names, taken from the operation input. */
+export const GetCompanyParams = paramsOf(GetCompanyInput, ["companyId"]);
+
 /** Typed input for deleting a company. */
 export const DeleteCompanyInput = Schema.Struct({
   companyId: Schema.String,
 });
+
+/** The company the URL names, taken from the operation input. */
+export const DeleteCompanyParams = paramsOf(DeleteCompanyInput, ["companyId"]);

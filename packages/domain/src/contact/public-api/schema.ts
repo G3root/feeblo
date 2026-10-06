@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
-import { payloadOf } from "../../public-api/payload";
+import { paramsOf, payloadOf } from "../../public-api/http-input";
 
 /**
  * The end-user resource: the workspace's own record of one of its customers.
@@ -44,10 +44,6 @@ export const ListEndUsersQuery = Schema.Struct({
   externalId: Schema.optional(Schema.String),
   email: Schema.optional(Schema.String),
   companyId: Schema.optional(Schema.String),
-});
-
-export const GetEndUserParams = Schema.Struct({
-  endUserId: Schema.String,
 });
 
 /**
@@ -119,5 +115,8 @@ export const GetEndUserInput = Schema.Struct({
 });
 
 export type TGetEndUserInput = Schema.Schema.Type<typeof GetEndUserInput>;
+
+/** The customer the URL names, taken from the operation input. */
+export const GetEndUserParams = paramsOf(GetEndUserInput, ["endUserId"]);
 
 export type TUpsertEndUserInput = Schema.Schema.Type<typeof UpsertEndUserInput>;
