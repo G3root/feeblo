@@ -17,6 +17,7 @@ import {
   Building03Icon,
   Chat01Icon,
   CreditCardIcon,
+  CursorInWindowIcon,
   Folder01Icon,
   LayoutThreeColumnIcon,
   LockIcon,
@@ -64,6 +65,12 @@ const settingsItems = [
         icon: PaintBrush04Icon,
         permission: "site.update" as const,
         to: "/$organizationId/settings/customize" as const,
+      },
+      {
+        label: "Widget",
+        icon: CursorInWindowIcon,
+        permission: "site.update" as const,
+        to: "/$organizationId/settings/widget" as const,
       },
       {
         label: "Members",
