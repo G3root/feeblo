@@ -17,6 +17,7 @@ import {
   Building03Icon,
   Chat01Icon,
   CreditCardIcon,
+  Database01Icon,
   Folder01Icon,
   LayoutThreeColumnIcon,
   LockIcon,
@@ -75,6 +76,12 @@ const settingsItems = [
         icon: PropertyNewIcon,
         permission: "contacts.*" as const,
         to: "/$organizationId/settings/custom-attributes" as const,
+      },
+      {
+        label: "Data",
+        icon: Database01Icon,
+        permission: "boards.exportData" as const,
+        to: "/$organizationId/settings/data" as const,
       },
       {
         label: "Billing",
