@@ -132,45 +132,47 @@ export const commentHandlers = {
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
       return yield* listPostCommentsOperation.handler({
+        ...params,
         cursor: query.cursor,
         limit,
-        postId: params.postId,
       });
     })) satisfies HandlerOf<PublicApiGroup, "listPostComments">,
 
+  // The body is the operation's own input minus the path, so handing it over
+  // cannot drop a field the operation gains.
   createComment: (({ params, payload }) =>
     createCommentOperation.handler({
-      author: payload.author,
-      content: payload.content,
-      parentCommentId: payload.parentCommentId,
-      postId: params.postId,
-      visibility: payload.visibility,
+      ...payload,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "createComment">,
 
   getComment: (({ params }) =>
-    getCommentOperation.handler({
-      commentId: params.commentId,
-    })) satisfies HandlerOf<PublicApiGroup, "getComment">,
+    getCommentOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "getComment"
+  >,
 
   updateComment: (({ params, payload }) =>
     updateCommentOperation.handler({
-      commentId: params.commentId,
-      content: payload.content,
-      visibility: payload.visibility,
+      ...payload,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "updateComment">,
 
   deleteComment: (({ params }) =>
-    deleteCommentOperation.handler({
-      commentId: params.commentId,
-    })) satisfies HandlerOf<PublicApiGroup, "deleteComment">,
+    deleteCommentOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "deleteComment"
+  >,
 
   pinComment: (({ params }) =>
-    pinCommentOperation.handler({
-      commentId: params.commentId,
-    })) satisfies HandlerOf<PublicApiGroup, "pinComment">,
+    pinCommentOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "pinComment"
+  >,
 
   unpinComment: (({ params }) =>
-    unpinCommentOperation.handler({
-      commentId: params.commentId,
-    })) satisfies HandlerOf<PublicApiGroup, "unpinComment">,
+    unpinCommentOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "unpinComment"
+  >,
 };

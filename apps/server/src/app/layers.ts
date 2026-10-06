@@ -1,8 +1,13 @@
-import { NodeCrypto, NodeRedis } from "@effect/platform-node";
+import { NodeRedis } from "@effect/platform-node";
 import { toAuthHandler } from "@feeblo/auth/auth-handler";
 import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
 import { BoardRepository } from "@feeblo/domain/board/repository";
+import {
+  DataImportWorkerLive,
+  runDataImportMaintenance,
+  runDataImportWorker,
+} from "@feeblo/domain/data-transfer/worker";
 import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
 import { EmailOutboxRepository } from "@feeblo/domain/email-outbox/repository";
 import { EmailProviderFeedbackConfig } from "@feeblo/domain/email-provider-feedback/config";
@@ -10,6 +15,7 @@ import { EmailProviderFeedbackService } from "@feeblo/domain/email-provider-feed
 import { SesEmailFeedbackWebhook } from "@feeblo/domain/email-provider-feedback/ses-webhook";
 import { EmailSubscriptionRepository } from "@feeblo/domain/email-subscription/repository";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
+import { ResolvePrincipalService } from "@feeblo/domain/identity/service";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import {
@@ -19,14 +25,18 @@ import {
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import { NotificationService } from "@feeblo/domain/notification/service";
+import { PostActivityRepository } from "@feeblo/domain/post-activity/repository";
 import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
+import { PostSubscriptionRepository } from "@feeblo/domain/post-subscription/repository";
+import { PostEmbeddingService } from "@feeblo/domain/post/embedding-service";
 import { PostRepository } from "@feeblo/domain/post/repository";
-import { PostWriteInternals } from "@feeblo/domain/post/write";
+import { PostWriteService } from "@feeblo/domain/post/write";
 import { PublicApiConfig } from "@feeblo/domain/public-api/config";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
 import { S3UploadServiceLive } from "@feeblo/domain/services/s3";
 import { Auth } from "@feeblo/domain/session-middleware";
 import { SiteRepository } from "@feeblo/domain/site/repository";
+import { UserRepository } from "@feeblo/domain/user/repository";
 import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
 import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
@@ -237,12 +247,29 @@ export const makeServiceLayers = ({
   const EntitlementPolicies = EntitlementPolicy.layer.pipe(
     Layer.provide(WorkspaceRepository.layer)
   );
-  // The shared post write path's own environment: the repositories it
-  // coordinates and the services its steps read from the running context.
-  // The widget feedback endpoint and the Slack and Discord inbound feedback
-  // services all build the path, so one merged layer serves the three.
-  const PostWrites = PostWriteInternals;
-  return Layer.mergeAll(
+  // The shared post write path's environment, provided once: the dashboard
+  // RPCs, the Public API, the widget feedback endpoint, and the Slack and
+  // Discord inbound feedback services all require this one service instead of
+  // restating its collaborators. A missing layer therefore fails this build's
+  // type rather than one request.
+  const PostWriteDependencies = Layer.mergeAll(
+    BoardRepository.layer,
+    EmailOutboxConfig.layer,
+    EmailOutboxRepository.layer,
+    EmailSubscriptionRepository.layer,
+    EntitlementPolicies,
+    IntegrationEventRecorderLive,
+    PostActivityRepository.layer,
+    PostRepository.layer,
+    PostSubscriptionRepository.layer,
+    ResolvePrincipalService.layer,
+    S3UploadServiceLive,
+    UserRepository.layer
+  );
+  const PostWrites = PostWriteService.layer.pipe(
+    Layer.provide(PostWriteDependencies)
+  );
+  const ServiceCore = Layer.mergeAll(
     workflowLayer,
     SiteRepository.layer,
     EmailOutboxRepository.layer,
@@ -270,10 +297,7 @@ export const makeServiceLayers = ({
       Layer.provide(SlackUserServiceLive),
       Layer.provide(
         SlackFeedbackServiceLive.pipe(
-          Layer.provide(EmailOutboxConfig.layer),
           Layer.provide(PostStatusRepository.layer),
-          Layer.provide(NodeCrypto.layer),
-          Layer.provide(S3UploadServiceLive),
           Layer.provide(PostWrites)
         )
       ),
@@ -292,10 +316,7 @@ export const makeServiceLayers = ({
       Layer.provide(DiscordUserServiceLive),
       Layer.provide(
         DiscordFeedbackServiceLive.pipe(
-          Layer.provide(EmailOutboxConfig.layer),
           Layer.provide(PostStatusRepository.layer),
-          Layer.provide(NodeCrypto.layer),
-          Layer.provide(S3UploadServiceLive),
           Layer.provide(PostWrites)
         )
       ),
@@ -334,6 +355,11 @@ export const makeServiceLayers = ({
     ),
     EntitlementPolicies,
     WorkspaceRepository.layer,
+    PostWrites,
+    // The write path's optional fan-outs resolve from the request context, so
+    // the one instance is merged here for every surface that writes a post.
+    NotificationService.layer,
+    PostEmbeddingService.layer,
     // Media storage is shared rather than the Public API's own: its repository
     // sweeps the editor assets a deleted changelog entry orphaned, and the
     // dashboard's routes upload through the same service. The Public API's
@@ -346,4 +372,16 @@ export const makeServiceLayers = ({
     // fails only when a request asks for a paging link.
     PublicApiConfig.layer
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
+
+  // The import worker and its retention sweep run for the layer's lifetime,
+  // inside the same built graph as the server: one `PostWriteService`, one
+  // optional fan-out set, one database. Providing `ServiceCore` by reference
+  // is what makes the two share it instead of building a second copy.
+  const DataImportWorkerLayer = Layer.effectDiscard(
+    Effect.gen(function* () {
+      yield* runDataImportMaintenance.pipe(Effect.forkScoped);
+      yield* runDataImportWorker().pipe(Effect.forkScoped);
+    })
+  ).pipe(Layer.provide(DataImportWorkerLive), Layer.provideMerge(ServiceCore));
+  return Layer.mergeAll(ServiceCore, DataImportWorkerLayer);
 };

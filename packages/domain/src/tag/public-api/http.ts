@@ -111,26 +111,29 @@ export const tagHandlers = {
       });
     })) satisfies HandlerOf<PublicApiGroup, "listTags">,
 
+  // The body is the operation's own input, so handing it over cannot drop a
+  // field the operation gains.
   createTag: (({ payload }) =>
-    createTagOperation.handler({ name: payload.name })) satisfies HandlerOf<
+    createTagOperation.handler(payload)) satisfies HandlerOf<
     PublicApiGroup,
     "createTag"
   >,
 
-  getTag: (({ params }) =>
-    getTagOperation.handler({ tagId: params.tagId })) satisfies HandlerOf<
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
+  getTag: (({ params }) => getTagOperation.handler(params)) satisfies HandlerOf<
     PublicApiGroup,
     "getTag"
   >,
 
   updateTag: (({ params, payload }) =>
     updateTagOperation.handler({
-      name: payload.name,
-      tagId: params.tagId,
+      ...payload,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "updateTag">,
 
   deleteTag: (({ params }) =>
-    deleteTagOperation.handler({ tagId: params.tagId })) satisfies HandlerOf<
+    deleteTagOperation.handler(params)) satisfies HandlerOf<
     PublicApiGroup,
     "deleteTag"
   >,

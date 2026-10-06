@@ -9,18 +9,11 @@ import {
   NodeRuntime,
 } from "@effect/platform-node";
 import { Database } from "@feeblo/db";
-import {
-  DataImportWorkerLive,
-  runDataImportMaintenance,
-  runDataImportWorker,
-} from "@feeblo/domain/data-transfer/worker";
-import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
 import { ExternalResourceService } from "@feeblo/domain/integration/external-resource/service";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
-import { S3UploadServiceLive } from "@feeblo/domain/services/s3";
 import { Mailer } from "@feeblo/transactional/mailer";
 import {
   makeMailerTestLayer,
@@ -145,27 +138,6 @@ export const program = Effect.gen(function* () {
 
   yield* integrationRuntime.worker.pipe(Effect.forkScoped);
   yield* integrationRuntime.maintenance.pipe(Effect.forkScoped);
-
-  // One context for both transfer loops, so the repositories and the shared
-  // post-write services are built once for the process rather than once per
-  // fork. The write path's storage and email configuration are provided here,
-  // where the composition root chooses concrete infrastructure, rather than
-  // inside the domain module that declares the worker.
-  const dataTransferContext = yield* Layer.build(
-    DataImportWorkerLive.pipe(
-      Layer.provideMerge(
-        Layer.mergeAll(S3UploadServiceLive, EmailOutboxConfig.layer)
-      )
-    )
-  );
-  yield* runDataImportWorker().pipe(
-    Effect.provide(dataTransferContext),
-    Effect.forkScoped
-  );
-  yield* runDataImportMaintenance.pipe(
-    Effect.provide(dataTransferContext),
-    Effect.forkScoped
-  );
 
   return yield* Layer.launch(server);
 });

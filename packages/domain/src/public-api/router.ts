@@ -1,26 +1,17 @@
-import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
 
 import { BoardRepository } from "../board/repository";
-import { PublicApiChangelogRepository } from "../changelog/public-api/repository";
 import { ChangelogRepository } from "../changelog/repository";
-import { PublicApiCommentRepository } from "../comments/public-api/repository";
 import { CommentRepository } from "../comments/repository";
-import { CommentService } from "../comments/service";
 import { CompanyRepository } from "../company/repository";
-import { PublicApiEndUserRepository } from "../contact/public-api/repository";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostStatusRepository } from "../post-status/repository";
-import { PostSubscriptionRepository } from "../post-subscription/repository";
-import { PostEmbeddingService } from "../post/embedding-service";
-import { PublicApiPostRepository } from "../post/public-api/repository";
 import { PostRepository } from "../post/repository";
 import { TagRepository } from "../tag/repository";
-import { PublicApiVoteRepository } from "../upvote/public-api/repository";
 import { UpvoteRepository } from "../upvote/repository";
 import { UserRepository } from "../user/repository";
 import { PublicApi } from "./api-contract";
@@ -30,6 +21,7 @@ import {
   ApiKeyAuthMiddlewareLive,
   PublicApiSchemaErrorHandlerLive,
 } from "./middleware";
+import { PublicApiProjections } from "./projections";
 
 /**
  * The `/api/v1` route tree.
@@ -49,16 +41,17 @@ import {
  * The layers the surface's own repositories need at construction time.
  *
  * They are closed over so the route does not require them, and they are what
- * its write paths need to do what the dashboard's write paths do: a tag
+ * its own write paths need to do what the dashboard's write paths do: a tag
  * assignment records a change in a post's timeline, so it needs the activity
  * repository at construction time; publishing a changelog entry records a
  * durable email intent and notifies subscribers through the same helper the
- * dashboard uses; and creating, changing, or deleting a post goes through the
- * dashboard's own shared write path (`post/write.ts`), which needs the board
- * and post repositories, the creator subscription, the integration event
- * recorder, the notification fan-out, and the embedding scheduler. A new
- * dependency is therefore one line here, not an edit in every place that
- * assembles a server or a test.
+ * dashboard uses; and a vote goes through the shared on-behalf write path.
+ * The post write path reads its environment from `PostWriteService`, which the
+ * composition root provides, so the collaborators only it used are not listed
+ * here; the repositories below are the ones the other operations — tags,
+ * comments, votes, changelog publication — still read. A new dependency is
+ * therefore one line here, not an edit in every place that assembles a server
+ * or a test.
  *
  * Everything the surface shares with the server — the database, `Auth`, the
  * rate limiter, the plan decision, media storage, the email subscription
@@ -74,13 +67,10 @@ export const PublicApiInternals = Layer.mergeAll(
   ChangelogRepository.layer,
   CompanyRepository.layer,
   EmailOutboxRepository.layer,
-  IntegrationEventRecorderLive,
   NotificationService.layer,
   PostActivityRepository.layer,
-  PostEmbeddingService.layer,
   PostRepository.layer,
   PostStatusRepository.layer,
-  PostSubscriptionRepository.layer,
   ResolvePrincipalService.layer,
   TagRepository.layer,
   UserRepository.layer,
@@ -92,20 +82,6 @@ export const PublicApiInternals = Layer.mergeAll(
   // resolver it attributes a comment through is already above, for the post
   // write path.
   CommentRepository.layer
-);
-
-/**
- * The comment writes this route serves, composed from the internals above.
- *
- * Merged into the route rather than only provided to it: `HttpApiBuilder`
- * does not thread a handler's requirements through the route layer, so a
- * handler reads the service from the fiber context — the same shape as
- * `currentPublicApiCaller`. The service is the dashboard comment RPC's own
- * write path, so an API-created comment lands in the same timeline, the same
- * transaction, and the same notification fan-out as one written by a member.
- */
-const PublicApiCommentService = CommentService.layer.pipe(
-  Layer.provide(PublicApiInternals)
 );
 
 /**
@@ -127,25 +103,14 @@ export const makePublicApiRoute = <E, R>(
     // rejected is part of this API's contract, not something the composition
     // root supplies.
     Layer.provide(PublicApiSchemaErrorHandlerLive),
-    // Merged rather than only provided: the repositories stay in this layer's
-    // output because tests drive them directly to reach races the HTTP surface
-    // cannot produce (a row that vanishes between a read and a write). Each
-    // resource's repository is provided with the same private bundle, so a new
-    // one is a line here and nowhere else.
+    // Merged rather than only provided: the projections stay in this layer's
+    // output because the middleware tests drive the repositories directly to
+    // reach races the HTTP surface cannot produce (a row that vanishes between
+    // a read and a write). The bundle is shared with `/mcp`, so a projection
+    // added for one surface is composed for both.
     Layer.provideMerge(
-      Layer.mergeAll(
-        PublicApiChangelogRepository.layer.pipe(
-          Layer.provide(PublicApiInternals)
-        ),
-        PublicApiCommentRepository.layer.pipe(
-          Layer.provide(PublicApiInternals)
-        ),
-        PublicApiEndUserRepository.layer,
-        PublicApiPostRepository.layer.pipe(Layer.provide(PublicApiInternals)),
-        PublicApiVoteRepository.layer.pipe(Layer.provide(PublicApiInternals))
-      )
+      PublicApiProjections.pipe(Layer.provide(PublicApiInternals))
     ),
-    Layer.provideMerge(PublicApiCommentService),
     // Provided into the request context, not merged into the output: the
     // public operations read the shared feature repositories — and the
     // database handle they run transactions on — from the fiber context, the
@@ -159,7 +124,8 @@ export const makePublicApiRoute = <E, R>(
  * The route as production composes it.
  *
  * Requires the shared services the server assembles — the database, `Auth`,
- * the rate limiter, `PublicApiConfig`, the plan decision, and media storage —
- * and nothing else.
+ * the rate limiter, `PublicApiConfig`, the plan decision, media storage, and
+ * `PostWriteService`, which the public post repository reads — and nothing
+ * else.
  */
 export const PublicApiRoute = makePublicApiRoute(ApiKeyAuthMiddlewareLive);

@@ -12,8 +12,9 @@ import {
   EmailSubscriptionTokenRequest,
   EmailSubscriptionUnsubscribeAccepted,
   EmailSubscriptionVerificationAccepted,
-  SubmissionNotificationPreferenceAccepted,
+  SubmissionNotificationPreferenceQuery,
   SubmissionNotificationPreferenceRequest,
+  SubmissionNotificationPreferenceState,
 } from "./schema";
 
 const EmailSubscriptionPublicErrors = Schema.Union([
@@ -39,9 +40,14 @@ export class EmailSubscriptionRpcs extends RpcGroup.make(
     success: EmailSubscriptionUnsubscribeAccepted,
     error: EmailSubscriptionPublicErrors,
   }).middleware(PublicRpcRateLimitMiddleware),
+  Rpc.make("EmailSubmissionNotificationPreferenceGet", {
+    payload: SubmissionNotificationPreferenceQuery,
+    success: SubmissionNotificationPreferenceState,
+    error: EmailSubscriptionPublicErrors,
+  }).middleware(AuthMiddleware),
   Rpc.make("EmailSubmissionNotificationPreferenceSet", {
     payload: SubmissionNotificationPreferenceRequest,
-    success: SubmissionNotificationPreferenceAccepted,
+    success: SubmissionNotificationPreferenceState,
     error: EmailSubscriptionPublicErrors,
   }).middleware(AuthMiddleware)
 ) {}

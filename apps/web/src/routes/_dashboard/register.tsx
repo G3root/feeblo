@@ -1,3 +1,4 @@
+import { getSafeCallbackURL } from "@feeblo/post-ui/auth-flows";
 import { Button } from "@feeblo/ui/button";
 import {
   Card,
@@ -29,6 +30,7 @@ export const Route = createFileRoute("/_dashboard/register")({
 
 function RegisterRoute() {
   const navigate = Route.useNavigate();
+  const search = Route.useSearch();
   const { refetch } = useAuthState();
 
   const form = useAppForm({
@@ -48,6 +50,15 @@ function RegisterRoute() {
             type: "success",
           });
           await refetch();
+          if (search.redirectTo !== undefined) {
+            // The guard sends an org-less visitor here with the path it
+            // bounced, so resume it now that a workspace exists — otherwise
+            // the deep link is silently dropped. `getSafeCallbackURL` rejects
+            // protocol-relative and absolute values, so the search param
+            // cannot turn this into an open redirect.
+            window.location.assign(getSafeCallbackURL(search.redirectTo));
+            return;
+          }
           navigate({
             to: "/$organizationId",
             params: { organizationId: result.organizationId },

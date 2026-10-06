@@ -1,11 +1,6 @@
-import { Database, transaction } from "@feeblo/db";
+import { transaction } from "@feeblo/db";
 import { PostId } from "@feeblo/id";
-import {
-  IntegrationEventRecorder,
-  IntegrationEventRecorderLive,
-} from "@feeblo/integration-core";
 import { markdownToHtmlCached } from "@feeblo/utils/markdown";
-import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
@@ -24,11 +19,7 @@ import { CompanyRepository } from "../company/repository";
 import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
 import { parsePersonAttributes } from "../contact/utils";
-import { EmailOutboxConfig } from "../email-outbox/config";
-import { EmailOutboxRepository } from "../email-outbox/repository";
-import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { Api } from "../http/api";
-import { ResolvePrincipalService } from "../identity/service";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import {
   maxTokenLifetimeFromMinutes,
@@ -45,7 +36,7 @@ import {
   postLexicalSimilarity,
   SUGGESTION_MAX_DISTANCE,
 } from "../post/suggestions";
-import { makePostWrites, PostWriteInternals } from "../post/write";
+import { PostWriteService } from "../post/write";
 import * as RateLimit from "../rate-limit";
 import {
   InternalServerError,
@@ -53,9 +44,7 @@ import {
   UnauthorizedError,
   withRemapDbErrors,
 } from "../rpc-errors";
-import { S3UploadService } from "../services/s3";
 import { SitePolicy } from "../site/policies";
-import { UserRepository } from "../user/repository";
 import {
   type TWidgetFeedbackMetadata,
   WidgetFeedbackMetadataValue,
@@ -122,46 +111,36 @@ export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
  * The feedback write is the shared post write path (`post/write.ts`), built
  * here at group construction so a widget submission lands in the same
  * timeline, webhook, staff notification, submission email window, and search
- * embedding as a dashboard or Public API create. The group provides the
- * environment that path reads — the repositories it coordinates through
- * `PostWriteInternals`, plus the pieces only this surface's handlers touch.
+ * embedding as a dashboard or Public API create. The group depends on the
+ * shared `PostWriteService`; the pieces only this surface's handlers touch
+ * stay in the layer build below.
  */
 export const WidgetApiLive = HttpApiBuilder.group(
   Api,
   "WidgetApiGroup",
   (handlers) =>
     Effect.gen(function* () {
-      const db = yield* Database.Database;
-      // The shared post write path reads its collaborators from the running
-      // fiber's context, so the group keeps a handle on each and provides the
-      // same instances around the feedback handler. The layer build above
-      // supplies them; this is the request-time half of the same environment.
-      const crypto = yield* Crypto.Crypto;
       const attributeDefinitionRepository =
         yield* AttributeDefinitionRepository;
       const boardRepository = yield* BoardRepository;
       const companyRepository = yield* CompanyRepository;
       const contactRepository = yield* ContactRepository;
-      const emailOutboxConfig = yield* EmailOutboxConfig;
-      const emailOutboxRepository = yield* EmailOutboxRepository;
-      const emailSubscriptions = yield* EmailSubscriptionRepository;
-      const integrationEventRecorder = yield* IntegrationEventRecorder;
       const jwtSecretRepository = yield* JwtSecretRepository;
       const organizationRepository = yield* OrganizationRepository;
-      const postRepository = yield* PostRepository;
       const postStatusRepository = yield* PostStatusRepository;
-      const resolvePrincipal = yield* ResolvePrincipalService;
-      const s3 = yield* S3UploadService;
-      const userRepository = yield* UserRepository;
-      const writes = yield* makePostWrites;
+      const writes = yield* PostWriteService;
 
-      /** The runtime context the feedback handler's writes read. */
-      const provideFeedbackEnvironment = <A, E, R>(
+      /**
+       * The handler's own services, provided around the feedback effect.
+       *
+       * `HttpApiBuilder` reads a handler's requirements from its own effect,
+       * so these are closed over here rather than left to the route layer;
+       * the shared write path's environment comes from `PostWriteService`.
+       */
+      const provideHandlerEnvironment = <A, E, R>(
         effect: Effect.Effect<A, E, R>
       ) =>
         effect.pipe(
-          Effect.provideService(Crypto.Crypto, crypto),
-          Effect.provideService(Database.Database, db),
           Effect.provideService(
             AttributeDefinitionRepository,
             attributeDefinitionRepository
@@ -169,23 +148,9 @@ export const WidgetApiLive = HttpApiBuilder.group(
           Effect.provideService(BoardRepository, boardRepository),
           Effect.provideService(CompanyRepository, companyRepository),
           Effect.provideService(ContactRepository, contactRepository),
-          Effect.provideService(EmailOutboxConfig, emailOutboxConfig),
-          Effect.provideService(EmailOutboxRepository, emailOutboxRepository),
-          Effect.provideService(
-            EmailSubscriptionRepository,
-            emailSubscriptions
-          ),
-          Effect.provideService(
-            IntegrationEventRecorder,
-            integrationEventRecorder
-          ),
           Effect.provideService(JwtSecretRepository, jwtSecretRepository),
           Effect.provideService(OrganizationRepository, organizationRepository),
-          Effect.provideService(PostRepository, postRepository),
-          Effect.provideService(PostStatusRepository, postStatusRepository),
-          Effect.provideService(ResolvePrincipalService, resolvePrincipal),
-          Effect.provideService(S3UploadService, s3),
-          Effect.provideService(UserRepository, userRepository)
+          Effect.provideService(PostStatusRepository, postStatusRepository)
         );
 
       return handlers
@@ -467,10 +432,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
               name: "WidgetCreateFeedback",
               level: "write",
             }),
-            // `HttpApiBuilder` computes a handler's requirements from its own
-            // effect, so the environment the handler's reads and the write
-            // path share is provided here.
-            provideFeedbackEnvironment,
+            provideHandlerEnvironment,
             Effect.catchTags({
               ConfigError: () =>
                 Effect.fail(
@@ -503,12 +465,9 @@ export const WidgetApiLive = HttpApiBuilder.group(
       BoardRepository.layer,
       CompanyRepository.layer,
       ContactRepository.layer,
-      EmailOutboxConfig.layer,
-      IntegrationEventRecorderLive,
       JwtSecretRepository.layer,
       OrganizationRepository.layer,
-      PostStatusRepository.layer,
-      PostWriteInternals
+      PostStatusRepository.layer
     )
   )
 );

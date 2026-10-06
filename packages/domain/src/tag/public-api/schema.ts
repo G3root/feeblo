@@ -1,16 +1,18 @@
 import * as Schema from "effect/Schema";
 
 import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
+import { paramsOf, payloadOf } from "../../public-api/http-input";
 
 /**
  * The tag resource: what the tag endpoints return, and the typed input every
  * tag operation takes.
  *
- * The `*Query`/`*Params`/`*Payload` schemas below describe the HTTP projection:
- * query parameters are strings validated in the endpoint's handler so a
- * malformed request stays on the published error envelope. The `*Input`
- * schemas are what an operation actually receives — typed values, so a surface
- * that already has types (MCP, a CLI) has nothing to parse. See
+ * The `*Input` schemas are what an operation receives — typed values, so a
+ * surface that already has types (MCP, a CLI) has nothing to parse — and they
+ * are the authority for the constraints a request obeys. A `*Payload` and a
+ * `*Params` are the HTTP body and path projected from that input; query
+ * parameters are still strings validated in the endpoint's handler so a
+ * malformed request stays on the published error envelope. See
  * `public-api/operation.ts`.
  */
 
@@ -45,35 +47,33 @@ export const ListTagsQuery = Schema.Struct({
   cursor: Schema.optional(Schema.String),
 });
 
-export const GetTagParams = Schema.Struct({
-  tagId: Schema.String,
-});
-
 /**
  * The name is the only writable field.
  *
  * `slug` is derived from it on every write, exactly as the dashboard derives
  * it, so the two surfaces cannot disagree about what a tag is called.
  */
-export const CreateTagPayload = Schema.Struct({
-  name: Schema.String,
+export const CreateTagInput = Schema.Struct({
+  name: Schema.String.annotate({ description: "The tag's display name" }),
 });
+
+/** The create body: the operation input with no path field to remove. */
+export const CreateTagPayload = payloadOf(CreateTagInput, []);
 
 export type TCreateTagPayload = Schema.Schema.Type<typeof CreateTagPayload>;
 
-export const UpdateTagParams = Schema.Struct({
+export const UpdateTagInput = Schema.Struct({
   tagId: Schema.String,
+  name: Schema.String.annotate({ description: "The tag's new display name" }),
 });
 
-export const UpdateTagPayload = Schema.Struct({
-  name: Schema.String,
-});
+/** The tag the URL names, taken from the operation input. */
+export const UpdateTagParams = paramsOf(UpdateTagInput, ["tagId"]);
+
+/** The update body: the operation input without the tag the URL names. */
+export const UpdateTagPayload = payloadOf(UpdateTagInput, ["tagId"]);
 
 export type TUpdateTagPayload = Schema.Schema.Type<typeof UpdateTagPayload>;
-
-export const DeleteTagParams = Schema.Struct({
-  tagId: Schema.String,
-});
 
 /** Typed input for a page of the workspace's tags. */
 export const ListTagsInput = Schema.Struct({
@@ -98,18 +98,13 @@ export const GetTagInput = Schema.Struct({
   tagId: Schema.String,
 });
 
-/** Typed input for creating a tag. */
-export const CreateTagInput = Schema.Struct({
-  name: Schema.String.annotate({ description: "The tag's display name" }),
-});
-
-/** Typed input for renaming a tag. */
-export const UpdateTagInput = Schema.Struct({
-  tagId: Schema.String,
-  name: Schema.String.annotate({ description: "The tag's new display name" }),
-});
+/** The tag the URL names, taken from the operation input. */
+export const GetTagParams = paramsOf(GetTagInput, ["tagId"]);
 
 /** Typed input for deleting a tag. */
 export const DeleteTagInput = Schema.Struct({
   tagId: Schema.String,
 });
+
+/** The tag the URL names, taken from the operation input. */
+export const DeleteTagParams = paramsOf(DeleteTagInput, ["tagId"]);

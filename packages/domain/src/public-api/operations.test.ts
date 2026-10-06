@@ -1,5 +1,6 @@
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import * as SchemaAST from "effect/SchemaAST";
 import { describe, expect, it } from "vitest";
 
 import { PublicApiGroups } from "./api-contract";
@@ -141,5 +142,69 @@ describe("public API operations registry", () => {
         Schema.decodeUnknownOption(ListPostsInput)({ tagIds: ["tag_ui"] })
       )
     ).toBe(true);
+  });
+
+  it("binds every URL parameter to the endpoint and the operation", () => {
+    // The params schema is derived from the operation input, so a path
+    // segment the input does not declare is one drift the derivation cannot
+    // catch. The other is the endpoint: the framework decodes the URL through
+    // the endpoint's own params schema, and a segment that schema omits never
+    // reaches the handler even when the operation input carries the field.
+    // Both are checked here, against the endpoint first.
+    for (const group of PublicApiGroups) {
+      for (const [identifier, endpoint] of Object.entries(group.endpoints)) {
+        const operation = PublicApiOperations.find(
+          (candidate) => candidate.name === identifier
+        );
+        if (operation === undefined) {
+          return expect.fail(`no operation named ${identifier}`);
+        }
+
+        const pathParams = [...endpoint.path.matchAll(/:([^/]+)/g)]
+          .map((match) => match[1])
+          .filter((name): name is string => name !== undefined);
+        if (pathParams.length === 0) {
+          continue;
+        }
+
+        // The endpoint stores its params as the StringTree codec, whose field
+        // names are the object AST's property signatures.
+        const params = endpoint.params;
+        if (params === undefined) {
+          return expect.fail(
+            `${identifier} has path parameters but no params schema`
+          );
+        }
+        const paramsAst = params.ast;
+        if (!SchemaAST.isObjects(paramsAst)) {
+          return expect.fail(
+            `${identifier} has path parameters but its params schema is not an object`
+          );
+        }
+        const declared = new Set(
+          paramsAst.propertySignatures.map((signature) => signature.name)
+        );
+        if (declared.size === 0) {
+          return expect.fail(
+            `${identifier} has path parameters but its params schema declares none`
+          );
+        }
+
+        if (!("fields" in operation.input)) {
+          return expect.fail(
+            `${identifier} has path parameters but no typed input fields`
+          );
+        }
+
+        for (const name of pathParams) {
+          // The endpoint's own schema first: this is what the framework
+          // decodes the URL with.
+          expect(declared.has(name)).toBe(true);
+          // Then the operation input, which the derivation already ties to
+          // the endpoint's params schema.
+          expect(name in operation.input.fields).toBe(true);
+        }
+      }
+    }
   });
 });

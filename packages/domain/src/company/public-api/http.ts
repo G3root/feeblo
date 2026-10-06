@@ -102,30 +102,31 @@ export const companyHandlers = {
       });
     })) satisfies HandlerOf<PublicApiGroup, "listCompanies">,
 
+  // The body is the operation's own input minus the path, so handing it over
+  // cannot drop a field the operation gains.
   createCompany: (({ payload }) =>
-    createCompanyOperation.handler({
-      avatar: payload.avatar,
-      externalCreatedAt: payload.externalCreatedAt,
-      externalId: payload.externalId,
-      name: payload.name,
-    })) satisfies HandlerOf<PublicApiGroup, "createCompany">,
+    createCompanyOperation.handler(payload)) satisfies HandlerOf<
+    PublicApiGroup,
+    "createCompany"
+  >,
 
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
   getCompany: (({ params }) =>
-    getCompanyOperation.handler({
-      companyId: params.companyId,
-    })) satisfies HandlerOf<PublicApiGroup, "getCompany">,
+    getCompanyOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "getCompany"
+  >,
 
   updateCompany: (({ params, payload }) =>
     updateCompanyOperation.handler({
-      avatar: payload.avatar,
-      companyId: params.companyId,
-      externalCreatedAt: payload.externalCreatedAt,
-      externalId: payload.externalId,
-      name: payload.name,
+      ...payload,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "updateCompany">,
 
   deleteCompany: (({ params }) =>
-    deleteCompanyOperation.handler({
-      companyId: params.companyId,
-    })) satisfies HandlerOf<PublicApiGroup, "deleteCompany">,
+    deleteCompanyOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "deleteCompany"
+  >,
 };

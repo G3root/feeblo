@@ -21,11 +21,7 @@ import {
   PostEmbeddingService,
   generatePostEmbedding,
 } from "../post/embedding-service";
-import {
-  makePostWrites,
-  type PostWriteActor,
-  PostWriteInternals,
-} from "../post/write";
+import { PostWriteService, type PostWriteActor } from "../post/write";
 import { TagRepository } from "../tag/repository";
 import { UserRepository } from "../user/repository";
 import {
@@ -208,7 +204,7 @@ const applyPendingRow = ({
   readonly row: PendingDataImportRow;
   readonly tagIdsByKey: ReadonlyMap<string, string>;
   readonly tags: TagRepository["Service"];
-  readonly writes: Effect.Success<typeof makePostWrites>;
+  readonly writes: PostWriteService["Service"];
 }) =>
   Effect.gen(function* () {
     const payload = row.payload;
@@ -307,7 +303,7 @@ const embedCreatedPosts = ({
 }: {
   readonly embeddings: readonly EmbeddingInput[];
   readonly organizationId: string;
-}): Effect.Effect<void, never, PostEmbeddingService | Database.Database> =>
+}): Effect.Effect<void, never, Database.Database> =>
   Effect.gen(function* () {
     if (embeddings.length === 0) {
       return;
@@ -352,7 +348,7 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
     const repository = yield* DataTransferRepository;
     const tags = yield* TagRepository;
     const statuses = yield* PostStatusRepository;
-    const writes = yield* makePostWrites;
+    const writes = yield* PostWriteService;
     const actor = yield* resolveImportActor(job);
 
     const statusRows = yield* statuses.findMany({
@@ -505,15 +501,12 @@ export const runDataImportMaintenance: Effect.Effect<
 });
 
 /**
- * Everything the import worker reads, assembled where the worker lives.
- *
- * The composition root builds this once and runs both the poll loop and the
- * retention sweep inside the context, so the server needs to know only that a
- * data-transfer worker exists — not which repositories and post-write
- * services it is made of.
+ * Everything the import worker reads besides the shared post write path,
+ * assembled where the worker lives. The composition root merges this with
+ * `PostWriteService` and the optional fan-outs the write path reads from the
+ * request context.
  */
 export const DataImportWorkerLive = Layer.mergeAll(
-  PostWriteInternals,
   DataTransferRepository.layer,
   PostStatusRepository.layer,
   TagRepository.layer,

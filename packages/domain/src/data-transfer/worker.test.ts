@@ -17,12 +17,11 @@ import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { ResolvePrincipalService } from "../identity/service";
-import { NotificationService } from "../notification/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostStatusRepository } from "../post-status/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
-import { PostEmbeddingService } from "../post/embedding-service";
 import { PostRepository } from "../post/repository";
+import { PostWriteService } from "../post/write";
 import { S3Test } from "../services/s3-test";
 import { CurrentSession, type Session } from "../session-middleware";
 import { TagRepository } from "../tag/repository";
@@ -112,7 +111,7 @@ const makeSession = (
   ],
 });
 
-const Repositories = Layer.mergeAll(
+const PostWriteDependenciesTest = Layer.mergeAll(
   BoardRepository.layer,
   PostRepository.layer,
   PostActivityRepository.layer,
@@ -123,29 +122,14 @@ const Repositories = Layer.mergeAll(
       EmailSubscriptionTokenService.layerTest("data-transfer-test-secret")
     )
   ),
-  ResolvePrincipalService.layer,
   EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
-  UserRepository.layer,
-  WorkspaceRepository.layer
-);
+  ResolvePrincipalService.layer,
+  UserRepository.layer
+).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
-const RepositoriesTest = Layer.mergeAll(
-  Repositories,
-  TagRepository.layer,
-  PostStatusRepository.layer,
-  DataTransferRepository.layer,
-  // The post write path reads both optionally; `serviceOption` still requires
-  // the tag to be present in the environment, the same as the server's
-  // `PostWriteInternals` merge.
-  PostEmbeddingService.layer,
-  NotificationService.layer
-);
-
-// One `Database.PgliteDatabaseLive` acquisition for the whole graph: PGlite is
-// a single writer, so a second instance over the same directory deadlocks.
-const TestLayer = Layer.mergeAll(
-  RepositoriesTest,
-  DataImportService.layer,
+const RuntimeTest = Layer.mergeAll(
+  Database.PgliteDatabaseLive,
+  NodeCrypto.layer,
   S3Test,
   EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
   Layer.succeed(
@@ -157,6 +141,19 @@ const TestLayer = Layer.mergeAll(
         }).pipe(Effect.as({ deliveryCount: 0, eventRecorded: false })),
     })
   )
+);
+
+// One built graph, mirroring the server's: the worker runs against the same
+// `PostWriteService` the write path exposes, and the optional fan-outs it
+// reads with `serviceOption` are simply absent (an import backfill skips them).
+const TestLayer = Layer.mergeAll(
+  PostWriteService.layer.pipe(
+    Layer.provideMerge(Layer.mergeAll(PostWriteDependenciesTest, RuntimeTest))
+  ),
+  DataImportService.layer,
+  DataTransferRepository.layer,
+  TagRepository.layer,
+  PostStatusRepository.layer
 ).pipe(
   Layer.provideMerge(Database.PgliteDatabaseLive),
   Layer.provideMerge(NodeCrypto.layer)

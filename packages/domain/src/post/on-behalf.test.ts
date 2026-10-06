@@ -37,6 +37,7 @@ import { WorkspaceRepository } from "../workspace/repository";
 import { PostRpcHandlersEffect } from "./handlers";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
+import { PostWriteService } from "./write";
 
 describe("PostRpcHandlers on-behalf", () => {
   const recordedIntegrationEvents: unknown[] = [];
@@ -193,20 +194,24 @@ describe("PostRpcHandlers on-behalf", () => {
     EntitlementPolicy.layer
   ).pipe(Layer.provideMerge(RepositoriesTest));
 
-  const TestLayer = Layer.mergeAll(
-    HandlerTest,
-    Database.PgliteDatabaseLive,
-    NodeCrypto.layer,
-    S3Test,
-    EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
-    Layer.succeed(
-      IntegrationEventRecorder,
-      IntegrationEventRecorder.of({
-        recordIntegrationEvent: ({ event }) =>
-          Effect.sync(() => {
-            recordedIntegrationEvents.push(event);
-          }).pipe(Effect.as({ deliveryCount: 0, eventRecorded: false })),
-      })
+  const TestLayer = PostWriteService.layer.pipe(
+    Layer.provideMerge(
+      Layer.mergeAll(
+        HandlerTest,
+        Database.PgliteDatabaseLive,
+        NodeCrypto.layer,
+        S3Test,
+        EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
+        Layer.succeed(
+          IntegrationEventRecorder,
+          IntegrationEventRecorder.of({
+            recordIntegrationEvent: ({ event }) =>
+              Effect.sync(() => {
+                recordedIntegrationEvents.push(event);
+              }).pipe(Effect.as({ deliveryCount: 0, eventRecorded: false })),
+          })
+        )
+      )
     )
   );
 

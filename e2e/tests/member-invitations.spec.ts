@@ -11,6 +11,7 @@ import {
   waitForTestEmail,
 } from "../helpers/test-mailbox";
 import { createTestUser, type TestUser } from "../helpers/test-users";
+import { LoginPage } from "../page-objects/LoginPage";
 
 const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
 const appOrigin = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3101")
@@ -342,6 +343,119 @@ test.describe("member invitations", () => {
       ).toBeVisible();
     } finally {
       await adminContext.close();
+    }
+  });
+
+  test("the emailed link is the whole acceptance flow", async ({
+    browser,
+    page,
+  }) => {
+    const owner = await createAuthenticatedWorkspace(page);
+    const invitee = createTestUser();
+    const inviteeContext = await browser.newContext();
+
+    try {
+      const inviteePage = await createSignedInUser(inviteeContext, invitee);
+      await page.goto(membersUrl(owner.organizationUrl));
+      await inviteMember(page, invitee.email);
+      const email = await waitForTestEmail(
+        page.context().request,
+        invitee.email
+      );
+      const invitationPath = `/invitation/${invitationIdFromEmail(email)}`;
+
+      await inviteePage.goto(invitationPath);
+      await expect(
+        inviteePage.getByText(`Join ${owner.workspaceName}`, { exact: true })
+      ).toBeVisible();
+      await expect(
+        inviteePage.getByText(owner.email, { exact: false })
+      ).toBeVisible();
+      await inviteePage
+        .getByRole("button", { name: "Accept invitation" })
+        .click();
+
+      // Accepting lands in the workspace it granted access to.
+      await expect(inviteePage).toHaveURL(/\/org_/);
+      await expect(
+        inviteePage.getByRole("button", { name: invitee.email })
+      ).toBeVisible();
+
+      await page.reload();
+      await expect(page.getByText(invitee.name, { exact: true })).toBeVisible();
+    } finally {
+      await inviteeContext.close();
+    }
+  });
+
+  test("an anonymous visitor is returned to the invitation after sign-in", async ({
+    browser,
+    page,
+  }) => {
+    const owner = await createAuthenticatedWorkspace(page);
+    const invitee = createTestUser();
+    const inviteeContext = await browser.newContext();
+    const anonymousContext = await browser.newContext();
+
+    try {
+      // The invited account has to exist (and be verified) before sign-in.
+      await createSignedInUser(inviteeContext, invitee);
+      await page.goto(membersUrl(owner.organizationUrl));
+      await inviteMember(page, invitee.email);
+      const email = await waitForTestEmail(
+        page.context().request,
+        invitee.email
+      );
+      const invitationPath = `/invitation/${invitationIdFromEmail(email)}`;
+
+      const anonymousPage = await anonymousContext.newPage();
+      await anonymousPage.goto(invitationPath);
+      await expect(anonymousPage).toHaveURL(/\/sign-in\?redirectTo=/);
+
+      const loginPage = new LoginPage(anonymousPage);
+      await expect(loginPage.submitButton).toBeVisible();
+      await loginPage.login(invitee.email, invitee.password);
+
+      await expect(anonymousPage).toHaveURL(new RegExp(`${invitationPath}$`));
+      await expect(
+        anonymousPage.getByRole("button", { name: "Accept invitation" })
+      ).toBeVisible();
+    } finally {
+      await inviteeContext.close();
+      await anonymousContext.close();
+    }
+  });
+
+  test("the recipient can decline through the emailed link", async ({
+    browser,
+    page,
+  }) => {
+    const owner = await createAuthenticatedWorkspace(page);
+    const invitee = createTestUser();
+    const inviteeContext = await browser.newContext();
+
+    try {
+      const inviteePage = await createSignedInUser(inviteeContext, invitee);
+      await page.goto(membersUrl(owner.organizationUrl));
+      await inviteMember(page, invitee.email);
+      const email = await waitForTestEmail(
+        page.context().request,
+        invitee.email
+      );
+
+      await inviteePage.goto(`/invitation/${invitationIdFromEmail(email)}`);
+      await inviteePage.getByRole("button", { name: "Decline" }).click();
+
+      // Declining keeps the invitee out: they land on the workspace
+      // registration page because they still have no workspace at all.
+      await expect(inviteePage).toHaveURL(/\/register/);
+
+      await page.reload();
+      await expect(page.getByText(invitee.email, { exact: true })).toHaveCount(
+        0
+      );
+    } finally {
+      await inviteeContext.close();
     }
   });
 

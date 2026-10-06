@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
+import { DeleteWorkspaceSection } from "~/features/settings/components/workspace-danger-zone";
 import { WorkspaceDetailsSection } from "~/features/settings/components/workspace-details-section";
 import {
   membershipCollection,
@@ -31,6 +32,7 @@ function WorkspaceSettingsPage() {
       </SettingsLayout.Header>
       <SettingsLayout.Content>
         <WorkspaceDetailsSection />
+        <DeleteWorkspaceSection />
       </SettingsLayout.Content>
     </SettingsLayout.Root>
   );
