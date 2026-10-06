@@ -1,7 +1,6 @@
-import { currentDb, Database, schema } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import type { TPostStatusType } from "@feeblo/domain-contracts/post-status-type";
 import { PostId } from "@feeblo/id";
-import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import {
   and,
   asc,
@@ -16,20 +15,16 @@ import {
   type SQL,
 } from "drizzle-orm";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { EmailOutboxConfig } from "../../email-outbox/config";
-import { EmailSubscriptionRepository } from "../../email-subscription/repository";
 import {
   CrmEntryLimitReachedError,
   InvalidSubjectError,
   SubjectNotFoundError,
 } from "../../identity/errors";
-import { ResolvePrincipalService } from "../../identity/service";
 import * as Policy from "../../policy";
 import type { TPublicApiOnBehalfAuthor } from "../../public-api/common";
 import type { Cursor } from "../../public-api/cursor";
@@ -47,9 +42,7 @@ import {
   planRequiresUpgradeError,
 } from "../../public-api/errors";
 import { BadRequestError, withRemapDbErrors } from "../../rpc-errors";
-import { S3UploadService } from "../../services/s3";
 import type { PublicApiPostTag } from "../../tag/public-api/mappers";
-import { UserRepository } from "../../user/repository";
 import {
   FailedToCreatePostError,
   FailedToDeletePostError,
@@ -58,8 +51,7 @@ import {
   PostAlreadyExistsError,
   PostNotFoundError,
 } from "../errors";
-import { PostRepository } from "../repository";
-import { makePostWrites } from "../write";
+import { PostWriteService } from "../write";
 
 /** An author reduced to a classification and display fields — never an id. */
 export type PublicApiPostAuthor = {
@@ -395,44 +387,9 @@ const mapPostMergeFailure = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
  */
 const makePublicApiPostRepository = Effect.gen(function* () {
   const db = yield* currentDb;
-  const s3 = yield* S3UploadService;
-  // The shared post write path drives these from the fiber context rather than
-  // from a value it holds, so the repository keeps a handle on each of them
-  // and provides them below.
-  const crypto = yield* Crypto.Crypto;
-  const emailOutboxConfig = yield* EmailOutboxConfig;
-  const emailSubscriptions = yield* EmailSubscriptionRepository;
-  const integrationEventRecorder = yield* IntegrationEventRecorder;
-  const postRepository = yield* PostRepository;
-  const resolvePrincipal = yield* ResolvePrincipalService;
-  const userRepository = yield* UserRepository;
-  const writes = yield* makePostWrites;
-
-  /**
-   * Provides the services the shared post write path reads from the fiber
-   * context.
-   *
-   * The HTTP layer answers a handler's service requirement with a `Request`
-   * failure rather than satisfying it from the route layer, so a handler that
-   * carried these would fail at request time while the layers were sitting
-   * right beside it. The repository already holds each instance for its own
-   * use, and closing over them here keeps every handler on the public surface
-   * requirement-free.
-   */
-  const providePostWriteEnvironment = <A, E, R>(
-    effect: Effect.Effect<A, E, R>
-  ) =>
-    effect.pipe(
-      Effect.provideService(Crypto.Crypto, crypto),
-      Effect.provideService(Database.Database, db),
-      Effect.provideService(EmailOutboxConfig, emailOutboxConfig),
-      Effect.provideService(EmailSubscriptionRepository, emailSubscriptions),
-      Effect.provideService(IntegrationEventRecorder, integrationEventRecorder),
-      Effect.provideService(PostRepository, postRepository),
-      Effect.provideService(ResolvePrincipalService, resolvePrincipal),
-      Effect.provideService(S3UploadService, s3),
-      Effect.provideService(UserRepository, userRepository)
-    );
+  // The shared write path owns its environment; every handler on this surface
+  // stays requirement-free of the write's collaborators.
+  const writes = yield* PostWriteService;
 
   const countByPostIds = (postIds: readonly string[]) =>
     Effect.gen(function* () {
@@ -897,7 +854,7 @@ const makePublicApiPostRepository = Effect.gen(function* () {
         return yield* Effect.fromOption(created, () =>
           internalError("The post could not be read after it was created.")
         );
-      }).pipe(providePostWriteEnvironment, mapPostCreateFailure),
+      }).pipe(mapPostCreateFailure),
 
     /**
      * Updates the fields the request names and returns the post afterwards.
@@ -951,7 +908,7 @@ const makePublicApiPostRepository = Effect.gen(function* () {
         // request was in flight; the caller answers the documented `NOT_FOUND`
         // rather than a success that changed nothing.
         return yield* readPost({ organizationId, postId });
-      }).pipe(providePostWriteEnvironment, mapPostWriteFailure),
+      }).pipe(mapPostWriteFailure),
 
     /**
      * Deletes a post, answering as the missing resource when there is none.
@@ -1023,8 +980,7 @@ const makePublicApiPostRepository = Effect.gen(function* () {
                 ? internalError()
                 : mapped
             );
-          }),
-          providePostWriteEnvironment
+          })
         );
       }),
 
@@ -1053,7 +1009,6 @@ const makePublicApiPostRepository = Effect.gen(function* () {
           { kind: "api_key" }
         )
         .pipe(
-          providePostWriteEnvironment,
           withRemapDbErrors("PublicApiPost", "update"),
           mapPostMergeFailure
         ),
@@ -1075,7 +1030,6 @@ const makePublicApiPostRepository = Effect.gen(function* () {
       writes
         .unmerge({ organizationId, sourcePostId: postId }, { kind: "api_key" })
         .pipe(
-          providePostWriteEnvironment,
           withRemapDbErrors("PublicApiPost", "update"),
           mapPostMergeFailure
         ),

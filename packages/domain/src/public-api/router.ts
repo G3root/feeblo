@@ -1,4 +1,3 @@
-import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
 
@@ -15,8 +14,6 @@ import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostStatusRepository } from "../post-status/repository";
-import { PostSubscriptionRepository } from "../post-subscription/repository";
-import { PostEmbeddingService } from "../post/embedding-service";
 import { PublicApiPostRepository } from "../post/public-api/repository";
 import { PostRepository } from "../post/repository";
 import { TagRepository } from "../tag/repository";
@@ -49,16 +46,17 @@ import {
  * The layers the surface's own repositories need at construction time.
  *
  * They are closed over so the route does not require them, and they are what
- * its write paths need to do what the dashboard's write paths do: a tag
+ * its own write paths need to do what the dashboard's write paths do: a tag
  * assignment records a change in a post's timeline, so it needs the activity
  * repository at construction time; publishing a changelog entry records a
  * durable email intent and notifies subscribers through the same helper the
- * dashboard uses; and creating, changing, or deleting a post goes through the
- * dashboard's own shared write path (`post/write.ts`), which needs the board
- * and post repositories, the creator subscription, the integration event
- * recorder, the notification fan-out, and the embedding scheduler. A new
- * dependency is therefore one line here, not an edit in every place that
- * assembles a server or a test.
+ * dashboard uses; and a vote goes through the shared on-behalf write path.
+ * The post write path reads its environment from `PostWriteService`, which the
+ * composition root provides, so the collaborators only it used are not listed
+ * here; the repositories below are the ones the other operations — tags,
+ * comments, votes, changelog publication — still read. A new dependency is
+ * therefore one line here, not an edit in every place that assembles a server
+ * or a test.
  *
  * Everything the surface shares with the server — the database, `Auth`, the
  * rate limiter, the plan decision, media storage, the email subscription
@@ -74,13 +72,10 @@ export const PublicApiInternals = Layer.mergeAll(
   ChangelogRepository.layer,
   CompanyRepository.layer,
   EmailOutboxRepository.layer,
-  IntegrationEventRecorderLive,
   NotificationService.layer,
   PostActivityRepository.layer,
-  PostEmbeddingService.layer,
   PostRepository.layer,
   PostStatusRepository.layer,
-  PostSubscriptionRepository.layer,
   ResolvePrincipalService.layer,
   TagRepository.layer,
   UserRepository.layer,
@@ -159,7 +154,8 @@ export const makePublicApiRoute = <E, R>(
  * The route as production composes it.
  *
  * Requires the shared services the server assembles — the database, `Auth`,
- * the rate limiter, `PublicApiConfig`, the plan decision, and media storage —
- * and nothing else.
+ * the rate limiter, `PublicApiConfig`, the plan decision, media storage, and
+ * `PostWriteService`, which the public post repository reads — and nothing
+ * else.
  */
 export const PublicApiRoute = makePublicApiRoute(ApiKeyAuthMiddlewareLive);
