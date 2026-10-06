@@ -121,8 +121,22 @@ function RouteComponent() {
           <Field>
             <FieldDescription className="px-6 text-center">
               By clicking continue, you agree to our{" "}
-              <Link to="/sign-up">Terms of Service</Link> and{" "}
-              <Link to="/sign-up">Privacy Policy</Link>.
+              <a
+                href="https://feeblo.com/terms"
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                Terms of Service
+              </a>{" "}
+              and{" "}
+              <a
+                href="https://feeblo.com/privacy"
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                Privacy Policy
+              </a>
+              .
             </FieldDescription>
           </Field>
         </div>
