@@ -92,12 +92,12 @@ export const PublicApiInternals = Layer.mergeAll(
 /**
  * The comment writes this route serves, composed from the internals above.
  *
- * Merged into the route rather than only provided to it: `HttpApiBuilder`
- * does not thread a handler's requirements through the route layer, so a
- * handler reads the service from the fiber context — the same shape as
- * `currentPublicApiCaller`. The service is the dashboard comment RPC's own
- * write path, so an API-created comment lands in the same timeline, the same
- * transaction, and the same notification fan-out as one written by a member.
+ * Merged into the route rather than only provided to it, so the layer that
+ * composes the comments group can capture it: the group's build effect yields
+ * `PublicApiDependencies`, which includes `CommentService`. The service is the
+ * dashboard comment RPC's own write path, so an API-created comment lands in
+ * the same timeline, the same transaction, and the same notification fan-out
+ * as one written by a member.
  */
 const PublicApiCommentService = CommentService.layer.pipe(
   Layer.provide(PublicApiInternals)
@@ -141,12 +141,12 @@ export const makePublicApiRoute = <E, R>(
       )
     ),
     Layer.provideMerge(PublicApiCommentService),
-    // Provided into the request context, not merged into the output: the
-    // public operations read the shared feature repositories — and the
-    // database handle they run transactions on — from the fiber context, the
-    // same way they read the caller and the config. This is the one line that
-    // makes `<feature>/public-api` able to call `<feature>/repository`
-    // directly instead of owning a second copy of it.
+    // Provided to the group builders, not merged into the output: every
+    // group's build effect yields `PublicApiDependencies` and the handlers
+    // close over them, so this is the one line that makes
+    // `<feature>/public-api` able to call `<feature>/repository` directly
+    // instead of owning a second copy of it. A dependency missing here fails
+    // the route layer's type rather than one request.
     Layer.provide(PublicApiInternals)
   );
 

@@ -9,7 +9,6 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { currentService } from "../current-service";
 import {
   CompanyAlreadyExistsError,
   FailedToCreateCompanyError,
@@ -460,5 +459,3 @@ export class CompanyRepository extends Context.Service<CompanyRepository>()(
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
-
-export const currentCompanyRepository = currentService(CompanyRepository);

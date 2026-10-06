@@ -9,7 +9,6 @@ import * as Option from "effect/Option";
 import * as RpcMiddleware from "effect/rpc/RpcMiddleware";
 
 import { Auth, type AuthHandler, type Session } from "./auth-handler";
-import { currentService } from "./current-service";
 import { UnauthorizedError } from "./rpc-errors";
 import {
   getSessionCookieName,
@@ -36,8 +35,6 @@ export { Auth, type AuthHandler, type Session };
 export class CurrentSession extends Context.Service<CurrentSession, Session>()(
   "@feeblo/domain/CurrentSession"
 ) {}
-
-export const currentHttpApiSession = currentService(CurrentSession);
 
 /** Session when authenticated; None when unauthenticated. Use for optional-auth routes (e.g. PostListPublic). */
 export class OptionalCurrentSession extends Context.Service<

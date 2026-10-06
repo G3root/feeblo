@@ -361,10 +361,10 @@ export const makeServiceLayers = ({
     // private dependencies live in its route layer (`public-api/router.ts`),
     // so what is assembled here is what more than one surface reads.
     S3UploadServiceLive,
-    // Read through the ambient context rather than as a layer requirement
-    // (`currentPublicApiConfig`), so no type catches its absence and the
-    // Public API's own tests supply their own. Dropping this line compiles and
-    // fails only when a request asks for a paging link.
+    // Required by the Public API's route layer (`public-api/router.ts`),
+    // where the operations declare it in `PublicApiDependencies`. Dropping
+    // this line fails the server's type rather than one request that asks for
+    // a paging link.
     PublicApiConfig.layer
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
 };

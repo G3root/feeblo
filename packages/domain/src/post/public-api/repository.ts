@@ -20,7 +20,6 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { currentService } from "../../current-service";
 import {
   CrmEntryLimitReachedError,
   InvalidSubjectError,
@@ -1045,7 +1044,3 @@ export class PublicApiPostRepository extends Context.Service<PublicApiPostReposi
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
-
-export const currentPublicApiPostRepository = currentService(
-  PublicApiPostRepository
-);

@@ -4,8 +4,6 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { currentService } from "../current-service";
-
 interface TFindMany {
   organizationId: string;
 }
@@ -40,5 +38,3 @@ export class PostStatusRepository extends Context.Service<PostStatusRepository>(
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
-
-export const currentPostStatusRepository = currentService(PostStatusRepository);

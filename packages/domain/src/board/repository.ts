@@ -7,8 +7,6 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { currentService } from "../current-service";
-
 interface TBoardCreate {
   creatorId: string;
   creatorMemberId: string;
@@ -237,5 +235,3 @@ export class BoardRepository extends Context.Service<BoardRepository>()(
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
-
-export const currentBoardRepository = currentService(BoardRepository);

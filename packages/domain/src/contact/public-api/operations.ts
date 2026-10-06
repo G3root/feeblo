@@ -14,10 +14,10 @@ import {
   notFoundError,
 } from "../../public-api/errors";
 import { onInternalError } from "../../public-api/failure";
-import { currentPublicApiCaller } from "../../public-api/middleware";
+import { PublicApiCaller } from "../../public-api/middleware";
 import { defineOperation } from "../../public-api/operation";
 import { toPublicApiEndUser } from "./mappers";
-import { currentPublicApiEndUserRepository } from "./repository";
+import { PublicApiEndUserRepository } from "./repository";
 import {
   GetEndUserInput,
   ListEndUsersInput,
@@ -72,8 +72,8 @@ export const listEndUsersOperation = defineOperation(
   },
   ({ companyId, cursor, email, externalId, limit }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiEndUserRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiEndUserRepository;
 
       const after = yield* decodeCursorOrFail(cursor);
 
@@ -109,8 +109,8 @@ export const getEndUserOperation = defineOperation(
   },
   ({ endUserId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiEndUserRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiEndUserRepository;
 
       const found = yield* repository
         .findEndUser({
@@ -139,8 +139,8 @@ export const upsertEndUserOperation = defineOperation(
   },
   ({ avatarUrl, companyId, email, externalId, name }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiEndUserRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiEndUserRepository;
 
       // Without one of these there is no key to match on, so a second request
       // would silently create a second person. The check lives here rather

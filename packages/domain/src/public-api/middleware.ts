@@ -15,7 +15,6 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 
 import { Auth } from "../auth-handler";
-import { currentService } from "../current-service";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { RateLimitService } from "../rate-limit/service";
 import {
@@ -88,17 +87,11 @@ export class ApiKeyAuthMiddleware extends HttpApiMiddleware.Service<
  */
 export const requirePublicApiScope = (scope: PublicApiScope) =>
   Effect.gen(function* () {
-    const caller = yield* currentPublicApiCaller;
+    const caller = yield* PublicApiCaller;
     if (!hasPublicApiScope(caller.scopes, scope)) {
       return yield* forbiddenScopeError(scope);
     }
   });
-
-/**
- * Mirrors `currentHttpApiSession`: the middleware already provided the value by
- * the time a handler runs.
- */
-export const currentPublicApiCaller = currentService(PublicApiCaller);
 
 /**
  * Builds the key middleware for one composition.

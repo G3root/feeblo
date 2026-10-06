@@ -7,7 +7,6 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { currentService } from "../../current-service";
 import type { Cursor } from "../../public-api/cursor";
 import { requireCrmEntryAllowance } from "../../public-api/entitlement";
 import {
@@ -429,7 +428,3 @@ export class PublicApiEndUserRepository extends Context.Service<PublicApiEndUser
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
-
-export const currentPublicApiEndUserRepository = currentService(
-  PublicApiEndUserRepository
-);

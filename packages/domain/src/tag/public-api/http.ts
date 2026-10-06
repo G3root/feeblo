@@ -1,3 +1,4 @@
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
@@ -10,6 +11,8 @@ import {
   PUBLIC_API_WRITE_ERROR_SCHEMAS,
 } from "../../public-api/errors";
 import type { HandlerOf } from "../../public-api/handler";
+import type { PublicApiCaller } from "../../public-api/middleware";
+import type { PublicApiDependencies } from "../../public-api/operations";
 
 /** The composed group, so a handler is typed with the group's middleware. */
 type PublicApiGroup = InstanceType<typeof PublicApiTagGroup>;
@@ -101,7 +104,9 @@ export const tagEndpoints = [
     ),
 ] as const;
 
-export const tagHandlers = {
+export const tagHandlers = (
+  context: Context.Context<PublicApiDependencies>
+) => ({
   listTags: (({ query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
@@ -109,29 +114,48 @@ export const tagHandlers = {
         cursor: query.cursor,
         limit,
       });
-    })) satisfies HandlerOf<PublicApiGroup, "listTags">,
+    }).pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "listTags",
+    PublicApiCaller
+  >,
 
   createTag: (({ payload }) =>
-    createTagOperation.handler({ name: payload.name })) satisfies HandlerOf<
+    createTagOperation
+      .handler({ name: payload.name })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "createTag"
+    "createTag",
+    PublicApiCaller
   >,
 
   getTag: (({ params }) =>
-    getTagOperation.handler({ tagId: params.tagId })) satisfies HandlerOf<
+    getTagOperation
+      .handler({ tagId: params.tagId })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "getTag"
+    "getTag",
+    PublicApiCaller
   >,
 
   updateTag: (({ params, payload }) =>
-    updateTagOperation.handler({
-      name: payload.name,
-      tagId: params.tagId,
-    })) satisfies HandlerOf<PublicApiGroup, "updateTag">,
+    updateTagOperation
+      .handler({
+        name: payload.name,
+        tagId: params.tagId,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "updateTag",
+    PublicApiCaller
+  >,
 
   deleteTag: (({ params }) =>
-    deleteTagOperation.handler({ tagId: params.tagId })) satisfies HandlerOf<
+    deleteTagOperation
+      .handler({ tagId: params.tagId })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "deleteTag"
+    "deleteTag",
+    PublicApiCaller
   >,
-};
+});

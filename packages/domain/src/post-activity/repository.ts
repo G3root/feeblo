@@ -6,8 +6,6 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { currentService } from "../current-service";
-
 /**
  * Structured provenance stored beside an activity. On-behalf actions record
  * the customer subject distinct from the staff actor, e.g.
@@ -378,7 +376,3 @@ export class PostActivityRepository extends Context.Service<PostActivityReposito
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
-
-export const currentPostActivityRepository = currentService(
-  PostActivityRepository
-);

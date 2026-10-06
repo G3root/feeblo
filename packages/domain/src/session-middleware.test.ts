@@ -15,7 +15,7 @@ import * as Schema from "effect/Schema";
 
 import {
   Auth,
-  currentHttpApiSession,
+  CurrentSession,
   HttpApiAuthMiddleware,
   makeHttpApiAuthMiddlewareLive,
   type Session,
@@ -84,13 +84,13 @@ class TestApi extends HttpApi.make("TestSessionMiddlewareApi")
 
 const GroupALive = HttpApiBuilder.group(TestApi, "SessionA", (handlers) =>
   handlers.handle("whoamiA", () =>
-    Effect.map(currentHttpApiSession, (session) => session.user.email)
+    Effect.map(CurrentSession, (session) => session.user.email)
   )
 );
 
 const GroupBLive = HttpApiBuilder.group(TestApi, "SessionB", (handlers) =>
   handlers.handle("whoamiB", () =>
-    Effect.map(currentHttpApiSession, (session) => session.user.email)
+    Effect.map(CurrentSession, (session) => session.user.email)
   )
 );
 

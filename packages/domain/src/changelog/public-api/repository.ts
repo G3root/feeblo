@@ -10,7 +10,6 @@ import {
   cleanupOrphanedEditorAssets,
   syncChangelogAssetReferences,
 } from "../../asset/service";
-import { currentService } from "../../current-service";
 import type { Cursor } from "../../public-api/cursor";
 import {
   conflictError,
@@ -699,7 +698,3 @@ export class PublicApiChangelogRepository extends Context.Service<PublicApiChang
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
-
-export const currentPublicApiChangelogRepository = currentService(
-  PublicApiChangelogRepository
-);

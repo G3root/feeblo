@@ -18,7 +18,7 @@ import {
 } from "../rpc-errors";
 import { S3UploadService, S3UploadServiceLive } from "../services/s3";
 import {
-  currentHttpApiSession,
+  CurrentSession,
   HttpApiAuthMiddlewareLive,
 } from "../session-middleware";
 
@@ -35,7 +35,7 @@ export const ProfileApiLive = HttpApiBuilder.group(
   (handlers) =>
     handlers.handle("uploadProfilePicture", ({ payload: { file } }) => {
       return Effect.gen(function* () {
-        const session = yield* currentHttpApiSession;
+        const session = yield* CurrentSession;
 
         if (!ALLOWED_CONTENT_TYPES.has(file.contentType)) {
           return yield* new BadRequestError({

@@ -9,7 +9,6 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { currentService } from "../current-service";
 import { PolicyDeniedError } from "../policy";
 import { FailedToCreateTagError, PostIsMergedError } from "./errors";
 import type { TPostTagList } from "./schema";
@@ -631,5 +630,3 @@ export class TagRepository extends Context.Service<TagRepository>()(
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
-
-export const currentTagRepository = currentService(TagRepository);

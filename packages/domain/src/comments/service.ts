@@ -7,7 +7,6 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { currentService } from "../current-service";
 import { InvalidSubjectError } from "../identity/errors";
 import {
   resolveOnBehalfSubject,
@@ -124,14 +123,9 @@ const makeCommentService = Effect.gen(function* () {
 
   /**
    * The services the write methods read from the fiber context, captured at
-   * construction so the methods carry no requirements of their own.
-   *
-   * That matters beyond tidiness: the Public API's handlers are handed to
-   * `HttpApiBuilder`, which wraps a handler's requirements in a request the
-   * route layer cannot satisfy — which is why that surface reads its services
-   * from the context (`currentCommentService`) instead of declaring them. A
-   * write still joins the caller's transaction: the database service is the
-   * same handle the repositories hold, and the transaction connection is
+   * construction so the methods carry no requirements of their own. A write
+   * still joins the caller's transaction: the database service is the same
+   * handle the repositories hold, and the transaction connection is
    * fiber-local, not a service.
    */
   const database = yield* Database.Database;
@@ -588,5 +582,3 @@ export class CommentService extends Context.Service<CommentService>()(
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
-
-export const currentCommentService = currentService(CommentService);

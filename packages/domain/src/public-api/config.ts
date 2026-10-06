@@ -4,8 +4,6 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-import { currentService } from "../current-service";
-
 const trailingSlashPattern = /\/$/;
 
 /**
@@ -32,5 +30,3 @@ export class PublicApiConfig extends Context.Service<PublicApiConfig>()(
       this.of({ appUrl: appUrl.href.replace(trailingSlashPattern, "") })
     );
 }
-
-export const currentPublicApiConfig = currentService(PublicApiConfig);

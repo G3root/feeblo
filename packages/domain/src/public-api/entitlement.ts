@@ -1,7 +1,6 @@
 import * as Effect from "effect/Effect";
 
-import { currentCompanyRepository } from "../company/repository";
-import { currentService } from "../current-service";
+import { CompanyRepository } from "../company/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { withRemapDbErrors } from "../rpc-errors";
 import {
@@ -34,12 +33,6 @@ export const crmLimitMessage =
   "This workspace's plan has no room for another CRM entry.";
 
 /**
- * `EntitlementPolicy` is already in the context because the key middleware
- * requires it for the plan gate.
- */
-export const currentEntitlementPolicy = currentService(EntitlementPolicy);
-
-/**
  * Refuses a company create the workspace's plan has no room for.
  *
  * Companies and contacts count together as CRM entries, and the dashboard's own
@@ -64,10 +57,14 @@ export const currentEntitlementPolicy = currentService(EntitlementPolicy);
  */
 export const requireCrmEntryAllowance = (
   organizationId: string
-): Effect.Effect<void, CrmEntryAllowanceError> =>
+): Effect.Effect<
+  void,
+  CrmEntryAllowanceError,
+  EntitlementPolicy | CompanyRepository
+> =>
   Effect.gen(function* () {
-    const policy = yield* currentEntitlementPolicy;
-    const repository = yield* currentCompanyRepository;
+    const policy = yield* EntitlementPolicy;
+    const repository = yield* CompanyRepository;
 
     yield* policy
       .canCreateCrmEntry({

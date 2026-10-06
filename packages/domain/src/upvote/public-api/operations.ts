@@ -22,11 +22,11 @@ import {
   planRequiresUpgradeError,
 } from "../../public-api/errors";
 import { onInternalError } from "../../public-api/failure";
-import { currentPublicApiCaller } from "../../public-api/middleware";
+import { PublicApiCaller } from "../../public-api/middleware";
 import { defineOperation } from "../../public-api/operation";
 import { withRemapDbErrors } from "../../rpc-errors";
 import { toPublicApiVote } from "./mappers";
-import { currentPublicApiVoteRepository } from "./repository";
+import { PublicApiVoteRepository } from "./repository";
 import {
   CreateVoteInput,
   DeleteVoteInput,
@@ -165,8 +165,8 @@ export const listPostVotesOperation = defineOperation(
   },
   ({ cursor, limit, postId, voter }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiVoteRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiVoteRepository;
 
       const after = yield* decodeCursorOrFail(cursor);
 
@@ -218,8 +218,8 @@ export const listVotesOperation = defineOperation(
   },
   ({ boardId, cursor, limit, postId, voter }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiVoteRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiVoteRepository;
 
       const after = yield* decodeCursorOrFail(cursor);
 
@@ -267,8 +267,8 @@ export const createVoteOperation = defineOperation(
   },
   ({ author, postId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiVoteRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiVoteRepository;
 
       // The post's state is checked inside the write's own transaction, under
       // the post row's lock: a check in a separate transaction would leave a
@@ -319,8 +319,8 @@ export const deleteVoteOperation = defineOperation(
   },
   ({ postId, voteId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiVoteRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiVoteRepository;
 
       // The removal names the vote's own id, and the repository deletes that
       // row inside one transaction that also locks the post and re-checks its

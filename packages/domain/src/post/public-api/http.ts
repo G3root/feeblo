@@ -1,3 +1,4 @@
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
@@ -10,6 +11,8 @@ import {
   PUBLIC_API_WRITE_ERROR_SCHEMAS,
 } from "../../public-api/errors";
 import type { HandlerOf } from "../../public-api/handler";
+import type { PublicApiCaller } from "../../public-api/middleware";
+import type { PublicApiDependencies } from "../../public-api/operations";
 import {
   parseIncludeArchived,
   parseLimit,
@@ -185,7 +188,9 @@ export const postEndpoints = [
     ),
 ] as const;
 
-export const postHandlers = {
+export const postHandlers = (
+  context: Context.Context<PublicApiDependencies>
+) => ({
   listBoardPosts: (({ params, query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
@@ -204,7 +209,11 @@ export const postHandlers = {
         // calendar, so the HTTP and MCP surfaces share one check.
         updatedAfter: query.updatedAfter,
       });
-    })) satisfies HandlerOf<PublicApiGroup, "listBoardPosts">,
+    }).pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "listBoardPosts",
+    PublicApiCaller
+  >,
 
   listPosts: (({ query }) =>
     Effect.gen(function* () {
@@ -223,19 +232,35 @@ export const postHandlers = {
         // Passed through raw: see the board list above.
         updatedAfter: query.updatedAfter,
       });
-    })) satisfies HandlerOf<PublicApiGroup, "listPosts">,
+    }).pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "listPosts",
+    PublicApiCaller
+  >,
 
   retrievePost: (({ query }) =>
-    retrievePostOperation.handler({
-      boardId: providedQueryParam(query.boardId),
-      postId: providedQueryParam(query.id),
-      slug: providedQueryParam(query.slug),
-    })) satisfies HandlerOf<PublicApiGroup, "retrievePost">,
+    retrievePostOperation
+      .handler({
+        boardId: providedQueryParam(query.boardId),
+        postId: providedQueryParam(query.id),
+        slug: providedQueryParam(query.slug),
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "retrievePost",
+    PublicApiCaller
+  >,
 
   getPost: (({ params }) =>
-    getPostOperation.handler({
-      postId: params.postId,
-    })) satisfies HandlerOf<PublicApiGroup, "getPost">,
+    getPostOperation
+      .handler({
+        postId: params.postId,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "getPost",
+    PublicApiCaller
+  >,
 
   listPostActivity: (({ params, query }) =>
     Effect.gen(function* () {
@@ -245,49 +270,89 @@ export const postHandlers = {
         limit,
         postId: params.postId,
       });
-    })) satisfies HandlerOf<PublicApiGroup, "listPostActivity">,
+    }).pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "listPostActivity",
+    PublicApiCaller
+  >,
 
   createPost: (({ payload }) =>
-    createPostOperation.handler({
-      author: payload.author,
-      boardId: payload.boardId,
-      content: payload.content,
-      createdAt: payload.createdAt,
-      etaQuarter: payload.etaQuarter,
-      statusId: payload.statusId,
-      title: payload.title,
-    })) satisfies HandlerOf<PublicApiGroup, "createPost">,
+    createPostOperation
+      .handler({
+        author: payload.author,
+        boardId: payload.boardId,
+        content: payload.content,
+        createdAt: payload.createdAt,
+        etaQuarter: payload.etaQuarter,
+        statusId: payload.statusId,
+        title: payload.title,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "createPost",
+    PublicApiCaller
+  >,
 
   updatePost: (({ params, payload }) =>
-    updatePostOperation.handler({
-      author: payload.author,
-      boardId: payload.boardId,
-      content: payload.content,
-      etaQuarter: payload.etaQuarter,
-      postId: params.postId,
-      statusId: payload.statusId,
-      title: payload.title,
-    })) satisfies HandlerOf<PublicApiGroup, "updatePost">,
+    updatePostOperation
+      .handler({
+        author: payload.author,
+        boardId: payload.boardId,
+        content: payload.content,
+        etaQuarter: payload.etaQuarter,
+        postId: params.postId,
+        statusId: payload.statusId,
+        title: payload.title,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "updatePost",
+    PublicApiCaller
+  >,
 
   setPostTags: (({ params, payload }) =>
-    setPostTagsOperation.handler({
-      postId: params.postId,
-      tagIds: payload.tagIds,
-    })) satisfies HandlerOf<PublicApiGroup, "setPostTags">,
+    setPostTagsOperation
+      .handler({
+        postId: params.postId,
+        tagIds: payload.tagIds,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "setPostTags",
+    PublicApiCaller
+  >,
 
   deletePost: (({ params }) =>
-    deletePostOperation.handler({
-      postId: params.postId,
-    })) satisfies HandlerOf<PublicApiGroup, "deletePost">,
+    deletePostOperation
+      .handler({
+        postId: params.postId,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "deletePost",
+    PublicApiCaller
+  >,
 
   mergePost: (({ params, payload }) =>
-    mergePostOperation.handler({
-      intoPostId: payload.intoPostId,
-      postId: params.postId,
-    })) satisfies HandlerOf<PublicApiGroup, "mergePost">,
+    mergePostOperation
+      .handler({
+        intoPostId: payload.intoPostId,
+        postId: params.postId,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "mergePost",
+    PublicApiCaller
+  >,
 
   unmergePost: (({ params }) =>
-    unmergePostOperation.handler({
-      postId: params.postId,
-    })) satisfies HandlerOf<PublicApiGroup, "unmergePost">,
-};
+    unmergePostOperation
+      .handler({
+        postId: params.postId,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "unmergePost",
+    PublicApiCaller
+  >,
+});

@@ -1,3 +1,4 @@
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
@@ -9,6 +10,8 @@ import {
   PUBLIC_API_WRITE_ERROR_SCHEMAS,
 } from "../../public-api/errors";
 import type { HandlerOf } from "../../public-api/handler";
+import type { PublicApiCaller } from "../../public-api/middleware";
+import type { PublicApiDependencies } from "../../public-api/operations";
 import { parseLimit } from "../../public-api/parse";
 import {
   createCommentOperation,
@@ -127,7 +130,9 @@ export const commentEndpoints = [
     ),
 ] as const;
 
-export const commentHandlers = {
+export const commentHandlers = (
+  context: Context.Context<PublicApiDependencies>
+) => ({
   listPostComments: (({ params, query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
@@ -136,41 +141,81 @@ export const commentHandlers = {
         limit,
         postId: params.postId,
       });
-    })) satisfies HandlerOf<PublicApiGroup, "listPostComments">,
+    }).pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "listPostComments",
+    PublicApiCaller
+  >,
 
   createComment: (({ params, payload }) =>
-    createCommentOperation.handler({
-      author: payload.author,
-      content: payload.content,
-      parentCommentId: payload.parentCommentId,
-      postId: params.postId,
-      visibility: payload.visibility,
-    })) satisfies HandlerOf<PublicApiGroup, "createComment">,
+    createCommentOperation
+      .handler({
+        author: payload.author,
+        content: payload.content,
+        parentCommentId: payload.parentCommentId,
+        postId: params.postId,
+        visibility: payload.visibility,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "createComment",
+    PublicApiCaller
+  >,
 
   getComment: (({ params }) =>
-    getCommentOperation.handler({
-      commentId: params.commentId,
-    })) satisfies HandlerOf<PublicApiGroup, "getComment">,
+    getCommentOperation
+      .handler({
+        commentId: params.commentId,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "getComment",
+    PublicApiCaller
+  >,
 
   updateComment: (({ params, payload }) =>
-    updateCommentOperation.handler({
-      commentId: params.commentId,
-      content: payload.content,
-      visibility: payload.visibility,
-    })) satisfies HandlerOf<PublicApiGroup, "updateComment">,
+    updateCommentOperation
+      .handler({
+        commentId: params.commentId,
+        content: payload.content,
+        visibility: payload.visibility,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "updateComment",
+    PublicApiCaller
+  >,
 
   deleteComment: (({ params }) =>
-    deleteCommentOperation.handler({
-      commentId: params.commentId,
-    })) satisfies HandlerOf<PublicApiGroup, "deleteComment">,
+    deleteCommentOperation
+      .handler({
+        commentId: params.commentId,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "deleteComment",
+    PublicApiCaller
+  >,
 
   pinComment: (({ params }) =>
-    pinCommentOperation.handler({
-      commentId: params.commentId,
-    })) satisfies HandlerOf<PublicApiGroup, "pinComment">,
+    pinCommentOperation
+      .handler({
+        commentId: params.commentId,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "pinComment",
+    PublicApiCaller
+  >,
 
   unpinComment: (({ params }) =>
-    unpinCommentOperation.handler({
-      commentId: params.commentId,
-    })) satisfies HandlerOf<PublicApiGroup, "unpinComment">,
-};
+    unpinCommentOperation
+      .handler({
+        commentId: params.commentId,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "unpinComment",
+    PublicApiCaller
+  >,
+});
