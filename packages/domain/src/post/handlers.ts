@@ -6,20 +6,14 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { BoardRepository } from "../board/repository";
-import { EmailOutboxConfig } from "../email-outbox/config";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { EmailOutboxRepository } from "../email-outbox/repository";
-import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
-import { ResolvePrincipalService } from "../identity/service";
-import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import {
   type PostActivityInput,
   PostActivityRepository,
 } from "../post-activity/repository";
-import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { redactCreatorIdentity } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import {
@@ -32,7 +26,6 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
-import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { PostEmbeddingService, postEmbeddingInput } from "./embedding-service";
 import {
@@ -62,7 +55,7 @@ import type {
   TPostUnmerge,
 } from "./schema";
 import { postLexicalSimilarity, SUGGESTION_MAX_DISTANCE } from "./suggestions";
-import { makePostWrites, type PostWriteActor } from "./write";
+import { PostWriteService, type PostWriteActor } from "./write";
 
 export const PostRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostRepository;
@@ -79,7 +72,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   // (see `write.ts`), parameterized by who is writing. The actor is built here
   // from the session the policies below have already resolved; a machine key
   // never reaches this module.
-  const writes = yield* makePostWrites;
+  const writes = yield* PostWriteService;
 
   const memberActor = (
     session: Session,
@@ -842,18 +835,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   // Layer.provide(SitePolicy.layer),
   Layer.provide(PostPolicy.layer),
-  Layer.provide(BoardRepository.layer),
   Layer.provide(PostRepository.layer),
   Layer.provide(PostActivityRepository.layer),
-  Layer.provide(PostSubscriptionRepository.layer),
   Layer.provide(EmailOutboxRepository.layer),
-  Layer.provide(EmailSubscriptionRepository.layer),
-  Layer.provide(EmailOutboxConfig.layer),
-  Layer.provide(ResolvePrincipalService.layer),
-  Layer.provide(UserRepository.layer),
   Layer.provide(
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   ),
-  Layer.provide(PostEmbeddingService.layer),
-  Layer.provide(NotificationService.layer)
+  Layer.provide(PostEmbeddingService.layer)
 );

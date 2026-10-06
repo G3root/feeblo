@@ -51,6 +51,7 @@ import { FailedToMergePostError, PostNotFoundError } from "./errors";
 import { PostRpcHandlersEffect } from "./handlers";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
+import { PostWriteService } from "./write";
 
 /** The `Date` for a known instant, built through `DateTime`. */
 const dateAt = (instant: string | number | Date): Date =>
@@ -279,7 +280,9 @@ describe("PostRpcHandlers", () => {
     IntegrationEventRecorderTest
   );
 
-  const TestLayer = Layer.mergeAll(HandlerTest, HandlerRuntimeTest);
+  const TestLayer = PostWriteService.layer.pipe(
+    Layer.provideMerge(Layer.mergeAll(HandlerTest, HandlerRuntimeTest))
+  );
 
   /**
    * Pauses the real merged-state policy after it has evaluated against the
@@ -330,7 +333,9 @@ describe("PostRpcHandlers", () => {
     EntitlementPolicy.layer
   ).pipe(Layer.provideMerge(RepositoriesTest));
 
-  const GatedTestLayer = Layer.mergeAll(GatedHandlerTest, HandlerRuntimeTest);
+  const GatedTestLayer = PostWriteService.layer.pipe(
+    Layer.provideMerge(Layer.mergeAll(GatedHandlerTest, HandlerRuntimeTest))
+  );
 
   layer(TestLayer)("handlers", (it) => {
     describe("PostList", () => {
@@ -2034,24 +2039,28 @@ describe("PostRpcHandlers", () => {
         Effect.gen(function* () {
           let embedCalls = 0;
           const releaseEmbedding = yield* Deferred.make<void>();
-          const handlers = yield* PostRpcHandlersEffect.pipe(
-            Effect.provideService(PostEmbeddingService, {
-              embed: () =>
-                Effect.sync(() => {
-                  embedCalls += 1;
-                }).pipe(
-                  Effect.andThen(Deferred.await(releaseEmbedding)),
-                  Effect.as(Option.none())
-                ),
-            })
-          );
+          const embedder: PostEmbeddingService["Service"] = {
+            embed: () =>
+              Effect.sync(() => {
+                embedCalls += 1;
+              }).pipe(
+                Effect.andThen(Deferred.await(releaseEmbedding)),
+                Effect.as(Option.none())
+              ),
+          };
+          const handlers = yield* PostRpcHandlersEffect;
           const db = yield* currentDb;
           const fixture = yield* makeFixture();
           const postId = yield* PostId.generate;
 
           yield* handlers
             .PostCreate(postCreateInput(fixture, postId, "Embedded feedback"))
-            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture)),
+              // The write path reads its optional embedding service from the
+              // running context, so the substitute wraps the write itself.
+              Effect.provideService(PostEmbeddingService, embedder)
+            );
           yield* Effect.yieldNow;
 
           const [post] = yield* db
