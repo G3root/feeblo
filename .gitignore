@@ -63,4 +63,5 @@ playwright-report/
 
 
 .vitest-attachments
+.vitest/
 .scratch/
