@@ -70,6 +70,14 @@ export function DeleteAccountDialog() {
       // The session cookie is cleared server-side; a full navigation drops the
       // SPA's cached session so the guard resolves the signed-out state.
       window.location.assign("/sign-up");
+    } catch {
+      // A rejected request (transport, or a body the client could not parse)
+      // must surface as a failure, not as a silently still-open dialog.
+      trackEvent("account_deleted", { success: false });
+      setError({
+        code: undefined,
+        message: "Could not delete your account. Try again.",
+      });
     } finally {
       setIsDeleting(false);
     }

@@ -128,9 +128,19 @@ export function InvitationAcceptanceCard({
         return;
       }
       // Accepting adds a membership; the cached session must see it before the
-      // guard canonicalizes the destination. A failed refresh still leaves the
-      // membership stored, so the destination workspace stays reachable.
-      await refreshAuthSession().catch(() => null);
+      // guard canonicalizes the destination. If the refresh fails the cache
+      // still says the user is not a member — and for a first invitation it
+      // still says they have no workspace at all — so the guard would bounce
+      // them to registration. A full navigation re-resolves the session from
+      // the cookie before `dashboardAuthBeforeLoad` runs.
+      const refreshed = await refreshAuthSession().then(
+        () => true,
+        () => false
+      );
+      if (!refreshed) {
+        window.location.assign(`/${organizationId}`);
+        return;
+      }
       toastManager.add({ title: "Invitation accepted", type: "success" });
       await navigate({
         to: "/$organizationId",

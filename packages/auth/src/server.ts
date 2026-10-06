@@ -1,5 +1,5 @@
 import { NodeCrypto } from "@effect/platform-node";
-import { Database } from "@feeblo/db";
+import { Database, transaction } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { PolarService } from "@feeblo/domain/billing/service";
@@ -295,58 +295,107 @@ export const initAuthHandler = (
      * one person leaving, so it blocks the deletion and names itself instead.
      */
     const deleteWorkspacesSolelyOwnedBy = async (userId: string) => {
-      const { blockingWorkspaceNames, ownedWorkspaces } =
-        await callbackRuntime.runPromise(
+      const ownershipRequiredError = (workspaceNames: readonly string[]) =>
+        new APIError("BAD_REQUEST", {
+          code: "WORKSPACE_OWNERSHIP_REQUIRED",
+          message: `${workspaceNames.join(", ")} still has other members. Remove them in Members settings, or delete the workspace, before deleting your account.`,
+        });
+
+      const countMembers = (organizationId: string, lock: boolean) =>
+        Effect.gen(function* () {
+          const members = db
+            .select({ id: schema.memberTable.id })
+            .from(schema.memberTable)
+            .where(eq(schema.memberTable.organizationId, organizationId));
+          const rows = yield* lock ? members.for("update") : members;
+          return rows.length;
+        });
+
+      const ownedWorkspaces = await callbackRuntime.runPromise(
+        Effect.gen(function* () {
+          const memberships = yield* db
+            .select({
+              id: schema.organizationTable.id,
+              name: schema.organizationTable.name,
+              role: schema.memberTable.role,
+            })
+            .from(schema.memberTable)
+            .innerJoin(
+              schema.organizationTable,
+              eq(schema.organizationTable.id, schema.memberTable.organizationId)
+            )
+            .where(eq(schema.memberTable.userId, userId));
+          return memberships.filter((membership) =>
+            membership.role.split(",").includes("owner")
+          );
+        })
+      );
+      if (ownedWorkspaces.length === 0) {
+        return;
+      }
+
+      // Checked before the subscriptions are cancelled: a refusal must not
+      // revoke the billing of a workspace that is staying.
+      const blockingWorkspaceNames = await callbackRuntime.runPromise(
+        Effect.gen(function* () {
+          const blocking: string[] = [];
+          for (const workspace of ownedWorkspaces) {
+            if ((yield* countMembers(workspace.id, false)) > 1) {
+              blocking.push(workspace.name);
+            }
+          }
+          return blocking;
+        })
+      );
+      if (blockingWorkspaceNames.length > 0) {
+        throw ownershipRequiredError(blockingWorkspaceNames);
+      }
+
+      // Cancelled before the rows (and their cascaded subscription rows)
+      // disappear, so the external subscription id is still queryable. It is
+      // best-effort and stays outside the transaction below, which must not
+      // hold row locks across a call to another service.
+      for (const workspace of ownedWorkspaces) {
+        await cancelOrganizationSubscription(workspace.id);
+      }
+
+      // Every deletion commits or none does, and the membership count is
+      // re-checked under a lock: an invitation accepted between the check above
+      // and here must fail the whole deletion rather than take a workspace away
+      // from the member who just joined. The subscription of a workspace the
+      // re-check refuses was already cancelled by the best-effort pass above;
+      // that is the cost of keeping the external call out of the transaction.
+      await callbackRuntime.runPromise(
+        transaction(
           Effect.gen(function* () {
-            const memberships = yield* db
-              .select({
-                id: schema.organizationTable.id,
-                name: schema.organizationTable.name,
-                role: schema.memberTable.role,
-              })
-              .from(schema.memberTable)
-              .innerJoin(
-                schema.organizationTable,
-                eq(
-                  schema.organizationTable.id,
-                  schema.memberTable.organizationId
-                )
-              )
-              .where(eq(schema.memberTable.userId, userId));
-            const ownedWorkspaces = memberships.filter((membership) =>
-              membership.role.split(",").includes("owner")
-            );
-            const blockingWorkspaceNames: string[] = [];
+            const nowBlocking: string[] = [];
+            const deletable: string[] = [];
             for (const workspace of ownedWorkspaces) {
-              const teammates = yield* db
-                .select({ id: schema.memberTable.id })
-                .from(schema.memberTable)
-                .where(eq(schema.memberTable.organizationId, workspace.id));
-              if (teammates.length > 1) {
-                blockingWorkspaceNames.push(workspace.name);
+              const [locked] = yield* db
+                .select({ id: schema.organizationTable.id })
+                .from(schema.organizationTable)
+                .where(eq(schema.organizationTable.id, workspace.id))
+                .for("update");
+              if (locked === undefined) {
+                continue;
+              }
+              if ((yield* countMembers(workspace.id, true)) > 1) {
+                nowBlocking.push(workspace.name);
+              } else {
+                deletable.push(workspace.id);
               }
             }
-            return { blockingWorkspaceNames, ownedWorkspaces };
+            if (nowBlocking.length > 0) {
+              return yield* Effect.fail(ownershipRequiredError(nowBlocking));
+            }
+            for (const workspaceId of deletable) {
+              yield* db
+                .delete(schema.organizationTable)
+                .where(eq(schema.organizationTable.id, workspaceId));
+            }
           })
-        );
-      if (blockingWorkspaceNames.length > 0) {
-        throw new APIError("BAD_REQUEST", {
-          code: "WORKSPACE_OWNERSHIP_REQUIRED",
-          message: `${blockingWorkspaceNames.join(", ")} still has other members. Remove them in Members settings, or delete the workspace, before deleting your account.`,
-        });
-      }
-      for (const workspace of ownedWorkspaces) {
-        // Cancelled before the organization row (and its cascaded subscription
-        // rows) disappear, so the external subscription id is still queryable.
-        await cancelOrganizationSubscription(workspace.id);
-        await callbackRuntime.runPromise(
-          Effect.gen(function* () {
-            yield* db
-              .delete(schema.organizationTable)
-              .where(eq(schema.organizationTable.id, workspace.id));
-          })
-        );
-      }
+        )
+      );
     };
 
     // Local OAuth emulator (vercel-labs/emulate) support.

@@ -62,6 +62,11 @@ export function DeleteWorkspaceDialog({
       // no longer exists; a full navigation rebuilds them against the next
       // workspace (or the registration page when this was the last one).
       window.location.assign("/");
+    } catch {
+      // A rejected request (transport, or a body the client could not parse)
+      // must surface as a failure, not as a silently still-open dialog.
+      trackEvent("org_deleted", { success: false });
+      setError("Could not delete the workspace. Try again.");
     } finally {
       setIsDeleting(false);
     }

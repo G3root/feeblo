@@ -8,7 +8,7 @@ import {
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { useOrganizationId } from "~/hooks/use-organization-id";
@@ -29,6 +29,7 @@ const preferenceQueryKey = (organizationId: string) => [
 export function SubmissionNotificationSetting() {
   const organizationId = useOrganizationId();
   const { data: session } = useAuthState();
+  const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
   const preferenceQuery = useQuery({
     queryKey: preferenceQueryKey(organizationId),
@@ -44,23 +45,25 @@ export function SubmissionNotificationSetting() {
   const handleChange = async (next: boolean) => {
     setIsSaving(true);
     try {
-      await fetchRpc((rpc) =>
+      // The write answers with the state it committed, so the switch renders
+      // the server's answer instead of a second read of it.
+      const state = await fetchRpc((rpc) =>
         rpc.EmailSubmissionNotificationPreferenceSet({
           enabled: next,
           organizationId,
         })
       );
+      queryClient.setQueryData(preferenceQueryKey(organizationId), state);
       trackEvent("email_notification_preference_changed", {
-        enabled: next,
+        enabled: state.enabled,
         success: true,
       });
       toastManager.add({
-        title: next
+        title: state.enabled
           ? "Submission emails turned on"
           : "Submission emails turned off",
         type: "success",
       });
-      await preferenceQuery.refetch();
     } catch {
       trackEvent("email_notification_preference_changed", {
         enabled: next,

@@ -117,7 +117,11 @@ function RouteComponent() {
       footer={
         <div className="text-center text-sm">
           Already have an account?{" "}
-          <Link className="underline underline-offset-4" to="/sign-in">
+          <Link
+            className="underline underline-offset-4"
+            search={{ redirectTo: search.redirectTo }}
+            to="/sign-in"
+          >
             Sign in
           </Link>
         </div>
