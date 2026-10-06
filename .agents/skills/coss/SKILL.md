@@ -1,6 +1,6 @@
 ---
 name: coss
-description: Helps implement coss UI components correctly. Use when building UIs with coss primitives (buttons, dialogs, selects, forms, menus, tabs, inputs, toasts, etc.), migrating from shadcn/Radix to coss/Base UI, composing trigger-based overlays, or troubleshooting coss component behavior. Covers imports, accessibility, Tailwind styling, and common pitfalls.
+description: Helps implement coss UI components correctly. Use when building UIs with coss primitives and patterns (buttons, dialogs, selects, forms, menus, tabs, segmented controls, inputs, toasts, etc.), migrating from shadcn/Radix to coss/Base UI, composing trigger-based overlays, or troubleshooting coss component behavior. Covers imports, accessibility, Tailwind styling, and common pitfalls.
 compatibility: Requires Tailwind CSS v4 and @base-ui/react. Designed for React projects using the coss component registry.
 license: MIT
 metadata:
@@ -60,6 +60,7 @@ Rule references (read on demand when the task touches these areas):
 - `./references/rules/forms.md` — Field composition, validation, input patterns
 - `./references/rules/composition.md` — Trigger/popup hierarchies, grouped controls
 - `./references/rules/migration.md` — shadcn/Radix to coss/Base UI migration patterns
+- `./references/segmented-control.md` — choose Radio Group, links, Toggle Group, or Tabs before applying segmented-control styling
 - `./references/portal-props.md` — optional `portalProps` on composed popups and toast providers (`keepMounted`, `container`, which surfaces support it)
 
 ## Component discovery
@@ -115,4 +116,3 @@ Before returning code:
 - composition structure is valid for selected primitive(s)
 - accessibility and explicit control types (`button`, `input`, etc.) are present
 - migration-sensitive flows are verified (type/lint, keyboard/a11y behavior, and SSR-sensitive primitives like Select/Command)
-

@@ -32,6 +32,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 </Avatar>
 ```
 
+Use `keepMounted` on `AvatarImage` when the image relies on native lazy loading or an optimized image component. The image and fallback are layered so the fallback remains visible while the image loads or if it fails.
+
 ## Patterns from coss particles
 
 ### Key patterns
