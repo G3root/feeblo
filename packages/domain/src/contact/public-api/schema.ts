@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
+import { paramsOf, payloadOf } from "../../public-api/http-input";
 
 /**
  * The end-user resource: the workspace's own record of one of its customers.
@@ -45,10 +46,6 @@ export const ListEndUsersQuery = Schema.Struct({
   companyId: Schema.optional(Schema.String),
 });
 
-export const GetEndUserParams = Schema.Struct({
-  endUserId: Schema.String,
-});
-
 /**
  * The fields an upsert may set.
  *
@@ -60,13 +57,19 @@ export const GetEndUserParams = Schema.Struct({
  * a different end user is refused with `CONFLICT` rather than silently
  * reassigned.
  */
-export const UpsertEndUserPayload = Schema.Struct({
+export const UpsertEndUserInput = Schema.Struct({
   externalId: Schema.optional(Schema.NullOr(Schema.String)),
   email: Schema.optional(Schema.NullOr(Schema.String)),
   name: Schema.optional(Schema.NullOr(Schema.String)),
   avatarUrl: Schema.optional(Schema.NullOr(Schema.String)),
   companyId: Schema.optional(Schema.NullOr(Schema.String)),
 });
+
+/**
+ * The upsert body: the operation input with no path field to remove, so the
+ * two share every constraint the operation declares.
+ */
+export const UpsertEndUserPayload = payloadOf(UpsertEndUserInput, []);
 
 export type TUpsertEndUserPayload = Schema.Schema.Type<
   typeof UpsertEndUserPayload
@@ -113,13 +116,7 @@ export const GetEndUserInput = Schema.Struct({
 
 export type TGetEndUserInput = Schema.Schema.Type<typeof GetEndUserInput>;
 
-/** Typed input for creating or updating one end user. */
-export const UpsertEndUserInput = Schema.Struct({
-  externalId: Schema.optional(Schema.NullOr(Schema.String)),
-  email: Schema.optional(Schema.NullOr(Schema.String)),
-  name: Schema.optional(Schema.NullOr(Schema.String)),
-  avatarUrl: Schema.optional(Schema.NullOr(Schema.String)),
-  companyId: Schema.optional(Schema.NullOr(Schema.String)),
-});
+/** The customer the URL names, taken from the operation input. */
+export const GetEndUserParams = paramsOf(GetEndUserInput, ["endUserId"]);
 
 export type TUpsertEndUserInput = Schema.Schema.Type<typeof UpsertEndUserInput>;

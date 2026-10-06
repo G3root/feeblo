@@ -111,25 +111,22 @@ export const companyHandlers = (
     PublicApiCaller
   >,
 
+  // The body is the operation's own input minus the path, so handing it over
+  // cannot drop a field the operation gains.
   createCompany: (({ payload }) =>
     createCompanyOperation
-      .handler({
-        avatar: payload.avatar,
-        externalCreatedAt: payload.externalCreatedAt,
-        externalId: payload.externalId,
-        name: payload.name,
-      })
+      .handler(payload)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "createCompany",
     PublicApiCaller
   >,
 
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
   getCompany: (({ params }) =>
     getCompanyOperation
-      .handler({
-        companyId: params.companyId,
-      })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "getCompany",
@@ -139,11 +136,8 @@ export const companyHandlers = (
   updateCompany: (({ params, payload }) =>
     updateCompanyOperation
       .handler({
-        avatar: payload.avatar,
-        companyId: params.companyId,
-        externalCreatedAt: payload.externalCreatedAt,
-        externalId: payload.externalId,
-        name: payload.name,
+        ...payload,
+        ...params,
       })
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
@@ -153,9 +147,7 @@ export const companyHandlers = (
 
   deleteCompany: (({ params }) =>
     deleteCompanyOperation
-      .handler({
-        companyId: params.companyId,
-      })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "deleteCompany",

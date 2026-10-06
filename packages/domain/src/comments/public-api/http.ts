@@ -137,9 +137,9 @@ export const commentHandlers = (
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
       return yield* listPostCommentsOperation.handler({
+        ...params,
         cursor: query.cursor,
         limit,
-        postId: params.postId,
       });
     }).pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
@@ -147,14 +147,13 @@ export const commentHandlers = (
     PublicApiCaller
   >,
 
+  // The body is the operation's own input minus the path, so handing it over
+  // cannot drop a field the operation gains.
   createComment: (({ params, payload }) =>
     createCommentOperation
       .handler({
-        author: payload.author,
-        content: payload.content,
-        parentCommentId: payload.parentCommentId,
-        postId: params.postId,
-        visibility: payload.visibility,
+        ...payload,
+        ...params,
       })
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
@@ -164,9 +163,7 @@ export const commentHandlers = (
 
   getComment: (({ params }) =>
     getCommentOperation
-      .handler({
-        commentId: params.commentId,
-      })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "getComment",
@@ -176,9 +173,8 @@ export const commentHandlers = (
   updateComment: (({ params, payload }) =>
     updateCommentOperation
       .handler({
-        commentId: params.commentId,
-        content: payload.content,
-        visibility: payload.visibility,
+        ...payload,
+        ...params,
       })
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
@@ -188,9 +184,7 @@ export const commentHandlers = (
 
   deleteComment: (({ params }) =>
     deleteCommentOperation
-      .handler({
-        commentId: params.commentId,
-      })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "deleteComment",
@@ -199,9 +193,7 @@ export const commentHandlers = (
 
   pinComment: (({ params }) =>
     pinCommentOperation
-      .handler({
-        commentId: params.commentId,
-      })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "pinComment",
@@ -210,9 +202,7 @@ export const commentHandlers = (
 
   unpinComment: (({ params }) =>
     unpinCommentOperation
-      .handler({
-        commentId: params.commentId,
-      })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "unpinComment",

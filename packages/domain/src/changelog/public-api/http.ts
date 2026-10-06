@@ -139,11 +139,11 @@ export const changelogHandlers = (
     PublicApiCaller
   >,
 
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
   getChangelog: (({ params }) =>
     getChangelogOperation
-      .handler({
-        changelogId: params.changelogId,
-      })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "getChangelog",
@@ -163,7 +163,7 @@ export const changelogHandlers = (
     updateChangelogOperation
       .handler({
         ...payload,
-        changelogId: params.changelogId,
+        ...params,
       })
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
@@ -173,9 +173,7 @@ export const changelogHandlers = (
 
   deleteChangelog: (({ params }) =>
     deleteChangelogOperation
-      .handler({
-        changelogId: params.changelogId,
-      })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "deleteChangelog",

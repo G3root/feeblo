@@ -87,26 +87,22 @@ export const endUserHandlers = (
     PublicApiCaller
   >,
 
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
   getEndUser: (({ params }) =>
     getEndUserOperation
-      .handler({
-        endUserId: params.endUserId,
-      })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "getEndUser",
     PublicApiCaller
   >,
 
+  // The body is the operation's own input, so handing it over cannot drop a
+  // field the operation gains.
   upsertEndUser: (({ payload }) =>
     upsertEndUserOperation
-      .handler({
-        avatarUrl: payload.avatarUrl,
-        companyId: payload.companyId,
-        email: payload.email,
-        externalId: payload.externalId,
-        name: payload.name,
-      })
+      .handler(payload)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "upsertEndUser",

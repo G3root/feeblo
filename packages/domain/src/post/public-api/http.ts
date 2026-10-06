@@ -199,7 +199,7 @@ export const postHandlers = (
       );
       const tagIds = yield* parseTagIds(query.tagIds);
       return yield* listBoardPostsOperation.handler({
-        boardId: params.boardId,
+        ...params,
         cursor: query.cursor,
         includeArchived,
         limit,
@@ -251,11 +251,11 @@ export const postHandlers = (
     PublicApiCaller
   >,
 
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
   getPost: (({ params }) =>
     getPostOperation
-      .handler({
-        postId: params.postId,
-      })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "getPost",
@@ -266,9 +266,9 @@ export const postHandlers = (
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
       return yield* listPostActivityOperation.handler({
+        ...params,
         cursor: query.cursor,
         limit,
-        postId: params.postId,
       });
     }).pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
@@ -276,17 +276,11 @@ export const postHandlers = (
     PublicApiCaller
   >,
 
+  // The body is the operation's own input minus the path, so handing it over
+  // cannot drop a field the operation gains.
   createPost: (({ payload }) =>
     createPostOperation
-      .handler({
-        author: payload.author,
-        boardId: payload.boardId,
-        content: payload.content,
-        createdAt: payload.createdAt,
-        etaQuarter: payload.etaQuarter,
-        statusId: payload.statusId,
-        title: payload.title,
-      })
+      .handler(payload)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "createPost",
@@ -296,13 +290,8 @@ export const postHandlers = (
   updatePost: (({ params, payload }) =>
     updatePostOperation
       .handler({
-        author: payload.author,
-        boardId: payload.boardId,
-        content: payload.content,
-        etaQuarter: payload.etaQuarter,
-        postId: params.postId,
-        statusId: payload.statusId,
-        title: payload.title,
+        ...payload,
+        ...params,
       })
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
@@ -313,8 +302,8 @@ export const postHandlers = (
   setPostTags: (({ params, payload }) =>
     setPostTagsOperation
       .handler({
-        postId: params.postId,
-        tagIds: payload.tagIds,
+        ...payload,
+        ...params,
       })
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
@@ -324,9 +313,7 @@ export const postHandlers = (
 
   deletePost: (({ params }) =>
     deletePostOperation
-      .handler({
-        postId: params.postId,
-      })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "deletePost",
@@ -336,8 +323,8 @@ export const postHandlers = (
   mergePost: (({ params, payload }) =>
     mergePostOperation
       .handler({
-        intoPostId: payload.intoPostId,
-        postId: params.postId,
+        ...payload,
+        ...params,
       })
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
@@ -347,9 +334,7 @@ export const postHandlers = (
 
   unmergePost: (({ params }) =>
     unmergePostOperation
-      .handler({
-        postId: params.postId,
-      })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "unmergePost",

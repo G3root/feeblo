@@ -18,9 +18,11 @@ import { invalidRequestError } from "./errors";
  * about the field the caller actually sent.
  *
  * `parseLimit`/`parseIncludeArchived`/`providedQueryParam` belong to the HTTP
- * projection, which is the only surface with string inputs; `parseName` and
- * `parseTitle` are called from operations too, so an MCP tool or a CLI trims
- * exactly as the API does.
+ * projection, which is the only surface with string inputs. `parseName` and
+ * `parseTitle` are called from operations instead, so every surface refuses
+ * an all-whitespace name or title with the same field-specific message; a
+ * post title reaches `parseTitle` already trimmed by the operation input's own
+ * `PostTitle`, and the handler is what rejects one that trimmed to nothing.
  */
 
 export const parseLimit = (raw: string | undefined) =>
@@ -216,11 +218,13 @@ export const parseName = (raw: string) =>
   });
 
 /**
- * Post titles are trimmed before they are stored or slugified.
+ * A post title that is not empty, so the refusal names the field.
  *
- * Without this, `" Dark mode "` and `"Dark mode"` are two titles whose slugs
- * are one, and an all-whitespace title is not a title at all. The dashboard's
- * own title schema trims for the same reason.
+ * The operation input's `PostTitle` has already trimmed the value and bounded
+ * its length, so this is the one rule the schema deliberately leaves to the
+ * handler: `"   "` is not a title at all, and answering it here keeps the
+ * message about the field the caller sent instead of a schema issue that names
+ * the whole body.
  */
 export const parseTitle = (raw: string) =>
   Effect.gen(function* () {

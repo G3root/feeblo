@@ -71,9 +71,11 @@ export const boardHandlers = (
     PublicApiCaller
   >,
 
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
   getBoard: (({ params }) =>
     getBoardOperation
-      .handler({ boardId: params.boardId })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "getBoard",

@@ -120,18 +120,22 @@ export const tagHandlers = (
     PublicApiCaller
   >,
 
+  // The body is the operation's own input, so handing it over cannot drop a
+  // field the operation gains.
   createTag: (({ payload }) =>
     createTagOperation
-      .handler({ name: payload.name })
+      .handler(payload)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "createTag",
     PublicApiCaller
   >,
 
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
   getTag: (({ params }) =>
     getTagOperation
-      .handler({ tagId: params.tagId })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "getTag",
@@ -141,8 +145,8 @@ export const tagHandlers = (
   updateTag: (({ params, payload }) =>
     updateTagOperation
       .handler({
-        name: payload.name,
-        tagId: params.tagId,
+        ...payload,
+        ...params,
       })
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
@@ -152,7 +156,7 @@ export const tagHandlers = (
 
   deleteTag: (({ params }) =>
     deleteTagOperation
-      .handler({ tagId: params.tagId })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "deleteTag",

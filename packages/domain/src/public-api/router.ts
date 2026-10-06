@@ -2,22 +2,16 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
 
 import { BoardRepository } from "../board/repository";
-import { PublicApiChangelogRepository } from "../changelog/public-api/repository";
 import { ChangelogRepository } from "../changelog/repository";
-import { PublicApiCommentRepository } from "../comments/public-api/repository";
 import { CommentRepository } from "../comments/repository";
-import { CommentService } from "../comments/service";
 import { CompanyRepository } from "../company/repository";
-import { PublicApiEndUserRepository } from "../contact/public-api/repository";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostStatusRepository } from "../post-status/repository";
-import { PublicApiPostRepository } from "../post/public-api/repository";
 import { PostRepository } from "../post/repository";
 import { TagRepository } from "../tag/repository";
-import { PublicApiVoteRepository } from "../upvote/public-api/repository";
 import { UpvoteRepository } from "../upvote/repository";
 import { UserRepository } from "../user/repository";
 import { PublicApi } from "./api-contract";
@@ -27,6 +21,7 @@ import {
   ApiKeyAuthMiddlewareLive,
   PublicApiSchemaErrorHandlerLive,
 } from "./middleware";
+import { PublicApiProjections } from "./projections";
 
 /**
  * The `/api/v1` route tree.
@@ -90,20 +85,6 @@ export const PublicApiInternals = Layer.mergeAll(
 );
 
 /**
- * The comment writes this route serves, composed from the internals above.
- *
- * Merged into the route rather than only provided to it, so the layer that
- * composes the comments group can capture it: the group's build effect yields
- * `PublicApiDependencies`, which includes `CommentService`. The service is the
- * dashboard comment RPC's own write path, so an API-created comment lands in
- * the same timeline, the same transaction, and the same notification fan-out
- * as one written by a member.
- */
-const PublicApiCommentService = CommentService.layer.pipe(
-  Layer.provide(PublicApiInternals)
-);
-
-/**
  * Builds the route with a specific key middleware.
  *
  * The middleware is a parameter so a test can compose the same route with a
@@ -122,25 +103,14 @@ export const makePublicApiRoute = <E, R>(
     // rejected is part of this API's contract, not something the composition
     // root supplies.
     Layer.provide(PublicApiSchemaErrorHandlerLive),
-    // Merged rather than only provided: the repositories stay in this layer's
-    // output because tests drive them directly to reach races the HTTP surface
-    // cannot produce (a row that vanishes between a read and a write). Each
-    // resource's repository is provided with the same private bundle, so a new
-    // one is a line here and nowhere else.
+    // Merged rather than only provided: the projections stay in this layer's
+    // output because the middleware tests drive the repositories directly to
+    // reach races the HTTP surface cannot produce (a row that vanishes between
+    // a read and a write). The bundle is shared with `/mcp`, so a projection
+    // added for one surface is composed for both.
     Layer.provideMerge(
-      Layer.mergeAll(
-        PublicApiChangelogRepository.layer.pipe(
-          Layer.provide(PublicApiInternals)
-        ),
-        PublicApiCommentRepository.layer.pipe(
-          Layer.provide(PublicApiInternals)
-        ),
-        PublicApiEndUserRepository.layer,
-        PublicApiPostRepository.layer.pipe(Layer.provide(PublicApiInternals)),
-        PublicApiVoteRepository.layer.pipe(Layer.provide(PublicApiInternals))
-      )
+      PublicApiProjections.pipe(Layer.provide(PublicApiInternals))
     ),
-    Layer.provideMerge(PublicApiCommentService),
     // Provided to the group builders, not merged into the output: every
     // group's build effect yields `PublicApiDependencies` and the handlers
     // close over them, so this is the one line that makes

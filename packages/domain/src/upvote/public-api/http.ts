@@ -122,9 +122,9 @@ export const voteHandlers = (
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
       return yield* listPostVotesOperation.handler({
+        ...params,
         cursor: query.cursor,
         limit,
-        postId: params.postId,
         voter: voterFilterFromQuery(query),
       });
     }).pipe(Effect.provideContext(context))) satisfies HandlerOf<
@@ -149,11 +149,13 @@ export const voteHandlers = (
     PublicApiCaller
   >,
 
+  // The body is the operation's own input minus the path, so handing it over
+  // cannot drop a field the operation gains.
   createVote: (({ params, payload }) =>
     createVoteOperation
       .handler({
-        author: payload.author,
-        postId: params.postId,
+        ...payload,
+        ...params,
       })
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
@@ -163,10 +165,7 @@ export const voteHandlers = (
 
   deleteVote: (({ params }) =>
     deleteVoteOperation
-      .handler({
-        postId: params.postId,
-        voteId: params.voteId,
-      })
+      .handler(params)
       .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
     "deleteVote",
