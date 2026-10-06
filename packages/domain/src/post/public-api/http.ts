@@ -194,7 +194,7 @@ export const postHandlers = {
       );
       const tagIds = yield* parseTagIds(query.tagIds);
       return yield* listBoardPostsOperation.handler({
-        boardId: params.boardId,
+        ...params,
         cursor: query.cursor,
         includeArchived,
         limit,
@@ -232,62 +232,59 @@ export const postHandlers = {
       slug: providedQueryParam(query.slug),
     })) satisfies HandlerOf<PublicApiGroup, "retrievePost">,
 
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
   getPost: (({ params }) =>
-    getPostOperation.handler({
-      postId: params.postId,
-    })) satisfies HandlerOf<PublicApiGroup, "getPost">,
+    getPostOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "getPost"
+  >,
 
   listPostActivity: (({ params, query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
       return yield* listPostActivityOperation.handler({
+        ...params,
         cursor: query.cursor,
         limit,
-        postId: params.postId,
       });
     })) satisfies HandlerOf<PublicApiGroup, "listPostActivity">,
 
+  // The body is the operation's own input minus the path, so handing it over
+  // cannot drop a field the operation gains.
   createPost: (({ payload }) =>
-    createPostOperation.handler({
-      author: payload.author,
-      boardId: payload.boardId,
-      content: payload.content,
-      createdAt: payload.createdAt,
-      etaQuarter: payload.etaQuarter,
-      statusId: payload.statusId,
-      title: payload.title,
-    })) satisfies HandlerOf<PublicApiGroup, "createPost">,
+    createPostOperation.handler(payload)) satisfies HandlerOf<
+    PublicApiGroup,
+    "createPost"
+  >,
 
   updatePost: (({ params, payload }) =>
     updatePostOperation.handler({
-      author: payload.author,
-      boardId: payload.boardId,
-      content: payload.content,
-      etaQuarter: payload.etaQuarter,
-      postId: params.postId,
-      statusId: payload.statusId,
-      title: payload.title,
+      ...payload,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "updatePost">,
 
   setPostTags: (({ params, payload }) =>
     setPostTagsOperation.handler({
-      postId: params.postId,
-      tagIds: payload.tagIds,
+      ...payload,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "setPostTags">,
 
   deletePost: (({ params }) =>
-    deletePostOperation.handler({
-      postId: params.postId,
-    })) satisfies HandlerOf<PublicApiGroup, "deletePost">,
+    deletePostOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "deletePost"
+  >,
 
   mergePost: (({ params, payload }) =>
     mergePostOperation.handler({
-      intoPostId: payload.intoPostId,
-      postId: params.postId,
+      ...payload,
+      ...params,
     })) satisfies HandlerOf<PublicApiGroup, "mergePost">,
 
   unmergePost: (({ params }) =>
-    unmergePostOperation.handler({
-      postId: params.postId,
-    })) satisfies HandlerOf<PublicApiGroup, "unmergePost">,
+    unmergePostOperation.handler(params)) satisfies HandlerOf<
+    PublicApiGroup,
+    "unmergePost"
+  >,
 };

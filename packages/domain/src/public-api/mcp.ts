@@ -13,14 +13,8 @@ import * as SchemaAST from "effect/SchemaAST";
 import type { unhandled } from "effect/Types";
 
 import { Auth } from "../auth-handler";
-import { PublicApiChangelogRepository } from "../changelog/public-api/repository";
-import { PublicApiCommentRepository } from "../comments/public-api/repository";
-import { CommentService } from "../comments/service";
-import { PublicApiEndUserRepository } from "../contact/public-api/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
-import { PublicApiPostRepository } from "../post/public-api/repository";
 import { RateLimitService } from "../rate-limit/service";
-import { PublicApiVoteRepository } from "../upvote/public-api/repository";
 import {
   authenticatePublicApiKey,
   type PublicApiAuthenticationFailure,
@@ -42,6 +36,7 @@ import {
   PUBLIC_API_KEY_RATE_LIMIT,
 } from "./middleware";
 import { PublicApiOperations } from "./operations";
+import { PublicApiProjections } from "./projections";
 import { PublicApiInternals } from "./router";
 
 /**
@@ -327,21 +322,17 @@ const makePublicApiMcpKeyMiddleware = (budget: PublicApiKeyBudget) =>
 /**
  * The layers the MCP route's own reads and writes need.
  *
- * The same bundle the HTTP route composes: the shared feature repositories come
- * from `PublicApiInternals`, and the public projections (the reads that must
- * not select actor identifiers, the changelog publication orchestration) and
- * the dashboard comment write path are built on top of it. Constructed here
- * rather than imported from `router.ts` so each surface owns its composition
- * (ADR 0006) and adding a public projection to MCP is an edit in one file.
+ * The shared feature repositories come from `PublicApiInternals`, and the
+ * public projections the two Public API surfaces both serve — the reads that
+ * must not select actor identifiers, the changelog publication orchestration,
+ * and the dashboard comment write path — come from the one bundle
+ * `projections.ts` declares. Providing rather than merging keeps them out of
+ * this route's output; the HTTP route merges them because its tests drive the
+ * repositories directly.
  */
-const PublicApiMcpRepositories = Layer.mergeAll(
-  PublicApiChangelogRepository.layer,
-  PublicApiCommentRepository.layer,
-  PublicApiEndUserRepository.layer,
-  PublicApiPostRepository.layer,
-  PublicApiVoteRepository.layer,
-  CommentService.layer
-).pipe(Layer.provide(PublicApiInternals));
+const PublicApiMcpRepositories = PublicApiProjections.pipe(
+  Layer.provide(PublicApiInternals)
+);
 
 /**
  * Builds the `/mcp` route with a specific key budget.
