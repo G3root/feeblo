@@ -1,9 +1,11 @@
-import { currentDb, schema, transaction } from "@feeblo/db";
+import { Database, schema, transaction } from "@feeblo/db";
 import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
-import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
+import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { eq } from "drizzle-orm";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -20,6 +22,7 @@ import {
   syncPostAssetReferences,
 } from "../asset/service";
 import { BoardRepository } from "../board/repository";
+import { EmailOutboxConfig } from "../email-outbox/config";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
@@ -40,8 +43,8 @@ import {
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import * as RateLimit from "../rate-limit";
 import { BadRequestError, InternalServerError } from "../rpc-errors";
+import { S3UploadService } from "../services/s3";
 import { UserRepository } from "../user/repository";
-import { WorkspaceRepository } from "../workspace/repository";
 import {
   PostEmbeddingService,
   schedulePostEmbeddingBestEffort,
@@ -129,6 +132,20 @@ export type PostCreateWrite = {
   readonly title: string;
 };
 
+/** Options for one create write, beyond the post fields themselves. */
+type PostCreateWriteOptions = {
+  readonly source?: "PUBLIC_BOARD";
+  /**
+   * The inbound user the created post is attributed to when the acting
+   * credential is a machine key whose feeblo user row the caller resolved
+   * (Slack, Discord). It sets the post's `creatorId` so creator-based reads
+   * and edit/delete permissions work. It does not subscribe the user: an
+   * inbound identity's feeblo inbox is synthetic, and a post made in chat
+   * must not put its author on the watch-list.
+   */
+  readonly creatorUserId?: string;
+};
+
 /**
  * What an update may change. An absent field is left alone; `null` clears a
  * nullable one, which is why `etaQuarter` is not collapsed to `undefined`.
@@ -191,22 +208,58 @@ export type PostUnmergeWrite = {
  * actor instead of being duplicated: a machine key has no email to subscribe
  * and no name to attribute, so those steps are skipped rather than invented.
  *
- * It is a plain `Effect` factory rather than a `Context.Service`, matching
- * `makeChangelogPublication`: both callers already hold the repositories it
- * needs, and the notification service stays optional the way it is optional in
- * the dashboard handlers.
+ * The path is one service, `PostWriteService`: it captures its required
+ * collaborators at construction and provides them to every operation, so a
+ * caller depends on the one tag instead of restating the environment. The
+ * optional fan-outs — notifications, embeddings, the rate limiter, the outbox
+ * wake — resolve from the running context per operation, so a composition that
+ * omits them skips them rather than failing.
  */
-export const makePostWrites = Effect.gen(function* () {
-  const db = yield* currentDb;
+const makePostWriteService = Effect.gen(function* () {
   const boardRepository = yield* BoardRepository;
-  const repository = yield* PostRepository;
+  const crypto = yield* Crypto.Crypto;
+  const db = yield* Database.Database;
   const emailOutbox = yield* EmailOutboxRepository;
+  const emailOutboxConfig = yield* EmailOutboxConfig;
   const emailSubscriptions = yield* EmailSubscriptionRepository;
   const entitlementPolicy = yield* EntitlementPolicy;
+  const integrationEventRecorder = yield* IntegrationEventRecorder;
   const activityRepository = yield* PostActivityRepository;
+  const repository = yield* PostRepository;
+  const resolvePrincipal = yield* ResolvePrincipalService;
+  const s3 = yield* S3UploadService;
   const subscriptionRepository = yield* PostSubscriptionRepository;
-  const notifications = yield* Effect.serviceOption(NotificationService);
-  const embeddingService = yield* Effect.serviceOption(PostEmbeddingService);
+  const userRepository = yield* UserRepository;
+
+  /**
+   * The services the write operations read from the running context, captured
+   * once at construction.
+   *
+   * The operations and their helpers read some collaborators directly and
+   * others through the fiber context (the asset promotion's storage, the
+   * integration event recorder, the identity resolver). Providing this one
+   * layer around each operation is what lets a caller depend on
+   * `PostWriteService` alone. The list is hand-maintained: a new requirement
+   * read by an operation leaks into the method's inferred requirements and
+   * fails at the composition root, not here.
+   */
+  const environment = Layer.mergeAll(
+    Layer.succeed(BoardRepository, boardRepository),
+    Layer.succeed(Crypto.Crypto, crypto),
+    Layer.succeed(Database.Database, db),
+    Layer.succeed(EmailOutboxConfig, emailOutboxConfig),
+    Layer.succeed(EmailOutboxRepository, emailOutbox),
+    Layer.succeed(EmailSubscriptionRepository, emailSubscriptions),
+    Layer.succeed(EntitlementPolicy, entitlementPolicy),
+    Layer.succeed(IntegrationEventRecorder, integrationEventRecorder),
+    Layer.succeed(PostActivityRepository, activityRepository),
+    Layer.succeed(PostRepository, repository),
+    Layer.succeed(PostSubscriptionRepository, subscriptionRepository),
+    Layer.succeed(ResolvePrincipalService, resolvePrincipal),
+    Layer.succeed(S3UploadService, s3),
+    Layer.succeed(UserRepository, userRepository)
+  );
+  const provideWriteEnvironment = Effect.provide(environment);
 
   /** The actor columns a timeline entry records. A key is not a member. */
   const actorColumns = (actor: PostWriteActor) =>
@@ -296,16 +349,22 @@ export const makePostWrites = Effect.gen(function* () {
     organizationId: string;
     title: string;
   }) =>
-    Option.match(embeddingService, {
-      onNone: () => Effect.void,
-      onSome: (service) =>
-        schedulePostEmbeddingBestEffort({
-          content,
-          embeddingService: service,
-          postId: id,
-          organizationId,
-          title,
-        }),
+    Effect.gen(function* () {
+      // Resolved per call, not captured: a caller may compose the write path
+      // with or without an embedding service, and the absent case is a skip
+      // rather than a failure.
+      const embeddingService =
+        yield* Effect.serviceOption(PostEmbeddingService);
+      if (Option.isNone(embeddingService)) {
+        return;
+      }
+      yield* schedulePostEmbeddingBestEffort({
+        content,
+        embeddingService: embeddingService.value,
+        postId: id,
+        organizationId,
+        title,
+      });
     });
 
   /**
@@ -373,22 +432,12 @@ export const makePostWrites = Effect.gen(function* () {
   const create = (
     args: PostCreateWrite,
     actor: PostWriteActor,
-    options: {
-      readonly source?: "PUBLIC_BOARD";
-      /**
-       * The post creator to attribute and watch-list when the acting
-       * credential has no session of its own to subscribe from — an inbound
-       * end-user identity (Slack, Discord) whose feeblo user row the caller
-       * resolved. A member session subscribes through its own branch; a
-       * machine key creating on behalf of `author` subscribes the subject
-       * instead. No email subscription is requested from this option:
-       * inbound identities carry synthetic inboxes that must never enter the
-       * email pipeline.
-       */
-      readonly subscribeCreatorUserId?: string;
-    } = {}
+    options: PostCreateWriteOptions = {}
   ) =>
     Effect.gen(function* () {
+      // Optional capabilities resolve from the running context, so a
+      // composition that omits them skips the fan-out instead of failing.
+      const notifications = yield* Effect.serviceOption(NotificationService);
       const member = actor.kind === "member" ? actor : null;
       const userId = member?.userId ?? null;
       // `source` is lifted out of the spread and re-added below: the
@@ -476,7 +525,7 @@ export const makePostWrites = Effect.gen(function* () {
             // member's own id still wins when there is one.
             creatorId: subject
               ? subject.userId
-              : (userId ?? options.subscribeCreatorUserId ?? null),
+              : (userId ?? options.creatorUserId ?? null),
             ...(writeSource !== undefined && { source: writeSource }),
             // On-behalf posts keep staff attribution out of the author fields.
             ...(member !== null &&
@@ -517,11 +566,11 @@ export const makePostWrites = Effect.gen(function* () {
           // staff actor, following the same notification-eligibility rules: a
           // verified account is trusted, everyone else is deferred until
           // identity linking grants them access. A machine key has no person
-          // behind it, so there is nobody to subscribe — unless the caller
-          // resolved the inbound end user for it (Slack, Discord).
+          // behind it, so there is nobody to subscribe — an inbound create
+          // attributes the post to its resolved author without watch-listing
+          // them.
           const subscriptionNow = yield* DateTime.nowAsDate;
           if (subject === undefined) {
-            const inboundCreatorUserId = options.subscribeCreatorUserId;
             const creator =
               member !== null
                 ? {
@@ -529,13 +578,7 @@ export const makePostWrites = Effect.gen(function* () {
                     memberId: member.memberId,
                     userId: member.userId,
                   }
-                : inboundCreatorUserId !== undefined
-                  ? {
-                      email: undefined,
-                      memberId: null,
-                      userId: inboundCreatorUserId,
-                    }
-                  : undefined;
+                : undefined;
             if (creator !== undefined) {
               yield* subscriptionRepository.subscribe({
                 organizationId: args.organizationId,
@@ -659,6 +702,7 @@ export const makePostWrites = Effect.gen(function* () {
    */
   const update = (args: PostUpdateWrite, actor: PostWriteActor) =>
     Effect.gen(function* () {
+      const notifications = yield* Effect.serviceOption(NotificationService);
       const member = actor.kind === "member" ? actor : null;
       const userId = member?.userId ?? null;
       const columns = actorColumns(actor);
@@ -1111,6 +1155,7 @@ export const makePostWrites = Effect.gen(function* () {
    */
   const merge = (args: PostMergeWrite, actor: PostWriteActor) =>
     Effect.gen(function* () {
+      const notifications = yield* Effect.serviceOption(NotificationService);
       const columns = actorColumns(actor);
       const member = actor.kind === "member" ? actor : null;
 
@@ -1198,6 +1243,7 @@ export const makePostWrites = Effect.gen(function* () {
    */
   const unmerge = (args: PostUnmergeWrite, actor: PostWriteActor) =>
     Effect.gen(function* () {
+      const notifications = yield* Effect.serviceOption(NotificationService);
       const columns = actorColumns(actor);
       const member = actor.kind === "member" ? actor : null;
 
@@ -1266,33 +1312,63 @@ export const makePostWrites = Effect.gen(function* () {
       yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
     });
 
-  return { create, merge, remove, unmerge, update };
+  return {
+    create: Effect.fn("PostWriteService.create")(function* (
+      args: PostCreateWrite,
+      actor: PostWriteActor,
+      options: PostCreateWriteOptions = {}
+    ) {
+      return yield* create(args, actor, options).pipe(provideWriteEnvironment);
+    }),
+    merge: Effect.fn("PostWriteService.merge")(function* (
+      args: PostMergeWrite,
+      actor: PostWriteActor
+    ) {
+      return yield* merge(args, actor).pipe(provideWriteEnvironment);
+    }),
+    remove: Effect.fn("PostWriteService.remove")(function* (
+      args: PostRemoveWrite,
+      actor: PostWriteActor
+    ) {
+      return yield* remove(args, actor).pipe(provideWriteEnvironment);
+    }),
+    unmerge: Effect.fn("PostWriteService.unmerge")(function* (
+      args: PostUnmergeWrite,
+      actor: PostWriteActor
+    ) {
+      return yield* unmerge(args, actor).pipe(provideWriteEnvironment);
+    }),
+    update: Effect.fn("PostWriteService.update")(function* (
+      args: PostUpdateWrite,
+      actor: PostWriteActor
+    ) {
+      return yield* update(args, actor).pipe(provideWriteEnvironment);
+    }),
+  };
 });
 
 /**
- * Every service the shared post write path reads, composed once.
+ * The post write path: every create, update, remove, merge, and unmerge,
+ * whichever credential asked.
  *
- * `makePostWrites` reads the repositories it coordinates from the context at
- * construction, and its steps read further services from the running fiber's
- * context (the identity resolver behind on-behalf attribution, the integration
- * event recorder behind a webhook, the notification fan-out, the embedding
- * scheduler). A caller that assembles the path — the dashboard handlers, the
- * Public API's own repository, the widget feedback endpoint, or an integration
- * provider's inbound feedback service — provides this layer instead of
- * restating the same set, so a write keeps every consequence whichever
- * credential asked for it.
+ * The layer carries the path's required environment, so the operations require
+ * nothing of their callers and the composition root supplies the collaborators
+ * once; a required collaborator missing from the layer is a gap in the
+ * composition root's type instead of a request-time failure. The optional
+ * fan-outs are read from the request context, so the root must keep
+ * `NotificationService` and `PostEmbeddingService` in it (see
+ * `apps/server/src/app/layers.ts`). The dashboard RPCs, the Public API, the
+ * widget feedback endpoint, and the Slack and Discord inbound feedback
+ * services all depend on this one tag.
  */
-export const PostWriteInternals = Layer.mergeAll(
-  BoardRepository.layer,
-  EmailOutboxRepository.layer,
-  EmailSubscriptionRepository.layer,
-  EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
-  IntegrationEventRecorderLive,
-  NotificationService.layer,
-  PostActivityRepository.layer,
-  PostEmbeddingService.layer,
-  PostRepository.layer,
-  PostSubscriptionRepository.layer,
-  ResolvePrincipalService.layer,
-  UserRepository.layer
-);
+export class PostWriteService extends Context.Service<PostWriteService>()(
+  "PostWriteService",
+  { make: makePostWriteService }
+) {
+  /**
+   * The path's required environment as a layer: every collaborator is a
+   * requirement, so the composition root names them once and a test
+   * substitutes only what it must.
+   */
+  static readonly layer = Layer.effect(this, this.make);
+}

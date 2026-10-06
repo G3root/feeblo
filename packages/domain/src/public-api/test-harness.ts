@@ -5,6 +5,7 @@ import {
 } from "@effect/platform-node";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
+import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
 import { slugify } from "@feeblo/utils/url";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -15,15 +16,24 @@ import * as Schema from "effect/Schema";
 
 import type { ApiKeyAuthRecord } from "../api-key/schema";
 import { Auth } from "../auth-handler";
+import { BoardRepository } from "../board/repository";
 import { CompanyRepository } from "../company/repository";
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { ResolvePrincipalService } from "../identity/service";
+import { NotificationService } from "../notification/service";
 import { PolicyDeniedError } from "../policy";
+import { PostActivityRepository } from "../post-activity/repository";
+import { PostSubscriptionRepository } from "../post-subscription/repository";
+import { PostEmbeddingService } from "../post/embedding-service";
+import { PostRepository } from "../post/repository";
+import { PostWriteService } from "../post/write";
 import { RateLimitService } from "../rate-limit/service";
 import { S3Test } from "../services/s3-test";
+import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { PublicApiConfig } from "./config";
 
@@ -121,7 +131,7 @@ export const makePublicApiDependencies = (
           )
         );
 
-  return Layer.mergeAll(
+  const SharedDependencies = Layer.mergeAll(
     // The route owns the layers only it reads (`PublicApiInternals` in
     // `router.ts`). What is listed here is the shared layers it requires, with
     // the substitutes standing in for the production ones: the plan decision,
@@ -160,9 +170,27 @@ export const makePublicApiDependencies = (
     // and hashes it, so a comment create needs randomness the same way the
     // dashboard's on-behalf writes do.
     NodeCrypto.layer,
-    NodeServices.layer
-    // Merged so test bodies can seed fixtures through `currentDb`.
-  ).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
+    NodeServices.layer,
+    // The post write path's own collaborators. The shared service owns them
+    // now, so the test supplies them here instead of through the route's
+    // internals.
+    BoardRepository.layer,
+    IntegrationEventRecorderLive,
+    NotificationService.layer,
+    PostActivityRepository.layer,
+    PostEmbeddingService.layer,
+    PostRepository.layer,
+    PostSubscriptionRepository.layer,
+    ResolvePrincipalService.layer,
+    UserRepository.layer
+  );
+
+  // The route requires the service; merging rather than only providing keeps
+  // the shared dependencies in the test layer's output so test bodies can seed
+  // fixtures through `currentDb`.
+  return PostWriteService.layer
+    .pipe(Layer.provideMerge(SharedDependencies))
+    .pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
 };
 
 /** The production wiring, with only the substitutes a test must supply. */
