@@ -179,8 +179,11 @@ export default defineConfig({
   },
 
   // Architecture boundary: client-side packages consume domain schemas, never
-  // DB internals. Server-side code (apps/server, packages/auth, integrations)
-  // is exempt because it legitimately talks to Postgres.
+  // DB internals or another package's `src/` path. The export map is the
+  // contract; a deep import compiles today and breaks the moment a file moves,
+  // and it lets client code reach modules the package never meant to publish.
+  // Server-side code (apps/server, packages/auth, integrations) is exempt from
+  // the DB half because it legitimately talks to Postgres.
   overrides: [
     {
       // A human-facing CLI, not a service: `seed.ts` builds fixture timestamps
@@ -217,6 +220,11 @@ export default defineConfig({
                 group: ["@feeblo/db", "@feeblo/db/**"],
                 message:
                   "Client code must not import @feeblo/db directly. Import schemas/vocabulary from @feeblo/domain instead.",
+              },
+              {
+                group: ["@feeblo/domain/src", "@feeblo/domain/src/**"],
+                message:
+                  "Client code must import @feeblo/domain through its export map (e.g. @feeblo/domain/comments/schema), never from src/.",
               },
             ],
           },
