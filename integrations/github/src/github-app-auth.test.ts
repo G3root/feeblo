@@ -2,6 +2,7 @@ import { generateKeyPairSync } from "node:crypto";
 
 import { describe, expect, it } from "@effect/vitest";
 import * as Clock from "effect/Clock";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as jose from "jose";
@@ -11,6 +12,10 @@ import {
   createGitHubAppJwt,
   makeGitHubInstallationTokenResolver,
 } from "./github-app-auth";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 const makePrivateKey = () =>
   Effect.tryPromise(() =>
@@ -25,7 +30,7 @@ describe("GitHub App authentication", () => {
     () =>
       Effect.gen(function* () {
         const privateKey = yield* makePrivateKey();
-        const now = new Date("2030-01-01T00:00:00Z");
+        const now = dateAt("2030-01-01T00:00:00Z");
         const token = yield* createGitHubAppJwt({
           appId: "1234",
           now,
@@ -55,7 +60,7 @@ describe("GitHub App authentication", () => {
         });
         const result = yield* createGitHubAppJwt({
           appId: "1234",
-          now: new Date("2030-01-01T00:00:00Z"),
+          now: dateAt("2030-01-01T00:00:00Z"),
           privateKey: Redacted.make(privateKey),
         });
         expect(jose.decodeProtectedHeader(Redacted.value(result)).alg).toBe(
@@ -67,7 +72,7 @@ describe("GitHub App authentication", () => {
   it.effect("caches an installation token until its safety skew", () =>
     Effect.gen(function* () {
       const privateKey = yield* makePrivateKey();
-      const now = new Date("2030-01-01T00:00:00Z");
+      const now = dateAt("2030-01-01T00:00:00Z");
       let minted = 0;
       const apiClient: GitHubApiClient = {
         createInstallationAccessToken: () => {
@@ -148,7 +153,7 @@ describe("GitHub App authentication", () => {
         const first = yield* resolver.getInstallationAccessToken({
           installationId: "9",
         });
-        currentTime = new Date(currentTime.getTime() + 61 * 60 * 1000);
+        currentTime = dateAt(currentTime.getTime() + 61 * 60 * 1000);
         const second = yield* resolver.getInstallationAccessToken({
           installationId: "9",
         });

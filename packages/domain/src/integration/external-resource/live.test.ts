@@ -12,6 +12,7 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -30,7 +31,7 @@ const seedPost = (suffix: string) =>
     const boardId = yield* BoardId.generate;
     const statusId = yield* PostStatusId.generate;
     const postId = yield* PostId.generate;
-    const now = new Date();
+    const now = yield* DateTime.nowAsDate;
     yield* db.insert(schema.organizationTable).values({
       id: organizationId,
       name: `External resource ${suffix}`,
@@ -75,7 +76,7 @@ const seedPostInOrganization = (
   Effect.gen(function* () {
     const db = yield* currentDb;
     const postId = yield* PostId.generate;
-    const now = new Date();
+    const now = yield* DateTime.nowAsDate;
     yield* db.insert(schema.postTable).values({
       id: postId,
       organizationId,

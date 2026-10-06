@@ -2,6 +2,7 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { ContactId, WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -19,7 +20,7 @@ describe("ContactRepository", () => {
         id,
         name: "Contact upsert test workspace",
         slug: id,
-        createdAt: new Date(),
+        createdAt: yield* DateTime.nowAsDate,
       });
     });
 
@@ -31,7 +32,7 @@ describe("ContactRepository", () => {
           const db = yield* currentDb;
           const repository = yield* ContactRepository;
           const organizationId = yield* WorkspaceId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
 
           yield* createOrganization(organizationId);
 

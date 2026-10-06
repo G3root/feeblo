@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 
 import {
@@ -6,19 +7,21 @@ import {
   verifyRequestSignature,
 } from "./request-signature";
 
-const okVerify = () =>
+const okVerify = (now: number) =>
   verifyRequestSignature({
     maxAgeMs: 60_000,
+    now,
     signatureHeader: "sig",
-    timestampHeader: String(Math.floor(Date.now() / 1000)),
+    timestampHeader: String(Math.floor(now / 1000)),
     verify: () => Effect.void,
   });
 
 describe("verifyRequestSignature", () => {
   it.effect("accepts a fresh request and delegates to the provider check", () =>
-    okVerify().pipe(
-      Effect.tap((result) => Effect.sync(() => expect(result).toBeUndefined()))
-    )
+    Effect.gen(function* () {
+      const result = yield* okVerify(yield* Clock.currentTimeMillis);
+      expect(result).toBeUndefined();
+    })
   );
 
   it.effect("rejects a missing header", () =>
@@ -42,10 +45,12 @@ describe("verifyRequestSignature", () => {
 
   it.effect("rejects a stale timestamp outside the freshness window", () =>
     Effect.gen(function* () {
-      const stale = String(Math.floor((Date.now() - 120_000) / 1000));
+      const now = yield* Clock.currentTimeMillis;
+      const stale = String(Math.floor((now - 120_000) / 1000));
       const failure = yield* Effect.flip(
         verifyRequestSignature({
           maxAgeMs: 60_000,
+          now,
           signatureHeader: "sig",
           timestampHeader: stale,
           verify: () => Effect.void,
@@ -71,11 +76,13 @@ describe("verifyRequestSignature", () => {
 
   it.effect("surfaces the provider check failure", () =>
     Effect.gen(function* () {
+      const now = yield* Clock.currentTimeMillis;
       const failure = yield* Effect.flip(
         verifyRequestSignature({
           maxAgeMs: 60_000,
+          now,
           signatureHeader: "sig",
-          timestampHeader: String(Math.floor(Date.now() / 1000)),
+          timestampHeader: String(Math.floor(now / 1000)),
           verify: () =>
             Effect.fail(
               new IntegrationRequestSignatureError({

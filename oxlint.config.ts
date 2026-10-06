@@ -13,11 +13,10 @@ import { defineConfig } from "oxlint";
  * `global-*`, `crypto-*`, `process-env`, `new-promise`, `schema-sync` and
  * `instance-of-schema` rules out of `recommended` and into the opt-in
  * `effect-native` preset. Extending only `recommended` would therefore have
- * dropped `global-date-in-effect` — the 372-finding defect ADR 0005 ranks
- * first, and the rule this file's `off` entries below are written against —
- * without a single test or type error to say so. The two presets together are
- * exactly the rule set `0.45.0`'s `recommended` carried, plus the three rules
- * 0.47 added.
+ * dropped `global-date-in-effect` — the defect ADR 0005 ranks first, and the
+ * rule this file's `off` entries below are written against — without a single
+ * test or type error to say so. The two presets together are exactly the rule
+ * set `0.45.0`'s `recommended` carried, plus the three rules 0.47 added.
  */
 export default defineConfig({
   extends: [recommended, effectNative],
@@ -155,6 +154,12 @@ export default defineConfig({
     // APIs move.
     "effecttsgo/unstable-api-usage": "off",
 
+    // The first rung of ADR 0005's ratchet, and now clear everywhere except
+    // `packages/db/seed.ts`. `new Date()` inside Effect bypasses `Clock`, so
+    // the rule is an error for every new way to write it; the seed script's
+    // snapshot fixtures are pinned to `warn` in the override below.
+    "effecttsgo/global-date-in-effect": "error",
+
     // anti-slop
     "anti-slop/no-chained-type-assertions": "error",
     "anti-slop/no-conditional-empty-object-spread": "error",
@@ -177,6 +182,15 @@ export default defineConfig({
   // DB internals. Server-side code (apps/server, packages/auth, integrations)
   // is exempt because it legitimately talks to Postgres.
   overrides: [
+    {
+      // A human-facing CLI, not a service: `seed.ts` builds fixture timestamps
+      // for the rows it inserts, and ADR 0005 leaves those 22 sites as the
+      // rule's only remaining findings. Every other file is `error`.
+      files: ["packages/db/seed.ts"],
+      rules: {
+        "effecttsgo/global-date-in-effect": "warn",
+      },
+    },
     {
       // Tests run Effects through `@effect/vitest`, never by hand.
       files: ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],

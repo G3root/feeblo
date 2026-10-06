@@ -11,6 +11,7 @@ import {
 } from "@feeblo/id";
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { and, eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -83,7 +84,7 @@ describe("CommentRpcHandlers", () => {
       const postSlug = `slug-${postId}`;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
@@ -168,7 +169,7 @@ describe("CommentRpcHandlers", () => {
     Effect.gen(function* () {
       const db = yield* currentDb;
       const id = yield* PostId.generate;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.postTable).values({
         id,
@@ -608,7 +609,7 @@ describe("CommentRpcHandlers", () => {
           const handlers = yield* CommentRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const mergedPostId = yield* addPost(fixture, fixture.boardId);
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
           // A merged source is archived and points at its survivor; the
           // `isUnlocked` gate denies interaction until it is unmerged.
           yield* db
@@ -1263,7 +1264,7 @@ describe("CommentRpcHandlers", () => {
             organizationId: fixture.organizationId,
             userId: otherUserId,
             role: "manager",
-            createdAt: new Date(),
+            createdAt: yield* DateTime.nowAsDate,
           });
           const otherMemberSession: Session = {
             user: {
@@ -1385,7 +1386,7 @@ describe("CommentRpcHandlers", () => {
             organizationId: fixture.organizationId,
             userId: otherUserId,
             role: "manager",
-            createdAt: new Date(),
+            createdAt: yield* DateTime.nowAsDate,
           });
 
           const otherSession: Session = {
@@ -1609,7 +1610,7 @@ describe("CommentRpcHandlers", () => {
             organizationId: fixture.organizationId,
             userId: otherUserId,
             role: "manager",
-            createdAt: new Date(),
+            createdAt: yield* DateTime.nowAsDate,
           });
 
           const otherSession: Session = {
@@ -1665,7 +1666,7 @@ describe("CommentRpcHandlers", () => {
             organizationId: fixture.organizationId,
             userId: otherUserId,
             role: "contributor",
-            createdAt: new Date(),
+            createdAt: yield* DateTime.nowAsDate,
           });
 
           const otherSession: Session = {

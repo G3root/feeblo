@@ -1,6 +1,8 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
+import * as Clock from "effect/Clock";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -10,6 +12,9 @@ import { BillingRpcHandlersEffect } from "./handlers";
 import { BillingRepository } from "./repository";
 import { PolarService } from "./service";
 
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 describe("BillingRpcHandlers", () => {
   type Fixture = {
     membershipId: string;
@@ -44,7 +49,7 @@ describe("BillingRpcHandlers", () => {
       const organizationId = yield* WorkspaceId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
         name: "Test organization",
@@ -209,8 +214,10 @@ describe("BillingRpcHandlers", () => {
             recurringInterval: "month",
             recurringIntervalCount: 1,
             status: "trialing",
-            currentPeriodStart: new Date(),
-            currentPeriodEnd: new Date(Date.now() + 86_400_000),
+            currentPeriodStart: yield* DateTime.nowAsDate,
+            currentPeriodEnd: dateAt(
+              (yield* Clock.currentTimeMillis) + 86_400_000
+            ),
             customerId: "cus_checkout_duplicate",
             productId: "prod_checkout_duplicate",
           });
@@ -241,7 +248,7 @@ describe("BillingRpcHandlers", () => {
         const handlers = yield* BillingRpcHandlersEffect;
         const fixture = yield* makeFixture();
         const db = yield* currentDb;
-        const now = Date.now();
+        const now = yield* Clock.currentTimeMillis;
 
         yield* db.insert(schema.productTable).values({
           id: "prod_portal",
@@ -264,11 +271,11 @@ describe("BillingRpcHandlers", () => {
             recurringInterval: "month",
             recurringIntervalCount: 1,
             status: "canceled",
-            currentPeriodStart: new Date(now - 60 * 86_400_000),
-            currentPeriodEnd: new Date(now - 30 * 86_400_000),
+            currentPeriodStart: dateAt(now - 60 * 86_400_000),
+            currentPeriodEnd: dateAt(now - 30 * 86_400_000),
             customerId: "cus_old",
             productId: "prod_portal",
-            createdAt: new Date(now - 60 * 86_400_000),
+            createdAt: dateAt(now - 60 * 86_400_000),
           },
           {
             id: "sub_portal_current",
@@ -280,11 +287,11 @@ describe("BillingRpcHandlers", () => {
             recurringInterval: "month",
             recurringIntervalCount: 1,
             status: "active",
-            currentPeriodStart: new Date(now),
-            currentPeriodEnd: new Date(now + 30 * 86_400_000),
+            currentPeriodStart: dateAt(now),
+            currentPeriodEnd: dateAt(now + 30 * 86_400_000),
             customerId: "cus_current",
             productId: "prod_portal",
-            createdAt: new Date(now),
+            createdAt: dateAt(now),
           },
         ]);
 

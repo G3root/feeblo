@@ -2,6 +2,7 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema, transaction } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -9,6 +10,10 @@ import * as Redacted from "effect/Redacted";
 
 import { EmailSubscriptionRepository } from "./repository";
 import { EmailSubscriptionTokenService } from "./tokens";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 describe("EmailSubscriptionRepository", () => {
   const TestLayer = EmailSubscriptionRepository.layerWithoutDependencies.pipe(
@@ -27,7 +32,7 @@ describe("EmailSubscriptionRepository", () => {
         id,
         name: "Email subscription test workspace",
         slug: id,
-        createdAt: new Date(),
+        createdAt: yield* DateTime.nowAsDate,
       });
     });
 
@@ -43,7 +48,7 @@ describe("EmailSubscriptionRepository", () => {
   const createVerifiedUser = (id: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
-      const now = new Date("2026-08-09T00:00:00.000Z");
+      const now = dateAt("2026-08-09T00:00:00.000Z");
       yield* db.insert(schema.userTable).values({
         id,
         name: "Subscription test user",
@@ -101,13 +106,13 @@ describe("EmailSubscriptionRepository", () => {
           expect(stored?.unsubscribeTokenHash).toHaveLength(64);
           expect(
             yield* repository.verifySubscription({
-              now: new Date("2026-08-09T00:01:00.000Z"),
+              now: dateAt("2026-08-09T00:01:00.000Z"),
               verificationToken: unsubscribeToken,
             })
           ).toEqual({ _tag: "Invalid" });
           expect(
             yield* repository.unsubscribe({
-              now: new Date("2026-08-09T00:01:00.000Z"),
+              now: dateAt("2026-08-09T00:01:00.000Z"),
               unsubscribeToken: verificationToken,
             })
           ).toEqual({ _tag: "Invalid" });
@@ -134,13 +139,13 @@ describe("EmailSubscriptionRepository", () => {
 
           expect(
             yield* repository.verifySubscription({
-              now: new Date("2026-08-09T00:05:00.000Z"),
+              now: dateAt("2026-08-09T00:05:00.000Z"),
               verificationToken: token,
             })
           ).toEqual({ _tag: "Verified" });
           expect(
             yield* repository.verifySubscription({
-              now: new Date("2026-08-09T00:06:00.000Z"),
+              now: dateAt("2026-08-09T00:06:00.000Z"),
               verificationToken: token,
             })
           ).toEqual({ _tag: "Invalid" });
@@ -176,13 +181,13 @@ describe("EmailSubscriptionRepository", () => {
 
           const repeated = yield* repository.requestSubscription({
             ...pendingChangelogSubscription(organizationId),
-            now: new Date("2026-08-09T00:01:00.000Z"),
+            now: dateAt("2026-08-09T00:01:00.000Z"),
           });
 
           expect(Option.isNone(repeated.unsubscribeToken)).toBe(true);
           expect(
             yield* repository.unsubscribe({
-              now: new Date("2026-08-09T00:02:00.000Z"),
+              now: dateAt("2026-08-09T00:02:00.000Z"),
               unsubscribeToken,
             })
           ).toEqual({ _tag: "Unsubscribed" });
@@ -206,19 +211,19 @@ describe("EmailSubscriptionRepository", () => {
             );
           }
           yield* repository.unsubscribe({
-            now: new Date("2026-08-09T00:01:00.000Z"),
+            now: dateAt("2026-08-09T00:01:00.000Z"),
             unsubscribeToken: Redacted.value(created.unsubscribeToken.value),
           });
 
           const repeated = yield* repository.requestSubscription({
             ...pendingChangelogSubscription(organizationId),
-            now: new Date("2026-08-09T00:02:00.000Z"),
+            now: dateAt("2026-08-09T00:02:00.000Z"),
           });
 
           expect(repeated.subscription.state).toBe("unsubscribed");
           expect(Option.isNone(repeated.verificationToken)).toBe(true);
           expect(repeated.subscription.unsubscribedAt).toEqual(
-            new Date("2026-08-09T00:01:00.000Z")
+            dateAt("2026-08-09T00:01:00.000Z")
           );
         })
     );
@@ -240,7 +245,7 @@ describe("EmailSubscriptionRepository", () => {
 
         expect(
           yield* repository.verifySubscription({
-            now: new Date("2026-08-09T00:16:00.000Z"),
+            now: dateAt("2026-08-09T00:16:00.000Z"),
             verificationToken: Redacted.value(created.verificationToken.value),
           })
         ).toEqual({ _tag: "Expired" });
@@ -278,7 +283,7 @@ describe("EmailSubscriptionRepository", () => {
           expect(post.contact.id).toBe(changelog.contact.id);
           expect(
             yield* repository.unsubscribe({
-              now: new Date("2026-08-09T00:01:00.000Z"),
+              now: dateAt("2026-08-09T00:01:00.000Z"),
               unsubscribeToken: token,
             })
           ).toEqual({
@@ -286,7 +291,7 @@ describe("EmailSubscriptionRepository", () => {
           });
           expect(
             yield* repository.unsubscribe({
-              now: new Date("2026-08-09T00:02:00.000Z"),
+              now: dateAt("2026-08-09T00:02:00.000Z"),
               unsubscribeToken: token,
             })
           ).toEqual({
@@ -336,7 +341,7 @@ describe("EmailSubscriptionRepository", () => {
           });
 
           const first = yield* repository.unsubscribeAuthenticatedSubscription({
-            now: new Date("2026-08-09T00:01:00.000Z"),
+            now: dateAt("2026-08-09T00:01:00.000Z"),
             organizationId,
             topic: { topicId: "post_a", topicType: "post" },
             userId: "usr_post_subscriber",
@@ -344,7 +349,7 @@ describe("EmailSubscriptionRepository", () => {
           expect(first).toEqual({ _tag: "Unsubscribed" });
           const second = yield* repository.unsubscribeAuthenticatedSubscription(
             {
-              now: new Date("2026-08-09T00:02:00.000Z"),
+              now: dateAt("2026-08-09T00:02:00.000Z"),
               organizationId,
               topic: { topicId: "post_a", topicType: "post" },
               userId: "usr_post_subscriber",
@@ -394,7 +399,7 @@ describe("EmailSubscriptionRepository", () => {
 
           expect(
             yield* repository.unsubscribeAuthenticatedSubscription({
-              now: new Date("2026-08-09T00:01:00.000Z"),
+              now: dateAt("2026-08-09T00:01:00.000Z"),
               organizationId,
               topic: { topicId: "post_multi", topicType: "post" },
               userId,
@@ -442,14 +447,14 @@ describe("EmailSubscriptionRepository", () => {
           expect(
             yield* repository.reconcileSubscriptionPlanStates({
               eligible: false,
-              now: new Date("2026-08-09T00:01:00.000Z"),
+              now: dateAt("2026-08-09T00:01:00.000Z"),
               organizationId,
             })
           ).toEqual({ paused: 1, resumed: 0 });
           expect(
             yield* repository.reconcileSubscriptionPlanStates({
               eligible: true,
-              now: new Date("2026-08-09T00:02:00.000Z"),
+              now: dateAt("2026-08-09T00:02:00.000Z"),
               organizationId,
             })
           ).toEqual({ paused: 0, resumed: 1 });

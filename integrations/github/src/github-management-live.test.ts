@@ -20,6 +20,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { and, eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -83,7 +84,7 @@ const makeTestLayer = () => {
 
 const seedPostWithConnection = Effect.gen(function* () {
   const db = yield* currentDb;
-  const now = new Date();
+  const now = yield* DateTime.nowAsDate;
   const organizationId = yield* WorkspaceId.generate;
   const boardId = yield* BoardId.generate;
   const postStatusId = yield* PostStatusId.generate;
@@ -135,7 +136,7 @@ const seedPostWithConnection = Effect.gen(function* () {
 
 const seedRuleFixtures = Effect.gen(function* () {
   const db = yield* currentDb;
-  const now = new Date();
+  const now = yield* DateTime.nowAsDate;
   const organizationId = yield* WorkspaceId.generate;
   const connectionId = yield* IntegrationConnectionId.generate;
   const postStatusId = yield* PostStatusId.generate;

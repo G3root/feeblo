@@ -2,6 +2,7 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { MemberId, WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -46,7 +47,7 @@ describe("MembershipRpcHandlers", () => {
       const organizationId = yield* WorkspaceId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = yield* MemberId.generate;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
         name: "Test organization",
@@ -81,7 +82,7 @@ describe("MembershipRpcHandlers", () => {
         organizationId,
         userId,
         role: "admin",
-        createdAt: new Date(),
+        createdAt: yield* DateTime.nowAsDate,
       });
     });
   const Repositories = Layer.mergeAll(
@@ -173,7 +174,7 @@ describe("MembershipRpcHandlers", () => {
           organizationId: fixture.organizationId,
           userId: `owner_${fixture.organizationId}`,
           role: "owner",
-          createdAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
         });
         yield* db
           .update(schema.memberTable)
@@ -215,7 +216,7 @@ describe("MembershipRpcHandlers", () => {
           organizationId: fixture.organizationId,
           userId: `member_${fixture.organizationId}`,
           role: "manager",
-          createdAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
         });
         yield* db.insert(schema.userTable).values({
           id: `owner_${fixture.organizationId}`,
@@ -227,7 +228,7 @@ describe("MembershipRpcHandlers", () => {
           organizationId: fixture.organizationId,
           userId: `owner_${fixture.organizationId}`,
           role: "owner",
-          createdAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
         });
         yield* db
           .update(schema.memberTable)
@@ -268,7 +269,7 @@ describe("MembershipRpcHandlers", () => {
           organizationId: fixture.organizationId,
           userId: `member_${fixture.organizationId}`,
           role: "manager",
-          createdAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
         });
 
         yield* handlers
@@ -298,7 +299,7 @@ describe("MembershipRpcHandlers", () => {
           organizationId: fixture.organizationId,
           userId: otherOwnerUserId,
           role: "owner",
-          createdAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
         });
 
         const removeError = yield* Effect.flip(
@@ -346,7 +347,7 @@ describe("MembershipRpcHandlers", () => {
           organizationId: fixture.organizationId,
           userId: `owner_${fixture.organizationId}`,
           role: "owner",
-          createdAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
         });
         yield* db
           .update(schema.memberTable)
@@ -387,7 +388,7 @@ describe("MembershipRpcHandlers", () => {
           organizationId: fixture.organizationId,
           userId: `admin2_${fixture.organizationId}`,
           role: "admin",
-          createdAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
         });
         yield* db
           .update(schema.memberTable)
@@ -428,7 +429,7 @@ describe("MembershipRpcHandlers", () => {
           organizationId: fixture.organizationId,
           userId: `member_${fixture.organizationId}`,
           role: "manager",
-          createdAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
         });
         yield* db
           .update(schema.memberTable)
@@ -469,7 +470,7 @@ describe("MembershipRpcHandlers", () => {
           organizationId: fixture.organizationId,
           userId: targetUserId,
           role: "contributor",
-          createdAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
         });
 
         yield* handlers

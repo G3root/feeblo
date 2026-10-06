@@ -215,7 +215,7 @@ describe("registerUploadedAsset", () => {
     it.effect("promotes temporary editor assets on save", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
         const organizationId = "org_asset_promotion";
         const deletedKeys = yield* Ref.make<string[]>([]);
 
@@ -289,7 +289,7 @@ describe("registerUploadedAsset", () => {
           id: organizationId,
           name: "Failed Asset Promotion",
           slug: organizationId,
-          createdAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
         });
         yield* db.insert(schema.assetTable).values([
           {

@@ -10,12 +10,17 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 
 import { decryptWebhookCredentialMaterial } from "./index";
 import { WebhookManagementServiceLive } from "./webhook-management-live";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 /** Single configuration source for the service tests: shared encryption key and the default policy. */
 const webhookTestConfig = {
@@ -69,7 +74,7 @@ const seedOrganization = Effect.gen(function* () {
   const db = yield* currentDb;
   const organizationId = yield* WorkspaceId.generate;
   yield* db.insert(schema.organizationTable).values({
-    createdAt: new Date(),
+    createdAt: yield* DateTime.nowAsDate,
     id: organizationId,
     name: "Webhook management test",
     slug: organizationId,
@@ -246,7 +251,7 @@ describe("webhook management service", () => {
             );
           const deliveryId = yield* IntegrationDeliveryId.generate;
           const eventId = yield* IntegrationEventId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
           yield* db.insert(schema.integrationEventTable).values({
             causalHopCount: 0,
             correlationId: eventId,
@@ -255,7 +260,7 @@ describe("webhook management service", () => {
             organizationId,
             origin: { kind: "feeblo" },
             payload: {},
-            retentionExpiresAt: new Date(now.getTime() + 86_400_000),
+            retentionExpiresAt: dateAt(now.getTime() + 86_400_000),
             type: "webhook.test",
             version: 1,
           });
@@ -266,7 +271,7 @@ describe("webhook management service", () => {
             id: deliveryId,
             nextAttemptAt: now,
             organizationId,
-            retentionExpiresAt: new Date(now.getTime() + 86_400_000),
+            retentionExpiresAt: dateAt(now.getTime() + 86_400_000),
             routeId: storedRoute?.id ?? "",
             state: "pending",
           });
@@ -524,7 +529,7 @@ describe("webhook management service", () => {
           });
           // Force identical creation timestamps so the cursor must disambiguate
           // by delivery ID rather than by time alone.
-          const sameTime = new Date("2026-08-11T00:00:00.000Z");
+          const sameTime = dateAt("2026-08-11T00:00:00.000Z");
           yield* db
             .update(schema.integrationDeliveryTable)
             .set({ createdAt: sameTime })
@@ -589,7 +594,7 @@ describe("webhook management service", () => {
         );
         expect(notExhausted._tag).toBe("NotFoundError");
 
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
         yield* db
           .update(schema.integrationDeliveryTable)
           .set({

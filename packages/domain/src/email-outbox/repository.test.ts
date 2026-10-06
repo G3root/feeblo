@@ -2,11 +2,16 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema, transaction } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import { submissionWindowMaxPosts } from "./config";
 import { EmailOutboxRepository } from "./repository";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 describe("EmailOutboxRepository", () => {
   const TestLayer = EmailOutboxRepository.layer.pipe(
@@ -20,7 +25,7 @@ describe("EmailOutboxRepository", () => {
         id,
         name: "Email outbox test workspace",
         slug: id,
-        createdAt: new Date(),
+        createdAt: yield* DateTime.nowAsDate,
       });
     });
 
@@ -53,7 +58,7 @@ describe("EmailOutboxRepository", () => {
         expect(duplicate).toEqual({ _tag: "Duplicate" });
         expect(
           yield* repository.findPending({
-            before: new Date("2026-08-10"),
+            before: dateAt("2026-08-10"),
             organizationId,
           })
         ).toHaveLength(1);
@@ -77,14 +82,14 @@ describe("EmailOutboxRepository", () => {
             aggregateId: "pst_corrupt",
             deduplicationKey: `corrupt:${organizationId}`,
             payload: { kind: "submission.created", postId: 123 },
-            scheduledAt: new Date("2026-08-09T00:00:00.000Z"),
+            scheduledAt: dateAt("2026-08-09T00:00:00.000Z"),
             expiresAt: null,
             state: "pending",
           });
 
           const error = yield* Effect.flip(
             repository.findPending({
-              before: new Date("2026-08-10"),
+              before: dateAt("2026-08-10"),
               organizationId,
             })
           );
@@ -103,14 +108,14 @@ describe("EmailOutboxRepository", () => {
           const organizationId = yield* WorkspaceId.generate;
           const repository = yield* EmailOutboxRepository;
           const db = yield* currentDb;
-          const scheduledAt = new Date("2026-08-09T12:05:00.000Z");
+          const scheduledAt = dateAt("2026-08-09T12:05:00.000Z");
 
           yield* createOrganization(organizationId);
           yield* repository.upsertPendingStatusChange({
             aggregateId: "pst_status",
             aggregateType: "post",
             deduplicationKey: `post.status_changed:${organizationId}:pst_status:window`,
-            expiresAt: new Date("2026-08-16T12:05:00.000Z"),
+            expiresAt: dateAt("2026-08-16T12:05:00.000Z"),
             organizationId,
             payload: {
               kind: "post.status_changed",
@@ -123,18 +128,18 @@ describe("EmailOutboxRepository", () => {
             aggregateId: "pst_status",
             aggregateType: "post",
             deduplicationKey: `post.status_changed:${organizationId}:pst_status:window`,
-            expiresAt: new Date("2026-08-16T12:05:00.000Z"),
+            expiresAt: dateAt("2026-08-16T12:05:00.000Z"),
             organizationId,
             payload: {
               kind: "post.status_changed",
               postId: "pst_status",
               statusId: "pss_completed",
             },
-            scheduledAt: new Date("2026-08-09T12:09:00.000Z"),
+            scheduledAt: dateAt("2026-08-09T12:09:00.000Z"),
           });
 
           const intents = yield* repository.findPending({
-            before: new Date("2026-08-10"),
+            before: dateAt("2026-08-10"),
             organizationId,
           });
 
@@ -159,7 +164,7 @@ describe("EmailOutboxRepository", () => {
             aggregateId: "pst_status",
             aggregateType: "post",
             deduplicationKey: `post.status_changed:${organizationId}:pst_status:window`,
-            expiresAt: new Date("2026-08-16T12:05:00.000Z"),
+            expiresAt: dateAt("2026-08-16T12:05:00.000Z"),
             organizationId,
             payload: {
               kind: "post.status_changed",
@@ -175,7 +180,7 @@ describe("EmailOutboxRepository", () => {
             aggregateId: "pst_status",
             aggregateType: "post",
             deduplicationKey: `post.status_changed:${organizationId}:pst_status:next-window`,
-            expiresAt: new Date("2026-08-16T12:05:00.000Z"),
+            expiresAt: dateAt("2026-08-16T12:05:00.000Z"),
             organizationId,
             payload: {
               kind: "post.status_changed",
@@ -198,7 +203,7 @@ describe("EmailOutboxRepository", () => {
 
           yield* createOrganization(organizationId);
           const opened = yield* repository.upsertPendingSubmissionWindow({
-            now: new Date("2026-08-09T10:02:00.000Z"),
+            now: dateAt("2026-08-09T10:02:00.000Z"),
             organizationId,
             postId: "pst_first",
           });
@@ -207,7 +212,7 @@ describe("EmailOutboxRepository", () => {
           }
 
           const [first] = yield* repository.findPending({
-            before: new Date("2026-08-10"),
+            before: dateAt("2026-08-10"),
             organizationId,
           });
           expect(first?.payload).toEqual({
@@ -219,16 +224,16 @@ describe("EmailOutboxRepository", () => {
           // The key is bucketed by the burst delay, so two simultaneous first
           // submissions in the same five minutes converge on one row.
           expect(first?.deduplicationKey).toBe(
-            `submission.created:${organizationId}:${new Date(
+            `submission.created:${organizationId}:${dateAt(
               "2026-08-09T10:00:00.000Z"
             ).getTime()}`
           );
           expect(first?.scheduledAt).toEqual(
-            new Date("2026-08-09T10:07:00.000Z")
+            dateAt("2026-08-09T10:07:00.000Z")
           );
 
           const appended = yield* repository.upsertPendingSubmissionWindow({
-            now: new Date("2026-08-09T10:04:00.000Z"),
+            now: dateAt("2026-08-09T10:04:00.000Z"),
             organizationId,
             postId: "pst_second",
           });
@@ -238,7 +243,7 @@ describe("EmailOutboxRepository", () => {
           });
 
           const [slid] = yield* repository.findPending({
-            before: new Date("2026-08-10"),
+            before: dateAt("2026-08-10"),
             organizationId,
           });
           expect(slid?.payload).toEqual({
@@ -247,23 +252,21 @@ describe("EmailOutboxRepository", () => {
             postId: "pst_first",
             postIds: ["pst_first", "pst_second"],
           });
-          expect(slid?.scheduledAt).toEqual(
-            new Date("2026-08-09T10:09:00.000Z")
-          );
+          expect(slid?.scheduledAt).toEqual(dateAt("2026-08-09T10:09:00.000Z"));
 
           // A quiet workspace would keep sliding; a busy one stops at one hour
           // after the window opened rather than postponing the email forever.
           yield* repository.upsertPendingSubmissionWindow({
-            now: new Date("2026-08-09T11:00:00.000Z"),
+            now: dateAt("2026-08-09T11:00:00.000Z"),
             organizationId,
             postId: "pst_third",
           });
           const [capped] = yield* repository.findPending({
-            before: new Date("2026-08-11"),
+            before: dateAt("2026-08-11"),
             organizationId,
           });
           expect(capped?.scheduledAt).toEqual(
-            new Date("2026-08-09T11:02:00.000Z")
+            dateAt("2026-08-09T11:02:00.000Z")
           );
           expect(capped?.id).toBe(opened.intentId);
         })
@@ -276,19 +279,19 @@ describe("EmailOutboxRepository", () => {
 
         yield* createOrganization(organizationId);
         const opened = yield* repository.upsertPendingSubmissionWindow({
-          now: new Date("2026-08-09T10:02:00.000Z"),
+          now: dateAt("2026-08-09T10:02:00.000Z"),
           organizationId,
           postId: "pst_replay",
         });
         const replay = yield* repository.upsertPendingSubmissionWindow({
-          now: new Date("2026-08-09T10:03:00.000Z"),
+          now: dateAt("2026-08-09T10:03:00.000Z"),
           organizationId,
           postId: "pst_replay",
         });
 
         expect(replay).toEqual({ _tag: "Duplicate" });
         const [intent] = yield* repository.findPending({
-          before: new Date("2026-08-10"),
+          before: dateAt("2026-08-10"),
           organizationId,
         });
         expect(intent?.id).toBe(opened.intentId);
@@ -298,9 +301,7 @@ describe("EmailOutboxRepository", () => {
           postId: "pst_replay",
           postIds: ["pst_replay"],
         });
-        expect(intent?.scheduledAt).toEqual(
-          new Date("2026-08-09T10:07:00.000Z")
-        );
+        expect(intent?.scheduledAt).toEqual(dateAt("2026-08-09T10:07:00.000Z"));
       })
     );
 
@@ -312,7 +313,7 @@ describe("EmailOutboxRepository", () => {
 
         yield* createOrganization(organizationId);
         const first = yield* repository.upsertPendingSubmissionWindow({
-          now: new Date("2026-08-09T10:02:00.000Z"),
+          now: dateAt("2026-08-09T10:02:00.000Z"),
           organizationId,
           postId: "pst_sent",
         });
@@ -325,7 +326,7 @@ describe("EmailOutboxRepository", () => {
           .where(eq(schema.emailOutboxTable.id, first.intentId));
 
         const next = yield* repository.upsertPendingSubmissionWindow({
-          now: new Date("2026-08-09T10:06:00.000Z"),
+          now: dateAt("2026-08-09T10:06:00.000Z"),
           organizationId,
           postId: "pst_next",
         });
@@ -333,7 +334,7 @@ describe("EmailOutboxRepository", () => {
         expect(next._tag).toBe("Written");
         expect(next.intentId).not.toBe(first.intentId);
         const [intent] = yield* repository.findPending({
-          before: new Date("2026-08-10"),
+          before: dateAt("2026-08-10"),
           organizationId,
         });
         expect(intent?.payload).toEqual({
@@ -350,7 +351,7 @@ describe("EmailOutboxRepository", () => {
         const organizationId = yield* WorkspaceId.generate;
         const repository = yield* EmailOutboxRepository;
         const db = yield* currentDb;
-        const openedAt = new Date("2026-08-09T10:02:00.000Z");
+        const openedAt = dateAt("2026-08-09T10:02:00.000Z");
         const fullPostIds = Array.from(
           { length: submissionWindowMaxPosts },
           (_, index) => `pst_full_${index}`
@@ -370,7 +371,7 @@ describe("EmailOutboxRepository", () => {
             postId: "pst_full_0",
             postIds: fullPostIds,
           },
-          scheduledAt: new Date("2026-08-09T10:07:00.000Z"),
+          scheduledAt: dateAt("2026-08-09T10:07:00.000Z"),
           expiresAt: null,
           state: "pending",
           createdAt: openedAt,
@@ -378,7 +379,7 @@ describe("EmailOutboxRepository", () => {
         });
 
         const overflowed = yield* repository.upsertPendingSubmissionWindow({
-          now: new Date("2026-08-09T10:04:00.000Z"),
+          now: dateAt("2026-08-09T10:04:00.000Z"),
           organizationId,
           postId: "pst_after_full",
         });
@@ -390,7 +391,7 @@ describe("EmailOutboxRepository", () => {
           intentId: "eob_full_window",
         });
         const [intent] = yield* repository.findPending({
-          before: new Date("2026-08-10"),
+          before: dateAt("2026-08-10"),
           organizationId,
         });
         expect(intent?.payload).toEqual({
@@ -399,9 +400,7 @@ describe("EmailOutboxRepository", () => {
           postId: "pst_full_0",
           postIds: fullPostIds,
         });
-        expect(intent?.scheduledAt).toEqual(
-          new Date("2026-08-09T10:09:00.000Z")
-        );
+        expect(intent?.scheduledAt).toEqual(dateAt("2026-08-09T10:09:00.000Z"));
       })
     );
 
@@ -412,8 +411,8 @@ describe("EmailOutboxRepository", () => {
           const organizationId = yield* WorkspaceId.generate;
           const repository = yield* EmailOutboxRepository;
           const db = yield* currentDb;
-          const now = new Date("2026-08-09T10:02:00.000Z");
-          const bucketStart = new Date("2026-08-09T10:00:00.000Z").getTime();
+          const now = dateAt("2026-08-09T10:02:00.000Z");
+          const bucketStart = dateAt("2026-08-09T10:00:00.000Z").getTime();
 
           yield* createOrganization(organizationId);
           yield* db.insert(schema.emailOutboxTable).values({
@@ -428,7 +427,7 @@ describe("EmailOutboxRepository", () => {
               postCount: 1,
               postIds: ["pst_sent_bucket"],
             },
-            scheduledAt: new Date("2026-08-09T10:07:00.000Z"),
+            scheduledAt: dateAt("2026-08-09T10:07:00.000Z"),
             expiresAt: null,
             state: "materialized",
             createdAt: now,
@@ -443,7 +442,7 @@ describe("EmailOutboxRepository", () => {
 
           expect(opened._tag).toBe("Written");
           const [intent] = yield* repository.findPending({
-            before: new Date("2026-08-10"),
+            before: dateAt("2026-08-10"),
             organizationId,
           });
           expect(intent?.deduplicationKey).toBe(
@@ -465,8 +464,8 @@ describe("EmailOutboxRepository", () => {
           const organizationId = yield* WorkspaceId.generate;
           const repository = yield* EmailOutboxRepository;
           const db = yield* currentDb;
-          const now = new Date("2026-08-09T10:02:00.000Z");
-          const bucketStart = new Date("2026-08-09T10:00:00.000Z").getTime();
+          const now = dateAt("2026-08-09T10:02:00.000Z");
+          const bucketStart = dateAt("2026-08-09T10:00:00.000Z").getTime();
 
           yield* createOrganization(organizationId);
           // Same deduplication key, different kind: the pending-window lookup

@@ -1,6 +1,7 @@
 import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -10,6 +11,10 @@ import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { WorkspaceRepository } from "../workspace/repository";
 import { requireCrmEntryAllowance } from "./entitlement";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 /**
  * The CRM entry gate on a company create.
@@ -46,7 +51,7 @@ const seedWorkspace = (plan: "free" | "starter") =>
   Effect.gen(function* () {
     const db = yield* currentDb;
     const organizationId = `org_crm_${Math.random().toString(36).slice(2, 10)}`;
-    const now = new Date();
+    const now = yield* DateTime.nowAsDate;
 
     yield* db.insert(schema.organizationTable).values({
       id: organizationId,
@@ -78,7 +83,7 @@ const seedWorkspace = (plan: "free" | "starter") =>
         recurringIntervalCount: 1,
         status: "active",
         currentPeriodStart: now,
-        currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+        currentPeriodEnd: dateAt(now.getTime() + 30 * 24 * 60 * 60 * 1000),
         customerId: `customer_${organizationId}`,
         productId: `product_${organizationId}`,
         createdAt: now,
@@ -101,7 +106,7 @@ const seedCrmEntries = (args: {
 }) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
-    const now = new Date();
+    const now = yield* DateTime.nowAsDate;
 
     yield* db.insert(schema.companyTable).values(
       Array.from({ length: args.companies }, (_, index) => ({

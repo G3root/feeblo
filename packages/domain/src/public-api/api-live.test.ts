@@ -9,6 +9,7 @@ import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray } from "drizzle-orm";
 import { McpSchema } from "effect/ai";
+import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
@@ -65,6 +66,10 @@ import {
   PublicApiVote,
   PublicApiVotePage,
 } from "./schema";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 /**
  * HTTP-level tests for `/api/v1`.
@@ -392,7 +397,7 @@ const seedChangelog = (
     const db = yield* currentDb;
     const id = options.id ?? `chg_${Math.random().toString(36).slice(2, 10)}`;
     const title = options.title ?? "Release notes";
-    const now = options.createdAt ?? new Date();
+    const now = options.createdAt ?? (yield* DateTime.nowAsDate);
     yield* db.insert(schema.changelogTable).values({
       id,
       title,
@@ -424,7 +429,7 @@ const seedCompany = (
 ) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
-    const createdAt = options.createdAt ?? new Date();
+    const createdAt = options.createdAt ?? (yield* DateTime.nowAsDate);
     yield* db.insert(schema.companyTable).values({
       id,
       name,
@@ -461,7 +466,7 @@ const seedComment = (
   Effect.gen(function* () {
     const db = yield* currentDb;
     const userId = `user_comment_${organizationId}`;
-    const now = options.createdAt ?? new Date();
+    const now = options.createdAt ?? (yield* DateTime.nowAsDate);
 
     yield* db
       .insert(schema.userTable)
@@ -506,7 +511,7 @@ const seedWorkspace = (
     const boardId = yield* BoardId.generate;
     const statusId = yield* PostStatusId.generate;
     const postId = yield* PostId.generate;
-    const now = new Date();
+    const now = yield* DateTime.nowAsDate;
 
     yield* db.insert(schema.organizationTable).values({
       id: organizationId,
@@ -545,7 +550,7 @@ const seedWorkspace = (
         statusId,
         organizationId,
         // Oldest first, so the list order is deterministic.
-        createdAt: new Date(now.getTime() - index * 60_000),
+        createdAt: dateAt(now.getTime() - index * 60_000),
         updatedAt: now,
       });
     }
@@ -624,7 +629,7 @@ const seedWorkspace = (
         recurringIntervalCount: 1,
         status: "active",
         currentPeriodStart: now,
-        currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+        currentPeriodEnd: dateAt(now.getTime() + 30 * 24 * 60 * 60 * 1000),
         customerId: `polar_customer_${organizationId}`,
         productId: `product_${organizationId}`,
         createdAt: now,
@@ -1046,7 +1051,7 @@ layer(makeTestApp())("public api v1", (it) => {
         // A second board with a newer post, so the workspace list is provably
         // not just the first board's.
         const db = yield* currentDb;
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
         const otherBoardId = yield* BoardId.generate;
         const otherPostId = yield* PostId.generate;
         yield* db.insert(schema.boardTable).values({
@@ -1066,7 +1071,7 @@ layer(makeTestApp())("public api v1", (it) => {
           boardId: otherBoardId,
           statusId: workspace.statusId,
           organizationId: workspace.organizationId,
-          createdAt: new Date(now.getTime() + 60_000),
+          createdAt: dateAt(now.getTime() + 60_000),
           updatedAt: now,
         });
 
@@ -1169,7 +1174,7 @@ layer(makeTestApp())("public api v1", (it) => {
         slug: "roadmap",
         visibility: "PUBLIC",
         organizationId: workspace.organizationId,
-        createdAt: new Date(),
+        createdAt: yield* DateTime.nowAsDate,
       });
 
       const wrongBoard = yield* executeRequest(
@@ -1548,7 +1553,7 @@ layer(makeTestApp())("public api v1", (it) => {
         // A second board and status, so the update has somewhere to move the
         // post and something to change its status to.
         const db = yield* currentDb;
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
         const otherBoardId = yield* BoardId.generate;
         const otherStatusId = yield* PostStatusId.generate;
         yield* db.insert(schema.boardTable).values({
@@ -1779,11 +1784,11 @@ layer(makeTestApp())("public api v1", (it) => {
         workspace.organizationId,
         POST_MANAGEMENT_KEY_SCOPES
       );
-      const createdAt = new Date("2024-03-01T12:00:00.000Z");
+      const createdAt = dateAt("2024-03-01T12:00:00.000Z");
       // The write's own clock is the TestClock, which starts at the epoch.
       // Pin it ahead of the backdated instant so the assertion below measures
       // the behavior rather than the fixture clock.
-      const writeTime = new Date("2026-08-11T00:00:00.000Z");
+      const writeTime = dateAt("2026-08-11T00:00:00.000Z");
       yield* TestClock.setTime(writeTime.getTime());
 
       const created = yield* executeWrite("POST", "/api/v1/posts", {
@@ -1988,7 +1993,7 @@ layer(makeTestApp())("public api v1", (it) => {
       );
 
       const db = yield* currentDb;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       const mergedId = yield* PostId.generate;
       yield* db.insert(schema.postTable).values({
         id: mergedId,
@@ -2026,20 +2031,15 @@ layer(makeTestApp())("public api v1", (it) => {
     () =>
       Effect.gen(function* () {
         const workspace = yield* seedWorkspace();
-        const now = Date.now();
+        const now = yield* Clock.currentTimeMillis;
         // Oldest first, so the expected page order is deterministic.
         yield* seedTag(
           workspace.organizationId,
           "tag_old",
           "Old",
-          new Date(now - 60_000)
+          dateAt(now - 60_000)
         );
-        yield* seedTag(
-          workspace.organizationId,
-          "tag_new",
-          "New",
-          new Date(now)
-        );
+        yield* seedTag(workspace.organizationId, "tag_new", "New", dateAt(now));
         registerKey("fbk_tags_read", workspace.organizationId);
 
         const first = yield* executeRequest(
@@ -2627,9 +2627,9 @@ layer(makeTestApp())("public api v1", (it) => {
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace();
       registerKey("fbk_changelog_read", workspace.organizationId);
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* seedChangelog(workspace.organizationId, {
-        createdAt: new Date(now.getTime() - 60_000),
+        createdAt: dateAt(now.getTime() - 60_000),
         id: "chg_old",
         status: "draft",
         title: "Older draft",
@@ -2928,10 +2928,10 @@ layer(makeTestApp())("public api v1", (it) => {
         expect(created.status).toBe(201);
         const entry = decodeChangelog(responseBody(created));
         expect(entry.status).toBe("published");
-        expect(entry.publishedAt).toEqual(new Date("2026-09-01T00:00:00.000Z"));
+        expect(entry.publishedAt).toEqual(dateAt("2026-09-01T00:00:00.000Z"));
 
         const intents = yield* outbox.findPending({
-          before: new Date(Date.now() + 60_000),
+          before: dateAt((yield* Clock.currentTimeMillis) + 60_000),
           organizationId: workspace.organizationId,
         });
         expect(intents.map((intent) => intent.kind)).toEqual([
@@ -3008,7 +3008,7 @@ layer(makeTestApp())("public api v1", (it) => {
         );
 
         const intents = yield* outbox.findPending({
-          before: new Date(Date.now() + 60_000),
+          before: dateAt((yield* Clock.currentTimeMillis) + 60_000),
           organizationId: workspace.organizationId,
         });
         expect(intents.map((intent) => intent.kind)).toEqual([
@@ -3097,7 +3097,7 @@ layer(makeTestApp())("public api v1", (it) => {
         url: "https://media.test/editor-media/changelog-orphan.png",
         kind: "editor_image",
         organizationId: workspace.organizationId,
-        createdAt: new Date(now.getTime() - 2 * 60 * 60 * 1000),
+        createdAt: dateAt(now.getTime() - 2 * 60 * 60 * 1000),
       });
       yield* db.insert(schema.changelogAssetTable).values({
         changelogId: id,
@@ -3183,15 +3183,15 @@ layer(makeTestApp())("public api v1", (it) => {
       Effect.gen(function* () {
         const workspace = yield* seedWorkspace();
         const other = yield* seedWorkspace();
-        const base = Date.now();
+        const base = yield* Clock.currentTimeMillis;
         yield* seedCompany(workspace.organizationId, "cmp_old", "Old", {
-          createdAt: new Date(base - 120_000),
+          createdAt: dateAt(base - 120_000),
         });
         yield* seedCompany(workspace.organizationId, "cmp_middle", "Middle", {
-          createdAt: new Date(base - 60_000),
+          createdAt: dateAt(base - 60_000),
         });
         yield* seedCompany(workspace.organizationId, "cmp_new", "New", {
-          createdAt: new Date(base),
+          createdAt: dateAt(base),
         });
         // Another workspace's company must not appear in this workspace's page.
         yield* seedCompany(other.organizationId, "cmp_unlisted", "Unlisted");
@@ -3252,7 +3252,7 @@ layer(makeTestApp())("public api v1", (it) => {
         expect(company.externalId).toBe("crm-1");
         expect(company.avatar).toBe("https://cdn.test/acme.png");
         expect(company.externalCreatedAt).toEqual(
-          new Date("2026-01-02T00:00:00.000Z")
+          dateAt("2026-01-02T00:00:00.000Z")
         );
         // The id is minted server-side; the caller's own key for the row is
         // `externalId`, not the primary key.
@@ -3687,7 +3687,7 @@ layer(makeTestApp())("public api v1", (it) => {
     () =>
       Effect.gen(function* () {
         const workspace = yield* seedWorkspace();
-        const older = new Date(Date.now() - 60_000);
+        const older = dateAt((yield* Clock.currentTimeMillis) - 60_000);
         yield* seedComment(
           workspace.organizationId,
           workspace.postId,
@@ -3704,7 +3704,7 @@ layer(makeTestApp())("public api v1", (it) => {
           "cmt_newer",
           {
             authorName: "Grace",
-            createdAt: new Date(),
+            createdAt: yield* DateTime.nowAsDate,
           }
         );
         registerKey("fbk_comments_read", workspace.organizationId);
@@ -3937,7 +3937,7 @@ layer(makeTestApp())("public api v1", (it) => {
 
       yield* db
         .update(schema.postTable)
-        .set({ lockedAt: new Date() })
+        .set({ lockedAt: yield* DateTime.nowAsDate })
         .where(eq(schema.postTable.id, workspace.postId));
 
       const response = yield* executeWrite(
@@ -3973,8 +3973,8 @@ layer(makeTestApp())("public api v1", (it) => {
       yield* db
         .update(schema.postTable)
         .set({
-          archivedAt: new Date(),
-          mergedAt: new Date(),
+          archivedAt: yield* DateTime.nowAsDate,
+          mergedAt: yield* DateTime.nowAsDate,
           mergedIntoPostId: `${workspace.postId}_1`,
         })
         .where(eq(schema.postTable.id, workspace.postId));
@@ -4302,7 +4302,7 @@ layer(makeTestApp())("public api v1", (it) => {
         workspace.organizationId,
         workspace.postId,
         "cmt_first",
-        { createdAt: new Date(Date.now() - 60_000) }
+        { createdAt: dateAt((yield* Clock.currentTimeMillis) - 60_000) }
       );
       yield* seedComment(
         workspace.organizationId,
@@ -4514,7 +4514,7 @@ layer(makeTestApp())("public api v1", (it) => {
           userId,
           postId: workspace.postId,
           organizationId: workspace.organizationId,
-          createdAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
         });
 
         // A delete by the old id must not fall back to the account: the row it
@@ -4597,7 +4597,7 @@ layer(makeTestApp())("public api v1", (it) => {
       const db = yield* currentDb;
       yield* db
         .update(schema.postTable)
-        .set({ lockedAt: new Date() })
+        .set({ lockedAt: yield* DateTime.nowAsDate })
         .where(eq(schema.postTable.id, workspace.postId));
       registerKey(
         "fbk_votes_locked",
@@ -4644,8 +4644,8 @@ layer(makeTestApp())("public api v1", (it) => {
       yield* db
         .update(schema.postTable)
         .set({
-          archivedAt: new Date(),
-          mergedAt: new Date(),
+          archivedAt: yield* DateTime.nowAsDate,
+          mergedAt: yield* DateTime.nowAsDate,
           mergedIntoPostId: `${workspace.postId}_1`,
         })
         .where(eq(schema.postTable.id, workspace.postId));
@@ -4781,7 +4781,7 @@ layer(makeTestApp())("public api v1", (it) => {
       // can have more than one contact row. The list must still report the
       // vote once, with a deterministic record, rather than duplicating it and
       // letting the page cursor skip one of the copies.
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       const userId = `user_voter_${workspace.organizationId}`;
       for (const id of ["cnt_dupe_a", "cnt_dupe_b"]) {
         yield* db.insert(schema.contactTable).values({
@@ -6061,7 +6061,7 @@ layer(
 
         // An update adds nothing to the count the plan caps, so it is not
         // blocked by a workspace already at the limit.
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
         yield* db.insert(schema.contactTable).values({
           id: "cnt_existing",
           organizationId: workspace.organizationId,

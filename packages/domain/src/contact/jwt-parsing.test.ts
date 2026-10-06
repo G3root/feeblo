@@ -1,11 +1,23 @@
 import { describe, expect, it } from "@effect/vitest";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as jose from "jose";
 
 import { DataValidationError } from "./errors";
 import { parsePersonAttributes } from "./utils";
 
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
+
 const SECRET = new TextEncoder().encode("test-secret");
+
+/**
+ * The instant `jose.jwtVerify` judges `exp`/`nbf` against. Tokens in this file
+ * are minted relative to it so the test does not depend on the wall clock.
+ */
+const fixtureNow = new Date("2026-08-11T00:00:00.000Z");
+const fixtureNowSeconds = Math.floor(fixtureNow.getTime() / 1000);
 
 async function signAndVerify<T extends jose.JWTPayload>(payload: T) {
   const token = await new jose.SignJWT(payload)
@@ -14,6 +26,7 @@ async function signAndVerify<T extends jose.JWTPayload>(payload: T) {
 
   const { payload: verified } = await jose.jwtVerify(token, SECRET, {
     algorithms: ["HS256"],
+    currentDate: fixtureNow,
   });
 
   return verified;
@@ -61,21 +74,20 @@ describe("JWT payload parsing", () => {
         id: "987654321",
         name: "Business Inc. 23",
         avatar: "https://example.com/company.png",
-        externalCreatedAt: new Date("2023-05-19T15:35:49.915Z"),
+        externalCreatedAt: dateAt("2023-05-19T15:35:49.915Z"),
       });
     })
   );
 
   it.effect("ignores standard JWT claims (iss, iat, exp, aud) except sub", () =>
     Effect.gen(function* () {
-      const now = Math.floor(Date.now() / 1000);
       const userData = {
         sub: "user_123",
         email: "test@example.com",
         name: "Alice",
         iss: "feeblo",
-        iat: now,
-        exp: now + 60,
+        iat: fixtureNowSeconds,
+        exp: fixtureNowSeconds + 60,
         aud: "feeblo-app",
       };
 
