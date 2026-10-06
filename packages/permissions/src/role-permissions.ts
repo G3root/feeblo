@@ -20,13 +20,15 @@ export const ROLE_PERMISSIONS = {
   contributor: ["posts.move", "votes.onBehalf"],
   /**
    * Managers (formerly "member") run day-to-day feedback operations:
-   * moderation, changelogs, tags, roadmaps, and user cleanup. CRM
-   * creation/update stays manager-scoped. `posts.*` includes
+   * moderation, changelogs, tags, roadmaps, CSV import/export, and user
+   * cleanup. CRM creation/update stays manager-scoped. `posts.*` includes
    * `posts.createOnBehalf` (attributing posts to customers); contributor's
    * scoped grants deliberately do not.
    */
   manager: [
     "members.remove",
+    "boards.importPosts",
+    "boards.exportData",
     "posts.*",
     "changelog.*",
     "changelog-categories.*",
