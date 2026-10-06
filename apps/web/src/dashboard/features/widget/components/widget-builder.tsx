@@ -14,17 +14,16 @@ import {
   Sun03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import type { Dispatch } from "react";
+import { useSelector } from "@xstate/store-react";
 
 import {
   describeWidgetLauncher,
   isWidgetLauncher,
   isWidgetTheme,
-  type WidgetDraft,
-  type WidgetDraftAction,
   type WidgetLauncher,
   type WidgetTheme,
 } from "../lib/widget-config";
+import { useWidgetStore } from "../lib/widget-store";
 import { WidgetModuleList } from "./widget-module-list";
 
 const LAUNCHER_OPTIONS = [
@@ -46,53 +45,61 @@ const THEME_OPTIONS = [
   value: WidgetTheme;
 }[];
 
-interface WidgetBuilderProps {
-  dispatch: Dispatch<WidgetDraftAction>;
-  draft: WidgetDraft;
-}
-
 /** The left column: what the widget contains and how it appears. */
-export function WidgetBuilder({ dispatch, draft }: WidgetBuilderProps) {
+export function WidgetBuilder() {
   return (
     <div className="flex flex-col gap-4">
-      <WidgetModulesCard dispatch={dispatch} draft={draft} />
-      <WidgetLauncherCard dispatch={dispatch} draft={draft} />
+      <WidgetModulesCard />
+      <WidgetLauncherCard />
     </div>
   );
 }
 
-function WidgetModulesCard({ dispatch, draft }: WidgetBuilderProps) {
+function WidgetModulesCard() {
+  const store = useWidgetStore();
+  const modules = useSelector(
+    store,
+    (snapshot) => snapshot.context.draft.modules
+  );
+
   return (
     <CardFrame>
       <CardFrameHeader>
         <CardFrameTitle>Modules</CardFrameTitle>
         <CardFrameDescription>
-          What visitors can do in the widget. Drag to reorder — the first
-          enabled module is what opens.
+          What visitors can do in the widget. Drag to reorder; the module you
+          put first opens by default.
         </CardFrameDescription>
       </CardFrameHeader>
       <div className="px-6 pb-5">
         <WidgetModuleList
-          modules={draft.modules}
-          onMove={(from, to) => dispatch({ type: "moveModule", from, to })}
-          onToggle={(module) => dispatch({ type: "toggleModule", module })}
+          modules={modules}
+          onMove={(from, to) => store.send({ type: "moveModule", from, to })}
+          onToggle={(module) => store.send({ type: "toggleModule", module })}
         />
         <p className="text-muted-foreground mt-3 text-xs">
-          Two modules become a hub with tabs; one module opens on its own. At
-          least one module is required.
+          Two enabled modules become a hub with tabs; a single module opens
+          directly. At least one module must stay enabled.
         </p>
       </div>
     </CardFrame>
   );
 }
 
-function WidgetLauncherCard({ dispatch, draft }: WidgetBuilderProps) {
+function WidgetLauncherCard() {
+  const store = useWidgetStore();
+  const launcher = useSelector(
+    store,
+    (snapshot) => snapshot.context.draft.launcher
+  );
+  const theme = useSelector(store, (snapshot) => snapshot.context.draft.theme);
+
   return (
     <CardFrame>
       <CardFrameHeader>
         <CardFrameTitle>Launcher</CardFrameTitle>
         <CardFrameDescription>
-          How visitors open the widget, and which theme it renders in.
+          How visitors open the widget and the theme it renders in.
         </CardFrameDescription>
       </CardFrameHeader>
       <div className="flex flex-col gap-5 px-6 pb-5">
@@ -103,10 +110,10 @@ function WidgetLauncherCard({ dispatch, draft }: WidgetBuilderProps) {
             onValueChange={(value) => {
               const next = value[0];
               if (next !== undefined && isWidgetLauncher(next)) {
-                dispatch({ type: "setLauncher", launcher: next });
+                store.send({ type: "setLauncher", launcher: next });
               }
             }}
-            value={[draft.launcher]}
+            value={[launcher]}
             variant="outline"
           >
             {LAUNCHER_OPTIONS.map((option) => (
@@ -121,7 +128,7 @@ function WidgetLauncherCard({ dispatch, draft }: WidgetBuilderProps) {
             ))}
           </ToggleGroup>
           <FieldDescription>
-            {describeWidgetLauncher(draft.launcher)}
+            {describeWidgetLauncher(launcher)}
           </FieldDescription>
         </Field>
         <Field>
@@ -131,10 +138,10 @@ function WidgetLauncherCard({ dispatch, draft }: WidgetBuilderProps) {
             onValueChange={(value) => {
               const next = value[0];
               if (next !== undefined && isWidgetTheme(next)) {
-                dispatch({ type: "setTheme", theme: next });
+                store.send({ type: "setTheme", theme: next });
               }
             }}
-            value={[draft.theme]}
+            value={[theme]}
             variant="outline"
           >
             {THEME_OPTIONS.map((option) => (

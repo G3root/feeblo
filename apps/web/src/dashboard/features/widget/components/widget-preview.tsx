@@ -5,12 +5,15 @@ import { cn } from "@feeblo/ui/utils";
 import { isObject, isString } from "@feeblo/utils/runtime-kind";
 import { LockIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useSelector } from "@xstate/store-react";
 import { useEffect, useRef, useState, type Ref } from "react";
 
 import {
   WIDGET_MODE_LABELS,
+  widgetEmbedConfig,
   type WidgetEmbedConfig,
 } from "../lib/widget-config";
+import { useWidgetStore } from "../lib/widget-store";
 
 /**
  * The launcher glyph the SDK draws, so the preview mirrors the real widget
@@ -41,7 +44,6 @@ function LauncherGlyph({ className }: { className?: string }) {
 }
 
 interface WidgetPreviewProps {
-  config: WidgetEmbedConfig;
   organizationId: string;
 }
 
@@ -50,7 +52,10 @@ interface WidgetPreviewProps {
  * frames, on a stand-in page. Only the host page and the launcher are drawn
  * here — the panel itself is the shipped widget.
  */
-export function WidgetPreview({ config, organizationId }: WidgetPreviewProps) {
+export function WidgetPreview({ organizationId }: WidgetPreviewProps) {
+  const store = useWidgetStore();
+  const draft = useSelector(store, (snapshot) => snapshot.context.draft);
+  const config = widgetEmbedConfig(draft);
   const [isOpen, setIsOpen] = useState(true);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const onRight = config.placement !== "bottom-left";

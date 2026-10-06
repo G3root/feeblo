@@ -61,6 +61,13 @@ export interface WidgetInstallTarget {
   organizationId: string;
 }
 
+/** How the host app installs the widget: a script tag or the React provider. */
+export type WidgetInstallTab = "vanilla" | "react";
+
+export function isWidgetInstallTab(value: string): value is WidgetInstallTab {
+  return value === "vanilla" || value === "react";
+}
+
 export function createWidgetDraft(theme: WidgetTheme): WidgetDraft {
   return {
     launcher: "bottom-right",
@@ -163,7 +170,7 @@ export function isWidgetTheme(value: string): value is WidgetTheme {
 const WIDGET_LAUNCHER_DESCRIPTIONS = {
   "bottom-left": "Launcher in the bottom-left corner.",
   "bottom-right": "Launcher in the bottom-right corner.",
-  none: "No launcher — open the widget from your own button.",
+  none: "No launcher. Open the widget from your own button.",
 } as const satisfies Record<WidgetLauncher, string>;
 
 export function describeWidgetLauncher(launcher: WidgetLauncher): string {
@@ -234,31 +241,114 @@ export function buildScriptSnippet(
   return `<script\n${attributes.join("\n")}\n></script>`;
 }
 
-/** The npm package form, for apps that bundle their JavaScript. */
-export function buildInitSnippet(
+/** Props for `FeebloProvider`, in the SDK's own option order. */
+function buildReactProviderProps(
   target: WidgetInstallTarget,
   config: WidgetEmbedConfig
-): string {
-  const options = [
-    `  organizationId: "${target.organizationId}",`,
-    `  baseUrl: "${stripTrailingSlash(target.baseUrl)}",`,
-    `  mode: "${config.mode}",`,
+): string[] {
+  const props = [
+    `organizationId="${target.organizationId}"`,
+    `baseUrl="${stripTrailingSlash(target.baseUrl)}"`,
+    `mode="${config.mode}"`,
   ];
   if (config.mode === "hub") {
-    options.push(
-      `  modules: [${config.modules.map((module) => `"${module}"`).join(", ")}],`
+    props.push(
+      `modules={[${config.modules.map((module) => `"${module}"`).join(", ")}]}`
     );
   }
   if (config.placement !== undefined) {
-    options.push(`  placement: "${config.placement}",`);
+    props.push(`placement="${config.placement}"`);
   }
-  options.push(`  theme: "${config.theme}",`);
+  props.push(`theme="${config.theme}"`);
+  return props;
+}
+
+/** The React provider form, for apps that bundle their JavaScript. */
+export function buildReactSnippet(
+  target: WidgetInstallTarget,
+  config: WidgetEmbedConfig
+): string {
   return [
-    'import { Feeblo } from "@feeblo/sdk";',
+    'import { FeebloProvider } from "@feeblo/sdk-react";',
     "",
-    "Feeblo.init({",
-    ...options,
-    "});",
+    "export function RootLayout({ children }: { children: React.ReactNode }) {",
+    "  return (",
+    "    <FeebloProvider",
+    ...buildReactProviderProps(target, config).map((prop) => `      ${prop}`),
+    "    >",
+    "      {children}",
+    "    </FeebloProvider>",
+    "  );",
+    "}",
+  ].join("\n");
+}
+
+/**
+ * The per-user integration for whichever install the page is showing. The
+ * token is minted by the customer's backend, so the example stops at the
+ * provider/identify call rather than at the signing code (Step 2).
+ */
+export function buildIdentitySnippet(
+  target: WidgetInstallTarget,
+  config: WidgetEmbedConfig,
+  tab: WidgetInstallTab
+): string {
+  if (tab === "react") {
+    return [
+      "<FeebloProvider",
+      ...buildReactProviderProps(target, config).map((prop) => `  ${prop}`),
+      "  user={{ id: user.id, email: user.email, name: user.name, token }}",
+      ">",
+      "  {children}",
+      "</FeebloProvider>",
+    ].join("\n");
+  }
+  return [
+    "<!-- Runs after the SDK script has loaded. -->",
+    "<script>",
+    '  window.addEventListener("load", async () => {',
+    '    const response = await fetch("/api/feeblo/token", {',
+    '      credentials: "include",',
+    "    });",
+    "    const { token } = await response.json();",
+    "",
+    "    Feeblo.identify({",
+    '      id: "user_123",',
+    '      email: "ada@example.com",',
+    '      name: "Ada Lovelace",',
+    "      token,",
+    "    });",
+    "  });",
+    "</script>",
+  ].join("\n");
+}
+
+/** The `jose` signing example the identity steps walk through. */
+export function buildSigningSnippet(organizationId: string): string {
+  return [
+    'import { SignJWT } from "jose";',
+    "",
+    "const secret = process.env.FEEBLO_SSO_SECRET; // 64-char hex, from Step 1",
+    "",
+    "export async function signFeebloToken(user) {",
+    "  return new SignJWT({",
+    "    sub: user.id,",
+    "    email: user.email,",
+    "    name: user.name,",
+    "    // Optional: contact attributes configured in Settings -> Custom attributes.",
+    "    customFields: { plan: user.plan, beta_tester: user.betaTester },",
+    "    // Optional: company attributes for every company the user belongs to.",
+    "    companies: [",
+    '      { id: "acme", name: "Acme", customFields: { industry: "SaaS" } },',
+    "    ],",
+    "  })",
+    '    .setProtectedHeader({ alg: "HS256" })',
+    `    .setAudience("${organizationId}")`,
+    '    .setIssuer("https://your-app.example.com")',
+    "    .setIssuedAt()",
+    '    .setExpirationTime("5m")',
+    '    .sign(new Uint8Array(Buffer.from(secret, "hex")));',
+    "}",
   ].join("\n");
 }
 
@@ -269,7 +359,8 @@ export function buildInitSnippet(
  */
 export function buildAgentPrompt(
   target: WidgetInstallTarget,
-  config: WidgetEmbedConfig
+  config: WidgetEmbedConfig,
+  tab: WidgetInstallTab
 ): string {
   const baseUrl = stripTrailingSlash(target.baseUrl);
   const securityUrl = `${baseUrl}/${target.organizationId}/settings/security`;
@@ -292,6 +383,43 @@ export function buildAgentPrompt(
     );
   }
 
+  const installSteps =
+    tab === "react"
+      ? [
+          "## 1. Add the SDK",
+          "",
+          "Use the project's package manager:",
+          "",
+          "```sh",
+          "pnpm add @feeblo/sdk-react @feeblo/sdk",
+          "```",
+          "",
+          "## 2. Mount it once",
+          "",
+          "Mount `FeebloProvider` once at the root and do not also load the script tag. The SDK keeps one widget per page, and two embeds compete for the same container.",
+          "",
+          "```tsx",
+          buildReactSnippet(target, config),
+          "```",
+          "",
+        ]
+      : [
+          "## 1. Add the SDK",
+          "",
+          "Add this snippet before the closing `</body>` tag of every page that should show the widget:",
+          "",
+          "```html",
+          buildScriptSnippet(target, config),
+          "```",
+          "",
+          "## 2. Open the widget",
+          "",
+          config.placement === undefined
+            ? "The launcher is hidden, so open the widget from your own trigger with `Feeblo.open()`."
+            : "The script initializes the widget on load, and the launcher appears in the corner you chose.",
+          "",
+        ];
+
   return [
     "# Install the Feeblo feedback widget",
     "",
@@ -305,35 +433,14 @@ export function buildAgentPrompt(
     `- ${describeWidgetLauncher(config.placement ?? "none")}`,
     `- Theme: ${config.theme}`,
     "",
-    "## 1. Add the SDK",
-    "",
-    "Use the project's package manager:",
-    "",
-    "```sh",
-    "pnpm add @feeblo/sdk",
-    "```",
-    "",
-    "If the project has no build step, add this snippet to every page instead:",
-    "",
-    "```html",
-    buildScriptSnippet(target, config),
-    "```",
-    "",
-    "## 2. Initialize it once",
-    "",
-    "Call `Feeblo.init` once on the client, after the app mounts. In React put it in an effect in the root layout or provider so it never runs during server rendering. Do not initialize it a second time.",
-    "",
-    "```ts",
-    buildInitSnippet(target, config),
-    "```",
-    "",
+    ...installSteps,
     "## 3. Verify",
     "",
     ...verification,
     "",
     "## Notes",
     "",
-    `- Signed-in users can be attributed by minting a short-lived SSO JWT on your server. Configure it in Feeblo under Settings -> Security: ${securityUrl}`,
+    `- To attribute feedback to signed-in users, mint a short-lived SSO JWT for each user on your server. Enable it in Feeblo under Settings -> Security: ${securityUrl}`,
     "- Never put the Feeblo signing secret in client-side code.",
     "- Keep the change limited to installing the widget.",
   ].join("\n");

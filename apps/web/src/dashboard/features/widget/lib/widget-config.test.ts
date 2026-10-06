@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildAgentPrompt,
-  buildInitSnippet,
+  buildIdentitySnippet,
+  buildReactSnippet,
   buildScriptSnippet,
+  buildSigningSnippet,
   createWidgetDraft,
   enabledWidgetModules,
   moveWidgetModule,
@@ -133,7 +135,7 @@ describe("install snippets", () => {
     expect(snippet).toContain('data-feeblo-theme="dark"');
   });
 
-  it("omits modules for a single-module mode", () => {
+  it("omits modules and placement for a single-module mode", () => {
     const config = widgetEmbedConfig(
       draftWith({
         launcher: "none",
@@ -144,36 +146,96 @@ describe("install snippets", () => {
       })
     );
     const snippet = buildScriptSnippet(target, config);
-    const init = buildInitSnippet(target, config);
+    const react = buildReactSnippet(target, config);
 
     expect(snippet).toContain('data-feeblo-mode="feedback"');
     expect(snippet).not.toContain("data-feeblo-modules");
     expect(snippet).not.toContain("data-feeblo-placement");
-    expect(init).not.toContain("modules:");
-    expect(init).not.toContain("placement:");
+    expect(react).not.toContain("modules={");
+    expect(react).not.toContain("placement=");
+  });
+
+  it("renders the provider props for hub mode", () => {
+    const react = buildReactSnippet(target, hubConfig);
+
+    expect(react).toContain(
+      'import { FeebloProvider } from "@feeblo/sdk-react";'
+    );
+    expect(react).toContain('organizationId="org_123"');
+    expect(react).toContain('baseUrl="https://app.example.com"');
+    expect(react).toContain('mode="hub"');
+    expect(react).toContain('modules={["updates", "feedback"]}');
+    expect(react).toContain('placement="bottom-right"');
+    expect(react).toContain('theme="dark"');
+  });
+});
+
+describe("buildIdentitySnippet", () => {
+  const config = widgetEmbedConfig(draftWith());
+
+  it("adds the user to the React provider", () => {
+    const snippet = buildIdentitySnippet(target, config, "react");
+
+    expect(snippet).toContain("<FeebloProvider");
+    expect(snippet).toContain('organizationId="org_123"');
+    expect(snippet).toContain(
+      "user={{ id: user.id, email: user.email, name: user.name, token }}"
+    );
+  });
+
+  it("identifies the user after the script tag loads", () => {
+    const snippet = buildIdentitySnippet(target, config, "vanilla");
+
+    expect(snippet).toContain('window.addEventListener("load"');
+    expect(snippet).toContain("Feeblo.identify({");
+    expect(snippet).toContain("token,");
+  });
+});
+
+describe("buildSigningSnippet", () => {
+  it("binds the token to the workspace and shows the custom attribute shape", () => {
+    const snippet = buildSigningSnippet("org_123");
+
+    expect(snippet).toContain('setAudience("org_123")');
+    expect(snippet).toContain('setExpirationTime("5m")');
+    expect(snippet).toContain("customFields:");
+    expect(snippet).toContain("companies:");
+    expect(snippet).toContain("sub: user.id");
   });
 });
 
 describe("buildAgentPrompt", () => {
-  it("carries the settings and the install steps", () => {
-    const prompt = buildAgentPrompt(
-      target,
-      widgetEmbedConfig(
-        draftWith({
-          modules: [
-            { enabled: true, id: "updates" },
-            { enabled: true, id: "feedback" },
-          ],
-        })
-      )
-    );
+  const hubConfig = widgetEmbedConfig(
+    draftWith({
+      modules: [
+        { enabled: true, id: "updates" },
+        { enabled: true, id: "feedback" },
+      ],
+    })
+  );
+
+  it("carries the settings and the React install steps", () => {
+    const prompt = buildAgentPrompt(target, hubConfig, "react");
 
     expect(prompt).toContain("Organization ID: org_123");
     expect(prompt).toContain("Widget host: https://app.example.com");
     expect(prompt).toContain("Updates and Feedback, with Updates first");
-    expect(prompt).toContain("pnpm add @feeblo/sdk");
+    expect(prompt).toContain("pnpm add @feeblo/sdk-react @feeblo/sdk");
+    expect(prompt).toContain("FeebloProvider");
     expect(prompt).toContain(
       "https://app.example.com/org_123/settings/security"
     );
+  });
+
+  it("switches to the script tag for the vanilla install", () => {
+    const prompt = buildAgentPrompt(
+      target,
+      widgetEmbedConfig(draftWith({ launcher: "none" })),
+      "vanilla"
+    );
+
+    expect(prompt).toContain('data-feeblo-organization-id="org_123"');
+    expect(prompt).toContain("Feeblo.open()");
+    expect(prompt).not.toContain("pnpm add");
   });
 });
