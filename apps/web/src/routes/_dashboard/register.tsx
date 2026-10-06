@@ -10,6 +10,7 @@ import {
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
@@ -65,10 +66,10 @@ function RegisterRoute() {
           });
           return;
         }
-      } catch {
+      } catch (error) {
         trackEvent("org_created", { success: false });
         toastManager.add({
-          title: "Failed to create workspace",
+          title: parseRpcError(error, "Failed to create workspace").message,
           type: "error",
         });
         return;

@@ -8,6 +8,7 @@ import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { SubdomainValidationService } from "../site/subdomain/service";
+import { WorkspacePolicy } from "./policies";
 import { WorkspaceRepository } from "./repository";
 import { WorkspaceRpcs } from "./rpcs";
 import type {
@@ -18,6 +19,7 @@ import type {
 
 export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* WorkspaceRepository;
+  const workspacePolicy = yield* WorkspacePolicy;
   const { validate: validateSubdomain } = yield* SubdomainValidationService;
 
   return {
@@ -38,6 +40,15 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
 
         const organizationId = yield* transaction(
           Effect.gen(function* () {
+            // Lock first, then count: the per-user workspace cap spans
+            // workspaces, so the count is only authoritative while this row
+            // is held. Locking before the first child insert avoids
+            // deadlocking two concurrent creates against each other.
+            yield* repository.lockUser(session.session.userId);
+            yield* workspacePolicy.canCreateWorkspace({
+              userId: session.session.userId,
+            });
+
             const isSubdomainTaken =
               yield* repository.isSubdomainTaken(subdomain);
 
@@ -107,5 +118,6 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
   WorkspaceRpcHandlersEffect
 ).pipe(
   Layer.provide(WorkspaceRepository.layer),
+  Layer.provide(WorkspacePolicy.layer),
   Layer.provide(SubdomainValidationService.layerEnv)
 );

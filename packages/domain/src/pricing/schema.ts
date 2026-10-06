@@ -15,6 +15,7 @@ const PlanLimits = S.Struct({
   changelogCategories: S.NullOr(S.Finite),
   submissionNotificationRecipients: S.NullOr(S.Finite),
   crmEntries: S.NullOr(S.Finite),
+  workspaces: S.NullOr(S.Finite),
 } satisfies { readonly [K in LimitFeatureKey]: S.Schema<number | null> });
 
 const PlanCapabilities = S.Struct({
