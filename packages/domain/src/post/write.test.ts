@@ -276,6 +276,47 @@ describe("PostWriteService", () => {
         })
     );
 
+    it.effect(
+      "attributes an inbound machine-key create without subscribing its author",
+      () =>
+        Effect.gen(function* () {
+          const fixture = yield* makeFixture("PRIVATE");
+          const writes = yield* PostWriteService;
+          const db = yield* currentDb;
+          const postId = yield* PostId.generate;
+          recordedIntegrationEvents.length = 0;
+
+          yield* writes.create(
+            {
+              assetIds: [],
+              boardId: fixture.boardId,
+              content: "Body",
+              id: postId,
+              organizationId: fixture.organizationId,
+              statusId: fixture.statusId,
+              title: "Inbound post",
+            },
+            { kind: "api_key" },
+            { creatorUserId: fixture.userId }
+          );
+
+          const [post] = yield* db
+            .select()
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+          // The post is attributed to the inbound author so creator-based
+          // reads and edit/delete permissions work.
+          expect(post?.creatorId).toBe(fixture.userId);
+
+          // A post made in chat does not put its author on the watch-list.
+          const subscriptions = yield* db
+            .select()
+            .from(schema.postSubscriptionTable)
+            .where(eq(schema.postSubscriptionTable.postId, postId));
+          expect(subscriptions).toHaveLength(0);
+        })
+    );
+
     it.effect("records an update only for the fields that changed", () =>
       Effect.gen(function* () {
         const fixture = yield* makeFixture();

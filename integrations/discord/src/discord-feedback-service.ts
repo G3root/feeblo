@@ -98,8 +98,8 @@ export const DiscordFeedbackServiceLive: Layer.Layer<
         // entry and integration event, notifies staff, opens the submission
         // email window, and schedules the embedding. The inbound author has no
         // contact row to attribute through, so the write's creator option
-        // watch-lists them instead; a Discord user's feeblo inbox is
-        // synthetic, so no email subscription is requested from here.
+        // attributes the post to their feeblo user row; that synthetic inbox
+        // is never subscribed.
         const id = yield* PostId.generate;
         const slug = yield* writes.create(
           {
@@ -114,7 +114,7 @@ export const DiscordFeedbackServiceLive: Layer.Layer<
             title,
           },
           { kind: "api_key" },
-          { subscribeCreatorUserId: userId }
+          { creatorUserId: userId }
         );
         return {
           boardId,

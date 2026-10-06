@@ -136,15 +136,14 @@ export type PostCreateWrite = {
 type PostCreateWriteOptions = {
   readonly source?: "PUBLIC_BOARD";
   /**
-   * The post creator to attribute and watch-list when the acting credential
-   * has no session of its own to subscribe from — an inbound end-user
-   * identity (Slack, Discord) whose feeblo user row the caller resolved. A
-   * member session subscribes through its own branch; a machine key creating
-   * on behalf of `author` subscribes the subject instead. No email
-   * subscription is requested from this option: inbound identities carry
-   * synthetic inboxes that must never enter the email pipeline.
+   * The inbound user the created post is attributed to when the acting
+   * credential is a machine key whose feeblo user row the caller resolved
+   * (Slack, Discord). It sets the post's `creatorId` so creator-based reads
+   * and edit/delete permissions work. It does not subscribe the user: an
+   * inbound identity's feeblo inbox is synthetic, and a post made in chat
+   * must not put its author on the watch-list.
    */
-  readonly subscribeCreatorUserId?: string;
+  readonly creatorUserId?: string;
 };
 
 /**
@@ -526,7 +525,7 @@ const makePostWriteService = Effect.gen(function* () {
             // member's own id still wins when there is one.
             creatorId: subject
               ? subject.userId
-              : (userId ?? options.subscribeCreatorUserId ?? null),
+              : (userId ?? options.creatorUserId ?? null),
             ...(writeSource !== undefined && { source: writeSource }),
             // On-behalf posts keep staff attribution out of the author fields.
             ...(member !== null &&
@@ -567,11 +566,11 @@ const makePostWriteService = Effect.gen(function* () {
           // staff actor, following the same notification-eligibility rules: a
           // verified account is trusted, everyone else is deferred until
           // identity linking grants them access. A machine key has no person
-          // behind it, so there is nobody to subscribe — unless the caller
-          // resolved the inbound end user for it (Slack, Discord).
+          // behind it, so there is nobody to subscribe — an inbound create
+          // attributes the post to its resolved author without watch-listing
+          // them.
           const subscriptionNow = yield* DateTime.nowAsDate;
           if (subject === undefined) {
-            const inboundCreatorUserId = options.subscribeCreatorUserId;
             const creator =
               member !== null
                 ? {
@@ -579,13 +578,7 @@ const makePostWriteService = Effect.gen(function* () {
                     memberId: member.memberId,
                     userId: member.userId,
                   }
-                : inboundCreatorUserId !== undefined
-                  ? {
-                      email: undefined,
-                      memberId: null,
-                      userId: inboundCreatorUserId,
-                    }
-                  : undefined;
+                : undefined;
             if (creator !== undefined) {
               yield* subscriptionRepository.subscribe({
                 organizationId: args.organizationId,
