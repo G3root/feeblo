@@ -1,4 +1,4 @@
-import { createModalStoreContext } from "~/lib/xstate";
+import { createModalStoreContext } from "@feeblo/web-shared/xstate";
 
 export type CustomAttributeEntityType = "contact" | "company";
 
