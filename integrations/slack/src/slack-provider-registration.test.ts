@@ -57,11 +57,22 @@ const deliveryInput = (
     correlationId: "corr_1",
     data: {
       actor: { kind: "end_user" },
-      board: { id: "brd_1", name: "Ideas", slug: "ideas" },
+      board: {
+        id: "brd_1",
+        name: "Ideas",
+        url: "https://feeblo.example/org/board/ideas",
+      },
       post: {
+        author: {
+          displayName: "Sally",
+          externalId: "user_123",
+          id: "cnt_1",
+          type: "end_user",
+        },
+        description: "Dark mode hurts my eyes at night.",
         id: "pst_1",
         metadata: { customer_tier: "Enterprise" },
-        status: { id: "pss_1", type: "PENDING" },
+        status: { id: "pss_1", name: "Open", type: "PENDING" },
         title: "Dark mode please",
         url: "https://feeblo.example/org/post/ideas/dark-mode",
       },
@@ -70,7 +81,7 @@ const deliveryInput = (
     occurredAt: DateTime.makeUnsafe(new Date("2026-08-12T00:00:00.000Z")),
     organizationId: asLegid(WorkspaceId)("org_1"),
     origin: { kind: "feeblo" },
-    type: "feedback.post.created",
+    type: "post.created",
     version: 1,
   },
   route: {
@@ -78,7 +89,7 @@ const deliveryInput = (
     configVersion: 1,
     connectionId: asLegid(IntegrationConnectionId)("conn_1"),
     enabled: true,
-    eventTypes: ["feedback.post.created"],
+    eventTypes: ["post.created"],
     id: asLegid(IntegrationRouteId)("route_1"),
     provider: slackProviderKey,
     providerConfig: { channelId: "C123", channelName: "feedback", version: 1 },
@@ -139,42 +150,40 @@ const makePostMessageSpy = () => {
 };
 
 describe("slack provider registration", () => {
-  it.effect(
-    "posts channel-update blocks for feedback.post.created deliveries",
-    () =>
-      Effect.gen(function* () {
-        const spy = makePostMessageSpy();
-        const registration = makeSlackProviderRegistration({
-          apiClient: spy.apiClient,
-          credentialResolver,
-          signingSecret,
-        });
-        const handler = registration.handlers.find(
-          (candidate) => candidate.capabilityKey === "channel.notifications"
-        );
-        expect(handler).toBeDefined();
+  it.effect("posts channel-update blocks for post.created deliveries", () =>
+    Effect.gen(function* () {
+      const spy = makePostMessageSpy();
+      const registration = makeSlackProviderRegistration({
+        apiClient: spy.apiClient,
+        credentialResolver,
+        signingSecret,
+      });
+      const handler = registration.handlers.find(
+        (candidate) => candidate.capabilityKey === "channel.notifications"
+      );
+      expect(handler).toBeDefined();
 
-        const result = yield* Effect.exit(
-          handler?.deliver(deliveryInput()) ?? Effect.never
-        );
-        expect(Exit.isSuccess(result)).toBe(true);
+      const result = yield* Effect.exit(
+        handler?.deliver(deliveryInput()) ?? Effect.never
+      );
+      expect(Exit.isSuccess(result)).toBe(true);
 
-        const call = spy.getLastCall();
-        expect(call?.channelId).toBe("C123");
-        expect(call?.text).toBe("Dark mode please");
-        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-        const header = call?.blocks[0] as { text: { text: string } };
-        expect(header.text.text).toBe("Dark mode please");
-        expect(call?.blocks[1]).toMatchObject({
-          elements: [
-            {
-              text: expect.stringContaining("*Customer Tier:* Enterprise"),
-              type: "mrkdwn",
-            },
-          ],
-          type: "context",
-        });
-      })
+      const call = spy.getLastCall();
+      expect(call?.channelId).toBe("C123");
+      expect(call?.text).toBe("Dark mode please");
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      const header = call?.blocks[0] as { text: { text: string } };
+      expect(header.text.text).toBe("Dark mode please");
+      expect(call?.blocks[1]).toMatchObject({
+        elements: [
+          {
+            text: expect.stringContaining("*Customer Tier:* Enterprise"),
+            type: "mrkdwn",
+          },
+        ],
+        type: "context",
+      });
+    })
   );
 
   it.effect("rejects unsupported event types as invalid configuration", () =>
@@ -191,7 +200,7 @@ describe("slack provider registration", () => {
           deliveryInput({
             event: {
               ...deliveryInput().event,
-              type: "feedback.post.status_changed",
+              type: "post.status_changed",
             },
           })
         ) ?? Effect.never

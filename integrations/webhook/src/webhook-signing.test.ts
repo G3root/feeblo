@@ -20,7 +20,7 @@ describe("signWebhookDelivery", () => {
       const secret = Redacted.make(
         "whsec_MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI="
       );
-      const rawBody = '{"type":"feedback.post.created","title":"A  B"}';
+      const rawBody = '{"type":"post.created","title":"A  B"}';
       const headers = yield* signWebhookDelivery({
         deliveryId: "delivery_123",
         keyring: { current: secret },

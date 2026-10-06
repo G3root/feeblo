@@ -477,14 +477,14 @@ describe("PostRpcHandlers", () => {
             expect(recordedIntegrationEvents).toEqual(
               expect.arrayContaining([
                 expect.objectContaining({
-                  type: "feedback.post.created",
+                  type: "post.created",
                   data: expect.objectContaining({
                     actor: expect.objectContaining({ kind: "member" }),
                     board: expect.objectContaining({ id: fixture.boardId }),
                   }),
                 }),
                 expect.objectContaining({
-                  type: "feedback.post.created",
+                  type: "post.created",
                   data: expect.objectContaining({
                     actor: { kind: "end_user" },
                     board: expect.objectContaining({ id: fixture.boardId }),
@@ -1324,9 +1324,12 @@ describe("PostRpcHandlers", () => {
               );
             expect(recordedIntegrationEvents).toEqual([
               expect.objectContaining({
-                type: "feedback.post.status_changed",
+                type: "post.status_changed",
                 data: expect.objectContaining({
-                  previousStatus: { id: fixture.statusId, type: "PENDING" },
+                  previousStatus: expect.objectContaining({
+                    id: fixture.statusId,
+                    type: "PENDING",
+                  }),
                 }),
               }),
             ]);

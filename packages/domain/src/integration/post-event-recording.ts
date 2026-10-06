@@ -27,13 +27,21 @@ export type PostIntegrationEventActor =
       readonly memberId: string;
     };
 
+/** The post's author as it is recorded on the event: a classification, never an email. */
+export type PostIntegrationEventAuthor =
+  | { readonly displayName: string | null; readonly type: "member" }
+  | {
+      readonly displayName?: string;
+      readonly externalId?: string;
+      readonly id?: string;
+      readonly type: "end_user";
+    };
+
 /** Canonical facts needed to record a post-created or post-status-changed event. */
 export interface PostIntegrationEventInput {
   readonly actor: PostIntegrationEventActor;
   readonly boardId: LegidOf<"BoardId">;
-  /** Post body (sanitized markdown) carried only for post-created events. */
-  readonly description?: string;
-  readonly eventType: "feedback.post.created" | "feedback.post.status_changed";
+  readonly eventType: "post.created" | "post.status_changed";
   readonly metadata?: Readonly<Record<string, string>>;
   readonly organizationId: LegidOf<"WorkspaceId">;
   readonly postId: LegidOf<"PostId">;
@@ -82,29 +90,87 @@ export const recordPostIntegrationEvent = Effect.fn(
         message: "Post board was not found",
       });
     }
-    const statusType = yield* postRepository.findStatusType({
+    const status = yield* postRepository.findStatus({
       id: input.statusId,
       organizationId: input.organizationId,
     });
-    if (statusType === undefined) {
+    if (status === undefined) {
       return yield* new PostIntegrationEventRecordingError({
         kind: "lookup",
         message: "Post status was not found",
       });
     }
-    const previousStatusType =
+    const previousStatus =
       input.previousStatusId === undefined
         ? undefined
-        : yield* postRepository.findStatusType({
+        : yield* postRepository.findStatus({
             id: input.previousStatusId,
             organizationId: input.organizationId,
           });
+    // Every event carries the post's own snapshot, so the author and the body
+    // are read here rather than re-derived at delivery time: a retry runs up
+    // to 24 hours later, when the row may say something else.
+    const [post] = yield* db
+      .select({
+        content: schema.postTable.content,
+        creatorMemberId: schema.postTable.creatorMemberId,
+        contactId: schema.postTable.contactId,
+        memberName: schema.userTable.name,
+        contactName: schema.contactTable.name,
+        contactExternalId: schema.contactTable.externalId,
+      })
+      .from(schema.postTable)
+      .leftJoin(
+        schema.memberTable,
+        eq(schema.memberTable.id, schema.postTable.creatorMemberId)
+      )
+      .leftJoin(
+        schema.userTable,
+        eq(schema.userTable.id, schema.memberTable.userId)
+      )
+      .leftJoin(
+        schema.contactTable,
+        eq(schema.contactTable.id, schema.postTable.contactId)
+      )
+      .where(
+        and(
+          eq(schema.postTable.id, input.postId),
+          eq(schema.postTable.organizationId, input.organizationId)
+        )
+      )
+      .limit(1);
+    if (post === undefined) {
+      return yield* new PostIntegrationEventRecordingError({
+        kind: "lookup",
+        message: "Post was not found",
+      });
+    }
+    // `creatorMemberId` is the same column the Public API classifies authors
+    // by: a member id present means workspace staff, absent means an outside
+    // end user. The column itself never leaves this function.
+    const author: PostIntegrationEventAuthor =
+      post.creatorMemberId === null
+        ? {
+            type: "end_user",
+            ...(post.contactName !== null && {
+              displayName: post.contactName,
+            }),
+            ...(post.contactId !== null && { id: post.contactId }),
+            ...(post.contactExternalId !== null && {
+              externalId: post.contactExternalId,
+            }),
+          }
+        : { type: "member", displayName: post.memberName };
 
     const id = yield* IntegrationEventId.generate;
     const correlationId = yield* IntegrationEventId.generate;
     const occurredAt = yield* DateTime.now;
     const url = new URL(
       `/${encodeURIComponent(input.organizationId)}/post/${encodeURIComponent(board.slug)}/${encodeURIComponent(input.postSlug)}`,
+      appUrl
+    ).href;
+    const boardUrl = new URL(
+      `/${encodeURIComponent(input.organizationId)}/board/${encodeURIComponent(board.slug)}`,
       appUrl
     ).href;
     return yield* recorder
@@ -114,27 +180,22 @@ export const recordPostIntegrationEvent = Effect.fn(
           correlationId,
           data: {
             actor: input.actor,
-            board,
+            board: { id: board.id, name: board.name, url: boardUrl },
             post: {
               id: input.postId,
-              ...(input.description !== undefined &&
-                input.description.length > 0 && {
-                  description: input.description,
-                }),
+              author,
+              description: post.content,
               ...(input.metadata !== undefined &&
                 Object.keys(input.metadata).length > 0 && {
                   metadata: { ...input.metadata },
                 }),
-              status: { id: input.statusId, type: statusType },
+              status,
               title: input.title,
               url,
             },
             ...(input.previousStatusId !== undefined &&
-              previousStatusType !== undefined && {
-                previousStatus: {
-                  id: input.previousStatusId,
-                  type: previousStatusType,
-                },
+              previousStatus !== undefined && {
+                previousStatus,
               }),
           },
           id,

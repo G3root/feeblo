@@ -403,7 +403,7 @@ const makePostRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows[0])),
 
-    findStatusType: ({
+    findStatus: ({
       id,
       organizationId,
     }: {
@@ -411,7 +411,14 @@ const makePostRepository = Effect.gen(function* () {
       readonly organizationId: string;
     }) =>
       db
-        .select({ type: schema.postStatusTable.type })
+        .select({
+          id: schema.postStatusTable.id,
+          type: schema.postStatusTable.type,
+          // A workspace may leave the label empty until it customizes the
+          // status; an empty name is never useful to a consumer, so the
+          // canonical type stands in for it.
+          name: sql<string>`coalesce(nullif(${schema.postStatusTable.label}, ''), ${schema.postStatusTable.type})`,
+        })
         .from(schema.postStatusTable)
         .where(
           and(
@@ -420,7 +427,7 @@ const makePostRepository = Effect.gen(function* () {
           )
         )
         .limit(1)
-        .pipe(Effect.map((rows) => rows[0]?.type)),
+        .pipe(Effect.map((rows) => rows[0])),
 
     findByCreatorId: ({
       id,

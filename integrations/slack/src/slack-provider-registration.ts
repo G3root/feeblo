@@ -215,7 +215,7 @@ export const makeSlackProviderRegistration = ({
     capabilityKey: slackChannelNotificationsCapabilityKey,
     deliver: (input: IntegrationProviderDeliveryInput) =>
       Effect.gen(function* () {
-        if (input.event.type !== "feedback.post.created") {
+        if (input.event.type !== "post.created") {
           return yield* new IntegrationProviderInvalidConfigurationError({
             message: "Slack channel notifications only support new posts",
             provider: slackProviderKey,

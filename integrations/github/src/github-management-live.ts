@@ -482,7 +482,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
             routeKey: "",
             configVersion: 1,
             enabled: input.enabled,
-            eventTypes: ["feedback.post.created"],
+            eventTypes: ["post.created"],
             providerConfig,
             safeDisplayMetadata: {},
           })

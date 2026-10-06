@@ -270,7 +270,7 @@ describe("PostRpcHandlers on-behalf", () => {
             // The integration event keeps the staff member as actor.
             expect(recordedIntegrationEvents).toEqual([
               expect.objectContaining({
-                type: "feedback.post.created",
+                type: "post.created",
                 data: expect.objectContaining({
                   actor: expect.objectContaining({
                     kind: "member",

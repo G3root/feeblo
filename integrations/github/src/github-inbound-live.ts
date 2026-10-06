@@ -258,7 +258,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
             yield* recordPostIntegrationEvent({
               actor: { kind: "end_user" },
               boardId: asLegid(BoardId)(post[0].boardId),
-              eventType: "feedback.post.status_changed",
+              eventType: "post.status_changed",
               organizationId: asLegid(WorkspaceId)(
                 activeConnection.organizationId
               ),

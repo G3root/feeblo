@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
   BoardId,
+  ContactId,
   IntegrationConnectionId,
   IntegrationDeliveryId,
   IntegrationEventId,
@@ -51,6 +52,7 @@ const makeDeliveryFixture = () =>
   Effect.gen(function* () {
     const boardId = yield* BoardId.generate;
     const connectionId = yield* IntegrationConnectionId.generate;
+    const contactId = yield* ContactId.generate;
     const deliveryId = yield* IntegrationDeliveryId.generate;
     const eventId = yield* IntegrationEventId.generate;
     const memberId = yield* MemberId.generate;
@@ -90,10 +92,21 @@ const makeDeliveryFixture = () =>
             kind: "member",
             memberId,
           },
-          board: { id: boardId, name: "Feedback", slug: "feedback" },
+          board: {
+            id: boardId,
+            name: "Feedback",
+            url: "https://app.example.test/org/board/feedback",
+          },
           post: {
             id: postId,
-            status: { id: statusId, type: "PENDING" },
+            author: {
+              displayName: "Sally",
+              externalId: "user_123",
+              id: contactId,
+              type: "end_user",
+            },
+            description: "Post body.",
+            status: { id: statusId, name: "Open", type: "PENDING" },
             title: "Canonical post",
             url: "https://app.example.test/org/post/feedback/canonical-post",
           },
@@ -102,7 +115,7 @@ const makeDeliveryFixture = () =>
         occurredAt: now,
         organizationId,
         origin: { kind: "feeblo" },
-        type: "feedback.post.created",
+        type: "post.created",
         version: 1,
       },
       route: {
@@ -110,7 +123,7 @@ const makeDeliveryFixture = () =>
         configVersion: 1,
         connectionId,
         enabled: true,
-        eventTypes: ["feedback.post.created"],
+        eventTypes: ["post.created"],
         id: routeId,
         provider: webhookProviderKey,
         providerConfig: {},
@@ -119,6 +132,7 @@ const makeDeliveryFixture = () =>
     };
     return {
       boardId,
+      contactId,
       input,
       memberId,
       now,
@@ -182,7 +196,7 @@ describe("webhook provider registration", () => {
             response.writeHead(204).end();
           });
         });
-        const { boardId, input, memberId, now, postId, statusId } =
+        const { boardId, contactId, input, now, postId, statusId } =
           yield* makeDeliveryFixture();
         const handler = makeRegistration(endpointUrl).handlers[0];
         if (handler === undefined) {
@@ -196,20 +210,32 @@ describe("webhook provider registration", () => {
           Schema.fromJsonString(WebhookExternalPayload)
         )(request.body);
         expect(request.headers["content-type"]).toBe("application/json");
-        expect(request.headers["x-feeblo-event"]).toBe("feedback.post.created");
+        expect(request.headers["x-feeblo-event"]).toBe("post.created");
         expect(decodedRequest).toEqual({
-          actor: { displayName: "Ada", memberId, type: "member" },
-          board: { id: boardId, name: "Feedback", slug: "feedback" },
+          actor: { displayName: "Ada", type: "member" },
+          board: {
+            id: boardId,
+            name: "Feedback",
+            url: "https://app.example.test/org/board/feedback",
+          },
           id: input.event.id,
-          occurredAt: now.toString(),
-          organizationId: input.event.organizationId,
-          post: {
+          object: {
+            author: {
+              displayName: "Sally",
+              externalId: "user_123",
+              id: contactId,
+              type: "end_user",
+            },
+            content: "Post body.",
             id: postId,
+            status: { id: statusId, name: "Open", type: "PENDING" },
             title: "Canonical post",
             url: "https://app.example.test/org/post/feedback/canonical-post",
           },
-          status: { id: statusId, type: "PENDING" },
-          type: "feedback.post.created",
+          objectType: "post",
+          occurredAt: now.toString(),
+          organizationId: input.event.organizationId,
+          type: "post.created",
           version: 1,
         });
         expect(
