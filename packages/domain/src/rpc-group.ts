@@ -10,6 +10,7 @@ import { CommentReactionRpcs } from "./comment-reaction/rpcs";
 import { CommentRpcs } from "./comments/rpcs";
 import { CompanyRpcs } from "./company/rpcs";
 import { ContactRpcs } from "./contact/rpcs";
+import { DataTransferRpcs } from "./data-transfer/rpcs";
 import { EmailSubscriptionRpcs } from "./email-subscription/rpcs";
 import { DiscordManagementRpcs } from "./integration/discord/rpcs";
 import { ExternalResourceRpcs } from "./integration/external-resource/rpcs";
@@ -47,6 +48,7 @@ export const AllRpcs = PostRpcs.merge(PostActivityRpcs).merge(
   CommentReactionRpcs,
   CommentRpcs,
   CompanyRpcs,
+  DataTransferRpcs,
   SiteRpcs,
   TagRpcs,
   UpvoteRpcs,

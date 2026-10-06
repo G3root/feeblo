@@ -14,6 +14,7 @@ import { CommentReactionRpcHandlers } from "./comment-reaction/handlers";
 import { CommentRpcHandlers } from "./comments/handlers";
 import { CompanyRpcHandlers } from "./company/handlers";
 import { ContactRpcHandlers } from "./contact/handlers";
+import { DataTransferRpcHandlers } from "./data-transfer/handlers";
 import { EmailSubscriptionRpcHandlers } from "./email-subscription/handlers";
 import { ExternalResourceRpcHandlers } from "./integration/external-resource/handlers";
 import { JwtSecretRpcHandlers } from "./jwt-secret/handlers";
@@ -77,7 +78,11 @@ export const makeRpcRoute = <RIn, ROut, E>(
     ),
     Layer.provide(Layer.merge(JwtSecretRpcHandlers, ApiKeyRpcHandlers)),
     Layer.provide(
-      Layer.mergeAll(MembershipRpcHandlers, NotificationRpcHandlers)
+      Layer.mergeAll(
+        MembershipRpcHandlers,
+        NotificationRpcHandlers,
+        DataTransferRpcHandlers
+      )
     ),
     Layer.provide(OrganizationRpcHandlers),
     Layer.provide(CommentReactionRpcHandlers),

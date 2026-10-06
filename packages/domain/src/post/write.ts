@@ -90,7 +90,13 @@ export type PostWriteActor =
       readonly name: string | null | undefined;
       readonly userId: string;
     }
-  | { readonly kind: "api_key" };
+  | { readonly kind: "api_key" }
+  /**
+   * A bulk backfill with nobody to attribute it to — the uploader's account
+   * is gone, or the job predates them. Timeline entries record no actor and
+   * the person-shaped side effects are skipped, exactly as for a key.
+   */
+  | { readonly kind: "import" };
 
 /** What a create needs, decoupled from the RPC request schema. */
 export type PostCreateWrite = {
@@ -386,9 +392,20 @@ export const makePostWrites = Effect.gen(function* () {
        * email pipeline.
        */
       readonly subscribeCreatorUserId?: string;
+      /**
+       * `"backfill"` marks a historical bulk load (a CSV import) rather than
+       * a live change. It skips the person-shaped side effects a backfilled
+       * post must not fire — the integration event, the creator's
+       * subscription, the submission notification, and the per-row embedding
+       * job — and the on-behalf abuse bound, which exists to pace interactive
+       * writes rather than a bounded batch. The post, its slug, its sanitized
+       * content and its timeline entry are identical in both modes.
+       */
+      readonly mode?: "interactive" | "backfill";
     } = {}
   ) =>
     Effect.gen(function* () {
+      const backfill = options.mode === "backfill";
       const member = actor.kind === "member" ? actor : null;
       const userId = member?.userId ?? null;
       // `source` is lifted out of the spread and re-added below: the
@@ -397,7 +414,7 @@ export const makePostWrites = Effect.gen(function* () {
       const { source, ...write } = args;
       const writeSource = options.source ?? source;
 
-      if (member !== null && args.author !== undefined) {
+      if (!backfill && member !== null && args.author !== undefined) {
         // Per-member abuse bound for on-behalf creations (see
         // plan-on-behalf.md); self-service creates are unaffected. Runs before
         // asset prep so a limited request does no work.
@@ -500,128 +517,129 @@ export const makePostWrites = Effect.gen(function* () {
             kind: "POST_CREATED",
             ...(onBehalfMetadata && { metadata: onBehalfMetadata }),
           });
-          yield* recordPostIntegrationEvent({
-            actor,
-            boardId: args.boardId,
-            eventType: "post.created",
-            ...(args.metadata !== undefined && { metadata: args.metadata }),
-            organizationId: args.organizationId,
-            postId: args.id,
-            postSlug: persistedSlug,
-            statusId: args.statusId,
-            title: args.title,
-          });
-
-          // The creator of a post is automatically subscribed to it.
-          // On-behalf posts subscribe the resolved customer instead of the
-          // staff actor, following the same notification-eligibility rules: a
-          // verified account is trusted, everyone else is deferred until
-          // identity linking grants them access. A machine key has no person
-          // behind it, so there is nobody to subscribe — unless the caller
-          // resolved the inbound end user for it (Slack, Discord).
-          const subscriptionNow = yield* DateTime.nowAsDate;
-          if (subject === undefined) {
-            const inboundCreatorUserId = options.subscribeCreatorUserId;
-            const creator =
-              member !== null
-                ? {
-                    email: member.email,
-                    memberId: member.memberId,
-                    userId: member.userId,
-                  }
-                : inboundCreatorUserId !== undefined
-                  ? {
-                      email: undefined,
-                      memberId: null,
-                      userId: inboundCreatorUserId,
-                    }
-                  : undefined;
-            if (creator !== undefined) {
-              yield* subscriptionRepository.subscribe({
-                organizationId: args.organizationId,
-                postId: args.id,
-                userId: creator.userId,
-                ...(creator.memberId !== null && {
-                  memberId: creator.memberId,
-                }),
-              });
-              if (creator.email !== undefined) {
-                yield* emailSubscriptions
-                  .requestSubscription({
-                    alreadyVerifiedUser: { userId: creator.userId },
-                    email: creator.email,
-                    now: subscriptionNow,
-                    organizationId: args.organizationId,
-                    source: "post_creator",
-                    topic: { topicId: args.id, topicType: "post" },
-                    verificationExpiresAt: DateTime.fromDateUnsafe(
-                      subscriptionNow
-                    ).pipe(
-                      DateTime.addDuration(Duration.days(1)),
-                      DateTime.toDate
-                    ),
-                  })
-                  .pipe(
-                    Effect.mapError(
-                      () =>
-                        new InternalServerError({
-                          message:
-                            "Could not record the post creator email subscription.",
-                        })
-                    )
-                  );
-              }
-            }
-          } else {
-            // In-app watch-list parity for the attributed author.
-            if (subject.userId !== null) {
-              yield* subscriptionRepository.subscribe({
-                organizationId: args.organizationId,
-                postId: args.id,
-                userId: subject.userId,
-              });
-            }
-            yield* subscribeOnBehalfSubject({
-              organizationId: args.organizationId,
-              topicId: args.id,
-              subject,
-              source: "post_creator",
-              subjectKind: "post author",
-              now: subscriptionNow,
-            });
-          }
-
-          const submissionWindow = yield* emailOutbox
-            .upsertPendingSubmissionWindow({
-              now: subscriptionNow,
+          let outboxId: string | undefined;
+          if (!backfill) {
+            yield* recordPostIntegrationEvent({
+              actor,
+              boardId: args.boardId,
+              eventType: "post.created",
+              ...(args.metadata !== undefined && { metadata: args.metadata }),
               organizationId: args.organizationId,
               postId: args.id,
-            })
-            .pipe(
-              Effect.mapError(
-                () =>
-                  new InternalServerError({
-                    message: "Could not record submission email intent.",
-                  })
-              )
-            );
-          yield* Option.match(notifications, {
-            onNone: () => Effect.void,
-            onSome: (service) =>
-              service.notifySubmission({
+              postSlug: persistedSlug,
+              statusId: args.statusId,
+              title: args.title,
+            });
+
+            // The creator of a post is automatically subscribed to it.
+            // On-behalf posts subscribe the resolved customer instead of the
+            // staff actor, following the same notification-eligibility rules: a
+            // verified account is trusted, everyone else is deferred until
+            // identity linking grants them access. A machine key has no person
+            // behind it, so there is nobody to subscribe — unless the caller
+            // resolved the inbound end user for it (Slack, Discord).
+            const subscriptionNow = yield* DateTime.nowAsDate;
+            if (subject === undefined) {
+              const inboundCreatorUserId = options.subscribeCreatorUserId;
+              const creator =
+                member !== null
+                  ? {
+                      email: member.email,
+                      memberId: member.memberId,
+                      userId: member.userId,
+                    }
+                  : inboundCreatorUserId !== undefined
+                    ? {
+                        email: undefined,
+                        memberId: null,
+                        userId: inboundCreatorUserId,
+                      }
+                    : undefined;
+              if (creator !== undefined) {
+                yield* subscriptionRepository.subscribe({
+                  organizationId: args.organizationId,
+                  postId: args.id,
+                  userId: creator.userId,
+                  ...(creator.memberId !== null && {
+                    memberId: creator.memberId,
+                  }),
+                });
+                if (creator.email !== undefined) {
+                  yield* emailSubscriptions
+                    .requestSubscription({
+                      alreadyVerifiedUser: { userId: creator.userId },
+                      email: creator.email,
+                      now: subscriptionNow,
+                      organizationId: args.organizationId,
+                      source: "post_creator",
+                      topic: { topicId: args.id, topicType: "post" },
+                      verificationExpiresAt: DateTime.fromDateUnsafe(
+                        subscriptionNow
+                      ).pipe(
+                        DateTime.addDuration(Duration.days(1)),
+                        DateTime.toDate
+                      ),
+                    })
+                    .pipe(
+                      Effect.mapError(
+                        () =>
+                          new InternalServerError({
+                            message:
+                              "Could not record the post creator email subscription.",
+                          })
+                      )
+                    );
+                }
+              }
+            } else {
+              // In-app watch-list parity for the attributed author.
+              if (subject.userId !== null) {
+                yield* subscriptionRepository.subscribe({
+                  organizationId: args.organizationId,
+                  postId: args.id,
+                  userId: subject.userId,
+                });
+              }
+              yield* subscribeOnBehalfSubject({
+                organizationId: args.organizationId,
+                topicId: args.id,
+                subject,
+                source: "post_creator",
+                subjectKind: "post author",
+                now: subscriptionNow,
+              });
+            }
+
+            const submissionWindow = yield* emailOutbox
+              .upsertPendingSubmissionWindow({
+                now: subscriptionNow,
                 organizationId: args.organizationId,
                 postId: args.id,
-                actorUserId: member?.userId ?? null,
-              }),
-          });
+              })
+              .pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message: "Could not record submission email intent.",
+                    })
+                )
+              );
+            yield* Option.match(notifications, {
+              onNone: () => Effect.void,
+              onSome: (service) =>
+                service.notifySubmission({
+                  organizationId: args.organizationId,
+                  postId: args.id,
+                  actorUserId: member?.userId ?? null,
+                }),
+            });
 
-          return {
-            slug: persistedSlug,
-            outboxId:
-              submissionWindow._tag === "Written"
-                ? submissionWindow.intentId
-                : undefined,
-          };
+            if (submissionWindow._tag === "Written") {
+              outboxId = submissionWindow.intentId;
+            }
+          }
+
+          return { slug: persistedSlug, outboxId };
         })
       ).pipe(
         Effect.tapCause(() =>
@@ -631,12 +649,14 @@ export const makePostWrites = Effect.gen(function* () {
       );
 
       yield* wakeEmailOutboxBestEffort(persisted.outboxId, args.organizationId);
-      yield* scheduleEmbedding({
-        content: prepared.content,
-        id: args.id,
-        organizationId: args.organizationId,
-        title: args.title,
-      });
+      if (!backfill) {
+        yield* scheduleEmbedding({
+          content: prepared.content,
+          id: args.id,
+          organizationId: args.organizationId,
+          title: args.title,
+        });
+      }
 
       // The slug actually persisted by the insert (including any collision
       // suffix) so callers can reference the stored post.
