@@ -10,6 +10,7 @@ import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
 import type { SqlError } from "effect/sql/SqlError";
 
@@ -30,6 +31,11 @@ const pgliteDataDir = (url: string): string => {
 
 // Configure the PGlite client layer. PGlite accepts the same `memory://`
 // data-directory URL the reference implementation passes straight through.
+//
+// The close is bounded because PGlite runs in-process: a close that waits on a
+// wedged WASM mutex would otherwise hang layer teardown — and the test worker
+// with it — forever. Ten seconds is far longer than a healthy close, and a
+// timeout is logged rather than thrown so it cannot fail a passing test.
 export const PgliteClientLive = PgliteClient.layerFrom(
   Effect.acquireRelease(
     Effect.map(
@@ -39,7 +45,17 @@ export const PgliteClientLive = PgliteClient.layerFrom(
           extensions: { vector, pg_trgm },
         })
     ),
-    (pglite) => Effect.promise(() => pglite.close())
+    (pglite) =>
+      Effect.promise(() => pglite.close()).pipe(
+        Effect.timeoutOption("10 seconds"),
+        Effect.tap((closed) =>
+          Option.isNone(closed)
+            ? Effect.logWarning(
+                "[Database client]: PGlite did not close within 10 seconds; the process may be wedged."
+              )
+            : Effect.void
+        )
+      )
   ).pipe(
     Effect.flatMap((liveClient) => PgliteClient.fromClient({ liveClient }))
   )
