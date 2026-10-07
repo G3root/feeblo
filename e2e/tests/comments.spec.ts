@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { expect, type Locator, type Page, test } from "@playwright/test";
-
+import { expect, type Locator, type Page, test } from "../fixtures";
 import { createWorkspace } from "../helpers/auth";
 import { assertNoPageErrors, trackPageErrors } from "../helpers/page-errors";
 import { createPost, fillEditor, openPost } from "../helpers/posts";

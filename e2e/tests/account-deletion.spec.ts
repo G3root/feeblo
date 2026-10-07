@@ -1,5 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
-
+import { expect, type Page, test } from "../fixtures";
 import {
   createAuthenticatedWorkspace,
   signUpProgrammatically,
@@ -9,10 +8,7 @@ import {
   waitForTestEmail,
 } from "../helpers/test-mailbox";
 import { createTestUser } from "../helpers/test-users";
-
-const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
-const appOrigin = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3101")
-  .origin;
+import { apiUrl, webUrl } from "../helpers/urls";
 
 /** `/<organizationId>` plus a settings suffix, on whatever host the app serves. */
 const settingsPath = (organizationUrl: string, suffix: string) =>
@@ -47,9 +43,9 @@ test.describe("account deletion", () => {
     await page.waitForURL(/\/sign-up/);
     const signIn = await page
       .context()
-      .request.post(`${apiURL}/api/auth/sign-in/email`, {
+      .request.post(`${apiUrl()}/api/auth/sign-in/email`, {
         data: { email: owner.email, password: owner.password },
-        headers: { Origin: appOrigin },
+        headers: { Origin: webUrl() },
       });
     expect(signIn.ok()).toBeFalsy();
   });
@@ -84,10 +80,10 @@ test.describe("account deletion", () => {
         teammate.email
       );
       const accepted = await teammateContext.request.post(
-        `${apiURL}/api/auth/organization/accept-invitation`,
+        `${apiUrl()}/api/auth/organization/accept-invitation`,
         {
           data: { invitationId: invitationIdFromEmail(email) },
-          headers: { Origin: appOrigin },
+          headers: { Origin: webUrl() },
         }
       );
       expect(accepted.ok()).toBeTruthy();

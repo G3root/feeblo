@@ -8,25 +8,21 @@ import {
   waitForVerificationEmail,
 } from "./test-mailbox";
 import { createTestUser, type TestUser } from "./test-users";
+import { apiUrl } from "./urls";
 
 export type AuthenticatedUser = TestUser & {
   organizationUrl: string;
 };
 
-const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
-
 export async function signUpProgrammatically(page: Page, user: TestUser) {
   const response = await page
     .context()
-    .request.post(`${apiURL}/api/auth/sign-up/email`, {
+    .request.post(`${apiUrl()}/api/auth/sign-up/email`, {
       data: {
         name: user.name,
         email: user.email,
         password: user.password,
       },
-      // The e2e server is shared by workers. Retry a dropped connection rather
-      // than failing authentication on a transient ECONNRESET.
-      maxRetries: 2,
     });
 
   expect(
@@ -37,12 +33,11 @@ export async function signUpProgrammatically(page: Page, user: TestUser) {
   const email = await waitForVerificationEmail(page.request, user.email);
   const verificationResponse = await page
     .context()
-    .request.post(`${apiURL}/api/auth/email-otp/verify-email`, {
+    .request.post(`${apiUrl()}/api/auth/email-otp/verify-email`, {
       data: {
         email: user.email,
         otp: verificationCodeFromEmail(email),
       },
-      maxRetries: 2,
     });
   expect(verificationResponse.ok()).toBeTruthy();
 }

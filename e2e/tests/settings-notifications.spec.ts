@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-
+import { expect, test } from "../fixtures";
 import { createAuthenticatedWorkspace } from "../helpers/auth";
 
 /** `/<organizationId>` plus a settings suffix, on whatever host the app serves. */

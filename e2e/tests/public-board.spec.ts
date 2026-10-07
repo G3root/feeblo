@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { expect, type Page, test } from "@playwright/test";
-
+import { expect, type Page, test } from "../fixtures";
 import { createAuthenticatedWorkspace } from "../helpers/auth";
 import { waitForHydration } from "../helpers/hydration";
 import { assertNoPageErrors, trackPageErrors } from "../helpers/page-errors";

@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { expect, type BrowserContext, type Page, test } from "@playwright/test";
-
+import { expect, type BrowserContext, type Page, test } from "../fixtures";
 import {
   createAuthenticatedWorkspace,
   signUpProgrammatically,
@@ -18,15 +17,12 @@ import {
   waitForTestEmail,
 } from "../helpers/test-mailbox";
 import { createTestUser, type TestUser } from "../helpers/test-users";
-import { publicBoardUrl } from "../helpers/urls";
+import { apiUrl, publicBoardUrl, webUrl } from "../helpers/urls";
 import {
   copyWorkspaceJwtSecret,
   signInRestrictedSsoVisitor,
 } from "../helpers/widget-sso";
 
-const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3101";
-const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
-const appOrigin = new URL(baseURL).origin;
 const authDialogName = "Sign in / Sign up";
 const signInWithEmailButtonName = /^Sign in with email/;
 
@@ -139,10 +135,10 @@ async function inviteMember(
 
 async function acceptInvitation(context: BrowserContext, invitationId: string) {
   return context.request.post(
-    `${apiURL}/api/auth/organization/accept-invitation`,
+    `${apiUrl()}/api/auth/organization/accept-invitation`,
     {
       data: { invitationId },
-      headers: { Origin: appOrigin },
+      headers: { Origin: webUrl() },
     }
   );
 }
@@ -511,7 +507,7 @@ test.describe("changelog notifications", () => {
           return { foreign, own };
         },
         {
-          apiUrl: apiURL,
+          apiUrl: apiUrl(),
           foreignOrganizationId: organizationIdB,
           ownOrganizationId: organizationIdA,
         }

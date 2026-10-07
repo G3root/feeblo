@@ -1,6 +1,6 @@
 import type { InvitableRole } from "@feeblo/permissions";
-import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
+import { type BrowserContext, expect, type Page, test } from "../fixtures";
 import {
   createAuthenticatedWorkspace,
   signUpProgrammatically,
@@ -11,14 +11,11 @@ import {
   waitForTestEmail,
 } from "../helpers/test-mailbox";
 import { createTestUser, type TestUser } from "../helpers/test-users";
+import { apiUrl, webUrl } from "../helpers/urls";
 import { LoginPage } from "../page-objects/LoginPage";
 
-const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
-const appOrigin = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3101")
-  .origin;
-
 const invitationEndpoint = (action: "accept" | "reject") =>
-  `${apiURL}/api/auth/organization/${action}-invitation`;
+  `${apiUrl()}/api/auth/organization/${action}-invitation`;
 
 function membersUrl(organizationUrl: string): string {
   return `${organizationUrl}/settings/members`;
@@ -63,7 +60,7 @@ function respondToInvitation(
 ) {
   return context.request.post(invitationEndpoint(action), {
     data: { invitationId },
-    headers: { Origin: appOrigin },
+    headers: { Origin: webUrl() },
   });
 }
 

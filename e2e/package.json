@@ -6,12 +6,8 @@
   "scripts": {
     "build:apps:e2e": "CLOUDFLARE_ADAPTER=false turbo run build --ui=stream --filter=@feeblo/web --filter=@feeblo/sdk",
     "db:migrate": "tsx scripts/migrate-pglite.ts",
-    "dev:server:e2e": "pnpm run db:migrate && pnpm --dir ../apps/server exec tsx src/index.ts",
-    "dev:web:e2e": "pnpm run build:apps:e2e && pnpm run start:web:e2e",
-    "start:server:e2e": "pnpm run db:migrate && pnpm --dir ../apps/server exec tsx src/index.ts",
-    "start:web:e2e": "node ../apps/web/server.mjs",
-    "test": "pnpm run build:apps:e2e && E2E_REUSE_BUILD=true playwright test",
-    "test:ci": "E2E_REUSE_BUILD=true playwright test",
+    "test": "pnpm run build:apps:e2e && playwright test",
+    "test:ci": "playwright test",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

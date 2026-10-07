@@ -2,8 +2,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingHttpHeaders } from "node:http";
 
 import { isObject, isString } from "@feeblo/utils/runtime-kind";
-import { expect, type Locator, test } from "@playwright/test";
 
+import { expect, type Locator, test } from "../fixtures";
 import { createAuthenticatedWorkspace } from "../helpers/auth";
 
 interface ReceivedWebhook {

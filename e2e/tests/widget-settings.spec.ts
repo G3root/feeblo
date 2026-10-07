@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-
+import { expect, test } from "../fixtures";
 import { createAuthenticatedWorkspace } from "../helpers/auth";
 import { setPlan } from "../helpers/set-plan";
 import { copyWorkspaceJwtSecret } from "../helpers/widget-sso";
