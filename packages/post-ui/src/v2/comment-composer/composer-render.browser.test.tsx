@@ -83,9 +83,15 @@ describe("CommentComposer rerender behavior", () => {
     renderCounts.submit = 0;
     renderCounts.toggle = 0;
 
-    // 10 "keystrokes" through the composer's real content pipeline.
+    // 10 "keystrokes" through the composer's real content pipeline. The probe
+    // is an empty, zero-size button, so Playwright's actionability check
+    // (visible, stable) is unreliable under load; a dispatched click is the
+    // same bubbling event React handles, and this test asserts render counts.
     for (let i = 0; i < 10; i++) {
-      await view.getByTestId("type").click();
+      view
+        .getByTestId("type")
+        .element()
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
     }
 
     // Retry until both counts settle: they must stay at their baseline.
@@ -108,7 +114,10 @@ describe("CommentComposer rerender behavior", () => {
     // Visibility feeds the submit label and the toggle state: both must
     // re-render exactly once per change. This setup has no StrictMode
     // (vitest-browser-react mounts as-is), so there is no double render.
-    await view.getByTestId("visibility").click();
+    await view
+      .getByTestId("visibility")
+      .element()
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await vi.waitFor(() => {
       expect(renderCounts.submit).toBe(1);
       expect(renderCounts.toggle).toBe(1);

@@ -1,9 +1,24 @@
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "vitest/config";
+
+// Bounds a run that a wedged PGlite worker would otherwise hang forever; see
+// `tools/vitest/watchdog.ts`.
+const watchdogPath = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "tools",
+  "vitest",
+  "watchdog.ts"
+);
 
 export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    globalSetup: [watchdogPath],
     // PGlite boots an embedded Postgres (plus the pgvector WASM extension),
     // which takes ~1.5s locally and longer on shared CI runners, especially
     // with turbo running packages concurrently. Keep the timeout generous so
