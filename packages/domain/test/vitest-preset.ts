@@ -41,7 +41,9 @@ const watchdogPath = join(
  */
 export const pgliteTestOptions: TestUserConfig = {
   environment: "node",
-  globalSetup: [fixturePath("global-setup.ts"), watchdogPath],
+  // The watchdog first so a migration that wedges in the fixture setup below
+  // is still covered; Vitest tears global setups down in reverse.
+  globalSetup: [watchdogPath, fixturePath("global-setup.ts")],
   hookTimeout: 60_000,
   // PGlite runs entirely in-process; worker threads avoid the process startup
   // and IPC overhead of Vitest's default fork pool while preserving per-file

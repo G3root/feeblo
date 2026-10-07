@@ -1,6 +1,8 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+import type { TestProject } from "vitest/node";
+
 /**
  * Bounds a test run that a blocked worker would otherwise hang forever.
  *
@@ -16,15 +18,32 @@ import { fileURLToPath } from "node:url";
  */
 const defaultDeadlineMs = 10 * 60 * 1000;
 
+/**
+ * The largest delay `setTimeout` can represent. Node clamps anything larger to
+ * 1ms, which would SIGKILL a healthy run the moment it starts.
+ */
+const maxTimerMs = 2_147_483_647;
+
 let watchdog: ChildProcess | undefined;
 
-export function setup(): void {
+export function setup(project: TestProject): void {
   const configured = process.env.FEEBLO_TEST_DEADLINE_MS;
-  const deadlineMs =
-    configured === undefined ? defaultDeadlineMs : Number(configured);
+  const explicit = configured !== undefined && configured !== "";
 
+  // A watcher is meant to stay open until the developer stops it, so the
+  // default deadline does not apply there. An explicit deadline still does.
+  if (!explicit && project.config.watch) {
+    return;
+  }
+
+  const deadlineMs = explicit ? Number(configured) : defaultDeadlineMs;
   if (!Number.isFinite(deadlineMs) || deadlineMs <= 0) {
     return;
+  }
+  if (deadlineMs > maxTimerMs) {
+    throw new Error(
+      `FEEBLO_TEST_DEADLINE_MS must be at most ${maxTimerMs}ms: setTimeout cannot represent a longer delay and would fire after 1ms instead.`
+    );
   }
 
   watchdog = spawn(
@@ -36,6 +55,12 @@ export function setup(): void {
     ],
     { detached: true, stdio: ["ignore", "inherit", "inherit"] }
   );
+  // A failed spawn emits `error`; without a listener that becomes an unhandled
+  // event and takes the runner down before the tests start.
+  watchdog.once("error", (error) => {
+    console.error(`[vitest-watchdog] could not start: ${error.message}`);
+    watchdog = undefined;
+  });
   watchdog.unref();
 }
 

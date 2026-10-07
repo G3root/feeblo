@@ -10,7 +10,6 @@ import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
 import type { SqlError } from "effect/sql/SqlError";
 
@@ -29,6 +28,34 @@ const pgliteDataDir = (url: string): string => {
   return url;
 };
 
+/** How long PGlite gets to close before the release gives up waiting. */
+const pgliteCloseTimeoutMs = 10_000;
+
+/**
+ * Resolves when `close` settles or the deadline passes, whichever is first.
+ *
+ * The race is wall-clock on purpose. `Effect.timeoutOption` reads the fiber's
+ * `Clock`, so a scope closing under `TestClock` would wait for virtual time
+ * that never advances, and a finalizer cannot rely on interrupting a close
+ * that is already past interruption.
+ */
+const closeWithinDeadline = (
+  close: Promise<void>
+): Promise<"closed" | "timed-out"> =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve("timed-out"), pgliteCloseTimeoutMs);
+    close.then(
+      () => {
+        clearTimeout(timer);
+        resolve("closed");
+      },
+      (reason) => {
+        clearTimeout(timer);
+        reject(reason);
+      }
+    );
+  });
+
 // Configure the PGlite client layer. PGlite accepts the same `memory://`
 // data-directory URL the reference implementation passes straight through.
 //
@@ -46,10 +73,9 @@ export const PgliteClientLive = PgliteClient.layerFrom(
         })
     ),
     (pglite) =>
-      Effect.promise(() => pglite.close()).pipe(
-        Effect.timeoutOption("10 seconds"),
-        Effect.tap((closed) =>
-          Option.isNone(closed)
+      Effect.promise(() => closeWithinDeadline(pglite.close())).pipe(
+        Effect.tap((outcome) =>
+          outcome === "timed-out"
             ? Effect.logWarning(
                 "[Database client]: PGlite did not close within 10 seconds; the process may be wedged."
               )
