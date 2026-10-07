@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 
-import { expect, type Browser, type Page, test } from "../fixtures";
+import {
+  expect,
+  type Browser,
+  type Locator,
+  type Page,
+  test,
+} from "../fixtures";
 import { createWorkspace, signUpProgrammatically } from "../helpers/auth";
 import { waitForHydration } from "../helpers/hydration";
 import { assertNoPageErrors, trackPageErrors } from "../helpers/page-errors";
@@ -13,12 +19,29 @@ import {
 import { createTestUser, type TestUser } from "../helpers/test-users";
 import { apiUrl, publicBoardUrl, webUrl } from "../helpers/urls";
 
-async function chooseFirstReaction(page: Page) {
-  await page.getByRole("button", { name: "Add reaction" }).first().click();
-  await page
-    .locator('[role="dialog"]:visible')
-    .getByRole("button", { name: "👍️", exact: true })
-    .click();
+/**
+ * Opens a reaction picker and picks 👍.
+ *
+ * The popover can close or be replaced while a live query re-renders the card
+ * underneath it, and a single click then chases a detached button until it
+ * times out. Retrying the open-and-pick pair re-opens the picker when that
+ * happens. `scope` selects the picker on one card; the page's first picker is
+ * used when it is omitted.
+ */
+async function pickReaction(page: Page, scope?: Locator) {
+  const trigger = (scope ?? page)
+    .getByRole("button", { name: "Add reaction" })
+    .first();
+  const dialog = page.locator('[role="dialog"]:visible');
+
+  await expect(async () => {
+    if ((await dialog.count()) === 0) {
+      await trigger.click();
+    }
+    await dialog
+      .getByRole("button", { name: "👍️", exact: true })
+      .click({ timeout: 2_000 });
+  }).toPass({ intervals: [250, 500, 1_000], timeout: 15_000 });
 }
 
 /**
@@ -138,7 +161,7 @@ test.describe("feedback workflow", () => {
       await upvoteButton.click();
       await expect(upvoteButton).toContainText("1");
 
-      await chooseFirstReaction(page);
+      await pickReaction(page);
       await expect(
         page
           .getByRole("button")
@@ -156,11 +179,7 @@ test.describe("feedback workflow", () => {
       const commentCard = page
         .locator('[data-slot="comment"]')
         .filter({ hasText: comment });
-      await commentCard.getByRole("button", { name: "Add reaction" }).click();
-      await page
-        .locator('[role="dialog"]:visible')
-        .getByRole("button", { name: "👍️", exact: true })
-        .click();
+      await pickReaction(page, commentCard);
       await expect(
         commentCard
           .getByRole("button")

@@ -1,6 +1,14 @@
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { mkdtempSync } from "node:fs";
-import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  appendFile,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -28,6 +36,20 @@ const readinessTimeoutMs = 240_000;
 
 /** How long teardown waits after SIGTERM before it escalates to SIGKILL. */
 const gracefulShutdownMs = 10_000;
+
+/** The prefix `mkdtempSync` gives every run directory. */
+const runDirectoryPrefix = "feeblo-e2e-run-";
+
+/**
+ * How old an abandoned run directory must be before a new run removes it.
+ *
+ * The watchdog stops the servers a killed runner leaves behind, but nothing
+ * removes their directory, and each one holds a PGlite cluster per worker. The
+ * cutoff is far longer than any run, so a directory a concurrent run is still
+ * writing to is never a candidate; a hard-killed run is reclaimed the next
+ * time tests start.
+ */
+const staleRunAgeMs = 2 * 60 * 60 * 1000;
 
 /** One product instance: an API server, a web server and a PGlite directory. */
 export type WorkerServer = {
@@ -305,6 +327,36 @@ const startWorkerServer = async (
 };
 
 /**
+ * Removes run directories a hard-killed runner left behind.
+ *
+ * Best effort: a permissions problem or a directory another run removed first
+ * must not turn into a test failure.
+ */
+const pruneAbandonedRunDirectories = async (): Promise<void> => {
+  const entries = await readdir(tmpdir(), { withFileTypes: true }).catch(
+    () => []
+  );
+  const removableBefore = Date.now() - staleRunAgeMs;
+
+  await Promise.all(
+    entries
+      .filter(
+        (entry) =>
+          entry.isDirectory() && entry.name.startsWith(runDirectoryPrefix)
+      )
+      .map(async (entry) => {
+        const directory = path.join(tmpdir(), entry.name);
+        const info = await stat(directory).catch(() => null);
+        if (info !== null && info.mtimeMs < removableBefore) {
+          await rm(directory, { force: true, recursive: true }).catch(
+            () => undefined
+          );
+        }
+      })
+  );
+};
+
+/**
  * One isolated product per Playwright worker.
  *
  * Every worker gets its own PGlite directory, API server and web server on
@@ -319,7 +371,8 @@ const startWorkerServer = async (
 export const startWorkerServers = async (
   workerCount: number
 ): Promise<ServerManifest> => {
-  const runDirectory = mkdtempSync(path.join(tmpdir(), "feeblo-e2e-run-"));
+  await pruneAbandonedRunDirectories();
+  const runDirectory = mkdtempSync(path.join(tmpdir(), runDirectoryPrefix));
   const servers: WorkerServer[] = [];
   try {
     for (let worker = 0; worker < workerCount; worker += 1) {
