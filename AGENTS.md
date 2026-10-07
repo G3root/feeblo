@@ -70,6 +70,8 @@ What actually enforces the rules:
 - `autofix.yml` runs `pnpm fmt` and `pnpm lint:fix` and commits the result. It is a writer, not a gate: a violation it cannot fix does not fail it.
 - `tools/oxlint/effect-tests` reports `Effect.run*` and `ManagedRuntime.make` in test files as an **error**, so hand-running an Effect fails the gate.
 
+**Choosing e2e scenarios.** `build_app` runs only the specs a pull request names in one fenced `e2e` block in its description: spec file names from `e2e/tests/`, `none` when no scenario exercises the change, or `all: <reason>` when every scenario does. Spec files the pull request adds or changes always run, and pushes to `main` run everything. A missing, empty, or invalid block fails the job — the choice is deliberate, never a fallback to the full suite. See `e2e/scripts/select-specs.ts`.
+
 **There is no commit hook.** Nothing stops a commit that fails the gate; CI catches it about twenty minutes later. Never pass `--no-verify` to git, and do not add a commit hook without deciding how it is protected from bypass.
 
 If a check fails, fix the failure. Do not loosen the rule to get green. If a rule is genuinely wrong for this codebase, turn it off in `oxlint.config.ts` with a written reason directly above it — the `effecttsgo/*` and `typescript/*` overrides in that file are the pattern to copy. A rule turned off without a reason is indistinguishable from a rule nobody could be bothered to satisfy.

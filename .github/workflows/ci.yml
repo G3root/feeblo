@@ -73,10 +73,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
+          # Full history so the selection step can diff the pull request against
+          # its base and always include the spec files it changes.
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node
+
+      # Reads the fenced ```e2e block from the pull request description and
+      # decides which spec files this run executes. See
+      # `e2e/scripts/select-specs.ts`; a missing or invalid block fails here.
+      - name: Select e2e scenarios
+        id: select
+        run: pnpm --filter @feeblo/e2e exec tsx scripts/select-specs.ts
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
 
       - name: Copy env
         run: cp .env.example .env
@@ -115,11 +127,19 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
       - name: Run end-to-end tests using built apps
-        run: pnpm --filter @feeblo/e2e test:ci
+        if: ${{ steps.select.outputs.run != 'false' }}
+        run: |
+          if [ -n "$E2E_SPECS" ]; then
+            pnpm --filter @feeblo/e2e test:ci $E2E_SPECS
+          else
+            pnpm --filter @feeblo/e2e test:ci
+          fi
         env:
           # Print web-server startup, health-check, and process-exit details when
           # Playwright fails before a spec can begin.
           DEBUG: pw:webserver
+          # Space-separated spec files chosen by scripts/select-specs.ts.
+          E2E_SPECS: ${{ steps.select.outputs.specs }}
 
       - name: Upload end-to-end test artifacts
         if: always()
