@@ -1,13 +1,12 @@
-import { schema } from "@feeblo/db";
+import { Database, schema } from "@feeblo/db";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { currentCompanyRepository } from "../../company/repository";
+import { CompanyRepository } from "../../company/repository";
 import { PUBLIC_API_PAGE_DEFAULT_LIMIT } from "../../public-api/common";
 import { decodeCursorOrFail, encodeCursor } from "../../public-api/cursor";
-import { currentPublicApiDatabase } from "../../public-api/database";
 import { requireCrmEntryAllowance } from "../../public-api/entitlement";
 import {
   ConflictError,
@@ -20,7 +19,7 @@ import {
   notFoundError,
 } from "../../public-api/errors";
 import { onInternalError } from "../../public-api/failure";
-import { currentPublicApiCaller } from "../../public-api/middleware";
+import { PublicApiCaller } from "../../public-api/middleware";
 import { defineOperation } from "../../public-api/operation";
 import { parseName } from "../../public-api/parse";
 import { withRemapDbErrors } from "../../rpc-errors";
@@ -109,7 +108,7 @@ const failIfCompanyIsTaken = (args: {
   readonly organizationId: string;
 }) =>
   Effect.gen(function* () {
-    const companies = yield* currentCompanyRepository;
+    const companies = yield* CompanyRepository;
 
     if (args.name !== null) {
       const nameTaken = yield* companies
@@ -172,8 +171,8 @@ export const listCompaniesOperation = defineOperation(
   },
   ({ cursor, limit }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const companies = yield* currentCompanyRepository;
+      const caller = yield* PublicApiCaller;
+      const companies = yield* CompanyRepository;
 
       const after = yield* decodeCursorOrFail(cursor);
       const pageSize = limit ?? PUBLIC_API_PAGE_DEFAULT_LIMIT;
@@ -214,9 +213,9 @@ export const createCompanyOperation = defineOperation(
   },
   ({ avatar, externalCreatedAt, externalId, name: rawName }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const db = yield* currentPublicApiDatabase;
-      const companies = yield* currentCompanyRepository;
+      const caller = yield* PublicApiCaller;
+      const db = yield* Database.Database;
+      const companies = yield* CompanyRepository;
 
       const name = yield* parseName(rawName);
 
@@ -288,8 +287,8 @@ export const getCompanyOperation = defineOperation(
   },
   ({ companyId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const companies = yield* currentCompanyRepository;
+      const caller = yield* PublicApiCaller;
+      const companies = yield* CompanyRepository;
 
       const company = yield* companies
         .findById({ id: companyId, organizationId: caller.organizationId })
@@ -317,8 +316,8 @@ export const updateCompanyOperation = defineOperation(
   },
   ({ avatar, companyId, externalCreatedAt, externalId, name: rawName }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const companies = yield* currentCompanyRepository;
+      const caller = yield* PublicApiCaller;
+      const companies = yield* CompanyRepository;
 
       // A body that names no field would otherwise be answered as a
       // successful write that changed nothing but `updatedAt`, which tells
@@ -402,8 +401,8 @@ export const deleteCompanyOperation = defineOperation(
   },
   ({ companyId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const companies = yield* currentCompanyRepository;
+      const caller = yield* PublicApiCaller;
+      const companies = yield* CompanyRepository;
 
       // A company that is already gone is a 404 rather than a success, for
       // the same reason as a tag: the caller cannot tell a delete that

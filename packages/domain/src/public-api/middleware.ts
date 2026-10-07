@@ -87,22 +87,11 @@ export class ApiKeyAuthMiddleware extends HttpApiMiddleware.Service<
  */
 export const requirePublicApiScope = (scope: PublicApiScope) =>
   Effect.gen(function* () {
-    const caller = yield* currentPublicApiCaller;
+    const caller = yield* PublicApiCaller;
     if (!hasPublicApiScope(caller.scopes, scope)) {
       return yield* forbiddenScopeError(scope);
     }
   });
-
-/**
- * Reads the caller from the fiber context.
- *
- * `HttpApiBuilder` does not thread group-middleware services through a
- * handler's type-level requirements, so this mirrors `currentHttpApiSession`:
- * the middleware has already provided the value by the time a handler runs.
- */
-export const currentPublicApiCaller = Effect.context<never>().pipe(
-  Effect.map((context) => Context.getUnsafe(context, PublicApiCaller))
-);
 
 /**
  * Builds the key middleware for one composition.

@@ -1,8 +1,8 @@
 import { ScrollArea } from "@feeblo/ui/scroll-area";
 import { cn } from "@feeblo/ui/utils";
-import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import type { ReactNode, Ref } from "react";
 
+import { formatPostStatus } from "../post-status";
 import { RoadmapStatusIcon } from "./roadmap-status-icon";
 import type { RoadmapStatus } from "./types";
 

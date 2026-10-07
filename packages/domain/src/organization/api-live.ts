@@ -19,7 +19,7 @@ import {
 } from "../rpc-errors";
 import { S3UploadService } from "../services/s3";
 import {
-  currentHttpApiSession,
+  CurrentSession,
   HttpApiAuthMiddlewareLive,
 } from "../session-middleware";
 
@@ -38,7 +38,7 @@ export const OrganizationApiLive = HttpApiBuilder.group(
       "uploadOrganizationLogo",
       ({ payload: { file, organizationId } }) => {
         return Effect.gen(function* () {
-          const session = yield* currentHttpApiSession;
+          const session = yield* CurrentSession;
           // Explicit permission gate (same `can()` as Policy.canPermission):
           // workspace management is the `workspace.update` grant, which is
           // exactly the roles `isPrivilegedRole` used to hardcode.

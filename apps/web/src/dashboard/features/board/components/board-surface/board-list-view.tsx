@@ -1,4 +1,5 @@
 import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion";
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import {
   Accordion,
   AccordionPanel,
@@ -13,10 +14,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@feeblo/ui/context-menu";
-import {
-  type BoardPostStatus,
-  formatPostStatus,
-} from "@feeblo/web-shared/board/constants";
+import { type BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { hasMembership, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
   Add01Icon,

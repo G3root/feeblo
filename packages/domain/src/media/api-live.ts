@@ -15,7 +15,7 @@ import {
 } from "../rpc-errors";
 import { S3UploadService } from "../services/s3";
 import {
-  currentHttpApiSession,
+  CurrentSession,
   HttpApiAuthMiddlewareLive,
 } from "../session-middleware";
 import { MediaUploadLimitsMiddlewareLive } from "./api-contract";
@@ -40,7 +40,7 @@ export const MediaApiLive = HttpApiBuilder.group(
   (handlers) =>
     handlers.handle("uploadMedia", ({ payload: { file, organizationId } }) =>
       Effect.gen(function* () {
-        const session = yield* currentHttpApiSession;
+        const session = yield* CurrentSession;
 
         // Editor uploads are the one dashboard write that stores bytes with no
         // plan quota (10 MB per file), so they are bounded per member rather
