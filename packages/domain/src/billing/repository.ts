@@ -249,10 +249,19 @@ const makeBillingRepository = Effect.gen(function* () {
           // one here — the org-gone gate makes it immediately eligible for
           // the retry loop, and the row's idempotent key keeps a revocation
           // the deletion already queued from being duplicated or re-opened.
-          // A metadata org that is not a workspace id this deployment mints
-          // is foreign metadata; touching it could revoke a subscription the
+          // A metadata org passing the legid checksum — the same scheme this
+          // deployment mints workspace ids with, not merely the `org_` shape —
+          // is treated as ours and queued. It is the strongest evidence
+          // available on this path: the local subscription row is gone, and a
+          // deployment marker stamped on the checkout was rejected because
+          // every subscription created before it would regress to
+          // log-and-acknowledge here, re-opening the missed-redelivery bug.
+          // The check does not separate two Feeblo deployments sharing one
+          // Polar org and token — that boundary is the webhook secret.
+          // Anything failing verification could be an operator-stamped or
+          // foreign subscription; touching it could revoke a subscription the
           // operator created directly in Polar, so it is only logged.
-          if (WorkspaceId.is(organizationId.value)) {
+          if (yield* WorkspaceId.verify(organizationId.value)) {
             const now = yield* DateTime.nowAsDate;
             yield* db
               .insert(schema.subscriptionRevocationTable)

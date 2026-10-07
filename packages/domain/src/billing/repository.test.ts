@@ -433,6 +433,45 @@ describe("BillingRepository", () => {
     );
 
     it.effect(
+      "does not queue a revocation for an id that merely looks like a workspace id",
+      () =>
+        Effect.gen(function* () {
+          const repository = yield* BillingRepository;
+          const db = yield* currentDb;
+          const { productId } = yield* makeWorkspace();
+
+          // Passes the prefix and charset shape check but not the legid
+          // checksum this deployment's ids embed — the refinement the queue
+          // decision rests on.
+          expect(WorkspaceId.is("org_a")).toBe(true);
+          expect(yield* WorkspaceId.verify("org_a")).toBe(false);
+
+          const exit = yield* Effect.exit(
+            repository.upsertSubscription(
+              makeSubscriptionPayload({
+                externalSubscriptionId: "sub_lookalike_org",
+                organizationId: "org_a",
+                productId,
+              }),
+              instant("2026-01-02T00:00:00.000Z")
+            )
+          );
+
+          expect(exit._tag).toBe("Success");
+          const queued = yield* db
+            .select()
+            .from(schema.subscriptionRevocationTable)
+            .where(
+              eq(
+                schema.subscriptionRevocationTable.externalSubscriptionId,
+                "sub_lookalike_org"
+              )
+            );
+          expect(queued).toHaveLength(0);
+        })
+    );
+
+    it.effect(
       "does not queue a revocation for foreign metadata on a deleted workspace",
       () =>
         Effect.gen(function* () {
@@ -1072,11 +1111,17 @@ describe("BillingRepository", () => {
             .delete(schema.organizationTable)
             .where(eq(schema.organizationTable.id, organizationId));
 
-          // The first pass runs immediately and Polar is unreachable.
+          // The first pass runs immediately and Polar is unreachable. The
+          // shared PGlite keeps pending rows from earlier tests, so the sweep
+          // services them first; wait until this row's own call has happened
+          // before the flip, or a recovering pass could precede the failing
+          // one and leave it only one call.
           const fiber = yield* Effect.forkScoped(
             subscriptionRevocationMaintenance
           );
-          yield* waitUntil(Effect.sync(() => polarState.calls.length >= 1));
+          yield* waitUntil(
+            Effect.sync(() => polarState.calls.includes("sub_maintenance"))
+          );
 
           // Polar recovers; the next scheduled pass closes the row.
           polarState.fail = false;
