@@ -1,3 +1,4 @@
+import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
@@ -16,6 +17,9 @@ const deterministicMessageIdPattern =
 
 describe("email delivery state", () => {
   const TestLayer = EmailOutboxRepository.layer.pipe(
+    // The repository's deterministic message id hashes through the Crypto
+    // service now, so the fixture supplies the node implementation.
+    Layer.provideMerge(NodeCrypto.layer),
     Layer.provideMerge(Database.PgliteDatabaseLive)
   );
 

@@ -7,7 +7,6 @@ import * as FileSystem from "effect/FileSystem";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
 
-import { AssetRepository } from "../asset/repository";
 import { replaceSingletonAsset } from "../asset/service";
 import { Api } from "../http/api";
 import { UploadLimitsMiddlewareLive } from "../http/upload-limits";
@@ -18,12 +17,11 @@ import {
   UnauthorizedError,
   withRemapDbErrors,
 } from "../rpc-errors";
-import { S3UploadService, S3UploadServiceLive } from "../services/s3";
+import { S3UploadService } from "../services/s3";
 import {
-  currentHttpApiSession,
+  CurrentSession,
   HttpApiAuthMiddlewareLive,
 } from "../session-middleware";
-import { OrganizationRepository } from "./repository";
 
 const MAX_ORGANIZATION_LOGO_BYTES = 5 * 1024 * 1024;
 const ALLOWED_CONTENT_TYPES = new Set([
@@ -40,7 +38,7 @@ export const OrganizationApiLive = HttpApiBuilder.group(
       "uploadOrganizationLogo",
       ({ payload: { file, organizationId } }) => {
         return Effect.gen(function* () {
-          const session = yield* currentHttpApiSession;
+          const session = yield* CurrentSession;
           // Explicit permission gate (same `can()` as Policy.canPermission):
           // workspace management is the `workspace.update` grant, which is
           // exactly the roles `isPrivilegedRole` used to hardcode.
@@ -120,15 +118,11 @@ export const OrganizationApiLive = HttpApiBuilder.group(
             });
           }
 
-          const s3Service = yield* S3UploadService.pipe(
-            Effect.provide(S3UploadServiceLive),
-            Effect.mapError(
-              () =>
-                new InternalServerError({
-                  message: "Failed to configure media storage",
-                })
-            )
-          );
+          // Media storage is a shared requirement supplied by the composition
+          // root, not a live layer built inside the request: the root provides
+          // the one instance every upload path uses, and a test that supplies
+          // a substitute is not overridden here.
+          const s3Service = yield* S3UploadService;
           const uploaded = yield* s3Service
             .uploadOrganizationLogo({
               bytes,
@@ -159,12 +153,7 @@ export const OrganizationApiLive = HttpApiBuilder.group(
           }).pipe(Effect.provideService(S3UploadService, s3Service));
 
           return uploaded;
-        }).pipe(
-          Effect.provide(
-            Layer.mergeAll(OrganizationRepository.layer, AssetRepository.layer)
-          ),
-          withRemapDbErrors("Organization", "create")
-        );
+        }).pipe(withRemapDbErrors("Organization", "create"));
       }
     )
 ).pipe(

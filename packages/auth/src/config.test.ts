@@ -2,7 +2,6 @@ import { describe, expect, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import * as Layer from "effect/Layer";
 
 import { AuthConfig } from "./config";
 
@@ -14,18 +13,13 @@ const requiredAuthEnvironment = {
 };
 
 const loadAuthConfig = (environment: Record<string, string | undefined> = {}) =>
-  AuthConfig.pipe(
-    Effect.provide(
-      AuthConfig.layer.pipe(
-        Layer.provide(
-          ConfigProvider.layer(
-            ConfigProvider.fromUnknown({
-              ...requiredAuthEnvironment,
-              ...environment,
-            })
-          )
-        )
-      )
+  AuthConfig.make.pipe(
+    Effect.provideService(
+      ConfigProvider.ConfigProvider,
+      ConfigProvider.fromUnknown({
+        ...requiredAuthEnvironment,
+        ...environment,
+      })
     )
   );
 

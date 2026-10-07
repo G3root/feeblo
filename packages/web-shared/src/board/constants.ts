@@ -28,15 +28,3 @@ export const BOARD_LANE_COLOR_MAP = {
   COMPLETED: "text-emerald-600 dark:text-emerald-400",
   CLOSED: "text-red-600 dark:text-red-400",
 } satisfies Record<BoardPostStatus, string>;
-
-/**
- * Fallback display label derived from the status type, used only when a
- * status row's `label` is empty (e.g. pre-migration rows).
- */
-export function formatPostStatus(status: string) {
-  return status
-    .toLowerCase()
-    .split("_")
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(" ");
-}

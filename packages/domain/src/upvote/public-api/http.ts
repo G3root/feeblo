@@ -1,3 +1,4 @@
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
@@ -9,6 +10,8 @@ import {
   PUBLIC_API_WRITE_ERROR_SCHEMAS,
 } from "../../public-api/errors";
 import type { HandlerOf } from "../../public-api/handler";
+import type { PublicApiCaller } from "../../public-api/middleware";
+import type { PublicApiDependencies } from "../../public-api/operations";
 import { parseLimit, providedQueryParam } from "../../public-api/parse";
 import {
   createVoteOperation,
@@ -112,7 +115,9 @@ export const voteEndpoints = [
     ),
 ] as const;
 
-export const voteHandlers = {
+export const voteHandlers = (
+  context: Context.Context<PublicApiDependencies>
+) => ({
   listPostVotes: (({ params, query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
@@ -122,7 +127,11 @@ export const voteHandlers = {
         limit,
         voter: voterFilterFromQuery(query),
       });
-    })) satisfies HandlerOf<PublicApiGroup, "listPostVotes">,
+    }).pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "listPostVotes",
+    PublicApiCaller
+  >,
 
   listVotes: (({ query }) =>
     Effect.gen(function* () {
@@ -134,19 +143,32 @@ export const voteHandlers = {
         postId: providedQueryParam(query.postId),
         voter: voterFilterFromQuery(query),
       });
-    })) satisfies HandlerOf<PublicApiGroup, "listVotes">,
+    }).pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "listVotes",
+    PublicApiCaller
+  >,
 
   // The body is the operation's own input minus the path, so handing it over
   // cannot drop a field the operation gains.
   createVote: (({ params, payload }) =>
-    createVoteOperation.handler({
-      ...payload,
-      ...params,
-    })) satisfies HandlerOf<PublicApiGroup, "createVote">,
+    createVoteOperation
+      .handler({
+        ...payload,
+        ...params,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "createVote",
+    PublicApiCaller
+  >,
 
   deleteVote: (({ params }) =>
-    deleteVoteOperation.handler(params)) satisfies HandlerOf<
+    deleteVoteOperation
+      .handler(params)
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "deleteVote"
+    "deleteVote",
+    PublicApiCaller
   >,
-};
+});

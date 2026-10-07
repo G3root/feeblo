@@ -2,9 +2,9 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { currentBoardRepository } from "../../board/repository";
+import { BoardRepository } from "../../board/repository";
 import { PUBLIC_API_PAGE_DEFAULT_LIMIT } from "../../public-api/common";
-import { currentPublicApiConfig } from "../../public-api/config";
+import { PublicApiConfig } from "../../public-api/config";
 import { decodeCursorOrFail, encodeCursor } from "../../public-api/cursor";
 import {
   InternalError,
@@ -13,7 +13,7 @@ import {
   notFoundError,
 } from "../../public-api/errors";
 import { onInternalError } from "../../public-api/failure";
-import { currentPublicApiCaller } from "../../public-api/middleware";
+import { PublicApiCaller } from "../../public-api/middleware";
 import { defineOperation } from "../../public-api/operation";
 import { withRemapDbErrors } from "../../rpc-errors";
 import { toBoardSource, toPublicApiBoard } from "./mappers";
@@ -55,9 +55,9 @@ export const listBoardsOperation = defineOperation(
   },
   ({ cursor, limit }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const config = yield* currentPublicApiConfig;
-      const boards = yield* currentBoardRepository;
+      const caller = yield* PublicApiCaller;
+      const config = yield* PublicApiConfig;
+      const boards = yield* BoardRepository;
 
       const after = yield* decodeCursorOrFail(cursor);
       const pageSize = limit ?? PUBLIC_API_PAGE_DEFAULT_LIMIT;
@@ -105,9 +105,9 @@ export const getBoardOperation = defineOperation(
   },
   ({ boardId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const config = yield* currentPublicApiConfig;
-      const boards = yield* currentBoardRepository;
+      const caller = yield* PublicApiCaller;
+      const config = yield* PublicApiConfig;
+      const boards = yield* BoardRepository;
 
       const board = yield* boards
         .findByIdInOrganization({

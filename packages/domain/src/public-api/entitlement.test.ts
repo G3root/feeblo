@@ -1,6 +1,7 @@
 import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
+import { WorkspaceId } from "@feeblo/id";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -50,7 +51,7 @@ const FREE_CRM_ENTRY_LIMIT = 10;
 const seedWorkspace = (plan: "free" | "starter") =>
   Effect.gen(function* () {
     const db = yield* currentDb;
-    const organizationId = `org_crm_${Math.random().toString(36).slice(2, 10)}`;
+    const organizationId = yield* WorkspaceId.generate;
     const now = yield* DateTime.nowAsDate;
 
     yield* db.insert(schema.organizationTable).values({

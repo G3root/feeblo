@@ -1,4 +1,5 @@
 import { PostCollectionDataProvider } from "@feeblo/post-ui/post-collection";
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import { Card, CardPanel, CardTitle } from "@feeblo/ui/card";
 import {
   Empty,
@@ -18,7 +19,6 @@ import {
   FeedbackBrowseLayoutContent,
   FeedbackBrowseLayoutMain,
 } from "../../components/layout/feedback-browse-layout";
-import { formatPostStatus } from "../../lib/utils";
 import { m } from "../../paraglide/messages.js";
 import { HomeBoardSelect } from "./components/board-select";
 import { HomeFilterList } from "./components/filter-list";

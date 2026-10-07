@@ -1,13 +1,4 @@
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogPopup,
-  AlertDialogTitle,
-} from "@feeblo/ui/alert-dialog";
-import { Button } from "@feeblo/ui/button";
+import { ConfirmDialog } from "@feeblo/ui/confirm-dialog";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { settleOptimisticMutation } from "@feeblo/web-shared/collections";
@@ -39,57 +30,41 @@ export function CustomAttributeDeleteDialog() {
   );
 
   return (
-    <AlertDialog
-      onOpenChange={() => store.send({ type: "toggle" })}
+    <ConfirmDialog
+      description="This action cannot be undone. This will permanently delete the custom attribute."
+      onConfirm={() => {
+        const { attributeId } = store.get().context.data;
+        const collection = getCollection(entityType, collections);
+        // The row is removed optimistically; close the confirm in the same
+        // tick and settle persistence in the background.
+        store.send({ type: "setOpen", open: false });
+        settleOptimisticMutation(
+          () => collection.delete(attributeId),
+          () => {
+            trackEvent("custom_attribute_deleted", {
+              entity_type: entityType,
+              success: true,
+            });
+            toastManager.add({
+              title: "Attribute deleted successfully",
+              type: "success",
+            });
+          },
+          () => {
+            trackEvent("custom_attribute_deleted", {
+              entity_type: entityType,
+              success: false,
+            });
+            toastManager.add({
+              title: "Failed to delete attribute",
+              type: "error",
+            });
+          }
+        );
+      }}
+      onOpenChange={(open) => store.send({ type: "setOpen", open })}
       open={open}
-    >
-      <AlertDialogPopup>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete Attribute</AlertDialogTitle>
-          <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete the
-            custom attribute.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button
-            onClick={() => {
-              const { attributeId } = store.get().context.data;
-              const collection = getCollection(entityType, collections);
-              // The row is removed optimistically; close the confirm in the
-              // same tick and settle persistence in the background.
-              store.send({ type: "toggle" });
-              settleOptimisticMutation(
-                () => collection.delete(attributeId),
-                () => {
-                  trackEvent("custom_attribute_deleted", {
-                    entity_type: entityType,
-                    success: true,
-                  });
-                  toastManager.add({
-                    title: "Attribute deleted successfully",
-                    type: "success",
-                  });
-                },
-                () => {
-                  trackEvent("custom_attribute_deleted", {
-                    entity_type: entityType,
-                    success: false,
-                  });
-                  toastManager.add({
-                    title: "Failed to delete attribute",
-                    type: "error",
-                  });
-                }
-              );
-            }}
-            variant="destructive"
-          >
-            Continue
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogPopup>
-    </AlertDialog>
+      title="Delete Attribute"
+    />
   );
 }

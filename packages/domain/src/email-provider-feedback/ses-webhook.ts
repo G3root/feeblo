@@ -1,8 +1,10 @@
 import * as NodeCrypto from "node:crypto";
 
-import * as Clock from "effect/Clock";
+import * as Cache from "effect/Cache";
 import * as Context from "effect/Context";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
@@ -231,22 +233,10 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
   const config = yield* EmailProviderFeedbackConfig;
   const httpClient = yield* HttpClient.HttpClient;
 
-  const signingCertCache = new Map<
-    string,
-    { readonly expiresAt: number; readonly pem: string }
-  >();
-
-  const fetchSnsSigningCert = Effect.fn(
+  const fetchSnsSigningCertUncached = Effect.fn(
     "SesEmailFeedbackWebhook.fetchSnsSigningCert"
   )((certUrl: string) =>
     Effect.gen(function* () {
-      const now = yield* Clock.currentTimeMillis;
-      const cached = signingCertCache.get(certUrl);
-      if (cached !== undefined && cached.expiresAt > now) {
-        return cached.pem;
-      }
-      signingCertCache.delete(certUrl);
-
       // SNS SigningCertURL must be fetched without following redirects —
       // a whitelist-bypass via 302 to an attacker host would leak the fetch
       // to an untrusted endpoint. We explicitly set redirect to manual so
@@ -291,7 +281,7 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
           operation: "SesEmailFeedbackWebhook.fetchSnsSigningCert",
         });
       }
-      const pem = yield* response.text.pipe(
+      return yield* response.text.pipe(
         Effect.mapError(
           (cause) =>
             new SesWebhookEnvelopeError({
@@ -301,30 +291,25 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
             })
         )
       );
-
-      // A fresh read: the cert fetch above can take a while, so the TTL
-      // window starts when the certificate is actually in hand.
-      const cacheNow = yield* Clock.currentTimeMillis;
-      if (signingCertCache.size >= SIGNING_CERT_CACHE_MAX_ENTRIES) {
-        for (const [url, entry] of signingCertCache) {
-          if (entry.expiresAt <= cacheNow) {
-            signingCertCache.delete(url);
-          }
-        }
-        if (signingCertCache.size >= SIGNING_CERT_CACHE_MAX_ENTRIES) {
-          const oldestUrl = signingCertCache.keys().next().value;
-          if (oldestUrl !== undefined) {
-            signingCertCache.delete(oldestUrl);
-          }
-        }
-      }
-      signingCertCache.set(certUrl, {
-        expiresAt: cacheNow + SIGNING_CERT_CACHE_TTL_MS,
-        pem,
-      });
-      return pem;
     })
   );
+
+  /**
+   * The SNS signing certificate PEM per cert URL.
+   *
+   * A success is kept for the same fifteen minutes the cache always used; a
+   * failure gets a zero TTL so a transient fetch failure is retried on the next
+   * message instead of being served from the cache. `Cache` also bounds the
+   * entries and shares one in-flight fetch between concurrent messages.
+   */
+  const signingCertCache = yield* Cache.makeWith(fetchSnsSigningCertUncached, {
+    capacity: SIGNING_CERT_CACHE_MAX_ENTRIES,
+    timeToLive: (exit) =>
+      Exit.isSuccess(exit) ? SIGNING_CERT_CACHE_TTL_MS : Duration.zero,
+  });
+
+  const fetchSnsSigningCert = (certUrl: string) =>
+    Cache.get(signingCertCache, certUrl);
 
   const confirmSubscription = Effect.fn(
     "SesEmailFeedbackWebhook.confirmSubscription"

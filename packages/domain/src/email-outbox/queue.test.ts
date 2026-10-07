@@ -1,3 +1,4 @@
+import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import {
@@ -79,6 +80,9 @@ const makeTestLayer = (
     Layer.provideMerge(
       PersistedQueue.layer.pipe(Layer.provide(PersistedQueue.layerStoreMemory))
     ),
+    // The mailer's per-send entity-ref UUID and the outbox recipient hash read
+    // the Crypto service; the test provides the node implementation.
+    Layer.provideMerge(NodeCrypto.layer),
     Layer.provideMerge(Database.PgliteDatabaseLive)
   );
 
@@ -2876,6 +2880,7 @@ describe("EmailOutbox queues with plain-HTTP API_URL", () => {
           Layer.provide(PersistedQueue.layerStoreMemory)
         )
       ),
+      Layer.provideMerge(NodeCrypto.layer),
       Layer.provideMerge(Database.PgliteDatabaseLive)
     )
   )("in-memory persisted queue", (it) => {

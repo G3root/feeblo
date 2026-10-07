@@ -1,13 +1,5 @@
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogPopup,
-  AlertDialogTitle,
-} from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
+import { ConfirmDialog } from "@feeblo/ui/confirm-dialog";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
@@ -140,142 +132,120 @@ function BulkDeleteAlert() {
   );
 
   return (
-    <AlertDialog
+    <ConfirmDialog
+      confirmDisabled={!canBulkDelete}
+      confirmLabel="Delete"
+      description={`This action cannot be undone. This will permanently delete ${selectedPostIds.length} selected post${selectedPostIds.length === 1 ? "" : "s"}.`}
+      onConfirm={async () => {
+        if (selectedPostIds.length === 0) {
+          store.send({ type: "setBulkDeleteOpen", open: false });
+          return;
+        }
+
+        try {
+          // Revalidate against the synced set at confirm time: a post
+          // engaged after the affordance rendered must not be fired.
+          // `queryOnce` evaluates without subscribing; the backend
+          // remains authoritative for anything that slips through.
+          // Contributor-only: the synced set holds the caller's own
+          // untouched posts, so managers (`posts.*`) bypass it entirely
+          // and delete every selected post through the backend policy.
+          const freshEligibility =
+            !canManageAllPosts && deleteEligibilityCollection
+              ? new Set(
+                  (
+                    await queryOnce((q) =>
+                      q
+                        .from({
+                          eligibility: deleteEligibilityCollection,
+                        })
+                        .where(({ eligibility }) =>
+                          and(
+                            eq(eligibility.organizationId, organizationId),
+                            inArray(eligibility.postId, selectedPostIds)
+                          )
+                        )
+                        .select(({ eligibility }) => ({
+                          postId: eligibility.postId,
+                        }))
+                    )
+                  ).map((row) => row.postId)
+                )
+              : null;
+          const deletablePosts =
+            freshEligibility === null
+              ? selectedPosts
+              : selectedPosts.filter((selectedPost) =>
+                  freshEligibility.has(selectedPost.postId)
+                );
+          const skippedCount = selectedPosts.length - deletablePosts.length;
+          if (deletablePosts.length === 0) {
+            trackEvent("post_deleted", {
+              mode: "bulk",
+              success: false,
+            });
+            toastManager.add({
+              title:
+                "These posts can no longer be deleted. The selection was refreshed.",
+              type: "error",
+            });
+            refetchInBackground(deleteEligibilityCollection?.utils.refetch());
+            store.send({ type: "setBulkDeleteOpen", open: false });
+            return;
+          }
+
+          // The rows are removed optimistically in one transaction;
+          // the collection handler groups them into one bulk RPC per
+          // board. Close the confirm now and settle persistence in the
+          // background so a slow network never holds the dialog open.
+          store.send({ type: "clearSelection" });
+          store.send({ type: "setBulkDeleteOpen", open: false });
+          settleOptimisticMutation(
+            () =>
+              postCollection.delete(
+                deletablePosts.map((selectedPost) => selectedPost.postId)
+              ),
+            () => {
+              trackEvent("post_deleted", { mode: "bulk", success: true });
+              toastManager.add({
+                title:
+                  skippedCount > 0
+                    ? `${deletablePosts.length} post${
+                        deletablePosts.length === 1 ? "" : "s"
+                      } deleted, ${skippedCount} skipped (no longer deletable)`
+                    : `${deletablePosts.length} post${
+                        deletablePosts.length === 1 ? "" : "s"
+                      } deleted successfully`,
+                type: "success",
+              });
+            },
+            () => {
+              trackEvent("post_deleted", {
+                mode: "bulk",
+                success: false,
+              });
+              toastManager.add({
+                title: "Failed to delete selected posts",
+                type: "error",
+              });
+            }
+          );
+        } catch {
+          trackEvent("post_deleted", {
+            mode: "bulk",
+            success: false,
+          });
+          toastManager.add({
+            title: "Failed to delete selected posts",
+            type: "error",
+          });
+        }
+      }}
       onOpenChange={(nextOpen) =>
         store.send({ type: "setBulkDeleteOpen", open: nextOpen })
       }
       open={open}
-    >
-      <AlertDialogPopup>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete selected posts</AlertDialogTitle>
-          <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete{" "}
-            {selectedPostIds.length} selected post
-            {selectedPostIds.length === 1 ? "" : "s"}.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button
-            disabled={!canBulkDelete}
-            onClick={async () => {
-              if (selectedPostIds.length === 0) {
-                store.send({ type: "setBulkDeleteOpen", open: false });
-                return;
-              }
-
-              try {
-                // Revalidate against the synced set at confirm time: a post
-                // engaged after the affordance rendered must not be fired.
-                // `queryOnce` evaluates without subscribing; the backend
-                // remains authoritative for anything that slips through.
-                // Contributor-only: the synced set holds the caller's own
-                // untouched posts, so managers (`posts.*`) bypass it entirely
-                // and delete every selected post through the backend policy.
-                const freshEligibility =
-                  !canManageAllPosts && deleteEligibilityCollection
-                    ? new Set(
-                        (
-                          await queryOnce((q) =>
-                            q
-                              .from({
-                                eligibility: deleteEligibilityCollection,
-                              })
-                              .where(({ eligibility }) =>
-                                and(
-                                  eq(
-                                    eligibility.organizationId,
-                                    organizationId
-                                  ),
-                                  inArray(eligibility.postId, selectedPostIds)
-                                )
-                              )
-                              .select(({ eligibility }) => ({
-                                postId: eligibility.postId,
-                              }))
-                          )
-                        ).map((row) => row.postId)
-                      )
-                    : null;
-                const deletablePosts =
-                  freshEligibility === null
-                    ? selectedPosts
-                    : selectedPosts.filter((selectedPost) =>
-                        freshEligibility.has(selectedPost.postId)
-                      );
-                const skippedCount =
-                  selectedPosts.length - deletablePosts.length;
-                if (deletablePosts.length === 0) {
-                  trackEvent("post_deleted", {
-                    mode: "bulk",
-                    success: false,
-                  });
-                  toastManager.add({
-                    title:
-                      "These posts can no longer be deleted. The selection was refreshed.",
-                    type: "error",
-                  });
-                  refetchInBackground(
-                    deleteEligibilityCollection?.utils.refetch()
-                  );
-                  store.send({ type: "setBulkDeleteOpen", open: false });
-                  return;
-                }
-
-                // The rows are removed optimistically in one transaction;
-                // the collection handler groups them into one bulk RPC per
-                // board. Close the confirm now and settle persistence in the
-                // background so a slow network never holds the dialog open.
-                store.send({ type: "clearSelection" });
-                store.send({ type: "setBulkDeleteOpen", open: false });
-                settleOptimisticMutation(
-                  () =>
-                    postCollection.delete(
-                      deletablePosts.map((selectedPost) => selectedPost.postId)
-                    ),
-                  () => {
-                    trackEvent("post_deleted", { mode: "bulk", success: true });
-                    toastManager.add({
-                      title:
-                        skippedCount > 0
-                          ? `${deletablePosts.length} post${
-                              deletablePosts.length === 1 ? "" : "s"
-                            } deleted, ${skippedCount} skipped (no longer deletable)`
-                          : `${deletablePosts.length} post${
-                              deletablePosts.length === 1 ? "" : "s"
-                            } deleted successfully`,
-                      type: "success",
-                    });
-                  },
-                  () => {
-                    trackEvent("post_deleted", {
-                      mode: "bulk",
-                      success: false,
-                    });
-                    toastManager.add({
-                      title: "Failed to delete selected posts",
-                      type: "error",
-                    });
-                  }
-                );
-              } catch {
-                trackEvent("post_deleted", {
-                  mode: "bulk",
-                  success: false,
-                });
-                toastManager.add({
-                  title: "Failed to delete selected posts",
-                  type: "error",
-                });
-              }
-            }}
-            variant="destructive"
-          >
-            Delete
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogPopup>
-    </AlertDialog>
+      title="Delete selected posts"
+    />
   );
 }

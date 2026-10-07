@@ -1,10 +1,9 @@
-import { createHash } from "node:crypto";
-
 import { Database, schema } from "@feeblo/db";
 import { EmailDeliveryId, EmailOutboxId } from "@feeblo/id";
 import { MESSAGE_ID_DOMAIN } from "@feeblo/transactional/config";
 import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -207,12 +206,17 @@ const normalizeRecipientEmail = (
 export const emailDeliveryMessageId = (
   outboxId: string,
   recipientEmail: string
-): string => {
-  const recipientHash = createHash("sha256")
-    .update(`${outboxId}:${recipientEmail}`)
-    .digest("hex");
-  return `<email.${recipientHash}@${MESSAGE_ID_DOMAIN}>`;
-};
+) =>
+  Effect.gen(function* () {
+    const crypto = yield* Crypto.Crypto;
+    const recipientHash = Buffer.from(
+      yield* crypto.digest(
+        "SHA-256",
+        new TextEncoder().encode(`${outboxId}:${recipientEmail}`)
+      )
+    ).toString("hex");
+    return `<email.${recipientHash}@${MESSAGE_ID_DOMAIN}>`;
+  }).pipe(Effect.orDie);
 
 const makeEmailOutboxRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
@@ -884,7 +888,10 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
           template: input.template,
           templateVersion: input.templateVersion,
           templatePayload: input.templatePayload,
-          messageId: emailDeliveryMessageId(input.outboxId, recipientEmail),
+          messageId: yield* emailDeliveryMessageId(
+            input.outboxId,
+            recipientEmail
+          ),
           state: "queued",
           attemptCount: 0,
           nextAttemptAt: null,

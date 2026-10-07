@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, it, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
 import {
@@ -19,18 +19,20 @@ describe("consumeDashboardRateLimit", () => {
     })
   );
 
-  it.effect("enforces the limit when the layer is provided", () =>
-    Effect.gen(function* () {
-      const key = "dashboard-rate-limit-test:enforce";
-      yield* consumeDashboardRateLimit({
-        key,
-        name: "contact-search",
-        limit: 1,
-      });
-      const second = yield* Effect.flip(
-        consumeDashboardRateLimit({ key, name: "contact-search", limit: 1 })
-      );
-      expect(second).toBeInstanceOf(RateLimitExceededError);
-    }).pipe(Effect.provide(RateLimitService.layerMemory))
-  );
+  layer(RateLimitService.layerMemory)("with the rate-limit layer", (it) => {
+    it.effect("enforces the limit when the layer is provided", () =>
+      Effect.gen(function* () {
+        const key = "dashboard-rate-limit-test:enforce";
+        yield* consumeDashboardRateLimit({
+          key,
+          name: "contact-search",
+          limit: 1,
+        });
+        const second = yield* Effect.flip(
+          consumeDashboardRateLimit({ key, name: "contact-search", limit: 1 })
+        );
+        expect(second).toBeInstanceOf(RateLimitExceededError);
+      })
+    );
+  });
 });

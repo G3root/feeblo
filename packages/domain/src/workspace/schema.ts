@@ -17,6 +17,21 @@ export const CreateWorkspaceOutput = S.Struct({
   organizationId: S.String,
 });
 
+export const WorkspaceCreationState = S.Struct({
+  canCreate: S.Boolean,
+  reason: S.NullOr(S.String),
+  freeWorkspaces: S.Array(
+    S.Struct({
+      id: S.String,
+      name: S.String,
+    })
+  ),
+});
+
+export type TWorkspaceCreationState = S.Schema.Type<
+  typeof WorkspaceCreationState
+>;
+
 export const WorkspaceSlugCheckInput = S.Struct({
   slug: S.String.pipe(S.check(S.isMinLength(4))),
 });

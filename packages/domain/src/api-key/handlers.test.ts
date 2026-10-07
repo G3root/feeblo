@@ -217,7 +217,7 @@ describe("ApiKeyRpcHandlers", () => {
      * fails it to prove the request still returns the one-time plaintext
      * instead of stranding a live key nobody can reveal.
      */
-    const FailAttributionRepository = Layer.succeed(ApiKeyRepository, {
+    const failAttributionRepository = {
       assignCreator: () =>
         Effect.fail(
           new InternalServerError({
@@ -226,7 +226,7 @@ describe("ApiKeyRpcHandlers", () => {
         ),
       listForOrganization: () => Effect.succeed([]),
       revoke: () => Effect.void,
-    });
+    };
 
     it.effect(
       "returns the plaintext once and a scoped summary for an owner",
@@ -338,7 +338,7 @@ describe("ApiKeyRpcHandlers", () => {
       () =>
         Effect.gen(function* () {
           const handlers = yield* ApiKeyRpcHandlersEffect.pipe(
-            Effect.provide(FailAttributionRepository)
+            Effect.provideService(ApiKeyRepository, failAttributionRepository)
           );
           const fixture = yield* makeFixture("starter");
 

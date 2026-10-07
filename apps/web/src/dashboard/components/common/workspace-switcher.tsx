@@ -1,3 +1,4 @@
+import { useAtomValue } from "@effect/atom-react";
 import {
   Menu,
   MenuItem,
@@ -11,19 +12,23 @@ import {
   SidebarMenuItem,
 } from "@feeblo/ui/sidebar";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
+import { toastManager } from "@feeblo/ui/toast";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { Plus, Tick02Icon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
+import * as Result from "effect/reactivity/AsyncResult";
 
+import { workspaceCreationStateAtom } from "~/features/workspace/atoms";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export function WorkspaceSwitcher() {
   const navigate = useNavigate();
   const organizationId = useOrganizationId();
+  const creationState = useAtomValue(workspaceCreationStateAtom);
   const { organizationCollection } = useDashboardCollections();
   const organizationsQuery = useLiveQuery({
     query: (q) =>
@@ -76,11 +81,23 @@ export function WorkspaceSwitcher() {
 
               <MenuItem
                 className="justify-center"
-                onClick={() =>
+                onClick={() => {
+                  if (
+                    Result.isSuccess(creationState) &&
+                    !creationState.value.canCreate
+                  ) {
+                    toastManager.add({
+                      title:
+                        creationState.value.reason ??
+                        "You cannot create another workspace right now.",
+                      type: "error",
+                    });
+                    return;
+                  }
                   navigate({
                     to: "/register",
-                  })
-                }
+                  });
+                }}
               >
                 <HugeiconsIcon className="text-muted-foreground" icon={Plus} />
                 <span>Create workspace</span>

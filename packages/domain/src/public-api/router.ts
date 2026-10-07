@@ -111,12 +111,12 @@ export const makePublicApiRoute = <E, R>(
     Layer.provideMerge(
       PublicApiProjections.pipe(Layer.provide(PublicApiInternals))
     ),
-    // Provided into the request context, not merged into the output: the
-    // public operations read the shared feature repositories — and the
-    // database handle they run transactions on — from the fiber context, the
-    // same way they read the caller and the config. This is the one line that
-    // makes `<feature>/public-api` able to call `<feature>/repository`
-    // directly instead of owning a second copy of it.
+    // Provided to the group builders, not merged into the output: every
+    // group's build effect yields `PublicApiDependencies` and the handlers
+    // close over them, so this is the one line that makes
+    // `<feature>/public-api` able to call `<feature>/repository` directly
+    // instead of owning a second copy of it. A dependency missing here fails
+    // the route layer's type rather than one request.
     Layer.provide(PublicApiInternals)
   );
 

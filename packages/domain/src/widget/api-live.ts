@@ -123,11 +123,13 @@ export const WidgetApiLive = HttpApiBuilder.group(
       const attributeDefinitionRepository =
         yield* AttributeDefinitionRepository;
       const boardRepository = yield* BoardRepository;
+      const changelogRepository = yield* ChangelogRepository;
       const companyRepository = yield* CompanyRepository;
       const contactRepository = yield* ContactRepository;
       const jwtSecretRepository = yield* JwtSecretRepository;
       const organizationRepository = yield* OrganizationRepository;
       const postStatusRepository = yield* PostStatusRepository;
+      const sitePolicy = yield* SitePolicy;
       const writes = yield* PostWriteService;
 
       /**
@@ -146,11 +148,13 @@ export const WidgetApiLive = HttpApiBuilder.group(
             attributeDefinitionRepository
           ),
           Effect.provideService(BoardRepository, boardRepository),
+          Effect.provideService(ChangelogRepository, changelogRepository),
           Effect.provideService(CompanyRepository, companyRepository),
           Effect.provideService(ContactRepository, contactRepository),
           Effect.provideService(JwtSecretRepository, jwtSecretRepository),
           Effect.provideService(OrganizationRepository, organizationRepository),
-          Effect.provideService(PostStatusRepository, postStatusRepository)
+          Effect.provideService(PostStatusRepository, postStatusRepository),
+          Effect.provideService(SitePolicy, sitePolicy)
         );
 
       return handlers
@@ -160,9 +164,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
               name: "WidgetListUpdates",
               level: "read",
             }),
-            Effect.provide(
-              Layer.mergeAll(ChangelogRepository.layer, SitePolicy.layer)
-            ),
+            provideHandlerEnvironment,
             withRemapDbErrors("Changelog", "select")
           )
         )
@@ -261,7 +263,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
               name: "WidgetListBoards",
               level: "read",
             }),
-            Effect.provide(BoardRepository.layer),
+            provideHandlerEnvironment,
             withRemapDbErrors("Boards", "select")
           )
         )
@@ -463,11 +465,13 @@ export const WidgetApiLive = HttpApiBuilder.group(
     Layer.mergeAll(
       AttributeDefinitionRepository.layer,
       BoardRepository.layer,
+      ChangelogRepository.layer,
       CompanyRepository.layer,
       ContactRepository.layer,
       JwtSecretRepository.layer,
       OrganizationRepository.layer,
-      PostStatusRepository.layer
+      PostStatusRepository.layer,
+      SitePolicy.layer
     )
   )
 );

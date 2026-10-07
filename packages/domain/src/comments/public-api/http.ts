@@ -1,3 +1,4 @@
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
@@ -9,6 +10,8 @@ import {
   PUBLIC_API_WRITE_ERROR_SCHEMAS,
 } from "../../public-api/errors";
 import type { HandlerOf } from "../../public-api/handler";
+import type { PublicApiCaller } from "../../public-api/middleware";
+import type { PublicApiDependencies } from "../../public-api/operations";
 import { parseLimit } from "../../public-api/parse";
 import {
   createCommentOperation,
@@ -127,7 +130,9 @@ export const commentEndpoints = [
     ),
 ] as const;
 
-export const commentHandlers = {
+export const commentHandlers = (
+  context: Context.Context<PublicApiDependencies>
+) => ({
   listPostComments: (({ params, query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
@@ -136,43 +141,71 @@ export const commentHandlers = {
         cursor: query.cursor,
         limit,
       });
-    })) satisfies HandlerOf<PublicApiGroup, "listPostComments">,
+    }).pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "listPostComments",
+    PublicApiCaller
+  >,
 
   // The body is the operation's own input minus the path, so handing it over
   // cannot drop a field the operation gains.
   createComment: (({ params, payload }) =>
-    createCommentOperation.handler({
-      ...payload,
-      ...params,
-    })) satisfies HandlerOf<PublicApiGroup, "createComment">,
+    createCommentOperation
+      .handler({
+        ...payload,
+        ...params,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "createComment",
+    PublicApiCaller
+  >,
 
   getComment: (({ params }) =>
-    getCommentOperation.handler(params)) satisfies HandlerOf<
+    getCommentOperation
+      .handler(params)
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "getComment"
+    "getComment",
+    PublicApiCaller
   >,
 
   updateComment: (({ params, payload }) =>
-    updateCommentOperation.handler({
-      ...payload,
-      ...params,
-    })) satisfies HandlerOf<PublicApiGroup, "updateComment">,
+    updateCommentOperation
+      .handler({
+        ...payload,
+        ...params,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "updateComment",
+    PublicApiCaller
+  >,
 
   deleteComment: (({ params }) =>
-    deleteCommentOperation.handler(params)) satisfies HandlerOf<
+    deleteCommentOperation
+      .handler(params)
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "deleteComment"
+    "deleteComment",
+    PublicApiCaller
   >,
 
   pinComment: (({ params }) =>
-    pinCommentOperation.handler(params)) satisfies HandlerOf<
+    pinCommentOperation
+      .handler(params)
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "pinComment"
+    "pinComment",
+    PublicApiCaller
   >,
 
   unpinComment: (({ params }) =>
-    unpinCommentOperation.handler(params)) satisfies HandlerOf<
+    unpinCommentOperation
+      .handler(params)
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "unpinComment"
+    "unpinComment",
+    PublicApiCaller
   >,
-};
+});

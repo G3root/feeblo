@@ -36,10 +36,6 @@ export class CurrentSession extends Context.Service<CurrentSession, Session>()(
   "@feeblo/domain/CurrentSession"
 ) {}
 
-export const currentHttpApiSession = Effect.context<never>().pipe(
-  Effect.map((context) => Context.getUnsafe(context, CurrentSession))
-);
-
 /** Session when authenticated; None when unauthenticated. Use for optional-auth routes (e.g. PostListPublic). */
 export class OptionalCurrentSession extends Context.Service<
   OptionalCurrentSession,

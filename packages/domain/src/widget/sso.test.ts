@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { NodeCrypto } from "@effect/platform-node";
-import { describe, expect, it, layer } from "@effect/vitest";
+import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
@@ -607,93 +607,95 @@ describe("linkAnonymousAccount", () => {
       return rows[0]?.userId ?? null;
     });
 
-  it.effect("re-assigns contacts and posts to the real user", () =>
-    Effect.gen(function* () {
-      const { anonymousUserId, contactId, newUserId } =
-        yield* makeLinkFixture();
+  layer(TestLayer)("anonymous account linking", (it) => {
+    it.effect("re-assigns contacts and posts to the real user", () =>
+      Effect.gen(function* () {
+        const { anonymousUserId, contactId, newUserId } =
+          yield* makeLinkFixture();
 
-      yield* linkAnonymousAccount({ anonymousUserId, newUserId });
+        yield* linkAnonymousAccount({ anonymousUserId, newUserId });
 
-      expect(yield* contactOwner(contactId)).toBe(newUserId);
-    }).pipe(Effect.provide(TestLayer))
-  );
+        expect(yield* contactOwner(contactId)).toBe(newUserId);
+      })
+    );
 
-  it.effect("is a no-op when both ids are the same", () =>
-    Effect.gen(function* () {
-      const { anonymousUserId, contactId } = yield* makeLinkFixture();
+    it.effect("is a no-op when both ids are the same", () =>
+      Effect.gen(function* () {
+        const { anonymousUserId, contactId } = yield* makeLinkFixture();
 
-      yield* linkAnonymousAccount({
-        anonymousUserId,
-        newUserId: anonymousUserId,
-      });
-
-      expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
-    }).pipe(Effect.provide(TestLayer))
-  );
-
-  it.effect("refuses to link a non-restricted user's data", () =>
-    Effect.gen(function* () {
-      const { anonymousUserId, contactId, newUserId } =
-        yield* makeLinkFixture();
-      const db = yield* currentDb;
-      const attackerId = yield* WorkspaceId.generate;
-      yield* db.insert(schema.userTable).values({
-        id: attackerId,
-        email: `attacker+${attackerId}@example.com`,
-        name: "Attacker",
-      });
-
-      const error = yield* Effect.flip(
-        linkAnonymousAccount({ anonymousUserId: attackerId, newUserId })
-      );
-      expect(error.code).toBe("ANONYMOUS_USER_NOT_RESTRICTED");
-      expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
-    }).pipe(Effect.provide(TestLayer))
-  );
-
-  it.effect("refuses to link data to an anonymous target", () =>
-    Effect.gen(function* () {
-      const { anonymousUserId, contactId, newUserId } =
-        yield* makeLinkFixture();
-      const db = yield* currentDb;
-      yield* db
-        .update(schema.userTable)
-        .set({ restrictedToOrganizationId: "another_org" })
-        .where(eq(schema.userTable.id, newUserId));
-
-      const error = yield* Effect.flip(
-        linkAnonymousAccount({ anonymousUserId, newUserId })
-      );
-      expect(error.code).toBe("NEW_USER_IS_ANONYMOUS");
-      expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
-    }).pipe(Effect.provide(TestLayer))
-  );
-
-  it.effect("refuses to link a missing anonymous user", () =>
-    Effect.gen(function* () {
-      const { anonymousUserId, contactId, newUserId } =
-        yield* makeLinkFixture();
-
-      const error = yield* Effect.flip(
-        linkAnonymousAccount({ anonymousUserId: "does-not-exist", newUserId })
-      );
-      expect(error.code).toBe("ANONYMOUS_USER_NOT_FOUND");
-      expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
-    }).pipe(Effect.provide(TestLayer))
-  );
-
-  it.effect("refuses to link to a missing real user", () =>
-    Effect.gen(function* () {
-      const { anonymousUserId, contactId } = yield* makeLinkFixture();
-
-      const error = yield* Effect.flip(
-        linkAnonymousAccount({
+        yield* linkAnonymousAccount({
           anonymousUserId,
-          newUserId: "does-not-exist",
-        })
-      );
-      expect(error.code).toBe("NEW_USER_NOT_FOUND");
-      expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
-    }).pipe(Effect.provide(TestLayer))
-  );
+          newUserId: anonymousUserId,
+        });
+
+        expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
+      })
+    );
+
+    it.effect("refuses to link a non-restricted user's data", () =>
+      Effect.gen(function* () {
+        const { anonymousUserId, contactId, newUserId } =
+          yield* makeLinkFixture();
+        const db = yield* currentDb;
+        const attackerId = yield* WorkspaceId.generate;
+        yield* db.insert(schema.userTable).values({
+          id: attackerId,
+          email: `attacker+${attackerId}@example.com`,
+          name: "Attacker",
+        });
+
+        const error = yield* Effect.flip(
+          linkAnonymousAccount({ anonymousUserId: attackerId, newUserId })
+        );
+        expect(error.code).toBe("ANONYMOUS_USER_NOT_RESTRICTED");
+        expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
+      })
+    );
+
+    it.effect("refuses to link data to an anonymous target", () =>
+      Effect.gen(function* () {
+        const { anonymousUserId, contactId, newUserId } =
+          yield* makeLinkFixture();
+        const db = yield* currentDb;
+        yield* db
+          .update(schema.userTable)
+          .set({ restrictedToOrganizationId: "another_org" })
+          .where(eq(schema.userTable.id, newUserId));
+
+        const error = yield* Effect.flip(
+          linkAnonymousAccount({ anonymousUserId, newUserId })
+        );
+        expect(error.code).toBe("NEW_USER_IS_ANONYMOUS");
+        expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
+      })
+    );
+
+    it.effect("refuses to link a missing anonymous user", () =>
+      Effect.gen(function* () {
+        const { anonymousUserId, contactId, newUserId } =
+          yield* makeLinkFixture();
+
+        const error = yield* Effect.flip(
+          linkAnonymousAccount({ anonymousUserId: "does-not-exist", newUserId })
+        );
+        expect(error.code).toBe("ANONYMOUS_USER_NOT_FOUND");
+        expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
+      })
+    );
+
+    it.effect("refuses to link to a missing real user", () =>
+      Effect.gen(function* () {
+        const { anonymousUserId, contactId } = yield* makeLinkFixture();
+
+        const error = yield* Effect.flip(
+          linkAnonymousAccount({
+            anonymousUserId,
+            newUserId: "does-not-exist",
+          })
+        );
+        expect(error.code).toBe("NEW_USER_NOT_FOUND");
+        expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
+      })
+    );
+  });
 });

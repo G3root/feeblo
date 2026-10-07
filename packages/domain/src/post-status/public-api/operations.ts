@@ -1,10 +1,10 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-import { currentPostStatusRepository } from "../../post-status/repository";
+import { PostStatusRepository } from "../../post-status/repository";
 import { InternalError } from "../../public-api/errors";
 import { onInternalError } from "../../public-api/failure";
-import { currentPublicApiCaller } from "../../public-api/middleware";
+import { PublicApiCaller } from "../../public-api/middleware";
 import { defineOperation } from "../../public-api/operation";
 import { withRemapDbErrors } from "../../rpc-errors";
 import { toPublicApiStatusDetail, toStatusSource } from "./mappers";
@@ -38,8 +38,8 @@ export const listStatusesOperation = defineOperation(
   },
   () =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const statuses = yield* currentPostStatusRepository;
+      const caller = yield* PublicApiCaller;
+      const statuses = yield* PostStatusRepository;
 
       const rows = yield* statuses
         .findMany({ organizationId: caller.organizationId })
