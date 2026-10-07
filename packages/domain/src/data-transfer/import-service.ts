@@ -10,8 +10,9 @@ import * as Policy from "../policy";
 import { PostStatusRepository } from "../post-status/repository";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
-import { parseBoardPostCsv } from "./csv";
+import { decodeBoardPostCsv, parseBoardPostCsv } from "./csv";
 import {
+  ACTIVE_IMPORT_MESSAGE,
   DataImportAlreadyActiveError,
   DataImportFileTooLargeError,
   DataImportNotConfirmableError,
@@ -112,18 +113,6 @@ export type DataImportServiceContract = {
 /** The most recent jobs a workspace sees, newest first. */
 const IMPORT_JOB_LIST_LIMIT = 20;
 
-const decodeUtf8 = (
-  bytes: Uint8Array
-): Effect.Effect<string, InvalidBoardPostCsvError> =>
-  Effect.tryPromise({
-    try: async () =>
-      new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes),
-    catch: () =>
-      new InvalidBoardPostCsvError({
-        message: "The file is not valid UTF-8 text.",
-      }),
-  });
-
 const toHex = (bytes: Uint8Array): string =>
   Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 
@@ -192,8 +181,7 @@ const makeDataImportService = Effect.gen(function* () {
       );
       if (hasActive) {
         return yield* new DataImportAlreadyActiveError({
-          message:
-            "This workspace already has an import waiting to be confirmed or running. Cancel it before starting another.",
+          message: ACTIVE_IMPORT_MESSAGE,
         });
       }
 
@@ -209,7 +197,7 @@ const makeDataImportService = Effect.gen(function* () {
         });
       }
 
-      const text = yield* decodeUtf8(input.bytes);
+      const text = yield* decodeBoardPostCsv(input.bytes);
       const fileHash = yield* hashBytes(crypto, input.bytes);
 
       const statusRows = yield* statuses
@@ -265,9 +253,8 @@ const makeDataImportService = Effect.gen(function* () {
       );
 
       const jobId = yield* DataImportJobId.generate;
-      return yield* fromStore(
-        "insertStagedJob",
-        repository.insertStagedJob({
+      return yield* repository
+        .insertStagedJob({
           boardId: input.boardId,
           createdByMemberId: input.memberId,
           createdByUserId: input.userId,
@@ -278,7 +265,15 @@ const makeDataImportService = Effect.gen(function* () {
           organizationId: input.organizationId,
           rows,
         })
-      );
+        .pipe(
+          Effect.catchTag("DataTransferRepositoryError", () =>
+            Effect.fail(
+              new InternalServerError({
+                message: "The import store failed during insertStagedJob.",
+              })
+            )
+          )
+        );
     }).pipe(Policy.withPolicy(canImportPosts(input.organizationId)));
 
   const confirmImport: DataImportServiceContract["confirmImport"] = (input) =>

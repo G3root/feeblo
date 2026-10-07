@@ -34,6 +34,12 @@ export const DataImportReportRow = S.Struct({
   /** A static field-scoped message; never a value copied from the file. */
   message: S.NullOr(S.String),
   postId: S.NullOr(S.String),
+  /** The planned title, so a preview shows what confirming will create. */
+  title: S.NullOr(S.String),
+  /** The planned status display name. */
+  statusName: S.NullOr(S.String),
+  /** A bounded excerpt of the planned body; never the whole payload. */
+  contentPreview: S.NullOr(S.String),
 });
 
 export type TDataImportReportRow = S.Schema.Type<typeof DataImportReportRow>;
@@ -58,9 +64,16 @@ export const DataImportList = S.Struct({
 
 export type TDataImportList = S.Schema.Type<typeof DataImportList>;
 
+/**
+ * A window bound: a whole, non-negative number of rows. Fractional or
+ * negative values are rejected at the contract boundary so the service only
+ * ever clamps a real request.
+ */
+const WindowBound = S.Int.check(S.isGreaterThanOrEqualTo(0));
+
 const ReportWindow = {
-  limit: S.optionalKey(S.Finite),
-  offset: S.optionalKey(S.Finite),
+  limit: S.optionalKey(WindowBound),
+  offset: S.optionalKey(WindowBound),
 };
 
 export const DataImportGet = S.Struct({

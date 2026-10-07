@@ -211,6 +211,10 @@ export const planImportRows = ({
         title: row.title,
         content: row.content,
         statusId: matchedStatus?.id ?? null,
+        statusName:
+          matchedStatus === undefined
+            ? defaultName
+            : statusDisplayName(matchedStatus.label, matchedStatus.type),
         tagNames: row.tags,
         etaQuarter: eta.etaQuarter,
         authorName: authorEmail === null ? null : authorName,

@@ -55,6 +55,30 @@ const HandlerDependencies = Layer.mergeAll(
   PublicApiConfig.layer
 ).pipe(Layer.orDie);
 
+/** Control characters and separators that must not reach the header. */
+const UNSAFE_FILENAME_CHARACTERS = /["\\/\r\n]/gu;
+const NON_ASCII_CHARACTERS = /[^\x20-\x7e]/gu;
+const RFC_5987_EXTRA_ESCAPES = /['()*!]/gu;
+
+/**
+ * A download header carrying both a conservative ASCII name and the real one.
+ *
+ * The quoted form is safe for every client; the `filename*` parameter is the
+ * RFC 5987 form that preserves non-ASCII board slugs. The name is built from
+ * a slug and a date server-side, so this is defense in depth: nothing a board
+ * is called may break the header or inject a second directive.
+ */
+const contentDisposition = (fileName: string): string => {
+  const fallback = fileName
+    .replace(UNSAFE_FILENAME_CHARACTERS, "_")
+    .replace(NON_ASCII_CHARACTERS, "_");
+  const encoded = encodeURIComponent(fileName).replace(
+    RFC_5987_EXTRA_ESCAPES,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+};
+
 const parseIncludeArchived = (
   value: string | undefined
 ): Effect.Effect<boolean, BadRequestError> => {
@@ -151,7 +175,7 @@ export const DataTransferApiLive = HttpApiBuilder.group(
           return HttpServerResponse.stream(exportFile.stream, {
             contentType: "text/csv; charset=utf-8",
             headers: {
-              "Content-Disposition": `attachment; filename="${exportFile.fileName}"`,
+              "Content-Disposition": contentDisposition(exportFile.fileName),
             },
           });
           // eslint-disable-next-line effecttsgo/strict-effect-provide -- HttpApiBuilder handlers resolve their own services (the same shape as the media upload)

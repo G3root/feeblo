@@ -44,6 +44,14 @@ export class DataImportAlreadyActiveError extends Schema.TaggedError<DataImportA
   { httpApiStatus: 409, identifier: "DataImportAlreadyActiveError" }
 ) {}
 
+/**
+ * The one message for a workspace that already holds an active import. Shared
+ * by the service's fast-path check and the repository's unique-index mapping
+ * so a raced upload reads the same way as an obvious one.
+ */
+export const ACTIVE_IMPORT_MESSAGE =
+  "This workspace already has an import waiting to be confirmed or running. Cancel it before starting another.";
+
 /** The job is not in `awaiting_confirmation`, so it cannot be confirmed. */
 export class DataImportNotConfirmableError extends Schema.TaggedError<DataImportNotConfirmableError>()(
   "DataImportNotConfirmableError",

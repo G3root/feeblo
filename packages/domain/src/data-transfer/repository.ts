@@ -7,7 +7,19 @@ import type {
 import { StagedDataImportRow } from "@feeblo/domain-contracts/data-import";
 import type { TPostStatusType } from "@feeblo/domain-contracts/post-status-type";
 import { DataImportRowId } from "@feeblo/id";
-import { and, asc, desc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  or,
+  sql,
+} from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -16,7 +28,12 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { DataTransferRepositoryError } from "./errors";
+import { getUniqueViolationConstraint, isUniqueViolation } from "../rpc-errors";
+import {
+  ACTIVE_IMPORT_MESSAGE,
+  DataImportAlreadyActiveError,
+  DataTransferRepositoryError,
+} from "./errors";
 import { DATA_IMPORT_RETENTION_MS } from "./limits";
 
 /** The active states; a job in one of these owns its workspace's transfer slot. */
@@ -76,6 +93,12 @@ export type DataImportRowRecord = {
   readonly outcome: TDataImportRowOutcome;
   readonly message: string | null;
   readonly postId: string | null;
+  /** The planned title, so the preview can show what the row will create. */
+  readonly title: string | null;
+  /** The planned status display name; null for a row that never got one. */
+  readonly statusName: string | null;
+  /** A bounded excerpt of the planned body; never the whole payload. */
+  readonly contentPreview: string | null;
 };
 
 /** One row as the worker applies it, payload included. */
@@ -124,7 +147,7 @@ export interface DataTransferRepositoryContract {
   readonly hasActiveJob: (input: {
     readonly organizationId: string;
   }) => Effect.Effect<boolean, DataTransferRepositoryError>;
-  /** The most recent job that uploaded the same bytes, for the confirm warning. */
+  /** The most recent job that actually ran and uploaded the same bytes. */
   readonly findPriorJobByHash: (input: {
     readonly organizationId: string;
     readonly fileHash: string;
@@ -142,7 +165,10 @@ export interface DataTransferRepositoryContract {
     readonly fileHash: string;
     readonly notices: readonly string[];
     readonly rows: readonly NewStagedImportRow[];
-  }) => Effect.Effect<DataImportJobRecord, DataTransferRepositoryError>;
+  }) => Effect.Effect<
+    DataImportJobRecord,
+    DataTransferRepositoryError | DataImportAlreadyActiveError
+  >;
 
   readonly findJob: (input: {
     readonly id: string;
@@ -215,6 +241,11 @@ export interface DataTransferRepositoryContract {
     readonly PendingDataImportRow[],
     DataTransferRepositoryError
   >;
+  /**
+   * Marks one row created, but only while it is still `pending`. An empty
+   * update means another worker owns this job now, and failing here is what
+   * rolls the row's post insert back with it.
+   */
   readonly markRowCreated: (input: {
     readonly rowId: string;
     readonly postId: string;
@@ -223,15 +254,27 @@ export interface DataTransferRepositoryContract {
     readonly rowId: string;
     readonly message: string;
   }) => Effect.Effect<void, DataTransferRepositoryError>;
-  /** Rewrites a job's counts from its row ledger, the report's single source. */
+  /** Rewrites the lease holder's job counts from its row ledger. */
   readonly syncCounts: (input: {
     readonly jobId: string;
+    readonly leaseOwner: string;
   }) => Effect.Effect<DataImportCounts, DataTransferRepositoryError>;
+  /** Terminal state, written only while `leaseOwner` still holds the job. */
   readonly finishJob: (input: {
     readonly jobId: string;
     readonly status: "completed" | "failed" | "canceled";
+    readonly leaseOwner: string;
     readonly failureMessage?: string | undefined;
   }) => Effect.Effect<void, DataTransferRepositoryError>;
+  /**
+   * Extends the caller's lease. False means the job is no longer running or
+   * belongs to another worker, so the caller must stop without writing.
+   */
+  readonly renewLease: (input: {
+    readonly jobId: string;
+    readonly leaseOwner: string;
+    readonly leaseDurationMs: number;
+  }) => Effect.Effect<boolean, DataTransferRepositoryError>;
   /** True while the job is still the running lease holder; false when canceled. */
   readonly isStillRunning: (input: {
     readonly jobId: string;
@@ -241,6 +284,13 @@ export interface DataTransferRepositoryContract {
 
 const repositoryError = (operation: string) =>
   new DataTransferRepositoryError({ operation });
+
+/** The partial index that makes "one active import per workspace" a rule. */
+const ACTIVE_IMPORT_INDEX = "data_import_job_organization_active_uidx";
+
+const isActiveImportViolation = <T>(error: T): boolean =>
+  isUniqueViolation(error) &&
+  getUniqueViolationConstraint(error) === ACTIVE_IMPORT_INDEX;
 
 /** Normalizes any store failure to the repository's own tagged failure. */
 const guard = <A, E, R>(
@@ -258,6 +308,14 @@ const guard = <A, E, R>(
 const decodeStagedRow = Schema.decodeUnknownEffect(
   Schema.NullOr(StagedDataImportRow)
 );
+
+/** How much of a planned body a report row carries into the preview. */
+const CONTENT_PREVIEW_LENGTH = 280;
+
+const previewContent = (content: string): string =>
+  content.length <= CONTENT_PREVIEW_LENGTH
+    ? content
+    : `${content.slice(0, CONTENT_PREVIEW_LENGTH)}…`;
 
 const makeDataTransferRepository = Effect.gen(function* () {
   const db = yield* currentDb;
@@ -294,7 +352,14 @@ const makeDataTransferRepository = Effect.gen(function* () {
           .where(
             and(
               eq(schema.dataImportJobTable.organizationId, organizationId),
-              eq(schema.dataImportJobTable.fileHash, fileHash)
+              eq(schema.dataImportJobTable.fileHash, fileHash),
+              // A staged-then-canceled job imported nothing, so warning that
+              // the file "was already imported" would be a lie. Confirmation
+              // is the point the file stopped being just a preview.
+              or(
+                isNotNull(schema.dataImportJobTable.confirmedAt),
+                gt(schema.dataImportJobTable.createdCount, 0)
+              )
             )
           )
           .orderBy(desc(schema.dataImportJobTable.createdAt))
@@ -303,9 +368,8 @@ const makeDataTransferRepository = Effect.gen(function* () {
       ),
 
     insertStagedJob: (input) =>
-      guard(
-        "insertStagedJob",
-        db.transaction(() =>
+      db
+        .transaction(() =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
             const retentionExpiresAt = DateTime.fromDateUnsafe(now).pipe(
@@ -371,7 +435,15 @@ const makeDataTransferRepository = Effect.gen(function* () {
             return job;
           })
         )
-      ),
+        .pipe(
+          Effect.mapError((error) =>
+            isActiveImportViolation(error)
+              ? new DataImportAlreadyActiveError({
+                  message: ACTIVE_IMPORT_MESSAGE,
+                })
+              : repositoryError("insertStagedJob")
+          )
+        ),
 
     findJob: ({ id, organizationId }) =>
       guard(
@@ -403,11 +475,12 @@ const makeDataTransferRepository = Effect.gen(function* () {
             .select({ total: sql<string | number>`count(*)` })
             .from(schema.dataImportRowTable)
             .where(eq(schema.dataImportRowTable.jobId, jobId));
-          const rows = yield* db
+          const stored = yield* db
             .select({
               id: schema.dataImportRowTable.id,
               message: schema.dataImportRowTable.message,
               outcome: schema.dataImportRowTable.outcome,
+              payload: schema.dataImportRowTable.payload,
               postId: schema.dataImportRowTable.postId,
               rowNumber: schema.dataImportRowTable.rowNumber,
             })
@@ -416,6 +489,25 @@ const makeDataTransferRepository = Effect.gen(function* () {
             .orderBy(asc(schema.dataImportRowTable.rowNumber))
             .limit(limit)
             .offset(offset);
+          // The payload holds the plan a preview renders; it is narrowed to
+          // three fields here and never leaves the module whole.
+          const rows = yield* Effect.forEach(stored, (row) =>
+            decodeStagedRow(row.payload)
+              .pipe(Effect.orElseSucceed((): null => null))
+              .pipe(
+                Effect.map((payload): DataImportRowRecord => ({
+                  contentPreview:
+                    payload === null ? null : previewContent(payload.content),
+                  id: row.id,
+                  message: row.message,
+                  outcome: row.outcome,
+                  postId: row.postId,
+                  rowNumber: row.rowNumber,
+                  statusName: payload?.statusName ?? null,
+                  title: payload?.title ?? null,
+                }))
+              )
+          );
           return { rows, total: Number(totals?.total ?? 0) };
         })
       ),
@@ -670,7 +762,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
         "markRowCreated",
         Effect.gen(function* () {
           const now = yield* DateTime.nowAsDate;
-          yield* db
+          const updated = yield* db
             .update(schema.dataImportRowTable)
             .set({
               message: null,
@@ -678,7 +770,16 @@ const makeDataTransferRepository = Effect.gen(function* () {
               postId,
               updatedAt: now,
             })
-            .where(eq(schema.dataImportRowTable.id, rowId));
+            .where(
+              and(
+                eq(schema.dataImportRowTable.id, rowId),
+                eq(schema.dataImportRowTable.outcome, "pending")
+              )
+            )
+            .returning({ id: schema.dataImportRowTable.id });
+          if (updated.length === 0) {
+            return yield* repositoryError("markRowCreated");
+          }
         })
       ),
 
@@ -694,7 +795,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
         })
       ),
 
-    syncCounts: ({ jobId }) =>
+    syncCounts: ({ jobId, leaseOwner }) =>
       guard(
         "syncCounts",
         Effect.gen(function* () {
@@ -721,12 +822,17 @@ const makeDataTransferRepository = Effect.gen(function* () {
               errorCount: counts.errorCount,
               updatedAt: now,
             })
-            .where(eq(schema.dataImportJobTable.id, jobId));
+            .where(
+              and(
+                eq(schema.dataImportJobTable.id, jobId),
+                eq(schema.dataImportJobTable.leaseOwner, leaseOwner)
+              )
+            );
           return counts;
         })
       ),
 
-    finishJob: ({ jobId, status, failureMessage }) =>
+    finishJob: ({ jobId, leaseOwner, status, failureMessage }) =>
       guard(
         "finishJob",
         Effect.gen(function* () {
@@ -744,9 +850,34 @@ const makeDataTransferRepository = Effect.gen(function* () {
             .where(
               and(
                 eq(schema.dataImportJobTable.id, jobId),
-                eq(schema.dataImportJobTable.status, "running")
+                eq(schema.dataImportJobTable.status, "running"),
+                eq(schema.dataImportJobTable.leaseOwner, leaseOwner)
               )
             );
+        })
+      ),
+
+    renewLease: ({ jobId, leaseDurationMs, leaseOwner }) =>
+      guard(
+        "renewLease",
+        Effect.gen(function* () {
+          const now = yield* DateTime.nowAsDate;
+          const leaseExpiresAt = DateTime.fromDateUnsafe(now).pipe(
+            DateTime.addDuration(Duration.millis(leaseDurationMs)),
+            DateTime.toDate
+          );
+          const updated = yield* db
+            .update(schema.dataImportJobTable)
+            .set({ leaseExpiresAt, updatedAt: now })
+            .where(
+              and(
+                eq(schema.dataImportJobTable.id, jobId),
+                eq(schema.dataImportJobTable.status, "running"),
+                eq(schema.dataImportJobTable.leaseOwner, leaseOwner)
+              )
+            )
+            .returning({ id: schema.dataImportJobTable.id });
+          return updated.length > 0;
         })
       ),
 

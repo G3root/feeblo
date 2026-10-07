@@ -60,13 +60,16 @@ export type TDataImportRowOutcome = S.Schema.Type<typeof DataImportRowOutcome>;
  * `statusId` is the resolved status when the file named one this workspace
  * knows, and `null` when it did not; a null status is applied with the
  * workspace's default open status and is always accompanied by a warning.
- * `warnings` are safe, workspace-authored strings (a status name, an eta
- * value) — never personal data.
+ * `statusName` is the display name the row was planned with (the matched
+ * label or the default), kept so a preview can name the status without a
+ * second lookup. `warnings` are safe, workspace-authored strings (a status
+ * name, an eta value) — never personal data.
  */
 export const StagedDataImportRow = S.Struct({
   title: S.String,
   content: S.String,
   statusId: S.NullOr(S.String),
+  statusName: S.String,
   tagNames: S.Array(S.String),
   etaQuarter: S.NullOr(S.String),
   authorName: S.NullOr(S.String),

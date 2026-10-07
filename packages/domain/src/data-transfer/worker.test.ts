@@ -362,6 +362,48 @@ layer(TestLayer)("DataImportWorker", (it) => {
     })
   );
 
+  it.effect("stops without finalizing once another worker owns the lease", () =>
+    Effect.gen(function* () {
+      recordedIntegrationEvents.length = 0;
+      const fixture = yield* makeFixture();
+      const job = yield* stageAndConfirm(fixture, "title\nLease test\n");
+      const claimed = yield* claim("worker-1");
+      const db = yield* currentDb;
+      const now = yield* DateTime.nowAsDate;
+      // Hand the job to a second worker without going through claim: the
+      // first worker's renewal must fail and it must write nothing.
+      yield* db
+        .update(schema.dataImportJobTable)
+        .set({
+          leaseExpiresAt: DateTime.fromDateUnsafe(now).pipe(
+            DateTime.addDuration(Duration.minutes(5)),
+            DateTime.toDate
+          ),
+          leaseOwner: "worker-2",
+        })
+        .where(eq(schema.dataImportJobTable.id, job.id));
+
+      const outcome = yield* runDataImportPass(claimed);
+      expect(outcome.createdCount).toBe(0);
+
+      const repository = yield* DataTransferRepository;
+      const stored = yield* repository.findJob({
+        id: job.id,
+        organizationId: fixture.organizationId,
+      });
+      expect(Option.isSome(stored)).toBe(true);
+      if (Option.isSome(stored)) {
+        expect(stored.value.status).toBe("running");
+      }
+
+      const posts = yield* db
+        .select()
+        .from(schema.postTable)
+        .where(eq(schema.postTable.organizationId, fixture.organizationId));
+      expect(posts).toEqual([]);
+    })
+  );
+
   it.effect("a canceled job stops before applying its pending rows", () =>
     Effect.gen(function* () {
       recordedIntegrationEvents.length = 0;

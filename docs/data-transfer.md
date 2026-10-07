@@ -25,7 +25,7 @@ title,content,status,board,tags,eta,author_name,author_email,vote_count,created_
 | `updated_at` | Read-only decoration. |
 | `url` | Read-only decoration. |
 
-Export writes UTF-8 with a byte-order mark and CRLF line endings so Excel reads non-ASCII titles correctly; import accepts LF or CRLF and a leading BOM. Unknown columns are ignored with a notice; a file with no header, no `title` column, or an unterminated quoted value is rejected before anything is staged.
+Export writes UTF-8 with a byte-order mark and CRLF line endings so Excel reads non-ASCII titles correctly; import accepts LF or CRLF, a leading BOM, and files marked UTF-16 (Excel's "Unicode Text" export). Free-text values beginning with a formula trigger (`=`, `+`, `-`, `@`, whitespace, `|`, NUL, or a DDE-shaped `=cmd`/`=HYPERLINK` call) are written with an apostrophe marker and quoted, and the marker is removed on import only where it guards such a trigger — a spreadsheet never evaluates a cell, and a round trip is unchanged. Unknown columns are ignored with a notice; a file with no header, no `title` column, or an unterminated quoted value is rejected before anything is staged.
 
 ## What import does and does not do
 

@@ -35,11 +35,14 @@ export const toDataImportJobSummary = (
 export const toDataImportReportRow = (
   row: DataImportRowRecord
 ): TDataImportReportRow => ({
+  contentPreview: row.contentPreview,
   id: row.id,
   message: row.message,
   outcome: row.outcome,
   postId: row.postId,
   rowNumber: row.rowNumber,
+  statusName: row.statusName,
+  title: row.title,
 });
 
 export const toDataImportJobDetail = (

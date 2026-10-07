@@ -1,5 +1,5 @@
 import { transaction, type Database } from "@feeblo/db";
-import { PostId } from "@feeblo/id";
+import { LegidError, PostId } from "@feeblo/id";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as Crypto from "effect/Crypto";
@@ -69,7 +69,9 @@ const errorTag = (error: TaggedFailure): string =>
  */
 const isInfrastructureFailure = (error: TaggedFailure): boolean =>
   Schema.is(EffectDrizzleQueryError)(error) ||
+  Schema.is(LegidError)(error) ||
   Predicate.isTagged(error, "InternalServerError") ||
+  Predicate.isTagged(error, "SqlError") ||
   Predicate.isTagged(error, "DataTransferRepositoryError") ||
   Predicate.isTagged(error, "DataImportPassFailedError");
 
@@ -343,7 +345,7 @@ const embedCreatedPosts = ({
  * re-claimed, and the pass resumes from the ledger.
  */
 export const runDataImportPass = (claim: ClaimedDataImportJob) => {
-  const { job } = claim;
+  const { job, leaseOwner } = claim;
   return Effect.gen(function* () {
     const repository = yield* DataTransferRepository;
     const tags = yield* TagRepository;
@@ -361,6 +363,7 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
         failureMessage:
           "This workspace has no post statuses; add one before importing.",
         jobId: job.id,
+        leaseOwner,
         status: "failed",
       });
       return { createdCount: 0, errorCount: 0, jobId: job.id };
@@ -368,12 +371,25 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
 
     const runBatches = Effect.gen(function* () {
       while (true) {
+        // Renew before doing any work: a lease that has moved on must not
+        // create posts, rewrite counts, or finalize the job.
+        const renewed = yield* repository.renewLease({
+          jobId: job.id,
+          leaseDurationMs: DATA_IMPORT_LEASE_MS,
+          leaseOwner,
+        });
+        if (!renewed) {
+          return yield* repository
+            .syncCounts({ jobId: job.id, leaseOwner })
+            .pipe(Effect.map((counts) => ({ ...counts, jobId: job.id })));
+        }
+
         const stillRunning = yield* repository.isStillRunning({
           jobId: job.id,
         });
         if (!stillRunning) {
           return yield* repository
-            .syncCounts({ jobId: job.id })
+            .syncCounts({ jobId: job.id, leaseOwner })
             .pipe(Effect.map((counts) => ({ ...counts, jobId: job.id })));
         }
 
@@ -406,15 +422,22 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
           }
         }
 
-        yield* repository.syncCounts({ jobId: job.id });
+        yield* repository.syncCounts({ jobId: job.id, leaseOwner });
         yield* embedCreatedPosts({
           embeddings,
           organizationId: job.organizationId,
         });
       }
 
-      const counts = yield* repository.syncCounts({ jobId: job.id });
-      yield* repository.finishJob({ jobId: job.id, status: "completed" });
+      const counts = yield* repository.syncCounts({
+        jobId: job.id,
+        leaseOwner,
+      });
+      yield* repository.finishJob({
+        jobId: job.id,
+        leaseOwner,
+        status: "completed",
+      });
       return { ...counts, jobId: job.id };
     });
 
@@ -428,6 +451,7 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
             failureMessage:
               "The import stopped unexpectedly. Posts created before the stop were kept.",
             jobId: job.id,
+            leaseOwner,
             status: "failed",
           });
           return { createdCount: 0, errorCount: 0, jobId: job.id };

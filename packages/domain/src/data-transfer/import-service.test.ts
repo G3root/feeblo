@@ -2,7 +2,12 @@ import { NodeCrypto } from "@effect/platform-node";
 import { expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import type { LegidOf } from "@feeblo/id";
-import { BoardId, PostStatusId, WorkspaceId } from "@feeblo/id";
+import {
+  BoardId,
+  DataImportJobId,
+  PostStatusId,
+  WorkspaceId,
+} from "@feeblo/id";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -12,7 +17,7 @@ import { BoardRepository } from "../board/repository";
 import { PostStatusRepository } from "../post-status/repository";
 import { CurrentSession, type Session } from "../session-middleware";
 import { DataImportService } from "./import-service";
-import { DataTransferRepository } from "./repository";
+import { DataTransferRepository, type NewStagedImportRow } from "./repository";
 
 type Role = Session["memberships"][number]["role"];
 
@@ -173,16 +178,83 @@ layer(TestLayer)("DataImportService", (it) => {
         offset: 0,
       });
       expect(report.total).toBe(3);
-      expect(report.rows).toEqual([
-        expect.objectContaining({ outcome: "pending", rowNumber: 2 }),
-        expect.objectContaining({ outcome: "pending", rowNumber: 3 }),
-        expect.objectContaining({
-          message: "The title is required.",
-          outcome: "failed",
-          rowNumber: 4,
-        }),
-      ]);
+      expect(report.rows[0]).toMatchObject({
+        contentPreview: "Body",
+        outcome: "pending",
+        rowNumber: 2,
+        statusName: "Pending",
+        title: "Good post",
+      });
+      // The staged payload's body is never returned whole.
+      expect(report.rows[0]).not.toHaveProperty("payload");
+      expect(report.rows[1]).toMatchObject({
+        outcome: "pending",
+        rowNumber: 3,
+      });
+      expect(report.rows[2]).toMatchObject({
+        contentPreview: null,
+        message: "The title is required.",
+        outcome: "failed",
+        rowNumber: 4,
+        statusName: null,
+        title: null,
+      });
     })
+  );
+
+  it.effect("bounds the preview excerpt a report row carries", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeFixture();
+      const fixtureContent = "x".repeat(300);
+      const job = yield* stage(
+        fixture,
+        encoder.encode(`title,content\nLong,${fixtureContent}\n`)
+      );
+      const repository = yield* DataTransferRepository;
+      const report = yield* repository.listRows({
+        jobId: job.id,
+        limit: 10,
+        offset: 0,
+      });
+
+      expect(report.rows[0]?.contentPreview).toHaveLength(281);
+      expect(report.rows[0]?.contentPreview?.endsWith("…")).toBe(true);
+    })
+  );
+
+  it.effect(
+    "refuses a second active job at the index, not just the fast path",
+    () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture();
+        const repository = yield* DataTransferRepository;
+        const notices: readonly string[] = [];
+        const rows: readonly NewStagedImportRow[] = [];
+        const base = {
+          boardId: fixture.boardId,
+          createdByMemberId: fixture.membershipId,
+          createdByUserId: fixture.userId,
+          fileName: "posts.csv",
+          notices,
+          organizationId: fixture.organizationId,
+          rows,
+        };
+
+        yield* repository.insertStagedJob({
+          ...base,
+          fileHash: "first",
+          id: yield* DataImportJobId.generate,
+        });
+        const error = yield* Effect.flip(
+          repository.insertStagedJob({
+            ...base,
+            fileHash: "second",
+            id: yield* DataImportJobId.generate,
+          })
+        );
+
+        expect(error._tag).toBe("DataImportAlreadyActiveError");
+      })
   );
 
   it.effect("refuses a second import while one is active", () =>
@@ -197,12 +269,23 @@ layer(TestLayer)("DataImportService", (it) => {
     })
   );
 
-  it.effect("warns when the same file has been imported before", () =>
+  it.effect("warns when the same file was already confirmed", () =>
     Effect.gen(function* () {
       const fixture = yield* makeFixture();
       const repository = yield* DataTransferRepository;
+      const service = yield* DataImportService;
+      const session = Effect.provideService(
+        CurrentSession,
+        makeSession(fixture, "manager")
+      );
       const bytes = encoder.encode("title\nFirst\n");
       const first = yield* stage(fixture, bytes);
+      yield* service
+        .confirmImport({
+          id: first.id,
+          organizationId: fixture.organizationId,
+        })
+        .pipe(session);
       yield* repository.cancelJob({
         id: first.id,
         organizationId: fixture.organizationId,
@@ -214,6 +297,22 @@ layer(TestLayer)("DataImportService", (it) => {
           /^This file was already imported on \d{4}-\d{2}-\d{2}\.$/u
         ),
       ]);
+    })
+  );
+
+  it.effect("does not warn about an upload that was never confirmed", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeFixture();
+      const repository = yield* DataTransferRepository;
+      const bytes = encoder.encode("title\nFirst\n");
+      const first = yield* stage(fixture, bytes);
+      yield* repository.cancelJob({
+        id: first.id,
+        organizationId: fixture.organizationId,
+      });
+
+      const again = yield* stage(fixture, bytes);
+      expect(again.notices).toEqual([]);
     })
   );
 

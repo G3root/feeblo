@@ -34,6 +34,9 @@ import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { fetchRpc } from "~/lib/runtime";
 
+/** Report rows one page shows; the RPC clamps whatever the client sends. */
+const REPORT_PAGE_SIZE = 100;
+
 const statusLabel = (status: TDataImportJobSummary["status"]): string => {
   switch (status) {
     case "awaiting_confirmation":
@@ -80,7 +83,9 @@ export function DataSettingsPage() {
   const [boardId, setBoardId] = useState("");
   const [includeArchived, setIncludeArchived] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [reportPage, setReportPage] = useState(0);
   const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const boardsQuery = useQuery({
     queryKey: ["data-transfer-boards", organizationId],
@@ -96,14 +101,24 @@ export function DataSettingsPage() {
   });
 
   const detailQuery = useQuery({
-    queryKey: ["data-transfer-import", organizationId, selectedJobId],
+    queryKey: [
+      "data-transfer-import",
+      organizationId,
+      selectedJobId,
+      reportPage,
+    ],
     queryFn: () => {
       const id = selectedJobId;
       if (id === null) {
         return Promise.reject(new Error("No import selected"));
       }
       return fetchRpc((rpc) =>
-        rpc.DataImportGet({ id, organizationId, limit: 100, offset: 0 })
+        rpc.DataImportGet({
+          id,
+          organizationId,
+          limit: REPORT_PAGE_SIZE,
+          offset: reportPage * REPORT_PAGE_SIZE,
+        })
       );
     },
     enabled: canImport && selectedJobId !== null,
@@ -115,11 +130,23 @@ export function DataSettingsPage() {
       queryKey: ["data-transfer-imports", organizationId],
     });
 
-  const upload = useMutation({
-    mutationFn: async () => {
-      if (file === null || boardId === "") {
-        return;
-      }
+  const messageFromResponse = async (
+    response: Response
+  ): Promise<string | null> => {
+    const payload: unknown = await response.json().catch(() => null);
+    return isPlainObject(payload) &&
+      Predicate.hasProperty(payload, "message") &&
+      isString(payload.message)
+      ? payload.message
+      : null;
+  };
+
+  const handleUpload = async () => {
+    if (file === null || boardId === "") {
+      return;
+    }
+    setIsUploading(true);
+    try {
       const body = new FormData();
       body.append("file", file);
       body.append("boardId", boardId);
@@ -130,32 +157,38 @@ export function DataSettingsPage() {
         method: "POST",
       });
       if (!response.ok) {
-        throw new Error(m.solid_calm_cub());
+        // 409 is the workspace's slot being taken, which reads better as the
+        // reserved conflict message; anything else shows the server's own
+        // explanation (an unknown status, the row limit) when it has one.
+        const title =
+          response.status === 409
+            ? m.grand_plain_moose()
+            : ((await messageFromResponse(response)) ?? m.solid_calm_cub());
+        toastManager.add({ title, type: "error" });
+        return;
       }
       const payload: unknown = await response.json();
       const id = Predicate.hasProperty(payload, "id") ? payload.id : undefined;
       if (!(isPlainObject(payload) && isString(id))) {
-        throw new Error(m.solid_calm_cub());
+        toastManager.add({ title: m.tidy_bold_yak(), type: "error" });
+        return;
       }
-      return { id };
-    },
-    onError: () => {
-      toastManager.add({ title: m.solid_calm_cub(), type: "error" });
-    },
-    onSuccess: async (job) => {
-      if (job !== undefined) {
-        setSelectedJobId(job.id);
-        setFile(null);
-      }
+      setSelectedJobId(id);
+      setReportPage(0);
+      setFile(null);
       await refreshJobs();
-    },
-  });
+    } catch {
+      toastManager.add({ title: m.tidy_bold_yak(), type: "error" });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const confirmJob = useMutation({
     mutationFn: (id: string) =>
       fetchRpc((rpc) => rpc.DataImportConfirm({ id, organizationId })),
     onError: () => {
-      toastManager.add({ title: m.sunny_mild_puma(), type: "error" });
+      toastManager.add({ title: m.lucky_plain_gull(), type: "error" });
     },
     onSuccess: refreshJobs,
   });
@@ -164,7 +197,7 @@ export function DataSettingsPage() {
     mutationFn: (id: string) =>
       fetchRpc((rpc) => rpc.DataImportCancel({ id, organizationId })),
     onError: () => {
-      toastManager.add({ title: m.grand_plain_moose(), type: "error" });
+      toastManager.add({ title: m.merry_plain_auk(), type: "error" });
     },
     onSuccess: refreshJobs,
   });
@@ -185,6 +218,10 @@ export function DataSettingsPage() {
   const boards = boardsQuery.data ?? [];
   const jobs = importsQuery.data ?? [];
   const detail: TDataImportJobDetail | undefined = detailQuery.data;
+  const reportTotal = detail?.report.total ?? 0;
+  const reportPages = Math.max(1, Math.ceil(reportTotal / REPORT_PAGE_SIZE));
+  const reportFrom = reportTotal === 0 ? 0 : reportPage * REPORT_PAGE_SIZE + 1;
+  const reportTo = Math.min(reportTotal, (reportPage + 1) * REPORT_PAGE_SIZE);
 
   return (
     <SettingsLayout.Root size="large">
@@ -277,8 +314,8 @@ export function DataSettingsPage() {
             </CardPanel>
             <CardFooter>
               <Button
-                disabled={file === null || boardId === "" || upload.isPending}
-                onClick={() => upload.mutate()}
+                disabled={file === null || boardId === "" || isUploading}
+                onClick={handleUpload}
                 type="button"
               >
                 {m.warm_wise_toad()}
@@ -312,7 +349,10 @@ export function DataSettingsPage() {
                         <TableCell>
                           <button
                             className="text-left hover:underline"
-                            onClick={() => setSelectedJobId(job.id)}
+                            onClick={() => {
+                              setSelectedJobId(job.id);
+                              setReportPage(0);
+                            }}
                             type="button"
                           >
                             {job.fileName}
@@ -337,6 +377,7 @@ export function DataSettingsPage() {
                               onClick={() => {
                                 confirmJob.mutate(job.id);
                                 setSelectedJobId(job.id);
+                                setReportPage(0);
                               }}
                               size="sm"
                               type="button"
@@ -372,7 +413,10 @@ export function DataSettingsPage() {
             <CardHeader>
               <CardTitle>{m.agile_bright_auk()}</CardTitle>
               <CardDescription>
-                {detail.job.failureMessage ?? statusLabel(detail.job.status)}
+                {detail.job.failureMessage ??
+                  (detail.job.status === "failed"
+                    ? m.sunny_mild_puma()
+                    : statusLabel(detail.job.status))}
               </CardDescription>
             </CardHeader>
             <CardPanel className="flex flex-col gap-4">
@@ -396,14 +440,24 @@ export function DataSettingsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>{m.quick_plain_dove({ row: 0 })}</TableHead>
-                      <TableHead />
+                      <TableHead>{m.calm_crisp_newt()}</TableHead>
+                      <TableHead>{m.keen_bold_kite()}</TableHead>
+                      <TableHead>{m.soft_calm_mouse()}</TableHead>
+                      <TableHead>{m.fresh_plain_bass()}</TableHead>
+                      <TableHead>{m.vivid_calm_newt()}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {detail.report.rows.map((row) => (
                       <TableRow key={row.id}>
-                        <TableCell>{row.rowNumber}</TableCell>
+                        <TableCell>
+                          {m.quick_plain_dove({ row: row.rowNumber })}
+                        </TableCell>
+                        <TableCell>{row.title ?? ""}</TableCell>
+                        <TableCell>{row.statusName ?? ""}</TableCell>
+                        <TableCell className="max-w-md whitespace-pre-wrap">
+                          {row.contentPreview ?? ""}
+                        </TableCell>
                         <TableCell>
                           {row.message ??
                             (row.outcome === "created" ? "" : row.outcome)}
@@ -413,10 +467,44 @@ export function DataSettingsPage() {
                   </TableBody>
                 </Table>
               )}
+              {reportTotal > REPORT_PAGE_SIZE ? (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground text-xs">
+                    {m.warm_lucky_toad({
+                      from: reportFrom,
+                      to: reportTo,
+                      total: reportTotal,
+                    })}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      disabled={reportPage === 0}
+                      onClick={() => setReportPage((page) => page - 1)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {m.calm_brisk_auk()}
+                    </Button>
+                    <Button
+                      disabled={reportPage + 1 >= reportPages}
+                      onClick={() => setReportPage((page) => page + 1)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {m.brave_plain_lark()}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </CardPanel>
             <CardFooter>
               <Button
-                onClick={() => setSelectedJobId(null)}
+                onClick={() => {
+                  setSelectedJobId(null);
+                  setReportPage(0);
+                }}
                 type="button"
                 variant="outline"
               >
