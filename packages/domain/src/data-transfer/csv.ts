@@ -100,7 +100,17 @@ const TAG_SEPARATOR = ";";
  * whitespace injection and a null byte. Kept beside the inverse so the two
  * cannot disagree about what the writer escaped.
  */
-const FORMULA_PREFIXES = ["=", "+", "-", "@", "\t", "\r", "\n", "\0", "|"];
+const FORMULA_PREFIXES = new Set([
+  "=",
+  "+",
+  "-",
+  "@",
+  "\t",
+  "\r",
+  "\n",
+  "\0",
+  "|",
+]);
 
 /** DDE and data-exfiltration functions, matched case-insensitively. */
 const DANGEROUS_PATTERNS = [
@@ -119,7 +129,7 @@ const escapeFormula = (value: string): string => {
   if (value.length === 0) {
     return value;
   }
-  if (FORMULA_PREFIXES.includes(value[0] ?? "")) {
+  if (FORMULA_PREFIXES.has(value[0] ?? "")) {
     return `'${value}`;
   }
   return DANGEROUS_PATTERNS.some((pattern) => pattern.test(value))
@@ -133,7 +143,7 @@ const escapeFormula = (value: string): string => {
  * typed stays where it is.
  */
 const unescapeFormula = (value: string): string =>
-  value.startsWith("'") && FORMULA_PREFIXES.includes(value[1] ?? "")
+  value.startsWith("'") && FORMULA_PREFIXES.has(value[1] ?? "")
     ? value.slice(1)
     : value;
 
