@@ -1,7 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { MailerConfig } from "./config";
@@ -9,13 +8,10 @@ import { MailerConfig } from "./config";
 const loadMailerConfig = (
   environment: Record<string, string | undefined> = {}
 ) =>
-  MailerConfig.pipe(
-    Effect.provide(
-      MailerConfig.layer.pipe(
-        Layer.provide(
-          ConfigProvider.layer(ConfigProvider.fromUnknown(environment))
-        )
-      )
+  MailerConfig.make.pipe(
+    Effect.provideService(
+      ConfigProvider.ConfigProvider,
+      ConfigProvider.fromUnknown(environment)
     )
   );
 

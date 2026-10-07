@@ -160,6 +160,15 @@ export default defineConfig({
     // snapshot fixtures are pinned to `warn` in the override below.
     "effecttsgo/global-date-in-effect": "error",
 
+    // Cleared by composing every layer where its scope lives: production
+    // surfaces capture their collaborators at group construction, and tests
+    // use `layer`/`it.layer` fixtures (or build the one per-call layer in the
+    // test's own scope). The one true entry point
+    // (`apps/server/src/app/program.ts`) carries a targeted disable with its
+    // reason, so a new provide-inside-a-request now fails the gate instead of
+    // warning.
+    "effecttsgo/strict-effect-provide": "error",
+
     // anti-slop
     "anti-slop/no-chained-type-assertions": "error",
     "anti-slop/no-conditional-empty-object-spread": "error",
