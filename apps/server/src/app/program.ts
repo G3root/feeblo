@@ -26,7 +26,7 @@ import * as HttpRouter from "effect/http/HttpRouter";
 import * as Layer from "effect/Layer";
 
 import { ServerConfig } from "../config";
-import { makeSentryLayer } from "../infra/sentry";
+import { makeObservabilityLayer } from "../infra/observability";
 import { makeIntegrationLayers } from "../integrations";
 import {
   makeAuthLayer,
@@ -142,12 +142,12 @@ export const program = Effect.gen(function* () {
   return yield* Layer.launch(server);
 });
 
-// Sentry must wrap the entire program (layer construction, forked workers,
-// and server execution), not just the HTTP server layer.
-const SentryLiveLayer = Layer.unwrap(
+// Observability must wrap the entire program (layer construction, forked
+// workers, and server execution), not just the HTTP server layer.
+const ObservabilityLayer = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* ServerConfig;
-    return makeSentryLayer(config);
+    return makeObservabilityLayer(config);
   })
 ).pipe(Layer.provideMerge(ServerConfig.layer));
 
@@ -158,7 +158,7 @@ export const main = program.pipe(
   // eslint-disable-next-line effecttsgo/strict-effect-provide -- application entry point
   Effect.provide(
     Layer.mergeAll(
-      SentryLiveLayer,
+      ObservabilityLayer,
       Database.DatabaseContextLive,
       NodeCrypto.layer
     )
