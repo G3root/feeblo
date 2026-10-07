@@ -11,6 +11,7 @@ import { createEmailSubscriptionVerificationEmail } from "@feeblo/transactional/
 import { createNotificationEmail } from "@feeblo/transactional/templates/notification";
 import { and, asc, eq, gte, inArray, isNull, sql, sum } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -1616,6 +1617,7 @@ export const reconcileEmailOutbox = ({
 } = {}): Effect.Effect<
   void,
   never,
+  | Crypto.Crypto
   | DatabaseService
   | EmailOutboxConfig
   | EmailOutboxRepository

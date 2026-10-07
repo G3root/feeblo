@@ -2,7 +2,6 @@ import { COMMENT_CONTENT_MAX_LENGTH } from "@feeblo/domain/content-limits";
 import { CommentId } from "@feeblo/id";
 import { useAppForm, withForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
-import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
@@ -18,6 +17,7 @@ import {
 import z from "zod";
 
 import { m } from "../../paraglide/messages.js";
+import { formatPostStatus } from "../../post-status";
 import {
   CommentComposer,
   commentComposerBoxClassName,

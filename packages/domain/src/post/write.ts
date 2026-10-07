@@ -254,28 +254,28 @@ const makePostWriteService = Effect.gen(function* () {
    * The operations and their helpers read some collaborators directly and
    * others through the fiber context (the asset promotion's storage, the
    * integration event recorder, the identity resolver). Providing this one
-   * layer around each operation is what lets a caller depend on
+   * context around each operation is what lets a caller depend on
    * `PostWriteService` alone. The list is hand-maintained: a new requirement
    * read by an operation leaks into the method's inferred requirements and
    * fails at the composition root, not here.
    */
-  const environment = Layer.mergeAll(
-    Layer.succeed(BoardRepository, boardRepository),
-    Layer.succeed(Crypto.Crypto, crypto),
-    Layer.succeed(Database.Database, db),
-    Layer.succeed(EmailOutboxConfig, emailOutboxConfig),
-    Layer.succeed(EmailOutboxRepository, emailOutbox),
-    Layer.succeed(EmailSubscriptionRepository, emailSubscriptions),
-    Layer.succeed(EntitlementPolicy, entitlementPolicy),
-    Layer.succeed(IntegrationEventRecorder, integrationEventRecorder),
-    Layer.succeed(PostActivityRepository, activityRepository),
-    Layer.succeed(PostRepository, repository),
-    Layer.succeed(PostSubscriptionRepository, subscriptionRepository),
-    Layer.succeed(ResolvePrincipalService, resolvePrincipal),
-    Layer.succeed(S3UploadService, s3),
-    Layer.succeed(UserRepository, userRepository)
+  const environment = Context.empty().pipe(
+    Context.add(BoardRepository, boardRepository),
+    Context.add(Crypto.Crypto, crypto),
+    Context.add(Database.Database, db),
+    Context.add(EmailOutboxConfig, emailOutboxConfig),
+    Context.add(EmailOutboxRepository, emailOutbox),
+    Context.add(EmailSubscriptionRepository, emailSubscriptions),
+    Context.add(EntitlementPolicy, entitlementPolicy),
+    Context.add(IntegrationEventRecorder, integrationEventRecorder),
+    Context.add(PostActivityRepository, activityRepository),
+    Context.add(PostRepository, repository),
+    Context.add(PostSubscriptionRepository, subscriptionRepository),
+    Context.add(ResolvePrincipalService, resolvePrincipal),
+    Context.add(S3UploadService, s3),
+    Context.add(UserRepository, userRepository)
   );
-  const provideWriteEnvironment = Effect.provide(environment);
+  const provideWriteEnvironment = Effect.provideContext(environment);
 
   /** The actor columns a timeline entry records. A key is not a member. */
   const actorColumns = (actor: PostWriteActor) =>

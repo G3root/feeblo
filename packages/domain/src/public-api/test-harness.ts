@@ -4,7 +4,13 @@ import {
   NodeServices,
 } from "@effect/platform-node";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
+import {
+  BoardId,
+  ChangelogId,
+  PostId,
+  PostStatusId,
+  WorkspaceId,
+} from "@feeblo/id";
 import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
 import { slugify } from "@feeblo/utils/url";
 import * as DateTime from "effect/DateTime";
@@ -117,9 +123,9 @@ export const makePublicApiDependencies = (
               Effect.gen(function* () {
                 const count = yield* crmEntryCount;
                 if (count >= crmEntryLimit) {
-                  return yield* Effect.fail(
-                    new PolicyDeniedError({ reason: "The plan has no room." })
-                  );
+                  return yield* new PolicyDeniedError({
+                    reason: "The plan has no room.",
+                  });
                 }
               }),
           }))
@@ -188,9 +194,10 @@ export const makePublicApiDependencies = (
   // The route requires the service; merging rather than only providing keeps
   // the shared dependencies in the test layer's output so test bodies can seed
   // fixtures through `currentDb`.
-  return PostWriteService.layer
-    .pipe(Layer.provideMerge(SharedDependencies))
-    .pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
+  return PostWriteService.layer.pipe(
+    Layer.provideMerge(SharedDependencies),
+    Layer.provideMerge(Database.PgliteDatabaseLive)
+  );
 };
 
 /** The production wiring, with only the substitutes a test must supply. */
@@ -256,7 +263,7 @@ export const seedChangelog = (
 ) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
-    const id = options.id ?? `chg_${Math.random().toString(36).slice(2, 10)}`;
+    const id = options.id ?? (yield* ChangelogId.generate);
     const title = options.title ?? "Release notes";
     const now = options.createdAt ?? (yield* DateTime.nowAsDate);
     yield* db.insert(schema.changelogTable).values({

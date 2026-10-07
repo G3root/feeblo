@@ -4,7 +4,6 @@ import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 
 import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { EmailOutboxRepository } from "../email-outbox/repository";
@@ -27,7 +26,7 @@ import {
   type Session,
 } from "../session-middleware";
 import { WorkspaceRepository } from "../workspace/repository";
-import { PostEmbeddingService, postEmbeddingInput } from "./embedding-service";
+import { PostEmbeddingService } from "./embedding-service";
 import {
   FailedToUpdatePostError,
   PostAlreadyExistsError,
@@ -54,7 +53,7 @@ import type {
   TPostUpdateTitle,
   TPostUnmerge,
 } from "./schema";
-import { postLexicalSimilarity, SUGGESTION_MAX_DISTANCE } from "./suggestions";
+import { makePostSuggestions } from "./suggestions";
 import { PostWriteService, type PostWriteActor } from "./write";
 
 export const PostRpcHandlersEffect = Effect.gen(function* () {
@@ -113,67 +112,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       )
     );
 
-  const suggestionsEffect = (args: TPostSuggestions, publicOnly: boolean) =>
-    Effect.gen(function* () {
-      const input = postEmbeddingInput(args);
-      const resultLimit = args.limit ?? 5;
-      const queryEmbedding = Option.isSome(embeddingService)
-        ? yield* embeddingService.value
-            .embed(input)
-            .pipe(
-              Effect.catch((cause) =>
-                Effect.logWarning(
-                  "Failed to generate suggestion query embedding",
-                  cause
-                ).pipe(Effect.as(Option.none()))
-              )
-            )
-        : Option.none();
-      const candidates = yield* repository.findSuggestionCandidates({
-        organizationId: args.organizationId,
-        ...(args.boardId && { boardId: args.boardId }),
-        ...(Option.isSome(queryEmbedding) && {
-          embedding: queryEmbedding.value.vector,
-          embeddingModel: queryEmbedding.value.model,
-        }),
-        limit: Option.isSome(queryEmbedding)
-          ? resultLimit
-          : Math.max(25, resultLimit * 5),
-        publicOnly,
-      });
-
-      if (Option.isSome(queryEmbedding)) {
-        const matches = candidates
-          .filter(
-            (candidate) =>
-              candidate.distance !== null &&
-              candidate.distance <= SUGGESTION_MAX_DISTANCE
-          )
-          .map(({ distance: _distance, ...post }) => post);
-        if (matches.length > 0) {
-          return matches;
-        }
-      }
-
-      const lexicalCandidates = Option.isSome(queryEmbedding)
-        ? yield* repository.findSuggestionCandidates({
-            organizationId: args.organizationId,
-            ...(args.boardId && { boardId: args.boardId }),
-            limit: Math.max(25, resultLimit * 5),
-            publicOnly,
-          })
-        : candidates;
-
-      return lexicalCandidates
-        .map((post) => ({
-          post,
-          score: postLexicalSimilarity(input, post),
-        }))
-        .filter(({ score }) => score > 0)
-        .sort((left, right) => right.score - left.score)
-        .slice(0, resultLimit)
-        .map(({ post }) => post);
-    });
+  const suggestions = makePostSuggestions({
+    candidates: repository.findSuggestionCandidates,
+    embeddings: embeddingService,
+  });
 
   /**
    * Re-attributes a post to a resolved on-behalf subject.
@@ -297,7 +239,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     },
 
     PostSuggestions: (args: TPostSuggestions) =>
-      suggestionsEffect(args, false).pipe(
+      suggestions({ ...args, publicOnly: false }).pipe(
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
         withRemapDbErrors("Post", "select")
       ),
@@ -324,7 +266,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           sessionOption._tag === "Some"
             ? sessionOption.value.session.userId
             : undefined;
-        const posts = yield* suggestionsEffect(args, true);
+        const posts = yield* suggestions({ ...args, publicOnly: true });
         // Same PII rule as PostListPublic: creator identifiers are only
         // meaningful for the session user's own rows.
         return posts.map((post) => redactCreatorIdentity(post, userId));

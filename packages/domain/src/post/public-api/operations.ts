@@ -1,12 +1,12 @@
+import { Database } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { currentPostActivityRepository } from "../../post-activity/repository";
+import { PostActivityRepository } from "../../post-activity/repository";
 import { PUBLIC_API_PAGE_DEFAULT_LIMIT } from "../../public-api/common";
-import { currentPublicApiConfig } from "../../public-api/config";
+import { PublicApiConfig } from "../../public-api/config";
 import { decodeCursorOrFail, encodeCursor } from "../../public-api/cursor";
-import { currentPublicApiDatabase } from "../../public-api/database";
 import {
   ConflictError,
   InternalError,
@@ -17,20 +17,20 @@ import {
   notFoundError,
 } from "../../public-api/errors";
 import { onInternalError } from "../../public-api/failure";
-import { currentPublicApiCaller } from "../../public-api/middleware";
+import { PublicApiCaller } from "../../public-api/middleware";
 import { defineOperation } from "../../public-api/operation";
 import { parseTitle, parseUpdatedAfter } from "../../public-api/parse";
 import { withRemapDbErrors } from "../../rpc-errors";
 import { postTagChangeActivities } from "../../tag/post-tag-activities";
 import { toPublicApiTag } from "../../tag/public-api/mappers";
-import { currentTagRepository } from "../../tag/repository";
+import { TagRepository } from "../../tag/repository";
 import {
   toActivitySource,
   toPublicApiPost,
   toPublicApiPostActivity,
   toPublicApiPostSummary,
 } from "./mappers";
-import { currentPublicApiPostRepository } from "./repository";
+import { PublicApiPostRepository } from "./repository";
 import {
   CreatePostInput,
   DeletePostInput,
@@ -133,9 +133,9 @@ export const listBoardPostsOperation = defineOperation(
     updatedAfter,
   }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiPostRepository;
-      const config = yield* currentPublicApiConfig;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiPostRepository;
+      const config = yield* PublicApiConfig;
 
       const after = yield* decodeCursorOrFail(cursor);
       // Parsed here rather than in the HTTP handler, so the MCP projection of
@@ -201,9 +201,9 @@ export const listPostsOperation = defineOperation(
     updatedAfter,
   }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiPostRepository;
-      const config = yield* currentPublicApiConfig;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiPostRepository;
+      const config = yield* PublicApiConfig;
 
       const after = yield* decodeCursorOrFail(cursor);
       // Parsed here rather than in the HTTP handler: see the board list above.
@@ -251,9 +251,9 @@ export const retrievePostOperation = defineOperation(
   },
   ({ boardId: rawBoardId, postId: rawPostId, slug: rawSlug }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiPostRepository;
-      const config = yield* currentPublicApiConfig;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiPostRepository;
+      const config = yield* PublicApiConfig;
 
       const postId = provided(rawPostId);
       const boardId = provided(rawBoardId);
@@ -310,9 +310,9 @@ export const getPostOperation = defineOperation(
   },
   ({ postId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiPostRepository;
-      const config = yield* currentPublicApiConfig;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiPostRepository;
+      const config = yield* PublicApiConfig;
 
       const post = yield* repository
         .findPost({
@@ -349,9 +349,9 @@ export const listPostActivityOperation = defineOperation(
   },
   ({ cursor, limit, postId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const posts = yield* currentPublicApiPostRepository;
-      const activity = yield* currentPostActivityRepository;
+      const caller = yield* PublicApiCaller;
+      const posts = yield* PublicApiPostRepository;
+      const activity = yield* PostActivityRepository;
 
       // The post is read first so a missing post and a post with no history
       // are not the same answer, and another workspace's post is reported as
@@ -414,9 +414,9 @@ export const createPostOperation = defineOperation(
     author,
   }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiPostRepository;
-      const config = yield* currentPublicApiConfig;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiPostRepository;
+      const config = yield* PublicApiConfig;
 
       const title = yield* parseTitle(rawTitle);
 
@@ -457,9 +457,9 @@ export const updatePostOperation = defineOperation(
     title: rawTitle,
   }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiPostRepository;
-      const config = yield* currentPublicApiConfig;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiPostRepository;
+      const config = yield* PublicApiConfig;
 
       // A body that names no field would otherwise be answered as a
       // successful write that changed nothing but `updatedAt`, which
@@ -521,10 +521,10 @@ export const setPostTagsOperation = defineOperation(
   },
   ({ postId, tagIds }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const db = yield* currentPublicApiDatabase;
-      const tags = yield* currentTagRepository;
-      const activities = yield* currentPostActivityRepository;
+      const caller = yield* PublicApiCaller;
+      const db = yield* Database.Database;
+      const tags = yield* TagRepository;
+      const activities = yield* PostActivityRepository;
 
       const wanted = [...new Set(tagIds)];
 
@@ -562,16 +562,16 @@ export const setPostTagsOperation = defineOperation(
                 tagIds: wanted,
               })
               .pipe(
-                Effect.catchTag("PolicyDenied", () =>
-                  Effect.fail(notFoundError("Post not found."))
-                ),
-                Effect.catchTag("PostIsMergedError", () =>
-                  Effect.fail(
-                    invalidRequestError(
-                      "This post has been merged into another post and cannot be changed."
-                    )
-                  )
-                )
+                Effect.catchTags({
+                  PolicyDenied: () =>
+                    Effect.fail(notFoundError("Post not found.")),
+                  PostIsMergedError: () =>
+                    Effect.fail(
+                      invalidRequestError(
+                        "This post has been merged into another post and cannot be changed."
+                      )
+                    ),
+                })
               );
 
             yield* activities.createMany(
@@ -612,8 +612,8 @@ export const deletePostOperation = defineOperation(
   },
   ({ postId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiPostRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiPostRepository;
 
       yield* repository.deletePost({
         organizationId: caller.organizationId,
@@ -658,8 +658,8 @@ export const mergePostOperation = defineOperation(
   },
   ({ intoPostId, postId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiPostRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiPostRepository;
 
       yield* repository.mergePost({
         intoPostId,
@@ -681,8 +681,8 @@ export const unmergePostOperation = defineOperation(
   },
   ({ postId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiPostRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiPostRepository;
 
       yield* repository.unmergePost({
         organizationId: caller.organizationId,

@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { expect, test } from "@playwright/test";
-
+import { expect, test } from "../fixtures";
 import { createWorkspace } from "../helpers/auth";
 import {
   createChangelogDraft,
@@ -11,7 +10,7 @@ import {
 import { waitForHydration } from "../helpers/hydration";
 import { createPost } from "../helpers/posts";
 import { createTestUser } from "../helpers/test-users";
-import { publicBoardUrl } from "../helpers/urls";
+import { publicBoardUrl, unknownPublicBoardUrl } from "../helpers/urls";
 
 /**
  * The structured-data scripts rendered into the initial HTML by the server.
@@ -183,11 +182,8 @@ test.describe("public board SEO", () => {
     expect(sitemapBody).not.toContain("<loc>");
 
     // A host without a site keeps crawlers out entirely.
-    const baseURL = new URL(
-      process.env.E2E_BASE_URL ?? "http://localhost:3101"
-    );
     const unknownRobots = await page.request.get(
-      `${baseURL.protocol}//does-not-exist.${baseURL.hostname}${baseURL.port ? `:${baseURL.port}` : ""}/robots.txt`
+      `${unknownPublicBoardUrl()}/robots.txt`
     );
     expect(unknownRobots.status()).toBe(200);
     expect(await unknownRobots.text()).toContain("Disallow: /");

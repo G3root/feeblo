@@ -2,6 +2,7 @@ import {
   useAuthDialogContext,
   usePostCreateDialogContext,
 } from "@feeblo/post-ui/dialog-stores";
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import { isLiveQueryPending } from "@feeblo/web-shared/collections";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
@@ -22,7 +23,6 @@ import {
 } from "react";
 
 import { useHomePageFilters } from "../../hooks/use-home-page-filters";
-import { formatPostStatus } from "../../lib/utils";
 import { m } from "../../paraglide/messages.js";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";

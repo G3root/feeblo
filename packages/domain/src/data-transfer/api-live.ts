@@ -15,7 +15,7 @@ import {
   UnauthorizedError,
 } from "../rpc-errors";
 import {
-  currentHttpApiSession,
+  CurrentSession,
   HttpApiAuthMiddlewareLive,
 } from "../session-middleware";
 import { DataImportUploadLimitsMiddlewareLive } from "./api-contract";
@@ -104,7 +104,7 @@ export const DataTransferApiLive = HttpApiBuilder.group(
         "uploadBoardImport",
         ({ payload: { boardId, file, organizationId } }) =>
           Effect.gen(function* () {
-            const session = yield* currentHttpApiSession;
+            const session = yield* CurrentSession;
             yield* consumeDashboardRateLimit({
               key: `data-import-upload:${session.user.id}`,
               name: "data-import-upload",
@@ -159,7 +159,7 @@ export const DataTransferApiLive = HttpApiBuilder.group(
       )
       .handle("exportBoardPosts", ({ query }) =>
         Effect.gen(function* () {
-          const session = yield* currentHttpApiSession;
+          const session = yield* CurrentSession;
           yield* consumeDashboardRateLimit({
             key: `data-export:${session.user.id}`,
             name: "data-export",

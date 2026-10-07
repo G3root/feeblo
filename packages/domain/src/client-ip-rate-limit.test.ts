@@ -1,4 +1,5 @@
 import { expect, it } from "@effect/vitest";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServerRequest from "effect/http/HttpServerRequest";
@@ -91,28 +92,33 @@ it.effect(
       Layer.provide(makeClientIpGlobalMiddleware(proxyTrustResult.success))
     );
     const TestRuntime = TestApp.pipe(Layer.provideMerge(HttpRouter.layer));
-    const executeRequest = (clientIp: string) => {
+    const executeRequest = (
+      router: HttpRouter.HttpRouter,
+      clientIp: string
+    ) => {
       const request = HttpServerRequest.fromWeb(
         new Request("http://localhost/rate-limit", {
           headers: { "x-forwarded-for": clientIp },
         })
       ).modify({ remoteAddress: Option.some("10.0.0.4") });
-      return Effect.flatMap(HttpRouter.HttpRouter, (router) =>
-        router.asHttpEffect()
-      ).pipe(
-        Effect.provideService(HttpServerRequest.HttpServerRequest, request)
-      );
+      return router
+        .asHttpEffect()
+        .pipe(
+          Effect.provideService(HttpServerRequest.HttpServerRequest, request)
+        );
     };
 
     return Effect.gen(function* () {
-      const firstClient = yield* executeRequest("198.51.100.1");
-      const secondClient = yield* executeRequest("198.51.100.2");
-      const firstClientAgain = yield* executeRequest("198.51.100.1");
+      const context = yield* Layer.build(TestRuntime);
+      const router = Context.get(context, HttpRouter.HttpRouter);
+      const firstClient = yield* executeRequest(router, "198.51.100.1");
+      const secondClient = yield* executeRequest(router, "198.51.100.2");
+      const firstClientAgain = yield* executeRequest(router, "198.51.100.1");
 
       expect(firstClient.status).toBe(200);
       expect(secondClient.status).toBe(200);
       expect(firstClientAgain.status).toBe(429);
-    }).pipe(Effect.provide(TestRuntime), Effect.scoped);
+    }).pipe(Effect.scoped);
   }
 );
 
@@ -197,13 +203,15 @@ it.effect(
     );
 
     return Effect.gen(function* () {
-      const response = yield* Effect.flatMap(HttpRouter.HttpRouter, (router) =>
-        router.asHttpEffect()
-      ).pipe(
-        Effect.provideService(HttpServerRequest.HttpServerRequest, request)
-      );
+      const context = yield* Layer.build(TestRuntime);
+      const router = Context.get(context, HttpRouter.HttpRouter);
+      const response = yield* router
+        .asHttpEffect()
+        .pipe(
+          Effect.provideService(HttpServerRequest.HttpServerRequest, request)
+        );
 
       expect(response.status).toBe(503);
-    }).pipe(Effect.provide(TestRuntime), Effect.scoped);
+    }).pipe(Effect.scoped);
   }
 );

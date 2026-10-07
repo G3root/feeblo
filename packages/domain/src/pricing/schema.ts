@@ -1,3 +1,4 @@
+import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
 
 import {
@@ -15,6 +16,13 @@ const PlanLimits = S.Struct({
   changelogCategories: S.NullOr(S.Finite),
   submissionNotificationRecipients: S.NullOr(S.Finite),
   crmEntries: S.NullOr(S.Finite),
+  // `/api/plans` is HTTP-cached for an hour, so a client can decode a body
+  // served before this key existed. A missing key decodes as `null`, matching
+  // "no cap"; a present finite number or explicit `null` still validates as
+  // before, and the decoded type stays `number | null`.
+  workspaces: S.NullOr(S.Finite).pipe(
+    S.withDecodingDefaultKey(Effect.succeed(null))
+  ),
 } satisfies { readonly [K in LimitFeatureKey]: S.Schema<number | null> });
 
 const PlanCapabilities = S.Struct({

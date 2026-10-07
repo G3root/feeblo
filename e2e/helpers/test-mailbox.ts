@@ -1,6 +1,6 @@
 import { type APIRequestContext, expect } from "@playwright/test";
 
-const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
+import { apiUrl } from "./urls";
 
 export interface TestEmail {
   readonly from?: string;
@@ -10,18 +10,14 @@ export interface TestEmail {
   readonly to: string;
 }
 
-const mailboxUrl = `${apiURL}/__e2e/emails`;
+const mailboxUrl = (): string => `${apiUrl()}/__e2e/emails`;
 const invitationPathPattern = /\/invitation\/([^"<\s]+)/;
 const verificationCodePattern = /\b(\d{6})\b/;
 
 export async function getTestEmails(
   request: APIRequestContext
 ): Promise<readonly TestEmail[]> {
-  const response = await request.get(mailboxUrl, {
-    // Playwright only retries transport-level ECONNRESET errors; mailbox
-    // polling is safe to retry and should not fail auth setup transiently.
-    maxRetries: 2,
-  });
+  const response = await request.get(mailboxUrl());
   expect(response.ok()).toBeTruthy();
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const body = (await response.json()) as { readonly emails: TestEmail[] };

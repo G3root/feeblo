@@ -1,8 +1,7 @@
-import { currentDb, Database, schema } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import type { TEntitySource } from "@feeblo/domain-contracts/entity-source";
 import { CompanyId } from "@feeblo/id";
 import { and, count, desc, eq, ne, sql } from "drizzle-orm";
-import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -11,7 +10,6 @@ import * as Option from "effect/Option";
 
 import {
   CompanyAlreadyExistsError,
-  FailedToCreateCompanyError,
   FailedToUpdateCompanyError,
 } from "./errors";
 import type { TCompanyUpsert } from "./schema";
@@ -176,93 +174,107 @@ const makeCompanyRepository = Effect.gen(function* () {
         return company !== undefined;
       }),
 
-    upsertCompany: (args: TCompanyUpsert) =>
+    /**
+     * The row an SSO upsert's keys name, or `None`.
+     *
+     * Deterministic, not an `OR`: the external id wins when the caller
+     * supplies one — it is the sync's own identity for the company — and the
+     * name match is the fallback. Split from the upsert so the SSO path's
+     * find-or-create can run the lookup after the workspace lock and again
+     * after a lost insert race (`ensureCrmEntry`).
+     */
+    findUpsertCompany: (args: TCompanyUpsert) =>
       Effect.gen(function* () {
-        /**
-         * The match is deterministic, not an `OR`: the external id wins when
-         * the caller supplies one — it is the sync's own identity for the
-         * company — and the name match is the fallback. Both keys matching
-         * different rows is refused below rather than guessed at, because
-         * updating either row would re-write a key the other holds (a unique
-         * violation with no recovery inside this upsert).
-         */
-        const findByKey = (): Effect.Effect<
-          typeof schema.companyTable.$inferSelect | undefined,
-          EffectDrizzleQueryError,
-          Database.Database
-        > =>
-          Effect.gen(function* () {
-            if (args.externalId) {
-              const [byExternalId] = yield* db
-                .select()
-                .from(schema.companyTable)
-                .where(
-                  and(
-                    eq(schema.companyTable.organizationId, args.organizationId),
-                    eq(schema.companyTable.externalId, args.externalId)
-                  )
-                )
-                .limit(1);
-              if (byExternalId !== undefined) {
-                return byExternalId;
-              }
-            }
-            const [byName] = yield* db
-              .select()
-              .from(schema.companyTable)
-              .where(
-                and(
-                  eq(schema.companyTable.organizationId, args.organizationId),
-                  eq(schema.companyTable.name, args.name)
-                )
+        if (args.externalId) {
+          const [byExternalId] = yield* db
+            .select()
+            .from(schema.companyTable)
+            .where(
+              and(
+                eq(schema.companyTable.organizationId, args.organizationId),
+                eq(schema.companyTable.externalId, args.externalId)
               )
-              .limit(1);
-            return byName;
-          });
-
-        const existing = yield* findByKey();
-
-        if (existing) {
-          // A foreign external id held by a different row is the ambiguous
-          // state above: refuse rather than write a key collision. The row
-          // may have been matched by name and hold `null` here, so the probe
-          // runs whenever the update would write a different value, over null
-          // included.
-          if (args.externalId && existing.externalId !== args.externalId) {
-            const [other] = yield* db
-              .select({ id: schema.companyTable.id })
-              .from(schema.companyTable)
-              .where(
-                and(
-                  eq(schema.companyTable.organizationId, args.organizationId),
-                  eq(schema.companyTable.externalId, args.externalId)
-                )
-              )
-              .limit(1);
-            if (other !== undefined && other.id !== existing.id) {
-              return yield* new FailedToUpdateCompanyError();
-            }
+            )
+            .limit(1);
+          if (byExternalId !== undefined) {
+            return Option.some(byExternalId);
           }
+        }
+        const [byName] = yield* db
+          .select()
+          .from(schema.companyTable)
+          .where(
+            and(
+              eq(schema.companyTable.organizationId, args.organizationId),
+              eq(schema.companyTable.name, args.name)
+            )
+          )
+          .limit(1);
+        return Option.fromNullishOr(byName);
+      }),
 
-          const now = yield* DateTime.nowAsDate;
-          const [updated = null] = yield* db
-            .update(schema.companyTable)
-            .set({
-              ...(args.externalId && { externalId: args.externalId }),
-              ...(args.avatar !== undefined && { avatar: args.avatar }),
-              ...(args.externalCreatedAt !== undefined && {
-                externalCreatedAt: args.externalCreatedAt,
-              }),
-              updatedAt: now,
-            })
-            .where(eq(schema.companyTable.id, existing.id))
-            .returning();
-          if (!updated) {
+    /**
+     * Applies an SSO upsert to the row its keys matched.
+     *
+     * A foreign external id held by a different row is the ambiguous state
+     * the lookup cannot resolve: writing over another row's key is a unique
+     * violation with no recovery inside this update, so that state is refused
+     * deterministically rather than guessed at. The row may have been matched
+     * by name and hold `null` here, so the probe runs whenever the update
+     * would write a different value, over null included.
+     */
+    updateUpsertCompany: (
+      args: TCompanyUpsert & {
+        readonly existing: typeof schema.companyTable.$inferSelect;
+      }
+    ) =>
+      Effect.gen(function* () {
+        const { existing } = args;
+        if (args.externalId && existing.externalId !== args.externalId) {
+          const [other] = yield* db
+            .select({ id: schema.companyTable.id })
+            .from(schema.companyTable)
+            .where(
+              and(
+                eq(schema.companyTable.organizationId, args.organizationId),
+                eq(schema.companyTable.externalId, args.externalId)
+              )
+            )
+            .limit(1);
+          if (other !== undefined && other.id !== existing.id) {
             return yield* new FailedToUpdateCompanyError();
           }
-          return updated;
         }
 
+        const now = yield* DateTime.nowAsDate;
+        const [updated = null] = yield* db
+          .update(schema.companyTable)
+          .set({
+            ...(args.externalId && { externalId: args.externalId }),
+            ...(args.avatar !== undefined && { avatar: args.avatar }),
+            ...(args.externalCreatedAt !== undefined && {
+              externalCreatedAt: args.externalCreatedAt,
+            }),
+            updatedAt: now,
+          })
+          .where(eq(schema.companyTable.id, existing.id))
+          .returning();
+        if (!updated) {
+          return yield* new FailedToUpdateCompanyError();
+        }
+        return updated;
+      }),
+
+    /**
+     * Inserts a new SSO company, tolerating a lost unique-key race.
+     *
+     * `None` means a concurrent sign-in wrote the row first; the SSO path
+     * re-reads through `findUpsertCompany` rather than failing the caller's
+     * transaction, and a win reported by neither lookup is the caller's
+     * unrecoverable-race failure.
+     */
+    insertUpsertCompany: (args: TCompanyUpsert) =>
+      Effect.gen(function* () {
         const id = yield* CompanyId.generate;
         const now = yield* DateTime.nowAsDate;
         const [created = null] = yield* db
@@ -278,20 +290,9 @@ const makeCompanyRepository = Effect.gen(function* () {
             createdAt: now,
             updatedAt: now,
           })
-          // A concurrent SSO login for the same company loses the unique
-          // (organization, name) or (organization, external id) race here;
-          // the winner is re-read through the same lookup rather than a
-          // unique violation failing the caller's transaction.
           .onConflictDoNothing()
           .returning();
-        if (created) {
-          return created;
-        }
-        const winner = yield* findByKey();
-        if (winner) {
-          return winner;
-        }
-        return yield* new FailedToCreateCompanyError();
+        return Option.fromNullishOr(created);
       }),
 
     findManyCompanies: (organizationId: string) =>
@@ -419,37 +420,6 @@ const makeCompanyRepository = Effect.gen(function* () {
         )
         .limit(1)
         .pipe(Effect.map((rows) => Option.fromNullishOr(rows[0]))),
-
-    /**
-     * How many CRM entries the workspace holds, for the plan's entry limit.
-     *
-     * Counts companies and contacts together, and selects nothing: the Public
-     * API does not return contacts, but the plan limit that gates creating a
-     * company counts them, and the dashboard's own create is gated on the same
-     * number. Two queries rather than one union, because each then uses its own
-     * `organizationId` index.
-     *
-     * Only meaningful inside the write transaction that holds the workspace
-     * lock: read anywhere else, the number it returns can be stale by the time
-     * the row it authorizes is inserted.
-     */
-    countCrmEntries: (organizationId: string) =>
-      Effect.gen(function* () {
-        const [companyRows, contactRows] = yield* Effect.all([
-          db
-            .select({ total: count(schema.companyTable.id) })
-            .from(schema.companyTable)
-            .where(eq(schema.companyTable.organizationId, organizationId)),
-          db
-            .select({ total: count(schema.contactTable.id) })
-            .from(schema.contactTable)
-            .where(eq(schema.contactTable.organizationId, organizationId)),
-        ]);
-
-        return (
-          (companyRows.at(0)?.total ?? 0) + (contactRows.at(0)?.total ?? 0)
-        );
-      }),
   };
 });
 
@@ -459,14 +429,3 @@ export class CompanyRepository extends Context.Service<CompanyRepository>()(
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
-
-/**
- * Reads the repository from the fiber context.
- *
- * `HttpApiBuilder` does not thread a handler's service requirements through the
- * route layer, so the Public API's operations take it from the context the
- * composition provides — the same shape as `currentCommentService`.
- */
-export const currentCompanyRepository = Effect.context<never>().pipe(
-  Effect.map((context) => Context.getUnsafe(context, CompanyRepository))
-);

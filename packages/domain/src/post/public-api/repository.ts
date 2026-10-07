@@ -1044,14 +1044,3 @@ export class PublicApiPostRepository extends Context.Service<PublicApiPostReposi
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
-
-/**
- * Reads the repository from the fiber context.
- *
- * `HttpApiBuilder` does not thread a handler's service requirements through the
- * route layer, so handlers take services from the context the composition
- * provides — the same shape as `currentPublicApiCaller`.
- */
-export const currentPublicApiPostRepository = Effect.context<never>().pipe(
-  Effect.map((context) => Context.getUnsafe(context, PublicApiPostRepository))
-);

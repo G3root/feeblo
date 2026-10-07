@@ -1,4 +1,4 @@
-import type { TComment } from "@feeblo/domain/src/comments/schema.js";
+import type { TComment } from "@feeblo/domain/comments/schema";
 import { toastManager } from "@feeblo/ui/toast";
 import { settleOptimisticMutation } from "@feeblo/web-shared/collections";
 import { fetchRpc } from "@feeblo/web-shared/runtime";

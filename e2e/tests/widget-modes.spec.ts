@@ -1,8 +1,8 @@
 import { fileURLToPath } from "node:url";
 
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
+import { webUrl } from "../helpers/urls";
 
-const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3101";
 const sdkBundlePath = fileURLToPath(
   new URL("../../packages/sdk/dist/feeblo-sdk.umd.cjs", import.meta.url)
 );
@@ -58,14 +58,14 @@ test("Feeblo Hub moves between updates and feedback inside one placed widget", a
 
   // Serve a stable host page from the same origin so the widget iframe can
   // load (the dashboard would otherwise redirect this bare origin to /sign-in).
-  await page.route(`${baseURL}/`, (route) =>
+  await page.route(`${webUrl()}/`, (route) =>
     route.fulfill({
       contentType: "text/html",
       body: "<!doctype html><html><body><h1>Host app</h1></body></html>",
     })
   );
 
-  await page.goto(`${baseURL}/`);
+  await page.goto(`${webUrl()}/`);
   await page.addScriptTag({ path: sdkBundlePath });
   await page.evaluate(
     ({ host }) => {
@@ -91,7 +91,7 @@ test("Feeblo Hub moves between updates and feedback inside one placed widget", a
         placement: "bottom-right",
       });
     },
-    { host: baseURL }
+    { host: webUrl() }
   );
 
   const launcher = page.getByRole("button", { name: "Open Feeblo widget" });

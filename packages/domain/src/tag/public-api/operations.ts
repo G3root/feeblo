@@ -14,11 +14,11 @@ import {
   notFoundError,
 } from "../../public-api/errors";
 import { onInternalError } from "../../public-api/failure";
-import { currentPublicApiCaller } from "../../public-api/middleware";
+import { PublicApiCaller } from "../../public-api/middleware";
 import { defineOperation } from "../../public-api/operation";
 import { parseName } from "../../public-api/parse";
 import { withRemapDbErrors } from "../../rpc-errors";
-import { currentTagRepository } from "../../tag/repository";
+import { TagRepository } from "../../tag/repository";
 import { toPublicApiTagDetail, toTagSource } from "./mappers";
 import {
   CreateTagInput,
@@ -77,7 +77,7 @@ const failIfTagNameIsTaken = (args: {
   readonly organizationId: string;
 }) =>
   Effect.gen(function* () {
-    const tags = yield* currentTagRepository;
+    const tags = yield* TagRepository;
     const existing = yield* tags.findNameConflict(args).pipe(
       withRemapDbErrors("PublicApiTag", "select"),
       Effect.catchTag("InternalServerError", () => onInternalError)
@@ -116,8 +116,8 @@ export const listTagsOperation = defineOperation(
   },
   ({ cursor, limit }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const tags = yield* currentTagRepository;
+      const caller = yield* PublicApiCaller;
+      const tags = yield* TagRepository;
 
       const after = yield* decodeCursorOrFail(cursor);
       const pageSize = limit ?? PUBLIC_API_PAGE_DEFAULT_LIMIT;
@@ -158,8 +158,8 @@ export const createTagOperation = defineOperation(
   },
   ({ name: rawName }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const tags = yield* currentTagRepository;
+      const caller = yield* PublicApiCaller;
+      const tags = yield* TagRepository;
 
       const name = yield* parseName(rawName);
 
@@ -202,8 +202,8 @@ export const getTagOperation = defineOperation(
   },
   ({ tagId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const tags = yield* currentTagRepository;
+      const caller = yield* PublicApiCaller;
+      const tags = yield* TagRepository;
 
       const tag = yield* tags
         .findById({ id: tagId, organizationId: caller.organizationId })
@@ -231,8 +231,8 @@ export const updateTagOperation = defineOperation(
   },
   ({ name: rawName, tagId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const tags = yield* currentTagRepository;
+      const caller = yield* PublicApiCaller;
+      const tags = yield* TagRepository;
 
       const name = yield* parseName(rawName);
 
@@ -289,8 +289,8 @@ export const deleteTagOperation = defineOperation(
   },
   ({ tagId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const tags = yield* currentTagRepository;
+      const caller = yield* PublicApiCaller;
+      const tags = yield* TagRepository;
 
       // Deleting a tag that is already gone is a 404 rather than a success:
       // the caller cannot tell a delete that worked from one that named the

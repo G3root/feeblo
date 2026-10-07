@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import { currentDb, schema } from "@feeblo/db";
 import { UserId } from "@feeblo/id";
 import { and, eq, sql } from "drizzle-orm";
@@ -13,9 +11,16 @@ import * as Option from "effect/Option";
 import { isShadowUserEmail } from "../identity/emails";
 import { UserPersistenceError } from "./errors";
 
-function hashEmail(email: string): string {
-  return createHash("sha256").update(email.toLowerCase().trim()).digest("hex");
-}
+const hashEmail = (email: string) =>
+  Effect.gen(function* () {
+    const crypto = yield* Crypto.Crypto;
+    return Buffer.from(
+      yield* crypto.digest(
+        "SHA-256",
+        new TextEncoder().encode(email.toLowerCase().trim())
+      )
+    ).toString("hex");
+  }).pipe(Effect.orDie);
 
 const generateRandomEmail = (prefix: string) =>
   Effect.gen(function* () {
@@ -83,12 +88,13 @@ const makeUserRepository = Effect.gen(function* () {
       organizationId: string;
     }) =>
       Effect.gen(function* () {
+        const emailHash = yield* hashEmail(args.email);
         const rows = yield* db
           .select()
           .from(schema.userTable)
           .where(
             and(
-              eq(schema.userTable.emailHash, hashEmail(args.email)),
+              eq(schema.userTable.emailHash, emailHash),
               sql`(${schema.userTable.restrictedToOrganizationId} IS NULL OR ${schema.userTable.restrictedToOrganizationId} = ${args.organizationId})`
             )
           )
@@ -102,7 +108,7 @@ const makeUserRepository = Effect.gen(function* () {
 
     upsertSsoUser: (args: UpsertSsoUserInput) =>
       Effect.gen(function* () {
-        const emailHash = hashEmail(args.email);
+        const emailHash = yield* hashEmail(args.email);
 
         // Explicit type guard: an SSO portal upsert must always be scoped to an
         // organization. Guard before the lookup so the query below can never
@@ -247,7 +253,7 @@ const makeUserRepository = Effect.gen(function* () {
      */
     provisionShadowUser: (args: ProvisionShadowUserInput) =>
       Effect.gen(function* () {
-        const emailHash = hashEmail(args.email);
+        const emailHash = yield* hashEmail(args.email);
         const restrictedToOrganizationId = args.restrictedToOrganizationId;
 
         if (restrictedToOrganizationId == null) {

@@ -12,7 +12,9 @@ import type * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
  *
  * Two things follow from it: the request the handler receives is the endpoint's
  * decoded request (params, query, payload), and the error channel is checked
- * against the endpoint's declared failures.
+ * against the endpoint's declared failures. `Requirements` is the handler's own
+ * residual requirement channel; after the group builder captured the stable
+ * dependencies, that is the key middleware's request-scoped caller.
  */
 export type HandlerOf<
   Group extends {

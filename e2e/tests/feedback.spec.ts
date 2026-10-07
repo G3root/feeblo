@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 
-import { expect, type Browser, type Page, test } from "@playwright/test";
-
+import {
+  expect,
+  type Browser,
+  type Locator,
+  type Page,
+  test,
+} from "../fixtures";
 import { createWorkspace, signUpProgrammatically } from "../helpers/auth";
 import { waitForHydration } from "../helpers/hydration";
 import { assertNoPageErrors, trackPageErrors } from "../helpers/page-errors";
@@ -12,14 +17,31 @@ import {
   waitForTestEmail,
 } from "../helpers/test-mailbox";
 import { createTestUser, type TestUser } from "../helpers/test-users";
-import { publicBoardUrl } from "../helpers/urls";
+import { apiUrl, publicBoardUrl, webUrl } from "../helpers/urls";
 
-async function chooseFirstReaction(page: Page) {
-  await page.getByRole("button", { name: "Add reaction" }).first().click();
-  await page
-    .locator('[role="dialog"]:visible')
-    .getByRole("button", { name: "👍️", exact: true })
-    .click();
+/**
+ * Opens a reaction picker and picks 👍.
+ *
+ * The popover can close or be replaced while a live query re-renders the card
+ * underneath it, and a single click then chases a detached button until it
+ * times out. Retrying the open-and-pick pair re-opens the picker when that
+ * happens. `scope` selects the picker on one card; the page's first picker is
+ * used when it is omitted.
+ */
+async function pickReaction(page: Page, scope?: Locator) {
+  const trigger = (scope ?? page)
+    .getByRole("button", { name: "Add reaction" })
+    .first();
+  const dialog = page.locator('[role="dialog"]:visible');
+
+  await expect(async () => {
+    if ((await dialog.count()) === 0) {
+      await trigger.click();
+    }
+    await dialog
+      .getByRole("button", { name: "👍️", exact: true })
+      .click({ timeout: 2_000 });
+  }).toPass({ intervals: [250, 500, 1_000], timeout: 15_000 });
 }
 
 /**
@@ -36,10 +58,6 @@ async function mergeCurrentPostInto(page: Page, targetTitle: string) {
   await mergeRpc;
   await expect(page.getByLabel("Post Title")).toHaveValue(targetTitle);
 }
-
-const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
-const appOrigin = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3101")
-  .origin;
 
 function membersUrl(organizationUrl: string) {
   return `${organizationUrl}/settings/members`;
@@ -90,10 +108,10 @@ async function signInAsContributor(
   const email = await waitForTestEmail(ownerPage.request, invitee.email);
   const invitationId = invitationIdFromEmail(email);
   const accepted = await inviteeContext.request.post(
-    `${apiURL}/api/auth/organization/accept-invitation`,
+    `${apiUrl()}/api/auth/organization/accept-invitation`,
     {
       data: { invitationId },
-      headers: { Origin: appOrigin },
+      headers: { Origin: webUrl() },
     }
   );
   expect(accepted.ok()).toBeTruthy();
@@ -143,7 +161,7 @@ test.describe("feedback workflow", () => {
       await upvoteButton.click();
       await expect(upvoteButton).toContainText("1");
 
-      await chooseFirstReaction(page);
+      await pickReaction(page);
       await expect(
         page
           .getByRole("button")
@@ -161,11 +179,7 @@ test.describe("feedback workflow", () => {
       const commentCard = page
         .locator('[data-slot="comment"]')
         .filter({ hasText: comment });
-      await commentCard.getByRole("button", { name: "Add reaction" }).click();
-      await page
-        .locator('[role="dialog"]:visible')
-        .getByRole("button", { name: "👍️", exact: true })
-        .click();
+      await pickReaction(page, commentCard);
       await expect(
         commentCard
           .getByRole("button")

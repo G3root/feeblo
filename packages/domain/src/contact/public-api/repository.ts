@@ -1,4 +1,4 @@
-import { currentDb, schema } from "@feeblo/db";
+import { currentDb, Database, schema } from "@feeblo/db";
 import { ContactId } from "@feeblo/id";
 import { and, desc, eq, sql, type SQL } from "drizzle-orm";
 import * as Context from "effect/Context";
@@ -7,15 +7,17 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { ensureCrmEntry } from "../../crm-entry/intake";
+import { EntitlementPolicy } from "../../entitlement/policies";
 import type { Cursor } from "../../public-api/cursor";
-import { requireCrmEntryAllowance } from "../../public-api/entitlement";
+import { crmLimitMessage } from "../../public-api/entitlement";
 import {
   conflictError,
   invalidRequestError,
   internalError,
+  planRequiresUpgradeError,
 } from "../../public-api/errors";
 import { withRemapDbErrors } from "../../rpc-errors";
-import { WorkspaceRepository } from "../../workspace/repository";
 import type { PublicApiEndUserSource } from "./mappers";
 
 export type PublicApiEndUserPage = {
@@ -78,7 +80,7 @@ const normalizeEmail = (email: string) => email.trim().toLowerCase();
  */
 const makePublicApiEndUserRepository = Effect.gen(function* () {
   const db = yield* currentDb;
-  const workspaceRepository = yield* WorkspaceRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
 
   const findContact = (organizationId: string, where: SQL | undefined) =>
     db
@@ -313,21 +315,35 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
           // Companies and contacts count together as CRM entries, and the
           // dashboard's own create is gated on the same number; without this
           // the endpoint would be a way around a plan limit. Only the create
-          // is checked — an update adds nothing to the count.
-          //
-          // The lock and the count and the insert are one transaction: the
-          // workspace row is locked first, the count runs after the lock,
-          // and only then is the row written, so two creates arriving near a
-          // plan's cap cannot both see room. This is the order the
-          // dashboard's create and the Public API's company create use; the
-          // lock comes before the insert because each insert's foreign-key
-          // check holds a key-share on this row that would otherwise
-          // deadlock against it.
-          return yield* db.transaction(() =>
-            Effect.gen(function* () {
-              yield* workspaceRepository.lockOrganization(organizationId);
-              yield* requireCrmEntryAllowance(organizationId);
+          // is checked — an update adds nothing to the count. The lock, the
+          // count, and the insert are `ensureCrmEntry`'s transaction:
+          // `crm-entry/intake.ts` owns the order the dashboard's create and
+          // the Public API's company create use.
+          const findForCreate = () =>
+            findByIdentifiers({
+              email: wantedEmail,
+              externalId: wantedExternalId,
+              organizationId,
+            }).pipe(
+              Effect.flatMap((found) =>
+                identifiersDisagree(found)
+                  ? Effect.fail(
+                      conflictError(
+                        "The external id and email belong to different end users."
+                      )
+                    )
+                  : Effect.succeed(
+                      Option.isSome(found.byExternalId)
+                        ? found.byExternalId
+                        : found.byEmail
+                    )
+              )
+            );
 
+          return yield* ensureCrmEntry({
+            organizationId,
+            find: findForCreate(),
+            insert: Effect.gen(function* () {
               const id = yield* ContactId.generate;
               const now = yield* DateTime.nowAsDate;
               const [created = null] = yield* db
@@ -346,41 +362,22 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
                 })
                 .onConflictDoNothing()
                 .returning();
-
-              if (created !== null) {
-                return toEndUserSource(created);
-              }
-
-              // Lost a race against a concurrent create. The winner is
-              // re-read by both identifiers and put through the same
-              // disagreement rule as the pre-check: a concurrent request may
-              // have claimed the supplied external id and email for two
-              // different people, and reporting one of them as this
-              // request's result would hide that.
-              const again = yield* findByIdentifiers({
-                email: wantedEmail,
-                externalId: wantedExternalId,
-                organizationId,
-              });
-              if (identifiersDisagree(again)) {
-                return yield* conflictError(
-                  "The external id and email belong to different end users."
-                );
-              }
-
-              const winner = Option.isSome(again.byExternalId)
-                ? again.byExternalId
-                : again.byEmail;
-              return yield* Option.match(winner, {
-                onNone: () =>
-                  Effect.fail(
-                    internalError(
-                      "The end user could not be read after it was created."
-                    )
-                  ),
-                onSome: (contact) => Effect.succeed(toEndUserSource(contact)),
-              });
-            })
+              return Option.fromNullishOr(created);
+            }),
+            onLostRace: Effect.fail(
+              internalError(
+                "The end user could not be read after it was created."
+              )
+            ),
+          }).pipe(
+            // The shared intake module refuses for want of plan room with the
+            // policy's own tag; this surface publishes `PLAN_REQUIRES_UPGRADE`.
+            Effect.catchTag("PolicyDenied", () =>
+              Effect.fail(planRequiresUpgradeError(crmLimitMessage))
+            ),
+            Effect.map(toEndUserSource),
+            Effect.provideService(EntitlementPolicy, entitlementPolicy),
+            Effect.provideService(Database.Database, db)
           );
         }
 
@@ -428,16 +425,3 @@ export class PublicApiEndUserRepository extends Context.Service<PublicApiEndUser
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
-
-/**
- * Reads the repository from the fiber context.
- *
- * `HttpApiBuilder` does not thread a handler's service requirements through
- * the route layer, so handlers take services from the context the composition
- * provides — the same shape as `currentPublicApiCaller`.
- */
-export const currentPublicApiEndUserRepository = Effect.context<never>().pipe(
-  Effect.map((context) =>
-    Context.getUnsafe(context, PublicApiEndUserRepository)
-  )
-);

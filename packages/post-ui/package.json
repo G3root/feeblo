@@ -8,6 +8,10 @@
       "types": "./src/i18n.ts",
       "default": "./src/i18n.ts"
     },
+    "./post-status": {
+      "types": "./src/post-status.ts",
+      "default": "./src/post-status.ts"
+    },
     "./post-properties": {
       "types": "./src/v2/post-field.tsx",
       "default": "./src/v2/post-field.tsx"

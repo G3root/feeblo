@@ -1,14 +1,5 @@
 import { useAtomSet } from "@effect/atom-react";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogPopup,
-  AlertDialogTitle,
-} from "@feeblo/ui/alert-dialog";
-import { Button } from "@feeblo/ui/button";
+import { ConfirmDialog } from "@feeblo/ui/confirm-dialog";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useSelector } from "@xstate/store-react";
@@ -33,51 +24,36 @@ export function ApiKeyRevokeDialog() {
   const [isRevoking, setIsRevoking] = useState(false);
 
   return (
-    <AlertDialog
-      // Toggle: closing keeps the key the dialog was opened with, so the
-      // confirmation copy never blanks out mid-transition.
-      onOpenChange={() => store.send({ type: "toggle" })}
+    <ConfirmDialog
+      confirmLabel="Revoke key"
+      confirmLoading={isRevoking}
+      description={`Requests using ${keyName} start failing immediately. This cannot be undone, and any integration using the key needs a new one.`}
+      onConfirm={async () => {
+        const { keyId } = store.get().context.data;
+        setIsRevoking(true);
+        try {
+          await revokeApiKey({
+            payload: { keyId, organizationId },
+            reactivityKeys: apiKeyReactivityKeys(organizationId),
+          });
+          trackEvent("api_key_revoked", { success: true });
+          store.send({ type: "setOpen", open: false });
+          toastManager.add({ title: "API key revoked", type: "success" });
+        } catch {
+          trackEvent("api_key_revoked", { success: false });
+          toastManager.add({
+            title: "Could not revoke API key",
+            type: "error",
+          });
+        } finally {
+          setIsRevoking(false);
+        }
+      }}
+      // Set open: closing keeps the key the dialog was opened with, and the
+      // requested state is respected rather than toggled.
+      onOpenChange={(open) => store.send({ type: "setOpen", open })}
       open={open}
-    >
-      <AlertDialogPopup>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Revoke API key</AlertDialogTitle>
-          <AlertDialogDescription>
-            Requests using {keyName} start failing immediately. This cannot be
-            undone, and any integration using the key needs a new one.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button
-            loading={isRevoking}
-            onClick={async () => {
-              const { keyId } = store.get().context.data;
-              setIsRevoking(true);
-              try {
-                await revokeApiKey({
-                  payload: { keyId, organizationId },
-                  reactivityKeys: apiKeyReactivityKeys(organizationId),
-                });
-                trackEvent("api_key_revoked", { success: true });
-                store.send({ type: "toggle" });
-                toastManager.add({ title: "API key revoked", type: "success" });
-              } catch {
-                trackEvent("api_key_revoked", { success: false });
-                toastManager.add({
-                  title: "Could not revoke API key",
-                  type: "error",
-                });
-              } finally {
-                setIsRevoking(false);
-              }
-            }}
-            variant="destructive"
-          >
-            Revoke key
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogPopup>
-    </AlertDialog>
+      title="Revoke API key"
+    />
   );
 }

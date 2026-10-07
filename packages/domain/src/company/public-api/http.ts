@@ -1,3 +1,4 @@
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
@@ -10,6 +11,8 @@ import {
   PUBLIC_API_WRITE_ERROR_SCHEMAS,
 } from "../../public-api/errors";
 import type { HandlerOf } from "../../public-api/handler";
+import type { PublicApiCaller } from "../../public-api/middleware";
+import type { PublicApiDependencies } from "../../public-api/operations";
 import { parseLimit } from "../../public-api/parse";
 import {
   createCompanyOperation,
@@ -92,7 +95,9 @@ export const companyEndpoints = [
     ),
 ] as const;
 
-export const companyHandlers = {
+export const companyHandlers = (
+  context: Context.Context<PublicApiDependencies>
+) => ({
   listCompanies: (({ query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
@@ -100,33 +105,52 @@ export const companyHandlers = {
         cursor: query.cursor,
         limit,
       });
-    })) satisfies HandlerOf<PublicApiGroup, "listCompanies">,
+    }).pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "listCompanies",
+    PublicApiCaller
+  >,
 
   // The body is the operation's own input minus the path, so handing it over
   // cannot drop a field the operation gains.
   createCompany: (({ payload }) =>
-    createCompanyOperation.handler(payload)) satisfies HandlerOf<
+    createCompanyOperation
+      .handler(payload)
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "createCompany"
+    "createCompany",
+    PublicApiCaller
   >,
 
   // The URL's params are the operation's own input fields, so handing them
   // over cannot drop a field the operation gains.
   getCompany: (({ params }) =>
-    getCompanyOperation.handler(params)) satisfies HandlerOf<
+    getCompanyOperation
+      .handler(params)
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "getCompany"
+    "getCompany",
+    PublicApiCaller
   >,
 
   updateCompany: (({ params, payload }) =>
-    updateCompanyOperation.handler({
-      ...payload,
-      ...params,
-    })) satisfies HandlerOf<PublicApiGroup, "updateCompany">,
+    updateCompanyOperation
+      .handler({
+        ...payload,
+        ...params,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "updateCompany",
+    PublicApiCaller
+  >,
 
   deleteCompany: (({ params }) =>
-    deleteCompanyOperation.handler(params)) satisfies HandlerOf<
+    deleteCompanyOperation
+      .handler(params)
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "deleteCompany"
+    "deleteCompany",
+    PublicApiCaller
   >,
-};
+});

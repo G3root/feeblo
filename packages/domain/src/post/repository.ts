@@ -153,7 +153,8 @@ interface TPostById {
   organizationId: string;
 }
 
-interface TPostSuggestionCandidates {
+/** The filters `findSuggestionCandidates` accepts; the suggestion program's request shape. */
+export interface TPostSuggestionCandidates {
   boardId?: string;
   embedding?: readonly number[];
   embeddingModel?: string;

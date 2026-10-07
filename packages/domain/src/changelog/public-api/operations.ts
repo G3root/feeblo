@@ -18,10 +18,10 @@ import {
   notFoundError,
 } from "../../public-api/errors";
 import { onInternalError } from "../../public-api/failure";
-import { currentPublicApiCaller } from "../../public-api/middleware";
+import { PublicApiCaller } from "../../public-api/middleware";
 import { defineOperation } from "../../public-api/operation";
 import { toPublicApiChangelog, toPublicApiChangelogSummary } from "./mappers";
-import { currentPublicApiChangelogRepository } from "./repository";
+import { PublicApiChangelogRepository } from "./repository";
 import {
   CreateChangelogInput,
   DeleteChangelogInput,
@@ -134,8 +134,8 @@ export const listChangelogOperation = defineOperation(
   },
   ({ cursor, limit, status }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiChangelogRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiChangelogRepository;
 
       const after = yield* decodeCursorOrFail(cursor);
 
@@ -168,8 +168,8 @@ export const getChangelogOperation = defineOperation(
   },
   ({ changelogId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiChangelogRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiChangelogRepository;
 
       const entry = yield* repository
         .find({
@@ -196,8 +196,8 @@ export const createChangelogOperation = defineOperation(
   },
   (payload) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiChangelogRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiChangelogRepository;
 
       const write = yield* parseChangelogWrite({
         ...payload,
@@ -240,8 +240,8 @@ export const updateChangelogOperation = defineOperation(
   },
   ({ changelogId, ...payload }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiChangelogRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiChangelogRepository;
 
       const write = yield* parseChangelogWrite(payload);
       const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
@@ -281,8 +281,8 @@ export const deleteChangelogOperation = defineOperation(
   },
   ({ changelogId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiChangelogRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiChangelogRepository;
 
       // A delete that matches no row is a 404 rather than a success: the
       // caller cannot tell a delete that worked from one that named the

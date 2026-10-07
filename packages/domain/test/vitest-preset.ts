@@ -7,6 +7,20 @@ const testDirectory = dirname(fileURLToPath(import.meta.url));
 
 const fixturePath = (name: string): string => join(testDirectory, name);
 
+// The watchdog lives at the repository root so the db and auth suites, which do
+// not use this preset, reference the same one. `join` rather than `new URL`
+// because this package's DOM lib supplies a different `URL` type than
+// `fileURLToPath` accepts.
+const watchdogPath = join(
+  testDirectory,
+  "..",
+  "..",
+  "..",
+  "tools",
+  "vitest",
+  "watchdog.ts"
+);
+
 /**
  * Vitest options shared by every package that tests against this directory's
  * PGlite fixture: `@feeblo/domain` and the five integrations.
@@ -27,7 +41,9 @@ const fixturePath = (name: string): string => join(testDirectory, name);
  */
 export const pgliteTestOptions: TestUserConfig = {
   environment: "node",
-  globalSetup: [fixturePath("global-setup.ts")],
+  // The watchdog first so a migration that wedges in the fixture setup below
+  // is still covered; Vitest tears global setups down in reverse.
+  globalSetup: [watchdogPath, fixturePath("global-setup.ts")],
   hookTimeout: 60_000,
   // PGlite runs entirely in-process; worker threads avoid the process startup
   // and IPC overhead of Vitest's default fork pool while preserving per-file
