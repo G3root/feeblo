@@ -227,5 +227,12 @@ export const decodeWidgetSuggestions = S.decodeUnknownSync(
 );
 export const decodeWidgetError = S.decodeUnknownSync(WidgetError);
 export const decodeWidgetBootEnv = S.decodeUnknownSync(WidgetBootEnv);
-export const decodeWidgetOrganizationId =
-  S.decodeUnknownSync(WidgetOrganizationId);
+
+/**
+ * The organization id decoder the shell uses. It is non-throwing so a
+ * malformed id follows the route's 404 path instead of escaping its handler
+ * as a 500. The iframe's boot decoder stays strict: a bad id there throws at
+ * boot, where the visitor is.
+ */
+export const decodeWidgetOrganizationIdOption =
+  S.decodeUnknownOption(WidgetOrganizationId);

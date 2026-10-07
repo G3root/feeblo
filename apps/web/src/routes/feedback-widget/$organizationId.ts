@@ -1,4 +1,4 @@
-import { decodeWidgetOrganizationId } from "@feeblo/domain/widget/schema";
+import { decodeWidgetOrganizationIdOption } from "@feeblo/domain/widget/schema";
 import {
   isSupportedLocale,
   type WidgetConfig,
@@ -6,6 +6,7 @@ import {
   type WidgetMode,
 } from "@feeblo/feedback-widget/config";
 import { createFileRoute } from "@tanstack/react-router";
+import * as Option from "effect/Option";
 
 import {
   apiPreconnectOrigins,
@@ -34,9 +35,11 @@ export const Route = createFileRoute("/feedback-widget/$organizationId")({
       GET: ({ params, request }) => {
         // Decoded through the same contract the iframe decodes its
         // `window.global.__ENV.organizationId` through, so the shell and the
-        // widget cannot disagree about what an organization id is.
-        const organizationId = decodeWidgetOrganizationId(
-          params.organizationId
+        // widget cannot disagree about what an organization id is. The
+        // non-throwing decode keeps a malformed id on this route's 404 path
+        // instead of letting it escape the handler as a 500.
+        const organizationId = Option.getOrUndefined(
+          decodeWidgetOrganizationIdOption(params.organizationId)
         );
         if (!organizationId) {
           return new Response("Not found", { status: 404 });

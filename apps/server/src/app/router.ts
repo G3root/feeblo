@@ -52,6 +52,25 @@ const ProviderRpcHandlers = {
   WebhookManagement: WebhookManagementRpcHandlers,
 } satisfies Record<ProviderOwnedRpcName, Layer.Layer<any, any, any>>;
 
+type ProviderRpcHandlerLayer =
+  (typeof ProviderRpcHandlers)[ProviderOwnedRpcName];
+
+/**
+ * The provider-owned handler layers as one layer, derived from the map above
+ * so a new provider-owned group is bound the moment its entry is added (the
+ * map's `satisfies` is what forces that entry). Listing the four names again
+ * at the call site was the one place that could still drift.
+ */
+const ProviderRpcLayer = Layer.mergeAll(
+  // SAFETY: `ProviderRpcHandlers` satisfies `Record<ProviderOwnedRpcName, …>`
+  // with one entry per provider-owned group, so its values are exactly the
+  // non-empty union of handler layers this tuple asserts.
+  ...(Object.values(ProviderRpcHandlers) as [
+    ProviderRpcHandlerLayer,
+    ...ProviderRpcHandlerLayer[],
+  ])
+);
+
 export const makePublicRouters = (
   mailbox: Ref.Ref<TestMailerState> | undefined,
   nodeEnv: string
@@ -83,14 +102,7 @@ export const makeMergedRoutes = ({
   Layer.mergeAll(
     publicRouters,
     HealthRouter,
-    makeRpcRoute(
-      Layer.mergeAll(
-        ProviderRpcHandlers.DiscordManagement,
-        ProviderRpcHandlers.GitHubManagement,
-        ProviderRpcHandlers.SlackManagement,
-        ProviderRpcHandlers.WebhookManagement
-      )
-    ),
+    makeRpcRoute(ProviderRpcLayer),
     HttpRoute,
     // The Public API is mounted in every environment, including production:
     // it is the paid feature, and its OpenAPI document and reference page are
