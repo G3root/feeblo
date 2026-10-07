@@ -303,6 +303,15 @@ export const subscriptionTable = pgTable(
     // Nullable because rows synced before this column existed have no known
     // source time — a null value accepts any event.
     lastEventAt: timestamp("last_event_at", { withTimezone: true }),
+
+    //
+    // Polar target (the SDK `server`, i.e. sandbox or production) whose
+    // webhooks synced this row. The revocation queue copies it so a deployment
+    // that changed targets cannot close a row on a 404 from a server that
+    // never held the subscription. Nullable because rows synced before this
+    // column existed have no known origin; the queue then falls back to the
+    // configured target.
+    polarServer: text("polar_server"),
   },
   (table) => [
     index("subscription_organizationId_idx").on(table.organizationId),
