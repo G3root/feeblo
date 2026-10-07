@@ -663,7 +663,10 @@ const makeDataTransferRepository = Effect.gen(function* () {
             .set({
               finishedAt: now,
               leaseExpiresAt: null,
-              leaseOwner: null,
+              // The lease owner is kept: the canceled worker's last
+              // `syncCounts` still matches on it and records the rows it had
+              // already created. Every other write is guarded by
+              // `status = running`, so a canceled job cannot be resurrected.
               status: "canceled",
               updatedAt: now,
             })
@@ -791,7 +794,12 @@ const makeDataTransferRepository = Effect.gen(function* () {
           yield* db
             .update(schema.dataImportRowTable)
             .set({ message, outcome: "failed", updatedAt: now })
-            .where(eq(schema.dataImportRowTable.id, rowId));
+            .where(
+              and(
+                eq(schema.dataImportRowTable.id, rowId),
+                eq(schema.dataImportRowTable.outcome, "pending")
+              )
+            );
         })
       ),
 

@@ -426,4 +426,87 @@ layer(TestLayer)("DataImportWorker", (it) => {
       expect(posts).toEqual([]);
     })
   );
+
+  it.effect("a late row failure cannot overwrite a row already created", () =>
+    Effect.gen(function* () {
+      recordedIntegrationEvents.length = 0;
+      const fixture = yield* makeFixture();
+      const job = yield* stageAndConfirm(fixture, "title\nApplied once\n");
+      const claimed = yield* claim("worker-1");
+      yield* runDataImportPass(claimed);
+
+      const repository = yield* DataTransferRepository;
+      const db = yield* currentDb;
+      const rows = yield* db
+        .select({
+          id: schema.dataImportRowTable.id,
+          outcome: schema.dataImportRowTable.outcome,
+        })
+        .from(schema.dataImportRowTable)
+        .where(eq(schema.dataImportRowTable.jobId, job.id));
+      const row = rows[0];
+      if (row === undefined) {
+        throw new Error("Expected the staged row to exist.");
+      }
+      expect(row.outcome).toBe("created");
+
+      // The row is no longer pending, so a pass that lost its lease cannot
+      // flip it back to failed while the post it created still exists.
+      yield* repository.markRowFailed({
+        message: "A pass that lost its lease",
+        rowId: row.id,
+      });
+
+      const [stored] = yield* db
+        .select({
+          message: schema.dataImportRowTable.message,
+          outcome: schema.dataImportRowTable.outcome,
+        })
+        .from(schema.dataImportRowTable)
+        .where(eq(schema.dataImportRowTable.id, row.id));
+      expect(stored?.outcome).toBe("created");
+      expect(stored?.message).toBeNull();
+    })
+  );
+
+  it.effect(
+    "a canceled job keeps its lease owner so the final counts land",
+    () =>
+      Effect.gen(function* () {
+        recordedIntegrationEvents.length = 0;
+        const fixture = yield* makeFixture();
+        const job = yield* stageAndConfirm(fixture, "title\nNever applied\n");
+        yield* claim("worker-1");
+
+        const repository = yield* DataTransferRepository;
+        const db = yield* currentDb;
+        const rows = yield* db
+          .select({ id: schema.dataImportRowTable.id })
+          .from(schema.dataImportRowTable)
+          .where(eq(schema.dataImportRowTable.jobId, job.id));
+        const rowId = rows[0]?.id;
+        if (rowId === undefined) {
+          throw new Error("Expected the staged row to exist.");
+        }
+        yield* repository.markRowFailed({ message: "Never applied.", rowId });
+
+        yield* repository.cancelJob({
+          id: job.id,
+          organizationId: fixture.organizationId,
+        });
+        // The canceled pass's last sync is what records the outcomes the
+        // ledger already holds; it only lands while the owner still matches.
+        yield* repository.syncCounts({ jobId: job.id, leaseOwner: "worker-1" });
+
+        const stored = yield* repository.findJob({
+          id: job.id,
+          organizationId: fixture.organizationId,
+        });
+        expect(Option.isSome(stored)).toBe(true);
+        if (Option.isSome(stored)) {
+          expect(stored.value.status).toBe("canceled");
+          expect(stored.value.errorCount).toBe(1);
+        }
+      })
+  );
 });

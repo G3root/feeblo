@@ -144,10 +144,7 @@ function ImportJobsCard({
   const jobsResult = useAtomValue(dataImportJobsAtom(organizationId));
   const confirmImport = useAtomSet(confirmDataImportAtom, { mode: "promise" });
   const cancelImport = useAtomSet(cancelDataImportAtom, { mode: "promise" });
-  const [pendingAction, setPendingAction] = useState<{
-    readonly id: string;
-    readonly kind: "cancel" | "confirm";
-  } | null>(null);
+  const [pendingJobId, setPendingJobId] = useState<string | null>(null);
 
   const jobs = Result.builder(jobsResult)
     .onInitial(
@@ -165,25 +162,25 @@ function ImportJobsCard({
     .exhaustive();
 
   const handleConfirm = async (job: TDataImportJobSummary) => {
-    setPendingAction({ id: job.id, kind: "confirm" });
+    setPendingJobId(job.id);
     onSelectJob(job.id);
     try {
       await confirmImport({ payload: { id: job.id, organizationId } });
     } catch {
       toastManager.add({ title: m.lucky_plain_gull(), type: "error" });
     } finally {
-      setPendingAction(null);
+      setPendingJobId(null);
     }
   };
 
   const handleCancel = async (job: TDataImportJobSummary) => {
-    setPendingAction({ id: job.id, kind: "cancel" });
+    setPendingJobId(job.id);
     try {
       await cancelImport({ payload: { id: job.id, organizationId } });
     } catch {
       toastManager.add({ title: m.merry_plain_auk(), type: "error" });
     } finally {
-      setPendingAction(null);
+      setPendingJobId(null);
     }
   };
 
@@ -233,10 +230,7 @@ function ImportJobsCard({
                   <TableCell className="text-right">
                     {job.status === "awaiting_confirmation" ? (
                       <Button
-                        disabled={
-                          pendingAction?.id === job.id &&
-                          pendingAction.kind === "confirm"
-                        }
+                        disabled={pendingJobId === job.id}
                         onClick={() => {
                           void handleConfirm(job);
                         }}
@@ -250,10 +244,7 @@ function ImportJobsCard({
                     job.status === "queued" ||
                     job.status === "running" ? (
                       <Button
-                        disabled={
-                          pendingAction?.id === job.id &&
-                          pendingAction.kind === "cancel"
-                        }
+                        disabled={pendingJobId === job.id}
                         onClick={() => {
                           void handleCancel(job);
                         }}
