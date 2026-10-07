@@ -19,6 +19,7 @@ import type {
 export const SiteRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* SiteRepository;
   const sitePolicy = yield* SitePolicy;
+  const entitlementPolicy = yield* EntitlementPolicy;
 
   return {
     SiteList: (args: TSiteList) =>
@@ -32,18 +33,31 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Site", "select")
         ),
     SiteListBySubdomain: (args: TSiteListBySubdomain) =>
-      repository
-        .findMany({
+      Effect.gen(function* () {
+        const sites = yield* repository.findMany({
           subdomain: args.subdomain,
           limit: 1,
-        })
-        .pipe(
-          RateLimit.withPublicRpcRateLimit({
-            name: "SiteListBySubdomain",
-            level: "read",
-          }),
-          withRemapDbErrors("Site", "select")
-        ),
+        });
+        const site = sites[0];
+        if (site === undefined) {
+          return [];
+        }
+
+        // `hidePoweredBy` is a paid capability, and this is the projection
+        // every public surface renders through. Deriving it here means a
+        // downgrade cannot leave the branding hidden through a stale row:
+        // the stored flag is only a preference, the plan decides.
+        const mayRemoveBranding = yield* entitlementPolicy.mayRemoveBranding(
+          site.organizationId
+        );
+        return mayRemoveBranding ? [site] : [{ ...site, hidePoweredBy: false }];
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "SiteListBySubdomain",
+          level: "read",
+        }),
+        withRemapDbErrors("Site", "select")
+      ),
     SiteUpdate: (args: TSiteUpdate) =>
       repository
         .update(args)

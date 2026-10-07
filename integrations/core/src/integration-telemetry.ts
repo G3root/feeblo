@@ -45,6 +45,11 @@ const automaticPauses = Metric.counter(
   { description: "Connections paused after consecutive exhausted deliveries" }
 );
 
+const planPauses = Metric.counter("feeblo_integration_plan_pauses_total", {
+  description:
+    "Deliveries canceled because the workspace plan excludes the provider",
+});
+
 /** Records one finished delivery attempt by outcome and error tag. */
 export const recordIntegrationDeliveryOutcome = (
   outcome: "succeeded" | "retry" | "exhausted",
@@ -83,3 +88,7 @@ export const recordIntegrationAutomaticPause = Metric.update(
   automaticPauses,
   1
 );
+
+/** Counts deliveries canceled because the workspace plan excludes the provider. */
+export const recordIntegrationPlanPauses = (count: number) =>
+  Metric.update(planPauses, count);

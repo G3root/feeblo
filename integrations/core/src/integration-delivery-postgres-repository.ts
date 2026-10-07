@@ -1,4 +1,5 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
+import { organizationHasEntitledPaidSubscription } from "@feeblo/db/schema/billing";
 import type {
   TIntegrationCapabilityKey,
   TIntegrationProviderKey,
@@ -37,6 +38,7 @@ import {
   recordIntegrationAutomaticPause,
   recordIntegrationDeliveryBacklog,
   recordIntegrationLeaseRecoveries,
+  recordIntegrationPlanPauses,
   recordIntegrationRecoveredLeaseAge,
 } from "./integration-telemetry";
 
@@ -74,6 +76,23 @@ const mapPersistenceError = <A, E, R>(
     )
   );
 
+/** Construction options for the PostgreSQL delivery worker repository. */
+export interface IntegrationDeliveryWorkerRepositoryOptions {
+  /** Records provider-normalized resources persisted only with a successful delivery. */
+  readonly recordExternalResourceDrafts?: (input: {
+    readonly connection: IntegrationConnection;
+    readonly drafts: readonly IntegrationExternalResourceDraft[];
+    readonly event: IntegrationEventEnvelopeV1;
+  }) => Effect.Effect<void, IntegrationDeliveryWorkerPersistenceError>;
+  /**
+   * Provider keys whose outbound deliveries require the workspace to hold an
+   * entitled paid plan. Pending deliveries of these providers are canceled
+   * with `paused_by_plan` at claim time for unentitled workspaces; other
+   * providers are never plan-gated.
+   */
+  readonly planGatedProviders?: readonly string[];
+}
+
 /**
  * PostgreSQL persistence boundary for lease ownership; it never performs
  * provider I/O. Deliveries are claimed only for capabilities owned by the
@@ -81,11 +100,7 @@ const mapPersistenceError = <A, E, R>(
  */
 export const makeIntegrationDeliveryWorkerRepository = (
   claimableCapabilityKeysByProvider: ReadonlyMap<string, readonly string[]>,
-  recordExternalResourceDrafts?: (input: {
-    readonly connection: IntegrationConnection;
-    readonly drafts: readonly IntegrationExternalResourceDraft[];
-    readonly event: IntegrationEventEnvelopeV1;
-  }) => Effect.Effect<void, IntegrationDeliveryWorkerPersistenceError>
+  options: IntegrationDeliveryWorkerRepositoryOptions
 ): Effect.Effect<
   IntegrationDeliveryWorkerRepository,
   never,
@@ -93,6 +108,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
 > =>
   Effect.gen(function* () {
     const db = yield* currentDb;
+    const planGatedProviders = options.planGatedProviders ?? [];
 
     const loadClaimedDelivery = (deliveryId: string, leaseOwner: string) =>
       Effect.gen(function* () {
@@ -231,10 +247,28 @@ export const makeIntegrationDeliveryWorkerRepository = (
             yield* recordIntegrationDeliveryBacklog(
               Number(backlog?.count ?? 0)
             );
+            const claimableCapabilityConditions =
+              providerCapabilityConditions.length === 0
+                ? sql`false`
+                : or(...providerCapabilityConditions);
+            const planGatedProviderSet = new Set(planGatedProviders);
             const claimedIds = yield* db.transaction(() =>
               Effect.gen(function* () {
                 const due = yield* db
-                  .select({ id: schema.integrationDeliveryTable.id })
+                  .select({
+                    id: schema.integrationDeliveryTable.id,
+                    provider: schema.integrationConnectionTable.provider,
+                    // Plan pauses are derived, never persisted on the workspace:
+                    // pending deliveries of plan-gated providers whose
+                    // workspace lost its entitled paid plan are canceled with
+                    // `paused_by_plan` instead of being claimed (and stop
+                    // being created once the downgrade is observed). Ungated
+                    // providers never consult this column.
+                    planEntitled: organizationHasEntitledPaidSubscription(
+                      schema.integrationDeliveryTable.organizationId,
+                      now
+                    ),
+                  })
                   .from(schema.integrationDeliveryTable)
                   .innerJoin(
                     schema.integrationConnectionTable,
@@ -256,9 +290,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
                       lte(schema.integrationDeliveryTable.nextAttemptAt, now),
                       eq(schema.integrationConnectionTable.lifecycle, "active"),
                       eq(schema.integrationRouteTable.enabled, true),
-                      providerCapabilityConditions.length === 0
-                        ? sql`false`
-                        : or(...providerCapabilityConditions)
+                      claimableCapabilityConditions
                     )
                   )
                   .orderBy(schema.integrationDeliveryTable.nextAttemptAt)
@@ -267,11 +299,38 @@ export const makeIntegrationDeliveryWorkerRepository = (
                     skipLocked: true,
                     of: schema.integrationDeliveryTable,
                   });
+                const pausedIds = due
+                  .filter(
+                    (row) =>
+                      planGatedProviderSet.has(row.provider) &&
+                      !row.planEntitled
+                  )
+                  .map((row) => row.id);
+                if (pausedIds.length > 0) {
+                  yield* db
+                    .update(schema.integrationDeliveryTable)
+                    .set({
+                      canceledAt: now,
+                      lastError: { errorTag: "paused_by_plan" },
+                      leaseExpiresAt: null,
+                      leaseOwner: null,
+                      state: "canceled",
+                      updatedAt: now,
+                    })
+                    .where(
+                      inArray(schema.integrationDeliveryTable.id, pausedIds)
+                    );
+                  yield* recordIntegrationPlanPauses(pausedIds.length);
+                }
+                const pausedIdSet = new Set(pausedIds);
+                const claimableRows = due.filter(
+                  (row) => !pausedIdSet.has(row.id)
+                );
                 const leaseExpiresAt = DateTime.fromDateUnsafe(now).pipe(
                   DateTime.addDuration(Duration.millis(leaseDurationMs)),
                   DateTime.toDate
                 );
-                return yield* Effect.forEach(due, ({ id }) =>
+                return yield* Effect.forEach(claimableRows, ({ id }) =>
                   Effect.gen(function* () {
                     const [delivery] = yield* db
                       .update(schema.integrationDeliveryTable)
@@ -480,12 +539,12 @@ export const makeIntegrationDeliveryWorkerRepository = (
                   externalResourceDrafts !== undefined &&
                   externalResourceDrafts.length > 0
                 ) {
-                  if (recordExternalResourceDrafts === undefined) {
+                  if (options.recordExternalResourceDrafts === undefined) {
                     return yield* persistenceError(
                       "record_external_resource_drafts"
                     );
                   }
-                  yield* recordExternalResourceDrafts({
+                  yield* options.recordExternalResourceDrafts({
                     connection: claimed.input.connection,
                     drafts: externalResourceDrafts,
                     event: claimed.input.event,

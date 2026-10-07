@@ -1,4 +1,5 @@
 import { currentDb, schema } from "@feeblo/db";
+import { entitledSubscriptionCondition } from "@feeblo/db/schema/billing";
 import {
   BoardId,
   ChangelogCategoryId,
@@ -11,7 +12,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
-import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -254,7 +255,15 @@ const makeWorkspaceRepository = Effect.gen(function* () {
           updatedAt: schema.productTable.updatedAt,
         })
         .from(schema.productTable)
-        .where(eq(schema.productTable.isArchived, false)),
+        .where(eq(schema.productTable.isArchived, false))
+        // Newest first, with the id as a total-order tiebreaker: when a plan
+        // and interval has more than one unarchived product, the pricing
+        // catalog's "first wins" rule has to mean the current one, not
+        // whatever heap order the planner happened to return.
+        .orderBy(
+          desc(schema.productTable.createdAt),
+          desc(schema.productTable.id)
+        ),
 
     findPlanByOrganizationId: (args: FindPlanByOrganizationIdArgs) =>
       Effect.gen(function* () {
@@ -272,16 +281,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
           .where(
             and(
               eq(schema.subscriptionTable.organizationId, args.organizationId),
-              or(
-                inArray(schema.subscriptionTable.status, [
-                  "active",
-                  "trialing",
-                ]),
-                and(
-                  eq(schema.subscriptionTable.status, "past_due"),
-                  gt(schema.subscriptionTable.currentPeriodEnd, now)
-                )
-              )
+              entitledSubscriptionCondition(now)
             )
           )
           .orderBy(

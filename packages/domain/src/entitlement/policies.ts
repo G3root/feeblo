@@ -263,6 +263,38 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     return entitlements.limits.submissionNotificationRecipients;
   });
 
+  /** Whether the workspace plan permits hiding the Feeblo branding. */
+  const mayRemoveBranding = Effect.fn("EntitlementPolicy.mayRemoveBranding")(
+    function* (organizationId: string) {
+      const { entitlements } = yield* findEntitlements(organizationId);
+      return entitlements.capabilities.removeBranding;
+    }
+  );
+
+  /** Whether the workspace plan permits Slack, Discord, and GitHub integrations. */
+  const mayUseIntegrations = Effect.fn("EntitlementPolicy.mayUseIntegrations")(
+    function* (organizationId: string) {
+      const { entitlements } = yield* findEntitlements(organizationId);
+      return entitlements.capabilities.integrations;
+    }
+  );
+
+  /**
+   * Denies new Slack, Discord, and GitHub connections on plans without the
+   * integrations capability. Webhook endpoints are deliberately not gated:
+   * they stay available on every plan.
+   */
+  const canUseIntegrations = (organizationId: string) =>
+    Effect.flatMap(mayUseIntegrations(organizationId), (allowed) =>
+      allowed
+        ? Effect.void
+        : Effect.fail(
+            new Policy.PolicyDeniedError({
+              reason: "Integrations require the Starter plan or higher.",
+            })
+          )
+    );
+
   return {
     canCreateBoard,
     canUpdateBoardVisibility,
@@ -277,6 +309,9 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     mayCreatePublicEmailSubscriptions,
     mayMaterializeEmailIntent,
     submissionNotificationRecipientLimit,
+    mayUseIntegrations,
+    canUseIntegrations,
+    mayRemoveBranding,
   };
 });
 
