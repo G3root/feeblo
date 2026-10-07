@@ -20,7 +20,10 @@ type QueuedRevocation = {
  * Revokes one queued subscription and records the outcome in the queue.
  *
  * A Polar failure is terminal for this attempt, not for the queue: the row
- * stays pending and the next pass tries again. A failure to record the
+ * stays pending and the next pass tries again. The exception is an
+ * already-terminated subscription — Polar's 403 `AlreadyCanceledSubscription`
+ * or 404 `ResourceNotFound` — where the wanted postcondition already holds, so
+ * the row is closed instead of retried forever. A failure to record the
  * outcome is a real error and stays in the error channel, because losing it
  * would leave the queue claiming work that already happened.
  */
@@ -54,10 +57,14 @@ export const revokeQueuedSubscription = Effect.fn(
         })
       ),
       Effect.catchTag("FailedToRevokeSubscriptionError", (error) =>
-        repository.markSubscriptionRevocationFailed({
-          externalSubscriptionId: revocation.externalSubscriptionId,
-          message: error.message ?? "Failed to revoke Polar subscription",
-        })
+        error.alreadyRevoked === true
+          ? repository.markSubscriptionRevocationSucceeded({
+              externalSubscriptionId: revocation.externalSubscriptionId,
+            })
+          : repository.markSubscriptionRevocationFailed({
+              externalSubscriptionId: revocation.externalSubscriptionId,
+              message: error.message ?? "Failed to revoke Polar subscription",
+            })
       )
     );
 });

@@ -2,7 +2,9 @@ import { Polar } from "@polar-sh/sdk";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
 
 import { BadRequestError } from "../rpc-errors";
 import { PolarConfig } from "./config";
@@ -13,6 +15,35 @@ import {
 } from "./errors";
 
 const URLRegex = /\/$/;
+
+/**
+ * The shape of a Polar SDK error response. `PolarError` carries `statusCode`;
+ * the typed `AlreadyCanceledSubscription` adds the `error` discriminant.
+ */
+const PolarRevokeFailure = Schema.Struct({
+  statusCode: Schema.optional(Schema.Finite),
+  error: Schema.optional(Schema.String),
+});
+
+/**
+ * Whether a rejected revoke means the subscription is already terminated.
+ *
+ * Polar answers a revoke with 403 `AlreadyCanceledSubscription` for any
+ * subscription it no longer considers billable (canceled, unpaid, incomplete,
+ * or already ended) and 404 `ResourceNotFound` once the row is gone. Both are
+ * achieved outcomes: there is nothing left to charge, so the queue closes the
+ * row instead of retrying a refusal that can never change. Other failures —
+ * 409 `SubscriptionLocked`, validation errors, transport errors — stay
+ * failures.
+ */
+export const isPolarSubscriptionAlreadyRevoked = (cause: unknown): boolean => {
+  const decoded = Schema.decodeUnknownOption(PolarRevokeFailure)(cause);
+  return (
+    Option.isSome(decoded) &&
+    (decoded.value.statusCode === 404 ||
+      decoded.value.error === "AlreadyCanceledSubscription")
+  );
+};
 
 const makePolarService = Effect.gen(function* () {
   const { accessToken, appUrl, server, webhookSecret } = yield* PolarConfig;
@@ -115,7 +146,8 @@ const makePolarService = Effect.gen(function* () {
      * durable retry (the revocation queue), so swallowing it here would lose
      * the only signal that the subscription is still live. "No client" is not
      * a failure — billing is simply not configured, so there is nothing to
-     * revoke.
+     * revoke. A revoke of an already-terminated subscription is reported as
+     * `alreadyRevoked` so the queue can close the row rather than retry it.
      */
     revokeSubscription: Effect.fn("PolarService.revokeSubscription")(
       function* ({ id }: { id: string }) {
@@ -128,7 +160,9 @@ const makePolarService = Effect.gen(function* () {
           catch: (cause) =>
             new FailedToRevokeSubscriptionError({
               message: "Failed to revoke Polar subscription",
-              ...(cause instanceof Error && { cause }),
+              ...(isPolarSubscriptionAlreadyRevoked(cause) && {
+                alreadyRevoked: true,
+              }),
             }),
         });
       }

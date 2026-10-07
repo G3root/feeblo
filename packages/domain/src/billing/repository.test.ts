@@ -185,6 +185,7 @@ const TestLayer = BillingRepository.layer.pipe(
 type PolarServiceTestState = {
   calls: string[];
   fail: boolean;
+  alreadyRevoked: boolean;
 };
 
 /**
@@ -194,6 +195,7 @@ type PolarServiceTestState = {
 const polarState: PolarServiceTestState = {
   calls: [],
   fail: false,
+  alreadyRevoked: false,
 };
 
 /**
@@ -217,7 +219,10 @@ const fakePolarService = (client: Polar | undefined) => ({
       return polarState.fail
         ? Effect.fail(
             new FailedToRevokeSubscriptionError({
-              message: "Polar unreachable",
+              message: polarState.alreadyRevoked
+                ? "Polar says the subscription is already canceled"
+                : "Polar unreachable",
+              ...(polarState.alreadyRevoked && { alreadyRevoked: true }),
             })
           )
         : Effect.void;
@@ -643,6 +648,7 @@ describe("BillingRepository", () => {
       Effect.gen(function* () {
         polarState.calls = [];
         polarState.fail = false;
+        polarState.alreadyRevoked = false;
         const repository = yield* BillingRepository;
         const db = yield* currentDb;
         const { organizationId, productId, now } = yield* makeWorkspace();
@@ -681,6 +687,7 @@ describe("BillingRepository", () => {
       Effect.gen(function* () {
         polarState.calls = [];
         polarState.fail = true;
+        polarState.alreadyRevoked = false;
         const repository = yield* BillingRepository;
         const db = yield* currentDb;
         const { organizationId, productId, now } = yield* makeWorkspace();
@@ -726,6 +733,54 @@ describe("BillingRepository", () => {
           "sub_revocation_retry",
         ]);
       })
+    );
+
+    it.effect(
+      "closes a queued revocation Polar reports as already terminated",
+      () =>
+        Effect.gen(function* () {
+          polarState.calls = [];
+          polarState.fail = true;
+          polarState.alreadyRevoked = true;
+          const repository = yield* BillingRepository;
+          const db = yield* currentDb;
+          const { organizationId, productId, now } = yield* makeWorkspace();
+
+          yield* insertSubscription({
+            externalId: "sub_revocation_already",
+            organizationId,
+            productId,
+            now,
+          });
+          yield* repository.enqueueSubscriptionRevocationsForOrganization({
+            organizationId,
+          });
+          yield* db
+            .delete(schema.organizationTable)
+            .where(eq(schema.organizationTable.id, organizationId));
+
+          yield* revokePendingSubscriptionRevocations({ organizationId });
+
+          const [row] = yield* db
+            .select()
+            .from(schema.subscriptionRevocationTable)
+            .where(
+              eq(
+                schema.subscriptionRevocationTable.externalSubscriptionId,
+                "sub_revocation_already"
+              )
+            );
+          expect(row?.revokedAt).not.toBeNull();
+          expect(row?.attempts).toBe(0);
+          expect(row?.lastError).toBeNull();
+
+          const pending = yield* repository.findPendingSubscriptionRevocations({
+            organizationId,
+            limit: 10,
+          });
+          expect(pending).toHaveLength(0);
+          expect(polarState.calls).toEqual(["sub_revocation_already"]);
+        })
     );
   });
 
