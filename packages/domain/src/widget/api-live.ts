@@ -19,6 +19,7 @@ import { CompanyRepository } from "../company/repository";
 import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
 import { parsePersonAttributes } from "../contact/utils";
+import { EntitlementPolicy } from "../entitlement/policies";
 import { Api } from "../http/api";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import {
@@ -125,6 +126,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
       const postStatusRepository = yield* PostStatusRepository;
       const sitePolicy = yield* SitePolicy;
       const writes = yield* PostWriteService;
+      const entitlementPolicy = yield* EntitlementPolicy;
       const postRepository = yield* PostRepository;
       const postEmbeddings = yield* PostEmbeddingService;
       // The same suggestion program the dashboard and public portal RPCs run,
@@ -337,6 +339,9 @@ export const WidgetApiLive = HttpApiBuilder.group(
                     );
                   })
                 ).pipe(
+                  // The SSO contact upsert creates through the shared intake
+                  // module, which reads the plan decision from the context.
+                  Effect.provideService(EntitlementPolicy, entitlementPolicy),
                   Effect.mapError(
                     () =>
                       new InternalServerError({

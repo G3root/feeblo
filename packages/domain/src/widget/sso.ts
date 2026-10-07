@@ -15,11 +15,14 @@ import type {
   TCompanyAttributeDefinition,
   TContactAttributeDefinition,
 } from "../attribute-definition/schema";
+import { FailedToCreateCompanyError } from "../company/errors";
 import { CompanyRepository } from "../company/repository";
 import type { DataValidationError } from "../contact/errors";
-import { ContactRepository } from "../contact/repository";
+import { FailedToCreateContactError } from "../contact/errors";
+import { type Contact, ContactRepository } from "../contact/repository";
 import type { ParsedPersonAttributes } from "../contact/utils";
 import { parsePersonAttributes } from "../contact/utils";
+import { ensureCrmEntry } from "../crm-entry/intake";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { linkShadowUser } from "../identity/linking";
 import { JwtSecretRepository } from "../jwt-secret/repository";
@@ -83,10 +86,82 @@ export interface SsoSessionResult {
   userId: string;
 }
 
+const upsertSsoCompany = (
+  organizationId: string,
+  company: ParsedPersonAttributes["companies"][number]
+) =>
+  Effect.gen(function* () {
+    const companyRepository = yield* CompanyRepository;
+    const args = {
+      organizationId,
+      externalId: company.commonFields.id,
+      name: company.commonFields.name,
+      avatar: company.commonFields.avatar,
+      externalCreatedAt: company.commonFields.externalCreatedAt,
+    };
+
+    const existing = yield* companyRepository.findUpsertCompany(args);
+    if (Option.isSome(existing)) {
+      return yield* companyRepository.updateUpsertCompany({
+        ...args,
+        existing: existing.value,
+      });
+    }
+
+    return yield* ensureCrmEntry({
+      organizationId,
+      find: companyRepository.findUpsertCompany(args),
+      insert: companyRepository.insertUpsertCompany(args),
+      onLostRace: Effect.fail(new FailedToCreateCompanyError()),
+    });
+  });
+
+const upsertSsoContact = (args: {
+  readonly externalId?: string | undefined;
+  readonly email?: string | undefined;
+  readonly name?: string | undefined;
+  readonly avatar?: string | undefined;
+  readonly companyId: string | null;
+  readonly organizationId: string;
+  readonly userId: string | null;
+}) =>
+  Effect.gen(function* () {
+    const contactRepository = yield* ContactRepository;
+    // Neither key names a person, so there is nothing to upsert and no row to
+    // write: the caller keeps the `None` the old repository upsert returned.
+    if (!(args.externalId || args.email)) {
+      return Option.none<Contact>();
+    }
+
+    const existing = yield* contactRepository.findUpsertContact(args);
+    if (Option.isSome(existing)) {
+      return Option.some(
+        yield* contactRepository.updateUpsertContact({
+          ...args,
+          existing: existing.value,
+        })
+      );
+    }
+
+    return Option.some(
+      yield* ensureCrmEntry({
+        organizationId: args.organizationId,
+        find: contactRepository.findUpsertContact(args),
+        insert: contactRepository.insertUpsertContact(args),
+        onLostRace: Effect.fail(new FailedToCreateContactError()),
+      })
+    );
+  });
+
 /**
  * Upserts a contact (and its nested companies + custom attributes) from a
  * parsed JWT payload. When `userId` is provided the contact is linked to that
  * user so feedback created from the widget portal is owned by the SSO user.
+ *
+ * Creation runs through `ensureCrmEntry`, so a new contact or company
+ * consumes the workspace's CRM-entry allowance exactly as a dashboard or
+ * Public API create does; an existing row is returned or updated without
+ * spending room.
  */
 export function upsertContactFromParsed(
   organizationId: string,
@@ -96,18 +171,10 @@ export function upsertContactFromParsed(
   return Effect.gen(function* () {
     const workspaceId = yield* WorkspaceId.parse(organizationId);
     const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
-    const contactRepository = yield* ContactRepository;
-    const companyRepository = yield* CompanyRepository;
     let linkedCompanyId: string | undefined;
 
     for (const company of parsedContact.companies) {
-      const upsertedCompany = yield* companyRepository.upsertCompany({
-        organizationId,
-        externalId: company.commonFields.id,
-        name: company.commonFields.name,
-        avatar: company.commonFields.avatar,
-        externalCreatedAt: company.commonFields.externalCreatedAt,
-      });
+      const upsertedCompany = yield* upsertSsoCompany(organizationId, company);
       linkedCompanyId = upsertedCompany.id;
 
       for (const attr of company.customAttributes) {
@@ -123,7 +190,7 @@ export function upsertContactFromParsed(
       }
     }
 
-    const contactOption = yield* contactRepository.upsertContact({
+    const contactOption = yield* upsertSsoContact({
       organizationId,
       externalId: parsedContact.commonFields.userId,
       email: parsedContact.commonFields.email,
@@ -324,6 +391,9 @@ export const createSsoSession = ({
     const contactId = yield* transaction(
       upsertContactFromParsed(organizationId, parsedContact, user.id)
     ).pipe(
+      // The contact upsert creates through the shared intake module, which
+      // reads the plan decision from the running context.
+      Effect.provideService(EntitlementPolicy, entitlementPolicy),
       Effect.mapError(
         () => new SsoError({ code: "FAILED_TO_CREATE_SSO_CONTACT" })
       )

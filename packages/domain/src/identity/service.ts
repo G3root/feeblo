@@ -1,4 +1,4 @@
-import { currentDb, schema } from "@feeblo/db";
+import { currentDb, Database, schema } from "@feeblo/db";
 import { ContactId } from "@feeblo/id";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
@@ -8,7 +8,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { CompanyRepository } from "../company/repository";
+import { ensureCrmEntry } from "../crm-entry/intake";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -66,7 +66,6 @@ const normalizeEmail = (email: string | undefined): string | undefined => {
 const makeResolvePrincipalService = Effect.gen(function* () {
   const db = yield* currentDb;
   const userRepository = yield* UserRepository;
-  const companyRepository = yield* CompanyRepository;
   const entitlementPolicy = yield* EntitlementPolicy;
 
   const getContactInOrganization = (id: string, organizationId: string) =>
@@ -233,97 +232,50 @@ const makeResolvePrincipalService = Effect.gen(function* () {
     });
 
   /**
-   * Insert that tolerates losing a race against the `(organization_id, email)`
-   * or `(organization_id, external_id)` unique indexes by re-reading the
-   * winner.
+   * Finds or creates a contact under the workspace lock and the plan's CRM
+   * allowance.
    *
-   * Every contact this service creates goes through here, which is what makes
-   * it the right place for the plan's CRM entry allowance: the check sits on the
-   * insert rather than on the resolution, so it consumes room only when a row
-   * would actually be written. An on-behalf write attributed to a customer who
-   * already has a contact is unaffected by a full CRM.
-   *
-   * Before this, the allowance was enforced only where a caller created a
-   * contact explicitly — the dashboard's contact create, and the Public API's
-   * company create. On-behalf attribution provisions contacts implicitly, from a
-   * subject in the request, and no surface checked the cap on that path: a key
-   * holding only `comments.create` could grow a workspace's contact table past
-   * its plan limit by naming a new email address per request.
-   *
-   * The count and the insert are serialized on the workspace row, the same
-   * `SELECT ... FOR UPDATE` the company create takes (`company/public-api/
-   * operations.ts`). Without it two writes naming different emails both read
-   * the same available slot, both pass, and the workspace ends up over its cap.
-   * The lock is held by the caller's write transaction, which every on-behalf
-   * path opens around resolution, so it covers the insert too.
-   *
-   * The re-detect runs *inside* that lock and before the allowance is
-   * consumed. Two requests naming the same new email both find no contact on
-   * the way in, and the loser of the insert race reuses the winner's row; if
-   * the allowance were checked first, the second request would read a count
-   * that already included the first request's contact and be refused at the cap
-   * for a write that would have added no CRM entry at all.
+   * The protocol — lock, re-detect, allowance, insert, post-conflict
+   * re-detect — is `ensureCrmEntry` in `crm-entry/intake.ts`. This wrapper
+   * adds the two rules that are identity's own: the re-detection is the
+   * caller's identifier priority, so a returning customer spends no room, and
+   * a plan refusal is `CrmEntryLimitReachedError` rather than the policy's own
+   * tag.
    */
-  function insertContactToleratingRace(
+  function ensureContactInRoom(
     values: Omit<ContactInsert, "id" | "createdAt" | "updatedAt">,
     redetect: () => Effect.Effect<
       Option.Option<Contact>,
       EffectDrizzleQueryError
     >
   ) {
-    return Effect.gen(function* () {
-      yield* db
-        .select({ id: schema.organizationTable.id })
-        .from(schema.organizationTable)
-        .where(eq(schema.organizationTable.id, values.organizationId))
-        .for("no key update");
-
-      // A concurrent request may have created this contact between the
-      // resolution's own lookup and here. Reusing it is the same answer the
-      // post-conflict recovery below gives, reached earlier and without
-      // spending allowance.
-      const raced = yield* redetect();
-      if (Option.isSome(raced)) {
-        return raced.value;
-      }
-
-      yield* entitlementPolicy
-        .canCreateCrmEntry({
-          organizationId: values.organizationId,
-          crmEntryCount: companyRepository.countCrmEntries(
-            values.organizationId
-          ),
-        })
-        .pipe(
-          Effect.catchTag("PolicyDenied", () =>
-            Effect.fail(
-              new CrmEntryLimitReachedError({
-                message:
-                  "This workspace's plan has no room for another CRM entry.",
-              })
-            )
-          )
-        );
-
-      const id = yield* ContactId.generate;
-      const now = yield* DateTime.nowAsDate;
-      const [created = null] = yield* db
-        .insert(schema.contactTable)
-        .values({ ...values, id, createdAt: now, updatedAt: now })
-        .onConflictDoNothing()
-        .returning();
-      if (created) {
-        return created;
-      }
-      // Lost an insert race; the winner must exist by now.
-      const winner = yield* redetect();
-      if (Option.isSome(winner)) {
-        return winner.value;
-      }
-      return yield* Effect.die(
+    return ensureCrmEntry({
+      organizationId: values.organizationId,
+      find: redetect(),
+      insert: Effect.gen(function* () {
+        const id = yield* ContactId.generate;
+        const now = yield* DateTime.nowAsDate;
+        const [created = null] = yield* db
+          .insert(schema.contactTable)
+          .values({ ...values, id, createdAt: now, updatedAt: now })
+          .onConflictDoNothing()
+          .returning();
+        return Option.fromNullishOr(created);
+      }),
+      onLostRace: Effect.die(
         new Error("Contact insert conflicted but no winner was found")
-      );
-    });
+      ),
+    }).pipe(
+      Effect.catchTag("PolicyDenied", () =>
+        Effect.fail(
+          new CrmEntryLimitReachedError({
+            message: "This workspace's plan has no room for another CRM entry.",
+          })
+        )
+      ),
+      Effect.provideService(EntitlementPolicy, entitlementPolicy),
+      Effect.provideService(Database.Database, db)
+    );
   }
 
   return {
@@ -378,7 +330,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
                 .returning();
               contact = linked ?? existingByEmail;
             } else {
-              contact = yield* insertContactToleratingRace(
+              contact = yield* ensureContactInRoom(
                 {
                   organizationId,
                   userId: user.value.id,
@@ -471,7 +423,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             return { contactId: contact.id, userId };
           }
 
-          const created = yield* insertContactToleratingRace(
+          const created = yield* ensureContactInRoom(
             {
               organizationId,
               externalId: subject.externalId,
@@ -524,7 +476,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
                 userId: contact.userId ?? user.id,
               };
             }
-            const created = yield* insertContactToleratingRace(
+            const created = yield* ensureContactInRoom(
               {
                 organizationId,
                 userId: user.id,
@@ -539,7 +491,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
 
           // Nothing anywhere: create the customer, plus a shadow user when
           // the action needs one.
-          const created = yield* insertContactToleratingRace(
+          const created = yield* ensureContactInRoom(
             {
               organizationId,
               email,
@@ -572,7 +524,6 @@ export class ResolvePrincipalService extends Context.Service<ResolvePrincipalSer
 ) {
   static readonly layer = Layer.effect(this, this.make).pipe(
     Layer.provide(UserRepository.layer),
-    Layer.provide(CompanyRepository.layer),
     Layer.provide(
       EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
     )
