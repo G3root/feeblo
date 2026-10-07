@@ -32,37 +32,75 @@ import { TagRpcs } from "./tag/rpcs";
 import { UpvoteRpcs } from "./upvote/rpcs";
 import { WorkspaceRpcs } from "./workspace/rpcs";
 
-export const AllRpcs = PostRpcs.merge(PostActivityRpcs).merge(
-  AttributeDefinitionRpcs,
-  BillingRpcs,
-  BoardRpcs,
-  ChangelogRpcs.merge(ChangelogPostRpcs, ChangelogCategoryRpcs).merge(
-    ChangelogSubscriptionRpcs
-  ),
-  JwtSecretRpcs,
-  ApiKeyRpcs,
-  MembershipRpcs,
-  NotificationRpcs,
-  OrganizationRpcs,
-  CommentReactionRpcs,
-  CommentRpcs,
-  CompanyRpcs,
-  SiteRpcs,
-  TagRpcs,
-  UpvoteRpcs,
-  PostReactionRpcs,
-  PostStatusRpcs,
-  PostSubscriptionRpcs,
-  RoadmapRpcs,
-  RoadmapColumnRpcs,
-  WorkspaceRpcs,
-  ContactRpcs,
-  EmailSubscriptionRpcs,
-  WebhookManagementRpcs,
-  SlackManagementRpcs,
-  DiscordManagementRpcs,
-  ExternalResourceRpcs,
+/**
+ * Every RPC group this package defines, named so the handler registry in
+ * `rpc-router.ts` can pair each one with its layer under a key the type
+ * checker understands.
+ *
+ * This list stays free of handler imports on purpose: the dashboard and the
+ * public board bundle `AllRpcs` into the browser through `@feeblo/rpc-client`,
+ * and a handler layer imports repositories and the database. The pairing list
+ * therefore lives in the server module, and `rpc-router.ts` uses
+ * `satisfies Record<RpcGroupName, …>` so a group added here without an entry
+ * there is a compile error rather than a request that dies at runtime.
+ * `rpc-router.test.ts` pins the same set at runtime.
+ *
+ * Provider-owned groups are listed here like any other — the domain still
+ * defines their contract (`docs/adr/0002` keeps the handler layers in
+ * `integrations/*`), so `AllRpcs` covers every group while the four provider
+ * entries are marked `"provider"` in the handler registry and supplied by the
+ * composition root.
+ */
+export const RpcGroups = [
+  ["Post", PostRpcs],
+  ["PostActivity", PostActivityRpcs],
+  ["AttributeDefinition", AttributeDefinitionRpcs],
+  ["Billing", BillingRpcs],
+  ["Board", BoardRpcs],
+  ["Changelog", ChangelogRpcs],
+  ["ChangelogPost", ChangelogPostRpcs],
+  ["ChangelogCategory", ChangelogCategoryRpcs],
+  ["ChangelogSubscription", ChangelogSubscriptionRpcs],
+  ["JwtSecret", JwtSecretRpcs],
+  ["ApiKey", ApiKeyRpcs],
+  ["Membership", MembershipRpcs],
+  ["Notification", NotificationRpcs],
+  ["Organization", OrganizationRpcs],
+  ["CommentReaction", CommentReactionRpcs],
+  ["Comment", CommentRpcs],
+  ["Company", CompanyRpcs],
+  ["Site", SiteRpcs],
+  ["Tag", TagRpcs],
+  ["Upvote", UpvoteRpcs],
+  ["PostReaction", PostReactionRpcs],
+  ["PostStatus", PostStatusRpcs],
+  ["PostSubscription", PostSubscriptionRpcs],
+  ["Roadmap", RoadmapRpcs],
+  ["RoadmapColumn", RoadmapColumnRpcs],
+  ["Workspace", WorkspaceRpcs],
+  ["Contact", ContactRpcs],
+  ["EmailSubscription", EmailSubscriptionRpcs],
+  ["ExternalResource", ExternalResourceRpcs],
+  ["WebhookManagement", WebhookManagementRpcs],
+  ["SlackManagement", SlackManagementRpcs],
+  ["DiscordManagement", DiscordManagementRpcs],
   // GitHub RPC definitions are contracts; their handler layer is bound by the
   // composition root (see docs/adr/0002).
-  GitHubManagementRpcs
-);
+  ["GitHubManagement", GitHubManagementRpcs],
+] as const;
+
+/** The key a handler registration in `rpc-router.ts` uses for a group. */
+export type RpcGroupName = (typeof RpcGroups)[number][0];
+
+/**
+ * Every RPC group, merged once.
+ *
+ * Derived from `RpcGroups` rather than restated, so the group list has one
+ * home. The variadic `merge` accumulates the procedure union at the type
+ * level, and `rpc-router.test.ts` checks the runtime result covers exactly the
+ * registered groups.
+ */
+export const AllRpcs = (() => {
+  const [first, ...rest] = RpcGroups;
+  return first[1].merge(...rest.map(([, group]) => group));
+})();

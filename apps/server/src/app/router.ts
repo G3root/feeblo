@@ -2,7 +2,10 @@ import { makeClientIpGlobalMiddleware } from "@feeblo/domain/client-ip";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { PublicApiMcpRoute } from "@feeblo/domain/public-api/mcp";
 import { PublicApiRoute } from "@feeblo/domain/public-api/router";
-import { makeRpcRoute } from "@feeblo/domain/rpc-router";
+import {
+  makeRpcRoute,
+  type ProviderOwnedRpcName,
+} from "@feeblo/domain/rpc-router";
 import { makeDiscordRouters } from "@feeblo/integration-discord/routers";
 import { DiscordManagementRpcHandlers } from "@feeblo/integration-discord/rpc-handlers";
 import { makeGitHubRouters } from "@feeblo/integration-github/github-routers";
@@ -36,6 +39,19 @@ import { serverTimingMiddleware } from "../http/server-timing";
 import { SesEmailFeedbackRouter } from "../http/ses";
 import type { IntegrationRuntime } from "../integrations";
 
+/**
+ * The provider-owned RPC handler layers the domain leaves to the composition
+ * root (see docs/adr/0002). Keyed by the same names as the domain registry:
+ * the `satisfies` below fails the server's type if a provider-owned group is
+ * added to `RpcHandlerRegistrations` and not bound here.
+ */
+const ProviderRpcHandlers = {
+  DiscordManagement: DiscordManagementRpcHandlers,
+  GitHubManagement: GitHubManagementRpcHandlers,
+  SlackManagement: SlackManagementRpcHandlers,
+  WebhookManagement: WebhookManagementRpcHandlers,
+} satisfies Record<ProviderOwnedRpcName, Layer.Layer<any, any, any>>;
+
 export const makePublicRouters = (
   mailbox: Ref.Ref<TestMailerState> | undefined,
   nodeEnv: string
@@ -68,15 +84,11 @@ export const makeMergedRoutes = ({
     publicRouters,
     HealthRouter,
     makeRpcRoute(
-      Layer.merge(
-        GitHubManagementRpcHandlers,
-        Layer.merge(
-          SlackManagementRpcHandlers,
-          Layer.merge(
-            DiscordManagementRpcHandlers,
-            WebhookManagementRpcHandlers
-          )
-        )
+      Layer.mergeAll(
+        ProviderRpcHandlers.DiscordManagement,
+        ProviderRpcHandlers.GitHubManagement,
+        ProviderRpcHandlers.SlackManagement,
+        ProviderRpcHandlers.WebhookManagement
       )
     ),
     HttpRoute,
