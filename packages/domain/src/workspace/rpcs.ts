@@ -7,6 +7,7 @@ import { WorkspaceServiceErrors } from "./errors";
 import {
   CreateWorkspaceInput,
   CreateWorkspaceOutput,
+  WorkspaceCreationState,
   WorkspaceInput,
   WorkspacePlan,
   WorkspaceProduct,
@@ -18,6 +19,10 @@ export class WorkspaceRpcs extends RpcGroup.make(
   Rpc.make("WorkspaceCreate", {
     payload: CreateWorkspaceInput,
     success: CreateWorkspaceOutput,
+    error: WorkspaceServiceErrors,
+  }).middleware(AuthMiddleware),
+  Rpc.make("WorkspaceCreationStateGet", {
+    success: WorkspaceCreationState,
     error: WorkspaceServiceErrors,
   }).middleware(AuthMiddleware),
   Rpc.make("WorkspaceProductList", {

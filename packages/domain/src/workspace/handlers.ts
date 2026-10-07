@@ -69,6 +69,13 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
         return { organizationId };
       }).pipe(withRemapDbErrors("Workspace", "create"));
     },
+    WorkspaceCreationStateGet: () =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        return yield* workspacePolicy.getCreationState({
+          userId: session.session.userId,
+        });
+      }).pipe(withRemapDbErrors("Workspace", "select")),
     WorkspaceProductList: () =>
       repository.findProducts().pipe(withRemapDbErrors("Workspace", "select")),
     WorkspacePlanGet: (args: TWorkspaceInput) =>

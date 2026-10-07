@@ -79,24 +79,31 @@ const makeWorkspaceRepository = Effect.gen(function* () {
       ),
 
     /**
-     * Organizations where the user holds the owner role.
+     * Workspaces where the user holds the owner role, with their names.
      *
-     * Ownership is `owner` anywhere in a comma-joined role list, matching the
-     * account-deletion ownership test in `packages/auth/src/server.ts`.
+     * Ownership is `owner` anywhere in a comma-joined role list, matching
+     * the account-deletion ownership test in `packages/auth/src/server.ts`.
+     * Names travel with the rows because the workspace-creation state
+     * surface lists the workspaces the cap is counting.
      */
-    findOwnedOrganizationIds: (userId: string) =>
+    findOwnedWorkspaces: (userId: string) =>
       Effect.gen(function* () {
         const memberships = yield* db
           .select({
-            organizationId: schema.memberTable.organizationId,
+            id: schema.organizationTable.id,
+            name: schema.organizationTable.name,
             role: schema.memberTable.role,
           })
           .from(schema.memberTable)
+          .innerJoin(
+            schema.organizationTable,
+            eq(schema.organizationTable.id, schema.memberTable.organizationId)
+          )
           .where(eq(schema.memberTable.userId, userId));
 
         return memberships
           .filter(({ role }) => role.split(",").includes("owner"))
-          .map(({ organizationId }) => organizationId);
+          .map(({ id, name }) => ({ id, name }));
       }),
 
     isSubdomainTaken: (subdomain: string) =>

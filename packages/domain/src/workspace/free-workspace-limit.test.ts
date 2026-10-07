@@ -265,5 +265,66 @@ describe("free workspace limit", () => {
           expect(error).toMatchObject({ _tag: "PolicyDenied" });
         })
     );
+
+    it.effect(
+      "reports that another workspace can be created below the cap",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const userId = "user_creation_state_below_cap";
+          yield* seedUser(userId);
+          yield* createOwnedWorkspace(userId);
+          yield* createOwnedWorkspace(userId);
+          yield* createOwnedWorkspace(userId, { paid: true });
+
+          const state = yield* handlers
+            .WorkspaceCreationStateGet()
+            .pipe(
+              Effect.provideService(CurrentSession, makeBareSession(userId))
+            );
+
+          expect(state.canCreate).toBe(true);
+          expect(state.reason).toBeNull();
+          expect(state.freeWorkspaces).toHaveLength(2);
+        })
+    );
+
+    it.effect("reports the cap and lists the counted free workspaces", () =>
+      Effect.gen(function* () {
+        const handlers = yield* WorkspaceRpcHandlersEffect;
+        const userId = "user_creation_state_at_cap";
+        yield* seedUser(userId);
+        const organizationIds = yield* Effect.forEach([0, 1, 2], () =>
+          createOwnedWorkspace(userId)
+        );
+
+        const state = yield* handlers
+          .WorkspaceCreationStateGet()
+          .pipe(Effect.provideService(CurrentSession, makeBareSession(userId)));
+
+        expect(state.canCreate).toBe(false);
+        expect(state.reason).toContain("3 workspaces");
+        expect(state.freeWorkspaces.map(({ id }) => id).sort()).toEqual(
+          [...organizationIds].sort()
+        );
+      })
+    );
+
+    it.effect("excludes paid workspaces from the free workspace list", () =>
+      Effect.gen(function* () {
+        const handlers = yield* WorkspaceRpcHandlersEffect;
+        const userId = "user_creation_state_paid_excluded";
+        yield* seedUser(userId);
+        yield* createOwnedWorkspace(userId);
+        yield* createOwnedWorkspace(userId, { paid: true });
+
+        const state = yield* handlers
+          .WorkspaceCreationStateGet()
+          .pipe(Effect.provideService(CurrentSession, makeBareSession(userId)));
+
+        expect(state.canCreate).toBe(true);
+        expect(state.freeWorkspaces).toHaveLength(1);
+      })
+    );
   });
 });
