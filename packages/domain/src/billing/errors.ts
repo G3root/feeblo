@@ -32,12 +32,19 @@ export class FailedToCreatePortalError extends Schema.TaggedError<FailedToCreate
  * that the subscription is already canceled, non-billable, or gone, so the
  * postcondition the caller wanted already holds and the queue must close the
  * row instead of retrying it forever.
+ *
+ * `statusCode` and `errorTag` carry Polar's HTTP status and typed error
+ * discriminant when Polar answered, so a failed queue row's `lastError` says
+ * which refusal keeps recurring (a 409 `SubscriptionLocked` reads differently
+ * from a transport failure).
  */
 export class FailedToRevokeSubscriptionError extends Schema.TaggedError<FailedToRevokeSubscriptionError>()(
   "FailedToRevokeSubscriptionError",
   {
     message: Schema.optional(Schema.String),
     alreadyRevoked: Schema.optional(Schema.Boolean),
+    statusCode: Schema.optional(Schema.Finite),
+    errorTag: Schema.optional(Schema.String),
   },
   { httpApiStatus: 500, identifier: "FailedToRevokeSubscriptionError" }
 ) {}

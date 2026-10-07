@@ -23,13 +23,15 @@ type QueuedRevocation = {
  * A Polar failure is terminal for this attempt, not for the queue: the row
  * stays pending and the next pass tries again. The exception is an
  * already-terminated subscription — Polar's 403 `AlreadyCanceledSubscription`
- * or 404 `ResourceNotFound` — where the wanted postcondition already holds, so
- * the row is closed instead of retried forever. That exception only applies
- * when the configured target is the row's originating target: a 404 from
- * another target says nothing about the subscription, so the row is left
- * pending for reconciliation instead of being sent there or closed. A failure
- * to record the outcome is a real error and stays in the error channel,
- * because losing it would leave the queue claiming work that already happened.
+ * or typed 404 `ResourceNotFound` — where the wanted postcondition already
+ * holds, so the row is closed instead of retried forever. That exception only
+ * applies when the row's originating target is the configured target: a 404
+ * from another target says nothing about the subscription, so the row is left
+ * pending for reconciliation instead of being sent there or closed. (The sweep
+ * query already excludes other-target rows; this check remains as defense for
+ * a direct caller.) A failure to record the outcome is a real error and stays
+ * in the error channel, because losing it would leave the queue claiming work
+ * that already happened.
  */
 export const revokeQueuedSubscription = Effect.fn(
   "SubscriptionRevocation.revokeQueued"
@@ -91,28 +93,43 @@ export const revokeQueuedSubscription = Effect.fn(
 });
 
 /**
- * One pass over every revocation whose workspace is already gone. Called
- * right after a deletion commits so the common case does not wait for the
- * loop, and by the loop itself for everything that failed.
+ * One pass over every revocation whose workspace is already gone and whose
+ * originating target is the configured one. Called right after a deletion
+ * commits so the common case does not wait for the loop, and by the loop
+ * itself for everything that failed. Billing that is not configured leaves
+ * every row pending: without a client nothing can be revoked, so the pass
+ * says so once instead of walking the queue.
  */
-export const revokePendingSubscriptionRevocations = ({
+export const revokePendingSubscriptionRevocations = Effect.fn(
+  "SubscriptionRevocation.revokePass"
+)(function* ({
   organizationId,
   limit = REVOCATION_BATCH_SIZE,
 }: {
   organizationId?: string;
   limit?: number;
-}) =>
-  Effect.gen(function* () {
-    const repository = yield* BillingRepository;
-    const revocations = yield* repository.findPendingSubscriptionRevocations(
-      organizationId === undefined ? { limit } : { organizationId, limit }
-    );
+} = {}) {
+  const polarService = yield* PolarService;
+  const repository = yield* BillingRepository;
 
-    yield* Effect.forEach(revocations, revokeQueuedSubscription, {
-      concurrency: 1,
-      discard: true,
-    });
+  if (!polarService.client) {
+    yield* Effect.logWarning(
+      "Skipping the Polar subscription revocation pass because billing is not configured"
+    );
+    return;
+  }
+
+  const revocations = yield* repository.findPendingSubscriptionRevocations({
+    ...(organizationId !== undefined && { organizationId }),
+    polarServer: polarService.target,
+    limit,
   });
+
+  yield* Effect.forEach(revocations, revokeQueuedSubscription, {
+    concurrency: 1,
+    discard: true,
+  });
+});
 
 /**
  * Durable half of deletion: keeps retrying queued revocations until Polar
@@ -120,15 +137,20 @@ export const revokePendingSubscriptionRevocations = ({
  * subscription billing a workspace Feeblo no longer knows about.
  *
  * Never fails — an unreachable database and an unreachable Polar are both
- * transient here, and the next pass is the retry.
+ * transient here, and the next pass is the retry. Typed failures and defects
+ * are caught separately so interruption still propagates and the loop dies
+ * with its scope instead of spinning.
  */
 export const subscriptionRevocationMaintenance =
   revokePendingSubscriptionRevocations({}).pipe(
     Effect.tap(() =>
       Effect.logDebug("Ran the Polar subscription revocation pass")
     ),
-    Effect.catchCause((cause) =>
-      Effect.logError("Polar subscription revocation pass failed", cause)
+    Effect.catch((error) =>
+      Effect.logError("Polar subscription revocation pass failed", error)
+    ),
+    Effect.catchDefect((defect) =>
+      Effect.logError("Polar subscription revocation pass defected", defect)
     ),
     Effect.repeat(Schedule.spaced(REVOCATION_RETRY_INTERVAL))
   );

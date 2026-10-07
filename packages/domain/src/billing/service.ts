@@ -25,24 +25,66 @@ const PolarRevokeFailure = Schema.Struct({
   error: Schema.optional(Schema.String),
 });
 
+/** What a rejected revoke tells us about the subscription's fate. */
+export interface ClassifiedRevokeFailure {
+  /**
+   * Polar answered that the subscription is already terminated, so the
+   * postcondition a revoke wants already holds.
+   */
+  readonly alreadyRevoked: boolean;
+  /** Polar's HTTP status when the cause was a recognizable error response. */
+  readonly statusCode?: number;
+  /** Polar's typed error discriminant (`AlreadyCanceledSubscription`, ...). */
+  readonly errorTag?: string;
+}
+
 /**
- * Whether a rejected revoke means the subscription is already terminated.
+ * Reads a rejected revoke's cause into the outcomes the revocation queue acts
+ * on.
  *
  * Polar answers a revoke with 403 `AlreadyCanceledSubscription` for any
  * subscription it no longer considers billable (canceled, unpaid, incomplete,
- * or already ended) and 404 `ResourceNotFound` once the row is gone. Both are
- * achieved outcomes: there is nothing left to charge, so the queue closes the
- * row instead of retrying a refusal that can never change. Other failures —
- * 409 `SubscriptionLocked`, validation errors, transport errors — stay
- * failures.
+ * or already ended) and a typed 404 `ResourceNotFound` once the row is gone.
+ * Both are achieved outcomes: there is nothing left to charge, so the queue
+ * closes the row instead of retrying a refusal that can never change. The
+ * typed discriminants are matched, not bare status codes: the SDK's generic
+ * `PolarError` fallback can carry any status, and closing a row on a 404 that
+ * is not a missing subscription would leave a live one billing. Other
+ * failures — 409 `SubscriptionLocked`, validation errors, transport errors —
+ * stay failures. Transport failures carry neither field, because there is no
+ * Polar answer to describe.
  */
-export const isPolarSubscriptionAlreadyRevoked = (cause: unknown): boolean => {
+export const classifyPolarRevokeFailure = (
+  cause: unknown
+): ClassifiedRevokeFailure => {
   const decoded = Schema.decodeUnknownOption(PolarRevokeFailure)(cause);
-  return (
-    Option.isSome(decoded) &&
-    (decoded.value.statusCode === 404 ||
-      decoded.value.error === "AlreadyCanceledSubscription")
-  );
+  if (Option.isNone(decoded)) {
+    return { alreadyRevoked: false };
+  }
+  const { statusCode, error } = decoded.value;
+  return {
+    alreadyRevoked:
+      error === "AlreadyCanceledSubscription" || error === "ResourceNotFound",
+    ...(statusCode !== undefined && { statusCode }),
+    ...(error !== undefined && { errorTag: error }),
+  };
+};
+
+/**
+ * The diagnostic suffix for a revoke failure's message: the Polar status and
+ * typed error when Polar answered, and an explicit "no answer" otherwise, so
+ * a transport failure is never mistaken for a classified refusal.
+ */
+export const describeRevokeFailure = (
+  failure: ClassifiedRevokeFailure
+): string => {
+  if (failure.errorTag !== undefined) {
+    return `Polar answered ${failure.statusCode ?? "an unknown status"} ${failure.errorTag}`;
+  }
+  if (failure.statusCode !== undefined) {
+    return `Polar answered HTTP ${failure.statusCode}`;
+  }
+  return "no Polar answer (transport error)";
 };
 
 const makePolarService = Effect.gen(function* () {
@@ -62,9 +104,10 @@ const makePolarService = Effect.gen(function* () {
   return {
     client,
     webhookSecret,
-    // The Polar target this deployment talks to. Queued revocations record it
-    // when they are created and only run once the configured target matches,
-    // so a target change cannot close a row on another server's 404.
+    // The Polar target this deployment talks to. Webhook sync stamps it as
+    // the origin on subscription rows, the revocation queue copies it, and a
+    // row only ever runs against a target that matches it — so a target
+    // change cannot close a row on another server's 404.
     target: server,
     createCheckout: Effect.fn("PolarService.createCheckout")(function* ({
       organizationId,
@@ -161,13 +204,22 @@ const makePolarService = Effect.gen(function* () {
 
         yield* Effect.tryPromise({
           try: () => client.subscriptions.revoke({ id }),
-          catch: (cause) =>
-            new FailedToRevokeSubscriptionError({
-              message: "Failed to revoke Polar subscription",
-              ...(isPolarSubscriptionAlreadyRevoked(cause) && {
-                alreadyRevoked: true,
+          catch: (cause) => {
+            const classified = classifyPolarRevokeFailure(cause);
+            return new FailedToRevokeSubscriptionError({
+              // The stable prefix leads a search back to this error; the
+              // classified detail tells a failed queue row's `lastError`
+              // which refusal keeps recurring.
+              message: `Failed to revoke Polar subscription (${describeRevokeFailure(classified)})`,
+              ...(classified.alreadyRevoked && { alreadyRevoked: true }),
+              ...(classified.statusCode !== undefined && {
+                statusCode: classified.statusCode,
               }),
-            }),
+              ...(classified.errorTag !== undefined && {
+                errorTag: classified.errorTag,
+              }),
+            });
+          },
         });
       }
     ),

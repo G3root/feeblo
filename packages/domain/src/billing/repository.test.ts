@@ -9,12 +9,18 @@ import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import { TestClock } from "effect/testing";
 
 import { FailedToRevokeSubscriptionError } from "./errors";
 import { BillingRepository } from "./repository";
-import { revokePendingSubscriptionRevocations } from "./revocation";
+import {
+  revokePendingSubscriptionRevocations,
+  revokeQueuedSubscription,
+  subscriptionRevocationMaintenance,
+} from "./revocation";
 import { PolarService } from "./service";
 
 const instant = (value: string): Date =>
@@ -148,12 +154,15 @@ const insertSubscription = ({
   productId,
   status = "active",
   now,
+  polarServer,
 }: {
   externalId: string;
   organizationId: string;
   productId: string;
   status?: "active" | "past_due" | "canceled";
   now: Date;
+  /** Simulates a row synced from a different Polar target than the test's. */
+  polarServer?: string;
 }) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
@@ -173,13 +182,10 @@ const insertSubscription = ({
       ),
       customerId: `cus_${externalId}`,
       productId,
+      ...(polarServer !== undefined && { polarServer }),
       createdAt: now,
     });
   });
-
-const TestLayer = BillingRepository.layer.pipe(
-  Layer.provideMerge(Database.PgliteDatabaseLive)
-);
 
 /** Mutable state for the fake Polar revoke call. */
 type PolarServiceTestState = {
@@ -197,6 +203,27 @@ const polarState: PolarServiceTestState = {
   fail: false,
   alreadyRevoked: false,
 };
+
+/**
+ * Advances the test clock until `check` holds. Each pass is a handful of
+ * PGlite statements, so the loop steps in 30-second increments — well past
+ * the five-minute retry interval — and dies the test if the condition never
+ * lands, rather than hanging. Polling the observable state (not the call
+ * count alone) is deliberate: a pass that runs while Polar is still down
+ * counts as a call but must not be mistaken for the recovering pass.
+ */
+const waitUntil = <E>(check: Effect.Effect<boolean, E>) =>
+  Effect.gen(function* () {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      if (yield* check) {
+        return;
+      }
+      yield* TestClock.adjust(Duration.seconds(30));
+    }
+    return yield* Effect.die(
+      "the revocation loop did not reach the expected state within the virtual clock budget"
+    );
+  });
 
 /**
  * The service needs a real client value when configured so the queue can tell
@@ -233,14 +260,31 @@ const fakePolarService = (
     }),
 });
 
+const fakeConfiguredPolar = fakePolarService(fakePolarClient);
+const fakeUnconfiguredPolar = fakePolarService(undefined);
+
 const RevocationTestLayer = Layer.mergeAll(
-  BillingRepository.layer,
-  Layer.succeed(PolarService, fakePolarService(fakePolarClient))
+  BillingRepository.layer.pipe(
+    Layer.provide(Layer.succeed(PolarService, fakeConfiguredPolar))
+  ),
+  // Exposed as well as provided: the revocation pass reads the service
+  // directly.
+  Layer.succeed(PolarService, fakeConfiguredPolar)
 ).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
 
 const UnconfiguredRevocationTestLayer = Layer.mergeAll(
-  BillingRepository.layer,
-  Layer.succeed(PolarService, fakePolarService(undefined))
+  BillingRepository.layer.pipe(
+    Layer.provide(Layer.succeed(PolarService, fakeUnconfiguredPolar))
+  ),
+  Layer.succeed(PolarService, fakeUnconfiguredPolar)
+).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
+
+/** The repository's own layer, with the fake Polar service it now reads the target from. */
+const TestLayer = Layer.mergeAll(
+  BillingRepository.layer.pipe(
+    Layer.provide(Layer.succeed(PolarService, fakeConfiguredPolar))
+  ),
+  Layer.succeed(PolarService, fakeConfiguredPolar)
 ).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
 
 describe("BillingRepository", () => {
@@ -284,6 +328,7 @@ describe("BillingRepository", () => {
         expect(rows[0]?.lastEventAt?.toISOString()).toBe(
           "2026-01-03T00:00:00.000Z"
         );
+        expect(rows[0]?.polarServer).toBe("sandbox");
       })
     );
 
@@ -338,30 +383,135 @@ describe("BillingRepository", () => {
       })
     );
 
-    it.effect("ignores a subscription whose workspace is already gone", () =>
-      Effect.gen(function* () {
-        const repository = yield* BillingRepository;
-        const db = yield* currentDb;
-        const { organizationId, productId } = yield* makeWorkspace();
+    it.effect(
+      "queues a revocation when a live subscription reports for a deleted workspace",
+      () =>
+        Effect.gen(function* () {
+          const repository = yield* BillingRepository;
+          const db = yield* currentDb;
+          const { productId } = yield* makeWorkspace();
 
-        const exit = yield* Effect.exit(
-          repository.upsertSubscription(
+          // A workspace id this deployment minted, whose row is already
+          // gone — the shape of a subscription.created that had not landed
+          // before the deletion committed.
+          const deletedWorkspaceId = yield* WorkspaceId.generate;
+
+          const exit = yield* Effect.exit(
+            repository.upsertSubscription(
+              makeSubscriptionPayload({
+                externalSubscriptionId: "sub_revive_deleted",
+                organizationId: deletedWorkspaceId,
+                productId,
+              }),
+              instant("2026-01-02T00:00:00.000Z")
+            )
+          );
+
+          expect(exit._tag).toBe("Success");
+          const subscriptionRows = yield* db
+            .select()
+            .from(schema.subscriptionTable)
+            .where(
+              eq(schema.subscriptionTable.externalId, "sub_revive_deleted")
+            );
+          expect(subscriptionRows).toHaveLength(0);
+
+          const queued = yield* db
+            .select()
+            .from(schema.subscriptionRevocationTable)
+            .where(
+              eq(
+                schema.subscriptionRevocationTable.externalSubscriptionId,
+                "sub_revive_deleted"
+              )
+            );
+          expect(queued).toHaveLength(1);
+          expect(queued[0]?.organizationId).toBe(deletedWorkspaceId);
+          expect(queued[0]?.polarServer).toBe("sandbox");
+          expect(queued[0]?.revokedAt).toBeNull();
+        })
+    );
+
+    it.effect(
+      "does not queue a revocation for foreign metadata on a deleted workspace",
+      () =>
+        Effect.gen(function* () {
+          const repository = yield* BillingRepository;
+          const db = yield* currentDb;
+          const { productId } = yield* makeWorkspace();
+
+          const exit = yield* Effect.exit(
+            repository.upsertSubscription(
+              makeSubscriptionPayload({
+                externalSubscriptionId: "sub_foreign_org",
+                organizationId: "someone_elses_workspace",
+                productId,
+              }),
+              instant("2026-01-02T00:00:00.000Z")
+            )
+          );
+
+          expect(exit._tag).toBe("Success");
+          const queued = yield* db
+            .select()
+            .from(schema.subscriptionRevocationTable)
+            .where(
+              eq(
+                schema.subscriptionRevocationTable.externalSubscriptionId,
+                "sub_foreign_org"
+              )
+            );
+          expect(queued).toHaveLength(0);
+        })
+    );
+
+    it.effect(
+      "does not duplicate a revocation the deletion already queued",
+      () =>
+        Effect.gen(function* () {
+          const repository = yield* BillingRepository;
+          const db = yield* currentDb;
+          const { organizationId, productId, now } = yield* makeWorkspace();
+
+          yield* insertSubscription({
+            externalId: "sub_requeued",
+            organizationId,
+            productId,
+            now,
+          });
+          yield* repository.enqueueSubscriptionRevocationsForOrganization({
+            organizationId,
+          });
+          yield* db
+            .delete(schema.organizationTable)
+            .where(eq(schema.organizationTable.id, organizationId));
+
+          // The deletion queued its revocation and closed it; a late webhook
+          // for the same subscription must not re-open the closed row.
+          yield* repository.markSubscriptionRevocationSucceeded({
+            externalSubscriptionId: "sub_requeued",
+          });
+          yield* repository.upsertSubscription(
             makeSubscriptionPayload({
-              externalSubscriptionId: "sub_deleted_org",
-              organizationId: "workspace_that_was_deleted",
+              externalSubscriptionId: "sub_requeued",
+              organizationId,
               productId,
             }),
             instant("2026-01-02T00:00:00.000Z")
-          )
-        );
+          );
 
-        expect(exit._tag).toBe("Success");
-        const rows = yield* db
-          .select()
-          .from(schema.subscriptionTable)
-          .where(eq(schema.subscriptionTable.organizationId, organizationId));
-        expect(rows).toHaveLength(0);
-      })
+          const queued = yield* db
+            .select()
+            .from(schema.subscriptionRevocationTable)
+            .where(
+              eq(
+                schema.subscriptionRevocationTable.externalSubscriptionId,
+                "sub_requeued"
+              )
+            );
+          expect(queued).toHaveLength(1);
+          expect(queued[0]?.revokedAt).not.toBeNull();
+        })
     );
 
     it.effect("keeps the newer state when events arrive out of order", () =>
@@ -425,7 +575,6 @@ describe("BillingRepository", () => {
 
           yield* repository.enqueueSubscriptionRevocationsForOrganization({
             organizationId,
-            polarServer: "sandbox",
           });
 
           // The workspace still exists: nothing may be revoked yet, which is
@@ -495,11 +644,9 @@ describe("BillingRepository", () => {
         });
         yield* repository.enqueueSubscriptionRevocationsForOrganization({
           organizationId,
-          polarServer: "sandbox",
         });
         yield* repository.enqueueSubscriptionRevocationsForOrganization({
           organizationId,
-          polarServer: "sandbox",
         });
 
         const queued = yield* db
@@ -668,7 +815,6 @@ describe("BillingRepository", () => {
         });
         yield* repository.enqueueSubscriptionRevocationsForOrganization({
           organizationId,
-          polarServer: "sandbox",
         });
         yield* db
           .delete(schema.organizationTable)
@@ -708,7 +854,6 @@ describe("BillingRepository", () => {
         });
         yield* repository.enqueueSubscriptionRevocationsForOrganization({
           organizationId,
-          polarServer: "sandbox",
         });
         yield* db
           .delete(schema.organizationTable)
@@ -745,7 +890,7 @@ describe("BillingRepository", () => {
     );
 
     it.effect(
-      "leaves a queued revocation pending when its originating target is not configured",
+      "excludes revocations whose originating target is not the configured one from the sweep",
       () =>
         Effect.gen(function* () {
           polarState.calls = [];
@@ -755,21 +900,35 @@ describe("BillingRepository", () => {
           const db = yield* currentDb;
           const { organizationId, productId, now } = yield* makeWorkspace();
 
+          // The subscription (and therefore the queue row) belongs to
+          // production while the configured client is sandbox: a 404 from
+          // sandbox would say nothing about the row, so the sweep query
+          // excludes it instead of the caller skipping it — a stale batch of
+          // mismatched rows cannot occupy the sweep's batch window.
           yield* insertSubscription({
             externalId: "sub_revocation_other_target",
             organizationId,
             productId,
             now,
+            polarServer: "production",
           });
-          // The queue row belongs to production while the configured client is
-          // sandbox: a 404 from sandbox would say nothing about the row.
           yield* repository.enqueueSubscriptionRevocationsForOrganization({
             organizationId,
-            polarServer: "production",
           });
           yield* db
             .delete(schema.organizationTable)
             .where(eq(schema.organizationTable.id, organizationId));
+
+          const queuedRow = yield* db
+            .select()
+            .from(schema.subscriptionRevocationTable)
+            .where(
+              eq(
+                schema.subscriptionRevocationTable.externalSubscriptionId,
+                "sub_revocation_other_target"
+              )
+            );
+          expect(queuedRow[0]?.polarServer).toBe("production");
 
           yield* revokePendingSubscriptionRevocations({ organizationId });
 
@@ -815,7 +974,6 @@ describe("BillingRepository", () => {
           });
           yield* repository.enqueueSubscriptionRevocationsForOrganization({
             organizationId,
-            polarServer: "sandbox",
           });
           yield* db
             .delete(schema.organizationTable)
@@ -844,6 +1002,105 @@ describe("BillingRepository", () => {
           expect(polarState.calls).toEqual(["sub_revocation_already"]);
         })
     );
+
+    it.effect(
+      "leaves a revocation pending when it is handed to the wrong target directly",
+      () =>
+        Effect.gen(function* () {
+          polarState.calls = [];
+          polarState.fail = false;
+          polarState.alreadyRevoked = false;
+          const repository = yield* BillingRepository;
+          const db = yield* currentDb;
+          const { organizationId, productId, now } = yield* makeWorkspace();
+
+          yield* insertSubscription({
+            externalId: "sub_guard_mismatch",
+            organizationId,
+            productId,
+            now,
+          });
+          yield* repository.enqueueSubscriptionRevocationsForOrganization({
+            organizationId,
+          });
+
+          // Direct callers bypass the sweep's target filter, so the queue row
+          // processor keeps its own check: a 404 from a server that never held
+          // the subscription is not evidence it is gone.
+          yield* revokeQueuedSubscription({
+            externalSubscriptionId: "sub_guard_mismatch",
+            organizationId,
+            polarServer: "production",
+          });
+
+          const [row] = yield* db
+            .select()
+            .from(schema.subscriptionRevocationTable)
+            .where(
+              eq(
+                schema.subscriptionRevocationTable.externalSubscriptionId,
+                "sub_guard_mismatch"
+              )
+            );
+          expect(row?.revokedAt).toBeNull();
+          expect(row?.attempts).toBe(0);
+          expect(polarState.calls).toEqual([]);
+        })
+    );
+
+    it.effect(
+      "the maintenance loop keeps retrying the queue on its schedule",
+      () =>
+        Effect.gen(function* () {
+          polarState.calls = [];
+          polarState.fail = true;
+          polarState.alreadyRevoked = false;
+          const repository = yield* BillingRepository;
+          const db = yield* currentDb;
+          const { organizationId, productId, now } = yield* makeWorkspace();
+
+          yield* insertSubscription({
+            externalId: "sub_maintenance",
+            organizationId,
+            productId,
+            now,
+          });
+          yield* repository.enqueueSubscriptionRevocationsForOrganization({
+            organizationId,
+          });
+          yield* db
+            .delete(schema.organizationTable)
+            .where(eq(schema.organizationTable.id, organizationId));
+
+          // The first pass runs immediately and Polar is unreachable.
+          const fiber = yield* Effect.forkScoped(
+            subscriptionRevocationMaintenance
+          );
+          yield* waitUntil(Effect.sync(() => polarState.calls.length >= 1));
+
+          // Polar recovers; the next scheduled pass closes the row.
+          polarState.fail = false;
+          yield* waitUntil(
+            Effect.map(
+              repository.findPendingSubscriptionRevocations({
+                organizationId,
+                limit: 10,
+              }),
+              (pending) => pending.length === 0
+            )
+          );
+          // The shared PGlite keeps pending rows from earlier tests, so the
+          // sweep services them too; the assertion is this poll's two calls.
+          expect(
+            polarState.calls.filter((id) => id === "sub_maintenance")
+          ).toEqual(["sub_maintenance", "sub_maintenance"]);
+
+          // Interruption must still reach the loop: it is caught neither as a
+          // typed failure nor as a defect, so the fiber dies with its scope
+          // instead of spinning.
+          yield* Fiber.interrupt(fiber);
+        })
+    );
   });
 
   layer(UnconfiguredRevocationTestLayer)("revocation without billing", (it) => {
@@ -861,7 +1118,6 @@ describe("BillingRepository", () => {
         });
         yield* repository.enqueueSubscriptionRevocationsForOrganization({
           organizationId,
-          polarServer: "sandbox",
         });
         yield* db
           .delete(schema.organizationTable)
@@ -877,6 +1133,47 @@ describe("BillingRepository", () => {
           "sub_revocation_unconfigured",
         ]);
       })
+    );
+
+    it.effect(
+      "leaves a single queued revocation pending when the pass is invoked directly",
+      () =>
+        Effect.gen(function* () {
+          const repository = yield* BillingRepository;
+          const db = yield* currentDb;
+          const { organizationId, productId, now } = yield* makeWorkspace();
+
+          yield* insertSubscription({
+            externalId: "sub_direct_unconfigured",
+            organizationId,
+            productId,
+            now,
+          });
+          yield* repository.enqueueSubscriptionRevocationsForOrganization({
+            organizationId,
+          });
+          yield* db
+            .delete(schema.organizationTable)
+            .where(eq(schema.organizationTable.id, organizationId));
+
+          yield* revokeQueuedSubscription({
+            externalSubscriptionId: "sub_direct_unconfigured",
+            organizationId,
+            polarServer: "sandbox",
+          });
+
+          const [row] = yield* db
+            .select()
+            .from(schema.subscriptionRevocationTable)
+            .where(
+              eq(
+                schema.subscriptionRevocationTable.externalSubscriptionId,
+                "sub_direct_unconfigured"
+              )
+            );
+          expect(row?.revokedAt).toBeNull();
+          expect(row?.attempts).toBe(0);
+        })
     );
   });
 });

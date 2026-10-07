@@ -139,8 +139,10 @@ export const initAuthHandler = (
 
     const callbackRuntime = ManagedRuntime.make(
       Layer.mergeAll(
+        // Exposed as well as provided: the revocation pass reads the service
+        // directly.
         PolarService.layer,
-        BillingRepository.layer,
+        BillingRepository.layer.pipe(Layer.provide(PolarService.layer)),
         entitlementPolicyLayer,
         membershipPolicyLayer,
         MembershipRepository.layer,
@@ -275,7 +277,6 @@ export const initAuthHandler = (
         BillingRepository.use((billingRepository) =>
           billingRepository.enqueueSubscriptionRevocationsForOrganization({
             organizationId,
-            polarServer: polarService.target,
           })
         ).pipe(
           Effect.catchCause((cause) =>
@@ -411,7 +412,6 @@ export const initAuthHandler = (
                 billingRepository.enqueueSubscriptionRevocationsForOrganization(
                   {
                     organizationId: workspaceId,
-                    polarServer: polarService.target,
                   }
                 )
               );
@@ -1050,8 +1050,11 @@ export const initAuthHandler = (
     Effect.provide(
       Layer.mergeAll(
         AuthConfig.layer,
+        // Exposed as well as provided: the auth handler reads the service
+        // directly, and the repository layer reads the configured target
+        // from it.
         PolarService.layer,
-        BillingRepository.layer,
+        BillingRepository.layer.pipe(Layer.provide(PolarService.layer)),
         MembershipRepository.layer,
         rateLimitLayer,
         WorkspaceRepository.layer

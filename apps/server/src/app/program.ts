@@ -145,9 +145,14 @@ export const program = Effect.gen(function* () {
   // The Polar client and the revocation queue are built here so a queued
   // revocation keeps retrying after the request that deleted the workspace has
   // already returned. `Layer.build` keeps them in this program's scope, next
-  // to the other forked workers.
+  // to the other forked workers. PolarService is provided into the repository
+  // layer (which reads the configured target from it) and merged alongside it,
+  // because the revocation pass reads the service directly.
   const billingRuntime = yield* Layer.build(
-    Layer.mergeAll(BillingRepository.layer, PolarService.layer)
+    Layer.mergeAll(
+      BillingRepository.layer.pipe(Layer.provide(PolarService.layer)),
+      PolarService.layer
+    )
   );
   yield* subscriptionRevocationMaintenance.pipe(
     Effect.provide(billingRuntime),
