@@ -11,6 +11,7 @@ import { CurrentSession, type Session } from "../session-middleware";
 import { ReservedSubdomainError } from "../site/subdomain/errors";
 import { SubdomainValidationService } from "../site/subdomain/service";
 import { WorkspaceRpcHandlersEffect } from "./handlers";
+import { WorkspacePolicy } from "./policies";
 import { WorkspaceRepository } from "./repository";
 
 /** The `Date` for a known instant, built through `DateTime`. */
@@ -99,6 +100,10 @@ describe("WorkspaceRpcHandlers", () => {
     Layer.provide(Database.PgliteDatabaseLive)
   );
 
+  const WorkspacePolicyTest = WorkspacePolicy.layer.pipe(
+    Layer.provide(RepositoryTest)
+  );
+
   const MockSubdomainValidationLayer = Layer.effect(
     SubdomainValidationService,
     Effect.succeed({
@@ -121,7 +126,8 @@ describe("WorkspaceRpcHandlers", () => {
   const TestLayer = Layer.mergeAll(
     RepositoryTest,
     Database.PgliteDatabaseLive,
-    MockSubdomainValidationLayer
+    MockSubdomainValidationLayer,
+    WorkspacePolicyTest
   );
 
   layer(TestLayer)("handlers", (it) => {

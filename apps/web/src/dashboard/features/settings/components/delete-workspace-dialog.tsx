@@ -16,20 +16,28 @@ import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useId, useState } from "react";
+import { useId, useState, type ReactElement } from "react";
 
 /**
  * Deleting a workspace is the only in-product way to erase everything a
  * workspace holds, so it is confirmed by typing the workspace name and never
  * applied optimistically. The server cancels the Polar subscription before the
  * row (and its cascaded content) disappears.
+ *
+ * The caller may supply its own `trigger` — the register page renders a trash
+ * icon per free workspace — and an `onDeleted` callback to keep the page and
+ * refresh its own state instead of the default full-navigation reload.
  */
 export function DeleteWorkspaceDialog({
   organizationId,
   workspaceName,
+  trigger,
+  onDeleted,
 }: {
   readonly organizationId: string;
   readonly workspaceName: string;
+  readonly trigger?: ReactElement;
+  readonly onDeleted?: () => void;
 }) {
   const confirmId = useId();
   const [open, setOpen] = useState(false);
@@ -58,10 +66,18 @@ export function DeleteWorkspaceDialog({
         return;
       }
       trackEvent("org_deleted", { success: true });
-      // Every organization-scoped cache in the SPA belongs to a workspace that
-      // no longer exists; a full navigation rebuilds them against the next
-      // workspace (or the registration page when this was the last one).
-      window.location.assign("/");
+      if (onDeleted === undefined) {
+        // Every organization-scoped cache in the SPA belongs to a workspace
+        // that no longer exists; a full navigation rebuilds them against the
+        // next workspace (or the registration page when this was the last
+        // one).
+        window.location.assign("/");
+        return;
+      }
+      // The caller keeps the page (register's limit card) and refreshes its
+      // own state instead of navigating away.
+      close();
+      onDeleted();
     } catch {
       // A rejected request (transport, or a body the client could not parse)
       // must surface as a failure, not as a silently still-open dialog.
@@ -88,9 +104,11 @@ export function DeleteWorkspaceDialog({
     >
       <AlertDialogTrigger
         render={
-          <Button size="sm" variant="destructive">
-            <HugeiconsIcon icon={Delete02Icon} /> Delete workspace
-          </Button>
+          trigger ?? (
+            <Button size="sm" variant="destructive">
+              <HugeiconsIcon icon={Delete02Icon} /> Delete workspace
+            </Button>
+          )
         }
       />
       <AlertDialogPopup>

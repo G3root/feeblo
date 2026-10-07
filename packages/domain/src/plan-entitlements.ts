@@ -5,7 +5,8 @@ export type LimitFeatureKey =
   | "privilegedMembers"
   | "changelogCategories"
   | "submissionNotificationRecipients"
-  | "crmEntries";
+  | "crmEntries"
+  | "workspaces";
 export type CapabilityFeatureKey =
   | "roadmap"
   | "changelog"
@@ -69,6 +70,11 @@ export const PLAN_FEATURE_CATALOG = {
     singularLabel: "CRM Entry",
     pluralLabel: "CRM Entries",
   },
+  workspaces: {
+    kind: "limit",
+    singularLabel: "Workspace",
+    pluralLabel: "Workspaces",
+  },
   roadmap: { kind: "capability", label: "Roadmap" },
   changelog: { kind: "capability", label: "Changelog" },
   unlimitedEndUsers: {
@@ -110,6 +116,7 @@ const LIMIT_FEATURE_ORDER = defineFeatureOrder<LimitFeatureKey>()([
   "changelogCategories",
   "submissionNotificationRecipients",
   "crmEntries",
+  "workspaces",
 ] as const);
 
 const CAPABILITY_FEATURE_ORDER = defineFeatureOrder<CapabilityFeatureKey>()([
@@ -134,6 +141,7 @@ export const PLAN_ENTITLEMENTS = {
       changelogCategories: 3,
       submissionNotificationRecipients: 1,
       crmEntries: 10,
+      workspaces: 3,
     },
     capabilities: {
       roadmap: true,
@@ -156,6 +164,7 @@ export const PLAN_ENTITLEMENTS = {
       changelogCategories: null,
       submissionNotificationRecipients: null,
       crmEntries: null,
+      workspaces: null,
     },
     capabilities: {
       roadmap: true,
@@ -178,6 +187,7 @@ export const PLAN_ENTITLEMENTS = {
       changelogCategories: null,
       submissionNotificationRecipients: null,
       crmEntries: null,
+      workspaces: null,
     },
     capabilities: {
       roadmap: true,
