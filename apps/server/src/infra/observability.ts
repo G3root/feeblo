@@ -39,7 +39,7 @@ export const makeObservabilityLayer = (config: ServerConfigValue) =>
       const loggers: Array<Logger.Logger<unknown, void>> = [
         defaultTelemetryLogger,
       ];
-      if (config.sentryDsn) {
+      if (config.sentryDsn && telemetry.logs === undefined) {
         loggers.push(Sentry.SentryEffectLogger);
       }
 
@@ -47,7 +47,7 @@ export const makeObservabilityLayer = (config: ServerConfigValue) =>
         makeSentryLayer(config, {
           logger: false,
           metrics: telemetry.metrics === undefined,
-          tracer: false,
+          tracer: telemetry.traces === undefined,
         }),
         telemetryLayer(telemetry, {
           baseLoggers: Logger.layer(loggers, { mergeWithExisting: false }),
