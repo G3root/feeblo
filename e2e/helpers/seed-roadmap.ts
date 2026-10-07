@@ -1,6 +1,6 @@
 import { type APIRequestContext, expect } from "@playwright/test";
 
-const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
+import { apiUrl } from "./urls";
 
 export type SeedRoadmapColumn = {
   name: string;
@@ -23,7 +23,7 @@ export async function seedRoadmap(
     visibility?: "public" | "private";
   }
 ) {
-  const response = await request.post(`${apiURL}/__e2e/seed-roadmap`, {
+  const response = await request.post(`${apiUrl()}/__e2e/seed-roadmap`, {
     data: payload,
   });
 

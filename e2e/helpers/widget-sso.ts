@@ -8,8 +8,7 @@ import {
   type Page,
 } from "@playwright/test";
 
-const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3101";
-const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
+import { apiUrl, webUrl } from "./urls";
 
 export const sdkBundlePath = fileURLToPath(
   new URL("../../packages/sdk/dist/feeblo-sdk.umd.cjs", import.meta.url)
@@ -65,7 +64,7 @@ export async function copyWorkspaceJwtSecret(
   organizationId: string
 ): Promise<string> {
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"], {
-    origin: baseURL,
+    origin: webUrl(),
   });
   await page.goto(`/${organizationId}/settings/security`);
 
@@ -128,7 +127,7 @@ export async function signInRestrictedSsoVisitor(
   const context = await browser.newContext();
   const page = await context.newPage();
 
-  await page.goto(baseURL);
+  await page.goto(webUrl());
   await page.setContent(`
     <!doctype html>
     <html lang="en">
@@ -173,7 +172,7 @@ export async function signInRestrictedSsoVisitor(
       });
     },
     {
-      host: baseURL,
+      host: webUrl(),
       orgId: organizationId,
       ssoToken: token,
       userEmail: identity.email,
@@ -184,7 +183,7 @@ export async function signInRestrictedSsoVisitor(
 
   const autoLoginResponse = page.waitForResponse(
     (response) =>
-      response.url() === `${apiURL}/api/auth/sign-in/jwt-auto-login` &&
+      response.url() === `${apiUrl()}/api/auth/sign-in/jwt-auto-login` &&
       response.request().method() === "POST"
   );
   await page.getByRole("link", { name: "Open public board" }).click();
@@ -204,7 +203,7 @@ export async function signInRestrictedSsoVisitor(
     );
   });
 
-  const cookies = await context.cookies(apiURL);
+  const cookies = await context.cookies(apiUrl());
   expect(
     cookies.some((cookie) => cookie.name === "better-auth.session_token")
   ).toBeTruthy();

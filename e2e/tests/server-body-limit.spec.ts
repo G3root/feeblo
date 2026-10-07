@@ -1,12 +1,11 @@
 import { request as httpRequest } from "node:http";
 
-import { expect, test } from "@playwright/test";
-
-const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
+import { expect, test } from "../fixtures";
+import { apiUrl } from "../helpers/urls";
 
 test("rejects an oversized chunked Better Auth request", async () => {
   const status = await new Promise<number>((resolve, reject) => {
-    const target = new URL("/api/auth/sign-in/jwt-auto-login", apiURL);
+    const target = new URL("/api/auth/sign-in/jwt-auto-login", apiUrl());
     const request = httpRequest(
       target,
       {

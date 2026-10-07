@@ -241,6 +241,38 @@ export default defineConfig({
       },
     },
     {
+      // E2E specs observe the product through its HTTP API and UI. Importing an
+      // application module would let a test assert against the implementation it
+      // is supposed to exercise, and PGlite must stay in the server harness
+      // (`e2e/servers.ts` and `e2e/scripts/migrate-pglite.ts`). `@feeblo/utils`
+      // and `@feeblo/permissions` are plain vocabularies, not product internals.
+      files: ["e2e/tests/**", "e2e/helpers/**", "e2e/page-objects/**"],
+      rules: {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: [
+                  "@feeblo/domain",
+                  "@feeblo/domain/**",
+                  "@feeblo/db",
+                  "@feeblo/db/**",
+                  "@feeblo/auth",
+                  "@feeblo/auth/**",
+                  "../../packages/**",
+                  "../../apps/**",
+                  "../../integrations/**",
+                ],
+                message:
+                  "E2E specs must drive the product through its API and UI, not import application modules.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
       // Architecture boundary for the Public API's shared root (see ADR 0004).
       // Response schemas from the dashboard and the public portal carry
       // internal actor identifiers (`creatorId`, `creatorMemberId`) that must
