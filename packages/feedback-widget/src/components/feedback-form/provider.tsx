@@ -23,7 +23,9 @@ export function FeedbackFormProvider(props: {
   const submission = useSubmission(createFeedBackAction);
   const [title, setTitle] = createSignal("");
   const [content, setContent] = createSignal("");
-  const [suggestions, setSuggestions] = createSignal<WidgetSuggestion[]>([]);
+  const [suggestions, setSuggestions] = createSignal<
+    readonly WidgetSuggestion[]
+  >([]);
   const [suggestionsPending, setSuggestionsPending] = createSignal(false);
 
   createEffect(() => {

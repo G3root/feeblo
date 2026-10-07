@@ -1,3 +1,4 @@
+import { decodeWidgetOrganizationId } from "@feeblo/domain/widget/schema";
 import {
   isSupportedLocale,
   type WidgetConfig,
@@ -31,7 +32,12 @@ export const Route = createFileRoute("/feedback-widget/$organizationId")({
   server: {
     handlers: {
       GET: ({ params, request }) => {
-        const organizationId = params.organizationId;
+        // Decoded through the same contract the iframe decodes its
+        // `window.global.__ENV.organizationId` through, so the shell and the
+        // widget cannot disagree about what an organization id is.
+        const organizationId = decodeWidgetOrganizationId(
+          params.organizationId
+        );
         if (!organizationId) {
           return new Response("Not found", { status: 404 });
         }
