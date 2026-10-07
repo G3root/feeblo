@@ -89,6 +89,14 @@ export const dataImportJobTable = pgTable(
     ),
     // The claim query scans for queued work and expired leases in this order.
     index("data_import_job_claim_idx").on(table.status, table.createdAt),
+    // At most one job per workspace is staged, queued, or running. The
+    // service's `hasActiveJob` check is the fast path; this index is what
+    // makes the rule hold when two uploads race past that check.
+    uniqueIndex("data_import_job_organization_active_uidx")
+      .on(table.organizationId)
+      .where(
+        sql`${table.status} IN ('awaiting_confirmation', 'queued', 'running')`
+      ),
     index("data_import_job_organization_created_idx").on(
       table.organizationId,
       table.createdAt

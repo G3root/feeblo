@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "data_import_job_organization_active_uidx" ON "data_import_job" ("organization_id") WHERE "status" IN ('awaiting_confirmation', 'queued', 'running');
