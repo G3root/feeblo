@@ -33,15 +33,14 @@ export const test = base.extend<{ baseURL: string }, WorkerFixtures>({
       }
 
       const manifest = await readServerManifest(manifestFile);
-      // Playwright restarts a worker after a failed test, and the replacement
-      // gets the next worker index, so a long run produces more indices than
-      // the run started workers. Map each index back onto the pool; workers
-      // that are alive at the same time still land on distinct servers.
-      const server =
-        manifest.servers[workerInfo.workerIndex % manifest.servers.length];
+      // Playwright restarts a worker after a failed test; the replacement gets a
+      // new `workerIndex` but keeps its slot's `parallelIndex`, which is also
+      // guaranteed distinct across workers running at the same time. The slot
+      // maps to the same server across restarts.
+      const server = manifest.servers[workerInfo.parallelIndex];
       if (server === undefined) {
         throw new Error(
-          `No e2e server is registered for worker ${workerInfo.workerIndex}.`
+          `No e2e server is registered for worker slot ${workerInfo.parallelIndex}.`
         );
       }
 
