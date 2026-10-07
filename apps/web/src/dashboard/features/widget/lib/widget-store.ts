@@ -1,7 +1,6 @@
 import type { WidgetModule } from "@feeblo/feedback-widget/config";
+import { createStoreContext } from "@feeblo/web-shared/xstate";
 import { createStore } from "@xstate/store";
-
-import { createStoreContext } from "~/lib/xstate";
 
 import {
   createWidgetDraft,
