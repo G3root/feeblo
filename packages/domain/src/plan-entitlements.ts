@@ -1,3 +1,5 @@
+import { PAID_PLAN_KEYS as PAID_PLAN_KEYS_CONTRACT } from "@feeblo/domain-contracts/plan";
+
 export type OrganizationPlan = "free" | "starter" | "professional";
 
 /**
@@ -216,9 +218,14 @@ export const PLAN_DISPLAY_NAMES = {
   professional: "Professional",
 } as const satisfies Record<OrganizationPlan, string>;
 
-export const PAID_PLAN_KEYS = Object.keys(PLAN_ENTITLEMENTS).filter(
-  (plan): plan is Exclude<OrganizationPlan, "free"> => plan !== "free"
-);
+/**
+ * Plan keys that grant paid entitlements. The literal is owned by
+ * `@feeblo/domain-contracts/plan` — `@feeblo/db/schema/billing` gates SQL on
+ * the same list and cannot import this package — and must equal every
+ * non-free key of `PLAN_ENTITLEMENTS`; `plan-entitlements.test.ts` enforces
+ * that equality.
+ */
+export const PAID_PLAN_KEYS = PAID_PLAN_KEYS_CONTRACT;
 
 export type PlanFeatureRow = {
   key: PlanFeatureKey;

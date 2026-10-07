@@ -1,3 +1,4 @@
+import { PAID_PLAN_KEYS } from "@feeblo/domain-contracts/plan";
 import {
   and,
   eq,
@@ -11,13 +12,6 @@ import {
 import { QueryBuilder } from "drizzle-orm/pg-core";
 
 import { productTable, subscriptionTable } from "./auth";
-
-/**
- * Product metadata plan keys that grant paid entitlements. Keep in sync with
- * `PLAN_ENTITLEMENTS` in `@feeblo/domain/plan-entitlements`, which owns the
- * entitlement semantics for every plan key listed here.
- */
-export const PAID_PRODUCT_PLAN_KEYS = ["starter", "professional"] as const;
 
 /**
  * SQL condition matching a subscription that currently grants plan
@@ -53,9 +47,7 @@ export const organizationHasEntitledPaidSubscription = (
       and(
         eq(subscriptionTable.organizationId, organizationId),
         entitledSubscriptionCondition(now),
-        inArray(sql`${productTable.metadata}->>'plan'`, [
-          ...PAID_PRODUCT_PLAN_KEYS,
-        ])
+        inArray(sql`${productTable.metadata}->>'plan'`, [...PAID_PLAN_KEYS])
       )
     )}`;
 };
