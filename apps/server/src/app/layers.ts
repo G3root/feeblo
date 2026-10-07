@@ -2,6 +2,7 @@ import { NodeRedis } from "@effect/platform-node";
 import { toAuthHandler } from "@feeblo/auth/auth-handler";
 import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
+import { AssetRepository } from "@feeblo/domain/asset/repository";
 import { BoardRepository } from "@feeblo/domain/board/repository";
 import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
 import { EmailOutboxRepository } from "@feeblo/domain/email-outbox/repository";
@@ -267,6 +268,9 @@ export const makeServiceLayers = ({
   return Layer.mergeAll(
     workflowLayer,
     SiteRepository.layer,
+    // The media-upload surfaces replace a singleton asset through the asset
+    // repository; provided once here rather than rebuilt inside each handler.
+    AssetRepository.layer,
     EmailOutboxRepository.layer,
     // The Public API's post writes record integration events, and the recorder
     // snapshots the post's URL into the event. Required rather than provided

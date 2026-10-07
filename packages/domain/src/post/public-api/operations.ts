@@ -562,16 +562,16 @@ export const setPostTagsOperation = defineOperation(
                 tagIds: wanted,
               })
               .pipe(
-                Effect.catchTag("PolicyDenied", () =>
-                  Effect.fail(notFoundError("Post not found."))
-                ),
-                Effect.catchTag("PostIsMergedError", () =>
-                  Effect.fail(
-                    invalidRequestError(
-                      "This post has been merged into another post and cannot be changed."
-                    )
-                  )
-                )
+                Effect.catchTags({
+                  PolicyDenied: () =>
+                    Effect.fail(notFoundError("Post not found.")),
+                  PostIsMergedError: () =>
+                    Effect.fail(
+                      invalidRequestError(
+                        "This post has been merged into another post and cannot be changed."
+                      )
+                    ),
+                })
               );
 
             yield* activities.createMany(

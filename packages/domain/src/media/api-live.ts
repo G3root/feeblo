@@ -13,7 +13,7 @@ import {
   UnauthorizedError,
   withRemapDbErrors,
 } from "../rpc-errors";
-import { S3UploadService, S3UploadServiceLive } from "../services/s3";
+import { S3UploadService } from "../services/s3";
 import {
   currentHttpApiSession,
   HttpApiAuthMiddlewareLive,
@@ -110,15 +110,11 @@ export const MediaApiLive = HttpApiBuilder.group(
             message: "You are not a member of this organization",
           });
         }
-        const s3Service = yield* S3UploadService.pipe(
-          Effect.provide(S3UploadServiceLive),
-          Effect.mapError(
-            () =>
-              new InternalServerError({
-                message: "Failed to configure media storage",
-              })
-          )
-        );
+        // Media storage is a shared requirement supplied by the composition
+        // root, not a live layer built inside the request: the root provides
+        // the one instance every upload path uses, and a test that supplies a
+        // substitute is not overridden here.
+        const s3Service = yield* S3UploadService;
         const uploaded = yield* s3Service
           .uploadEditorMedia({
             bytes,
