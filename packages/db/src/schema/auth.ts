@@ -224,76 +224,124 @@ export const invitationTable = pgTable(
   ]
 );
 
-export const subscriptionTable = pgTable("subscription", {
-  id: text("id").primaryKey(),
-  externalId: text("external_id").unique().notNull(),
-  organizationId: text("organization_id")
-    .notNull()
-    .references(() => organizationTable.id, { onDelete: "cascade" }),
-  amount: real("amount").notNull(),
-  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull(),
-  currency: text("currency").notNull(),
-  recurringInterval: text("recurring_interval").notNull(),
-  recurringIntervalCount: integer("recurring_interval_count").notNull(),
-  status: text("status")
-    .$type<
-      | "incomplete"
-      | "incomplete_expired"
-      | "trialing"
-      | "active"
-      | "past_due"
-      | "canceled"
-      | "unpaid"
-    >()
-    .notNull(),
+export const subscriptionTable = pgTable(
+  "subscription",
+  {
+    id: text("id").primaryKey(),
+    externalId: text("external_id").unique().notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    amount: real("amount").notNull(),
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull(),
+    currency: text("currency").notNull(),
+    recurringInterval: text("recurring_interval").notNull(),
+    recurringIntervalCount: integer("recurring_interval_count").notNull(),
+    status: text("status")
+      .$type<
+        | "incomplete"
+        | "incomplete_expired"
+        | "trialing"
+        | "active"
+        | "past_due"
+        | "canceled"
+        | "unpaid"
+      >()
+      .notNull(),
 
-  currentPeriodStart: timestamp("current_period_start", {
-    withTimezone: true,
-  }).notNull(),
+    currentPeriodStart: timestamp("current_period_start", {
+      withTimezone: true,
+    }).notNull(),
 
-  currentPeriodEnd: timestamp("current_period_end", {
-    withTimezone: true,
-  }),
+    currentPeriodEnd: timestamp("current_period_end", {
+      withTimezone: true,
+    }),
 
-  trialStart: timestamp("trial_start", {
-    withTimezone: true,
-  }),
+    trialStart: timestamp("trial_start", {
+      withTimezone: true,
+    }),
 
-  trialEnd: timestamp("trial_end", {
-    withTimezone: true,
-  }),
+    trialEnd: timestamp("trial_end", {
+      withTimezone: true,
+    }),
 
-  canceledAt: timestamp("canceled_at", {
-    withTimezone: true,
-  }),
+    canceledAt: timestamp("canceled_at", {
+      withTimezone: true,
+    }),
 
-  startedAt: timestamp("started_at", {
-    withTimezone: true,
-  }),
+    startedAt: timestamp("started_at", {
+      withTimezone: true,
+    }),
 
-  endsAt: timestamp("ends_at", {
-    withTimezone: true,
-  }),
+    endsAt: timestamp("ends_at", {
+      withTimezone: true,
+    }),
 
-  endedAt: timestamp("ended_at", {
-    withTimezone: true,
-  }),
+    endedAt: timestamp("ended_at", {
+      withTimezone: true,
+    }),
 
-  customerId: text("customer_id").notNull(),
-  productId: text("product_id")
-    .notNull()
-    .references(() => productTable.id, { onDelete: "cascade" }),
-  discountId: text("discount_id"),
-  checkoutId: text("checkout_id"),
-  seats: integer("seats"),
+    customerId: text("customer_id").notNull(),
+    productId: text("product_id")
+      .notNull()
+      .references(() => productTable.id, { onDelete: "cascade" }),
+    discountId: text("discount_id"),
+    checkoutId: text("checkout_id"),
+    seats: integer("seats"),
 
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .$onUpdate(() => /* @__PURE__ */ new Date())
-    .notNull(),
-});
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+
+    //
+    // Envelope timestamp of the last Polar webhook applied to this row. Polar
+    // retries failed deliveries, so events can arrive out of order; a stale
+    // `subscription.active` must not overwrite a newer `subscription.revoked`.
+    // Nullable because rows synced before this column existed have no known
+    // source time — a null value accepts any event.
+    lastEventAt: timestamp("last_event_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("subscription_organizationId_idx").on(table.organizationId),
+    // The product link is a foreign key without an automatic index; deletes
+    // of a product and integrity checks otherwise scan the table.
+    index("subscription_productId_idx").on(table.productId),
+  ]
+);
+
+/**
+ * Durable queue of Polar subscriptions awaiting revocation because their
+ * workspace is being deleted. The organization id deliberately has no foreign
+ * key: the row is enqueued before the organization row disappears and only
+ * becomes eligible for the retry loop once that row is gone. That gate is what
+ * makes a rolled-back deletion safe — nothing is revoked while the workspace
+ * still exists. Rows are kept after revocation for audit and are never
+ * eligible again once `revoked_at` is set.
+ */
+export const subscriptionRevocationTable = pgTable(
+  "subscription_revocation",
+  {
+    externalSubscriptionId: text("external_subscription_id").primaryKey(),
+    organizationId: text("organization_id").notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("subscription_revocation_organizationId_idx").on(
+      table.organizationId
+    ),
+  ]
+);
 
 export const productTable = pgTable("product", {
   id: text("id").primaryKey(),

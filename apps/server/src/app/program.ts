@@ -9,6 +9,9 @@ import {
   NodeRuntime,
 } from "@effect/platform-node";
 import { Database } from "@feeblo/db";
+import { BillingRepository } from "@feeblo/domain/billing/repository";
+import { subscriptionRevocationMaintenance } from "@feeblo/domain/billing/revocation";
+import { PolarService } from "@feeblo/domain/billing/service";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
@@ -138,6 +141,18 @@ export const program = Effect.gen(function* () {
 
   yield* integrationRuntime.worker.pipe(Effect.forkScoped);
   yield* integrationRuntime.maintenance.pipe(Effect.forkScoped);
+
+  // The Polar client and the revocation queue are built here so a queued
+  // revocation keeps retrying after the request that deleted the workspace has
+  // already returned. `Layer.build` keeps them in this program's scope, next
+  // to the other forked workers.
+  const billingRuntime = yield* Layer.build(
+    Layer.mergeAll(BillingRepository.layer, PolarService.layer)
+  );
+  yield* subscriptionRevocationMaintenance.pipe(
+    Effect.provide(billingRuntime),
+    Effect.forkScoped
+  );
 
   return yield* Layer.launch(server);
 });

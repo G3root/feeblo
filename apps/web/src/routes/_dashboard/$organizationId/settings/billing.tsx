@@ -108,7 +108,10 @@ function BillingSettingsContent({
     const timer = window.setInterval(() => {
       attempts += 1;
       workspacePlanCollection.utils
-        .refetch()
+        // `throwOnError` is what makes the catch reachable: without it the
+        // refetch resolves with the error in the result and the alert would
+        // stay on "pending" through a network failure.
+        .refetch({ throwOnError: true })
         .catch(() => setConfirmationStatus("error"));
       if (attempts >= 10) {
         window.clearInterval(timer);
@@ -124,7 +127,7 @@ function BillingSettingsContent({
   const refreshCheckoutConfirmation = async () => {
     setConfirmationStatus("pending");
     try {
-      await workspacePlanCollection.utils.refetch();
+      await workspacePlanCollection.utils.refetch({ throwOnError: true });
       setConfirmationStatus("delayed");
     } catch {
       setConfirmationStatus("error");

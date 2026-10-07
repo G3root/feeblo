@@ -64,6 +64,9 @@
     "./billing/repository": {
       "default": "./src/billing/repository.ts"
     },
+    "./billing/revocation": {
+      "default": "./src/billing/revocation.ts"
+    },
     "./billing/service": {
       "default": "./src/billing/service.ts"
     },

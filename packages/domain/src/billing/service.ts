@@ -56,10 +56,15 @@ const makePolarService = Effect.gen(function* () {
             metadata: {
               org: organizationId,
             },
-            // Billing belongs to the workspace, not the person who happened to
-            // create checkout. This prevents an admin of one workspace from
-            // receiving a portal session that also manages their other
-            // workspaces' subscriptions.
+            // The workspace is identified by `metadata.org` above, which is
+            // the webhook tenancy key. The external customer id only names the
+            // customer a first checkout creates: Polar resolves a checkout
+            // customer by email before external id and allows one customer per
+            // email per organization, so a buyer who pays for several
+            // workspaces shares one Polar customer (and its portal). That is a
+            // Polar constraint, not an isolation guarantee — which is why
+            // account deletion must never delete a Polar customer (see the
+            // `createCustomerOnSignUp` note in packages/auth).
             externalCustomerId: organizationId,
             customerEmail: user.email ?? undefined,
             customerName: user.name ?? undefined,
@@ -105,6 +110,12 @@ const makePolarService = Effect.gen(function* () {
     /**
      * Immediately cancels a subscription. Used when an organization is deleted
      * so billing does not continue for a tenant that no longer exists.
+     *
+     * The failure is left in the error channel on purpose: the caller owns the
+     * durable retry (the revocation queue), so swallowing it here would lose
+     * the only signal that the subscription is still live. "No client" is not
+     * a failure — billing is simply not configured, so there is nothing to
+     * revoke.
      */
     revokeSubscription: Effect.fn("PolarService.revokeSubscription")(
       function* ({ id }: { id: string }) {
@@ -119,14 +130,7 @@ const makePolarService = Effect.gen(function* () {
               message: "Failed to revoke Polar subscription",
               ...(cause instanceof Error && { cause }),
             }),
-        }).pipe(
-          Effect.catch((error) =>
-            Effect.logWarning("Failed to revoke Polar subscription", {
-              subscriptionId: id,
-              error,
-            })
-          )
-        );
+        });
       }
     ),
   };
