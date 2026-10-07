@@ -1,7 +1,6 @@
-import { currentDb, Database, schema } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import { ContactId } from "@feeblo/id";
 import { and, count, eq, getTableName, sql } from "drizzle-orm";
-import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -10,7 +9,6 @@ import * as Option from "effect/Option";
 
 import {
   ContactAlreadyExistsError,
-  FailedToCreateContactError,
   FailedToUpdateContactError,
 } from "./errors";
 import type {
@@ -172,128 +170,130 @@ const makeContactRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows[0] !== undefined)),
 
-    upsertContact: (args: TContactUpsert) =>
+    /**
+     * The row an SSO upsert's keys name, or `None`.
+     *
+     * Deterministic, not an `OR`: the external id wins when the caller
+     * supplies one — it is the caller's own identity for this human — and the
+     * email match is the fallback. Split from the upsert so the SSO path's
+     * find-or-create can run the lookup after the workspace lock and again
+     * after a lost insert race (`ensureCrmEntry`).
+     */
+    findUpsertContact: (args: TContactUpsert) =>
       Effect.gen(function* () {
-        if (!(args.externalId || args.email)) {
-          return Option.none<typeof schema.contactTable.$inferSelect>();
+        if (args.externalId) {
+          const [byExternalId] = yield* db
+            .select()
+            .from(schema.contactTable)
+            .where(
+              and(
+                eq(schema.contactTable.organizationId, args.organizationId),
+                eq(schema.contactTable.externalId, args.externalId)
+              )
+            )
+            .limit(1);
+          if (byExternalId !== undefined) {
+            return Option.some(byExternalId);
+          }
         }
-
-        /**
-         * The match is deterministic, not an `OR`: the external id wins when
-         * the caller supplies one — it is the caller's own identity for this
-         * human — and the email match is the fallback. When both keys match
-         * different rows, two customer records claim the same person and
-         * updating either would re-write a key the other row holds (a unique
-         * violation with no recovery inside this upsert), so that state is
-         * refused instead of guessed at.
-         */
-        const findByKey = (): Effect.Effect<
-          typeof schema.contactTable.$inferSelect | undefined,
-          EffectDrizzleQueryError,
-          Database.Database
-        > =>
-          Effect.gen(function* () {
-            if (args.externalId) {
-              const [byExternalId] = yield* db
-                .select()
-                .from(schema.contactTable)
-                .where(
-                  and(
-                    eq(schema.contactTable.organizationId, args.organizationId),
-                    eq(schema.contactTable.externalId, args.externalId)
-                  )
-                )
-                .limit(1);
-              if (byExternalId !== undefined) {
-                return byExternalId;
-              }
-            }
-            if (args.email) {
-              const [byEmail] = yield* db
-                .select()
-                .from(schema.contactTable)
-                .where(
-                  and(
-                    eq(schema.contactTable.organizationId, args.organizationId),
-                    eq(schema.contactTable.email, args.email)
-                  )
-                )
-                .limit(1);
-              return byEmail;
-            }
-            return undefined;
-          });
-
-        const existing = yield* findByKey();
-
-        if (existing) {
-          // A foreign email (or external id) held by a different row is the
-          // ambiguous state above: refuse rather than write a key collision.
-          // Each key the update would write is checked separately: the
-          // failure mode is one key held by another row, and one probe per
-          // key is what distinguishes that from the row matching itself.
-          // Writing over another row's key is a unique violation with no
-          // recovery inside this upsert, so the ambiguous state is refused
-          // deterministically rather than guessed at. A row matched by the
-          // other key may hold `null` here — an SSO contact with no email, or
-          // a widget contact with no external id — so the probe runs whenever
-          // the update would write a different value, over null included.
-          if (args.email && existing.email !== args.email) {
-            const [emailHolder] = yield* db
-              .select({ id: schema.contactTable.id })
-              .from(schema.contactTable)
-              .where(
-                and(
-                  eq(schema.contactTable.organizationId, args.organizationId),
-                  eq(schema.contactTable.email, args.email)
-                )
+        if (args.email) {
+          const [byEmail] = yield* db
+            .select()
+            .from(schema.contactTable)
+            .where(
+              and(
+                eq(schema.contactTable.organizationId, args.organizationId),
+                eq(schema.contactTable.email, args.email)
               )
-              .limit(1);
-            if (emailHolder !== undefined && emailHolder.id !== existing.id) {
-              return yield* new FailedToUpdateContactError();
-            }
-          }
-          if (args.externalId && existing.externalId !== args.externalId) {
-            const [externalIdHolder] = yield* db
-              .select({ id: schema.contactTable.id })
-              .from(schema.contactTable)
-              .where(
-                and(
-                  eq(schema.contactTable.organizationId, args.organizationId),
-                  eq(schema.contactTable.externalId, args.externalId)
-                )
-              )
-              .limit(1);
-            if (
-              externalIdHolder !== undefined &&
-              externalIdHolder.id !== existing.id
-            ) {
-              return yield* new FailedToUpdateContactError();
-            }
-          }
+            )
+            .limit(1);
+          return Option.fromNullishOr(byEmail);
+        }
+        return Option.none<Contact>();
+      }),
 
-          const now = yield* DateTime.nowAsDate;
-          const [updated = null] = yield* db
-            .update(schema.contactTable)
-            .set({
-              ...(args.name && { name: args.name }),
-              ...(args.email && { email: args.email }),
-              ...(args.phone && { phone: args.phone }),
-              ...(args.avatar !== undefined && { avatar: args.avatar }),
-              ...(args.companyId !== undefined && {
-                companyId: args.companyId,
-              }),
-              ...(args.userId !== undefined && { userId: args.userId }),
-              updatedAt: now,
-            })
-            .where(eq(schema.contactTable.id, existing.id))
-            .returning();
-          if (!updated) {
+    /**
+     * Applies an SSO upsert to the row its keys matched.
+     *
+     * A foreign email (or external id) held by a different row is the
+     * ambiguous state the lookup cannot resolve: writing over another row's
+     * key is a unique violation with no recovery inside this update, so that
+     * state is refused deterministically rather than guessed at. A row matched
+     * by the other key may hold `null` here — an SSO contact with no email, or
+     * a widget contact with no external id — so each probe runs whenever the
+     * update would write a different value, over null included.
+     */
+    updateUpsertContact: (
+      args: TContactUpsert & { readonly existing: Contact }
+    ) =>
+      Effect.gen(function* () {
+        const { existing } = args;
+        if (args.email && existing.email !== args.email) {
+          const [emailHolder] = yield* db
+            .select({ id: schema.contactTable.id })
+            .from(schema.contactTable)
+            .where(
+              and(
+                eq(schema.contactTable.organizationId, args.organizationId),
+                eq(schema.contactTable.email, args.email)
+              )
+            )
+            .limit(1);
+          if (emailHolder !== undefined && emailHolder.id !== existing.id) {
             return yield* new FailedToUpdateContactError();
           }
-          return Option.some(updated);
+        }
+        if (args.externalId && existing.externalId !== args.externalId) {
+          const [externalIdHolder] = yield* db
+            .select({ id: schema.contactTable.id })
+            .from(schema.contactTable)
+            .where(
+              and(
+                eq(schema.contactTable.organizationId, args.organizationId),
+                eq(schema.contactTable.externalId, args.externalId)
+              )
+            )
+            .limit(1);
+          if (
+            externalIdHolder !== undefined &&
+            externalIdHolder.id !== existing.id
+          ) {
+            return yield* new FailedToUpdateContactError();
+          }
         }
 
+        const now = yield* DateTime.nowAsDate;
+        const [updated = null] = yield* db
+          .update(schema.contactTable)
+          .set({
+            ...(args.name && { name: args.name }),
+            ...(args.email && { email: args.email }),
+            ...(args.phone && { phone: args.phone }),
+            ...(args.avatar !== undefined && { avatar: args.avatar }),
+            ...(args.companyId !== undefined && {
+              companyId: args.companyId,
+            }),
+            ...(args.userId !== undefined && { userId: args.userId }),
+            updatedAt: now,
+          })
+          .where(eq(schema.contactTable.id, existing.id))
+          .returning();
+        if (!updated) {
+          return yield* new FailedToUpdateContactError();
+        }
+        return updated;
+      }),
+
+    /**
+     * Inserts a new SSO contact, tolerating a lost unique-key race.
+     *
+     * `None` means a concurrent sign-in wrote the row first; the SSO path
+     * re-reads through `findUpsertContact` rather than failing the caller's
+     * transaction, and a win reported by neither lookup is the caller's
+     * unrecoverable-race failure.
+     */
+    insertUpsertContact: (args: TContactUpsert) =>
+      Effect.gen(function* () {
         const id = yield* ContactId.generate;
         const now = yield* DateTime.nowAsDate;
         const [created = null] = yield* db
@@ -312,20 +312,9 @@ const makeContactRepository = Effect.gen(function* () {
             createdAt: now,
             updatedAt: now,
           })
-          // A concurrent SSO sign-in for the same human loses the unique
-          // (organization, email) or (organization, external id) race here;
-          // the winner is re-read through the same lookup rather than a
-          // unique violation failing the caller's transaction.
           .onConflictDoNothing()
           .returning();
-        if (created) {
-          return Option.some(created);
-        }
-        const winner = yield* findByKey();
-        if (winner) {
-          return Option.some(winner);
-        }
-        return yield* new FailedToCreateContactError();
+        return Option.fromNullishOr(created);
       }),
 
     findManyContacts: (organizationId: string) =>
