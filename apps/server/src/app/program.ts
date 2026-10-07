@@ -22,7 +22,10 @@ import {
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Etag from "effect/http/Etag";
+import * as HttpPlatform from "effect/http/HttpPlatform";
 import * as HttpRouter from "effect/http/HttpRouter";
+import type * as HttpServer from "effect/http/HttpServer";
 import * as Layer from "effect/Layer";
 
 import { ServerConfig } from "../config";
@@ -44,7 +47,22 @@ import {
   withGlobalMiddleware,
 } from "./router";
 
-export const program = Effect.gen(function* () {
+/**
+ * The composition root's interface.
+ *
+ * `makeServerApp` builds the route tree and the integration runtime without
+ * binding a port, and returns `makeServer`, which closes over that tree and
+ * takes the one layer a caller owns: the HTTP server. `program` supplies
+ * `NodeHttpServer`; a test supplies an in-memory server and builds the same
+ * tree over PGlite and test configs. That is the gap ADR 0006 recorded — no
+ * test built the server layers, so a collaborator missing from `ServiceLayers`
+ * stayed invisible until a request asked for it.
+ *
+ * The layers are provided after `HttpRouter.serve`, exactly as before: the
+ * serve step is what unwraps the `Request` markers the route and middleware
+ * layers carry, so the `Layer.provide`s can subtract the services they name.
+ */
+export const makeServerApp = Effect.gen(function* () {
   const config = yield* ServerConfig;
 
   const useTestMailer = yield* Config.Boolean("E2E_TEST_MAILER").pipe(
@@ -116,23 +134,39 @@ export const program = Effect.gen(function* () {
   });
   const AllRoutes = withGlobalMiddleware(MergedRoutes, config);
 
-  const server = HttpRouter.serve(AllRoutes, {
-    routerConfig: {
-      maxParamLength: 500,
-    },
-  }).pipe(
-    Layer.provide(AuthLayer),
-    Layer.provide(RateLimitLayer),
-    Layer.provide(ServiceLayers),
-    Layer.provide(NodeFileSystem.layer),
-    Layer.provide(NodePath.layer),
-    Layer.provide(
-      NodeHttpServer.layerConfig(
-        createServer,
-        Config.all({
-          port: Config.Number("SERVER_PORT").pipe(Config.withDefault(3000)),
-        })
-      )
+  return {
+    integrationRuntime,
+    makeServer: <E, R>(
+      platform: Layer.Layer<
+        HttpServer.HttpServer | HttpPlatform.HttpPlatform | Etag.Generator,
+        E,
+        R
+      >
+    ) =>
+      HttpRouter.serve(AllRoutes, {
+        routerConfig: {
+          maxParamLength: 500,
+        },
+      }).pipe(
+        Layer.provide(AuthLayer),
+        Layer.provide(RateLimitLayer),
+        Layer.provide(ServiceLayers),
+        Layer.provide(NodeFileSystem.layer),
+        Layer.provide(NodePath.layer),
+        Layer.provide(platform)
+      ),
+  };
+});
+
+export const program = Effect.gen(function* () {
+  const { integrationRuntime, makeServer } = yield* makeServerApp;
+
+  const server = makeServer(
+    NodeHttpServer.layerConfig(
+      createServer,
+      Config.all({
+        port: Config.Number("SERVER_PORT").pipe(Config.withDefault(3000)),
+      })
     )
   );
 

@@ -39,4 +39,6 @@ The Public API no longer reads collaborators that way. Each operation declares i
 
 Two `workspace:*` dependencies follow from the scopes move: `@feeblo/auth` and `@feeblo/web` now depend on `@feeblo/domain-contracts` directly, instead of reaching the vocabulary through the Public API's server module. That direction is the one ADR 0002 already prescribes.
 
-The write path's required environment is now a compile-time obligation: a collaborator missing from `PostWriteService.layer` fails the composition root's build rather than one request. Its optional fan-outs are the part the type system cannot enforce — they are read from the request context, so the root must keep them there, and no test builds the server layers to notice their absence.
+The write path's required environment is now a compile-time obligation: a collaborator missing from `PostWriteService.layer` fails the composition root's build rather than one request. Its optional fan-outs are the part the type system cannot enforce — they are read from the request context, so the root must keep them there.
+
+That gap is now visible to `pnpm test`: `apps/server/src/app/program.test.ts` builds the same `makeServerApp` production launches, over a PGlite database and the test configs the Public API harness proves, with `NodeHttpServer.layerTest` in place of the bound port. A missing provider or a layer whose build fails now fails the suite instead of one request.
