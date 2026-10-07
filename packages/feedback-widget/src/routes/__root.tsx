@@ -7,6 +7,7 @@ import {
   onCleanup,
   onMount,
   Show,
+  Suspense,
 } from "solid-js";
 
 import { Button } from "../components/ui/button";
@@ -95,7 +96,15 @@ export function RootComponent(props: RouteSectionProps) {
 
         <main class="hide-scrollbar min-h-0 flex-1 overflow-y-auto">
           <ErrorBoundary fallback={(err) => <ErrorFallback error={err} />}>
-            {props.children}
+            {/*
+             * Route components read `createAsync` data. Without a boundary
+             * Solid renders `undefined` on the first pass and each route's
+             * not-found fallback flashes (or, on a cold load, sits there)
+             * until the request resolves. With one, navigation runs in a
+             * transition and the previous screen is held until the next
+             * route is ready; the skeleton only shows on first load.
+             */}
+            <Suspense fallback={<WidgetLoading />}>{props.children}</Suspense>
           </ErrorBoundary>
         </main>
 
@@ -126,5 +135,29 @@ export function RootComponent(props: RouteSectionProps) {
         </Show>
       </div>
     </Show>
+  );
+}
+
+function WidgetLoading() {
+  return (
+    <div class="p-6" role="status">
+      <span class="sr-only">Loading…</span>
+      <div
+        aria-hidden="true"
+        class="bg-muted h-5 w-40 animate-pulse rounded-md"
+      />
+      <div
+        aria-hidden="true"
+        class="bg-muted mt-3 h-3.5 w-56 animate-pulse rounded-full"
+      />
+      <div
+        aria-hidden="true"
+        class="bg-muted mt-6 h-14 w-full animate-pulse rounded-lg"
+      />
+      <div
+        aria-hidden="true"
+        class="bg-muted mt-3 h-14 w-full animate-pulse rounded-lg"
+      />
+    </div>
   );
 }
