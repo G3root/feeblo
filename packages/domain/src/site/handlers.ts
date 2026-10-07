@@ -10,6 +10,7 @@ import { SitePolicy } from "./policies";
 import { SiteRepository } from "./repository";
 import { SiteRpcs } from "./rpcs";
 import type {
+  TSite,
   TSiteHidePoweredByBranding,
   TSiteList,
   TSiteListBySubdomain,
@@ -21,17 +22,37 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
   const sitePolicy = yield* SitePolicy;
   const entitlementPolicy = yield* EntitlementPolicy;
 
+  /**
+   * `hidePoweredBy` is a paid capability, and the stored flag is only a
+   * preference — the plan decides. Deriving it at the projection means a
+   * downgrade cannot leave the branding hidden through a stale row, and the
+   * dashboard's settings toggle reports what the plan currently allows
+   * instead of a preference the public surface would ignore.
+   */
+  const applyBrandingEntitlement = (site: TSite) =>
+    Effect.gen(function* () {
+      const mayRemoveBranding = yield* entitlementPolicy.mayRemoveBranding(
+        site.organizationId
+      );
+      return mayRemoveBranding ? site : { ...site, hidePoweredBy: false };
+    });
+
   return {
     SiteList: (args: TSiteList) =>
-      repository
-        .findMany({
+      Effect.gen(function* () {
+        const sites = yield* repository.findMany({
           organizationId: args.organizationId,
           limit: 1,
-        })
-        .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("Site", "select")
-        ),
+        });
+        const site = sites[0];
+        if (site === undefined) {
+          return [];
+        }
+        return [yield* applyBrandingEntitlement(site)];
+      }).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Site", "select")
+      ),
     SiteListBySubdomain: (args: TSiteListBySubdomain) =>
       Effect.gen(function* () {
         const sites = yield* repository.findMany({
@@ -43,14 +64,8 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
           return [];
         }
 
-        // `hidePoweredBy` is a paid capability, and this is the projection
-        // every public surface renders through. Deriving it here means a
-        // downgrade cannot leave the branding hidden through a stale row:
-        // the stored flag is only a preference, the plan decides.
-        const mayRemoveBranding = yield* entitlementPolicy.mayRemoveBranding(
-          site.organizationId
-        );
-        return mayRemoveBranding ? [site] : [{ ...site, hidePoweredBy: false }];
+        // The projection every public surface renders through.
+        return [yield* applyBrandingEntitlement(site)];
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "SiteListBySubdomain",

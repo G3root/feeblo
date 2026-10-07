@@ -226,6 +226,31 @@ describe("SiteRpcHandlers", () => {
           });
         })
       );
+
+      it.effect(
+        "reports the plan's branding capability, not the stored preference, to members",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* SiteRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            yield* setHidePoweredBy(fixture, true);
+
+            const results = yield* handlers
+              .SiteList({ organizationId: fixture.organizationId })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            expect(results[0]?.hidePoweredBy).toBe(false);
+
+            yield* addPaidPlan(fixture);
+            const entitled = yield* handlers
+              .SiteList({ organizationId: fixture.organizationId })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            expect(entitled[0]?.hidePoweredBy).toBe(true);
+          })
+      );
     });
 
     describe("SiteListBySubdomain", () => {
