@@ -14,6 +14,7 @@ const REVOCATION_RETRY_INTERVAL = Duration.minutes(5);
 type QueuedRevocation = {
   readonly externalSubscriptionId: string;
   readonly organizationId: string;
+  readonly polarServer: string;
 };
 
 /**
@@ -23,9 +24,12 @@ type QueuedRevocation = {
  * stays pending and the next pass tries again. The exception is an
  * already-terminated subscription — Polar's 403 `AlreadyCanceledSubscription`
  * or 404 `ResourceNotFound` — where the wanted postcondition already holds, so
- * the row is closed instead of retried forever. A failure to record the
- * outcome is a real error and stays in the error channel, because losing it
- * would leave the queue claiming work that already happened.
+ * the row is closed instead of retried forever. That exception only applies
+ * when the configured target is the row's originating target: a 404 from
+ * another target says nothing about the subscription, so the row is left
+ * pending for reconciliation instead of being sent there or closed. A failure
+ * to record the outcome is a real error and stays in the error channel,
+ * because losing it would leave the queue claiming work that already happened.
  */
 export const revokeQueuedSubscription = Effect.fn(
   "SubscriptionRevocation.revokeQueued"
@@ -43,6 +47,23 @@ export const revokeQueuedSubscription = Effect.fn(
       {
         externalSubscriptionId: revocation.externalSubscriptionId,
         organizationId: revocation.organizationId,
+      }
+    );
+    return;
+  }
+
+  // The row belongs to the target it was created on. Sending it to a different
+  // target cannot revoke it and could only answer about that target's own
+  // ids, so leave it for an operator to restore the target configuration or
+  // reconcile it manually.
+  if (revocation.polarServer !== polarService.target) {
+    yield* Effect.logWarning(
+      "Leaving a queued Polar revocation pending because its originating target is not the configured target",
+      {
+        externalSubscriptionId: revocation.externalSubscriptionId,
+        organizationId: revocation.organizationId,
+        originatingTarget: revocation.polarServer,
+        configuredTarget: polarService.target,
       }
     );
     return;

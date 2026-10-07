@@ -206,8 +206,12 @@ const polarState: PolarServiceTestState = {
  */
 const fakePolarClient = new Polar({ accessToken: "test-token" });
 
-const fakePolarService = (client: Polar | undefined) => ({
+const fakePolarService = (
+  client: Polar | undefined,
+  target: "sandbox" | "production" = "sandbox"
+) => ({
   client,
+  target,
   webhookSecret: Option.none(),
   createCheckout: () =>
     Effect.succeed({ url: "https://example.test/checkout" }),
@@ -421,6 +425,7 @@ describe("BillingRepository", () => {
 
           yield* repository.enqueueSubscriptionRevocationsForOrganization({
             organizationId,
+            polarServer: "sandbox",
           });
 
           // The workspace still exists: nothing may be revoked yet, which is
@@ -490,9 +495,11 @@ describe("BillingRepository", () => {
         });
         yield* repository.enqueueSubscriptionRevocationsForOrganization({
           organizationId,
+          polarServer: "sandbox",
         });
         yield* repository.enqueueSubscriptionRevocationsForOrganization({
           organizationId,
+          polarServer: "sandbox",
         });
 
         const queued = yield* db
@@ -661,6 +668,7 @@ describe("BillingRepository", () => {
         });
         yield* repository.enqueueSubscriptionRevocationsForOrganization({
           organizationId,
+          polarServer: "sandbox",
         });
         yield* db
           .delete(schema.organizationTable)
@@ -700,6 +708,7 @@ describe("BillingRepository", () => {
         });
         yield* repository.enqueueSubscriptionRevocationsForOrganization({
           organizationId,
+          polarServer: "sandbox",
         });
         yield* db
           .delete(schema.organizationTable)
@@ -736,6 +745,58 @@ describe("BillingRepository", () => {
     );
 
     it.effect(
+      "leaves a queued revocation pending when its originating target is not configured",
+      () =>
+        Effect.gen(function* () {
+          polarState.calls = [];
+          polarState.fail = false;
+          polarState.alreadyRevoked = false;
+          const repository = yield* BillingRepository;
+          const db = yield* currentDb;
+          const { organizationId, productId, now } = yield* makeWorkspace();
+
+          yield* insertSubscription({
+            externalId: "sub_revocation_other_target",
+            organizationId,
+            productId,
+            now,
+          });
+          // The queue row belongs to production while the configured client is
+          // sandbox: a 404 from sandbox would say nothing about the row.
+          yield* repository.enqueueSubscriptionRevocationsForOrganization({
+            organizationId,
+            polarServer: "production",
+          });
+          yield* db
+            .delete(schema.organizationTable)
+            .where(eq(schema.organizationTable.id, organizationId));
+
+          yield* revokePendingSubscriptionRevocations({ organizationId });
+
+          const [row] = yield* db
+            .select()
+            .from(schema.subscriptionRevocationTable)
+            .where(
+              eq(
+                schema.subscriptionRevocationTable.externalSubscriptionId,
+                "sub_revocation_other_target"
+              )
+            );
+          expect(row?.revokedAt).toBeNull();
+          expect(row?.attempts).toBe(0);
+          expect(polarState.calls).toEqual([]);
+
+          const pending = yield* repository.findPendingSubscriptionRevocations({
+            organizationId,
+            limit: 10,
+          });
+          expect(pending.map((item) => item.externalSubscriptionId)).toEqual([
+            "sub_revocation_other_target",
+          ]);
+        })
+    );
+
+    it.effect(
       "closes a queued revocation Polar reports as already terminated",
       () =>
         Effect.gen(function* () {
@@ -754,6 +815,7 @@ describe("BillingRepository", () => {
           });
           yield* repository.enqueueSubscriptionRevocationsForOrganization({
             organizationId,
+            polarServer: "sandbox",
           });
           yield* db
             .delete(schema.organizationTable)
@@ -799,6 +861,7 @@ describe("BillingRepository", () => {
         });
         yield* repository.enqueueSubscriptionRevocationsForOrganization({
           organizationId,
+          polarServer: "sandbox",
         });
         yield* db
           .delete(schema.organizationTable)

@@ -1,6 +1,7 @@
 CREATE TABLE "subscription_revocation" (
 	"external_subscription_id" text PRIMARY KEY,
 	"organization_id" text NOT NULL,
+	"polar_server" text NOT NULL,
 	"attempts" integer DEFAULT 0 NOT NULL,
 	"last_error" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,

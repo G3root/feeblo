@@ -35,6 +35,12 @@ interface TFindSubscriptionByOrganizationId {
   organizationId: string;
 }
 
+interface TEnqueueSubscriptionRevocations {
+  organizationId: string;
+  /** Polar target (SDK `server`) the workspace's subscriptions came from. */
+  polarServer: string;
+}
+
 interface TFindCheckoutProduct {
   productId: string;
 }
@@ -369,7 +375,8 @@ const makeBillingRepository = Effect.gen(function* () {
      */
     enqueueSubscriptionRevocationsForOrganization: ({
       organizationId,
-    }: TFindSubscriptionByOrganizationId) =>
+      polarServer,
+    }: TEnqueueSubscriptionRevocations) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
         const subscriptions = yield* db
@@ -385,6 +392,7 @@ const makeBillingRepository = Effect.gen(function* () {
             subscriptions.map((subscription) => ({
               externalSubscriptionId: subscription.externalId,
               organizationId,
+              polarServer,
               createdAt: now,
               updatedAt: now,
             }))
@@ -428,6 +436,7 @@ const makeBillingRepository = Effect.gen(function* () {
           externalSubscriptionId:
             schema.subscriptionRevocationTable.externalSubscriptionId,
           organizationId: schema.subscriptionRevocationTable.organizationId,
+          polarServer: schema.subscriptionRevocationTable.polarServer,
           attempts: schema.subscriptionRevocationTable.attempts,
         })
         .from(schema.subscriptionRevocationTable)

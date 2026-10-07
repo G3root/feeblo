@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "8413fe1b-01b8-4006-85c6-093b58dc9b91",
+  "id": "afc89915-1264-4cd2-87cf-9853ea40849c",
   "prevIds": [
     "bb37fa6f-90a8-4303-b546-6a6bee56a580"
   ],
@@ -1568,6 +1568,19 @@
       "generated": null,
       "identity": null,
       "name": "organization_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "subscription_revocation"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "polar_server",
       "entityType": "columns",
       "schema": "public",
       "table": "subscription_revocation"

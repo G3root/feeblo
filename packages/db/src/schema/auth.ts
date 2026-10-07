@@ -320,12 +320,24 @@ export const subscriptionTable = pgTable(
  * makes a rolled-back deletion safe — nothing is revoked while the workspace
  * still exists. Rows are kept after revocation for audit and are never
  * eligible again once `revoked_at` is set.
+ *
+ * `polar_server` binds each row to the target its subscription belongs to, so
+ * a deployment that changed targets cannot close the row on a 404 from a
+ * server that never held it.
  */
 export const subscriptionRevocationTable = pgTable(
   "subscription_revocation",
   {
     externalSubscriptionId: text("external_subscription_id").primaryKey(),
     organizationId: text("organization_id").notNull(),
+    /**
+     * Polar target (the SDK `server`, i.e. sandbox or production) the
+     * subscription was synced from. A queued revocation is only conclusive
+     * against this target: a 404 from a different target means "unknown
+     * here", not "already gone", so the row stays pending for reconciliation
+     * instead of being closed.
+     */
+    polarServer: text("polar_server").notNull(),
     attempts: integer("attempts").default(0).notNull(),
     lastError: text("last_error"),
     createdAt: timestamp("created_at", { withTimezone: true })

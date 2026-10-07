@@ -275,6 +275,7 @@ export const initAuthHandler = (
         BillingRepository.use((billingRepository) =>
           billingRepository.enqueueSubscriptionRevocationsForOrganization({
             organizationId,
+            polarServer: polarService.target,
           })
         ).pipe(
           Effect.catchCause((cause) =>
@@ -408,7 +409,10 @@ export const initAuthHandler = (
             for (const workspaceId of deletable) {
               yield* BillingRepository.use((billingRepository) =>
                 billingRepository.enqueueSubscriptionRevocationsForOrganization(
-                  { organizationId: workspaceId }
+                  {
+                    organizationId: workspaceId,
+                    polarServer: polarService.target,
+                  }
                 )
               );
               yield* db

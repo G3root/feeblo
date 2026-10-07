@@ -62,6 +62,10 @@ const makePolarService = Effect.gen(function* () {
   return {
     client,
     webhookSecret,
+    // The Polar target this deployment talks to. Queued revocations record it
+    // when they are created and only run once the configured target matches,
+    // so a target change cannot close a row on another server's 404.
+    target: server,
     createCheckout: Effect.fn("PolarService.createCheckout")(function* ({
       organizationId,
       productId,

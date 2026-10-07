@@ -72,6 +72,7 @@ describe("BillingRpcHandlers", () => {
     });
   const PolarServiceTest = Layer.succeed(PolarService, {
     client: undefined,
+    target: "sandbox",
     webhookSecret: Option.none(),
     createCheckout: () =>
       Effect.succeed({ url: "https://sandbox.polar.sh/checkout" }),
