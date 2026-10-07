@@ -1,3 +1,4 @@
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import type {
   TDataImportJobDetail,
   TDataImportJobSummary,
@@ -25,14 +26,24 @@ import { toastManager } from "@feeblo/ui/toast";
 import { isPlainObject, isString } from "@feeblo/utils/runtime-kind";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
-import { useState } from "react";
+import * as Result from "effect/reactivity/AsyncResult";
+import { useMemo, useState } from "react";
 
 import { m } from "@/paraglide/messages.js";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { fetchRpc } from "~/lib/runtime";
+
+import {
+  cancelDataImportAtom,
+  confirmDataImportAtom,
+  type DataImportDetailArgs,
+  dataImportDetailAtom,
+  dataImportJobsAtom,
+  type DataTransferBoard,
+  dataTransferBoardsAtom,
+} from "../atoms";
 
 /** Report rows one page shows; the RPC clamps whatever the client sends. */
 const REPORT_PAGE_SIZE = 100;
@@ -70,9 +81,348 @@ const statusVariant = (
   }
 };
 
+/**
+ * The board a transfer names. Reading the atom here rather than in the page
+ * keeps the query unmounted for a member who sees neither transfer card.
+ */
+function BoardPicker({
+  onChange,
+  organizationId,
+  value,
+}: {
+  readonly onChange: (boardId: string) => void;
+  readonly organizationId: string;
+  readonly value: string;
+}) {
+  const boardsResult = useAtomValue(dataTransferBoardsAtom(organizationId));
+  const boards = Result.builder(boardsResult)
+    .onInitial(
+      // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+      () => [] as readonly DataTransferBoard[]
+    )
+    .onFailure((_, { previousSuccess }) =>
+      Option.match(previousSuccess, {
+        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+        onNone: () => [] as readonly DataTransferBoard[],
+        onSome: ({ value: boards }) => boards,
+      })
+    )
+    .onSuccess((value) => value)
+    .exhaustive();
+
+  return (
+    <label className="flex flex-col gap-2 text-sm">
+      <span className="font-medium">{m.brave_lucky_newt()}</span>
+      <select
+        className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      >
+        <option value="" />
+        {boards.map((board) => (
+          <option key={board.id} value={board.id}>
+            {board.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/**
+ * The workspace's import jobs and the two actions a person takes on them.
+ * The job list is a watch stream, so a confirm or a worker pass updates the
+ * statuses without this card asking again.
+ */
+function ImportJobsCard({
+  onSelectJob,
+  organizationId,
+}: {
+  readonly onSelectJob: (jobId: string) => void;
+  readonly organizationId: string;
+}) {
+  const jobsResult = useAtomValue(dataImportJobsAtom(organizationId));
+  const confirmImport = useAtomSet(confirmDataImportAtom, { mode: "promise" });
+  const cancelImport = useAtomSet(cancelDataImportAtom, { mode: "promise" });
+  const [pendingAction, setPendingAction] = useState<{
+    readonly id: string;
+    readonly kind: "cancel" | "confirm";
+  } | null>(null);
+
+  const jobs = Result.builder(jobsResult)
+    .onInitial(
+      // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+      () => [] as readonly TDataImportJobSummary[]
+    )
+    .onFailure((_, { previousSuccess }) =>
+      Option.match(previousSuccess, {
+        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+        onNone: () => [] as readonly TDataImportJobSummary[],
+        onSome: ({ value }) => value,
+      })
+    )
+    .onSuccess((value) => value)
+    .exhaustive();
+
+  const handleConfirm = async (job: TDataImportJobSummary) => {
+    setPendingAction({ id: job.id, kind: "confirm" });
+    onSelectJob(job.id);
+    try {
+      await confirmImport({ payload: { id: job.id, organizationId } });
+    } catch {
+      toastManager.add({ title: m.lucky_plain_gull(), type: "error" });
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  const handleCancel = async (job: TDataImportJobSummary) => {
+    setPendingAction({ id: job.id, kind: "cancel" });
+    try {
+      await cancelImport({ payload: { id: job.id, organizationId } });
+    } catch {
+      toastManager.add({ title: m.merry_plain_auk(), type: "error" });
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{m.vivid_steady_hare()}</CardTitle>
+      </CardHeader>
+      <CardPanel>
+        {jobs.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            {m.plain_gentle_robin()}
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{m.keen_calm_swan()}</TableHead>
+                <TableHead />
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {jobs.map((job) => (
+                <TableRow key={job.id}>
+                  <TableCell>
+                    <button
+                      className="text-left hover:underline"
+                      onClick={() => onSelectJob(job.id)}
+                      type="button"
+                    >
+                      {job.fileName}
+                    </button>
+                    <p className="text-muted-foreground text-xs">
+                      {m.witty_loyal_bee({
+                        created: job.createdCount,
+                        errors: job.errorCount,
+                        warnings: job.warningCount,
+                      })}
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={statusVariant(job.status)}>
+                      {statusLabel(job.status)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {job.status === "awaiting_confirmation" ? (
+                      <Button
+                        disabled={
+                          pendingAction?.id === job.id &&
+                          pendingAction.kind === "confirm"
+                        }
+                        onClick={() => {
+                          void handleConfirm(job);
+                        }}
+                        size="sm"
+                        type="button"
+                      >
+                        {m.zesty_fresh_mole({ count: job.rowCount })}
+                      </Button>
+                    ) : null}
+                    {job.status === "awaiting_confirmation" ||
+                    job.status === "queued" ||
+                    job.status === "running" ? (
+                      <Button
+                        disabled={
+                          pendingAction?.id === job.id &&
+                          pendingAction.kind === "cancel"
+                        }
+                        onClick={() => {
+                          void handleCancel(job);
+                        }}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        {m.crisp_honest_wren()}
+                      </Button>
+                    ) : null}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardPanel>
+    </Card>
+  );
+}
+
+/**
+ * One job's report, page by page. The watch stream follows the job until it
+ * is terminal, so the counters and the visible rows update in place; a page
+ * change moves the atom to that page's own watcher.
+ */
+function ImportDetailCard({
+  id,
+  onClose,
+  onPageChange,
+  organizationId,
+  page,
+}: {
+  readonly id: string;
+  readonly onClose: () => void;
+  readonly onPageChange: (page: number) => void;
+  readonly organizationId: string;
+  readonly page: number;
+}) {
+  const args = useMemo(
+    (): DataImportDetailArgs => ({
+      id,
+      limit: REPORT_PAGE_SIZE,
+      offset: page * REPORT_PAGE_SIZE,
+      organizationId,
+    }),
+    [id, organizationId, page]
+  );
+  const detailResult = useAtomValue(dataImportDetailAtom(args));
+  const detail: TDataImportJobDetail | undefined = Result.builder(detailResult)
+    .onInitial(() => undefined)
+    .onFailure((_, { previousSuccess }) =>
+      Option.match(previousSuccess, {
+        onNone: () => undefined,
+        onSome: ({ value }) => value,
+      })
+    )
+    .onSuccess((value) => value)
+    .exhaustive();
+
+  if (detail === undefined) {
+    return null;
+  }
+
+  const reportTotal = detail.report.total;
+  const reportPages = Math.max(1, Math.ceil(reportTotal / REPORT_PAGE_SIZE));
+  const reportFrom = reportTotal === 0 ? 0 : page * REPORT_PAGE_SIZE + 1;
+  const reportTo = Math.min(reportTotal, (page + 1) * REPORT_PAGE_SIZE);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{m.agile_bright_auk()}</CardTitle>
+        <CardDescription>
+          {detail.job.failureMessage ??
+            (detail.job.status === "failed"
+              ? m.sunny_mild_puma()
+              : statusLabel(detail.job.status))}
+        </CardDescription>
+      </CardHeader>
+      <CardPanel className="flex flex-col gap-4">
+        {detail.job.notices.length > 0 ? (
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium">{m.humble_sleek_carp()}</span>
+            {detail.job.notices.map((notice) => (
+              <p className="text-muted-foreground text-xs" key={notice}>
+                {notice}
+              </p>
+            ))}
+          </div>
+        ) : null}
+        {detail.report.rows.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            {m.breezy_quiet_loon()}
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{m.calm_crisp_newt()}</TableHead>
+                <TableHead>{m.keen_bold_kite()}</TableHead>
+                <TableHead>{m.soft_calm_mouse()}</TableHead>
+                <TableHead>{m.fresh_plain_bass()}</TableHead>
+                <TableHead>{m.vivid_calm_newt()}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {detail.report.rows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell>
+                    {m.quick_plain_dove({ row: row.rowNumber })}
+                  </TableCell>
+                  <TableCell>{row.title ?? ""}</TableCell>
+                  <TableCell>{row.statusName ?? ""}</TableCell>
+                  <TableCell className="max-w-md whitespace-pre-wrap">
+                    {row.contentPreview ?? ""}
+                  </TableCell>
+                  <TableCell>
+                    {row.message ??
+                      (row.outcome === "created" ? "" : row.outcome)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+        {reportTotal > REPORT_PAGE_SIZE ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground text-xs">
+              {m.warm_lucky_toad({
+                from: reportFrom,
+                to: reportTo,
+                total: reportTotal,
+              })}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                disabled={page === 0}
+                onClick={() => onPageChange(page - 1)}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                {m.calm_brisk_auk()}
+              </Button>
+              <Button
+                disabled={page + 1 >= reportPages}
+                onClick={() => onPageChange(page + 1)}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                {m.brave_plain_lark()}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </CardPanel>
+      <CardFooter>
+        <Button onClick={onClose} type="button" variant="outline">
+          {m.deft_vivid_egret()}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
 export function DataSettingsPage() {
   const organizationId = useOrganizationId();
-  const queryClient = useQueryClient();
   const apiUrl = getRuntimePublicEnv().apiUrl;
   const { allowed: canImport, isPending: importPolicyPending } = usePolicy(
     hasPermission(organizationId, "boards.importPosts")
@@ -87,48 +437,10 @@ export function DataSettingsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const boardsQuery = useQuery({
-    queryKey: ["data-transfer-boards", organizationId],
-    queryFn: () => fetchRpc((rpc) => rpc.BoardList({ organizationId })),
-    enabled: canExport || canImport,
-  });
-
-  const importsQuery = useQuery({
-    queryKey: ["data-transfer-imports", organizationId],
-    queryFn: () => fetchRpc((rpc) => rpc.DataImportList({ organizationId })),
-    enabled: canImport,
-    refetchInterval: 3000,
-  });
-
-  const detailQuery = useQuery({
-    queryKey: [
-      "data-transfer-import",
-      organizationId,
-      selectedJobId,
-      reportPage,
-    ],
-    queryFn: () => {
-      const id = selectedJobId;
-      if (id === null) {
-        return Promise.reject(new Error("No import selected"));
-      }
-      return fetchRpc((rpc) =>
-        rpc.DataImportGet({
-          id,
-          organizationId,
-          limit: REPORT_PAGE_SIZE,
-          offset: reportPage * REPORT_PAGE_SIZE,
-        })
-      );
-    },
-    enabled: canImport && selectedJobId !== null,
-    refetchInterval: 3000,
-  });
-
-  const refreshJobs = () =>
-    queryClient.invalidateQueries({
-      queryKey: ["data-transfer-imports", organizationId],
-    });
+  const selectJob = (jobId: string) => {
+    setSelectedJobId(jobId);
+    setReportPage(0);
+  };
 
   const messageFromResponse = async (
     response: Response
@@ -173,34 +485,14 @@ export function DataSettingsPage() {
         toastManager.add({ title: m.tidy_bold_yak(), type: "error" });
         return;
       }
-      setSelectedJobId(id);
-      setReportPage(0);
+      selectJob(id);
       setFile(null);
-      await refreshJobs();
     } catch {
       toastManager.add({ title: m.tidy_bold_yak(), type: "error" });
     } finally {
       setIsUploading(false);
     }
   };
-
-  const confirmJob = useMutation({
-    mutationFn: (id: string) =>
-      fetchRpc((rpc) => rpc.DataImportConfirm({ id, organizationId })),
-    onError: () => {
-      toastManager.add({ title: m.lucky_plain_gull(), type: "error" });
-    },
-    onSuccess: refreshJobs,
-  });
-
-  const cancelJob = useMutation({
-    mutationFn: (id: string) =>
-      fetchRpc((rpc) => rpc.DataImportCancel({ id, organizationId })),
-    onError: () => {
-      toastManager.add({ title: m.merry_plain_auk(), type: "error" });
-    },
-    onSuccess: refreshJobs,
-  });
 
   const handleExport = () => {
     if (boardId === "") {
@@ -214,14 +506,6 @@ export function DataSettingsPage() {
     }
     window.location.assign(url.toString());
   };
-
-  const boards = boardsQuery.data ?? [];
-  const jobs = importsQuery.data ?? [];
-  const detail: TDataImportJobDetail | undefined = detailQuery.data;
-  const reportTotal = detail?.report.total ?? 0;
-  const reportPages = Math.max(1, Math.ceil(reportTotal / REPORT_PAGE_SIZE));
-  const reportFrom = reportTotal === 0 ? 0 : reportPage * REPORT_PAGE_SIZE + 1;
-  const reportTo = Math.min(reportTotal, (reportPage + 1) * REPORT_PAGE_SIZE);
 
   return (
     <SettingsLayout.Root size="large">
@@ -242,21 +526,11 @@ export function DataSettingsPage() {
               <CardDescription>{m.gentle_happy_moth()}</CardDescription>
             </CardHeader>
             <CardPanel className="flex flex-col gap-4">
-              <label className="flex flex-col gap-2 text-sm">
-                <span className="font-medium">{m.brave_lucky_newt()}</span>
-                <select
-                  className="border-input bg-background h-9 rounded-md border px-3 text-sm"
-                  onChange={(event) => setBoardId(event.target.value)}
-                  value={boardId}
-                >
-                  <option value="" />
-                  {boards.map((board) => (
-                    <option key={board.id} value={board.id}>
-                      {board.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <BoardPicker
+                onChange={setBoardId}
+                organizationId={organizationId}
+                value={boardId}
+              />
               <label className="flex items-center gap-2 text-sm">
                 <input
                   checked={includeArchived}
@@ -285,21 +559,11 @@ export function DataSettingsPage() {
               <CardDescription>{m.proud_witty_fox()}</CardDescription>
             </CardHeader>
             <CardPanel className="flex flex-col gap-4">
-              <label className="flex flex-col gap-2 text-sm">
-                <span className="font-medium">{m.brave_lucky_newt()}</span>
-                <select
-                  className="border-input bg-background h-9 rounded-md border px-3 text-sm"
-                  onChange={(event) => setBoardId(event.target.value)}
-                  value={boardId}
-                >
-                  <option value="" />
-                  {boards.map((board) => (
-                    <option key={board.id} value={board.id}>
-                      {board.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <BoardPicker
+                onChange={setBoardId}
+                organizationId={organizationId}
+                value={boardId}
+              />
               <label className="flex flex-col gap-2 text-sm">
                 <span className="font-medium">{m.keen_calm_swan()}</span>
                 <Input
@@ -315,7 +579,9 @@ export function DataSettingsPage() {
             <CardFooter>
               <Button
                 disabled={file === null || boardId === "" || isUploading}
-                onClick={handleUpload}
+                onClick={() => {
+                  void handleUpload();
+                }}
                 type="button"
               >
                 {m.warm_wise_toad()}
@@ -325,193 +591,23 @@ export function DataSettingsPage() {
         ) : null}
 
         {canImport && !importPolicyPending ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>{m.vivid_steady_hare()}</CardTitle>
-            </CardHeader>
-            <CardPanel>
-              {jobs.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  {m.plain_gentle_robin()}
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{m.keen_calm_swan()}</TableHead>
-                      <TableHead />
-                      <TableHead />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {jobs.map((job) => (
-                      <TableRow key={job.id}>
-                        <TableCell>
-                          <button
-                            className="text-left hover:underline"
-                            onClick={() => {
-                              setSelectedJobId(job.id);
-                              setReportPage(0);
-                            }}
-                            type="button"
-                          >
-                            {job.fileName}
-                          </button>
-                          <p className="text-muted-foreground text-xs">
-                            {m.witty_loyal_bee({
-                              created: job.createdCount,
-                              errors: job.errorCount,
-                              warnings: job.warningCount,
-                            })}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={statusVariant(job.status)}>
-                            {statusLabel(job.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {job.status === "awaiting_confirmation" ? (
-                            <Button
-                              disabled={confirmJob.isPending}
-                              onClick={() => {
-                                confirmJob.mutate(job.id);
-                                setSelectedJobId(job.id);
-                                setReportPage(0);
-                              }}
-                              size="sm"
-                              type="button"
-                            >
-                              {m.zesty_fresh_mole({ count: job.rowCount })}
-                            </Button>
-                          ) : null}
-                          {job.status === "awaiting_confirmation" ||
-                          job.status === "queued" ||
-                          job.status === "running" ? (
-                            <Button
-                              disabled={cancelJob.isPending}
-                              onClick={() => cancelJob.mutate(job.id)}
-                              size="sm"
-                              type="button"
-                              variant="outline"
-                            >
-                              {m.crisp_honest_wren()}
-                            </Button>
-                          ) : null}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardPanel>
-          </Card>
+          <ImportJobsCard
+            onSelectJob={selectJob}
+            organizationId={organizationId}
+          />
         ) : null}
 
-        {detail !== undefined ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>{m.agile_bright_auk()}</CardTitle>
-              <CardDescription>
-                {detail.job.failureMessage ??
-                  (detail.job.status === "failed"
-                    ? m.sunny_mild_puma()
-                    : statusLabel(detail.job.status))}
-              </CardDescription>
-            </CardHeader>
-            <CardPanel className="flex flex-col gap-4">
-              {detail.job.notices.length > 0 ? (
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-medium">
-                    {m.humble_sleek_carp()}
-                  </span>
-                  {detail.job.notices.map((notice) => (
-                    <p className="text-muted-foreground text-xs" key={notice}>
-                      {notice}
-                    </p>
-                  ))}
-                </div>
-              ) : null}
-              {detail.report.rows.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  {m.breezy_quiet_loon()}
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{m.calm_crisp_newt()}</TableHead>
-                      <TableHead>{m.keen_bold_kite()}</TableHead>
-                      <TableHead>{m.soft_calm_mouse()}</TableHead>
-                      <TableHead>{m.fresh_plain_bass()}</TableHead>
-                      <TableHead>{m.vivid_calm_newt()}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {detail.report.rows.map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell>
-                          {m.quick_plain_dove({ row: row.rowNumber })}
-                        </TableCell>
-                        <TableCell>{row.title ?? ""}</TableCell>
-                        <TableCell>{row.statusName ?? ""}</TableCell>
-                        <TableCell className="max-w-md whitespace-pre-wrap">
-                          {row.contentPreview ?? ""}
-                        </TableCell>
-                        <TableCell>
-                          {row.message ??
-                            (row.outcome === "created" ? "" : row.outcome)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-              {reportTotal > REPORT_PAGE_SIZE ? (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-muted-foreground text-xs">
-                    {m.warm_lucky_toad({
-                      from: reportFrom,
-                      to: reportTo,
-                      total: reportTotal,
-                    })}
-                  </span>
-                  <div className="flex gap-2">
-                    <Button
-                      disabled={reportPage === 0}
-                      onClick={() => setReportPage((page) => page - 1)}
-                      size="sm"
-                      type="button"
-                      variant="outline"
-                    >
-                      {m.calm_brisk_auk()}
-                    </Button>
-                    <Button
-                      disabled={reportPage + 1 >= reportPages}
-                      onClick={() => setReportPage((page) => page + 1)}
-                      size="sm"
-                      type="button"
-                      variant="outline"
-                    >
-                      {m.brave_plain_lark()}
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-            </CardPanel>
-            <CardFooter>
-              <Button
-                onClick={() => {
-                  setSelectedJobId(null);
-                  setReportPage(0);
-                }}
-                type="button"
-                variant="outline"
-              >
-                {m.deft_vivid_egret()}
-              </Button>
-            </CardFooter>
-          </Card>
+        {selectedJobId !== null ? (
+          <ImportDetailCard
+            id={selectedJobId}
+            onClose={() => {
+              setSelectedJobId(null);
+              setReportPage(0);
+            }}
+            onPageChange={setReportPage}
+            organizationId={organizationId}
+            page={reportPage}
+          />
         ) : null}
       </SettingsLayout.Content>
     </SettingsLayout.Root>

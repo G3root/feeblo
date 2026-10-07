@@ -10,14 +10,23 @@ import {
 } from "@feeblo/id";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Queue from "effect/Queue";
+import * as Stream from "effect/Stream";
+import { TestClock } from "effect/testing";
 
 import { BoardRepository } from "../board/repository";
 import { PostStatusRepository } from "../post-status/repository";
 import { CurrentSession, type Session } from "../session-middleware";
-import { DataImportService } from "./import-service";
-import { DataTransferRepository, type NewStagedImportRow } from "./repository";
+import { DataImportService, type DataImportJobDetail } from "./import-service";
+import { DATA_IMPORT_WATCH_MS } from "./limits";
+import {
+  DataTransferRepository,
+  type DataImportJobRecord,
+  type NewStagedImportRow,
+} from "./repository";
 
 type Role = Session["memberships"][number]["role"];
 
@@ -467,5 +476,87 @@ layer(TestLayer)("DataImportService", (it) => {
       expect(jobs).toHaveLength(1);
       expect(jobs[0]?.fileName).toBe("posts.csv");
     })
+  );
+
+  it.effect("watches one job until it reaches a terminal status", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeFixture();
+      const job = yield* stage(fixture, encoder.encode("title\nFirst\n"));
+      const service = yield* DataImportService;
+      const session = makeSession(fixture, "manager");
+      const emissions = yield* Queue.unbounded<DataImportJobDetail>();
+
+      const watcher = yield* service
+        .watchImport({
+          id: job.id,
+          organizationId: fixture.organizationId,
+          limit: 10,
+          offset: 0,
+        })
+        .pipe(
+          Stream.tap((detail) => Queue.offer(emissions, detail)),
+          Stream.runDrain,
+          Effect.provideService(CurrentSession, session),
+          Effect.forkChild
+        );
+
+      const first = yield* Queue.take(emissions);
+      expect(first.job.status).toBe("awaiting_confirmation");
+
+      yield* service
+        .cancelImport({ id: job.id, organizationId: fixture.organizationId })
+        .pipe(Effect.provideService(CurrentSession, session));
+      yield* TestClock.adjust(DATA_IMPORT_WATCH_MS);
+
+      const second = yield* Queue.take(emissions);
+      expect(second.job.status).toBe("canceled");
+
+      // The terminal snapshot is the last one: the stream ends on its own.
+      yield* Fiber.join(watcher);
+      expect(yield* Queue.size(emissions)).toBe(0);
+    })
+  );
+
+  it.effect(
+    "keeps watching the job list and stays silent on unchanged ticks",
+    () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture();
+        const job = yield* stage(fixture, encoder.encode("title\nFirst\n"));
+        const service = yield* DataImportService;
+        const session = makeSession(fixture, "manager");
+        const emissions =
+          yield* Queue.unbounded<readonly DataImportJobRecord[]>();
+
+        const watcher = yield* service
+          .watchImportList({ organizationId: fixture.organizationId })
+          .pipe(
+            Stream.tap((jobs) => Queue.offer(emissions, jobs)),
+            Stream.runDrain,
+            Effect.provideService(CurrentSession, session),
+            Effect.forkChild
+          );
+
+        const first = yield* Queue.take(emissions);
+        expect(first.map((entry) => entry.status)).toEqual([
+          "awaiting_confirmation",
+        ]);
+
+        // A tick that finds the same rows emits nothing.
+        yield* TestClock.adjust(DATA_IMPORT_WATCH_MS);
+        expect(Option.isNone(yield* Queue.poll(emissions))).toBe(true);
+
+        // The next real change still gets through, so the watch survived.
+        yield* service
+          .cancelImport({ id: job.id, organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, session));
+        yield* TestClock.adjust(DATA_IMPORT_WATCH_MS);
+
+        const second = yield* Queue.take(emissions);
+        expect(second[0]?.status).toBe("canceled");
+
+        // The list has no terminal state to end on; the caller ends it.
+        yield* Fiber.interrupt(watcher);
+      })
   );
 });

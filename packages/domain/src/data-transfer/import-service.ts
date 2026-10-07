@@ -2,8 +2,11 @@ import { DataImportJobId, type LegidError } from "@feeblo/id";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
+import * as Filter from "effect/Filter";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Schedule from "effect/Schedule";
+import * as Stream from "effect/Stream";
 
 import { BoardRepository } from "../board/repository";
 import * as Policy from "../policy";
@@ -22,7 +25,7 @@ import {
   type DataTransferRepositoryError,
   InvalidBoardPostCsvError,
 } from "./errors";
-import { DATA_IMPORT_MAX_BYTES } from "./limits";
+import { DATA_IMPORT_MAX_BYTES, DATA_IMPORT_WATCH_MS } from "./limits";
 import { planImportRows } from "./plan";
 import { canImportPosts } from "./policies";
 import {
@@ -108,6 +111,30 @@ export type DataImportServiceContract = {
     Policy.PolicyDeniedError | InternalServerError,
     CurrentSession
   >;
+  /**
+   * The job's current snapshot, re-read on an interval and re-emitted only
+   * when something a viewer sees changed. Ends after the first terminal
+   * snapshot: a finished job has nothing left to report.
+   */
+  readonly watchImport: (
+    input: DescribeImportInput
+  ) => Stream.Stream<
+    DataImportJobDetail,
+    DataImportNotFoundError | Policy.PolicyDeniedError | InternalServerError,
+    CurrentSession
+  >;
+  /**
+   * The workspace's job list, re-read on an interval and re-emitted only when
+   * a job row changed. The stream stays open: another upload can arrive at
+   * any time.
+   */
+  readonly watchImportList: (input: {
+    readonly organizationId: string;
+  }) => Stream.Stream<
+    readonly DataImportJobRecord[],
+    Policy.PolicyDeniedError | InternalServerError,
+    CurrentSession
+  >;
 };
 
 /** The most recent jobs a workspace sees, newest first. */
@@ -155,6 +182,73 @@ const clampReportWindow = (
   ),
   offset: Math.max(offset ?? 0, 0),
 });
+
+/**
+ * A job still moves through these statuses on its own; everything else is
+ * final. A detail watch writes its last snapshot and ends on the transition
+ * out.
+ */
+const statusIsActive = (status: DataImportJobRecord["status"]): boolean =>
+  status === "awaiting_confirmation" ||
+  status === "queued" ||
+  status === "running";
+
+/**
+ * A cheap key over the fields of a job a viewer sees change while it runs.
+ * Two snapshots with the same key are the same picture, so a watch tick that
+ * finds nothing new stays silent instead of waking every subscriber.
+ */
+const jobChangeKey = (job: DataImportJobRecord): string =>
+  [
+    job.id,
+    job.status,
+    job.createdCount,
+    job.warningCount,
+    job.errorCount,
+    job.finishedAt?.getTime() ?? 0,
+    job.failureMessage ?? "",
+  ].join("\u0000");
+
+/** The job key plus the visible shape of the one report page being watched. */
+const reportChangeKey = (detail: DataImportJobDetail): string =>
+  [
+    jobChangeKey(detail.job),
+    detail.report.total,
+    ...detail.report.rows.map(
+      (row) => `${row.id}\u0000${row.outcome}\u0000${row.postId ?? ""}`
+    ),
+  ].join("\u0001");
+
+/** Drops stream values whose change key matches the previous emission. */
+const excludeUnchanged =
+  <A, E, R>(keyOf: (value: A) => string) =>
+  (self: Stream.Stream<A, E, R>): Stream.Stream<A, E, R> =>
+    self.pipe(
+      Stream.mapAccum(
+        () => "",
+        (previous: string, value: A): readonly [string, ReadonlyArray<A>] => {
+          const key = keyOf(value);
+          return key === previous ? [previous, []] : [key, [value]];
+        }
+      )
+    );
+
+/**
+ * One watch tick. An infrastructure failure is not a reason to end a watch
+ * that the next tick may recover from — the same stance the worker's pass
+ * loop takes — so it suppresses that tick and lets the schedule retry. The
+ * typed domain failures (denied, not found) stay fatal: retrying those would
+ * spin forever without a way out.
+ */
+const suppressInternalFailures = <A, E, R>(
+  effect: Effect.Effect<A, E | InternalServerError, R>
+): Effect.Effect<Option.Option<A>, E, R> =>
+  effect.pipe(
+    Effect.map(Option.some),
+    Effect.catchTag("InternalServerError", () =>
+      Effect.succeed(Option.none<A>())
+    )
+  );
 
 const makeDataImportService = Effect.gen(function* () {
   const repository = yield* DataTransferRepository;
@@ -369,12 +463,45 @@ const makeDataImportService = Effect.gen(function* () {
       })
     ).pipe(Policy.withPolicy(canImportPosts(input.organizationId)));
 
+  const watchImport: DataImportServiceContract["watchImport"] = (input) =>
+    Stream.fromEffectSchedule(
+      suppressInternalFailures(describeImport(input)),
+      Schedule.spaced(DATA_IMPORT_WATCH_MS)
+    ).pipe(
+      Stream.filterMap(
+        Filter.fromPredicateOption(
+          (option: Option.Option<DataImportJobDetail>) => option
+        )
+      ),
+      Stream.takeUntil((detail) => !statusIsActive(detail.job.status)),
+      excludeUnchanged(reportChangeKey)
+    );
+
+  const watchImportList: DataImportServiceContract["watchImportList"] = (
+    input
+  ) =>
+    Stream.fromEffectSchedule(
+      suppressInternalFailures(
+        listImports({ organizationId: input.organizationId })
+      ),
+      Schedule.spaced(DATA_IMPORT_WATCH_MS)
+    ).pipe(
+      Stream.filterMap(
+        Filter.fromPredicateOption(
+          (option: Option.Option<readonly DataImportJobRecord[]>) => option
+        )
+      ),
+      excludeUnchanged((jobs) => jobs.map(jobChangeKey).join("\u0001"))
+    );
+
   return {
     cancelImport,
     confirmImport,
     describeImport,
     listImports,
     stageBoardImport,
+    watchImport,
+    watchImportList,
   } satisfies DataImportServiceContract;
 });
 

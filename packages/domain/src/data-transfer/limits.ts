@@ -28,3 +28,6 @@ export const DATA_IMPORT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** Delay between claim attempts when there is no work. */
 export const DATA_IMPORT_POLL_MS = 1_000;
+
+/** How often a live import stream re-reads what it is watching. */
+export const DATA_IMPORT_WATCH_MS = 1_000;

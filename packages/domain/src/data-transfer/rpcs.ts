@@ -16,7 +16,8 @@ import {
 /**
  * The dashboard's import control plane. The upload and the download are file
  * transfers and live on the dashboard HTTP API; what is left here is the job
- * list, the report, and the two state transitions a person makes.
+ * list, the report, the two state transitions a person makes, and the two
+ * watchers that keep the page live while the worker drains a confirmed job.
  */
 export class DataTransferRpcs extends RpcGroup.make(
   Rpc.make("DataImportList", {
@@ -38,5 +39,17 @@ export class DataTransferRpcs extends RpcGroup.make(
     error: DataTransferServiceErrors,
     payload: DataImportCancel,
     success: Schema.Void,
+  }).middleware(AuthMiddleware),
+  Rpc.make("DataImportListWatch", {
+    error: DataTransferServiceErrors,
+    payload: DataImportList,
+    stream: true,
+    success: Schema.Array(DataImportJobSummary),
+  }).middleware(AuthMiddleware),
+  Rpc.make("DataImportWatch", {
+    error: DataTransferServiceErrors,
+    payload: DataImportGet,
+    stream: true,
+    success: DataImportJobDetail,
   }).middleware(AuthMiddleware)
 ) {}
