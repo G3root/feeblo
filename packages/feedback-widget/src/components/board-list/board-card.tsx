@@ -11,10 +11,7 @@ export function BoardCard(props: { board: Board }) {
       href={`/board/${props.board.id}`}
     >
       <span class="min-w-0 flex-1 truncate">{props.board.name}</span>
-      <Icon
-        class="text-muted-foreground/50 size-4 transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none"
-        name="ArrowRight01Icon"
-      />
+      <Icon class="text-muted-foreground/50 size-4" name="ArrowRight01Icon" />
     </A>
   );
 }
