@@ -1,5 +1,6 @@
 import { Polar } from "@polar-sh/sdk";
 import * as Context from "effect/Context";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -87,6 +88,68 @@ export const describeRevokeFailure = (
   return "no Polar answer (transport error)";
 };
 
+/**
+ * The one Polar organization setting Feeblo's billing behavior depends on.
+ * `allowMultipleSubscriptions` is `false` by default, and because a checkout
+ * customer is resolved by email (ADR 0013) that default caps a buyer across
+ * workspaces — see ADR 0015.
+ */
+export interface PolarOrganizationSubscriptionSettings {
+  readonly allowMultipleSubscriptions: boolean;
+}
+
+/** The slice of an organizations list response the settings read needs. */
+type OrganizationsWithSettings = {
+  readonly result: {
+    readonly items: ReadonlyArray<{
+      readonly subscriptionSettings: PolarOrganizationSubscriptionSettings;
+    }>;
+  };
+};
+
+/**
+ * The settings read is best-effort: it drives a startup warning, so this error
+ * exists only to keep a failure typed until the read degrades to `None`. It is
+ * never surfaced to a caller.
+ */
+class FailedToReadPolarSettingsError extends Schema.TaggedError<FailedToReadPolarSettingsError>()(
+  "FailedToReadPolarSettingsError",
+  {
+    cause: Schema.Defect(),
+  }
+) {}
+
+/**
+ * Reads the token organization's Polar subscription settings through an
+ * `organizations.list` call.
+ *
+ * Never fails. The settings drive a startup warning, and a diagnostic must not
+ * turn an unreachable Polar into a failed boot: a failure is logged and read
+ * as `None`, which callers treat as "no guard". The timeout bounds the startup
+ * read so a Polar outage cannot hold up composition.
+ */
+export const readOrganizationSubscriptionSettings = (
+  listOrganizations: () => Promise<OrganizationsWithSettings>
+) =>
+  Effect.tryPromise({
+    try: listOrganizations,
+    catch: (cause) => new FailedToReadPolarSettingsError({ cause }),
+  }).pipe(
+    Effect.timeout(Duration.seconds(5)),
+    Effect.map((page) =>
+      Option.fromNullishOr(page.result.items[0]?.subscriptionSettings)
+    ),
+    Effect.tapError((error) =>
+      Effect.logWarning(
+        "Failed to read Polar organization subscription settings",
+        error
+      )
+    ),
+    Effect.orElseSucceed(() =>
+      Option.none<PolarOrganizationSubscriptionSettings>()
+    )
+  );
+
 const makePolarService = Effect.gen(function* () {
   const { accessToken, appUrl, server, webhookSecret } = yield* PolarConfig;
 
@@ -109,6 +172,23 @@ const makePolarService = Effect.gen(function* () {
     // row only ever runs against a target that matches it — so a target
     // change cannot close a row on another server's 404.
     target: server,
+    /**
+     * The token organization's subscription settings, or `None` when billing
+     * is not configured or Polar could not be read. `allowMultipleSubscriptions`
+     * is `false` by default, and because a checkout customer is resolved by
+     * email (ADR 0013) that default caps a buyer across workspaces — see
+     * ADR 0015 and the startup warning in `packages/auth`.
+     */
+    getOrganizationSettings: Effect.fn("PolarService.getOrganizationSettings")(
+      function* () {
+        if (!client) {
+          return Option.none<PolarOrganizationSubscriptionSettings>();
+        }
+        return yield* readOrganizationSubscriptionSettings(() =>
+          client.organizations.list({ limit: 1 })
+        );
+      }
+    ),
     createCheckout: Effect.fn("PolarService.createCheckout")(function* ({
       organizationId,
       productId,
