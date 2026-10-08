@@ -1,3 +1,4 @@
+import { isWidgetIdentity } from "@feeblo/domain/widget/schema";
 import { hasWindow, isObject, isString } from "@feeblo/utils/runtime-kind";
 
 import type { WidgetModule } from "./config";
@@ -97,11 +98,9 @@ export function isParentMessage<T>(
         isSupportedLocale(dataRecord.locale)
       );
     case "IDENTIFY":
-      return (
-        "id" in dataRecord &&
-        isString(dataRecord.id) &&
-        dataRecord.id.length > 0
-      );
+      // The identity is the SDK's wire shape; decoding it here rejects a
+      // malformed identity at the iframe boundary instead of storing it.
+      return isWidgetIdentity(data);
   }
   return false;
 }

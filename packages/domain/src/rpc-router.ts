@@ -28,7 +28,7 @@ import { PostRpcHandlers } from "./post/handlers";
 import { PublicRpcRateLimitMiddlewareLive } from "./rate-limit";
 import { RoadmapColumnRpcHandlers } from "./roadmap-column/handlers";
 import { RoadmapRpcHandlers } from "./roadmap/handlers";
-import { AllRpcs } from "./rpc-group";
+import { AllRpcs, type RpcGroupName } from "./rpc-group";
 import { S3UploadServiceLive } from "./services/s3";
 import {
   AuthMiddlewareLive,
@@ -41,12 +41,98 @@ import { UpvoteRpcHandlers } from "./upvote/handlers";
 import { WorkspaceRpcHandlers } from "./workspace/handlers";
 
 /**
- * Core (non-provider) RPC handlers bound inside the domain package.
+ * The handler layer for every group in `RpcGroups`, or `"provider"` for the
+ * groups whose layer a provider package owns and the composition root supplies
+ * (see docs/adr/0002).
+ *
+ * This record is the pairing the two hand-maintained lists used to be: adding
+ * a group to `RpcGroups` is a compile error here until it is paired, and the
+ * `satisfies` below is what fails — not a request, which is how the hazard was
+ * recorded in `AGENTS.md`. The domain handler layers are merged in one place
+ * from this record, so no route builder decides which layers travel together.
+ *
+ * The four provider entries name groups the domain still defines; only their
+ * handler layers live in `integrations/*`. `ProviderOwnedRpcName` derives the
+ * key set from exactly those entries, and the composition root's map satisfies
+ * it, so a fifth provider-owned group cannot be half-wired either.
  */
-export const CoreRpcHandlers = Layer.mergeAll(
-  PostRpcHandlers,
-  PostActivityRpcHandlers,
-  ExternalResourceRpcHandlers
+export const RpcHandlerRegistrations = {
+  Post: PostRpcHandlers,
+  PostActivity: PostActivityRpcHandlers,
+  AttributeDefinition: AttributeDefinitionRpcHandlers,
+  Billing: BillingRpcHandlers,
+  Board: BoardRpcHandlers,
+  Changelog: ChangelogRpcHandlers,
+  ChangelogPost: ChangelogPostRpcHandlers,
+  ChangelogCategory: ChangelogCategoryRpcHandlers,
+  ChangelogSubscription: ChangelogSubscriptionRpcHandlers,
+  JwtSecret: JwtSecretRpcHandlers,
+  ApiKey: ApiKeyRpcHandlers,
+  Membership: MembershipRpcHandlers,
+  Notification: NotificationRpcHandlers,
+  Organization: OrganizationRpcHandlers,
+  CommentReaction: CommentReactionRpcHandlers,
+  Comment: CommentRpcHandlers,
+  Company: CompanyRpcHandlers,
+  Site: SiteRpcHandlers,
+  Tag: TagRpcHandlers,
+  Upvote: UpvoteRpcHandlers,
+  PostReaction: PostReactionRpcHandlers,
+  PostStatus: PostStatusRpcHandlers,
+  PostSubscription: PostSubscriptionRpcHandlers,
+  Roadmap: RoadmapRpcHandlers,
+  RoadmapColumn: RoadmapColumnRpcHandlers,
+  Workspace: WorkspaceRpcHandlers,
+  Contact: ContactRpcHandlers,
+  EmailSubscription: EmailSubscriptionRpcHandlers,
+  ExternalResource: ExternalResourceRpcHandlers,
+  WebhookManagement: "provider",
+  SlackManagement: "provider",
+  DiscordManagement: "provider",
+  GitHubManagement: "provider",
+} satisfies Record<RpcGroupName, Layer.Layer<any, any, any> | "provider">;
+
+type RegisteredHandlerValue = (typeof RpcHandlerRegistrations)[RpcGroupName];
+
+/** A handler layer this package binds. */
+type DomainHandlerLayer = Exclude<RegisteredHandlerValue, "provider">;
+
+/**
+ * The keys whose handler layer the composition root supplies, derived from the
+ * record above rather than written out again.
+ */
+export type ProviderOwnedRpcName = {
+  [
+    Name in RpcGroupName
+  ]: (typeof RpcHandlerRegistrations)[Name] extends "provider" ? Name : never;
+}[RpcGroupName];
+
+/** The provider-owned keys, for a test that publishes the expected set. */
+export const ProviderOwnedRpcNames =
+  // SAFETY: the record is declared with `satisfies Record<RpcGroupName, …>`,
+  // so its keys are exactly the names in that union.
+  (Object.keys(RpcHandlerRegistrations) as RpcGroupName[]).filter(
+    (name): name is ProviderOwnedRpcName =>
+      RpcHandlerRegistrations[name] === "provider"
+  );
+
+/**
+ * Every in-domain handler layer, merged once.
+ *
+ * The assertion is safe because the record covers every group by its
+ * `satisfies`, so the filter leaves exactly the non-provider entries; the
+ * non-empty tuple keeps `Layer.mergeAll`'s variadic signature honest. The
+ * union of layer types distributes through `mergeAll`, so the route's
+ * requirement channel is the union of every handler's dependencies — a
+ * collaborator no root layer supplies still fails the build's type.
+ */
+export const DomainRpcHandlers = Layer.mergeAll(
+  // SAFETY: the record covers every group by its `satisfies`, so the filter
+  // leaves exactly the non-provider entries; the tuple assertion only states
+  // that the record is non-empty, which `RpcGroupName` guarantees.
+  ...(Object.values(RpcHandlerRegistrations).filter(
+    (entry): entry is DomainHandlerLayer => entry !== "provider"
+  ) as [DomainHandlerLayer, ...DomainHandlerLayer[]])
 );
 
 /**
@@ -60,9 +146,14 @@ export const CoreRpcHandlers = Layer.mergeAll(
 export const rpcSpanPrefix = "RpcServer";
 
 /**
- * Builds the `/rpc` route. Core handlers are bound here; provider-owned
- * handler layers are supplied by the composition root so the domain package
- * does not depend on provider packages (see docs/adr/0002).
+ * Builds the `/rpc` route with the provider-owned handler layers the
+ * composition root supplies.
+ *
+ * `AllRpcs` and `DomainRpcHandlers` are derived from the same registry, so
+ * this function never chooses which groups to bind; it binds every group the
+ * provider argument does not own. The middleware and serialization a route
+ * always needs are provided here, and the rest of the requirements stay on the
+ * returned layer for the composition root to supply.
  */
 export const makeRpcRoute = <RIn, ROut, E>(
   providerHandlers: Layer.Layer<ROut, E, RIn>
@@ -73,45 +164,8 @@ export const makeRpcRoute = <RIn, ROut, E>(
     group: AllRpcs,
     spanPrefix: rpcSpanPrefix,
   }).pipe(
-    Layer.provide(CoreRpcHandlers),
+    Layer.provide(DomainRpcHandlers),
     Layer.provide(providerHandlers),
-    Layer.provide(BillingRpcHandlers),
-    Layer.provide(
-      Layer.mergeAll(BoardRpcHandlers, ChangelogCategoryRpcHandlers)
-    ),
-    Layer.provide(
-      Layer.mergeAll(
-        ChangelogRpcHandlers,
-        ChangelogPostRpcHandlers,
-        ChangelogSubscriptionRpcHandlers
-      )
-    ),
-    Layer.provide(Layer.merge(JwtSecretRpcHandlers, ApiKeyRpcHandlers)),
-    Layer.provide(
-      Layer.mergeAll(MembershipRpcHandlers, NotificationRpcHandlers)
-    ),
-    Layer.provide(OrganizationRpcHandlers),
-    Layer.provide(CommentReactionRpcHandlers),
-    Layer.provide(CommentRpcHandlers),
-    Layer.provide(
-      Layer.mergeAll(
-        AttributeDefinitionRpcHandlers,
-        CompanyRpcHandlers,
-        ContactRpcHandlers
-      )
-    ),
-    Layer.provide(Layer.merge(SiteRpcHandlers, EmailSubscriptionRpcHandlers)),
-    Layer.provide(Layer.merge(TagRpcHandlers, UpvoteRpcHandlers)),
-    Layer.provide(PostReactionRpcHandlers),
-    Layer.provide(PostStatusRpcHandlers),
-    Layer.provide(
-      Layer.mergeAll(
-        PostSubscriptionRpcHandlers,
-        RoadmapRpcHandlers,
-        RoadmapColumnRpcHandlers
-      )
-    ),
-    Layer.provide(WorkspaceRpcHandlers),
     Layer.provide(S3UploadServiceLive),
     Layer.provide(RpcSerialization.layerNdjson),
     Layer.provide(
