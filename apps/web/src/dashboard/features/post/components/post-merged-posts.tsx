@@ -1,4 +1,5 @@
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import {
   Accordion,
   AccordionItem,
@@ -6,7 +7,6 @@ import {
   AccordionTrigger,
 } from "@feeblo/ui/accordion";
 import { Badge } from "@feeblo/ui/badge";
-import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { Link } from "@tanstack/react-router";
 

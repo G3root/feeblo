@@ -5,6 +5,7 @@ import {
   PublicApiAuthor,
   PublicApiOnBehalfAuthor,
 } from "../../public-api/common";
+import { paramsOf, payloadOf } from "../../public-api/http-input";
 
 /**
  * The vote resource: what the vote endpoints return, and the typed input every
@@ -48,10 +49,6 @@ export const PublicApiVotePage = Schema.Struct({
 export type TPublicApiVotePage = Schema.Schema.Type<typeof PublicApiVotePage>;
 
 /** Query parameters, declared as strings and validated in the handler. */
-export const ListPostVotesParams = Schema.Struct({
-  postId: Schema.String,
-});
-
 export const ListPostVotesQuery = Schema.Struct({
   limit: Schema.optional(Schema.String),
   cursor: Schema.optional(Schema.String),
@@ -112,10 +109,6 @@ export type TPublicApiVoterFilter = Schema.Schema.Type<
   typeof PublicApiVoterFilter
 >;
 
-export const CreateVoteParams = Schema.Struct({
-  postId: Schema.String,
-});
-
 /**
  * The vote a request adds.
  *
@@ -125,9 +118,16 @@ export const CreateVoteParams = Schema.Struct({
  * `email`, with `name`/`avatarUrl` only enriching the resolved contact — so one
  * customer resolved by two resources cannot become two contact rows.
  */
-export const CreateVotePayload = Schema.Struct({
+export const CreateVoteInput = Schema.Struct({
+  postId: Schema.String,
   author: PublicApiOnBehalfAuthor,
 });
+
+/** The post the URL names, taken from the operation input. */
+export const CreateVoteParams = paramsOf(CreateVoteInput, ["postId"]);
+
+/** The create body: the operation input without the post the URL names. */
+export const CreateVotePayload = payloadOf(CreateVoteInput, ["postId"]);
 
 export type TCreateVotePayload = Schema.Schema.Type<typeof CreateVotePayload>;
 
@@ -140,11 +140,6 @@ export type TCreateVotePayload = Schema.Schema.Type<typeof CreateVotePayload>;
  * this API deliberately withholds. Deleting a vote that is already gone is
  * reported as not found, like every other delete.
  */
-export const DeleteVoteParams = Schema.Struct({
-  postId: Schema.String,
-  voteId: Schema.String,
-});
-
 /** Typed input for a page of a post's votes. */
 export const ListPostVotesInput = Schema.Struct({
   postId: Schema.String,
@@ -164,6 +159,9 @@ export const ListPostVotesInput = Schema.Struct({
 });
 
 export type TListPostVotesInput = Schema.Schema.Type<typeof ListPostVotesInput>;
+
+/** The post the URL names, taken from the operation input. */
+export const ListPostVotesParams = paramsOf(ListPostVotesInput, ["postId"]);
 
 /** Typed input for a page of the workspace's votes. */
 export const ListVotesInput = Schema.Struct({
@@ -190,12 +188,6 @@ export const ListVotesInput = Schema.Struct({
 
 export type TListVotesInput = Schema.Schema.Type<typeof ListVotesInput>;
 
-/** Typed input for adding a vote to a post. */
-export const CreateVoteInput = Schema.Struct({
-  postId: Schema.String,
-  author: PublicApiOnBehalfAuthor,
-});
-
 export type TCreateVoteInput = Schema.Schema.Type<typeof CreateVoteInput>;
 
 /** Typed input for removing one vote from a post. */
@@ -205,3 +197,6 @@ export const DeleteVoteInput = Schema.Struct({
 });
 
 export type TDeleteVoteInput = Schema.Schema.Type<typeof DeleteVoteInput>;
+
+/** The post and vote the URL names, taken from the operation input. */
+export const DeleteVoteParams = paramsOf(DeleteVoteInput, ["postId", "voteId"]);

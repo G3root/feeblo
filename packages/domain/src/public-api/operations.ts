@@ -1,3 +1,5 @@
+import type * as Effect from "effect/Effect";
+
 import { boardOperations } from "../board/public-api/operations";
 import { changelogOperations } from "../changelog/public-api/operations";
 import { commentOperations } from "../comments/public-api/operations";
@@ -7,6 +9,7 @@ import { statusOperations } from "../post-status/public-api/operations";
 import { postOperations } from "../post/public-api/operations";
 import { tagOperations } from "../tag/public-api/operations";
 import { voteOperations } from "../upvote/public-api/operations";
+import type { PublicApiCaller } from "./middleware";
 
 /**
  * Every Public API operation, in one registry.
@@ -37,3 +40,26 @@ export const PublicApiOperations = [
 
 export type PublicApiOperationName =
   (typeof PublicApiOperations)[number]["name"];
+
+type OperationRequirements<Operation> = Operation extends {
+  readonly handler: (
+    input: never
+  ) => Effect.Effect<infer _A, infer _E, infer Requirements>;
+}
+  ? Requirements
+  : never;
+
+/**
+ * The stable services every registered operation reads from the context.
+ *
+ * `PublicApiCaller` is excluded: it is request-scoped, provided per request by
+ * the key middleware, so a handler that yields it is a middleware consumer
+ * rather than a layer requirement. Everything else — the feature repositories,
+ * the public projections, the application URL, the database handle, the plan
+ * decision — is built once and captured when a surface composes its groups, so
+ * a missing layer fails that surface's type instead of one request.
+ */
+export type PublicApiDependencies = Exclude<
+  OperationRequirements<(typeof PublicApiOperations)[number]>,
+  PublicApiCaller
+>;

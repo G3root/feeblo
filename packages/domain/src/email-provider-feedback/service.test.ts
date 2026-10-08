@@ -2,11 +2,16 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import { EmailProviderFeedbackInputError } from "./schema";
 import { EmailProviderFeedbackService } from "./service";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 describe("EmailProviderFeedbackService", () => {
   const TestLayer = EmailProviderFeedbackService.layer.pipe(
@@ -20,7 +25,7 @@ describe("EmailProviderFeedbackService", () => {
     Effect.gen(function* () {
       const db = yield* currentDb;
       const organizationId = yield* WorkspaceId.generate;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       const outboxId = `eob_${organizationId}`;
       const deliveryId = `edl_${organizationId}`;
       const messageId = `<email.${organizationId}@notifications.feeblo>`;
@@ -290,7 +295,7 @@ describe("EmailProviderFeedbackService", () => {
           const db = yield* currentDb;
           const service = yield* EmailProviderFeedbackService;
           const delivery = yield* makeDelivery("accepted");
-          const currentUpdatedAt = new Date("2026-08-09T13:00:00.000Z");
+          const currentUpdatedAt = dateAt("2026-08-09T13:00:00.000Z");
           yield* db
             .update(schema.emailDeliveryTable)
             .set({ updatedAt: currentUpdatedAt })

@@ -28,6 +28,9 @@ import type * as React from "react";
 // ---------------------------------------------------------------------------
 
 export interface AnalyticsEvents {
+  // ── Account ──────────────────────────────────────────────────────────────
+  account_deleted: { success: boolean };
+
   // ── API keys ─────────────────────────────────────────────────────────────
   api_key_created: { success: boolean };
   api_key_revoked: { success: boolean };
@@ -62,6 +65,7 @@ export interface AnalyticsEvents {
   org_created: { success: boolean };
   org_deleted: { success: boolean };
   org_invitation_accepted: { success: boolean };
+  org_invitation_declined: { success: boolean };
   org_invitation_revoked: { success: boolean };
   org_logo_updated: { action: "uploaded" | "removed"; success: boolean };
   org_member_invited: { role: string; success: boolean };
@@ -71,6 +75,12 @@ export interface AnalyticsEvents {
   // ── Organization ─────────────────────────────────────────────────────────
   org_renamed: { success: boolean };
   org_switched: { success: boolean };
+
+  // ── Email ────────────────────────────────────────────────────────────────
+  email_notification_preference_changed: {
+    enabled: boolean;
+    success: boolean;
+  };
 
   // ── Posts ────────────────────────────────────────────────────────────────
   post_created: { source: PostCreationSource; success: boolean };

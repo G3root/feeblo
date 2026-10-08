@@ -32,7 +32,7 @@ describe("ResolvePrincipalService", () => {
         id: organizationId,
         name: "Test organization",
         slug: organizationId,
-        createdAt: new Date(),
+        createdAt: yield* DateTime.nowAsDate,
       });
       return organizationId;
     });

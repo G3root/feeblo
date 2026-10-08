@@ -154,6 +154,8 @@ Supported plan values are `starter` and `professional`; supported variants are `
 
 After adding the webhook to an existing Polar organization, resend `product.created` or `product.updated` events for the current products so the local product catalog is populated before enabling billing.
 
+The workspace a subscription belongs to is the `metadata.org` value on the checkout, not the Polar customer. Polar resolves a checkout customer by email and allows one customer per email per organization, so a buyer who pays for several workspaces shares one Polar customer and one portal. Deleting an account never deletes a Polar customer for that reason; a deleted workspace's subscription is queued and revoked with retries (see `docs/adr/0013` and `docs/adr/0014`).
+
 ## Deployment
 
 Production deployments use the Docker images referenced in `docker-compose.yml` (`ghcr.io/g3root/feeblo-server` and `ghcr.io/g3root/feeblo-web`). Images are published automatically to GHCR: pushes to `main` produce `edge` and `sha-*` tags, while version tags produce the release version, `major.minor`, `major`, and `latest` tags. The dashboard can alternatively be deployed to Cloudflare using the Wrangler configuration in `apps/web/wrangler.jsonc`.

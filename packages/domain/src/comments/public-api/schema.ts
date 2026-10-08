@@ -7,6 +7,7 @@ import {
   PublicApiOnBehalfAuthor,
   type TPublicApiOnBehalfAuthor,
 } from "../../public-api/common";
+import { paramsOf, payloadOf } from "../../public-api/http-input";
 
 /**
  * The comment resource: what the comment endpoints return, and the typed input
@@ -63,17 +64,9 @@ export type TPublicApiCommentPage = Schema.Schema.Type<
 >;
 
 /** Query parameters, declared as strings and validated in the handler. */
-export const ListPostCommentsParams = Schema.Struct({
-  postId: Schema.String,
-});
-
 export const ListPostCommentsQuery = Schema.Struct({
   limit: Schema.optional(Schema.String),
   cursor: Schema.optional(Schema.String),
-});
-
-export const GetCommentParams = Schema.Struct({
-  commentId: Schema.String,
 });
 
 /**
@@ -90,18 +83,6 @@ export const PublicApiCommentAuthorSubject = PublicApiOnBehalfAuthor;
 export type TPublicApiCommentAuthorSubject = TPublicApiOnBehalfAuthor;
 
 /**
- * The comment a request creates.
- *
- * `parentCommentId` is a reply; a parent outside the workspace or the post is
- * rejected rather than silently stored against a foreign comment. `visibility`
- * defaults to `PUBLIC`, and an INTERNAL comment is a workspace note: it is
- * visible to keys, but not on the public board.
- */
-export const CreateCommentParams = Schema.Struct({
-  postId: Schema.String,
-});
-
-/**
  * The comment a create writes.
  *
  * `author` is required: an API key has no user of its own, so the request has
@@ -110,7 +91,8 @@ export const CreateCommentParams = Schema.Struct({
  * `visibility` defaults to `PUBLIC`; an INTERNAL comment is a workspace note,
  * visible to keys but not on the public board.
  */
-export const CreateCommentPayload = Schema.Struct({
+export const CreateCommentInput = Schema.Struct({
+  postId: Schema.String,
   content: Schema.String.check(
     Schema.isMinLength(1),
     Schema.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)
@@ -120,13 +102,15 @@ export const CreateCommentPayload = Schema.Struct({
   author: PublicApiCommentAuthorSubject,
 });
 
+/** The post the URL names, taken from the operation input. */
+export const CreateCommentParams = paramsOf(CreateCommentInput, ["postId"]);
+
+/** The create body: the operation input without the post the URL names. */
+export const CreateCommentPayload = payloadOf(CreateCommentInput, ["postId"]);
+
 export type TCreateCommentPayload = Schema.Schema.Type<
   typeof CreateCommentPayload
 >;
-
-export const UpdateCommentParams = Schema.Struct({
-  commentId: Schema.String,
-});
 
 /**
  * The comment's writable fields.
@@ -137,7 +121,8 @@ export const UpdateCommentParams = Schema.Struct({
  * renders as nothing. `visibility` is optional: omitting it leaves the stored
  * visibility alone, which is the one field an update may leave untouched.
  */
-export const UpdateCommentPayload = Schema.Struct({
+export const UpdateCommentInput = Schema.Struct({
+  commentId: Schema.String,
   content: Schema.String.check(
     Schema.isMinLength(1),
     Schema.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)
@@ -145,21 +130,17 @@ export const UpdateCommentPayload = Schema.Struct({
   visibility: Schema.optional(PublicApiCommentVisibility),
 });
 
+/** The comment the URL names, taken from the operation input. */
+export const UpdateCommentParams = paramsOf(UpdateCommentInput, ["commentId"]);
+
+/** The update body: the operation input without the comment the URL names. */
+export const UpdateCommentPayload = payloadOf(UpdateCommentInput, [
+  "commentId",
+]);
+
 export type TUpdateCommentPayload = Schema.Schema.Type<
   typeof UpdateCommentPayload
 >;
-
-export const DeleteCommentParams = Schema.Struct({
-  commentId: Schema.String,
-});
-
-export const PinCommentParams = Schema.Struct({
-  commentId: Schema.String,
-});
-
-export const UnpinCommentParams = Schema.Struct({
-  commentId: Schema.String,
-});
 
 /** Typed input for a page of a post's comments. */
 export const ListPostCommentsInput = Schema.Struct({
@@ -178,44 +159,39 @@ export const ListPostCommentsInput = Schema.Struct({
   ),
 });
 
+/** The post the URL names, taken from the operation input. */
+export const ListPostCommentsParams = paramsOf(ListPostCommentsInput, [
+  "postId",
+]);
+
 /** Typed input for reading one comment. */
 export const GetCommentInput = Schema.Struct({
   commentId: Schema.String,
 });
 
-/** Typed input for commenting on a post. */
-export const CreateCommentInput = Schema.Struct({
-  postId: Schema.String,
-  content: Schema.String.check(
-    Schema.isMinLength(1),
-    Schema.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)
-  ),
-  visibility: Schema.optional(PublicApiCommentVisibility),
-  parentCommentId: Schema.optional(Schema.NullOr(Schema.String)),
-  author: PublicApiCommentAuthorSubject,
-});
-
-/** Typed input for editing a comment. */
-export const UpdateCommentInput = Schema.Struct({
-  commentId: Schema.String,
-  content: Schema.String.check(
-    Schema.isMinLength(1),
-    Schema.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)
-  ),
-  visibility: Schema.optional(PublicApiCommentVisibility),
-});
+/** The comment the URL names, taken from the operation input. */
+export const GetCommentParams = paramsOf(GetCommentInput, ["commentId"]);
 
 /** Typed input for deleting a comment and its replies. */
 export const DeleteCommentInput = Schema.Struct({
   commentId: Schema.String,
 });
 
+/** The comment the URL names, taken from the operation input. */
+export const DeleteCommentParams = paramsOf(DeleteCommentInput, ["commentId"]);
+
 /** Typed input for pinning a comment to the top of its post. */
 export const PinCommentInput = Schema.Struct({
   commentId: Schema.String,
 });
 
+/** The comment the URL names, taken from the operation input. */
+export const PinCommentParams = paramsOf(PinCommentInput, ["commentId"]);
+
 /** Typed input for unpinning a comment. */
 export const UnpinCommentInput = Schema.Struct({
   commentId: Schema.String,
 });
+
+/** The comment the URL names, taken from the operation input. */
+export const UnpinCommentParams = paramsOf(UnpinCommentInput, ["commentId"]);

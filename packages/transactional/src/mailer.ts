@@ -1,6 +1,5 @@
-import { randomUUID } from "node:crypto";
-
 import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -104,7 +103,8 @@ export interface MailerService {
     | MailPermanentDeliveryError
     | MailTemplateRenderError
     | MailTemporaryDeliveryError
-    | MailUncertainDeliveryError
+    | MailUncertainDeliveryError,
+    Crypto.Crypto
   >;
 }
 
@@ -254,6 +254,7 @@ const findEntityRefIdHeaderName = (
 
 const makeMailerService = (transport: MailerTransport): MailerService => ({
   send: Effect.fn("Mailer.send")(function* (message: MailMessage) {
+    const crypto = yield* Crypto.Crypto;
     const html = yield* Effect.tryPromise({
       try: () => render(message.react),
       catch: (cause) =>
@@ -283,7 +284,7 @@ const makeMailerService = (transport: MailerTransport): MailerService => ({
       // emails separate. Caller-supplied headers take precedence in any casing.
       headers: {
         ...(findEntityRefIdHeaderName(message.headers) === undefined && {
-          "X-Entity-Ref-ID": randomUUID(),
+          "X-Entity-Ref-ID": yield* crypto.randomUUIDv7.pipe(Effect.orDie),
         }),
         ...message.headers,
       },

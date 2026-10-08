@@ -1,3 +1,4 @@
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import { buttonVariants } from "@feeblo/ui/button";
 import {
   Empty,
@@ -22,7 +23,6 @@ import {
   formatChangelogDate,
 } from "../components/changelog/changelog-layout";
 import { ChangelogSubscribeButton } from "../components/changelog/changelog-subscribe-button";
-import { formatPostStatus } from "../lib/utils";
 import { m } from "../paraglide/messages.js";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";

@@ -11,7 +11,7 @@ type FeedbackFormSubmission = ReturnType<
 export interface FeedbackFormState {
   content: Accessor<string>;
   submission: FeedbackFormSubmission;
-  suggestions: Accessor<WidgetSuggestion[]>;
+  suggestions: Accessor<readonly WidgetSuggestion[]>;
   suggestionsPending: Accessor<boolean>;
   title: Accessor<string>;
 }

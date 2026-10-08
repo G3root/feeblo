@@ -61,11 +61,21 @@ const deliveryInput: IntegrationProviderDeliveryInput = {
     correlationId: "corr_1",
     data: {
       actor: { kind: "end_user" },
-      board: { id: "brd_1", name: "Ideas", slug: "ideas" },
+      board: {
+        id: "brd_1",
+        name: "Ideas",
+        url: "https://feeblo.example/org/board/ideas",
+      },
       post: {
-        id: "pst_1",
+        author: {
+          displayName: "Sally",
+          externalId: "user_123",
+          id: "cnt_1",
+          type: "end_user",
+        },
         description: "Dark mode hurts my eyes at night.",
-        status: { id: "pss_1", type: "PENDING" },
+        id: "pst_1",
+        status: { id: "pss_1", name: "Open", type: "PENDING" },
         title: "Dark mode",
         url: "https://feeblo.example/org/post/ideas/dark-mode",
       },
@@ -74,7 +84,7 @@ const deliveryInput: IntegrationProviderDeliveryInput = {
     occurredAt: DateTime.makeUnsafe(new Date()),
     organizationId: asLegid(WorkspaceId)("org_1"),
     origin: { kind: "feeblo" },
-    type: "feedback.post.created",
+    type: "post.created",
     version: 1,
   },
   route: {
@@ -82,7 +92,7 @@ const deliveryInput: IntegrationProviderDeliveryInput = {
     configVersion: 1,
     connectionId: asLegid(IntegrationConnectionId)("conn_1"),
     enabled: true,
-    eventTypes: ["feedback.post.created"],
+    eventTypes: ["post.created"],
     id: asLegid(IntegrationRouteId)("route_1"),
     provider: githubProviderKey,
     providerConfig: {
@@ -495,7 +505,7 @@ describe("GitHub issue-create handler", () => {
           ...deliveryInput,
           event: {
             ...deliveryInput.event,
-            type: "feedback.post.status_changed",
+            type: "post.status_changed",
           },
         })
         .pipe(

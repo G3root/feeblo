@@ -8,6 +8,7 @@ import {
   type IntegrationProviderRegistration,
   type IntegrationProviderTemporaryFailure,
 } from "@feeblo/integration-core";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import type * as Redacted from "effect/Redacted";
 import * as Result from "effect/Result";
@@ -122,6 +123,7 @@ const makeSlackInboundHandler = ({
     Effect.gen(function* () {
       const verified = yield* Effect.result(
         verifySlackRequestSignature({
+          now: yield* Clock.currentTimeMillis,
           rawBody: input.rawBody,
           signingSecret,
           timestampHeader: input.headers["x-slack-request-timestamp"] ?? "",
@@ -213,7 +215,7 @@ export const makeSlackProviderRegistration = ({
     capabilityKey: slackChannelNotificationsCapabilityKey,
     deliver: (input: IntegrationProviderDeliveryInput) =>
       Effect.gen(function* () {
-        if (input.event.type !== "feedback.post.created") {
+        if (input.event.type !== "post.created") {
           return yield* new IntegrationProviderInvalidConfigurationError({
             message: "Slack channel notifications only support new posts",
             provider: slackProviderKey,

@@ -833,13 +833,15 @@ export const WebhookManagementServiceLive = Layer.effect(
                   board: {
                     id: boardId,
                     name: "Synthetic test board",
-                    slug: "webhook-test",
+                    url: "https://example.invalid/board/webhook-test",
                   },
                   post: {
                     id: postId,
-                    status: { id: statusId, type: "PENDING" },
+                    author: { displayName: "Webhook test", type: "member" },
+                    description: "Synthetic webhook test body.",
+                    status: { id: statusId, name: "PENDING", type: "PENDING" },
                     title: "Synthetic webhook test",
-                    url: "https://example.invalid/webhook-test",
+                    url: "https://example.invalid/post/webhook-test",
                   },
                 },
                 retentionExpiresAt: DateTime.fromDateUnsafe(now).pipe(

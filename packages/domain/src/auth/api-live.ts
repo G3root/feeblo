@@ -4,6 +4,7 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as HttpEffect from "effect/http/HttpEffect";
 import * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
+import * as Layer from "effect/Layer";
 
 import { Api } from "../http/api";
 import * as RateLimit from "../rate-limit";
@@ -26,45 +27,52 @@ export const AuthApiLive = HttpApiBuilder.group(
   Api,
   "AuthApiGroup",
   (handlers) =>
-    handlers
-      .handle("postVerificationOtp", ({ payload }) =>
-        postVerificationOtp(payload).pipe(
-          RateLimit.withPublicHttpRateLimit({
-            name: "VerificationOtpPost",
-            level: "read",
-          }),
-          withRemapDbErrors("Otp", "create")
+    Effect.gen(function* () {
+      // Read once at group construction; the handlers close over the decoded
+      // config instead of rebuilding its layer per request.
+      const config = yield* VerificationOtpConfig;
+
+      return handlers
+        .handle("postVerificationOtp", ({ payload }) =>
+          postVerificationOtp(payload, config).pipe(
+            RateLimit.withPublicHttpRateLimit({
+              name: "VerificationOtpPost",
+              level: "read",
+            }),
+            withRemapDbErrors("Otp", "create")
+          )
         )
-      )
-      .handle("getVerificationOtp", () =>
-        getVerificationOtp().pipe(
-          RateLimit.withPublicHttpRateLimit({
-            name: "VerificationOtpGet",
-            level: "read",
-          }),
-          withRemapDbErrors("Otp", "select")
+        .handle("getVerificationOtp", () =>
+          getVerificationOtp(config).pipe(
+            RateLimit.withPublicHttpRateLimit({
+              name: "VerificationOtpGet",
+              level: "read",
+            }),
+            withRemapDbErrors("Otp", "select")
+          )
         )
-      )
-      .handle("deleteVerificationOtp", () =>
-        deleteVerificationOtp().pipe(
-          RateLimit.withPublicHttpRateLimit({
-            name: "VerificationOtpDelete",
-            level: "read",
-          }),
-          withRemapDbErrors("Otp", "delete")
-        )
-      )
-);
+        .handle("deleteVerificationOtp", () =>
+          deleteVerificationOtp(config).pipe(
+            RateLimit.withPublicHttpRateLimit({
+              name: "VerificationOtpDelete",
+              level: "read",
+            }),
+            withRemapDbErrors("Otp", "delete")
+          )
+        );
+    })
+).pipe(Layer.provide(VerificationOtpConfig.layer));
 
 function postVerificationOtp(
-  payload: VerificationOTPState
+  payload: VerificationOTPState,
+  config: VerificationOtpConfig["Service"]
 ): Effect.Effect<
   { success: boolean },
   BadRequestError | InternalServerError,
   HttpServerRequest.HttpServerRequest
 > {
   return Effect.gen(function* () {
-    const { appUrl, secret } = yield* VerificationOtpConfig;
+    const { appUrl, secret } = config;
 
     const email = payload.email.toLowerCase();
     if (!isValidVerificationOTPEmail(email)) {
@@ -102,16 +110,18 @@ function postVerificationOtp(
     );
 
     return { success: true };
-  }).pipe(Effect.provide(VerificationOtpConfig.layer));
+  });
 }
 
-function getVerificationOtp(): Effect.Effect<
+function getVerificationOtp(
+  config: VerificationOtpConfig["Service"]
+): Effect.Effect<
   { email: string; type: "email-verification" | "reset-password" },
   BadRequestError | NotFoundError | InternalServerError,
   HttpServerRequest.HttpServerRequest
 > {
   return Effect.gen(function* () {
-    const { secret } = yield* VerificationOtpConfig;
+    const { secret } = config;
     const request = yield* HttpServerRequest.HttpServerRequest;
     const cookieData = generateVerificationOTPCookieData(false);
     const cookieValue = request.cookies[cookieData.name];
@@ -138,16 +148,18 @@ function getVerificationOtp(): Effect.Effect<
       email: state.email,
       type: state.type,
     };
-  }).pipe(Effect.provide(VerificationOtpConfig.layer));
+  });
 }
 
-function deleteVerificationOtp(): Effect.Effect<
+function deleteVerificationOtp(
+  config: VerificationOtpConfig["Service"]
+): Effect.Effect<
   { success: boolean },
   InternalServerError,
   HttpServerRequest.HttpServerRequest
 > {
   return Effect.gen(function* () {
-    const { appUrl } = yield* VerificationOtpConfig;
+    const { appUrl } = config;
     // Mirror the cookie set by postVerificationOtp: same name, path, and
     // Secure flag so the client actually clears it. (Secure is not part of
     // cookie identity, but emitting an identically-Secure Max-Age=0 is the
@@ -171,5 +183,5 @@ function deleteVerificationOtp(): Effect.Effect<
     );
 
     return { success: true };
-  }).pipe(Effect.provide(VerificationOtpConfig.layer));
+  });
 }

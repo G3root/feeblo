@@ -1,6 +1,8 @@
+import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -15,6 +17,9 @@ const deterministicMessageIdPattern =
 
 describe("email delivery state", () => {
   const TestLayer = EmailOutboxRepository.layer.pipe(
+    // The repository's deterministic message id hashes through the Crypto
+    // service now, so the fixture supplies the node implementation.
+    Layer.provideMerge(NodeCrypto.layer),
     Layer.provideMerge(Database.PgliteDatabaseLive)
   );
 
@@ -42,7 +47,7 @@ describe("email delivery state", () => {
             id: organizationId,
             name: "Delivery state workspace",
             slug: organizationId,
-            createdAt: new Date(),
+            createdAt: yield* DateTime.nowAsDate,
           });
           const intent = yield* repository.recordIntent({
             aggregateId: "pst_delivery",
@@ -52,7 +57,7 @@ describe("email delivery state", () => {
             kind: "submission.created",
             organizationId,
             payload: { kind: "submission.created", postId: "pst_delivery" },
-            scheduledAt: new Date(),
+            scheduledAt: yield* DateTime.nowAsDate,
           });
           if (intent._tag !== "Inserted") {
             expect(intent).toEqual({ _tag: "Inserted" });
@@ -89,11 +94,11 @@ describe("email delivery state", () => {
             [
               repository.claimDeliveryForSending({
                 id: created.delivery.id,
-                now: new Date(),
+                now: yield* DateTime.nowAsDate,
               }),
               repository.claimDeliveryForSending({
                 id: created.delivery.id,
-                now: new Date(),
+                now: yield* DateTime.nowAsDate,
               }),
             ],
             { concurrency: "unbounded" }
@@ -115,7 +120,7 @@ describe("email delivery state", () => {
           id: organizationId,
           name: "Stale deferral workspace",
           slug: organizationId,
-          createdAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
         });
         const intent = yield* repository.recordIntent({
           aggregateId: "pst_stale",
@@ -125,7 +130,7 @@ describe("email delivery state", () => {
           kind: "submission.created",
           organizationId,
           payload: { kind: "submission.created", postId: "pst_stale" },
-          scheduledAt: new Date(),
+          scheduledAt: yield* DateTime.nowAsDate,
         });
         if (intent._tag !== "Inserted") {
           expect(intent).toEqual({ _tag: "Inserted" });
@@ -147,14 +152,14 @@ describe("email delivery state", () => {
         const preClaimDeferred = yield* repository.deferSendingDelivery({
           id: created.delivery.id,
           expectedTransitionVersion: created.delivery.transitionVersion,
-          nextAttemptAt: new Date(),
+          nextAttemptAt: yield* DateTime.nowAsDate,
           lastError: { tag: "EmailDeliveryActivityError" },
         });
         expect(preClaimDeferred).toBe(true);
 
         const claimedVersion = yield* repository.claimDeliveryForSending({
           id: created.delivery.id,
-          now: new Date(),
+          now: yield* DateTime.nowAsDate,
         });
         if (claimedVersion === undefined) {
           return yield* Effect.die("Expected the claim to win");
@@ -165,7 +170,7 @@ describe("email delivery state", () => {
         const staleDeferred = yield* repository.deferSendingDelivery({
           id: created.delivery.id,
           expectedTransitionVersion: created.delivery.transitionVersion,
-          nextAttemptAt: new Date(),
+          nextAttemptAt: yield* DateTime.nowAsDate,
           lastError: { tag: "EmailDeliveryActivityError" },
         });
         expect(staleDeferred).toBe(false);
@@ -179,7 +184,7 @@ describe("email delivery state", () => {
         const claimedDeferred = yield* repository.deferSendingDelivery({
           id: created.delivery.id,
           expectedTransitionVersion: claimedVersion,
-          nextAttemptAt: new Date(),
+          nextAttemptAt: yield* DateTime.nowAsDate,
           lastError: { tag: "EmailDeliveryActivityError" },
         });
         expect(claimedDeferred).toBe(true);
@@ -201,7 +206,7 @@ describe("email delivery state", () => {
           id: organizationId,
           name: "Terminal delivery workspace",
           slug: organizationId,
-          createdAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
         });
         const intent = yield* repository.recordIntent({
           aggregateId: "pst_terminal",
@@ -211,7 +216,7 @@ describe("email delivery state", () => {
           kind: "submission.created",
           organizationId,
           payload: { kind: "submission.created", postId: "pst_terminal" },
-          scheduledAt: new Date(),
+          scheduledAt: yield* DateTime.nowAsDate,
         });
         if (intent._tag !== "Inserted") {
           expect(intent).toEqual({ _tag: "Inserted" });
@@ -231,19 +236,19 @@ describe("email delivery state", () => {
 
         yield* repository.claimDeliveryForSending({
           id: delivery.delivery.id,
-          now: new Date(),
+          now: yield* DateTime.nowAsDate,
         });
         const firstDelivery = yield* repository.markDeliveryDelivered({
           id: delivery.delivery.id,
-          deliveredAt: new Date(),
+          deliveredAt: yield* DateTime.nowAsDate,
         });
         const repeatedDelivery = yield* repository.markDeliveryDelivered({
           id: delivery.delivery.id,
-          deliveredAt: new Date(),
+          deliveredAt: yield* DateTime.nowAsDate,
         });
         const replayClaim = yield* repository.claimDeliveryForSending({
           id: delivery.delivery.id,
-          now: new Date(),
+          now: yield* DateTime.nowAsDate,
         });
 
         expect(firstDelivery).toBe(true);

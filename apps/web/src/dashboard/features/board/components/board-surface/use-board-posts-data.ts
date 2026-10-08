@@ -276,6 +276,7 @@ export function useBoardPostsData({
         .orderBy(({ post }) => post.createdAt, "desc")
         .select(({ board, post, postStatus, upvoteCounts }) => ({
           archivedAt: post.archivedAt,
+          authorIsMember: post.authorIsMember,
           boardId: post.boardId,
           boardName: coalesce(board.name, ""),
           boardSlug: coalesce(board.slug, ""),

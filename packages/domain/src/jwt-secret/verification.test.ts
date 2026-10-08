@@ -11,7 +11,15 @@ const SECRET = "a".repeat(64);
 const OTHER_SECRET = "b".repeat(64);
 const ORGANIZATION_ID = "org_test";
 
-const nowSeconds = () => Math.floor(Date.now() / 1000);
+/**
+ * The instant every test pins `TestClock` to.
+ *
+ * Tokens are minted relative to this instant, so `verifyJwt`'s Clock read and
+ * the `exp`/`iat` claims agree without depending on the wall clock.
+ */
+const fixtureNow = new Date("2026-08-11T00:00:00.000Z");
+
+const nowSeconds = () => Math.floor(fixtureNow.getTime() / 1000);
 const futureExp = () => nowSeconds() + 3600;
 const pastExp = () => nowSeconds() - 3600;
 
@@ -36,7 +44,7 @@ const signTokenEffect = (payload: jose.JWTPayload, secret: string) =>
 describe("verifyJwt", () => {
   it.effect("verifies a token bound to the organization via aud with exp", () =>
     Effect.gen(function* () {
-      yield* TestClock.setTime(Date.now());
+      yield* TestClock.setTime(fixtureNow.getTime());
       const token = yield* signTokenEffect(basePayload(), SECRET);
 
       const payload = yield* verifyJwt(token, [SECRET], ORGANIZATION_ID);
@@ -203,7 +211,7 @@ describe("verifyJwt", () => {
 
   it.effect("accepts a token with a lifetime within the default cap", () =>
     Effect.gen(function* () {
-      yield* TestClock.setTime(Date.now());
+      yield* TestClock.setTime(fixtureNow.getTime());
       const token = yield* signTokenEffect(
         {
           ...basePayload(),
@@ -242,7 +250,7 @@ describe("verifyJwt", () => {
 
   it.effect("accepts a token within a tightened per-workspace cap", () =>
     Effect.gen(function* () {
-      yield* TestClock.setTime(Date.now());
+      yield* TestClock.setTime(fixtureNow.getTime());
       const token = yield* signTokenEffect(
         { ...basePayload(), iat: nowSeconds(), exp: nowSeconds() + 3600 },
         SECRET
@@ -283,7 +291,7 @@ describe("verifyJwt", () => {
 
   it.effect("succeeds when at least one secret matches", () =>
     Effect.gen(function* () {
-      yield* TestClock.setTime(Date.now());
+      yield* TestClock.setTime(fixtureNow.getTime());
       const token = yield* signTokenEffect(basePayload(), OTHER_SECRET);
 
       const payload = yield* verifyJwt(

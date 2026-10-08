@@ -1,7 +1,7 @@
 import { RoadmapColumnId } from "@feeblo/id";
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import { withForm } from "@feeblo/ui/hooks/form";
 import { Separator } from "@feeblo/ui/separator";
-import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import { useState } from "react";
 
 import { useOrgPostStatuses } from "~/hooks/use-org-post-statuses";

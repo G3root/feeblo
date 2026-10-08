@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getPlanFeatureRows, PLAN_ENTITLEMENTS } from "./plan-entitlements";
+import {
+  getPlanFeatureRows,
+  PAID_PLAN_KEYS,
+  PLAN_ENTITLEMENTS,
+} from "./plan-entitlements";
 
 describe("plan feature catalog", () => {
   it("excludes disabled free capabilities while retaining enabled features", () => {
@@ -10,6 +14,10 @@ describe("plan feature catalog", () => {
     expect(rows).toContainEqual({
       key: "unlimitedPosts",
       label: "Unlimited Posts",
+    });
+    expect(rows).toContainEqual({
+      key: "workspaces",
+      label: "3 Workspaces",
     });
     expect(rows).not.toContainEqual({
       key: "privateBoards",
@@ -45,6 +53,7 @@ describe("plan feature catalog", () => {
         changelogCategories: null,
         submissionNotificationRecipients: null,
         crmEntries: null,
+        workspaces: null,
       },
       capabilities: {
         changelog: true,
@@ -70,6 +79,7 @@ describe("plan feature catalog", () => {
         label: "Unlimited Submission Notification Recipients",
       },
       { key: "crmEntries", label: "Unlimited CRM Entries" },
+      { key: "workspaces", label: "Unlimited Workspaces" },
       { key: "roadmap", label: "Roadmap" },
       { key: "changelog", label: "Changelog" },
       { key: "integrations", label: "Integrations" },
@@ -92,5 +102,17 @@ describe("plan feature catalog", () => {
       { key: "feedbackBoards", label: "Unlimited Feedback Boards" },
       { key: "privilegedMembers", label: "Unlimited Admin Roles" },
     ]);
+  });
+
+  it("keeps the shared paid-plan list equal to every non-free key of PLAN_ENTITLEMENTS", () => {
+    // `PAID_PLAN_KEYS` is shared with `@feeblo/db/schema/billing`, which
+    // cannot import this package and therefore reads the literal from
+    // `@feeblo/domain-contracts/plan`. A plan added to `PLAN_ENTITLEMENTS`
+    // must be added there too, or SQL-level gating silently misses it.
+    expect([...PAID_PLAN_KEYS].sort()).toEqual(
+      Object.keys(PLAN_ENTITLEMENTS)
+        .filter((plan) => plan !== "free")
+        .sort()
+    );
   });
 });

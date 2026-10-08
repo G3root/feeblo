@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 
 import { NodeCrypto } from "@effect/platform-node";
-import { describe, expect, it, layer } from "@effect/vitest";
+import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { TestClock } from "effect/testing";
@@ -31,8 +32,20 @@ const signToken = (payload: jose.JWTPayload, secret: string) =>
 const hashEmail = (email: string): string =>
   createHash("sha256").update(email.toLowerCase().trim()).digest("hex");
 
-const futureExp = Math.floor(Date.now() / 1000) + 3600;
-const pastExp = Math.floor(Date.now() / 1000) - 3600;
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
+
+/**
+ * The instant every test pins `TestClock` to. Tokens are minted relative to it,
+ * so `createSsoSession`'s Clock read and the `exp`/`iat` claims agree without
+ * depending on the wall clock.
+ */
+const fixtureNow = new Date("2026-08-11T00:00:00.000Z");
+const fixtureNowSeconds = Math.floor(fixtureNow.getTime() / 1000);
+
+const futureExp = fixtureNowSeconds + 3600;
+const pastExp = fixtureNowSeconds - 3600;
 
 const TestLayer = Layer.mergeAll(
   SsoRepositoriesLive,
@@ -52,7 +65,7 @@ describe("createSsoSession", () => {
     Effect.gen(function* () {
       const db = yield* currentDb;
       const organizationId = yield* WorkspaceId.generate;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
@@ -94,7 +107,7 @@ describe("createSsoSession", () => {
           recurringIntervalCount: 1,
           status: "trialing",
           currentPeriodStart: now,
-          currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+          currentPeriodEnd: dateAt(now.getTime() + 86_400_000),
           customerId: `cus_sso_${organizationId}`,
           productId,
         });
@@ -110,7 +123,7 @@ describe("createSsoSession", () => {
   const validPayload = (fixture: Fixture) => ({
     aud: fixture.organizationId,
     exp: futureExp,
-    iat: Math.floor(Date.now() / 1000),
+    iat: fixtureNowSeconds,
     sub: "external_user_1",
     email: "ada@example.com",
     name: "Ada Lovelace",
@@ -119,7 +132,7 @@ describe("createSsoSession", () => {
   layer(TestLayer)("token contract", (it) => {
     it.effect("creates a restricted SSO user for a valid org-bound token", () =>
       Effect.gen(function* () {
-        yield* TestClock.setTime(Date.now());
+        yield* TestClock.setTime(fixtureNow.getTime());
         const fixture = yield* makeFixture(true);
         const token = yield* signToken(validPayload(fixture), fixture.secret);
 
@@ -252,8 +265,8 @@ describe("createSsoSession", () => {
           const token = yield* signToken(
             {
               ...validPayload(fixture),
-              iat: Math.floor(Date.now() / 1000),
-              exp: Math.floor(Date.now() / 1000) + 25 * 3600,
+              iat: fixtureNowSeconds,
+              exp: fixtureNowSeconds + 25 * 3600,
             },
             fixture.secret
           );
@@ -282,8 +295,8 @@ describe("createSsoSession", () => {
         const token = yield* signToken(
           {
             ...validPayload(fixture),
-            iat: Math.floor(Date.now() / 1000),
-            exp: Math.floor(Date.now() / 1000) + 2 * 3600,
+            iat: fixtureNowSeconds,
+            exp: fixtureNowSeconds + 2 * 3600,
           },
           fixture.secret
         );
@@ -303,7 +316,7 @@ describe("createSsoSession", () => {
       "accepts a token within a tightened per-organization lifetime cap",
       () =>
         Effect.gen(function* () {
-          yield* TestClock.setTime(Date.now());
+          yield* TestClock.setTime(fixtureNow.getTime());
           const fixture = yield* makeFixture(true);
           const db = yield* currentDb;
           yield* db
@@ -314,8 +327,8 @@ describe("createSsoSession", () => {
           const token = yield* signToken(
             {
               ...validPayload(fixture),
-              iat: Math.floor(Date.now() / 1000),
-              exp: Math.floor(Date.now() / 1000) + 30 * 60,
+              iat: fixtureNowSeconds,
+              exp: fixtureNowSeconds + 30 * 60,
             },
             fixture.secret
           );
@@ -347,7 +360,7 @@ describe("createSsoSession", () => {
 
     it.effect("rate limits repeated SSO sign-ins per organization", () =>
       Effect.gen(function* () {
-        yield* TestClock.setTime(Date.now());
+        yield* TestClock.setTime(fixtureNow.getTime());
         const fixture = yield* makeFixture(true);
         const token = yield* signToken(validPayload(fixture), fixture.secret);
 
@@ -374,7 +387,7 @@ describe("createSsoSession", () => {
       "limits invalid tokens by client without spending an organization limit",
       () =>
         Effect.gen(function* () {
-          yield* TestClock.setTime(Date.now());
+          yield* TestClock.setTime(fixtureNow.getTime());
           const fixture = yield* makeFixture(true);
           const validToken = yield* signToken(
             validPayload(fixture),
@@ -432,10 +445,10 @@ describe("createSsoSession", () => {
       "promotes a matched behalf-* shadow into a clean verified SSO identity",
       () =>
         Effect.gen(function* () {
-          yield* TestClock.setTime(Date.now());
+          yield* TestClock.setTime(fixtureNow.getTime());
           const db = yield* currentDb;
           const fixture = yield* makeFixture(true);
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
 
           // An admin recorded this customer on behalf before they ever used
           // the widget portal: contact + shadow user already exist.
@@ -519,7 +532,7 @@ describe("createSsoSession", () => {
 
     it.effect("leaves native SSO users untouched when they sign in again", () =>
       Effect.gen(function* () {
-        yield* TestClock.setTime(Date.now());
+        yield* TestClock.setTime(fixtureNow.getTime());
         const fixture = yield* makeFixture(true);
         const token = yield* signToken(validPayload(fixture), fixture.secret);
 
@@ -554,7 +567,7 @@ describe("linkAnonymousAccount", () => {
       const anonymousUserId = yield* WorkspaceId.generate; // ids are opaque strings
       const newUserId = yield* WorkspaceId.generate;
       const contactId = yield* WorkspaceId.generate;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
@@ -594,93 +607,95 @@ describe("linkAnonymousAccount", () => {
       return rows[0]?.userId ?? null;
     });
 
-  it.effect("re-assigns contacts and posts to the real user", () =>
-    Effect.gen(function* () {
-      const { anonymousUserId, contactId, newUserId } =
-        yield* makeLinkFixture();
+  layer(TestLayer)("anonymous account linking", (it) => {
+    it.effect("re-assigns contacts and posts to the real user", () =>
+      Effect.gen(function* () {
+        const { anonymousUserId, contactId, newUserId } =
+          yield* makeLinkFixture();
 
-      yield* linkAnonymousAccount({ anonymousUserId, newUserId });
+        yield* linkAnonymousAccount({ anonymousUserId, newUserId });
 
-      expect(yield* contactOwner(contactId)).toBe(newUserId);
-    }).pipe(Effect.provide(TestLayer))
-  );
+        expect(yield* contactOwner(contactId)).toBe(newUserId);
+      })
+    );
 
-  it.effect("is a no-op when both ids are the same", () =>
-    Effect.gen(function* () {
-      const { anonymousUserId, contactId } = yield* makeLinkFixture();
+    it.effect("is a no-op when both ids are the same", () =>
+      Effect.gen(function* () {
+        const { anonymousUserId, contactId } = yield* makeLinkFixture();
 
-      yield* linkAnonymousAccount({
-        anonymousUserId,
-        newUserId: anonymousUserId,
-      });
-
-      expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
-    }).pipe(Effect.provide(TestLayer))
-  );
-
-  it.effect("refuses to link a non-restricted user's data", () =>
-    Effect.gen(function* () {
-      const { anonymousUserId, contactId, newUserId } =
-        yield* makeLinkFixture();
-      const db = yield* currentDb;
-      const attackerId = yield* WorkspaceId.generate;
-      yield* db.insert(schema.userTable).values({
-        id: attackerId,
-        email: `attacker+${attackerId}@example.com`,
-        name: "Attacker",
-      });
-
-      const error = yield* Effect.flip(
-        linkAnonymousAccount({ anonymousUserId: attackerId, newUserId })
-      );
-      expect(error.code).toBe("ANONYMOUS_USER_NOT_RESTRICTED");
-      expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
-    }).pipe(Effect.provide(TestLayer))
-  );
-
-  it.effect("refuses to link data to an anonymous target", () =>
-    Effect.gen(function* () {
-      const { anonymousUserId, contactId, newUserId } =
-        yield* makeLinkFixture();
-      const db = yield* currentDb;
-      yield* db
-        .update(schema.userTable)
-        .set({ restrictedToOrganizationId: "another_org" })
-        .where(eq(schema.userTable.id, newUserId));
-
-      const error = yield* Effect.flip(
-        linkAnonymousAccount({ anonymousUserId, newUserId })
-      );
-      expect(error.code).toBe("NEW_USER_IS_ANONYMOUS");
-      expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
-    }).pipe(Effect.provide(TestLayer))
-  );
-
-  it.effect("refuses to link a missing anonymous user", () =>
-    Effect.gen(function* () {
-      const { anonymousUserId, contactId, newUserId } =
-        yield* makeLinkFixture();
-
-      const error = yield* Effect.flip(
-        linkAnonymousAccount({ anonymousUserId: "does-not-exist", newUserId })
-      );
-      expect(error.code).toBe("ANONYMOUS_USER_NOT_FOUND");
-      expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
-    }).pipe(Effect.provide(TestLayer))
-  );
-
-  it.effect("refuses to link to a missing real user", () =>
-    Effect.gen(function* () {
-      const { anonymousUserId, contactId } = yield* makeLinkFixture();
-
-      const error = yield* Effect.flip(
-        linkAnonymousAccount({
+        yield* linkAnonymousAccount({
           anonymousUserId,
-          newUserId: "does-not-exist",
-        })
-      );
-      expect(error.code).toBe("NEW_USER_NOT_FOUND");
-      expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
-    }).pipe(Effect.provide(TestLayer))
-  );
+          newUserId: anonymousUserId,
+        });
+
+        expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
+      })
+    );
+
+    it.effect("refuses to link a non-restricted user's data", () =>
+      Effect.gen(function* () {
+        const { anonymousUserId, contactId, newUserId } =
+          yield* makeLinkFixture();
+        const db = yield* currentDb;
+        const attackerId = yield* WorkspaceId.generate;
+        yield* db.insert(schema.userTable).values({
+          id: attackerId,
+          email: `attacker+${attackerId}@example.com`,
+          name: "Attacker",
+        });
+
+        const error = yield* Effect.flip(
+          linkAnonymousAccount({ anonymousUserId: attackerId, newUserId })
+        );
+        expect(error.code).toBe("ANONYMOUS_USER_NOT_RESTRICTED");
+        expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
+      })
+    );
+
+    it.effect("refuses to link data to an anonymous target", () =>
+      Effect.gen(function* () {
+        const { anonymousUserId, contactId, newUserId } =
+          yield* makeLinkFixture();
+        const db = yield* currentDb;
+        yield* db
+          .update(schema.userTable)
+          .set({ restrictedToOrganizationId: "another_org" })
+          .where(eq(schema.userTable.id, newUserId));
+
+        const error = yield* Effect.flip(
+          linkAnonymousAccount({ anonymousUserId, newUserId })
+        );
+        expect(error.code).toBe("NEW_USER_IS_ANONYMOUS");
+        expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
+      })
+    );
+
+    it.effect("refuses to link a missing anonymous user", () =>
+      Effect.gen(function* () {
+        const { anonymousUserId, contactId, newUserId } =
+          yield* makeLinkFixture();
+
+        const error = yield* Effect.flip(
+          linkAnonymousAccount({ anonymousUserId: "does-not-exist", newUserId })
+        );
+        expect(error.code).toBe("ANONYMOUS_USER_NOT_FOUND");
+        expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
+      })
+    );
+
+    it.effect("refuses to link to a missing real user", () =>
+      Effect.gen(function* () {
+        const { anonymousUserId, contactId } = yield* makeLinkFixture();
+
+        const error = yield* Effect.flip(
+          linkAnonymousAccount({
+            anonymousUserId,
+            newUserId: "does-not-exist",
+          })
+        );
+        expect(error.code).toBe("NEW_USER_NOT_FOUND");
+        expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
+      })
+    );
+  });
 });

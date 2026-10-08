@@ -11,6 +11,7 @@ import {
 } from "@feeblo/id";
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { and, eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -58,7 +59,7 @@ describe("CommentRpcHandlers on-behalf", () => {
       const userId = `user_${organizationId}`;
       const userEmail = `${organizationId}@example.com`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,

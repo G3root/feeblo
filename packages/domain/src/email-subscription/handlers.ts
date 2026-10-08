@@ -28,6 +28,7 @@ import {
   type EmailSubscriptionInputError,
   type EmailSubscriptionTokenRequest,
   parseEmailAddress,
+  type SubmissionNotificationPreferenceQuery,
   type SubmissionNotificationPreferenceRequest,
 } from "./schema";
 import type { EmailSubscriptionTokenError } from "./tokens";
@@ -180,6 +181,27 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       )
     );
 
+  /**
+   * Submission notifications only ever go to owners and administrators, so
+   * reading or writing the preference is authorized the same way and the
+   * refusal reason describes both operations.
+   */
+  const requireSubmissionNotificationAdmin = (organizationId: string) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, organizationId);
+      if (
+        membership === undefined ||
+        (membership.role !== "owner" && membership.role !== "admin")
+      ) {
+        return yield* new Policy.PolicyDeniedError({
+          reason:
+            "Only workspace owners and administrators can receive submission notification email.",
+        });
+      }
+      return session;
+    });
+
   return {
     EmailSubscriptionChangelogSubscribePublic: ({
       email,
@@ -216,22 +238,26 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
         }),
         withRemapDbErrors("EmailSubscription", "update")
       ),
+    EmailSubmissionNotificationPreferenceGet: ({
+      organizationId,
+    }: SubmissionNotificationPreferenceQuery) =>
+      Effect.gen(function* () {
+        const session =
+          yield* requireSubmissionNotificationAdmin(organizationId);
+        const subscription = yield* repository.findAuthenticatedSubscription({
+          organizationId,
+          topic: { topicId: null, topicType: "submission" },
+          userId: session.session.userId,
+        });
+        return { enabled: subscription?.state === "active" };
+      }).pipe(withRemapDbErrors("EmailSubscription", "select")),
     EmailSubmissionNotificationPreferenceSet: ({
       enabled,
       organizationId,
     }: SubmissionNotificationPreferenceRequest) =>
       Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        const membership = Policy.getMembership(session, organizationId);
-        if (
-          membership === undefined ||
-          (membership.role !== "owner" && membership.role !== "admin")
-        ) {
-          return yield* new Policy.PolicyDeniedError({
-            reason:
-              "Only workspace owners and administrators can receive submission notification email.",
-          });
-        }
+        const session =
+          yield* requireSubmissionNotificationAdmin(organizationId);
         const now = yield* DateTime.nowAsDate;
         if (enabled) {
           const recipientLimit =

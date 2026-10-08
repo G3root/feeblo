@@ -1,6 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { type LegidOf, RoadmapId, SiteId, WorkspaceId } from "@feeblo/id";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -12,6 +13,10 @@ import { WorkspaceRepository } from "../workspace/repository";
 import { RoadmapRpcHandlersEffect } from "./handlers";
 import { RoadmapPolicy } from "./policies";
 import { RoadmapRepository } from "./repository";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 describe("RoadmapRpcHandlers", () => {
   type Fixture = {
@@ -33,7 +38,7 @@ describe("RoadmapRpcHandlers", () => {
       const roadmapId = yield* RoadmapId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
@@ -254,7 +259,7 @@ describe("RoadmapRpcHandlers", () => {
         const fixture = yield* makeFixture("PUBLIC");
         const db = yield* currentDb;
         const roadmapId = yield* RoadmapId.generate;
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
 
         yield* db.insert(schema.productTable).values({
           id: "prod_roadmap_starter",
@@ -277,7 +282,7 @@ describe("RoadmapRpcHandlers", () => {
           recurringIntervalCount: 1,
           status: "trialing",
           currentPeriodStart: now,
-          currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+          currentPeriodEnd: dateAt(now.getTime() + 86_400_000),
           customerId: "cus_roadmap_starter",
           productId: "prod_roadmap_starter",
         });
@@ -331,7 +336,7 @@ describe("RoadmapRpcHandlers", () => {
         const fixture = yield* makeFixture("PUBLIC");
         const db = yield* currentDb;
         const privateRoadmapId = yield* RoadmapId.generate;
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
 
         yield* db.insert(schema.roadmapTable).values({
           id: privateRoadmapId,
@@ -596,7 +601,7 @@ describe("RoadmapRpcHandlers", () => {
           const db = yield* currentDb;
           const secondId = yield* RoadmapId.generate;
           const thirdId = yield* RoadmapId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
 
           yield* db.insert(schema.roadmapTable).values([
             {

@@ -1,11 +1,6 @@
-import { Database, transaction } from "@feeblo/db";
+import { transaction } from "@feeblo/db";
 import { PostId } from "@feeblo/id";
-import {
-  IntegrationEventRecorder,
-  IntegrationEventRecorderLive,
-} from "@feeblo/integration-core";
 import { markdownToHtmlCached } from "@feeblo/utils/markdown";
-import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
@@ -24,11 +19,8 @@ import { CompanyRepository } from "../company/repository";
 import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
 import { parsePersonAttributes } from "../contact/utils";
-import { EmailOutboxConfig } from "../email-outbox/config";
-import { EmailOutboxRepository } from "../email-outbox/repository";
-import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import { EntitlementPolicy } from "../entitlement/policies";
 import { Api } from "../http/api";
-import { ResolvePrincipalService } from "../identity/service";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import {
   maxTokenLifetimeFromMinutes,
@@ -36,16 +28,10 @@ import {
 } from "../jwt-secret/verification";
 import { OrganizationRepository } from "../organization/repository";
 import { PostStatusRepository } from "../post-status/repository";
-import {
-  PostEmbeddingService,
-  postEmbeddingInput,
-} from "../post/embedding-service";
+import { PostEmbeddingService } from "../post/embedding-service";
 import { PostRepository } from "../post/repository";
-import {
-  postLexicalSimilarity,
-  SUGGESTION_MAX_DISTANCE,
-} from "../post/suggestions";
-import { makePostWrites, PostWriteInternals } from "../post/write";
+import { makePostSuggestions } from "../post/suggestions";
+import { PostWriteService } from "../post/write";
 import * as RateLimit from "../rate-limit";
 import {
   InternalServerError,
@@ -53,9 +39,7 @@ import {
   UnauthorizedError,
   withRemapDbErrors,
 } from "../rpc-errors";
-import { S3UploadService } from "../services/s3";
 import { SitePolicy } from "../site/policies";
-import { UserRepository } from "../user/repository";
 import {
   type TWidgetFeedbackMetadata,
   WidgetFeedbackMetadataValue,
@@ -122,70 +106,60 @@ export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
  * The feedback write is the shared post write path (`post/write.ts`), built
  * here at group construction so a widget submission lands in the same
  * timeline, webhook, staff notification, submission email window, and search
- * embedding as a dashboard or Public API create. The group provides the
- * environment that path reads — the repositories it coordinates through
- * `PostWriteInternals`, plus the pieces only this surface's handlers touch.
+ * embedding as a dashboard or Public API create. The group depends on the
+ * shared `PostWriteService`; the pieces only this surface's handlers touch
+ * stay in the layer build below.
  */
 export const WidgetApiLive = HttpApiBuilder.group(
   Api,
   "WidgetApiGroup",
   (handlers) =>
     Effect.gen(function* () {
-      const db = yield* Database.Database;
-      // The shared post write path reads its collaborators from the running
-      // fiber's context, so the group keeps a handle on each and provides the
-      // same instances around the feedback handler. The layer build above
-      // supplies them; this is the request-time half of the same environment.
-      const crypto = yield* Crypto.Crypto;
       const attributeDefinitionRepository =
         yield* AttributeDefinitionRepository;
       const boardRepository = yield* BoardRepository;
+      const changelogRepository = yield* ChangelogRepository;
       const companyRepository = yield* CompanyRepository;
       const contactRepository = yield* ContactRepository;
-      const emailOutboxConfig = yield* EmailOutboxConfig;
-      const emailOutboxRepository = yield* EmailOutboxRepository;
-      const emailSubscriptions = yield* EmailSubscriptionRepository;
-      const integrationEventRecorder = yield* IntegrationEventRecorder;
       const jwtSecretRepository = yield* JwtSecretRepository;
       const organizationRepository = yield* OrganizationRepository;
-      const postRepository = yield* PostRepository;
       const postStatusRepository = yield* PostStatusRepository;
-      const resolvePrincipal = yield* ResolvePrincipalService;
-      const s3 = yield* S3UploadService;
-      const userRepository = yield* UserRepository;
-      const writes = yield* makePostWrites;
+      const sitePolicy = yield* SitePolicy;
+      const writes = yield* PostWriteService;
+      const entitlementPolicy = yield* EntitlementPolicy;
+      const postRepository = yield* PostRepository;
+      const postEmbeddings = yield* PostEmbeddingService;
+      // The same suggestion program the dashboard and public portal RPCs run,
+      // with the widget's public-only rule. Its collaborators are captured
+      // here so the handler does not build a layer per request.
+      const suggestions = makePostSuggestions({
+        candidates: postRepository.findSuggestionCandidates,
+        embeddings: Option.some(postEmbeddings),
+      });
 
-      /** The runtime context the feedback handler's writes read. */
-      const provideFeedbackEnvironment = <A, E, R>(
+      /**
+       * The handler's own services, provided around the feedback effect.
+       *
+       * `HttpApiBuilder` reads a handler's requirements from its own effect,
+       * so these are closed over here rather than left to the route layer;
+       * the shared write path's environment comes from `PostWriteService`.
+       */
+      const provideHandlerEnvironment = <A, E, R>(
         effect: Effect.Effect<A, E, R>
       ) =>
         effect.pipe(
-          Effect.provideService(Crypto.Crypto, crypto),
-          Effect.provideService(Database.Database, db),
           Effect.provideService(
             AttributeDefinitionRepository,
             attributeDefinitionRepository
           ),
           Effect.provideService(BoardRepository, boardRepository),
+          Effect.provideService(ChangelogRepository, changelogRepository),
           Effect.provideService(CompanyRepository, companyRepository),
           Effect.provideService(ContactRepository, contactRepository),
-          Effect.provideService(EmailOutboxConfig, emailOutboxConfig),
-          Effect.provideService(EmailOutboxRepository, emailOutboxRepository),
-          Effect.provideService(
-            EmailSubscriptionRepository,
-            emailSubscriptions
-          ),
-          Effect.provideService(
-            IntegrationEventRecorder,
-            integrationEventRecorder
-          ),
           Effect.provideService(JwtSecretRepository, jwtSecretRepository),
           Effect.provideService(OrganizationRepository, organizationRepository),
-          Effect.provideService(PostRepository, postRepository),
           Effect.provideService(PostStatusRepository, postStatusRepository),
-          Effect.provideService(ResolvePrincipalService, resolvePrincipal),
-          Effect.provideService(S3UploadService, s3),
-          Effect.provideService(UserRepository, userRepository)
+          Effect.provideService(SitePolicy, sitePolicy)
         );
 
       return handlers
@@ -195,80 +169,20 @@ export const WidgetApiLive = HttpApiBuilder.group(
               name: "WidgetListUpdates",
               level: "read",
             }),
-            Effect.provide(
-              Layer.mergeAll(ChangelogRepository.layer, SitePolicy.layer)
-            ),
+            provideHandlerEnvironment,
             withRemapDbErrors("Changelog", "select")
           )
         )
         .handle("suggestPosts", ({ payload }) =>
-          Effect.gen(function* () {
-            const repository = yield* PostRepository;
-            const embeddings = yield* PostEmbeddingService;
-            const input = postEmbeddingInput(payload);
-            const queryEmbedding = yield* embeddings
-              .embed(input)
-              .pipe(
-                Effect.catchCause((cause) =>
-                  Effect.logWarning(
-                    "Failed to generate widget suggestion embedding",
-                    cause
-                  ).pipe(Effect.as(Option.none()))
-                )
-              );
-            const candidates = yield* repository.findSuggestionCandidates({
-              boardId: payload.boardId,
-              organizationId: payload.organizationId,
-              publicOnly: true,
-              limit: Option.isSome(queryEmbedding) ? 5 : 25,
-              ...(Option.isSome(queryEmbedding) && {
-                embedding: queryEmbedding.value.vector,
-                embeddingModel: queryEmbedding.value.model,
-              }),
-            });
-            if (Option.isSome(queryEmbedding)) {
-              const matches = candidates
-                .filter(
-                  (candidate) =>
-                    candidate.distance !== null &&
-                    candidate.distance <= SUGGESTION_MAX_DISTANCE
-                )
-                .map(({ id, title, excerpt, slug }) => ({
-                  id,
-                  title,
-                  excerpt,
-                  slug,
-                }));
-              if (matches.length > 0) {
-                return matches;
-              }
-            }
-
-            const lexicalCandidates = Option.isSome(queryEmbedding)
-              ? yield* repository.findSuggestionCandidates({
-                  boardId: payload.boardId,
-                  organizationId: payload.organizationId,
-                  publicOnly: true,
-                  limit: 25,
-                })
-              : candidates;
-
-            return lexicalCandidates
-              .map((post) => ({
-                post,
-                score: postLexicalSimilarity(input, post),
-              }))
-              .filter(({ score }) => score > 0)
-              .sort((left, right) => right.score - left.score)
-              .slice(0, 5)
-              .map(({ post: { id, title, excerpt, slug } }) => ({
+          suggestions({ ...payload, publicOnly: true }).pipe(
+            Effect.map((posts) =>
+              posts.map(({ id, title, excerpt, slug }) => ({
                 id,
                 title,
                 excerpt,
                 slug,
-              }));
-          }).pipe(
-            Effect.provide([PostEmbeddingService.layer, PostRepository.layer]),
+              }))
+            ),
             Effect.mapError(
               () =>
                 new InternalServerError({
@@ -296,7 +210,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
               name: "WidgetListBoards",
               level: "read",
             }),
-            Effect.provide(BoardRepository.layer),
+            provideHandlerEnvironment,
             withRemapDbErrors("Boards", "select")
           )
         )
@@ -425,6 +339,9 @@ export const WidgetApiLive = HttpApiBuilder.group(
                     );
                   })
                 ).pipe(
+                  // The SSO contact upsert creates through the shared intake
+                  // module, which reads the plan decision from the context.
+                  Effect.provideService(EntitlementPolicy, entitlementPolicy),
                   Effect.mapError(
                     () =>
                       new InternalServerError({
@@ -467,10 +384,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
               name: "WidgetCreateFeedback",
               level: "write",
             }),
-            // `HttpApiBuilder` computes a handler's requirements from its own
-            // effect, so the environment the handler's reads and the write
-            // path share is provided here.
-            provideFeedbackEnvironment,
+            provideHandlerEnvironment,
             Effect.catchTags({
               ConfigError: () =>
                 Effect.fail(
@@ -501,14 +415,15 @@ export const WidgetApiLive = HttpApiBuilder.group(
     Layer.mergeAll(
       AttributeDefinitionRepository.layer,
       BoardRepository.layer,
+      ChangelogRepository.layer,
       CompanyRepository.layer,
       ContactRepository.layer,
-      EmailOutboxConfig.layer,
-      IntegrationEventRecorderLive,
       JwtSecretRepository.layer,
       OrganizationRepository.layer,
+      PostEmbeddingService.layer,
+      PostRepository.layer,
       PostStatusRepository.layer,
-      PostWriteInternals
+      SitePolicy.layer
     )
   )
 );

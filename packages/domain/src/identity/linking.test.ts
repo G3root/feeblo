@@ -5,6 +5,7 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { BoardId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -44,7 +45,7 @@ describe("identity linking", () => {
         id: organizationId,
         name: "Test organization",
         slug: organizationId,
-        createdAt: new Date(),
+        createdAt: yield* DateTime.nowAsDate,
       });
       return organizationId;
     });
@@ -116,7 +117,7 @@ describe("identity linking", () => {
         organizationId: args.organizationId,
         userId: args.userId,
         role: "manager",
-        createdAt: new Date(),
+        createdAt: yield* DateTime.nowAsDate,
       });
     });
 
@@ -125,7 +126,7 @@ describe("identity linking", () => {
       const db = yield* currentDb;
       const boardId = yield* BoardId.generate;
       const statusId = yield* PostStatusId.generate;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* db.insert(schema.boardTable).values({
         id: boardId,
         name: "Board",
@@ -153,7 +154,7 @@ describe("identity linking", () => {
   }) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* db.insert(schema.postTable).values({
         id: args.id,
         title: `Post ${args.id}`,
@@ -176,7 +177,7 @@ describe("identity linking", () => {
   }) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* db.insert(schema.contactTable).values({
         id: args.id,
         organizationId: args.organizationId,
@@ -245,7 +246,7 @@ describe("identity linking", () => {
   }) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       const emailContactId = `email_contact_${args.id}`;
       yield* db.insert(schema.emailContactTable).values({
         id: emailContactId,

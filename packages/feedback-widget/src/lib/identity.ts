@@ -1,27 +1,18 @@
+import type { TWidgetIdentity } from "@feeblo/domain/widget/schema";
 import { createSignal } from "solid-js";
 
-export interface WidgetUserIdentity {
-  avatar?: string | undefined;
-  companies?:
-    | Array<{
-        id: string;
-        name: string;
-        avatar?: string | undefined;
-        customFields?:
-          | Record<string, string | number | boolean | null | undefined>
-          | undefined;
-      }>
-    | undefined;
-  customFields?:
-    | Record<string, string | number | boolean | null | undefined>
-    | undefined;
-  email?: string | undefined;
-  id: string;
-  name?: string | undefined;
-  token?: string | undefined;
-}
+/**
+ * The identity the embedding page posts to the iframe.
+ *
+ * The shape is the widget contract's `WidgetIdentity`, not a hand-written copy:
+ * the SDK normalizes the embedder's `UserIdentity` into it and posts it as the
+ * `IDENTIFY` message, so the iframe's receiver and the sender cannot disagree
+ * about the fields. The iframe's previous copy narrowed `customFields` to
+ * scalars, which silently dropped the nested values the SDK permits.
+ */
+export type WidgetUserIdentity = TWidgetIdentity;
 
-export type WidgetIdentity = WidgetUserIdentity;
+export type WidgetIdentity = TWidgetIdentity;
 
 const [identity, setIdentity] = createSignal<WidgetIdentity | null>(null);
 

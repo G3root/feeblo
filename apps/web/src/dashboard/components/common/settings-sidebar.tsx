@@ -17,9 +17,11 @@ import {
   Building03Icon,
   Chat01Icon,
   CreditCardIcon,
+  CursorInWindowIcon,
   Folder01Icon,
   LayoutThreeColumnIcon,
   LockIcon,
+  Mail01Icon,
   PaintBrush04Icon,
   PropertyNewIcon,
   Settings05Icon,
@@ -66,6 +68,12 @@ const settingsItems = [
         to: "/$organizationId/settings/customize" as const,
       },
       {
+        label: "Widget",
+        icon: CursorInWindowIcon,
+        permission: "site.update" as const,
+        to: "/$organizationId/settings/widget" as const,
+      },
+      {
         label: "Members",
         icon: UserMultipleIcon,
         to: "/$organizationId/settings/members" as const,
@@ -87,6 +95,14 @@ const settingsItems = [
         icon: LockIcon,
         permission: "workspace.update" as const,
         to: "/$organizationId/settings/security" as const,
+      },
+      {
+        label: "Notifications",
+        icon: Mail01Icon,
+        // Submission notification email only reaches owners and
+        // administrators, and the RPC enforces exactly that grant.
+        permission: "workspace.update" as const,
+        to: "/$organizationId/settings/notifications" as const,
       },
       {
         label: "Webhooks",

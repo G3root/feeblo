@@ -1,3 +1,4 @@
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
@@ -13,6 +14,8 @@ import {
 } from "../../public-api/errors";
 import { invalidRequestError } from "../../public-api/errors";
 import type { HandlerOf } from "../../public-api/handler";
+import type { PublicApiCaller } from "../../public-api/middleware";
+import type { PublicApiDependencies } from "../../public-api/operations";
 import { parseLimit } from "../../public-api/parse";
 import {
   createChangelogOperation,
@@ -118,7 +121,9 @@ export const changelogEndpoints = [
     ),
 ] as const;
 
-export const changelogHandlers = {
+export const changelogHandlers = (
+  context: Context.Context<PublicApiDependencies>
+) => ({
   listChangelog: (({ query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
@@ -128,27 +133,50 @@ export const changelogHandlers = {
         limit,
         status: status ?? undefined,
       });
-    })) satisfies HandlerOf<PublicApiGroup, "listChangelog">,
+    }).pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "listChangelog",
+    PublicApiCaller
+  >,
 
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
   getChangelog: (({ params }) =>
-    getChangelogOperation.handler({
-      changelogId: params.changelogId,
-    })) satisfies HandlerOf<PublicApiGroup, "getChangelog">,
+    getChangelogOperation
+      .handler(params)
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "getChangelog",
+    PublicApiCaller
+  >,
 
   createChangelog: (({ payload }) =>
-    createChangelogOperation.handler(payload)) satisfies HandlerOf<
+    createChangelogOperation
+      .handler(payload)
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "createChangelog"
+    "createChangelog",
+    PublicApiCaller
   >,
 
   updateChangelog: (({ params, payload }) =>
-    updateChangelogOperation.handler({
-      ...payload,
-      changelogId: params.changelogId,
-    })) satisfies HandlerOf<PublicApiGroup, "updateChangelog">,
+    updateChangelogOperation
+      .handler({
+        ...payload,
+        ...params,
+      })
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "updateChangelog",
+    PublicApiCaller
+  >,
 
   deleteChangelog: (({ params }) =>
-    deleteChangelogOperation.handler({
-      changelogId: params.changelogId,
-    })) satisfies HandlerOf<PublicApiGroup, "deleteChangelog">,
-};
+    deleteChangelogOperation
+      .handler(params)
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "deleteChangelog",
+    PublicApiCaller
+  >,
+});

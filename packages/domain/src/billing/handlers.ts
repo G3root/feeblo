@@ -86,5 +86,14 @@ export const BillingRpcHandlersEffect = Effect.gen(function* () {
 export const BillingRpcHandlers = BillingRpcs.toLayer(
   BillingRpcHandlersEffect
 ).pipe(
-  Layer.provide(Layer.mergeAll(PolarService.layer, BillingRepository.layer))
+  // PolarService is provided into the repository layer (which reads the
+  // configured target from it) and merged alongside it, because the handlers
+  // effect reads the service directly. Merging it only as a sibling would
+  // leave the requirement unresolved for the composition root.
+  Layer.provide(
+    Layer.mergeAll(
+      BillingRepository.layer.pipe(Layer.provide(PolarService.layer)),
+      PolarService.layer
+    )
+  )
 );

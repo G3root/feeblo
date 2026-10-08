@@ -1,13 +1,4 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogPopup,
-  AlertDialogTitle,
-} from "@feeblo/ui/alert-dialog";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -18,6 +9,7 @@ import {
   CardPanel,
   CardTitle,
 } from "@feeblo/ui/card";
+import { ConfirmDialog } from "@feeblo/ui/confirm-dialog";
 import { CopyButton } from "@feeblo/ui/copy-button";
 import {
   Table,
@@ -454,31 +446,18 @@ function WebhookDetailContent({
 
       <WebhookEditSheet />
 
-      <AlertDialog
+      <ConfirmDialog
+        confirmLabel="Remove endpoint"
+        description="Its encrypted URL and signing keys are erased immediately. Pending deliveries are canceled while safe history is retained temporarily."
+        onConfirm={handleRemove}
         onOpenChange={(open) => {
           if (!open) {
             setConfirmRemove(false);
           }
         }}
         open={confirmRemove}
-      >
-        <AlertDialogPopup>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove webhook endpoint?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Its encrypted URL and signing keys are erased immediately. Pending
-              deliveries are canceled while safe history is retained
-              temporarily.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button onClick={handleRemove} variant="destructive">
-              Remove endpoint
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogPopup>
-      </AlertDialog>
+        title="Remove webhook endpoint?"
+      />
     </>
   );
 }

@@ -27,6 +27,7 @@ import { Route as SRobotsDottxtRouteImport } from "./routes/s/robots[.]txt"
 import { Route as SSitemapDotxmlRouteImport } from "./routes/s/sitemap[.]xml"
 import { Route as DashboardOrganizationIdDashboardLayoutRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout"
 import { Route as DashboardOrganizationIdSettingsRouteImport } from "./routes/_dashboard/$organizationId/settings"
+import { Route as DashboardInvitationInvitationIdRouteImport } from "./routes/_dashboard/invitation/$invitationId"
 import { Route as SBBoardSlugRouteImport } from "./routes/s/b/$boardSlug"
 import { Route as SChangelogIndexRouteImport } from "./routes/s/changelog/index"
 import { Route as SChangelogChangelogSlugRouteImport } from "./routes/s/changelog/$changelogSlug"
@@ -44,10 +45,12 @@ import { Route as DashboardOrganizationIdSettingsCustomizeRouteImport } from "./
 import { Route as DashboardOrganizationIdSettingsDevelopersRouteImport } from "./routes/_dashboard/$organizationId/settings/developers"
 import { Route as DashboardOrganizationIdSettingsFeedbackTagsRouteImport } from "./routes/_dashboard/$organizationId/settings/feedback-tags"
 import { Route as DashboardOrganizationIdSettingsMembersRouteImport } from "./routes/_dashboard/$organizationId/settings/members"
+import { Route as DashboardOrganizationIdSettingsNotificationsRouteImport } from "./routes/_dashboard/$organizationId/settings/notifications"
 import { Route as DashboardOrganizationIdSettingsPreferencesRouteImport } from "./routes/_dashboard/$organizationId/settings/preferences"
 import { Route as DashboardOrganizationIdSettingsProfileRouteImport } from "./routes/_dashboard/$organizationId/settings/profile"
 import { Route as DashboardOrganizationIdSettingsRoadmapRouteImport } from "./routes/_dashboard/$organizationId/settings/roadmap"
 import { Route as DashboardOrganizationIdSettingsSecurityRouteImport } from "./routes/_dashboard/$organizationId/settings/security"
+import { Route as DashboardOrganizationIdSettingsWidgetRouteImport } from "./routes/_dashboard/$organizationId/settings/widget"
 import { Route as DashboardOrganizationIdSettingsWorkspaceRouteImport } from "./routes/_dashboard/$organizationId/settings/workspace"
 import { Route as DashboardOrganizationIdDashboardLayoutChangelogIndexRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/changelog/index"
 import { Route as DashboardOrganizationIdDashboardLayoutChangelogDraftRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/changelog/draft"
@@ -162,6 +165,12 @@ const DashboardOrganizationIdSettingsRoute =
     path: "/settings",
     getParentRoute: () => DashboardOrganizationIdRoute,
   } as any)
+const DashboardInvitationInvitationIdRoute =
+  DashboardInvitationInvitationIdRouteImport.update({
+    id: "/invitation/$invitationId",
+    path: "/invitation/$invitationId",
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const SBBoardSlugRoute = SBBoardSlugRouteImport.update({
   id: "/b/$boardSlug",
   path: "/b/$boardSlug",
@@ -257,6 +266,12 @@ const DashboardOrganizationIdSettingsMembersRoute =
     path: "/members",
     getParentRoute: () => DashboardOrganizationIdSettingsRoute,
   } as any)
+const DashboardOrganizationIdSettingsNotificationsRoute =
+  DashboardOrganizationIdSettingsNotificationsRouteImport.update({
+    id: "/notifications",
+    path: "/notifications",
+    getParentRoute: () => DashboardOrganizationIdSettingsRoute,
+  } as any)
 const DashboardOrganizationIdSettingsPreferencesRoute =
   DashboardOrganizationIdSettingsPreferencesRouteImport.update({
     id: "/preferences",
@@ -279,6 +294,12 @@ const DashboardOrganizationIdSettingsSecurityRoute =
   DashboardOrganizationIdSettingsSecurityRouteImport.update({
     id: "/security",
     path: "/security",
+    getParentRoute: () => DashboardOrganizationIdSettingsRoute,
+  } as any)
+const DashboardOrganizationIdSettingsWidgetRoute =
+  DashboardOrganizationIdSettingsWidgetRouteImport.update({
+    id: "/widget",
+    path: "/widget",
     getParentRoute: () => DashboardOrganizationIdSettingsRoute,
   } as any)
 const DashboardOrganizationIdSettingsWorkspaceRoute =
@@ -438,6 +459,7 @@ export interface FileRoutesByFullPath {
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
   "/s/": typeof SIndexRoute
   "/$organizationId/settings": typeof DashboardOrganizationIdSettingsRouteWithChildren
+  "/invitation/$invitationId": typeof DashboardInvitationInvitationIdRoute
   "/s/b/$boardSlug": typeof SBBoardSlugRoute
   "/s/changelog/$changelogSlug": typeof SChangelogChangelogSlugRoute
   "/s/changelog/rss.xml": typeof SChangelogRssDotxmlRoute
@@ -453,10 +475,12 @@ export interface FileRoutesByFullPath {
   "/$organizationId/settings/developers": typeof DashboardOrganizationIdSettingsDevelopersRoute
   "/$organizationId/settings/feedback-tags": typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof DashboardOrganizationIdSettingsMembersRoute
+  "/$organizationId/settings/notifications": typeof DashboardOrganizationIdSettingsNotificationsRoute
   "/$organizationId/settings/preferences": typeof DashboardOrganizationIdSettingsPreferencesRoute
   "/$organizationId/settings/profile": typeof DashboardOrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof DashboardOrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/security": typeof DashboardOrganizationIdSettingsSecurityRoute
+  "/$organizationId/settings/widget": typeof DashboardOrganizationIdSettingsWidgetRoute
   "/$organizationId/settings/workspace": typeof DashboardOrganizationIdSettingsWorkspaceRoute
   "/$organizationId/": typeof DashboardOrganizationIdDashboardLayoutIndexRoute
   "/$organizationId/settings/": typeof DashboardOrganizationIdSettingsIndexRoute
@@ -498,6 +522,7 @@ export interface FileRoutesByTo {
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
   "/s": typeof SIndexRoute
+  "/invitation/$invitationId": typeof DashboardInvitationInvitationIdRoute
   "/s/b/$boardSlug": typeof SBBoardSlugRoute
   "/s/changelog/$changelogSlug": typeof SChangelogChangelogSlugRoute
   "/s/changelog/rss.xml": typeof SChangelogRssDotxmlRoute
@@ -513,10 +538,12 @@ export interface FileRoutesByTo {
   "/$organizationId/settings/developers": typeof DashboardOrganizationIdSettingsDevelopersRoute
   "/$organizationId/settings/feedback-tags": typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof DashboardOrganizationIdSettingsMembersRoute
+  "/$organizationId/settings/notifications": typeof DashboardOrganizationIdSettingsNotificationsRoute
   "/$organizationId/settings/preferences": typeof DashboardOrganizationIdSettingsPreferencesRoute
   "/$organizationId/settings/profile": typeof DashboardOrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof DashboardOrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/security": typeof DashboardOrganizationIdSettingsSecurityRoute
+  "/$organizationId/settings/widget": typeof DashboardOrganizationIdSettingsWidgetRoute
   "/$organizationId/settings/workspace": typeof DashboardOrganizationIdSettingsWorkspaceRoute
   "/$organizationId/settings": typeof DashboardOrganizationIdSettingsIndexRoute
   "/$organizationId/changelog/draft": typeof DashboardOrganizationIdDashboardLayoutChangelogDraftRoute
@@ -561,6 +588,7 @@ export interface FileRoutesById {
   "/s/": typeof SIndexRoute
   "/_dashboard/$organizationId/_dashboard-layout": typeof DashboardOrganizationIdDashboardLayoutRouteWithChildren
   "/_dashboard/$organizationId/settings": typeof DashboardOrganizationIdSettingsRouteWithChildren
+  "/_dashboard/invitation/$invitationId": typeof DashboardInvitationInvitationIdRoute
   "/s/b/$boardSlug": typeof SBBoardSlugRoute
   "/s/changelog/$changelogSlug": typeof SChangelogChangelogSlugRoute
   "/s/changelog/rss.xml": typeof SChangelogRssDotxmlRoute
@@ -576,10 +604,12 @@ export interface FileRoutesById {
   "/_dashboard/$organizationId/settings/developers": typeof DashboardOrganizationIdSettingsDevelopersRoute
   "/_dashboard/$organizationId/settings/feedback-tags": typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
   "/_dashboard/$organizationId/settings/members": typeof DashboardOrganizationIdSettingsMembersRoute
+  "/_dashboard/$organizationId/settings/notifications": typeof DashboardOrganizationIdSettingsNotificationsRoute
   "/_dashboard/$organizationId/settings/preferences": typeof DashboardOrganizationIdSettingsPreferencesRoute
   "/_dashboard/$organizationId/settings/profile": typeof DashboardOrganizationIdSettingsProfileRoute
   "/_dashboard/$organizationId/settings/roadmap": typeof DashboardOrganizationIdSettingsRoadmapRoute
   "/_dashboard/$organizationId/settings/security": typeof DashboardOrganizationIdSettingsSecurityRoute
+  "/_dashboard/$organizationId/settings/widget": typeof DashboardOrganizationIdSettingsWidgetRoute
   "/_dashboard/$organizationId/settings/workspace": typeof DashboardOrganizationIdSettingsWorkspaceRoute
   "/_dashboard/$organizationId/_dashboard-layout/": typeof DashboardOrganizationIdDashboardLayoutIndexRoute
   "/_dashboard/$organizationId/settings/": typeof DashboardOrganizationIdSettingsIndexRoute
@@ -625,6 +655,7 @@ export interface FileRouteTypes {
     | "/s/sitemap.xml"
     | "/s/"
     | "/$organizationId/settings"
+    | "/invitation/$invitationId"
     | "/s/b/$boardSlug"
     | "/s/changelog/$changelogSlug"
     | "/s/changelog/rss.xml"
@@ -640,10 +671,12 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/developers"
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
+    | "/$organizationId/settings/notifications"
     | "/$organizationId/settings/preferences"
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/security"
+    | "/$organizationId/settings/widget"
     | "/$organizationId/settings/workspace"
     | "/$organizationId/"
     | "/$organizationId/settings/"
@@ -685,6 +718,7 @@ export interface FileRouteTypes {
     | "/s/robots.txt"
     | "/s/sitemap.xml"
     | "/s"
+    | "/invitation/$invitationId"
     | "/s/b/$boardSlug"
     | "/s/changelog/$changelogSlug"
     | "/s/changelog/rss.xml"
@@ -700,10 +734,12 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/developers"
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
+    | "/$organizationId/settings/notifications"
     | "/$organizationId/settings/preferences"
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/security"
+    | "/$organizationId/settings/widget"
     | "/$organizationId/settings/workspace"
     | "/$organizationId/settings"
     | "/$organizationId/changelog/draft"
@@ -747,6 +783,7 @@ export interface FileRouteTypes {
     | "/s/"
     | "/_dashboard/$organizationId/_dashboard-layout"
     | "/_dashboard/$organizationId/settings"
+    | "/_dashboard/invitation/$invitationId"
     | "/s/b/$boardSlug"
     | "/s/changelog/$changelogSlug"
     | "/s/changelog/rss.xml"
@@ -762,10 +799,12 @@ export interface FileRouteTypes {
     | "/_dashboard/$organizationId/settings/developers"
     | "/_dashboard/$organizationId/settings/feedback-tags"
     | "/_dashboard/$organizationId/settings/members"
+    | "/_dashboard/$organizationId/settings/notifications"
     | "/_dashboard/$organizationId/settings/preferences"
     | "/_dashboard/$organizationId/settings/profile"
     | "/_dashboard/$organizationId/settings/roadmap"
     | "/_dashboard/$organizationId/settings/security"
+    | "/_dashboard/$organizationId/settings/widget"
     | "/_dashboard/$organizationId/settings/workspace"
     | "/_dashboard/$organizationId/_dashboard-layout/"
     | "/_dashboard/$organizationId/settings/"
@@ -927,6 +966,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DashboardOrganizationIdSettingsRouteImport
       parentRoute: typeof DashboardOrganizationIdRoute
     }
+    "/_dashboard/invitation/$invitationId": {
+      id: "/_dashboard/invitation/$invitationId"
+      path: "/invitation/$invitationId"
+      fullPath: "/invitation/$invitationId"
+      preLoaderRoute: typeof DashboardInvitationInvitationIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     "/s/b/$boardSlug": {
       id: "/s/b/$boardSlug"
       path: "/b/$boardSlug"
@@ -1046,6 +1092,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DashboardOrganizationIdSettingsMembersRouteImport
       parentRoute: typeof DashboardOrganizationIdSettingsRoute
     }
+    "/_dashboard/$organizationId/settings/notifications": {
+      id: "/_dashboard/$organizationId/settings/notifications"
+      path: "/notifications"
+      fullPath: "/$organizationId/settings/notifications"
+      preLoaderRoute: typeof DashboardOrganizationIdSettingsNotificationsRouteImport
+      parentRoute: typeof DashboardOrganizationIdSettingsRoute
+    }
     "/_dashboard/$organizationId/settings/preferences": {
       id: "/_dashboard/$organizationId/settings/preferences"
       path: "/preferences"
@@ -1072,6 +1125,13 @@ declare module "@tanstack/react-router" {
       path: "/security"
       fullPath: "/$organizationId/settings/security"
       preLoaderRoute: typeof DashboardOrganizationIdSettingsSecurityRouteImport
+      parentRoute: typeof DashboardOrganizationIdSettingsRoute
+    }
+    "/_dashboard/$organizationId/settings/widget": {
+      id: "/_dashboard/$organizationId/settings/widget"
+      path: "/widget"
+      fullPath: "/$organizationId/settings/widget"
+      preLoaderRoute: typeof DashboardOrganizationIdSettingsWidgetRouteImport
       parentRoute: typeof DashboardOrganizationIdSettingsRoute
     }
     "/_dashboard/$organizationId/settings/workspace": {
@@ -1331,10 +1391,12 @@ interface DashboardOrganizationIdSettingsRouteChildren {
   DashboardOrganizationIdSettingsDevelopersRoute: typeof DashboardOrganizationIdSettingsDevelopersRoute
   DashboardOrganizationIdSettingsFeedbackTagsRoute: typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
   DashboardOrganizationIdSettingsMembersRoute: typeof DashboardOrganizationIdSettingsMembersRoute
+  DashboardOrganizationIdSettingsNotificationsRoute: typeof DashboardOrganizationIdSettingsNotificationsRoute
   DashboardOrganizationIdSettingsPreferencesRoute: typeof DashboardOrganizationIdSettingsPreferencesRoute
   DashboardOrganizationIdSettingsProfileRoute: typeof DashboardOrganizationIdSettingsProfileRoute
   DashboardOrganizationIdSettingsRoadmapRoute: typeof DashboardOrganizationIdSettingsRoadmapRoute
   DashboardOrganizationIdSettingsSecurityRoute: typeof DashboardOrganizationIdSettingsSecurityRoute
+  DashboardOrganizationIdSettingsWidgetRoute: typeof DashboardOrganizationIdSettingsWidgetRoute
   DashboardOrganizationIdSettingsWorkspaceRoute: typeof DashboardOrganizationIdSettingsWorkspaceRoute
   DashboardOrganizationIdSettingsIndexRoute: typeof DashboardOrganizationIdSettingsIndexRoute
   DashboardOrganizationIdSettingsWebhooksConnectionIdRoute: typeof DashboardOrganizationIdSettingsWebhooksConnectionIdRoute
@@ -1363,6 +1425,8 @@ const DashboardOrganizationIdSettingsRouteChildren: DashboardOrganizationIdSetti
       DashboardOrganizationIdSettingsFeedbackTagsRoute,
     DashboardOrganizationIdSettingsMembersRoute:
       DashboardOrganizationIdSettingsMembersRoute,
+    DashboardOrganizationIdSettingsNotificationsRoute:
+      DashboardOrganizationIdSettingsNotificationsRoute,
     DashboardOrganizationIdSettingsPreferencesRoute:
       DashboardOrganizationIdSettingsPreferencesRoute,
     DashboardOrganizationIdSettingsProfileRoute:
@@ -1371,6 +1435,8 @@ const DashboardOrganizationIdSettingsRouteChildren: DashboardOrganizationIdSetti
       DashboardOrganizationIdSettingsRoadmapRoute,
     DashboardOrganizationIdSettingsSecurityRoute:
       DashboardOrganizationIdSettingsSecurityRoute,
+    DashboardOrganizationIdSettingsWidgetRoute:
+      DashboardOrganizationIdSettingsWidgetRoute,
     DashboardOrganizationIdSettingsWorkspaceRoute:
       DashboardOrganizationIdSettingsWorkspaceRoute,
     DashboardOrganizationIdSettingsIndexRoute:
@@ -1421,6 +1487,7 @@ interface DashboardRouteChildren {
   DashboardResetPasswordRoute: typeof DashboardResetPasswordRoute
   DashboardSignInRoute: typeof DashboardSignInRoute
   DashboardSignUpRoute: typeof DashboardSignUpRoute
+  DashboardInvitationInvitationIdRoute: typeof DashboardInvitationInvitationIdRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
@@ -1432,6 +1499,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardResetPasswordRoute: DashboardResetPasswordRoute,
   DashboardSignInRoute: DashboardSignInRoute,
   DashboardSignUpRoute: DashboardSignUpRoute,
+  DashboardInvitationInvitationIdRoute: DashboardInvitationInvitationIdRoute,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(

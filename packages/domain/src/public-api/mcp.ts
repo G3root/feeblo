@@ -13,14 +13,8 @@ import * as SchemaAST from "effect/SchemaAST";
 import type { unhandled } from "effect/Types";
 
 import { Auth } from "../auth-handler";
-import { PublicApiChangelogRepository } from "../changelog/public-api/repository";
-import { PublicApiCommentRepository } from "../comments/public-api/repository";
-import { CommentService } from "../comments/service";
-import { PublicApiEndUserRepository } from "../contact/public-api/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
-import { PublicApiPostRepository } from "../post/public-api/repository";
 import { RateLimitService } from "../rate-limit/service";
-import { PublicApiVoteRepository } from "../upvote/public-api/repository";
 import {
   authenticatePublicApiKey,
   type PublicApiAuthenticationFailure,
@@ -42,6 +36,8 @@ import {
   PUBLIC_API_KEY_RATE_LIMIT,
 } from "./middleware";
 import { PublicApiOperations } from "./operations";
+import type { PublicApiDependencies } from "./operations";
+import { PublicApiProjections } from "./projections";
 import { PublicApiInternals } from "./router";
 
 /**
@@ -144,36 +140,48 @@ type PublicApiMcpTools = typeof PublicApiMcpToolkit.tools;
  * The toolkit does the surface work — decoding parameters with the tool's own
  * schema, encoding the success, encoding a declared failure as an `isError`
  * result, and answering a parameter the schema rejects as a protocol error —
- * so what is left is the operation's handler, keyed by its tool name.
+ * so what is left is the operation's handler, keyed by its tool name. The
+ * operation's stable dependencies are captured here, when the toolkit layer is
+ * built; the only requirement a handler still declares is the key
+ * middleware's request-scoped caller.
  */
-const buildPublicApiMcpHandlers =
-  (): Toolkit.HandlersFrom<PublicApiMcpTools> => {
+const buildPublicApiMcpHandlers = () =>
+  Effect.gen(function* () {
+    const context = yield* Effect.context<PublicApiDependencies>();
+
     const handlers: Record<
       string,
       // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The registry erases each operation's input to `unknown` (ADR 0007), and a record keyed by tool name cannot name one input type per key; the toolkit decodes a call's parameters with the operation's own schema before this handler runs, which is what turns the erased input back into the operation's input type.
-      (parameters: unknown) => Effect.Effect<unknown, unknown, never>
+      (parameters: unknown) => Effect.Effect<unknown, unknown, PublicApiCaller>
     > = {};
 
     for (const operation of PublicApiOperations) {
-      // SAFETY: the erasure above, narrowed back for the cast. The handler is the
-      // operation's own, so the value the toolkit decodes with `operation.input`
-      // is exactly what it accepts.
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-      handlers[operation.name] = operation.handler as (
-        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- See the record's comment: this is the erased view of the operation's own input type.
-        input: unknown
-      ) => Effect.Effect<unknown, unknown, never>;
+      handlers[operation.name] = (parameters) =>
+        // SAFETY: the erasure above, narrowed back for the cast. The handler
+        // is the operation's own, so the value the toolkit decodes with
+        // `operation.input` is exactly what it accepts.
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        (
+          operation.handler as (
+            // oxlint-disable-next-line anti-slop/no-unknown-parameters -- See the record's comment: this is the erased view of the operation's own input type.
+            input: unknown
+          ) => Effect.Effect<
+            unknown,
+            unknown,
+            PublicApiDependencies | PublicApiCaller
+          >
+        )(parameters).pipe(Effect.provideContext(context));
     }
 
     // SAFETY: the record is built from the same registry that produced the
     // toolkit, so it is keyed by exactly the toolkit's tool names and holds one
-    // handler per tool. A loop over a heterogeneous array cannot carry that
-    // mapping in its type, which is the one thing this assertion restores; the
-    // intermediate `unknown` is what lets the assertion pass the compiler's
-    // overlap check at all.
+    // handler per tool. The one requirement the mapped type cannot express is
+    // `PublicApiCaller`, which the key middleware provides to every request;
+    // every stable dependency is in the layer's own type. The intermediate
+    // `unknown` is what lets the assertion pass the compiler's overlap check.
     // oxlint-disable-next-line anti-slop/no-chained-type-assertions, typescript/no-unsafe-type-assertion -- See the SAFETY comment: the erased record is exactly the toolkit's handler map, and a single assertion cannot convert between the index signature and the mapped type.
     return handlers as unknown as Toolkit.HandlersFrom<PublicApiMcpTools>;
-  };
+  });
 
 const PublicApiMcpHandlers = PublicApiMcpToolkit.toLayer(
   buildPublicApiMcpHandlers()
@@ -327,21 +335,17 @@ const makePublicApiMcpKeyMiddleware = (budget: PublicApiKeyBudget) =>
 /**
  * The layers the MCP route's own reads and writes need.
  *
- * The same bundle the HTTP route composes: the shared feature repositories come
- * from `PublicApiInternals`, and the public projections (the reads that must
- * not select actor identifiers, the changelog publication orchestration) and
- * the dashboard comment write path are built on top of it. Constructed here
- * rather than imported from `router.ts` so each surface owns its composition
- * (ADR 0006) and adding a public projection to MCP is an edit in one file.
+ * The shared feature repositories come from `PublicApiInternals`, and the
+ * public projections the two Public API surfaces both serve — the reads that
+ * must not select actor identifiers, the changelog publication orchestration,
+ * and the dashboard comment write path — come from the one bundle
+ * `projections.ts` declares. Providing rather than merging keeps them out of
+ * this route's output; the HTTP route merges them because its tests drive the
+ * repositories directly.
  */
-const PublicApiMcpRepositories = Layer.mergeAll(
-  PublicApiChangelogRepository.layer,
-  PublicApiCommentRepository.layer,
-  PublicApiEndUserRepository.layer,
-  PublicApiPostRepository.layer,
-  PublicApiVoteRepository.layer,
-  CommentService.layer
-).pipe(Layer.provide(PublicApiInternals));
+const PublicApiMcpRepositories = PublicApiProjections.pipe(
+  Layer.provide(PublicApiInternals)
+);
 
 /**
  * Builds the `/mcp` route with a specific key budget.

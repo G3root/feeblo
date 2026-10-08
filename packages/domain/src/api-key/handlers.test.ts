@@ -4,6 +4,7 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { type LegidOf, WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -15,6 +16,10 @@ import { ApiKeyRpcHandlersEffect } from "./handlers";
 import { ApiKeyPolicy } from "./policies";
 import { ApiKeyRepository } from "./repository";
 import type { ApiKeyAuthCreated } from "./schema";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 type Plan = "free" | "starter";
 
@@ -95,7 +100,7 @@ describe("ApiKeyRpcHandlers", () => {
       }
 
       const db = yield* currentDb;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.productTable).values({
         id: `product_${organizationId}`,
@@ -118,7 +123,7 @@ describe("ApiKeyRpcHandlers", () => {
         recurringIntervalCount: 1,
         status: "active",
         currentPeriodStart: now,
-        currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+        currentPeriodEnd: dateAt(now.getTime() + 30 * 24 * 60 * 60 * 1000),
         customerId: `polar_customer_${organizationId}`,
         productId: `product_${organizationId}`,
         createdAt: now,
@@ -132,7 +137,7 @@ describe("ApiKeyRpcHandlers", () => {
       const organizationId = yield* WorkspaceId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
@@ -170,7 +175,7 @@ describe("ApiKeyRpcHandlers", () => {
   ) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
-      const now = new Date("2026-09-18T00:00:00.000Z");
+      const now = dateAt("2026-09-18T00:00:00.000Z");
 
       yield* db.insert(schema.apiKeyTable).values({
         id: options.id,
@@ -212,7 +217,7 @@ describe("ApiKeyRpcHandlers", () => {
      * fails it to prove the request still returns the one-time plaintext
      * instead of stranding a live key nobody can reveal.
      */
-    const FailAttributionRepository = Layer.succeed(ApiKeyRepository, {
+    const failAttributionRepository = {
       assignCreator: () =>
         Effect.fail(
           new InternalServerError({
@@ -221,7 +226,7 @@ describe("ApiKeyRpcHandlers", () => {
         ),
       listForOrganization: () => Effect.succeed([]),
       revoke: () => Effect.void,
-    });
+    };
 
     it.effect(
       "returns the plaintext once and a scoped summary for an owner",
@@ -259,10 +264,10 @@ describe("ApiKeyRpcHandlers", () => {
               "changelog.read",
             ],
             creatorId: fixture.userId,
-            createdAt: new Date("2026-09-18T00:00:00.000Z"),
+            createdAt: dateAt("2026-09-18T00:00:00.000Z"),
             lastRequest: null,
             // 30 days after the double's creation date.
-            expiresAt: new Date("2026-10-18T00:00:00.000Z"),
+            expiresAt: dateAt("2026-10-18T00:00:00.000Z"),
           });
         })
     );
@@ -333,7 +338,7 @@ describe("ApiKeyRpcHandlers", () => {
       () =>
         Effect.gen(function* () {
           const handlers = yield* ApiKeyRpcHandlersEffect.pipe(
-            Effect.provide(FailAttributionRepository)
+            Effect.provideService(ApiKeyRepository, failAttributionRepository)
           );
           const fixture = yield* makeFixture("starter");
 

@@ -1,8 +1,19 @@
 import { currentDb, schema } from "@feeblo/db";
-import { SubscriptionId } from "@feeblo/id";
+import { entitledSubscriptionCondition } from "@feeblo/db/schema/billing";
+import { SubscriptionId, WorkspaceId } from "@feeblo/id";
 import type { WebhookProductCreatedPayload } from "@polar-sh/sdk/models/components/webhookproductcreatedpayload";
 import type { WebhookSubscriptionCreatedPayload } from "@polar-sh/sdk/models/components/webhooksubscriptioncreatedpayload";
-import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  notExists,
+  or,
+  sql,
+} from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -13,6 +24,7 @@ import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 
 import { PAID_PLAN_KEYS } from "../plan-entitlements";
+import { PolarService } from "./service";
 
 type SubscriptionPayload = WebhookSubscriptionCreatedPayload["data"];
 type ProductPayload = WebhookProductCreatedPayload["data"];
@@ -24,18 +36,13 @@ interface TFindSubscriptionByOrganizationId {
   organizationId: string;
 }
 
+interface TEnqueueSubscriptionRevocations {
+  organizationId: string;
+}
+
 interface TFindCheckoutProduct {
   productId: string;
 }
-
-const currentlyEntitledSubscription = (now: Date) =>
-  or(
-    inArray(schema.subscriptionTable.status, ["active", "trialing"]),
-    and(
-      eq(schema.subscriptionTable.status, "past_due"),
-      gt(schema.subscriptionTable.currentPeriodEnd, now)
-    )
-  );
 
 const DbSubscriptionStatus = Schema.Literals([
   "incomplete",
@@ -86,13 +93,44 @@ const ProductMetadataFromPolar = Schema.Unknown.pipe(
   )
 );
 
-// These decode Polar webhook payload fields synchronously on purpose: the
-// Polar SDK types them as strings, so a decode failure means the SDK sent
-// garbage, and dying the fiber (defect) is deliberate over silently coercing
-// the tenancy key. Typing the failure would widen the billing repository's
-// error contract, which needs owner sign-off (AGENTS.md, billing surface).
+/**
+ * The `org` key a checkout stamps into Polar metadata. Polar types metadata
+ * values as `string | number | boolean` and the key is absent on
+ * subscriptions Feeblo did not create, so this is an optional read, not a
+ * string decode: a value that is not a string means "not our subscription",
+ * not "the SDK sent garbage".
+ */
+const SubscriptionMetadataSchema = Schema.Struct({
+  org: Schema.String,
+});
+
+const SubscriptionOrganizationIdFromPolar = Schema.Unknown.pipe(
+  Schema.decodeTo(
+    Schema.Option(Schema.String),
+    SchemaTransformation.transform({
+      decode: (value) =>
+        Option.map(
+          Schema.decodeUnknownOption(SubscriptionMetadataSchema)(value),
+          (metadata) => metadata.org
+        ),
+      encode: (value) => value,
+    })
+  )
+);
+
+// The product id is a genuinely required string on every Polar payload, so a
+// decode failure there means the SDK sent garbage and dying the fiber (defect)
+// is deliberate over silently coercing it. The workspace key is different and
+// is decoded as an Option above, because a subscription without it is merely
+// one Feeblo does not own.
 // eslint-disable-next-line effecttsgo/schema-sync -- see block comment above
 const decodeString = Schema.decodeUnknownSync(Schema.String);
+// Never fails: SubscriptionOrganizationIdFromPolar is total and returns an
+// Option. Reported only because the rule cannot see that.
+// eslint-disable-next-line effecttsgo/schema-sync -- see block comment above
+const decodeSubscriptionOrganizationId = Schema.decodeUnknownSync(
+  SubscriptionOrganizationIdFromPolar
+);
 // eslint-disable-next-line effecttsgo/schema-sync -- see block comment above
 const decodeSubscriptionStatus = Schema.decodeUnknownSync(
   SubscriptionStatusFromPolar
@@ -110,11 +148,16 @@ const decodeProductMetadata = Schema.decodeUnknownSync(
 
 const toSubscriptionValues = (
   payload: SubscriptionPayload,
-  id: string
+  id: string,
+  organizationId: string,
+  eventTimestamp: Date,
+  polarServer: string
 ): SubscriptionInsert => ({
   id,
   externalId: payload.id,
-  organizationId: decodeString(payload.metadata.org),
+  organizationId,
+  lastEventAt: eventTimestamp,
+  polarServer,
   amount: payload.amount,
   cancelAtPeriodEnd: payload.cancelAtPeriodEnd,
   currency: payload.currency,
@@ -159,21 +202,113 @@ const toProductValues = (
 
 const makeBillingRepository = Effect.gen(function* () {
   const db = yield* currentDb;
+  // The Polar target this deployment is configured for. It stamps the origin
+  // onto subscription rows at webhook-sync time and seeds the revocation
+  // queue with it, so a queued row is only ever conclusive against the
+  // server that actually held the subscription.
+  const polarService = yield* PolarService;
 
   return {
-    createSubscription: (payload: SubscriptionPayload) =>
+    /**
+     * Applies one Polar subscription event. Three events are deliberately not
+     * errors: a subscription whose metadata carries no string `org` (Polar
+     * dashboard, import, or edited metadata) belongs to no workspace here; one
+     * whose workspace row is already gone arrives after a deletion — which may
+     * not have been able to queue its revocation, so one is written now and
+     * the retry loop closes it; and one whose metadata `org` is not a Feeblo
+     * workspace id is foreign metadata this deployment never minted, so it is
+     * only logged. All three are acknowledged so Polar stops retrying an event
+     * this deployment can never apply.
+     */
+    upsertSubscription: (payload: SubscriptionPayload, eventTimestamp: Date) =>
       Effect.gen(function* () {
-        const id = yield* SubscriptionId.generate;
-        yield* db
-          .insert(schema.subscriptionTable)
-          .values(toSubscriptionValues(payload, id))
-          .onConflictDoNothing();
-      }),
-    upsertSubscription: (payload: SubscriptionPayload) =>
-      Effect.gen(function* () {
+        const organizationId = decodeSubscriptionOrganizationId(
+          payload.metadata
+        );
+        if (Option.isNone(organizationId)) {
+          yield* Effect.logWarning(
+            "Ignoring a Polar subscription that carries no workspace id",
+            {
+              externalSubscriptionId: payload.id,
+              status: payload.status,
+            }
+          );
+          return;
+        }
+
+        const organization = yield* db
+          .select({ id: schema.organizationTable.id })
+          .from(schema.organizationTable)
+          .where(eq(schema.organizationTable.id, organizationId.value))
+          .limit(1);
+        if (organization.length === 0) {
+          // The workspace is gone, but this event still describes a live
+          // subscription on the target whose webhook just verified against
+          // this deployment's secret. A deletion whose `subscription.created`
+          // had not landed yet could not queue a revocation for it, so queue
+          // one here — the org-gone gate makes it immediately eligible for
+          // the retry loop, and the row's idempotent key keeps a revocation
+          // the deletion already queued from being duplicated or re-opened.
+          // A metadata org passing the legid checksum — the same scheme this
+          // deployment mints workspace ids with, not merely the `org_` shape —
+          // is treated as ours and queued. It is the strongest evidence
+          // available on this path: the local subscription row is gone, and a
+          // deployment marker stamped on the checkout was rejected because
+          // every subscription created before it would regress to
+          // log-and-acknowledge here, re-opening the missed-redelivery bug.
+          // The check does not separate two Feeblo deployments sharing one
+          // Polar org: the secret authenticates the org, not the deployment,
+          // and the checksum proves the scheme, not the writer. Tenancy
+          // isolation — one Polar org per deployment, no other actor writing
+          // legid workspace ids into metadata.org — is an operational
+          // invariant of this path (ADR 0014); a shared org is unsupported
+          // here, and the stamped-identifier check is the escalation path
+          // if sharing ever becomes a requirement.
+          // Anything failing verification could be an operator-stamped or
+          // foreign subscription; touching it could revoke a subscription the
+          // operator created directly in Polar, so it is only logged.
+          if (yield* WorkspaceId.verify(organizationId.value)) {
+            const now = yield* DateTime.nowAsDate;
+            yield* db
+              .insert(schema.subscriptionRevocationTable)
+              .values({
+                externalSubscriptionId: payload.id,
+                organizationId: organizationId.value,
+                polarServer: polarService.target,
+                createdAt: now,
+                updatedAt: now,
+              })
+              .onConflictDoNothing();
+            yield* Effect.logWarning(
+              "Queueing a revocation for a Polar subscription whose workspace is already deleted",
+              {
+                externalSubscriptionId: payload.id,
+                organizationId: organizationId.value,
+                status: payload.status,
+              }
+            );
+          } else {
+            yield* Effect.logWarning(
+              "Ignoring a Polar subscription whose workspace id is not a Feeblo id",
+              {
+                externalSubscriptionId: payload.id,
+                organizationId: organizationId.value,
+                status: payload.status,
+              }
+            );
+          }
+          return;
+        }
+
         const id = yield* SubscriptionId.generate;
         const now = yield* DateTime.nowAsDate;
-        const values = toSubscriptionValues(payload, id);
+        const values = toSubscriptionValues(
+          payload,
+          id,
+          organizationId.value,
+          eventTimestamp,
+          polarService.target
+        );
         const { id: _id, ...updateValues } = values;
         yield* db
           .insert(schema.subscriptionTable)
@@ -184,16 +319,11 @@ const makeBillingRepository = Effect.gen(function* () {
               ...updateValues,
               updatedAt: now,
             },
+            // Polar retries failed deliveries, so a retried older event can
+            // arrive after a newer one. Keep the newer state; only rows synced
+            // before `lastEventAt` existed (null) accept any event.
+            setWhere: sql`${schema.subscriptionTable.lastEventAt} is null or ${schema.subscriptionTable.lastEventAt} <= ${eventTimestamp}`,
           });
-      }),
-    createProduct: (payload: ProductPayload) =>
-      Effect.gen(function* () {
-        const now = yield* DateTime.nowAsDate;
-        yield* db
-          .insert(schema.productTable)
-          .values(toProductValues(payload, now))
-          .onConflictDoNothing()
-          .pipe(Effect.asVoid);
       }),
     upsertProduct: (payload: ProductPayload) =>
       Effect.gen(function* () {
@@ -255,7 +385,7 @@ const makeBillingRepository = Effect.gen(function* () {
           .where(
             and(
               eq(schema.subscriptionTable.organizationId, organizationId),
-              currentlyEntitledSubscription(now)
+              entitledSubscriptionCondition(now)
             )
           )
           .orderBy(
@@ -284,6 +414,161 @@ const makeBillingRepository = Effect.gen(function* () {
         )
         .limit(1)
         .pipe(Effect.map(EffectArray.get(0))),
+
+    /** Every subscription a workspace holds, while the rows still exist. */
+    findSubscriptionsByOrganizationId: ({
+      organizationId,
+    }: TFindSubscriptionByOrganizationId) =>
+      db
+        .select({ externalId: schema.subscriptionTable.externalId })
+        .from(schema.subscriptionTable)
+        .where(eq(schema.subscriptionTable.organizationId, organizationId)),
+
+    /**
+     * Enqueues one revocation row per subscription the workspace holds,
+     * idempotently, binding each row to the Polar target the subscription was
+     * synced from (`polarServer` on the subscription row). Rows synced before
+     * that column existed have no known origin and fall back to the currently
+     * configured target — the best available evidence for a deployment that
+     * never changed targets, and a documented residual risk for one that did.
+     * Runs inside the deletion transaction for account deletion and immediately
+     * before the delete in the workspace hook, so a rolled-back delete leaves
+     * no work the retry loop would act on: the loop only revokes rows whose
+     * organization no longer exists.
+     */
+    enqueueSubscriptionRevocationsForOrganization: ({
+      organizationId,
+    }: TEnqueueSubscriptionRevocations) =>
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        const subscriptions = yield* db
+          .select({
+            externalId: schema.subscriptionTable.externalId,
+            polarServer: schema.subscriptionTable.polarServer,
+          })
+          .from(schema.subscriptionTable)
+          .where(eq(schema.subscriptionTable.organizationId, organizationId));
+        if (subscriptions.length === 0) {
+          return;
+        }
+        yield* db
+          .insert(schema.subscriptionRevocationTable)
+          .values(
+            subscriptions.map((subscription) => ({
+              externalSubscriptionId: subscription.externalId,
+              organizationId,
+              polarServer: subscription.polarServer ?? polarService.target,
+              createdAt: now,
+              updatedAt: now,
+            }))
+          )
+          .onConflictDoNothing();
+      }),
+
+    /**
+     * Revocations ready to run: not revoked yet, whose workspace is gone, and
+     * — when `polarServer` is supplied — whose originating target matches it.
+     * Rows bound to another target are excluded here rather than skipped by
+     * the caller, so a stale batch of mismatched rows cannot starve newer
+     * rows out of the sweep's batch window. The organization check is the
+     * safety gate for a deletion that failed after enqueueing.
+     */
+    findPendingSubscriptionRevocations: ({
+      organizationId,
+      polarServer,
+      limit,
+    }: {
+      organizationId?: string;
+      polarServer?: string;
+      limit: number;
+    }) => {
+      const conditions = [
+        isNull(schema.subscriptionRevocationTable.revokedAt),
+        notExists(
+          db
+            .select({ id: schema.organizationTable.id })
+            .from(schema.organizationTable)
+            .where(
+              eq(
+                schema.organizationTable.id,
+                schema.subscriptionRevocationTable.organizationId
+              )
+            )
+        ),
+      ];
+      if (organizationId !== undefined) {
+        conditions.push(
+          eq(schema.subscriptionRevocationTable.organizationId, organizationId)
+        );
+      }
+      if (polarServer !== undefined) {
+        conditions.push(
+          eq(schema.subscriptionRevocationTable.polarServer, polarServer)
+        );
+      }
+      return db
+        .select({
+          externalSubscriptionId:
+            schema.subscriptionRevocationTable.externalSubscriptionId,
+          organizationId: schema.subscriptionRevocationTable.organizationId,
+          polarServer: schema.subscriptionRevocationTable.polarServer,
+          attempts: schema.subscriptionRevocationTable.attempts,
+        })
+        .from(schema.subscriptionRevocationTable)
+        .where(and(...conditions))
+        .orderBy(asc(schema.subscriptionRevocationTable.updatedAt))
+        .limit(limit);
+    },
+
+    markSubscriptionRevocationSucceeded: ({
+      externalSubscriptionId,
+    }: {
+      externalSubscriptionId: string;
+    }) =>
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.subscriptionRevocationTable)
+          .set({ revokedAt: now, lastError: null, updatedAt: now })
+          .where(
+            and(
+              eq(
+                schema.subscriptionRevocationTable.externalSubscriptionId,
+                externalSubscriptionId
+              ),
+              // Setting both marks on `revoked_at is null` keeps a late
+              // failure from a concurrent pass from re-opening a success.
+              isNull(schema.subscriptionRevocationTable.revokedAt)
+            )
+          );
+      }),
+
+    markSubscriptionRevocationFailed: ({
+      externalSubscriptionId,
+      message,
+    }: {
+      externalSubscriptionId: string;
+      message: string;
+    }) =>
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.subscriptionRevocationTable)
+          .set({
+            attempts: sql`${schema.subscriptionRevocationTable.attempts} + 1`,
+            lastError: message,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(
+                schema.subscriptionRevocationTable.externalSubscriptionId,
+                externalSubscriptionId
+              ),
+              isNull(schema.subscriptionRevocationTable.revokedAt)
+            )
+          );
+      }),
   };
 });
 

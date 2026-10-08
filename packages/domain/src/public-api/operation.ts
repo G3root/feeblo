@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 import { ForbiddenScopeError } from "./errors";
-import { requirePublicApiScope } from "./middleware";
+import { requirePublicApiScope, type PublicApiCaller } from "./middleware";
 
 /**
  * What an operation says about itself to a non-HTTP surface.
@@ -134,7 +134,9 @@ export const defineOperation = <
   Input,
   Output,
   Schema.Union<readonly [Failure, typeof ForbiddenScopeError]>,
-  Requirements
+  // The scope check runs first and reads the key middleware's caller, so every
+  // operation requires it in addition to its own dependencies.
+  Requirements | PublicApiCaller
 > => {
   const failure = Schema.Union([options.failure, ForbiddenScopeError]);
 

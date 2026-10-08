@@ -2,6 +2,7 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
 import { and, eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -16,6 +17,10 @@ import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { ChangelogSubscriptionRpcHandlersEffect } from "./handlers";
 import { ChangelogSubscriptionRepository } from "./repository";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 describe("ChangelogSubscriptionRpcHandlers", () => {
   const Repositories = Layer.mergeAll(
@@ -59,7 +64,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
     Effect.gen(function* () {
       const db = yield* currentDb;
       const organizationId = yield* WorkspaceId.generate;
-      const now = new Date("2026-08-09T00:00:00.000Z");
+      const now = dateAt("2026-08-09T00:00:00.000Z");
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
         name: "Subscription workspace",
@@ -104,7 +109,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
         recurringIntervalCount: 1,
         status: "active",
         currentPeriodStart: now,
-        currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+        currentPeriodEnd: dateAt(now.getTime() + 86_400_000),
         customerId: `customer_${organizationId}`,
         productId,
         createdAt: now,
@@ -135,7 +140,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
           organizationId,
           userId,
           role: "manager",
-          createdAt: new Date(),
+          createdAt: yield* DateTime.nowAsDate,
         });
       }
       return {

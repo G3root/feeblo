@@ -1,5 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -26,7 +27,6 @@ import { Kbd, KbdGroup } from "@feeblo/ui/kbd";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
-import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import { refetchInBackground } from "@feeblo/web-shared/collections";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { GitMergeIcon, Undo02Icon } from "@hugeicons/core-free-icons";

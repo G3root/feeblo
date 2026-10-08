@@ -153,7 +153,8 @@ interface TPostById {
   organizationId: string;
 }
 
-interface TPostSuggestionCandidates {
+/** The filters `findSuggestionCandidates` accepts; the suggestion program's request shape. */
+export interface TPostSuggestionCandidates {
   boardId?: string;
   embedding?: readonly number[];
   embeddingModel?: string;
@@ -207,6 +208,9 @@ const selectPostFields = (opts?: { contactFallback?: boolean }) => ({
   },
   creatorMemberId: schema.postTable.creatorMemberId,
   creatorId: schema.postTable.creatorId,
+  // The member tick the author's avatar draws. Derived here rather than in
+  // the client because the public selects redact `creatorMemberId`.
+  authorIsMember: sql<boolean>`${schema.postTable.creatorMemberId} is not null`,
   metadata: schema.postTable.metadata,
   lockedAt: schema.postTable.lockedAt,
   archivedAt: schema.postTable.archivedAt,
@@ -400,7 +404,7 @@ const makePostRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows[0])),
 
-    findStatusType: ({
+    findStatus: ({
       id,
       organizationId,
     }: {
@@ -408,7 +412,14 @@ const makePostRepository = Effect.gen(function* () {
       readonly organizationId: string;
     }) =>
       db
-        .select({ type: schema.postStatusTable.type })
+        .select({
+          id: schema.postStatusTable.id,
+          type: schema.postStatusTable.type,
+          // A workspace may leave the label empty until it customizes the
+          // status; an empty name is never useful to a consumer, so the
+          // canonical type stands in for it.
+          name: sql<string>`coalesce(nullif(${schema.postStatusTable.label}, ''), ${schema.postStatusTable.type})`,
+        })
         .from(schema.postStatusTable)
         .where(
           and(
@@ -417,7 +428,7 @@ const makePostRepository = Effect.gen(function* () {
           )
         )
         .limit(1)
-        .pipe(Effect.map((rows) => rows[0]?.type)),
+        .pipe(Effect.map((rows) => rows[0])),
 
     findByCreatorId: ({
       id,

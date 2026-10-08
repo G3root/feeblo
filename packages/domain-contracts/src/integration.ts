@@ -57,8 +57,8 @@ export type TIntegrationCapabilityKey = S.Schema.Type<
 
 /** Canonical event selection stored in `integration_route.event_types`. */
 export const SUBSCRIBABLE_INTEGRATION_EVENT_TYPES = [
-  "feedback.post.created",
-  "feedback.post.status_changed",
+  "post.created",
+  "post.status_changed",
 ] as const;
 export const SubscribableIntegrationEventType = S.Literals(
   SUBSCRIBABLE_INTEGRATION_EVENT_TYPES
@@ -75,8 +75,8 @@ export type TIntegrationRouteEventSelection = S.Schema.Type<
 
 /** Canonical event vocabulary stored in `integration_event.type`. */
 export const IntegrationEventType = S.Literals([
-  "feedback.post.created",
-  "feedback.post.status_changed",
+  "post.created",
+  "post.status_changed",
   "webhook.test",
 ]);
 export type TIntegrationEventType = S.Schema.Type<typeof IntegrationEventType>;

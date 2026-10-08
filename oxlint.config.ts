@@ -13,11 +13,10 @@ import { defineConfig } from "oxlint";
  * `global-*`, `crypto-*`, `process-env`, `new-promise`, `schema-sync` and
  * `instance-of-schema` rules out of `recommended` and into the opt-in
  * `effect-native` preset. Extending only `recommended` would therefore have
- * dropped `global-date-in-effect` — the 372-finding defect ADR 0005 ranks
- * first, and the rule this file's `off` entries below are written against —
- * without a single test or type error to say so. The two presets together are
- * exactly the rule set `0.45.0`'s `recommended` carried, plus the three rules
- * 0.47 added.
+ * dropped `global-date-in-effect` — the defect ADR 0005 ranks first, and the
+ * rule this file's `off` entries below are written against — without a single
+ * test or type error to say so. The two presets together are exactly the rule
+ * set `0.45.0`'s `recommended` carried, plus the three rules 0.47 added.
  */
 export default defineConfig({
   extends: [recommended, effectNative],
@@ -155,6 +154,21 @@ export default defineConfig({
     // APIs move.
     "effecttsgo/unstable-api-usage": "off",
 
+    // The first rung of ADR 0005's ratchet, and now clear everywhere except
+    // `packages/db/seed.ts`. `new Date()` inside Effect bypasses `Clock`, so
+    // the rule is an error for every new way to write it; the seed script's
+    // snapshot fixtures are pinned to `warn` in the override below.
+    "effecttsgo/global-date-in-effect": "error",
+
+    // Cleared by composing every layer where its scope lives: production
+    // surfaces capture their collaborators at group construction, and tests
+    // use `layer`/`it.layer` fixtures (or build the one per-call layer in the
+    // test's own scope). The one true entry point
+    // (`apps/server/src/app/program.ts`) carries a targeted disable with its
+    // reason, so a new provide-inside-a-request now fails the gate instead of
+    // warning.
+    "effecttsgo/strict-effect-provide": "error",
+
     // anti-slop
     "anti-slop/no-chained-type-assertions": "error",
     "anti-slop/no-conditional-empty-object-spread": "error",
@@ -174,9 +188,21 @@ export default defineConfig({
   },
 
   // Architecture boundary: client-side packages consume domain schemas, never
-  // DB internals. Server-side code (apps/server, packages/auth, integrations)
-  // is exempt because it legitimately talks to Postgres.
+  // DB internals or another package's `src/` path. The export map is the
+  // contract; a deep import compiles today and breaks the moment a file moves,
+  // and it lets client code reach modules the package never meant to publish.
+  // Server-side code (apps/server, packages/auth, integrations) is exempt from
+  // the DB half because it legitimately talks to Postgres.
   overrides: [
+    {
+      // A human-facing CLI, not a service: `seed.ts` builds fixture timestamps
+      // for the rows it inserts, and ADR 0005 leaves those 22 sites as the
+      // rule's only remaining findings. Every other file is `error`.
+      files: ["packages/db/seed.ts"],
+      rules: {
+        "effecttsgo/global-date-in-effect": "warn",
+      },
+    },
     {
       // Tests run Effects through `@effect/vitest`, never by hand.
       files: ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
@@ -203,6 +229,43 @@ export default defineConfig({
                 group: ["@feeblo/db", "@feeblo/db/**"],
                 message:
                   "Client code must not import @feeblo/db directly. Import schemas/vocabulary from @feeblo/domain instead.",
+              },
+              {
+                group: ["@feeblo/domain/src", "@feeblo/domain/src/**"],
+                message:
+                  "Client code must import @feeblo/domain through its export map (e.g. @feeblo/domain/comments/schema), never from src/.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      // E2E specs observe the product through its HTTP API and UI. Importing an
+      // application module would let a test assert against the implementation it
+      // is supposed to exercise, and PGlite must stay in the server harness
+      // (`e2e/servers.ts` and `e2e/scripts/migrate-pglite.ts`). `@feeblo/utils`
+      // and `@feeblo/permissions` are plain vocabularies, not product internals.
+      files: ["e2e/tests/**", "e2e/helpers/**", "e2e/page-objects/**"],
+      rules: {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: [
+                  "@feeblo/domain",
+                  "@feeblo/domain/**",
+                  "@feeblo/db",
+                  "@feeblo/db/**",
+                  "@feeblo/auth",
+                  "@feeblo/auth/**",
+                  "../../packages/**",
+                  "../../apps/**",
+                  "../../integrations/**",
+                ],
+                message:
+                  "E2E specs must drive the product through its API and UI, not import application modules.",
               },
             ],
           },

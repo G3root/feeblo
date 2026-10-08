@@ -10,12 +10,17 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 
 import { decryptWebhookCredentialMaterial } from "./index";
 import { WebhookManagementServiceLive } from "./webhook-management-live";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 /** Single configuration source for the service tests: shared encryption key and the default policy. */
 const webhookTestConfig = {
@@ -69,7 +74,7 @@ const seedOrganization = Effect.gen(function* () {
   const db = yield* currentDb;
   const organizationId = yield* WorkspaceId.generate;
   yield* db.insert(schema.organizationTable).values({
-    createdAt: new Date(),
+    createdAt: yield* DateTime.nowAsDate,
     id: organizationId,
     name: "Webhook management test",
     slug: organizationId,
@@ -84,7 +89,7 @@ const createEndpointInput = (
   endpointUrl: string
 ) => ({
   endpointUrl,
-  eventTypes: ["feedback.post.created"] as const,
+  eventTypes: ["post.created"] as const,
   name: "Product events",
   organizationId,
 });
@@ -135,7 +140,7 @@ describe("webhook management service", () => {
 
           expect(created.signingSecret).toMatch(signingSecretPattern);
           expect(created.endpoint).toMatchObject({
-            eventTypes: ["feedback.post.created"],
+            eventTypes: ["post.created"],
             health: "healthy",
             hostname: "127.0.0.1",
             lifecycle: "active",
@@ -159,7 +164,7 @@ describe("webhook management service", () => {
               eq(schema.integrationRouteTable.connectionId, created.endpoint.id)
             );
           expect(route?.enabled).toBe(true);
-          expect(route?.eventTypes).toEqual(["feedback.post.created"]);
+          expect(route?.eventTypes).toEqual(["post.created"]);
 
           const listed = yield* service.listEndpoints({ organizationId });
           expect(listed).toHaveLength(1);
@@ -186,12 +191,12 @@ describe("webhook management service", () => {
           const updated = yield* service.updateEndpoint({
             connectionId: created.endpoint.id,
             endpointUrl: "https://127.0.0.1:8080/moved",
-            eventTypes: ["feedback.post.status_changed"],
+            eventTypes: ["post.status_changed"],
             name: "Renamed endpoint",
             organizationId,
           });
           expect(updated.name).toBe("Renamed endpoint");
-          expect(updated.eventTypes).toEqual(["feedback.post.status_changed"]);
+          expect(updated.eventTypes).toEqual(["post.status_changed"]);
           expect(updated.hostname).toBe("127.0.0.1");
 
           const [connection] = yield* db
@@ -224,7 +229,7 @@ describe("webhook management service", () => {
             .where(
               eq(schema.integrationRouteTable.connectionId, created.endpoint.id)
             );
-          expect(route?.eventTypes).toEqual(["feedback.post.status_changed"]);
+          expect(route?.eventTypes).toEqual(["post.status_changed"]);
         })
     );
 
@@ -246,7 +251,7 @@ describe("webhook management service", () => {
             );
           const deliveryId = yield* IntegrationDeliveryId.generate;
           const eventId = yield* IntegrationEventId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
           yield* db.insert(schema.integrationEventTable).values({
             causalHopCount: 0,
             correlationId: eventId,
@@ -255,7 +260,7 @@ describe("webhook management service", () => {
             organizationId,
             origin: { kind: "feeblo" },
             payload: {},
-            retentionExpiresAt: new Date(now.getTime() + 86_400_000),
+            retentionExpiresAt: dateAt(now.getTime() + 86_400_000),
             type: "webhook.test",
             version: 1,
           });
@@ -266,7 +271,7 @@ describe("webhook management service", () => {
             id: deliveryId,
             nextAttemptAt: now,
             organizationId,
-            retentionExpiresAt: new Date(now.getTime() + 86_400_000),
+            retentionExpiresAt: dateAt(now.getTime() + 86_400_000),
             routeId: storedRoute?.id ?? "",
             state: "pending",
           });
@@ -524,7 +529,7 @@ describe("webhook management service", () => {
           });
           // Force identical creation timestamps so the cursor must disambiguate
           // by delivery ID rather than by time alone.
-          const sameTime = new Date("2026-08-11T00:00:00.000Z");
+          const sameTime = dateAt("2026-08-11T00:00:00.000Z");
           yield* db
             .update(schema.integrationDeliveryTable)
             .set({ createdAt: sameTime })
@@ -589,7 +594,7 @@ describe("webhook management service", () => {
         );
         expect(notExhausted._tag).toBe("NotFoundError");
 
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
         yield* db
           .update(schema.integrationDeliveryTable)
           .set({

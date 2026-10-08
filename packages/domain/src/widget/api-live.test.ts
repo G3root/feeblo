@@ -17,6 +17,10 @@ import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { listWidgetUpdates } from "./api-live";
 
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
+
 const SitePolicyLayer = SitePolicy.layer.pipe(
   Layer.provide(SiteRepository.layer),
   Layer.provide(
@@ -78,7 +82,7 @@ layer(TestLayer)("widget updates", (it) => {
             slug: "older-release",
             content: "A useful improvement.",
             status: "published",
-            publishedAt: new Date("2026-01-01T00:00:00Z"),
+            publishedAt: dateAt("2026-01-01T00:00:00Z"),
             organizationId,
           },
           {
@@ -92,7 +96,7 @@ layer(TestLayer)("widget updates", (it) => {
             excerpt: "The newest improvement.",
             coverImage: "https://cdn.example.com/cover.png",
             status: "published",
-            publishedAt: new Date("2026-02-01T00:00:00Z"),
+            publishedAt: dateAt("2026-02-01T00:00:00Z"),
             organizationId,
           },
           {
@@ -109,7 +113,7 @@ layer(TestLayer)("widget updates", (it) => {
             slug: "foreign-release",
             content: "Not from this organization.",
             status: "published",
-            publishedAt: new Date("2026-03-01T00:00:00Z"),
+            publishedAt: dateAt("2026-03-01T00:00:00Z"),
             organizationId: otherOrganizationId,
           },
           {
@@ -118,7 +122,7 @@ layer(TestLayer)("widget updates", (it) => {
             slug: "scheduled",
             content: "Not released yet.",
             status: "scheduled",
-            scheduledAt: new Date("2026-04-01T00:00:00Z"),
+            scheduledAt: dateAt("2026-04-01T00:00:00Z"),
             organizationId,
           },
         ]);
@@ -237,38 +241,42 @@ layer(TestLayer)("widget updates", (it) => {
     })
   );
 
-  it.effect(
-    "preserves suggestion rate-limit errors instead of mapping them to 500",
-    () => {
-      const request = HttpServerRequest.fromWeb(
-        new Request("http://localhost/api/widget/v1/suggestions")
-      );
-      const rateLimitedSuggestion = Effect.succeed("suggestions").pipe(
-        Effect.mapError(
-          () =>
-            new InternalServerError({
-              message: "Failed to find similar posts",
+  it.layer(RateLimitService.layerMemory)(
+    "with an in-memory rate limiter",
+    (it) => {
+      it.effect(
+        "preserves suggestion rate-limit errors instead of mapping them to 500",
+        () => {
+          const request = HttpServerRequest.fromWeb(
+            new Request("http://localhost/api/widget/v1/suggestions")
+          );
+          const rateLimitedSuggestion = Effect.succeed("suggestions").pipe(
+            Effect.mapError(
+              () =>
+                new InternalServerError({
+                  message: "Failed to find similar posts",
+                })
+            ),
+            withPublicHttpRateLimit({
+              name: "WidgetSuggestPostsTest",
+              level: "expensive",
+              limit: 1,
             })
-        ),
-        withPublicHttpRateLimit({
-          name: "WidgetSuggestPostsTest",
-          level: "expensive",
-          limit: 1,
-        })
-      );
+          );
 
-      return Effect.gen(function* () {
-        yield* rateLimitedSuggestion;
-        const error = yield* Effect.flip(rateLimitedSuggestion);
+          return Effect.gen(function* () {
+            yield* rateLimitedSuggestion;
+            const error = yield* Effect.flip(rateLimitedSuggestion);
 
-        expect(error._tag).toBe("RateLimitExceededError");
-      }).pipe(
-        Effect.provide(RateLimitService.layerMemory),
-        Effect.provideService(ClientIp, {
-          _tag: "ClientIpAddress",
-          address: "203.0.113.9",
-        }),
-        Effect.provideService(HttpServerRequest.HttpServerRequest, request)
+            expect(error._tag).toBe("RateLimitExceededError");
+          }).pipe(
+            Effect.provideService(ClientIp, {
+              _tag: "ClientIpAddress",
+              address: "203.0.113.9",
+            }),
+            Effect.provideService(HttpServerRequest.HttpServerRequest, request)
+          );
+        }
       );
     }
   );

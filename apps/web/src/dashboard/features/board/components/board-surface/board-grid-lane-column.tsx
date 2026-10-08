@@ -1,11 +1,9 @@
 import { CollisionPriority } from "@dnd-kit/abstract";
 import { useSortable } from "@dnd-kit/react/sortable";
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import { RoadmapLaneColumn } from "@feeblo/post-ui/roadmap/roadmap-lane-column";
 import { Button } from "@feeblo/ui/button";
-import {
-  formatPostStatus,
-  type BoardPostStatus,
-} from "@feeblo/web-shared/board/constants";
+import { type BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo } from "react";

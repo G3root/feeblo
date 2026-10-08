@@ -7,6 +7,7 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -62,7 +63,7 @@ describe("ChangelogPostRpcHandlers", () => {
       const postId = yield* PostId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
@@ -198,7 +199,7 @@ describe("ChangelogPostRpcHandlers", () => {
           const db = yield* currentDb;
           const foreignOrganizationId = yield* WorkspaceId.generate;
           const foreignChangelogId = yield* ChangelogId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
 
           yield* db.insert(schema.organizationTable).values({
             id: foreignOrganizationId,

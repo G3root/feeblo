@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
+import { paramsOf } from "../../public-api/http-input";
 
 /**
  * The board resource: what the board endpoints return, and the typed input
@@ -48,10 +49,6 @@ export const ListBoardsQuery = Schema.Struct({
   cursor: Schema.optional(Schema.String),
 });
 
-export const GetBoardParams = Schema.Struct({
-  boardId: Schema.String,
-});
-
 /** Typed input for a page of the workspace's boards. */
 export const ListBoardsInput = Schema.Struct({
   cursor: Schema.optional(
@@ -74,3 +71,6 @@ export type TListBoardsInput = Schema.Schema.Type<typeof ListBoardsInput>;
 export const GetBoardInput = Schema.Struct({
   boardId: Schema.String,
 });
+
+/** The board the URL names, taken from the operation input. */
+export const GetBoardParams = paramsOf(GetBoardInput, ["boardId"]);

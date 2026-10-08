@@ -17,6 +17,10 @@ import {
 
 const now = new Date();
 
+// `DateTime` cannot represent an invalid instant, so this fixture is built at
+// module scope rather than inside the Effect.
+const invalidDate = new Date(Number.NaN);
+
 function makeContactDef(
   overrides: Partial<TContactAttributeDefinition> = {}
 ): TContactAttributeDefinition {
@@ -397,7 +401,7 @@ describe("parseContactCustomAttributes", () => {
         // A Date instance cannot occur in a JSON JWT payload; like every other
         // non-scalar value it is ignored rather than persisted or failed on.
         const result = yield* parseContactCustomAttributes(
-          { customFields: { birthday: new Date(Number.NaN) } },
+          { customFields: { birthday: invalidDate } },
           [def]
         );
         expect(result).toEqual([]);

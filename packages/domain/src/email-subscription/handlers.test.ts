@@ -1,6 +1,8 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
+import * as Clock from "effect/Clock";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -9,6 +11,7 @@ import * as Redacted from "effect/Redacted";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { RateLimitService } from "../rate-limit/service";
+import { CurrentSession, type Session } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -18,6 +21,10 @@ import {
 } from "./handlers";
 import { EmailSubscriptionRepository } from "./repository";
 import { EmailSubscriptionTokenService } from "./tokens";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 describe("EmailSubscriptionConsentHandlers", () => {
   const Repositories = Layer.mergeAll(
@@ -60,7 +67,7 @@ describe("EmailSubscriptionConsentHandlers", () => {
     Effect.gen(function* () {
       const db = yield* currentDb;
       const organizationId = yield* WorkspaceId.generate;
-      const now = new Date("2026-08-09T00:00:00.000Z");
+      const now = dateAt("2026-08-09T00:00:00.000Z");
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
         name: "Subscription workspace",
@@ -105,7 +112,7 @@ describe("EmailSubscriptionConsentHandlers", () => {
         recurringIntervalCount: 1,
         status: "active",
         currentPeriodStart: now,
-        currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+        currentPeriodEnd: dateAt(now.getTime() + 86_400_000),
         customerId: `customer_${organizationId}`,
         productId,
         createdAt: now,
@@ -113,6 +120,26 @@ describe("EmailSubscriptionConsentHandlers", () => {
       });
       return organizationId;
     });
+
+  const makeSession = (
+    organizationId: string,
+    role: Session["memberships"][number]["role"]
+  ): Session => {
+    const userId = `user_${organizationId}`;
+    return {
+      user: {
+        id: userId,
+        email: `${userId}@example.com`,
+        name: "Test Owner",
+        restrictedToOrganizationId: null,
+      },
+      session: { userId, token: "test-token" },
+      organizations: [{ id: organizationId }],
+      memberships: [
+        { membershipId: `member_${organizationId}`, organizationId, role },
+      ],
+    };
+  };
 
   layer(TestLayer)("handlers", (it) => {
     it.effect(
@@ -262,11 +289,13 @@ describe("EmailSubscriptionConsentHandlers", () => {
         });
         const post = yield* repository.requestSubscription({
           email: "subscriber@example.com",
-          now: new Date(),
+          now: yield* DateTime.nowAsDate,
           organizationId,
           source: "explicit",
           topic: { topicId: "pst_1", topicType: "post" },
-          verificationExpiresAt: new Date(Date.now() + 86_400_000),
+          verificationExpiresAt: dateAt(
+            (yield* Clock.currentTimeMillis) + 86_400_000
+          ),
         });
         yield* handlers.unsubscribe({
           unsubscribeToken: Redacted.value(accepted.unsubscribeToken.value),
@@ -281,6 +310,100 @@ describe("EmailSubscriptionConsentHandlers", () => {
         });
         expect(post.subscription.state).toBe("pending_verification");
       })
+    );
+
+    it.effect(
+      "reads and toggles the acting user's submission notification preference",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* EmailSubscriptionRpcHandlersEffect;
+          const organizationId = yield* createWorkspace({ paid: true });
+          const session = makeSession(organizationId, "owner");
+          // The subscription write is keyed to the acting user, so the row has
+          // to exist for the contact foreign key to resolve.
+          const db = yield* currentDb;
+          yield* db.insert(schema.userTable).values({
+            id: session.session.userId,
+            email: session.user.email,
+            name: session.user.name,
+          });
+          const withSession = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+            effect.pipe(Effect.provideService(CurrentSession, session));
+
+          expect(
+            yield* withSession(
+              handlers.EmailSubmissionNotificationPreferenceGet({
+                organizationId,
+              })
+            )
+          ).toEqual({ enabled: false });
+
+          expect(
+            yield* withSession(
+              handlers.EmailSubmissionNotificationPreferenceSet({
+                enabled: true,
+                organizationId,
+              })
+            )
+          ).toEqual({ enabled: true });
+          expect(
+            yield* withSession(
+              handlers.EmailSubmissionNotificationPreferenceGet({
+                organizationId,
+              })
+            )
+          ).toEqual({ enabled: true });
+
+          expect(
+            yield* withSession(
+              handlers.EmailSubmissionNotificationPreferenceSet({
+                enabled: false,
+                organizationId,
+              })
+            )
+          ).toEqual({ enabled: false });
+          expect(
+            yield* withSession(
+              handlers.EmailSubmissionNotificationPreferenceGet({
+                organizationId,
+              })
+            )
+          ).toEqual({ enabled: false });
+        })
+    );
+
+    it.effect(
+      "denies submission notification preferences to non-administrators",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* EmailSubscriptionRpcHandlersEffect;
+          const organizationId = yield* createWorkspace({ paid: true });
+
+          for (const role of ["manager", "contributor"] as const) {
+            const session = makeSession(organizationId, role);
+            const denied = yield* Effect.flip(
+              handlers
+                .EmailSubmissionNotificationPreferenceGet({ organizationId })
+                .pipe(Effect.provideService(CurrentSession, session))
+            );
+            expect(denied._tag).toBe("PolicyDenied");
+          }
+
+          // A session with no membership at all is refused the same way.
+          const outsider = {
+            ...makeSession(organizationId, "admin"),
+            memberships: [],
+          };
+          const denied = yield* Effect.flip(
+            handlers
+              .EmailSubmissionNotificationPreferenceSet({
+                enabled: true,
+                organizationId,
+              })
+              .pipe(Effect.provideService(CurrentSession, outsider))
+          );
+          expect(denied._tag).toBe("PolicyDenied");
+        })
     );
   });
 });

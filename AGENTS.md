@@ -102,12 +102,12 @@ A domain module is `packages/domain/src/<entity>/` with a consistent shape: `sch
 
 A feature that has a Public API surface owns it in `<entity>/public-api/`: `schema.ts` (closed DTOs and HTTP shapes), `operations.ts` (the surface-neutral capability a future MCP tool binds), `http.ts` (the `HttpApiEndpoint`s and handlers), `mappers.ts`, and a `repository.ts` only where the public projection is genuinely different from the feature repository (the post and comment reads, the changelog publication orchestration). Tag and company operations call `<entity>/repository.ts` directly. The shared infrastructure — the operation helper, the registry, the key middleware, the error vocabulary, and the composition root — stays in `packages/domain/src/public-api/`. See `docs/adr/0007`.
 
-Two files are hand-maintained lists that must stay in sync, and today nothing checks them:
+RPC registration is one registry in two halves, split because the browser reads one half:
 
-- `packages/domain/src/rpc-group.ts` composes every `*Rpcs` group into `AllRpcs`.
-- `packages/domain/src/rpc-router.ts` provides every `*RpcHandlers` layer.
+- `packages/domain/src/rpc-group.ts` lists every `*Rpcs` group in `RpcGroups` and derives `AllRpcs` from it. It imports no handler layer, so the dashboard and public board can bundle `AllRpcs` without pulling in repositories or the database.
+- `packages/domain/src/rpc-router.ts` pairs every group name with its handler layer in `RpcHandlerRegistrations`, marking the four provider-owned management groups as `"provider"` (see `docs/adr/0002`). Its `satisfies Record<RpcGroupName, …>` makes a group with no entry a compile error, and the route merges the in-domain layers from that record instead of an ad-hoc grouping.
 
-Adding an RPC means editing both. `rpc-group.ts` currently lists 34 groups and `rpc-router.ts` 30, the difference being the four provider-owned management groups that `apps/server` supplies (see `docs/adr/0002`) plus the `Core` merge. A group with no handler layer compiles cleanly and fails at runtime.
+The composition root's provider map in `apps/server/src/app/router.ts` satisfies `ProviderOwnedRpcName`, so a fifth provider-owned group cannot be half-wired either. `rpc-router.test.ts` pins the registry at runtime. Adding an RPC group is now a line in `RpcGroups` and a line in `RpcHandlerRegistrations` (plus the provider map if a provider owns it), and nothing can compile with the two lists disagreeing.
 
 The four surfaces, deliberately not sharing one contract:
 

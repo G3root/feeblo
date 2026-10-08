@@ -1,4 +1,5 @@
 import { PostCollectionDataProvider } from "@feeblo/post-ui/post-collection";
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import {
   Empty,
   EmptyDescription,
@@ -20,7 +21,6 @@ import {
   FeedbackBrowseLayoutMain,
   FeedbackBrowseLayoutSidebar,
 } from "../components/layout/feedback-browse-layout";
-import { formatPostStatus } from "../lib/utils";
 import { m } from "../paraglide/messages.js";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";

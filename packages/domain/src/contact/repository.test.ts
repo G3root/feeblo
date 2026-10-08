@@ -2,8 +2,10 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { ContactId, WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
 import { ContactRepository } from "./repository";
 
@@ -19,11 +21,11 @@ describe("ContactRepository", () => {
         id,
         name: "Contact upsert test workspace",
         slug: id,
-        createdAt: new Date(),
+        createdAt: yield* DateTime.nowAsDate,
       });
     });
 
-  layer(TestLayer)("upsertContact", (it) => {
+  layer(TestLayer)("updateUpsertContact", (it) => {
     it.effect(
       "refuses an email another contact holds when the matched row has none",
       () =>
@@ -31,7 +33,7 @@ describe("ContactRepository", () => {
           const db = yield* currentDb;
           const repository = yield* ContactRepository;
           const organizationId = yield* WorkspaceId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
 
           yield* createOrganization(organizationId);
 
@@ -57,11 +59,23 @@ describe("ContactRepository", () => {
             updatedAt: now,
           });
 
+          const existingContact = yield* repository.findUpsertContact({
+            organizationId,
+            externalId: "sso-1",
+            email: "ada@example.com",
+          });
+          if (Option.isNone(existingContact)) {
+            return yield* Effect.die(
+              new Error("the external id must match the SSO contact")
+            );
+          }
+
           const error = yield* Effect.flip(
-            repository.upsertContact({
+            repository.updateUpsertContact({
               organizationId,
               externalId: "sso-1",
               email: "ada@example.com",
+              existing: existingContact.value,
             })
           );
           expect(error._tag).toBe("FailedToUpdateContactError");

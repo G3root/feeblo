@@ -1,11 +1,25 @@
+import { PAID_PLAN_KEYS as PAID_PLAN_KEYS_CONTRACT } from "@feeblo/domain-contracts/plan";
+
 export type OrganizationPlan = "free" | "starter" | "professional";
+
+/**
+ * Providers whose connections and outbound deliveries require the
+ * `integrations` capability. Webhook endpoints stay available on every plan
+ * and are therefore excluded from delivery pauses.
+ */
+export const INTEGRATION_CAPABILITY_PROVIDER_KEYS = [
+  "slack",
+  "discord",
+  "github",
+] as const;
 
 export type LimitFeatureKey =
   | "feedbackBoards"
   | "privilegedMembers"
   | "changelogCategories"
   | "submissionNotificationRecipients"
-  | "crmEntries";
+  | "crmEntries"
+  | "workspaces";
 export type CapabilityFeatureKey =
   | "roadmap"
   | "changelog"
@@ -69,6 +83,11 @@ export const PLAN_FEATURE_CATALOG = {
     singularLabel: "CRM Entry",
     pluralLabel: "CRM Entries",
   },
+  workspaces: {
+    kind: "limit",
+    singularLabel: "Workspace",
+    pluralLabel: "Workspaces",
+  },
   roadmap: { kind: "capability", label: "Roadmap" },
   changelog: { kind: "capability", label: "Changelog" },
   unlimitedEndUsers: {
@@ -110,6 +129,7 @@ const LIMIT_FEATURE_ORDER = defineFeatureOrder<LimitFeatureKey>()([
   "changelogCategories",
   "submissionNotificationRecipients",
   "crmEntries",
+  "workspaces",
 ] as const);
 
 const CAPABILITY_FEATURE_ORDER = defineFeatureOrder<CapabilityFeatureKey>()([
@@ -134,6 +154,7 @@ export const PLAN_ENTITLEMENTS = {
       changelogCategories: 3,
       submissionNotificationRecipients: 1,
       crmEntries: 10,
+      workspaces: 3,
     },
     capabilities: {
       roadmap: true,
@@ -156,6 +177,7 @@ export const PLAN_ENTITLEMENTS = {
       changelogCategories: null,
       submissionNotificationRecipients: null,
       crmEntries: null,
+      workspaces: null,
     },
     capabilities: {
       roadmap: true,
@@ -178,6 +200,7 @@ export const PLAN_ENTITLEMENTS = {
       changelogCategories: null,
       submissionNotificationRecipients: null,
       crmEntries: null,
+      workspaces: null,
     },
     capabilities: {
       roadmap: true,
@@ -205,9 +228,14 @@ export const PLAN_DISPLAY_NAMES = {
   professional: "Professional",
 } as const satisfies Record<OrganizationPlan, string>;
 
-export const PAID_PLAN_KEYS = Object.keys(PLAN_ENTITLEMENTS).filter(
-  (plan): plan is Exclude<OrganizationPlan, "free"> => plan !== "free"
-);
+/**
+ * Plan keys that grant paid entitlements. The literal is owned by
+ * `@feeblo/domain-contracts/plan` — `@feeblo/db/schema/billing` gates SQL on
+ * the same list and cannot import this package — and must equal every
+ * non-free key of `PLAN_ENTITLEMENTS`; `plan-entitlements.test.ts` enforces
+ * that equality.
+ */
+export const PAID_PLAN_KEYS = PAID_PLAN_KEYS_CONTRACT;
 
 export type PlanFeatureRow = {
   key: PlanFeatureKey;

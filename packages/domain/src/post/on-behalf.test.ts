@@ -12,6 +12,7 @@ import {
 } from "@feeblo/id";
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { and, eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -36,6 +37,7 @@ import { WorkspaceRepository } from "../workspace/repository";
 import { PostRpcHandlersEffect } from "./handlers";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
+import { PostWriteService } from "./write";
 
 describe("PostRpcHandlers on-behalf", () => {
   const recordedIntegrationEvents: unknown[] = [];
@@ -62,7 +64,7 @@ describe("PostRpcHandlers on-behalf", () => {
       const userId = `user_${organizationId}`;
       const userEmail = `${organizationId}@example.com`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
@@ -192,20 +194,24 @@ describe("PostRpcHandlers on-behalf", () => {
     EntitlementPolicy.layer
   ).pipe(Layer.provideMerge(RepositoriesTest));
 
-  const TestLayer = Layer.mergeAll(
-    HandlerTest,
-    Database.PgliteDatabaseLive,
-    NodeCrypto.layer,
-    S3Test,
-    EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
-    Layer.succeed(
-      IntegrationEventRecorder,
-      IntegrationEventRecorder.of({
-        recordIntegrationEvent: ({ event }) =>
-          Effect.sync(() => {
-            recordedIntegrationEvents.push(event);
-          }).pipe(Effect.as({ deliveryCount: 0, eventRecorded: false })),
-      })
+  const TestLayer = PostWriteService.layer.pipe(
+    Layer.provideMerge(
+      Layer.mergeAll(
+        HandlerTest,
+        Database.PgliteDatabaseLive,
+        NodeCrypto.layer,
+        S3Test,
+        EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
+        Layer.succeed(
+          IntegrationEventRecorder,
+          IntegrationEventRecorder.of({
+            recordIntegrationEvent: ({ event }) =>
+              Effect.sync(() => {
+                recordedIntegrationEvents.push(event);
+              }).pipe(Effect.as({ deliveryCount: 0, eventRecorded: false })),
+          })
+        )
+      )
     )
   );
 
@@ -269,7 +275,7 @@ describe("PostRpcHandlers on-behalf", () => {
             // The integration event keeps the staff member as actor.
             expect(recordedIntegrationEvents).toEqual([
               expect.objectContaining({
-                type: "feedback.post.created",
+                type: "post.created",
                 data: expect.objectContaining({
                   actor: expect.objectContaining({
                     kind: "member",

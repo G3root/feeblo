@@ -6,6 +6,7 @@ import { WorkspaceId } from "@feeblo/id";
 import { isString } from "@feeblo/utils/runtime-kind";
 import { eq } from "drizzle-orm";
 import * as Cause from "effect/Cause";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
@@ -245,6 +246,46 @@ const SubscriptionConfirmationFetch = asFetch(
   }
 );
 
+/**
+ * Counts signing-certificate fetches so a cache test can assert the second
+ * message reused the cached PEM instead of paying another network request.
+ */
+let signingCertFetchCount = 0;
+const CountingSigningCertFetch = asFetch(
+  (input: RequestInfo | URL): Promise<Response> => {
+    const url = requestUrl(input);
+    if (url === SIGNING_CERT_URL) {
+      signingCertFetchCount += 1;
+      return Promise.resolve(new Response(SIGNING_CERT_PEM, { status: 200 }));
+    }
+    return Promise.resolve(
+      new Response("Subscription Confirmed", { status: 200 })
+    );
+  }
+);
+
+/**
+ * Fails the first signing-certificate fetch with a 503, then serves the
+ * certificate. Pins that a failed fetch is not reused: the next message must
+ * retry instead of replaying the cached failure.
+ */
+let failNextSigningCertFetch = true;
+const FlakySigningCertFetch = asFetch(
+  (input: RequestInfo | URL): Promise<Response> => {
+    const url = requestUrl(input);
+    if (url === SIGNING_CERT_URL) {
+      if (failNextSigningCertFetch) {
+        failNextSigningCertFetch = false;
+        return Promise.resolve(new Response("unavailable", { status: 503 }));
+      }
+      return Promise.resolve(new Response(SIGNING_CERT_PEM, { status: 200 }));
+    }
+    return Promise.resolve(
+      new Response("Subscription Confirmed", { status: 200 })
+    );
+  }
+);
+
 const TestConfig = Layer.succeed(
   EmailProviderFeedbackConfig,
   EmailProviderFeedbackConfig.of({
@@ -285,7 +326,7 @@ describe("SesEmailFeedbackWebhook", () => {
     Effect.gen(function* () {
       const db = yield* currentDb;
       const organizationId = yield* WorkspaceId.generate;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       const outboxId = `eob_${organizationId}`;
       const deliveryId = `edl_${organizationId}`;
       const messageId = `<email.${organizationId}@notifications.feeblo>`;
@@ -474,6 +515,67 @@ describe("SesEmailFeedbackWebhook", () => {
               SIGNING_CERT_URL,
               subscribeUrl,
             ]);
+          })
+        );
+      }
+    );
+
+    it.layer(makeWebhookLayer(TestConfig, CountingSigningCertFetch))(
+      "signing certificate cache",
+      (it) => {
+        it.effect(
+          "fetches a signing certificate once and reuses it across messages",
+          () =>
+            Effect.gen(function* () {
+              signingCertFetchCount = 0;
+              const webhook = yield* SesEmailFeedbackWebhook;
+
+              const first = yield* webhook.handle(
+                snsSubscriptionConfirmation(
+                  "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription&Token=cache-1"
+                )
+              );
+              const second = yield* webhook.handle(
+                snsSubscriptionConfirmation(
+                  "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription&Token=cache-2"
+                )
+              );
+
+              expect(first).toEqual({ _tag: "Confirmed" });
+              expect(second).toEqual({ _tag: "Confirmed" });
+              expect(signingCertFetchCount).toBe(1);
+            })
+        );
+      }
+    );
+
+    it.layer(makeWebhookLayer(TestConfig, FlakySigningCertFetch))(
+      "signing certificate fetch failures",
+      (it) => {
+        it.effect("does not cache a failed signing-certificate fetch", () =>
+          Effect.gen(function* () {
+            failNextSigningCertFetch = true;
+            const webhook = yield* SesEmailFeedbackWebhook;
+
+            const outcome = yield* webhook
+              .handle(
+                snsSubscriptionConfirmation(
+                  "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription&Token=retry-1"
+                )
+              )
+              .pipe(Effect.exit);
+
+            const error = expectFailed(outcome);
+            expect(error).toBeInstanceOf(SesWebhookEnvelopeError);
+            expect(error).toMatchObject({ httpStatus: 503 });
+
+            expect(
+              yield* webhook.handle(
+                snsSubscriptionConfirmation(
+                  "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription&Token=retry-2"
+                )
+              )
+            ).toEqual({ _tag: "Confirmed" });
           })
         );
       }

@@ -1,4 +1,5 @@
 import {
+  type IntegrationEventIdentity,
   IntegrationPostEventData,
   type IntegrationProviderDeliveryInput,
   IntegrationProviderInvalidConfigurationError,
@@ -72,29 +73,47 @@ export const makeWebhookProviderRegistration = ({
                 })
             )
           );
+          // A member actor is a display name only (mem_* is never published);
+          // an end-user actor carries no identifiers on the event, so only the
+          // classification is sent. The post's author block is where a
+          // receiver finds join keys.
+          const actor: IntegrationEventIdentity =
+            eventData.actor.kind === "member"
+              ? {
+                  type: "member",
+                  displayName: eventData.actor.displayName ?? null,
+                }
+              : { type: "end_user" };
           const payload = yield* Schema.decodeEffect(WebhookExternalPayload)({
-            actor: {
-              type: eventData.actor.kind,
-              ...(eventData.actor.memberId !== undefined && {
-                memberId: eventData.actor.memberId,
-              }),
-              ...(eventData.actor.displayName !== undefined && {
-                displayName: eventData.actor.displayName,
-              }),
+            actor,
+            board: {
+              id: eventData.board.id,
+              name: eventData.board.name,
+              url: eventData.board.url.toString(),
             },
-            board: eventData.board,
+            ...(eventData.previousStatus !== undefined && {
+              changes: {
+                status: {
+                  from: eventData.previousStatus,
+                  to: eventData.post.status,
+                },
+              },
+            }),
             id: input.event.id,
             occurredAt: input.event.occurredAt.toString(),
-            organizationId: input.event.organizationId,
-            post: {
+            object: {
+              author: eventData.post.author,
+              content: eventData.post.description,
               id: eventData.post.id,
+              ...(eventData.post.metadata !== undefined && {
+                metadata: eventData.post.metadata,
+              }),
+              status: eventData.post.status,
               title: eventData.post.title,
               url: eventData.post.url.toString(),
             },
-            ...(eventData.previousStatus !== undefined && {
-              previousStatus: eventData.previousStatus,
-            }),
-            status: eventData.post.status,
+            objectType: "post",
+            organizationId: input.event.organizationId,
             type: input.event.type,
             version: input.event.version,
           }).pipe(

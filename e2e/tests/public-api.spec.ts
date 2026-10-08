@@ -1,9 +1,8 @@
-import { expect, test } from "@playwright/test";
-
+import { expect, test } from "../fixtures";
 import { createAuthenticatedWorkspace } from "../helpers/auth";
 import { setPlan } from "../helpers/set-plan";
+import { apiUrl } from "../helpers/urls";
 
-const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
 const apiKeyPattern = /^fbk_/;
 
 /**
@@ -72,7 +71,7 @@ test.describe("public API keys", () => {
         // A missing post is answered with the documented envelope, which only
         // happens after the key, the plan, and the scope have all passed.
         const authorized = await request.get(
-          `${apiURL}/api/v1/posts/pst_missing`,
+          `${apiUrl()}/api/v1/posts/pst_missing`,
           { headers: { "x-api-key": apiKey } }
         );
 
@@ -80,7 +79,7 @@ test.describe("public API keys", () => {
         expect(await authorized.json()).toMatchObject({ _tag: "NOT_FOUND" });
 
         const anonymous = await request.get(
-          `${apiURL}/api/v1/posts/pst_missing`
+          `${apiUrl()}/api/v1/posts/pst_missing`
         );
         expect(anonymous.status()).toBe(401);
         expect(await anonymous.json()).toMatchObject({
@@ -91,7 +90,7 @@ test.describe("public API keys", () => {
       await test.step("the posts capability reaches the post endpoints", async () => {
         // The workspace-wide list exists and needs no id, so it is the one
         // post read that can be exercised without a fixture.
-        const listed = await request.get(`${apiURL}/api/v1/posts`, {
+        const listed = await request.get(`${apiUrl()}/api/v1/posts`, {
           headers: { "x-api-key": apiKey },
         });
         expect(listed.status()).toBe(200);
@@ -99,9 +98,12 @@ test.describe("public API keys", () => {
 
         // A retrieve that names no post is the documented invalid request,
         // which only happens after the key, plan, and scope have passed.
-        const retrieve = await request.get(`${apiURL}/api/v1/posts/retrieve`, {
-          headers: { "x-api-key": apiKey },
-        });
+        const retrieve = await request.get(
+          `${apiUrl()}/api/v1/posts/retrieve`,
+          {
+            headers: { "x-api-key": apiKey },
+          }
+        );
         expect(retrieve.status()).toBe(400);
         expect(await retrieve.json()).toMatchObject({
           _tag: "INVALID_REQUEST",
@@ -110,7 +112,7 @@ test.describe("public API keys", () => {
         // The scope is checked before the post is looked up, so `404` proves
         // the key holds `posts.delete`; without it this would be `403`.
         const missing = await request.delete(
-          `${apiURL}/api/v1/posts/pst_missing`,
+          `${apiUrl()}/api/v1/posts/pst_missing`,
           { headers: { "x-api-key": apiKey } }
         );
 
@@ -119,7 +121,7 @@ test.describe("public API keys", () => {
       });
 
       await test.step("the CRM grant reaches the company endpoints", async () => {
-        const created = await request.post(`${apiURL}/api/v1/companies`, {
+        const created = await request.post(`${apiUrl()}/api/v1/companies`, {
           headers: { "x-api-key": apiKey },
           data: { name: "Acme", externalId: "e2e-crm-1" },
         });
@@ -133,7 +135,7 @@ test.describe("public API keys", () => {
 
         // The list is the assertion rather than a read by id: the id is minted
         // by the server, and this keeps the spec free of a cast to reach it.
-        const listed = await request.get(`${apiURL}/api/v1/companies`, {
+        const listed = await request.get(`${apiUrl()}/api/v1/companies`, {
           headers: { "x-api-key": apiKey },
         });
         expect(listed.status()).toBe(200);
@@ -155,7 +157,7 @@ test.describe("public API keys", () => {
         await expect(page.getByText("No API keys yet")).toBeVisible();
 
         const revoked = await request.get(
-          `${apiURL}/api/v1/posts/pst_missing`,
+          `${apiUrl()}/api/v1/posts/pst_missing`,
           { headers: { "x-api-key": apiKey } }
         );
         expect(revoked.status()).toBe(401);

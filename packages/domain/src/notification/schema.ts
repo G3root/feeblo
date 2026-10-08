@@ -8,6 +8,22 @@ export const Notification = S.Struct({
   organizationId: S.String,
   recipientUserId: S.String,
   actorUserId: S.NullOr(S.String),
+  /**
+   * The actor's display name and image, resolved at read time in `list`.
+   * `null` for an event with no actor (a public submission has none) and for
+   * an actor whose account was deleted (`actor_user_id` is `on delete set
+   * null`), which is why the inbox falls back to the event kind's icon rather
+   * than to initials.
+   */
+  actorName: S.NullOr(S.String),
+  actorImage: S.NullOr(S.String),
+  /**
+   * Whether the actor is still a member of the workspace. Resolved at read
+   * time by joining the membership rather than stored on the row: the inbox
+   * draws the member tick on a member's face, and someone who leaves loses it
+   * instead of keeping a stale badge.
+   */
+  actorIsMember: S.Boolean,
   kind: NotificationEventType,
   resourceType: S.String,
   resourceId: S.String,
@@ -45,6 +61,9 @@ export const NotificationMarkAllRead = S.Struct({
   organizationId: WorkspaceId.schema,
 });
 
+export type TNotificationEventType = S.Schema.Type<
+  typeof NotificationEventType
+>;
 export type TNotificationList = S.Schema.Type<typeof NotificationList>;
 export type TNotificationMarkRead = S.Schema.Type<typeof NotificationMarkRead>;
 
@@ -83,9 +102,9 @@ export const decodeNotificationCursor = (
   if (cursor === undefined) {
     return { _tag: "Absent" };
   }
-  const decoded = S.decodeUnknownOption(
-    S.fromJsonString(NotificationCursorPayload)
-  )(Buffer.from(cursor, "base64url").toString("utf8"));
+  const decoded = S.decodeOption(S.fromJsonString(NotificationCursorPayload))(
+    Buffer.from(cursor, "base64url").toString("utf8")
+  );
   return Option.isSome(decoded)
     ? {
         _tag: "Decoded",

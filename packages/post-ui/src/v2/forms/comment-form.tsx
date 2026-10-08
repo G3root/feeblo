@@ -2,7 +2,6 @@ import { COMMENT_CONTENT_MAX_LENGTH } from "@feeblo/domain/content-limits";
 import { CommentId } from "@feeblo/id";
 import { useAppForm, withForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
-import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
@@ -17,6 +16,7 @@ import {
 import z from "zod";
 
 import { m } from "../../paraglide/messages.js";
+import { formatPostStatus } from "../../post-status";
 import {
   CommentComposer,
   commentComposerBoxClassName,
@@ -163,6 +163,12 @@ export function useCreateCommentAction() {
       const optimisticAuthorName = onBehalf
         ? (author?.name ?? author?.email ?? session.user.name)
         : session.user.name;
+      // Mirrors the server's `authorIsMember`, which the picker already
+      // knows for an on-behalf subject and the session's memberships give for
+      // a self-authored comment.
+      const optimisticAuthorIsMember = onBehalf
+        ? (author?.isMember ?? false)
+        : membership !== undefined;
 
       const tx = commentCollection.insert({
         id: await CommentId.unsafeGenerate(),
@@ -178,6 +184,7 @@ export function useCreateCommentAction() {
         organizationId,
         // On-behalf comments keep staff attribution out of the author fields.
         memberId: onBehalf ? null : (membership?.membershipId ?? null),
+        authorIsMember: optimisticAuthorIsMember,
         // Optimistic rows are authored on this post, never merged in.
         mergedFromPostId: null,
         postId,

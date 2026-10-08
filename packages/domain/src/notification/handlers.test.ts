@@ -9,6 +9,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { and, eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -17,6 +18,10 @@ import { NotificationRpcHandlersEffect } from "./handlers";
 import { NotificationPolicy } from "./policies";
 import { encodeNotificationCursor } from "./schema";
 import { NotificationService } from "./service";
+
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 describe("NotificationRpcHandlers", () => {
   type Fixture = {
@@ -31,7 +36,7 @@ describe("NotificationRpcHandlers", () => {
       const organizationId = yield* WorkspaceId.generate;
       const userId = `user_${organizationId}`;
       const memberId = `member_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
         name: "Test organization",
@@ -76,6 +81,7 @@ describe("NotificationRpcHandlers", () => {
   const insertNotification = (
     fixture: Fixture,
     options: {
+      actorUserId?: string | null;
       createdAt?: Date;
       recipientUserId?: string;
     } = {}
@@ -87,7 +93,7 @@ describe("NotificationRpcHandlers", () => {
         id,
         organizationId: fixture.organizationId,
         recipientUserId: options.recipientUserId ?? fixture.userId,
-        actorUserId: null,
+        actorUserId: options.actorUserId ?? null,
         kind: "feedback.commented",
         resourceType: "comment",
         resourceId: "comment_1",
@@ -115,7 +121,7 @@ describe("NotificationRpcHandlers", () => {
         organizationId: fixture.organizationId,
         userId,
         role: "manager",
-        createdAt: new Date(),
+        createdAt: yield* DateTime.nowAsDate,
       });
       return { ...fixture, memberId, userId } satisfies Fixture;
     });
@@ -165,6 +171,67 @@ describe("NotificationRpcHandlers", () => {
               })
             )
           ).toEqual({ count: 0 });
+        })
+      );
+
+      it.effect(
+        "resolves the actor's name, image, and membership for the inbox row",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* NotificationRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const actor = yield* addMember(fixture);
+            const id = yield* insertNotification(fixture, {
+              actorUserId: actor.userId,
+            });
+
+            expect(
+              yield* handlers
+                .NotificationList({
+                  organizationId: fixture.organizationId,
+                })
+                .pipe(Effect.provideService(CurrentSession, session(fixture)))
+            ).toMatchObject([
+              {
+                actorImage: null,
+                actorIsMember: true,
+                actorName: "Second user",
+                id,
+              },
+            ]);
+          })
+      );
+
+      it.effect("clears the member tick for a non-member actor", () =>
+        Effect.gen(function* () {
+          const handlers = yield* NotificationRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          // A signed-in visitor with no membership, like a public-board
+          // commenter whose comment notified the workspace.
+          const visitorId = `user_visitor_${fixture.organizationId}`;
+          yield* db.insert(schema.userTable).values({
+            id: visitorId,
+            email: `${visitorId}@example.com`,
+            name: "Public visitor",
+          });
+          const id = yield* insertNotification(fixture, {
+            actorUserId: visitorId,
+          });
+
+          expect(
+            yield* handlers
+              .NotificationList({
+                organizationId: fixture.organizationId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session(fixture)))
+          ).toMatchObject([
+            {
+              actorIsMember: false,
+              actorName: "Public visitor",
+              id,
+            },
+          ]);
         })
       );
 
@@ -236,14 +303,14 @@ describe("NotificationRpcHandlers", () => {
             const fixture = yield* makeFixture();
             const otherMember = yield* addMember(fixture);
             const oldest = yield* insertNotification(fixture, {
-              createdAt: new Date("2026-01-01T00:00:00.000Z"),
+              createdAt: dateAt("2026-01-01T00:00:00.000Z"),
             });
             const newest = yield* insertNotification(fixture, {
-              createdAt: new Date("2026-01-01T00:02:00.000Z"),
+              createdAt: dateAt("2026-01-01T00:02:00.000Z"),
             });
             yield* insertNotification(fixture, {
               recipientUserId: otherMember.userId,
-              createdAt: new Date("2026-01-01T00:03:00.000Z"),
+              createdAt: dateAt("2026-01-01T00:03:00.000Z"),
             });
             const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
               effect.pipe(
@@ -277,7 +344,7 @@ describe("NotificationRpcHandlers", () => {
           Effect.gen(function* () {
             const handlers = yield* NotificationRpcHandlersEffect;
             const fixture = yield* makeFixture();
-            const sharedInstant = new Date("2026-01-01T00:01:00.000Z");
+            const sharedInstant = dateAt("2026-01-01T00:01:00.000Z");
             // A fan-out writes every recipient row in one statement, so every
             // row of the batch carries one `createdAt`. Legid ids are random,
             // so the expected order comes from the composite sort key (id
@@ -412,7 +479,7 @@ describe("NotificationRpcHandlers", () => {
       Effect.gen(function* () {
         const db = yield* currentDb;
         const userId = `user_${suffix}`;
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
         yield* db.insert(schema.userTable).values({
           id: userId,
           email: `${userId}@example.com`,
@@ -453,7 +520,7 @@ describe("NotificationRpcHandlers", () => {
               id: organizationId,
               name: "Changelog org",
               slug: organizationId,
-              createdAt: new Date(),
+              createdAt: yield* DateTime.nowAsDate,
             });
             const subscribedMember = yield* insertChangelogSubscriber(
               organizationId,
@@ -477,7 +544,7 @@ describe("NotificationRpcHandlers", () => {
               organizationId,
               userId: `user_unsubscribed`,
               role: "manager",
-              createdAt: new Date(),
+              createdAt: yield* DateTime.nowAsDate,
             });
 
             yield* service.notifyChangelogPublished({
@@ -520,7 +587,7 @@ describe("NotificationRpcHandlers", () => {
               id: organizationId,
               name: "Changelog org restricted",
               slug: organizationId,
-              createdAt: new Date(),
+              createdAt: yield* DateTime.nowAsDate,
             });
             const unrestrictedMember = yield* insertChangelogSubscriber(
               organizationId,
@@ -575,7 +642,7 @@ describe("NotificationRpcHandlers", () => {
               id: organizationId,
               name: "Changelog org two",
               slug: organizationId,
-              createdAt: new Date(),
+              createdAt: yield* DateTime.nowAsDate,
             });
             const publisher = yield* insertChangelogSubscriber(
               organizationId,
@@ -623,7 +690,7 @@ describe("NotificationRpcHandlers", () => {
               const boardId = yield* BoardId.generate;
               const statusId = yield* PostStatusId.generate;
               const postId = yield* PostId.generate;
-              const now = new Date();
+              const now = yield* DateTime.nowAsDate;
               const memberSubscriberId = `user_${organizationId}_member_sub`;
               const memberSubscriberMemberId = `member_${organizationId}_member_sub`;
               const visitorCreatorId = `user_${organizationId}_visitor_creator`;

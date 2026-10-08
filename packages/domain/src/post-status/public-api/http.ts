@@ -1,9 +1,13 @@
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as OpenApi from "effect/http-api/OpenApi";
 
 import type { PublicApiPostStatusGroup } from "../../public-api/api-contract";
 import { PUBLIC_API_ERROR_SCHEMAS } from "../../public-api/errors";
 import type { HandlerOf } from "../../public-api/handler";
+import type { PublicApiCaller } from "../../public-api/middleware";
+import type { PublicApiDependencies } from "../../public-api/operations";
 import { listStatusesOperation } from "./operations";
 import { PublicApiStatusList } from "./schema";
 
@@ -32,9 +36,15 @@ export const statusEndpoints = [
     ),
 ] as const;
 
-export const statusHandlers = {
-  listStatuses: (() => listStatusesOperation.handler({})) satisfies HandlerOf<
+export const statusHandlers = (
+  context: Context.Context<PublicApiDependencies>
+) => ({
+  listStatuses: (() =>
+    listStatusesOperation
+      .handler({})
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "listStatuses"
+    "listStatuses",
+    PublicApiCaller
   >,
-};
+});

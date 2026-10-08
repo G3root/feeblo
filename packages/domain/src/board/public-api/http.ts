@@ -1,3 +1,4 @@
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as OpenApi from "effect/http-api/OpenApi";
@@ -5,6 +6,8 @@ import * as OpenApi from "effect/http-api/OpenApi";
 import type { PublicApiBoardGroup } from "../../public-api/api-contract";
 import { PUBLIC_API_ERROR_SCHEMAS } from "../../public-api/errors";
 import type { HandlerOf } from "../../public-api/handler";
+import type { PublicApiCaller } from "../../public-api/middleware";
+import type { PublicApiDependencies } from "../../public-api/operations";
 import { parseLimit } from "../../public-api/parse";
 import { getBoardOperation, listBoardsOperation } from "./operations";
 import {
@@ -52,7 +55,9 @@ export const boardEndpoints = [
     ),
 ] as const;
 
-export const boardHandlers = {
+export const boardHandlers = (
+  context: Context.Context<PublicApiDependencies>
+) => ({
   listBoards: (({ query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
@@ -60,11 +65,20 @@ export const boardHandlers = {
         cursor: query.cursor,
         limit,
       });
-    })) satisfies HandlerOf<PublicApiGroup, "listBoards">,
-
-  getBoard: (({ params }) =>
-    getBoardOperation.handler({ boardId: params.boardId })) satisfies HandlerOf<
+    }).pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "getBoard"
+    "listBoards",
+    PublicApiCaller
   >,
-};
+
+  // The URL's params are the operation's own input fields, so handing them
+  // over cannot drop a field the operation gains.
+  getBoard: (({ params }) =>
+    getBoardOperation
+      .handler(params)
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "getBoard",
+    PublicApiCaller
+  >,
+});

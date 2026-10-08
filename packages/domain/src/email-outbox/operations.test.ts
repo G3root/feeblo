@@ -1,11 +1,15 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import { EmailOutboxOperations } from "./operations";
 
+/** The `Date` for a known instant, built through `DateTime`. */
+const dateAt = (instant: string | number | Date): Date =>
+  DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 const TestLayer = EmailOutboxOperations.layer.pipe(
   Layer.provideMerge(Database.PgliteDatabaseLive)
 );
@@ -19,9 +23,9 @@ describe("EmailOutboxOperations", () => {
           const db = yield* currentDb;
           const operations = yield* EmailOutboxOperations;
           const organizationId = yield* WorkspaceId.generate;
-          const now = new Date("2026-08-09T12:00:00.000Z");
-          const createdAt = new Date(now.getTime() - 120_000);
-          const failedCreatedAt = new Date(now.getTime() - 600_000);
+          const now = dateAt("2026-08-09T12:00:00.000Z");
+          const createdAt = dateAt(now.getTime() - 120_000);
+          const failedCreatedAt = dateAt(now.getTime() - 600_000);
           yield* db.insert(schema.organizationTable).values({
             id: organizationId,
             name: "Outbox operations",
@@ -98,7 +102,7 @@ describe("EmailOutboxOperations", () => {
           const db = yield* currentDb;
           const operations = yield* EmailOutboxOperations;
           const organizationId = yield* WorkspaceId.generate;
-          const now = new Date("2026-08-09T12:00:00.000Z");
+          const now = dateAt("2026-08-09T12:00:00.000Z");
           yield* db.insert(schema.organizationTable).values({
             id: organizationId,
             name: "Terminal outbox operations",

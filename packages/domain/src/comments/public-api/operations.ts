@@ -24,7 +24,7 @@ import {
   planRequiresUpgradeError,
 } from "../../public-api/errors";
 import { onInternalError } from "../../public-api/failure";
-import { currentPublicApiCaller } from "../../public-api/middleware";
+import { PublicApiCaller } from "../../public-api/middleware";
 import { defineOperation } from "../../public-api/operation";
 import { BadRequestError, InternalServerError } from "../../rpc-errors";
 import {
@@ -35,9 +35,9 @@ import {
   type FailedToUpdateCommentError,
   type PostDoesNotAcceptCommentsError,
 } from "../errors";
-import { currentCommentService } from "../service";
+import { CommentService } from "../service";
 import { toPublicApiComment } from "./mappers";
-import { currentPublicApiCommentRepository } from "./repository";
+import { PublicApiCommentRepository } from "./repository";
 import {
   CreateCommentInput,
   DeleteCommentInput,
@@ -196,7 +196,7 @@ const readWrittenComment = (args: {
   readonly organizationId: string;
 }) =>
   Effect.gen(function* () {
-    const repository = yield* currentPublicApiCommentRepository;
+    const repository = yield* PublicApiCommentRepository;
     const found = yield* repository
       .findComment(args)
       .pipe(Effect.catchTag("InternalServerError", () => onInternalError));
@@ -230,8 +230,8 @@ export const listPostCommentsOperation = defineOperation(
   },
   ({ cursor, limit, postId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiCommentRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiCommentRepository;
 
       const after = yield* decodeCursorOrFail(cursor);
 
@@ -272,8 +272,8 @@ export const getCommentOperation = defineOperation(
   },
   ({ commentId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiCommentRepository;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiCommentRepository;
 
       const comment = yield* repository
         .findComment({
@@ -302,9 +302,9 @@ export const createCommentOperation = defineOperation(
   },
   ({ author, content, parentCommentId, postId, visibility }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiCommentRepository;
-      const comments = yield* currentCommentService;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiCommentRepository;
+      const comments = yield* CommentService;
 
       const target = yield* repository
         .findCommentTarget({
@@ -362,9 +362,9 @@ export const updateCommentOperation = defineOperation(
   },
   ({ commentId, content, visibility }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiCommentRepository;
-      const comments = yield* currentCommentService;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiCommentRepository;
+      const comments = yield* CommentService;
 
       // Read first so another workspace's comment is a 404 rather than an
       // update that matches no row and answers 200. The post id comes from
@@ -412,9 +412,9 @@ export const deleteCommentOperation = defineOperation(
   },
   ({ commentId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiCommentRepository;
-      const comments = yield* currentCommentService;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiCommentRepository;
+      const comments = yield* CommentService;
 
       // A comment that is already gone is a 404 rather than a success: the
       // caller cannot tell a delete that worked from one that named the
@@ -456,9 +456,9 @@ export const pinCommentOperation = defineOperation(
   },
   ({ commentId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiCommentRepository;
-      const comments = yield* currentCommentService;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiCommentRepository;
+      const comments = yield* CommentService;
 
       const comment = yield* repository
         .findComment({
@@ -501,9 +501,9 @@ export const unpinCommentOperation = defineOperation(
   },
   ({ commentId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const repository = yield* currentPublicApiCommentRepository;
-      const comments = yield* currentCommentService;
+      const caller = yield* PublicApiCaller;
+      const repository = yield* PublicApiCommentRepository;
+      const comments = yield* CommentService;
 
       const comment = yield* repository
         .findComment({

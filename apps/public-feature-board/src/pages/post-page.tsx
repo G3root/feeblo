@@ -10,6 +10,7 @@ import {
 import { PostCommentGuestPrompt } from "@feeblo/post-ui/post-comment-composer";
 import { PostPage as ComposedPostPage } from "@feeblo/post-ui/post-page";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import { SubscribeCard } from "@feeblo/post-ui/subscribe-toggle";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
@@ -34,7 +35,6 @@ import { PostVoterDialog } from "../components/feedback/post-voter-dialog";
 // import { useUpvote } from "../hooks/use-upvote";
 import { boardPaths } from "../lib/board-links";
 import { mergedPostTargetAtom } from "../lib/merged-post-atoms";
-import { formatPostStatus } from "../lib/utils";
 import { m } from "../paraglide/messages.js";
 import { getLocale } from "../paraglide/runtime.js";
 import { usePublicCollections } from "../providers/public-collections-provider";
@@ -549,7 +549,13 @@ function PostMetaSidebarAuthor() {
   return (
     <PostMetaSidebarSection title={m.great_trick_jay()}>
       <div className="flex items-center gap-2.5">
-        <UserAvatar className="size-8" image={authorImage} name={authorName} />
+        <UserAvatar
+          className="size-8"
+          image={authorImage}
+          isMember={post?.authorIsMember ?? false}
+          memberLabel={m.sad_soft_tadpole()}
+          name={authorName}
+        />
         <p className="text-foreground text-sm font-medium">{authorName}</p>
       </div>
     </PostMetaSidebarSection>

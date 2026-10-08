@@ -1,19 +1,16 @@
 import { randomUUID } from "node:crypto";
 
-import { expect, test } from "@playwright/test";
-
+import { expect, test } from "../fixtures";
 import { createAuthenticatedWorkspace } from "../helpers/auth";
 import { setPlan } from "../helpers/set-plan";
 import { createTestUser } from "../helpers/test-users";
-import { publicBoardUrl } from "../helpers/urls";
+import { apiUrl, publicBoardUrl, webUrl } from "../helpers/urls";
 import {
   copyWorkspaceJwtSecret,
   sdkBundlePath,
   signWidgetToken,
 } from "../helpers/widget-sso";
 
-const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3101";
-const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
 const organizationIdPattern = /^org_/;
 const ssoTokenPattern = /ssoToken/;
 
@@ -58,7 +55,7 @@ test(
 
     try {
       await test.step("submit authenticated feedback through the embedded widget", async () => {
-        await visitorPage.goto(baseURL);
+        await visitorPage.goto(webUrl());
         await visitorPage.setContent(`
           <!doctype html>
           <html lang="en">
@@ -122,7 +119,7 @@ test(
             }).open();
           },
           {
-            host: baseURL,
+            host: webUrl(),
             identity: { ...visitor, token },
             orgId: organizationId,
           }
@@ -183,7 +180,7 @@ test(
 
         const autoLoginResponse = visitorPage.waitForResponse(
           (response) =>
-            response.url() === `${apiURL}/api/auth/sign-in/jwt-auto-login` &&
+            response.url() === `${apiUrl()}/api/auth/sign-in/jwt-auto-login` &&
             response.request().method() === "POST"
         );
         await publicBoardLink.click();
@@ -202,7 +199,7 @@ test(
           );
         });
 
-        const cookies = await visitorContext.cookies(apiURL);
+        const cookies = await visitorContext.cookies(apiUrl());
         expect(
           cookies.some((cookie) => cookie.name === "better-auth.session_token")
         ).toBeTruthy();

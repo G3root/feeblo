@@ -119,6 +119,7 @@ const makeCommentRepository = Effect.gen(function* () {
             // actual parent.
             resolvedParentCommentId: schema.commentTable.parentCommentId,
             memberId: schema.commentTable.memberId,
+            authorIsMember: sql<boolean>`${schema.commentTable.memberId} is not null`,
             statusUpdateId: schema.commentTable.statusUpdateId,
             pinnedAt: schema.commentTable.pinnedAt,
             user: {
@@ -155,6 +156,7 @@ const makeCommentRepository = Effect.gen(function* () {
           visibility: schema.commentTable.visibility,
           parentCommentId: schema.commentTable.parentCommentId,
           memberId: schema.commentTable.memberId,
+          authorIsMember: sql<boolean>`${schema.commentTable.memberId} is not null`,
           statusUpdateId: schema.commentTable.statusUpdateId,
           pinnedAt: schema.commentTable.pinnedAt,
           user: {

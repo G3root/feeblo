@@ -1,4 +1,4 @@
-import type { TComment } from "@feeblo/domain/src/comments/schema.js";
+import type { TComment } from "@feeblo/domain/comments/schema";
 import {
   Collapsible,
   CollapsiblePanel,

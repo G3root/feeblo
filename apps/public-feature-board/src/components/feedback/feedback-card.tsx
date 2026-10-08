@@ -1,9 +1,9 @@
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { PostCard as SharedPostCard } from "@feeblo/post-ui/post/post-card";
 import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
+import { truncate } from "@feeblo/utils/text";
 import type { ReactNode } from "react";
 
-import { truncate } from "../../lib/utils";
 import { m } from "../../paraglide/messages.js";
 
 // ---------------------------------------------------------------------------
@@ -61,17 +61,23 @@ function FeedbackPostCardBoardBadge({ children }: { children?: ReactNode }) {
 function FeedbackPostCardAuthor() {
   const { post } = usePostCollectionData();
   return (
-    <SharedPostCard.Author image={post.user.image} name={post.user.name} />
+    <SharedPostCard.Author
+      image={post.user.image}
+      isMember={post.authorIsMember}
+      name={post.user.name}
+    />
   );
 }
 
 function FeedbackPostCardMobileMeta({
   boardName,
   image,
+  isMember,
   name,
 }: {
   boardName?: string;
   image?: string | null;
+  isMember?: boolean;
   name?: string | null;
 }) {
   const { board, post } = usePostCollectionData();
@@ -79,6 +85,7 @@ function FeedbackPostCardMobileMeta({
     <SharedPostCard.MobileMeta
       boardName={boardName ?? board.name}
       image={image ?? post.user.image}
+      isMember={isMember ?? post.authorIsMember}
       name={name ?? post.user.name}
     />
   );

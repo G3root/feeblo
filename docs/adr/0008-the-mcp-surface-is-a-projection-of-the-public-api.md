@@ -20,7 +20,7 @@ The scope a key holds is enforced by the operation's own `requirePublicApiScope`
 
 **Per-key tool filtering is not expressible, and is unnecessary.** An MCP server's tool list is a property of the server, not of a credential; making the list key-dependent would mean one server instance per key. The operation's scope check is the authority, so a key that lacks a scope still sees the tool and is refused when it calls it — with the scope named in the message, which is more useful to a model than a tool that silently does not exist.
 
-**The erasure boundary is real and belongs in one file.** The registry erases every operation's requirement channel so operations of different shapes fit one list, and `Toolkit.make`/`toLayer` need a statically keyed handler record. `mcp.ts` is where those two meet, so it is the one file with noted `oxlint-disable`s and a `SAFETY` comment; the rest of the surface is fully typed.
+**The erasure boundary is real and belongs in one file.** `Toolkit.make` needs a tool per operation and `toLayer` needs a statically keyed handler record, so `mcp.ts` erases each operation's input type and the key middleware's request-scoped caller while keeping every stable dependency in the layer's type. It is the one file with noted `oxlint-disable`s and a `SAFETY` comment; the rest of the surface is fully typed.
 
 ## Consequences
 

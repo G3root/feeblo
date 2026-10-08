@@ -1,3 +1,4 @@
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import { PostCard } from "@feeblo/post-ui/post/post-card";
 import { StandaloneUpvoteButton } from "@feeblo/post-ui/upvote-toggle";
 import { Button } from "@feeblo/ui/button";
@@ -10,7 +11,6 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import * as dayjs from "@feeblo/utils/dayjs";
-import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import { MessageMultiple01Icon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
@@ -30,6 +30,7 @@ interface Post {
   title: string;
   excerpt: string | null;
   createdAt: Date | string;
+  authorIsMember: boolean;
   user?: {
     name: string | null;
     image: string | null;
@@ -122,6 +123,7 @@ export function RecentPostsSection({
                   <PostCard.MobileMeta
                     boardName={board?.name ?? ""}
                     image={post.user?.image}
+                    isMember={post.authorIsMember}
                     name={post.user?.name}
                   />
                 </PostCard.Body>
@@ -137,6 +139,7 @@ export function RecentPostsSection({
                   )}
                   <PostCard.Author
                     image={post.user?.image}
+                    isMember={post.authorIsMember}
                     name={post.user?.name}
                   />
                 </PostCard.DesktopMeta>

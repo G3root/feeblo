@@ -2,6 +2,7 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { BoardId, type LegidOf, WorkspaceId } from "@feeblo/id";
 import type { Role } from "@feeblo/permissions";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -48,7 +49,7 @@ describe("BoardRpcHandlers", () => {
       const db = yield* currentDb;
       const userId = `user_${fixture.organizationId}_${role}`;
       const membershipId = `membership_${fixture.organizationId}_${role}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* db.insert(schema.userTable).values({
         id: userId,
         email: `${userId}@example.com`,
@@ -71,7 +72,7 @@ describe("BoardRpcHandlers", () => {
       const boardId = yield* BoardId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
 
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
@@ -186,7 +187,7 @@ describe("BoardRpcHandlers", () => {
           const db = yield* currentDb;
 
           const privateBoardId = yield* BoardId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
           yield* db.insert(schema.boardTable).values({
             id: privateBoardId,
             name: "Private board",

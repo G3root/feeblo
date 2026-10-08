@@ -64,6 +64,9 @@
     "./billing/repository": {
       "default": "./src/billing/repository.ts"
     },
+    "./billing/revocation": {
+      "default": "./src/billing/revocation.ts"
+    },
     "./billing/service": {
       "default": "./src/billing/service.ts"
     },
@@ -309,6 +312,9 @@
     },
     "./membership/schema": {
       "default": "./src/membership/schema.ts"
+    },
+    "./notification/schema": {
+      "default": "./src/notification/schema.ts"
     },
     "./notification/service": {
       "default": "./src/notification/service.ts"

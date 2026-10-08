@@ -1,5 +1,5 @@
 import { NodeHttpPlatform, NodeServices } from "@effect/platform-node";
-import { expect, it } from "@effect/vitest";
+import { expect, layer } from "@effect/vitest";
 import { parseCookie } from "cookie-es";
 import * as Effect from "effect/Effect";
 import * as HttpApi from "effect/http-api/HttpApi";
@@ -15,7 +15,7 @@ import * as Schema from "effect/Schema";
 
 import {
   Auth,
-  currentHttpApiSession,
+  CurrentSession,
   HttpApiAuthMiddleware,
   makeHttpApiAuthMiddlewareLive,
   type Session,
@@ -84,13 +84,13 @@ class TestApi extends HttpApi.make("TestSessionMiddlewareApi")
 
 const GroupALive = HttpApiBuilder.group(TestApi, "SessionA", (handlers) =>
   handlers.handle("whoamiA", () =>
-    Effect.map(currentHttpApiSession, (session) => session.user.email)
+    Effect.map(CurrentSession, (session) => session.user.email)
   )
 );
 
 const GroupBLive = HttpApiBuilder.group(TestApi, "SessionB", (handlers) =>
   handlers.handle("whoamiB", () =>
-    Effect.map(currentHttpApiSession, (session) => session.user.email)
+    Effect.map(CurrentSession, (session) => session.user.email)
   )
 );
 
@@ -128,36 +128,38 @@ const responseText = (response: HttpServerResponse.HttpServerResponse) => {
   return body._tag === "Uint8Array" ? new TextDecoder().decode(body.body) : "";
 };
 
-it.effect(
-  "each composed route authenticates against its own session cookie name",
-  () =>
-    Effect.gen(function* () {
-      const ownCookieA = yield* executeRequest(
-        "/a/whoami",
-        `${COOKIE_A}=token-a`
-      );
-      expect(ownCookieA.status).toBe(200);
-      // String success schema encodes to a JSON string literal.
-      expect(responseText(ownCookieA)).toBe('"session@test.dev"');
+layer(TestApp)("session middleware composition", (it) => {
+  it.effect(
+    "each composed route authenticates against its own session cookie name",
+    () =>
+      Effect.gen(function* () {
+        const ownCookieA = yield* executeRequest(
+          "/a/whoami",
+          `${COOKIE_A}=token-a`
+        );
+        expect(ownCookieA.status).toBe(200);
+        // String success schema encodes to a JSON string literal.
+        expect(responseText(ownCookieA)).toBe('"session@test.dev"');
 
-      const ownCookieB = yield* executeRequest(
-        "/b/whoami",
-        `${COOKIE_B}=token-b`
-      );
-      expect(ownCookieB.status).toBe(200);
-      expect(responseText(ownCookieB)).toBe('"session@test.dev"');
+        const ownCookieB = yield* executeRequest(
+          "/b/whoami",
+          `${COOKIE_B}=token-b`
+        );
+        expect(ownCookieB.status).toBe(200);
+        expect(responseText(ownCookieB)).toBe('"session@test.dev"');
 
-      // Composition A must not honor composition B's cookie, and vice versa.
-      const foreignToken = yield* executeRequest(
-        "/a/whoami",
-        `${COOKIE_A}=token-b`
-      );
-      expect(foreignToken.status).toBe(401);
+        // Composition A must not honor composition B's cookie, and vice versa.
+        const foreignToken = yield* executeRequest(
+          "/a/whoami",
+          `${COOKIE_A}=token-b`
+        );
+        expect(foreignToken.status).toBe(401);
 
-      const foreignCookie = yield* executeRequest(
-        "/a/whoami",
-        `${COOKIE_B}=token-a`
-      );
-      expect(foreignCookie.status).toBe(401);
-    }).pipe(Effect.provide(TestApp), Effect.scoped)
-);
+        const foreignCookie = yield* executeRequest(
+          "/a/whoami",
+          `${COOKIE_B}=token-a`
+        );
+        expect(foreignCookie.status).toBe(401);
+      })
+  );
+});

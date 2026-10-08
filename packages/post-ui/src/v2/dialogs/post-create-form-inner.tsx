@@ -324,6 +324,12 @@ export function PostCreateForm() {
         const authorSelection = createOnBehalfPolicy.allowed
           ? value.author
           : undefined;
+        // Mirrors the server's `authorIsMember`: an on-behalf subject carries
+        // the picker's hint, a self-authored post follows the session's
+        // membership.
+        const authorIsMember = hasOnBehalfAuthorValue(authorSelection)
+          ? (authorSelection.isMember ?? false)
+          : member !== undefined;
 
         // The list row carries no body; it travels as action input to the
         // surface's `persistPost` RPC instead. On-behalf attribution rides
@@ -348,6 +354,7 @@ export function PostCreateForm() {
             organizationId,
             creatorId: session?.user?.id ?? null,
             creatorMemberId: member?.id ?? null,
+            authorIsMember,
             user: {
               name: session?.user?.name ?? null,
               image: session?.user?.image ?? null,
@@ -447,6 +454,7 @@ export function PostCreateForm() {
                         selection ?? {
                           name: session?.user?.name ?? m.noble_merry_owl(),
                           avatarUrl: session?.user?.image ?? null,
+                          isMember: member !== undefined,
                         }
                       }
                       label={m.inner_glad_leopard()}
