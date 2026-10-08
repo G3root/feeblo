@@ -9,6 +9,9 @@ import {
   NodeRuntime,
 } from "@effect/platform-node";
 import { Database } from "@feeblo/db";
+import { BillingRepository } from "@feeblo/domain/billing/repository";
+import { subscriptionRevocationMaintenance } from "@feeblo/domain/billing/revocation";
+import { PolarService } from "@feeblo/domain/billing/service";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
@@ -22,7 +25,10 @@ import {
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Etag from "effect/http/Etag";
+import * as HttpPlatform from "effect/http/HttpPlatform";
 import * as HttpRouter from "effect/http/HttpRouter";
+import type * as HttpServer from "effect/http/HttpServer";
 import * as Layer from "effect/Layer";
 
 import { ServerConfig } from "../config";
@@ -44,7 +50,22 @@ import {
   withGlobalMiddleware,
 } from "./router";
 
-export const program = Effect.gen(function* () {
+/**
+ * The composition root's interface.
+ *
+ * `makeServerApp` builds the route tree and the integration runtime without
+ * binding a port, and returns `makeServer`, which closes over that tree and
+ * takes the one layer a caller owns: the HTTP server. `program` supplies
+ * `NodeHttpServer`; a test supplies an in-memory server and builds the same
+ * tree over PGlite and test configs. That is the gap ADR 0006 recorded — no
+ * test built the server layers, so a collaborator missing from `ServiceLayers`
+ * stayed invisible until a request asked for it.
+ *
+ * The layers are provided after `HttpRouter.serve`, exactly as before: the
+ * serve step is what unwraps the `Request` markers the route and middleware
+ * layers carry, so the `Layer.provide`s can subtract the services they name.
+ */
+export const makeServerApp = Effect.gen(function* () {
   const config = yield* ServerConfig;
 
   const useTestMailer = yield* Config.Boolean("E2E_TEST_MAILER").pipe(
@@ -116,28 +137,61 @@ export const program = Effect.gen(function* () {
   });
   const AllRoutes = withGlobalMiddleware(MergedRoutes, config);
 
-  const server = HttpRouter.serve(AllRoutes, {
-    routerConfig: {
-      maxParamLength: 500,
-    },
-  }).pipe(
-    Layer.provide(AuthLayer),
-    Layer.provide(RateLimitLayer),
-    Layer.provide(ServiceLayers),
-    Layer.provide(NodeFileSystem.layer),
-    Layer.provide(NodePath.layer),
-    Layer.provide(
-      NodeHttpServer.layerConfig(
-        createServer,
-        Config.all({
-          port: Config.Number("SERVER_PORT").pipe(Config.withDefault(3000)),
-        })
-      )
+  return {
+    integrationRuntime,
+    makeServer: <E, R>(
+      platform: Layer.Layer<
+        HttpServer.HttpServer | HttpPlatform.HttpPlatform | Etag.Generator,
+        E,
+        R
+      >
+    ) =>
+      HttpRouter.serve(AllRoutes, {
+        routerConfig: {
+          maxParamLength: 500,
+        },
+      }).pipe(
+        Layer.provide(AuthLayer),
+        Layer.provide(RateLimitLayer),
+        Layer.provide(ServiceLayers),
+        Layer.provide(NodeFileSystem.layer),
+        Layer.provide(NodePath.layer),
+        Layer.provide(platform)
+      ),
+  };
+});
+
+export const program = Effect.gen(function* () {
+  const { integrationRuntime, makeServer } = yield* makeServerApp;
+
+  const server = makeServer(
+    NodeHttpServer.layerConfig(
+      createServer,
+      Config.all({
+        port: Config.Number("SERVER_PORT").pipe(Config.withDefault(3000)),
+      })
     )
   );
 
   yield* integrationRuntime.worker.pipe(Effect.forkScoped);
   yield* integrationRuntime.maintenance.pipe(Effect.forkScoped);
+
+  // The Polar client and the revocation queue are built here so a queued
+  // revocation keeps retrying after the request that deleted the workspace has
+  // already returned. `Layer.build` keeps them in this program's scope, next
+  // to the other forked workers. PolarService is provided into the repository
+  // layer (which reads the configured target from it) and merged alongside it,
+  // because the revocation pass reads the service directly.
+  const billingRuntime = yield* Layer.build(
+    Layer.mergeAll(
+      BillingRepository.layer.pipe(Layer.provide(PolarService.layer)),
+      PolarService.layer
+    )
+  );
+  yield* subscriptionRevocationMaintenance.pipe(
+    Effect.provide(billingRuntime),
+    Effect.forkScoped
+  );
 
   return yield* Layer.launch(server);
 });

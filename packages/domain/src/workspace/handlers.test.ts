@@ -374,6 +374,54 @@ describe("WorkspaceRpcHandlers", () => {
           expect(products[0]?.name).toBe("Starter Plan");
         })
       );
+
+      it.effect(
+        "lists the newest product first so duplicate plan slots resolve deterministically",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* WorkspaceRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const db = yield* currentDb;
+
+            yield* db.insert(schema.productTable).values([
+              {
+                id: "prod_legacy",
+                name: "Legacy Starter",
+                isRecurring: true,
+                isArchived: false,
+                externalOrganizationId: "ext_legacy",
+                visibility: "PUBLIC",
+                metadata: { plan: "starter", variant: "monthly" },
+                createdAt: dateAt("2025-01-01T00:00:00.000Z"),
+                updatedAt: dateAt("2025-01-01T00:00:00.000Z"),
+              },
+              {
+                id: "prod_current",
+                name: "Current Starter",
+                isRecurring: true,
+                isArchived: false,
+                externalOrganizationId: "ext_current",
+                visibility: "PUBLIC",
+                metadata: { plan: "starter", variant: "monthly" },
+                createdAt: dateAt("2026-01-01T00:00:00.000Z"),
+                updatedAt: dateAt("2026-01-01T00:00:00.000Z"),
+              },
+            ]);
+
+            const products = yield* handlers
+              .WorkspaceProductList()
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            // The shared PGlite database keeps products from earlier tests,
+            // so the assertion is the relative order, not the whole list.
+            const ids = products.map((product) => product.id);
+            expect(ids.indexOf("prod_current")).toBeLessThan(
+              ids.indexOf("prod_legacy")
+            );
+          })
+      );
     });
 
     describe("WorkspacePlanGet", () => {

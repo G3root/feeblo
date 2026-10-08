@@ -1,1 +1,1 @@
-export type { WidgetBoard as Board } from "./api";
+export type { TWidgetBoard as Board } from "@feeblo/domain/widget/schema";

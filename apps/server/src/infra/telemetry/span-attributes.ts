@@ -105,18 +105,39 @@ const allowlistedSpan = (span: Tracer.Span): Tracer.Span => ({
 });
 
 /**
+ * Root spans that are library internals rather than operations.
+ *
+ * Background fibers (queue pollers, delivery workers) execute SQL without a
+ * parent request, so Effect SQL's spans arrive as roots and every poll turns
+ * into a standalone trace. A SQL span under a request keeps its parent and is
+ * still exported; only the orphan poller queries are dropped. The names are
+ * exact because the library owns them.
+ */
+export const rootSpanNoise: ReadonlySet<string> = new Set([
+  "sql.execute",
+  "sql.transaction",
+]);
+
+/**
  * Wraps a tracer with the attribute filter and ratio sampling.
  *
  * A root span is sampled at `sampleRate`; a child always keeps its parent's
  * decision, so a retained trace stays whole and a dropped one stays cheap.
- * `Math.random` is the ratio-sampler primitive an OpenTelemetry SDK uses:
- * span creation is synchronous and cannot read Effect's `Random` service.
+ * Root spans named in `dropRootSpans` are never exported: they are emitted by
+ * library internals (see `rootSpanNoise`) rather than by a request or a named
+ * operation. `Math.random` is the ratio-sampler primitive an OpenTelemetry SDK
+ * uses: span creation is synchronous and cannot read Effect's `Random`
+ * service.
  */
 export const allowedSpans = (
   tracer: Tracer.Tracer,
-  options?: { readonly sampleRate?: number | undefined }
+  options?: {
+    readonly sampleRate?: number | undefined;
+    readonly dropRootSpans?: ReadonlySet<string> | undefined;
+  }
 ): Tracer.Tracer => {
   const sampleRate = Math.min(1, Math.max(0, options?.sampleRate ?? 1));
+  const dropRootSpans = options?.dropRootSpans ?? rootSpanNoise;
   const span = (
     spanOptions: Parameters<Tracer.Tracer["span"]>[0]
   ): Tracer.Span => {
@@ -127,6 +148,7 @@ export const allowedSpans = (
     const sampled = Option.isSome(spanOptions.parent)
       ? spanOptions.sampled
       : spanOptions.sampled &&
+        !dropRootSpans.has(spanOptions.name) &&
         // oxlint-disable-next-line effecttsgo/global-random -- ratio sampling is a synchronous span-creation decision and cannot read Effect's Random service
         Math.random() < sampleRate;
     return allowlistedSpan(tracer.span({ ...spanOptions, sampled }));

@@ -85,7 +85,8 @@ type PlanPrices = {
 /**
  * Builds the public pricing response: static plan entitlements merged with
  * the current Polar product prices. Plans appear in PLAN_KEYS order; the
- * first unarchived recurring product for each plan and interval wins.
+ * newest unarchived recurring product for each plan and interval wins, which
+ * is why the caller's order is load-bearing (see `findProducts`).
  */
 export const buildPlansResponse = (
   products: readonly PricingProduct[]

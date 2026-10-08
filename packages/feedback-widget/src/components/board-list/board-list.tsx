@@ -4,7 +4,7 @@ import type { Board } from "../../lib/boards";
 import { PoweredByBadge } from "../ui/powered-by-badge";
 import { BoardCard } from "./board-card";
 
-export function BoardList(props: { boards: Board[] }) {
+export function BoardList(props: { boards: readonly Board[] }) {
   return (
     <div class="p-6">
       <p class="text-foreground text-lg font-medium">Give us feedback</p>

@@ -1,3 +1,4 @@
+import { rpcSpanPrefix } from "@feeblo/domain/rpc-router";
 /**
  * The composition root's observability layer.
  *
@@ -51,6 +52,7 @@ export const makeObservabilityLayer = (config: ServerConfigValue) =>
         }),
         telemetryLayer(telemetry, {
           baseLoggers: Logger.layer(loggers, { mergeWithExisting: false }),
+          rpcSpanPrefix,
         })
       );
     })

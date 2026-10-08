@@ -55,6 +55,8 @@ export const TelemetryConfig = Schema.Struct({
     Schema.Literals(["http/json", "http/protobuf"])
   ),
   tracesSampleRate: Schema.Finite,
+  /** Whether parentless `sql.*` spans are kept; false is a debugging escape hatch. */
+  dropRootSpans: Schema.Boolean,
 });
 export type TelemetryConfig = typeof TelemetryConfig.Type;
 
@@ -86,6 +88,9 @@ export const telemetryConfig = (options: {
     const sampleRate = yield* Config.Number(
       "FEEBLO_TELEMETRY_TRACES_SAMPLE_RATE"
     ).pipe(Config.withDefault(1));
+    const dropRootSpans = yield* Config.Boolean(
+      "FEEBLO_TELEMETRY_DROP_ROOT_SPANS"
+    ).pipe(Config.withDefault(true));
     const target = (signal: "TRACES" | "LOGS" | "METRICS") =>
       Effect.gen(function* () {
         const endpoint = yield* Config.URL(
@@ -127,6 +132,7 @@ export const telemetryConfig = (options: {
       // A mistyped ratio must not take down a deployment; clamp to the
       // documented 0–1 range instead.
       tracesSampleRate: Math.min(1, Math.max(0, sampleRate)),
+      dropRootSpans,
       traces: yield* target("TRACES"),
       logs: yield* target("LOGS"),
       metrics: yield* target("METRICS"),

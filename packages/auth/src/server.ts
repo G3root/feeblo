@@ -2,6 +2,7 @@ import { NodeCrypto } from "@effect/platform-node";
 import { Database, transaction } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
+import { revokePendingSubscriptionRevocations } from "@feeblo/domain/billing/revocation";
 import { PolarService } from "@feeblo/domain/billing/service";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { healShadowsForVerifiedUser } from "@feeblo/domain/identity/linking";
@@ -111,6 +112,16 @@ export const initAuthHandler = (
     } = yield* AuthConfig;
     const polarService = yield* PolarService;
 
+    // A half-configured Polar is the one failure mode that takes money without
+    // granting a plan: checkout and the portal need only the access token, but
+    // the signed webhook endpoint (the only way a subscription reaches this
+    // deployment) is registered only when the secret is present too.
+    if (polarService.client && Option.isNone(polarService.webhookSecret)) {
+      yield* Effect.logWarning(
+        "POLAR_ACCESS_TOKEN is set without POLAR_WEBHOOK_SECRET: checkout can charge a card, but subscription webhooks will never be applied"
+      );
+    }
+
     const isTest = nodeEnv === "test";
 
     const trustedOrigins = yield* getTrustedOrigins;
@@ -128,8 +139,10 @@ export const initAuthHandler = (
 
     const callbackRuntime = ManagedRuntime.make(
       Layer.mergeAll(
+        // Exposed as well as provided: the revocation pass reads the service
+        // directly.
         PolarService.layer,
-        BillingRepository.layer,
+        BillingRepository.layer.pipe(Layer.provide(PolarService.layer)),
         entitlementPolicyLayer,
         membershipPolicyLayer,
         MembershipRepository.layer,
@@ -251,45 +264,24 @@ export const initAuthHandler = (
     };
 
     /**
-     * External subscription id of a workspace, when it has one.
-     *
-     * Separate from the revocation so a caller that is about to delete the
-     * organization row can capture the id first and revoke it afterwards, once
-     * the deletion has committed. Best-effort: a billing read that fails must
-     * not block the deletion, so it logs and reports "no subscription".
+     * Writes every subscription a workspace holds into the durable revocation
+     * queue, while the subscription rows still exist. A failure to queue must
+     * not block the deletion, so it logs and the queue is simply empty — the
+     * same best-effort read the old unconditional revocation had, now with a
+     * retry loop behind every row that did make it in.
      */
-    const findOrganizationSubscriptionId = (organizationId: string) =>
+    const enqueueOrganizationSubscriptionRevocations = (
+      organizationId: string
+    ) =>
       callbackRuntime.runPromise(
         BillingRepository.use((billingRepository) =>
-          billingRepository.findSubscriptionByOrganizationId({
+          billingRepository.enqueueSubscriptionRevocationsForOrganization({
             organizationId,
           })
         ).pipe(
-          Effect.map(Option.map((subscription) => subscription.externalId)),
           Effect.catchCause((cause) =>
             Effect.logWarning(
-              "Failed to read billing for a deleted organization",
-              cause
-            ).pipe(
-              Effect.annotateLogs({ organizationId }),
-              Effect.map(() => Option.none<string>())
-            )
-          )
-        )
-      );
-
-    /** Best-effort revocation of one already-resolved external subscription. */
-    const revokeOrganizationSubscription = (
-      organizationId: string,
-      subscriptionId: string
-    ) =>
-      callbackRuntime.runPromise(
-        PolarService.use((polarService) =>
-          polarService.revokeSubscription({ id: subscriptionId })
-        ).pipe(
-          Effect.catchCause((cause) =>
-            Effect.logWarning(
-              "Failed to cancel billing for deleted organization",
+              "Failed to queue billing revocation for a deleted organization",
               cause
             ).pipe(Effect.annotateLogs({ organizationId }))
           )
@@ -297,21 +289,21 @@ export const initAuthHandler = (
       );
 
     /**
-     * Best-effort cancellation of a deleted tenant's Polar subscription. Runs
-     * before the organization row (and its cascaded subscription rows) are
-     * deleted so the external subscription id is still queryable; a failure to
-     * reach Polar must never block the deletion.
+     * Attempts every queued revocation for a workspace whose row is already
+     * gone. Polar failures stay queued for `subscriptionRevocationMaintenance`;
+     * only a database failure surfaces here and is logged.
      */
-    const cancelOrganizationSubscription = async (organizationId: string) => {
-      const subscriptionId =
-        await findOrganizationSubscriptionId(organizationId);
-      if (Option.isSome(subscriptionId)) {
-        await revokeOrganizationSubscription(
-          organizationId,
-          subscriptionId.value
-        );
-      }
-    };
+    const revokePendingOrganizationSubscriptions = (organizationId: string) =>
+      callbackRuntime.runPromise(
+        revokePendingSubscriptionRevocations({ organizationId }).pipe(
+          Effect.catchCause((cause) =>
+            Effect.logWarning(
+              "Failed to revoke queued billing for a deleted organization",
+              cause
+            ).pipe(Effect.annotateLogs({ organizationId }))
+          )
+        )
+      );
 
     /**
      * Deletes the workspaces a departing account is the only member of, and
@@ -385,24 +377,13 @@ export const initAuthHandler = (
         throw ownershipRequiredError(blockingWorkspaceNames);
       }
 
-      // Captured before the transaction: the subscription rows cascade away
-      // with the organization row, and the ids are revoked only once the
-      // deletion has committed, so a rollback can never leave a live workspace
-      // without its subscription.
-      const subscriptionIds = new Map<string, string>();
-      for (const workspace of ownedWorkspaces) {
-        const subscriptionId = await findOrganizationSubscriptionId(
-          workspace.id
-        );
-        if (Option.isSome(subscriptionId)) {
-          subscriptionIds.set(workspace.id, subscriptionId.value);
-        }
-      }
-
       // Every deletion commits or none does, and the membership count is
       // re-checked under a lock: an invitation accepted between the check above
       // and here must fail the whole deletion rather than take a workspace away
-      // from the member who just joined.
+      // from the member who just joined. The revocation rows are written in
+      // this transaction, before the organization row (and its cascaded
+      // subscriptions) disappears, so a rollback leaves no queue work and no
+      // revoked subscription for a workspace that survives.
       const deletedWorkspaceIds = await callbackRuntime.runPromise(
         transaction(
           Effect.gen(function* () {
@@ -427,6 +408,13 @@ export const initAuthHandler = (
               return yield* Effect.fail(ownershipRequiredError(nowBlocking));
             }
             for (const workspaceId of deletable) {
+              yield* BillingRepository.use((billingRepository) =>
+                billingRepository.enqueueSubscriptionRevocationsForOrganization(
+                  {
+                    organizationId: workspaceId,
+                  }
+                )
+              );
               yield* db
                 .delete(schema.organizationTable)
                 .where(eq(schema.organizationTable.id, workspaceId));
@@ -436,14 +424,12 @@ export const initAuthHandler = (
         )
       );
 
-      // Revoked after the commit, best-effort: an external call must not hold
-      // the transaction's row locks, and a workspace the re-check spared keeps
-      // the subscription it still needs.
+      // Revoked after the commit: an external call must not hold the
+      // transaction's row locks, a workspace the re-check spared keeps the
+      // subscription it still needs, and anything Polar refuses stays queued
+      // for `subscriptionRevocationMaintenance`.
       for (const workspaceId of deletedWorkspaceIds) {
-        const subscriptionId = subscriptionIds.get(workspaceId);
-        if (subscriptionId !== undefined) {
-          await revokeOrganizationSubscription(workspaceId, subscriptionId);
-        }
+        await revokePendingOrganizationSubscriptions(workspaceId);
       }
     };
 
@@ -737,7 +723,17 @@ export const initAuthHandler = (
           ? [
               polar({
                 client: polarService.client,
-                createCustomerOnSignUp: true,
+                // Off on purpose. The plugin creates a customer per user with
+                // `externalId = user.id` and, on account deletion, deletes a
+                // customer matched only by email — which is the customer a
+                // workspace checkout's `externalCustomerId = organizationId`
+                // resolves to, because Polar looks a checkout customer up by
+                // email before external id. That combination cancels a
+                // surviving workspace's subscription when the person who paid
+                // deletes their account. Feeblo owns customer creation at
+                // checkout (`PolarService.createCheckout`); the plugin is here
+                // only for the signed webhook endpoint.
+                createCustomerOnSignUp: false,
 
                 use: [
                   webhooks({
@@ -764,12 +760,14 @@ export const initAuthHandler = (
                         case "subscription.created":
                         case "subscription.revoked":
                         case "subscription.uncanceled":
-                        case "subscription.active": {
+                        case "subscription.active":
+                        case "subscription.past_due": {
                           await callbackRuntime
                             .runPromise(
                               BillingRepository.use((billingRepository) =>
                                 billingRepository.upsertSubscription(
-                                  payload.data
+                                  payload.data,
+                                  payload.timestamp
                                 )
                               )
                             )
@@ -855,11 +853,21 @@ export const initAuthHandler = (
                 )
               );
             },
-            // Cancels the Polar subscription before the org row (and its
-            // cascaded subscription/site rows) disappear, so the subdomain is
-            // released and billing stops for the deleted tenant.
+            // Queues the Polar subscription for revocation before the org row
+            // (and its cascaded subscription/site rows) disappears, so the
+            // external subscription id is still readable. The revocation runs
+            // in the after hook once the deletion has committed, and anything
+            // Polar refuses stays queued; the revocation retry loop will not
+            // touch it while the organization row still exists.
             async beforeDeleteOrganization(data) {
-              await cancelOrganizationSubscription(data.organization.id);
+              await enqueueOrganizationSubscriptionRevocations(
+                data.organization.id
+              );
+            },
+            async afterDeleteOrganization(data) {
+              await revokePendingOrganizationSubscriptions(
+                data.organization.id
+              );
             },
           },
           async sendInvitationEmail(data) {
@@ -1042,8 +1050,11 @@ export const initAuthHandler = (
     Effect.provide(
       Layer.mergeAll(
         AuthConfig.layer,
+        // Exposed as well as provided: the auth handler reads the service
+        // directly, and the repository layer reads the configured target
+        // from it.
         PolarService.layer,
-        BillingRepository.layer,
+        BillingRepository.layer.pipe(Layer.provide(PolarService.layer)),
         MembershipRepository.layer,
         rateLimitLayer,
         WorkspaceRepository.layer

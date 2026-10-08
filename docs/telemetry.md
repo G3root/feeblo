@@ -9,7 +9,8 @@ Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the 
 | `apps/server/src/infra/observability.ts` | Chooses Sentry-only or Sentry + OTLP, and owns the final logger set |
 | `apps/server/src/infra/telemetry/config.ts` | Parses the standard `OTEL_EXPORTER_OTLP_*` environment |
 | `apps/server/src/infra/telemetry/layer.ts` | Builds the OTLP tracer, logger, and metrics layers |
-| `apps/server/src/infra/telemetry/span-attributes.ts` | HTTP attribute allowlist and ratio sampling |
+| `apps/server/src/infra/telemetry/span-attributes.ts` | HTTP attribute allowlist, root-span filter, and ratio sampling |
+| `apps/server/src/infra/telemetry/rpc-spans.ts` | Adds `rpc.*` attributes and labels the parent HTTP span per RPC method |
 | `apps/server/src/infra/sentry.ts` | Sentry SDK, logger, metrics, and tracer, each optional |
 
 `program.ts` provides `makeObservabilityLayer` around the whole program, so layer construction, the forked workers, and the HTTP server all share one tracer and one logger set.
@@ -23,8 +24,16 @@ Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the 
 | `OTEL_EXPORTER_OTLP_HEADERS` | Backend credentials, `key=value,key2=value2` (URI-encoded). A per-signal `_HEADERS` override wins. |
 | `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` | `http/protobuf` (default) or `http/json`. |
 | `FEEBLO_TELEMETRY_TRACES_SAMPLE_RATE` | Root-span ratio, `0.0`–`1.0`, default `1`. Children always follow their root's decision. |
+| `FEEBLO_TELEMETRY_DROP_ROOT_SPANS` | Drop parentless `sql.execute` / `sql.transaction` spans, default `true`. Set `false` to keep them while debugging a poller. |
 | `OTEL_SERVICE_NAME` | Defaults to `feeblo-server`. |
 | `APP_RELEASE` | Reported as `service.version`. |
+
+## Span shaping
+
+Two policies run in the tracer wrappers the OTLP layer installs (`span-attributes.ts` and `rpc-spans.ts`):
+
+- **RPC methods.** `effect/rpc` names each server span `RpcServer.<Tag>`, but every call shares the same `POST /rpc` HTTP route. `rpc-spans.ts` adds `rpc.system.name=effect` and `rpc.method=<Tag>` to the RPC span, and records `rpc.method` on the parent HTTP span (or on the HTTP link when the client owns the trace context), so a backend can filter and group by method instead of the anonymous route. When one HTTP span serves more than one method, the shared span keeps every distinct method as an array instead of the last write winning; each RPC span still carries the scalar method it serves. The prefix is pinned by `rpcSpanPrefix` in `@feeblo/domain/rpc-router`, which also passes it to `RpcServer.layerHttp`.
+- **Root library spans.** Queue pollers and delivery workers run without a parent request, so Effect SQL's `sql.execute` and `sql.transaction` arrive as roots and every 1 Hz poll becomes a standalone trace. Those root names are dropped; a SQL span under a request keeps its parent and is exported.
 
 ## Local development
 
