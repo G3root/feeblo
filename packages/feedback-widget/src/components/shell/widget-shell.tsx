@@ -23,6 +23,12 @@ export function WidgetShell(props: {
   const view = createMemo(() => resolveView(location.pathname));
   const tabs = createMemo(() => widgetTabs(config));
   const activeModule = createMemo(() => moduleForPath(location.pathname));
+  const activeTabIndex = createMemo(() =>
+    Math.max(
+      0,
+      tabs().findIndex((tab) => tab.module === activeModule())
+    )
+  );
 
   let scroller: HTMLDivElement | undefined;
 
@@ -80,15 +86,38 @@ export function WidgetShell(props: {
           class="bg-popover relative z-10 shrink-0 border-t p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
           data-slot="widget-tab-bar"
         >
-          <ul class="bg-muted flex gap-1 rounded-xl p-1">
+          <ul
+            class="bg-muted relative flex gap-1 rounded-xl p-1"
+            style={{
+              "--tab-count": tabs().length,
+              "--active-tab": activeTabIndex(),
+            }}
+          >
+            {/*
+             * The pill is a sibling of the tabs and slides between them, so a
+             * section switch reads as one control rather than two background
+             * swaps. The tabs are equal width, so the pill's width and offset
+             * are pure arithmetic on --tab-count.
+             */}
+            <span
+              aria-hidden="true"
+              class="bg-background pointer-events-none absolute inset-y-1 left-1 z-0 rounded-lg shadow-sm/5 transition-transform duration-200 ease-in-out motion-reduce:transition-none"
+              data-slot="widget-tab-indicator"
+              style={{
+                width:
+                  "calc((100% - 0.5rem - (var(--tab-count) - 1) * 0.25rem) / var(--tab-count))",
+                transform:
+                  "translateX(calc(var(--active-tab) * (100% + 0.25rem)))",
+              }}
+            />
             <For each={tabs()}>
               {(tab) => (
-                <li class="min-w-0 flex-1">
+                <li class="relative z-10 min-w-0 flex-1">
                   <A
                     aria-current={
                       activeModule() === tab.module ? "page" : undefined
                     }
-                    class="text-muted-foreground/72 focus-visible:ring-ring focus-visible:ring-offset-background aria-[current=page]:bg-background aria-[current=page]:text-foreground flex w-full items-center justify-center gap-2 rounded-lg border border-transparent px-3 py-2 text-sm font-medium transition-[color,background-color,box-shadow] duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 aria-[current=page]:shadow-sm/5 sm:py-1.5"
+                    class="text-muted-foreground/72 focus-visible:ring-ring focus-visible:ring-offset-background aria-[current=page]:text-foreground flex w-full items-center justify-center gap-2 rounded-lg border border-transparent px-3 py-2 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 sm:py-1.5"
                     href={tab.href}
                     preload
                   >
