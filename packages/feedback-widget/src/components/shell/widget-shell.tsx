@@ -131,9 +131,7 @@ export function WidgetShell(props: {
         </nav>
       </Show>
 
-      <Show when={view().kind === "root"}>
-        <PoweredByBadge />
-      </Show>
+      <PoweredByBadge />
     </div>
   );
 }
