@@ -2,16 +2,14 @@ import type { DragDropEventHandlers } from "@dnd-kit/react";
 import { DragDropProvider } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
-import {
-  BoardIconMap,
-  formatPostStatus,
-} from "@feeblo/web-shared/board/constants";
+import { BoardIconMap } from "@feeblo/web-shared/board/constants";
 import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import {
   Delete02Icon,

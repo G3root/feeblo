@@ -1,6 +1,5 @@
 import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
-
-import { createModalStoreContext } from "~/lib/xstate";
+import { createModalStoreContext } from "@feeblo/web-shared/xstate";
 
 /** The section whose "New" button opened the dialog; the new status joins it. */
 export const [
