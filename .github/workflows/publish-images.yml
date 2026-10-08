@@ -29,7 +29,9 @@ jobs:
           startsWith(github.event.release.tag_name, 'v'))
       )
     runs-on: ${{ matrix.platform.runner }}
-    timeout-minutes: 30
+    # A cold server build (empty pnpm store, full `turbo build`) runs past 30
+    # minutes; 45 leaves room for the first build that fills the registry cache.
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
@@ -87,8 +89,18 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha || github.sha }}
             org.opencontainers.image.version=${{ github.event.release.tag_name || github.event.workflow_run.head_sha }}
-          cache-from: type=gha,scope=${{ matrix.service.image }}-${{ matrix.platform.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service.image }}-${{ matrix.platform.arch }}
+          # `type=gha` keys its cache off `GITHUB_REF`, so a release run on
+          # `refs/tags/vX.Y.Z` never read the layers `main` had already built
+          # and every first release build ran cold. The tag scopes it wrote
+          # also sat in the repository's 10 GB Actions cache quota, which CI's
+          # pnpm store shares. A registry cache ref is shared across refs and
+          # lives in GHCR instead of that quota. The `type=gha` line is
+          # read-only now, kept so the first builds after this change can
+          # still reuse entries written before it.
+          cache-from: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}:buildcache-${{ matrix.platform.arch }}
+            type=gha,scope=${{ matrix.service.image }}-${{ matrix.platform.arch }}
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}:buildcache-${{ matrix.platform.arch }},mode=max
 
   merge-manifests:
     name: Publish ${{ matrix.service.image }} manifest

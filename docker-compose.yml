@@ -81,6 +81,10 @@ services:
       # custom domain, never the S3 endpoint. Unset, uploads still succeed and
       # return URLs that 403 for every browser.
       MEDIA_PUBLIC_BASE_URL: "${MEDIA_PUBLIC_BASE_URL:?MEDIA_PUBLIC_BASE_URL is required - e.g. https://media.example.com}"
+      # Optional OTLP exporters; unset keeps Sentry as the only tracing backend.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+      FEEBLO_TELEMETRY_TRACES_SAMPLE_RATE: ${FEEBLO_TELEMETRY_TRACES_SAMPLE_RATE:-1}
     ports:
       - "${SERVER_PORT:-8080}:8080"
 

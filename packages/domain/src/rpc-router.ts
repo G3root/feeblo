@@ -136,6 +136,16 @@ export const DomainRpcHandlers = Layer.mergeAll(
 );
 
 /**
+ * Span-name prefix every RPC server span carries.
+ *
+ * Pinned here rather than left to `effect/rpc`'s default so the telemetry
+ * layer, which reads this contract to add the per-method `rpc.*` attributes
+ * (and to label the parent HTTP span), cannot silently stop matching after an
+ * upgrade. The value matches the library default, so span names are unchanged.
+ */
+export const rpcSpanPrefix = "RpcServer";
+
+/**
  * Builds the `/rpc` route with the provider-owned handler layers the
  * composition root supplies.
  *
@@ -152,6 +162,7 @@ export const makeRpcRoute = <RIn, ROut, E>(
     path: "/rpc",
     protocol: "http",
     group: AllRpcs,
+    spanPrefix: rpcSpanPrefix,
   }).pipe(
     Layer.provide(DomainRpcHandlers),
     Layer.provide(providerHandlers),
