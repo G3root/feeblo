@@ -13,7 +13,7 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 export function UpdateCard(props: { update: WidgetUpdate }) {
   return (
     <Card
-      class="group hover:border-foreground/20 focus-visible:ring-ring/30 overflow-hidden rounded-xl transition-[border-color,box-shadow,transform] duration-150 before:rounded-[calc(var(--radius-xl)-1px)] hover:shadow-sm focus-visible:ring-[3px] active:scale-[0.985] motion-reduce:active:scale-100"
+      class="group hover:border-foreground/20 focus-visible:ring-ring/30 ease-widget-out overflow-hidden rounded-xl transition-[border-color,box-shadow,transform] duration-150 before:rounded-[calc(var(--radius-xl)-1px)] hover:shadow-sm focus-visible:ring-[3px] active:scale-[0.985] motion-reduce:active:scale-100"
       href={`/updates/${props.update.id}`}
       render={A}
     >

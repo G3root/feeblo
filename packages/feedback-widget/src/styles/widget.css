@@ -37,9 +37,9 @@
  * keeps back-navigation and rapid tab switches feeling immediate rather than
  * queued behind an animation.
  */
-:root {
-  --widget-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --widget-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+@theme {
+  --ease-widget-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-widget-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /*
@@ -59,8 +59,8 @@ body,
  * push. Both are entry-only: the outgoing view is replaced in the same frame. */
 .widget-enter {
   transition:
-    opacity 220ms var(--widget-ease-out),
-    transform 220ms var(--widget-ease-drawer);
+    opacity 220ms var(--ease-widget-out),
+    transform 220ms var(--ease-widget-drawer);
 }
 
 .widget-enter[data-enter="rise"] {
@@ -91,8 +91,8 @@ body,
  */
 .widget-stagger {
   transition:
-    opacity 240ms var(--widget-ease-out),
-    transform 240ms var(--widget-ease-drawer);
+    opacity 240ms var(--ease-widget-out),
+    transform 240ms var(--ease-widget-drawer);
   transition-delay: calc(var(--stagger, 0) * 40ms);
 
   @starting-style {
@@ -104,7 +104,7 @@ body,
 /* The submit confirmation's check: a small overshoot-free pop, not a scale(0)
  * that makes the mark appear out of nowhere. */
 .widget-pop {
-  animation: widget-pop 320ms var(--widget-ease-out) both;
+  animation: widget-pop 320ms var(--ease-widget-out) both;
 }
 
 @keyframes widget-pop {
