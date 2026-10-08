@@ -35,6 +35,8 @@ export function PostStatusDeleteDialog() {
   const open = useSelector(store, (state) => state.context.open);
   const statusId = useSelector(store, (state) => state.context.data.statusId);
   const [preview, setPreview] = useState<DeletePreview | null>(null);
+  const [previewError, setPreviewError] = useState(false);
+  const [previewAttempt, setPreviewAttempt] = useState(0);
   const [pending, setPending] = useState(false);
 
   const statusQuery = useLiveQuery({
@@ -50,15 +52,20 @@ export function PostStatusDeleteDialog() {
   const status = statuses.find((row) => row.id === statusId);
   const fallback = statuses.find((row) => row.isDefault);
 
-  // Read once per open: the numbers are what the dialog promises, and they are
-  // cheap to re-read if the workspace changed underneath it.
+  // Read once per open, and again on retry: the numbers are what the dialog
+  // promises, and they are cheap to re-read if the workspace changed
+  // underneath it.
   useEffect(() => {
     if (!open) {
       setPreview(null);
+      setPreviewError(false);
       return;
     }
 
     let cancelled = false;
+
+    setPreview(null);
+    setPreviewError(false);
 
     fetchRpc((rpc) =>
       rpc.PostStatusDeletePreview({ id: statusId, organizationId })
@@ -70,14 +77,19 @@ export function PostStatusDeleteDialog() {
       })
       .catch(() => {
         if (!cancelled) {
-          setPreview(null);
+          setPreviewError(true);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [open, organizationId, statusId]);
+  }, [open, organizationId, statusId, previewAttempt]);
+
+  const handlePreviewRetry = () => {
+    setPreviewError(false);
+    setPreviewAttempt((attempt) => attempt + 1);
+  };
 
   const handleDelete = () => {
     if (!status || pending) {
@@ -127,7 +139,19 @@ export function PostStatusDeleteDialog() {
             Delete {status?.label ?? "this status"}?
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {preview === null ? (
+            {previewError ? (
+              <span className="flex items-center gap-2">
+                Could not check what this status is used by.
+                <Button
+                  onClick={handlePreviewRetry}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  Try again
+                </Button>
+              </span>
+            ) : preview === null ? (
               "Checking what this status is used by…"
             ) : (
               <>
@@ -162,7 +186,7 @@ export function PostStatusDeleteDialog() {
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <Button
-            disabled={pending || !status}
+            disabled={pending || !status || preview === null}
             onClick={handleDelete}
             type="button"
             variant="destructive"

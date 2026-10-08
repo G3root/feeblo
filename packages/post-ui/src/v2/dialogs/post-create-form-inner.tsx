@@ -251,6 +251,7 @@ export function PostCreateForm() {
           (postStatus) => postStatus.type === explicitStatus
         )) ??
     postStatuses.find((postStatus) => postStatus.isDefault) ??
+    postStatuses.find((postStatus) => postStatus.type === "PENDING") ??
     postStatuses[0];
 
   const initialBoardId = store.get().context.data.boardId ?? "";
