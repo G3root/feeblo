@@ -8,10 +8,9 @@ import * as S from "effect/Schema";
 /** One staged job as the dashboard lists and describes it. */
 export const DataImportJobSummary = S.Struct({
   id: S.String,
-  boardId: S.String,
   status: DataImportStatus,
   fileName: S.String,
-  /** File-level notices: unknown columns, a differently named board, a re-upload. */
+  /** File-level notices: unknown columns, new boards, a re-upload. */
   notices: S.Array(S.String),
   rowCount: S.Finite,
   createdCount: S.Finite,
@@ -36,6 +35,8 @@ export const DataImportReportRow = S.Struct({
   postId: S.NullOr(S.String),
   /** The planned title, so a preview shows what confirming will create. */
   title: S.NullOr(S.String),
+  /** The planned board name, or null for a row that failed before planning. */
+  boardName: S.NullOr(S.String),
   /** The planned status display name. */
   statusName: S.NullOr(S.String),
   /** A bounded excerpt of the planned body; never the whole payload. */
@@ -101,20 +102,20 @@ export type TDataImportCancel = S.Schema.Type<typeof DataImportCancel>;
 /**
  * The export endpoint's query, as the wire carries it: query parameters are
  * strings, and the handler validates `includeArchived` so a malformed value
- * stays on the published error envelope.
+ * stays on the published error envelope. An absent `boardId` exports every
+ * board in the workspace.
  */
-export const BoardExportQuery = S.Struct({
+export const PostExportQuery = S.Struct({
   organizationId: S.String,
-  boardId: S.String,
+  boardId: S.optionalKey(S.String),
   includeArchived: S.optionalKey(S.String),
 });
 
-export type TBoardExportQuery = S.Schema.Type<typeof BoardExportQuery>;
+export type TPostExportQuery = S.Schema.Type<typeof PostExportQuery>;
 
 /** The multipart upload's non-file fields. */
-export const BoardImportUploadFields = {
+export const DataImportUploadFields = {
   organizationId: S.String,
-  boardId: S.String,
 };
 
 export const BOARD_IMPORT_DEFAULT_REPORT_LIMIT = 100;

@@ -21,7 +21,6 @@ import {
   DataImportNotConfirmableError,
   DataImportNotFoundError,
   DataImportRowLimitError,
-  DataTransferBoardNotFoundError,
   type DataTransferRepositoryError,
   InvalidBoardPostCsvError,
 } from "./errors";
@@ -43,7 +42,6 @@ export type StageBoardImportInput = {
   readonly bytes: Uint8Array;
   readonly fileName: string;
   readonly organizationId: string;
-  readonly boardId: string;
   readonly userId: string;
   readonly memberId: string | null;
 };
@@ -72,7 +70,6 @@ export type DataImportServiceContract = {
     | DataImportRowLimitError
     | DataImportFileTooLargeError
     | DataImportAlreadyActiveError
-    | DataTransferBoardNotFoundError
     | Policy.PolicyDeniedError
     | InternalServerError
     | LegidError,
@@ -279,17 +276,19 @@ const makeDataImportService = Effect.gen(function* () {
         });
       }
 
-      const board = yield* boards
-        .findByIdInOrganization({
-          id: input.boardId,
-          organizationId: input.organizationId,
-        })
+      // Imports are not scoped to a board: the `board` column routes every
+      // row. The oldest board is the fallback for a row with an empty cell,
+      // and is null only when the workspace has no boards at all. The read
+      // and the sort happen here so the plan stays a pure function of them.
+      const existingBoards = yield* boards
+        .findMany({ organizationId: input.organizationId })
         .pipe(withRemapDbErrors("Board", "select"));
-      if (Option.isNone(board)) {
-        return yield* new DataTransferBoardNotFoundError({
-          message: "No board with this id exists in this workspace.",
-        });
-      }
+      const sortedBoards = [...existingBoards].sort(
+        (left, right) =>
+          left.createdAt.getTime() - right.createdAt.getTime() ||
+          left.id.localeCompare(right.id)
+      );
+      const [defaultBoard = null] = sortedBoards;
 
       const text = yield* decodeBoardPostCsv(input.bytes);
       const fileHash = yield* hashBytes(crypto, input.bytes);
@@ -315,7 +314,8 @@ const makeDataImportService = Effect.gen(function* () {
         })
       );
       const plan = planImportRows({
-        board: { name: board.value.name, slug: board.value.slug },
+        boards: sortedBoards,
+        defaultBoard,
         defaultStatus: fallbackStatus,
         rows: parsed.rows,
         statuses: statusRows,
@@ -349,7 +349,6 @@ const makeDataImportService = Effect.gen(function* () {
       const jobId = yield* DataImportJobId.generate;
       return yield* repository
         .insertStagedJob({
-          boardId: input.boardId,
           createdByMemberId: input.memberId,
           createdByUserId: input.userId,
           fileName: input.fileName,

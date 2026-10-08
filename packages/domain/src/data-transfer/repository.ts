@@ -12,6 +12,7 @@ import {
   asc,
   desc,
   eq,
+  exists,
   gt,
   inArray,
   isNotNull,
@@ -44,7 +45,6 @@ const ACTIVE_STATUSES = [
 ] as const satisfies readonly TDataImportStatus[];
 
 const JOB_FIELDS = {
-  boardId: schema.dataImportJobTable.boardId,
   confirmedAt: schema.dataImportJobTable.confirmedAt,
   createdByMemberId: schema.dataImportJobTable.createdByMemberId,
   createdByUserId: schema.dataImportJobTable.createdByUserId,
@@ -68,7 +68,6 @@ const JOB_FIELDS = {
 export type DataImportJobRecord = {
   readonly id: string;
   readonly organizationId: string;
-  readonly boardId: string;
   readonly createdByUserId: string | null;
   readonly createdByMemberId: string | null;
   readonly status: TDataImportStatus;
@@ -95,6 +94,8 @@ export type DataImportRowRecord = {
   readonly postId: string | null;
   /** The planned title, so the preview can show what the row will create. */
   readonly title: string | null;
+  /** The planned board name, or null for a row that never got one. */
+  readonly boardName: string | null;
   /** The planned status display name; null for a row that never got one. */
   readonly statusName: string | null;
   /** A bounded excerpt of the planned body; never the whole payload. */
@@ -114,11 +115,13 @@ export type DataImportCounts = {
 };
 
 /** One post as the CSV export reads it, before the CSV layer names it. */
-export type BoardPostCsvSourceRow = {
+export type PostCsvSourceRow = {
   readonly id: string;
   readonly slug: string;
   readonly title: string;
   readonly content: string;
+  readonly boardName: string;
+  readonly boardSlug: string;
   readonly statusLabel: string;
   readonly statusType: TPostStatusType;
   readonly etaQuarter: string | null;
@@ -158,7 +161,6 @@ export interface DataTransferRepositoryContract {
   readonly insertStagedJob: (input: {
     readonly id: string;
     readonly organizationId: string;
-    readonly boardId: string;
     readonly createdByUserId: string | null;
     readonly createdByMemberId: string | null;
     readonly fileName: string;
@@ -193,23 +195,26 @@ export interface DataTransferRepositoryContract {
     DataTransferRepositoryError
   >;
 
-  /** Rows an export would stream, so the cap can be checked before streaming. */
-  readonly countBoardPostsForCsv: (input: {
+  /**
+   * Rows an export would stream, so the cap can be checked before streaming.
+   * A null `boardId` counts every board in the workspace.
+   */
+  readonly countPostsForCsv: (input: {
     readonly organizationId: string;
-    readonly boardId: string;
+    readonly boardId: string | null;
     readonly includeArchived: boolean;
   }) => Effect.Effect<number, DataTransferRepositoryError>;
-  /** One keyset page of the export, ordered `(createdAt, id)` ascending. */
-  readonly listBoardPostCsvRows: (input: {
+  /**
+   * One keyset page of the export, ordered `(createdAt, id)` ascending, with
+   * each row's board carried along. A null `boardId` reads every board.
+   */
+  readonly listPostCsvRows: (input: {
     readonly organizationId: string;
-    readonly boardId: string;
+    readonly boardId: string | null;
     readonly includeArchived: boolean;
     readonly limit: number;
     readonly after: { readonly createdAt: Date; readonly id: string } | null;
-  }) => Effect.Effect<
-    readonly BoardPostCsvSourceRow[],
-    DataTransferRepositoryError
-  >;
+  }) => Effect.Effect<readonly PostCsvSourceRow[], DataTransferRepositoryError>;
 
   /** Moves an `awaiting_confirmation` job to `queued`; None when it is not one. */
   readonly markQueued: (input: {
@@ -242,11 +247,13 @@ export interface DataTransferRepositoryContract {
     DataTransferRepositoryError
   >;
   /**
-   * Marks one row created, but only while it is still `pending`. An empty
-   * update means another worker owns this job now, and failing here is what
-   * rolls the row's post insert back with it.
+   * Marks one row created, but only while it is still `pending` and its job
+   * is still `running`. An empty update means another worker owns this job
+   * now, or a cancel landed mid-batch; failing here is what rolls the row's
+   * post insert back with it.
    */
   readonly markRowCreated: (input: {
+    readonly jobId: string;
     readonly rowId: string;
     readonly postId: string;
   }) => Effect.Effect<void, DataTransferRepositoryError>;
@@ -389,7 +396,6 @@ const makeDataTransferRepository = Effect.gen(function* () {
             const [job] = yield* db
               .insert(schema.dataImportJobTable)
               .values({
-                boardId: input.boardId,
                 createdByMemberId: input.createdByMemberId,
                 createdByUserId: input.createdByUserId,
                 errorCount,
@@ -490,12 +496,13 @@ const makeDataTransferRepository = Effect.gen(function* () {
             .limit(limit)
             .offset(offset);
           // The payload holds the plan a preview renders; it is narrowed to
-          // three fields here and never leaves the module whole.
+          // four fields here and never leaves the module whole.
           const rows = yield* Effect.forEach(stored, (row) =>
             decodeStagedRow(row.payload)
               .pipe(Effect.orElseSucceed((): null => null))
               .pipe(
                 Effect.map((payload): DataImportRowRecord => ({
+                  boardName: payload?.boardName ?? null,
                   contentPreview:
                     payload === null ? null : previewContent(payload.content),
                   id: row.id,
@@ -512,23 +519,25 @@ const makeDataTransferRepository = Effect.gen(function* () {
         })
       ),
 
-    countBoardPostsForCsv: ({ boardId, includeArchived, organizationId }) =>
+    countPostsForCsv: ({ boardId, includeArchived, organizationId }) =>
       guard(
-        "countBoardPostsForCsv",
+        "countPostsForCsv",
         db
           .select({ total: sql<string | number>`count(*)` })
           .from(schema.postTable)
           .where(
             and(
               eq(schema.postTable.organizationId, organizationId),
-              eq(schema.postTable.boardId, boardId),
+              ...(boardId === null
+                ? []
+                : [eq(schema.postTable.boardId, boardId)]),
               ...(includeArchived ? [] : [isNull(schema.postTable.archivedAt)])
             )
           )
           .pipe(Effect.map((rows) => Number(rows[0]?.total ?? 0)))
       ),
 
-    listBoardPostCsvRows: ({
+    listPostCsvRows: ({
       after,
       boardId,
       includeArchived,
@@ -536,10 +545,12 @@ const makeDataTransferRepository = Effect.gen(function* () {
       organizationId,
     }) =>
       guard(
-        "listBoardPostCsvRows",
+        "listPostCsvRows",
         Effect.gen(function* () {
           const posts = yield* db
             .select({
+              boardName: schema.boardTable.name,
+              boardSlug: schema.boardTable.slug,
               contactEmail: schema.contactTable.email,
               contactName: schema.contactTable.name,
               content: schema.postTable.content,
@@ -562,6 +573,10 @@ const makeDataTransferRepository = Effect.gen(function* () {
               schema.postStatusTable,
               eq(schema.postStatusTable.id, schema.postTable.statusId)
             )
+            .innerJoin(
+              schema.boardTable,
+              eq(schema.boardTable.id, schema.postTable.boardId)
+            )
             .leftJoin(
               schema.contactTable,
               eq(schema.contactTable.id, schema.postTable.contactId)
@@ -573,7 +588,9 @@ const makeDataTransferRepository = Effect.gen(function* () {
             .where(
               and(
                 eq(schema.postTable.organizationId, organizationId),
-                eq(schema.postTable.boardId, boardId),
+                ...(boardId === null
+                  ? []
+                  : [eq(schema.postTable.boardId, boardId)]),
                 ...(includeArchived
                   ? []
                   : [isNull(schema.postTable.archivedAt)]),
@@ -615,9 +632,11 @@ const makeDataTransferRepository = Effect.gen(function* () {
             tagsByPost.set(tag.postId, names);
           }
 
-          return posts.map((post): BoardPostCsvSourceRow => ({
+          return posts.map((post): PostCsvSourceRow => ({
             authorEmail: post.contactEmail ?? post.creatorEmail,
             authorName: post.contactName ?? post.creatorName,
+            boardName: post.boardName,
+            boardSlug: post.boardSlug,
             content: post.content,
             createdAt: post.createdAt,
             etaQuarter: post.etaQuarter,
@@ -760,7 +779,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
           )
       ),
 
-    markRowCreated: ({ rowId, postId }) =>
+    markRowCreated: ({ jobId, rowId, postId }) =>
       guard(
         "markRowCreated",
         Effect.gen(function* () {
@@ -776,7 +795,22 @@ const makeDataTransferRepository = Effect.gen(function* () {
             .where(
               and(
                 eq(schema.dataImportRowTable.id, rowId),
-                eq(schema.dataImportRowTable.outcome, "pending")
+                eq(schema.dataImportRowTable.outcome, "pending"),
+                // The job check is what makes a cancel win the race: a
+                // cancellation that lands while this transaction is open
+                // leaves the post unapplied instead of creating it after
+                // the cancel the uploader already saw.
+                exists(
+                  db
+                    .select({ id: schema.dataImportJobTable.id })
+                    .from(schema.dataImportJobTable)
+                    .where(
+                      and(
+                        eq(schema.dataImportJobTable.id, jobId),
+                        eq(schema.dataImportJobTable.status, "running")
+                      )
+                    )
+                )
               )
             )
             .returning({ id: schema.dataImportRowTable.id });

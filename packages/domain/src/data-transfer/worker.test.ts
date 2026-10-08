@@ -147,6 +147,7 @@ const RuntimeTest = Layer.mergeAll(
 // `PostWriteService` the write path exposes, and the optional fan-outs it
 // reads with `serviceOption` are simply absent (an import backfill skips them).
 const TestLayer = Layer.mergeAll(
+  BoardRepository.layer,
   PostWriteService.layer.pipe(
     Layer.provideMerge(Layer.mergeAll(PostWriteDependenciesTest, RuntimeTest))
   ),
@@ -168,7 +169,6 @@ const stageAndConfirm = (
     const session = Effect.provideService(CurrentSession, makeSession(fixture));
     const job = yield* service
       .stageBoardImport({
-        boardId: fixture.boardId,
         bytes: new TextEncoder().encode(csv),
         fileName: "posts.csv",
         memberId: fixture.membershipId,
@@ -316,9 +316,89 @@ layer(TestLayer)("DataImportWorker", (it) => {
         if (Option.isSome(stored)) {
           expect(stored.value.status).toBe("completed");
           expect(stored.value.createdCount).toBe(2);
-          expect(stored.value.warningCount).toBe(1);
+          // Both rows have an empty `board` cell, so both warn about the
+          // fallback board; the second also has an unknown status.
+          expect(stored.value.warningCount).toBe(2);
         }
       })
+  );
+
+  it.effect("routes rows to the board the file names and creates it", () =>
+    Effect.gen(function* () {
+      recordedIntegrationEvents.length = 0;
+      const fixture = yield* makeFixture();
+      yield* stageAndConfirm(
+        fixture,
+        [
+          "title,board",
+          "Known board post,Test board",
+          "New board post,Bugs",
+          "Another new board post,Ideas",
+        ].join("\n")
+      );
+
+      const outcome = yield* runDataImportPass(yield* claim("worker-1"));
+      expect(outcome).toMatchObject({ createdCount: 3, errorCount: 0 });
+
+      const db = yield* currentDb;
+      const posts = yield* db
+        .select()
+        .from(schema.postTable)
+        .where(eq(schema.postTable.organizationId, fixture.organizationId));
+      const boards = yield* db
+        .select()
+        .from(schema.boardTable)
+        .where(eq(schema.boardTable.organizationId, fixture.organizationId));
+      const boardByName = new Map(
+        boards.map((board) => [board.name, board.id])
+      );
+
+      expect(posts).toHaveLength(3);
+      const byTitle = new Map(posts.map((post) => [post.title, post]));
+      expect(byTitle.get("Known board post")?.boardId).toBe(fixture.boardId);
+      expect(byTitle.get("New board post")?.boardId).toBe(
+        boardByName.get("Bugs")
+      );
+      expect(byTitle.get("Another new board post")?.boardId).toBe(
+        boardByName.get("Ideas")
+      );
+      const created = boards.find((board) => board.name === "Bugs");
+      expect(created).toMatchObject({
+        visibility: "PUBLIC",
+      });
+      expect(created?.slug).toBe("bugs");
+    })
+  );
+
+  it.effect("recreates a board deleted after the import was staged", () =>
+    Effect.gen(function* () {
+      recordedIntegrationEvents.length = 0;
+      const fixture = yield* makeFixture();
+      yield* stageAndConfirm(fixture, "title,board\nAfter delete,Test board\n");
+
+      const db = yield* currentDb;
+      yield* db
+        .delete(schema.boardTable)
+        .where(eq(schema.boardTable.id, fixture.boardId));
+
+      const outcome = yield* runDataImportPass(yield* claim("worker-1"));
+      expect(outcome).toMatchObject({ createdCount: 1, errorCount: 0 });
+
+      const boards = yield* db
+        .select()
+        .from(schema.boardTable)
+        .where(eq(schema.boardTable.organizationId, fixture.organizationId));
+      const recreated = boards.find((board) => board.name === "Test board");
+      expect(recreated).toBeDefined();
+      expect(recreated?.id).not.toBe(fixture.boardId);
+
+      const posts = yield* db
+        .select()
+        .from(schema.postTable)
+        .where(eq(schema.postTable.organizationId, fixture.organizationId));
+      expect(posts).toHaveLength(1);
+      expect(posts[0]?.boardId).toBe(recreated?.id);
+    })
   );
 
   it.effect("re-running a pass never creates a post twice", () =>
@@ -424,6 +504,63 @@ layer(TestLayer)("DataImportWorker", (it) => {
         .from(schema.postTable)
         .where(eq(schema.postTable.organizationId, fixture.organizationId));
       expect(posts).toEqual([]);
+    })
+  );
+
+  it.effect("a canceled job cannot mark a pending row created", () =>
+    Effect.gen(function* () {
+      recordedIntegrationEvents.length = 0;
+      const fixture = yield* makeFixture();
+      // A real post for the second job's row to point at, so the assertion
+      // isolates the job-status guard from the row's foreign key.
+      yield* stageAndConfirm(fixture, "title\nFirst post\n");
+      yield* runDataImportPass(yield* claim("worker-1"));
+
+      const db = yield* currentDb;
+      const [post] = yield* db
+        .select({ id: schema.postTable.id })
+        .from(schema.postTable)
+        .where(eq(schema.postTable.organizationId, fixture.organizationId));
+      if (post === undefined) {
+        throw new Error("Expected the first import to create a post.");
+      }
+
+      const canceledJob = yield* stageAndConfirm(
+        fixture,
+        "title\nSecond post\n"
+      );
+      const repository = yield* DataTransferRepository;
+      yield* repository.cancelJob({
+        id: canceledJob.id,
+        organizationId: fixture.organizationId,
+      });
+
+      const rows = yield* db
+        .select({ id: schema.dataImportRowTable.id })
+        .from(schema.dataImportRowTable)
+        .where(eq(schema.dataImportRowTable.jobId, canceledJob.id));
+      const rowId = rows[0]?.id;
+      if (rowId === undefined) {
+        throw new Error("Expected the second job's staged row to exist.");
+      }
+
+      // The cancel happened after the worker claimed the job, so the row
+      // guard alone would let this update through; the job-status condition
+      // is what rolls the post transaction back.
+      const error = yield* Effect.flip(
+        repository.markRowCreated({
+          jobId: canceledJob.id,
+          postId: post.id,
+          rowId,
+        })
+      );
+      expect(error._tag).toBe("DataTransferRepositoryError");
+
+      const [stored] = yield* db
+        .select({ outcome: schema.dataImportRowTable.outcome })
+        .from(schema.dataImportRowTable)
+        .where(eq(schema.dataImportRowTable.id, rowId));
+      expect(stored?.outcome).toBe("pending");
     })
   );
 

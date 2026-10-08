@@ -73,7 +73,7 @@ export class DataTransferBoardNotFoundError extends Schema.TaggedError<DataTrans
   { httpApiStatus: 404, identifier: "DataTransferBoardNotFoundError" }
 ) {}
 
-/** The board holds more rows than {@link DATA_EXPORT_MAX_ROWS}. */
+/** The selection holds more rows than {@link DATA_EXPORT_MAX_ROWS}. */
 export class DataExportTooLargeError extends Schema.TaggedError<DataExportTooLargeError>()(
   "DataExportTooLargeError",
   { maxRows: Schema.Finite, message: Schema.String },

@@ -18,7 +18,7 @@ import * as Stream from "effect/Stream";
 import { BoardRepository } from "../board/repository";
 import { PublicApiConfig } from "../public-api/config";
 import { CurrentSession, type Session } from "../session-middleware";
-import { streamBoardPostCsv } from "./export-service";
+import { streamPostCsv } from "./export-service";
 import { DATA_EXPORT_MAX_ROWS } from "./limits";
 import { DataTransferRepository } from "./repository";
 
@@ -126,14 +126,18 @@ const TestLayer = Layer.mergeAll(
   Layer.provideMerge(PublicApiConfig.layerTest(new URL("https://app.test")))
 );
 
-const exportBoard = (
+const exportPosts = (
   fixture: Effect.Success<ReturnType<typeof makeFixture>>,
-  includeArchived = false
+  options: {
+    readonly boardId?: string | null;
+    readonly includeArchived?: boolean;
+  } = {}
 ) =>
   Effect.gen(function* () {
-    const exportFile = yield* streamBoardPostCsv({
-      boardId: fixture.boardId,
-      includeArchived,
+    const exportFile = yield* streamPostCsv({
+      boardId:
+        options.boardId === undefined ? fixture.boardId : options.boardId,
+      includeArchived: options.includeArchived ?? false,
       organizationId: fixture.organizationId,
     });
     const chunks = yield* Stream.runCollect(exportFile.stream);
@@ -143,7 +147,7 @@ const exportBoard = (
     };
   }).pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
-layer(TestLayer)("streamBoardPostCsv", (it) => {
+layer(TestLayer)("streamPostCsv", (it) => {
   it.effect("streams a board's posts with status, author, tags and votes", () =>
     Effect.gen(function* () {
       const fixture = yield* makeFixture();
@@ -197,7 +201,7 @@ layer(TestLayer)("streamBoardPostCsv", (it) => {
         createdAt: now,
       });
 
-      const result = yield* exportBoard(fixture);
+      const result = yield* exportPosts(fixture);
 
       expect(result.fileName).toMatch(
         /^feedback-posts-\d{4}-\d{2}-\d{2}\.csv$/u
@@ -242,7 +246,7 @@ layer(TestLayer)("streamBoardPostCsv", (it) => {
         updatedAt: now,
       });
 
-      const result = yield* exportBoard(fixture);
+      const result = yield* exportPosts(fixture);
 
       expect(result.csv).toContain("Won't do");
     })
@@ -279,11 +283,13 @@ layer(TestLayer)("streamBoardPostCsv", (it) => {
         },
       ]);
 
-      const withoutArchived = yield* exportBoard(fixture, false);
+      const withoutArchived = yield* exportPosts(fixture);
       expect(withoutArchived.csv).toContain("Live post");
       expect(withoutArchived.csv).not.toContain("Archived post");
 
-      const withArchived = yield* exportBoard(fixture, true);
+      const withArchived = yield* exportPosts(fixture, {
+        includeArchived: true,
+      });
       expect(withArchived.csv).toContain("Archived post");
     })
   );
@@ -314,7 +320,7 @@ layer(TestLayer)("streamBoardPostCsv", (it) => {
           .values(rows.slice(offset, offset + chunkSize));
       }
 
-      const error = yield* Effect.flip(exportBoard(fixture));
+      const error = yield* Effect.flip(exportPosts(fixture));
 
       expect(error._tag).toBe("DataExportTooLargeError");
 
@@ -323,6 +329,79 @@ layer(TestLayer)("streamBoardPostCsv", (it) => {
         .from(schema.postTable)
         .where(eq(schema.postTable.organizationId, fixture.organizationId));
       expect(count.length).toBe(DATA_EXPORT_MAX_ROWS + 1);
+    })
+  );
+
+  it.effect("exports every board when no board is named", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeFixture();
+      const db = yield* currentDb;
+      const now = yield* DateTime.nowAsDate;
+      const secondBoardId = yield* BoardId.generate;
+      yield* db.insert(schema.boardTable).values({
+        id: secondBoardId,
+        name: "Ideas",
+        slug: "ideas",
+        visibility: "PUBLIC",
+        organizationId: fixture.organizationId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      yield* db.insert(schema.postTable).values([
+        {
+          id: yield* PostId.generate,
+          title: "Feedback post",
+          slug: "feedback-post",
+          content: "Body",
+          boardId: fixture.boardId,
+          statusId: fixture.statusId,
+          organizationId: fixture.organizationId,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: yield* PostId.generate,
+          title: "Idea post",
+          slug: "idea-post",
+          content: "Body",
+          boardId: secondBoardId,
+          statusId: fixture.statusId,
+          organizationId: fixture.organizationId,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ]);
+
+      const result = yield* exportPosts(fixture, { boardId: null });
+
+      expect(result.fileName).toMatch(/^posts-\d{4}-\d{2}-\d{2}\.csv$/u);
+      expect(result.csv).toContain("Feedback post");
+      expect(result.csv).toContain("Idea post");
+      const lines = result.csv
+        .replace(/^\uFEFF/u, "")
+        .trimEnd()
+        .split("\r\n");
+      // Both posts share one instant, so the page order between them is by
+      // id; assert by row rather than by position.
+      expect(lines.find((line) => line.includes("Feedback post"))).toContain(
+        "Feedback"
+      );
+      expect(lines.find((line) => line.includes("Idea post"))).toContain(
+        "Ideas"
+      );
+    })
+  );
+
+  it.effect("fails before streaming when the named board is missing", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeFixture();
+      const other = yield* makeFixture();
+
+      const error = yield* Effect.flip(
+        exportPosts(fixture, { boardId: other.boardId })
+      );
+
+      expect(error._tag).toBe("DataTransferBoardNotFoundError");
     })
   );
 });

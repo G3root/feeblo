@@ -1,5 +1,6 @@
 import type { TStagedDataImportRow } from "@feeblo/domain-contracts/data-import";
 import type { TPostStatusType } from "@feeblo/domain-contracts/post-status-type";
+import { slugify } from "@feeblo/utils/url";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 
@@ -17,8 +18,9 @@ export type ImportPlanStatus = {
   readonly type: TPostStatusType;
 };
 
-/** The board every row of the import lands in. */
+/** One existing board of the importing workspace. */
 export type ImportPlanBoard = {
+  readonly id: string;
   readonly name: string;
   readonly slug: string;
 };
@@ -52,6 +54,44 @@ const ETA_PATTERN = /^(\d{4})-Q([1-4])$/iu;
 
 const normalizeKey = (value: string): string =>
   value.toLowerCase().replaceAll(/[^a-z0-9]/gu, "");
+
+/**
+ * The key two board names share when they mean the same board. Slugify is the
+ * identity on purpose: "Feature Requests" and "feature_requests" are one
+ * board, in the plan and in the worker's batch resolver alike.
+ */
+export const boardKey = (name: string): string =>
+  slugify(name) || normalizeKey(name);
+
+/**
+ * The board a `board` cell names, when the workspace already has it. Slug first
+ * (exact, then slugified), then the comparison-normalized name, so a file that
+ * spells a board the way a person would still lands on the right one.
+ */
+const matchBoard = (
+  value: string,
+  bySlug: ReadonlyMap<string, ImportPlanBoard>,
+  byName: ReadonlyMap<string, ImportPlanBoard>
+): ImportPlanBoard | undefined =>
+  bySlug.get(value.toLowerCase()) ??
+  bySlug.get(boardKey(value)) ??
+  byName.get(normalizeKey(value));
+
+const boardLookups = (boards: readonly ImportPlanBoard[]) => {
+  const bySlug = new Map<string, ImportPlanBoard>();
+  const byName = new Map<string, ImportPlanBoard>();
+  for (const board of boards) {
+    const slug = board.slug.toLowerCase();
+    if (!bySlug.has(slug)) {
+      bySlug.set(slug, board);
+    }
+    const name = normalizeKey(board.name);
+    if (!byName.has(name)) {
+      byName.set(name, board);
+    }
+  }
+  return { byName, bySlug };
+};
 
 const statusLookups = (statuses: readonly ImportPlanStatus[]) => {
   const byName = new Map<string, ImportPlanStatus>();
@@ -105,21 +145,30 @@ const parseInstant = (value: string) => {
  *
  * The rule that separates a failed row from a warning: a row fails when it
  * cannot become the post it claims to be (no title, an unreadable creation
- * instant, a value past the post limits); a row warns when it becomes a post
- * with one value substituted — an unknown status becomes the workspace's
- * default open status, an unreadable eta is left empty, an unusable author
- * email means the post has no author. Both are visible in the row report; the
- * difference is whether the post exists afterwards.
+ * instant, a value past the post limits, an empty board in a workspace that
+ * has none); a row warns when it becomes a post with one value substituted —
+ * an unknown status becomes the workspace's default open status, an unreadable
+ * eta is left empty, an unusable author email means the post has no author, an
+ * empty board falls back to the workspace's default board. Both are visible in
+ * the row report; the difference is whether the post exists afterwards.
+ *
+ * The `board` cell is the routing key. A row that names a board the workspace
+ * has lands there; a row that names an unknown board is staged with that name
+ * and the worker creates it; a row with an empty cell lands on `defaultBoard`.
+ * The plan never writes anything, so the preview can show every destination
+ * before a person confirms.
  */
 export const planImportRows = ({
   rows,
   statuses,
-  board,
+  boards,
+  defaultBoard,
   defaultStatus,
 }: {
   readonly rows: readonly ParsedBoardPostRow[];
   readonly statuses: readonly ImportPlanStatus[];
-  readonly board: ImportPlanBoard;
+  readonly boards: readonly ImportPlanBoard[];
+  readonly defaultBoard: ImportPlanBoard | null;
   readonly defaultStatus: ImportPlanStatus;
 }): ImportPlan => {
   const lookups = statusLookups(statuses);
@@ -127,17 +176,7 @@ export const planImportRows = ({
     defaultStatus.label,
     defaultStatus.type
   );
-
-  const boardKeys = new Set([
-    normalizeKey(board.name),
-    normalizeKey(board.slug),
-  ]);
-  const foreignBoards = new Set<string>();
-  for (const row of rows) {
-    if (row.board.length > 0 && !boardKeys.has(normalizeKey(row.board))) {
-      foreignBoards.add(row.board);
-    }
-  }
+  const boardLookupsByName = boardLookups(boards);
 
   const planned = rows.map((row): PlannedImportRow => {
     if (row.title.trim().length === 0) {
@@ -163,6 +202,43 @@ export const planImportRows = ({
     }
 
     const warnings: string[] = [];
+
+    const namedBoard =
+      row.board.trim().length === 0
+        ? undefined
+        : matchBoard(
+            row.board.trim(),
+            boardLookupsByName.bySlug,
+            boardLookupsByName.byName
+          );
+    let boardId: string | null;
+    let boardName: string;
+    if (row.board.trim().length === 0) {
+      if (defaultBoard === null) {
+        return {
+          kind: "failed",
+          rowNumber: row.rowNumber,
+          message:
+            "The board is empty and this workspace has no boards. Name a board in the row.",
+        };
+      }
+      boardId = defaultBoard.id;
+      boardName = defaultBoard.name;
+      warnings.push(`The board is empty; imported into "${boardName}".`);
+    } else if (namedBoard !== undefined) {
+      boardId = namedBoard.id;
+      boardName = namedBoard.name;
+    } else {
+      boardId = null;
+      boardName = row.board.trim();
+      if (boardKey(boardName).length === 0) {
+        return {
+          kind: "failed",
+          rowNumber: row.rowNumber,
+          message: "The board name is not usable as a board.",
+        };
+      }
+    }
 
     const matchedStatus =
       row.status.length === 0
@@ -215,6 +291,8 @@ export const planImportRows = ({
           matchedStatus === undefined
             ? defaultName
             : statusDisplayName(matchedStatus.label, matchedStatus.type),
+        boardId,
+        boardName,
         tagNames: row.tags,
         etaQuarter: eta.etaQuarter,
         authorName: authorEmail === null ? null : authorName,
@@ -225,12 +303,33 @@ export const planImportRows = ({
     };
   });
 
-  const notices =
-    foreignBoards.size === 0
+  const newBoards = new Map<string, string>();
+  for (const row of planned) {
+    if (row.kind === "pending" && row.payload.boardId === null) {
+      const key = boardKey(row.payload.boardName);
+      if (!newBoards.has(key)) {
+        newBoards.set(key, row.payload.boardName);
+      }
+    }
+  }
+  const newBoardNames = [...newBoards.values()];
+  const shownBoards = newBoardNames.slice(0, 8);
+  const boardNotices =
+    newBoardNames.length === 0
       ? []
       : [
-          `The file names ${foreignBoards.size === 1 ? "a different board" : `${foreignBoards.size} other boards`}; all rows import into "${board.name}".`,
+          `The file names ${
+            newBoardNames.length === 1
+              ? `a board that does not exist yet; it will be created: "${shownBoards[0] ?? ""}".`
+              : `${newBoardNames.length} boards that do not exist yet; they will be created: ${shownBoards
+                  .map((name) => `"${name}"`)
+                  .join(", ")}${
+                  newBoardNames.length > shownBoards.length
+                    ? `, and ${newBoardNames.length - shownBoards.length} more`
+                    : ""
+                }.`
+          }`,
         ];
 
-  return { notices, rows: planned };
+  return { notices: boardNotices, rows: planned };
 };

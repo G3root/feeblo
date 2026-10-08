@@ -64,12 +64,20 @@ export type TDataImportRowOutcome = S.Schema.Type<typeof DataImportRowOutcome>;
  * label or the default), kept so a preview can name the status without a
  * second lookup. `warnings` are safe, workspace-authored strings (a status
  * name, an eta value) — never personal data.
+ *
+ * `boardId` is the resolved board when the file named one this workspace
+ * knows, and `null` when it did not; a null board is applied by resolving
+ * `boardName` once per batch, creating the board when it does not exist yet.
+ * Every pending row carries a `boardName`, which is also what names the
+ * destination in the row report — an import is not scoped to one board.
  */
 export const StagedDataImportRow = S.Struct({
   title: S.String,
   content: S.String,
   statusId: S.NullOr(S.String),
   statusName: S.String,
+  boardId: S.NullOr(S.String),
+  boardName: S.String,
   tagNames: S.Array(S.String),
   etaQuarter: S.NullOr(S.String),
   authorName: S.NullOr(S.String),

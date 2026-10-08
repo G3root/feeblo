@@ -20,10 +20,7 @@ import {
 } from "./errors";
 import { DATA_EXPORT_MAX_ROWS } from "./limits";
 import { canExportData } from "./policies";
-import {
-  type BoardPostCsvSourceRow,
-  DataTransferRepository,
-} from "./repository";
+import { type PostCsvSourceRow, DataTransferRepository } from "./repository";
 
 /** Posts read per database page while streaming. */
 const EXPORT_PAGE_SIZE = 500;
@@ -51,19 +48,15 @@ type ExportCursor = { readonly createdAt: Date; readonly id: string };
 const toCsvRow =
   ({
     appUrl,
-    boardName,
-    boardSlug,
     organizationId,
   }: {
     readonly appUrl: string;
-    readonly boardName: string;
-    readonly boardSlug: string;
     readonly organizationId: string;
   }) =>
-  (row: BoardPostCsvSourceRow): BoardPostCsvRow => ({
+  (row: PostCsvSourceRow): BoardPostCsvRow => ({
     authorEmail: row.authorEmail,
     authorName: row.authorName,
-    board: boardName,
+    board: row.boardName,
     content: row.content,
     createdAt: row.createdAt,
     eta: row.etaQuarter,
@@ -75,24 +68,27 @@ const toCsvRow =
       appUrl,
       encodeURIComponent(organizationId),
       "post",
-      encodeURIComponent(boardSlug),
+      encodeURIComponent(row.boardSlug),
       encodeURIComponent(row.slug),
     ].join("/"),
     voteCount: row.voteCount,
   });
 
 /**
- * Streams a board's posts as CSV.
+ * Streams posts as CSV, either one board's or the whole workspace's.
  *
- * The row count is checked before the first byte is produced, so "too large"
- * is an ordinary error response rather than a download that ends early. After
- * that the stream pages the board by `(createdAt, id)`, reading tags and vote
- * counts per page; a database failure mid-stream aborts the response, which is
+ * When a board is named, a missing one fails before anything else, so a stale
+ * id reads as a 404 rather than an empty file. The row count is checked before
+ * the first byte is produced, so "too large" is an ordinary error response
+ * rather than a download that ends early. After that the stream pages the
+ * selection by `(createdAt, id)`, reading each row's board, tags and vote
+ * count per page; a database failure mid-stream aborts the response, which is
  * the only truthful thing left once headers are on the wire.
  */
-export const streamBoardPostCsv = (input: {
+export const streamPostCsv = (input: {
   readonly organizationId: string;
-  readonly boardId: string;
+  /** A board to export, or null for every board in the workspace. */
+  readonly boardId: string | null;
   readonly includeArchived: boolean;
 }) =>
   Effect.gen(function* () {
@@ -100,20 +96,26 @@ export const streamBoardPostCsv = (input: {
     const boardRepository = yield* BoardRepository;
     const config = yield* PublicApiConfig;
 
-    const board = yield* boardRepository
-      .findByIdInOrganization({
-        id: input.boardId,
-        organizationId: input.organizationId,
-      })
-      .pipe(withRemapDbErrors("Board", "select"));
-    if (Option.isNone(board)) {
-      return yield* new DataTransferBoardNotFoundError({
-        message: "No board with this id exists in this workspace.",
-      });
+    // A named board must exist, so a stale id reads as a 404 rather than an
+    // empty file; an all-boards export skips the lookup entirely.
+    let boardSlug: string | null = null;
+    if (input.boardId !== null) {
+      const found = yield* boardRepository
+        .findByIdInOrganization({
+          id: input.boardId,
+          organizationId: input.organizationId,
+        })
+        .pipe(withRemapDbErrors("Board", "select"));
+      if (Option.isNone(found)) {
+        return yield* new DataTransferBoardNotFoundError({
+          message: "No board with this id exists in this workspace.",
+        });
+      }
+      boardSlug = found.value.slug;
     }
 
     const total = yield* fromExportStore(
-      repository.countBoardPostsForCsv({
+      repository.countPostsForCsv({
         boardId: input.boardId,
         includeArchived: input.includeArchived,
         organizationId: input.organizationId,
@@ -122,14 +124,12 @@ export const streamBoardPostCsv = (input: {
     if (total > DATA_EXPORT_MAX_ROWS) {
       return yield* new DataExportTooLargeError({
         maxRows: DATA_EXPORT_MAX_ROWS,
-        message: `This board has ${total} rows; the export limit is ${DATA_EXPORT_MAX_ROWS}. Narrow the export with the archived setting.`,
+        message: `This export has ${total} rows; the export limit is ${DATA_EXPORT_MAX_ROWS}. Narrow the export with the archived setting.`,
       });
     }
 
     const mapRow = toCsvRow({
       appUrl: config.appUrl,
-      boardName: board.value.name,
-      boardSlug: board.value.slug,
       organizationId: input.organizationId,
     });
 
@@ -139,7 +139,7 @@ export const streamBoardPostCsv = (input: {
       InternalServerError
     >(null, (cursor) =>
       fromExportStore(
-        repository.listBoardPostCsvRows({
+        repository.listPostCsvRows({
           after: cursor,
           boardId: input.boardId,
           includeArchived: input.includeArchived,
@@ -159,8 +159,9 @@ export const streamBoardPostCsv = (input: {
     );
 
     const now = yield* DateTime.nowAsDate;
+    const name = boardSlug === null ? "posts" : `${boardSlug}-posts`;
     return {
-      fileName: `${board.value.slug}-posts-${now.toISOString().slice(0, 10)}.csv`,
+      fileName: `${name}-${now.toISOString().slice(0, 10)}.csv`,
       stream: Stream.concat(
         Stream.make(encodeText(BOARD_POST_CSV_HEADER)),
         pages.pipe(
@@ -172,6 +173,4 @@ export const streamBoardPostCsv = (input: {
   }).pipe(Policy.withPolicy(canExportData(input.organizationId)));
 
 /** What an export hands back: the download's name and its byte stream. */
-export type BoardPostCsvExport = Effect.Success<
-  ReturnType<typeof streamBoardPostCsv>
->;
+export type PostCsvExport = Effect.Success<ReturnType<typeof streamPostCsv>>;

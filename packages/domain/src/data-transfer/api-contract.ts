@@ -12,9 +12,9 @@ import { HttpApiAuthMiddleware } from "../session-middleware";
 import { DataTransferServiceErrors } from "./errors";
 import { DATA_IMPORT_MAX_BYTES } from "./limits";
 import {
-  BoardExportQuery,
-  BoardImportUploadFields,
   DataImportJobSummary,
+  DataImportUploadFields,
+  PostExportQuery,
 } from "./schema";
 
 const MAX_IMPORT_FIELD_BYTES = 16 * 1024;
@@ -58,17 +58,17 @@ export class DataTransferApiGroup extends HttpApiGroup.make(
   "DataTransferApiGroup"
 )
   .add(
-    HttpApiEndpoint.post("uploadBoardImport", "/data/import", {
+    HttpApiEndpoint.post("uploadPostsImport", "/data/import", {
       error: Schema.Union([DataTransferServiceErrors, RateLimitErrors]),
       payload: Schema.Struct({
         file: Multipart.SingleFileSchema,
-        ...BoardImportUploadFields,
+        ...DataImportUploadFields,
       }).pipe(HttpApiSchema.asMultipart()),
       success: DataImportJobSummary,
     }),
-    HttpApiEndpoint.get("exportBoardPosts", "/data/export", {
+    HttpApiEndpoint.get("exportPosts", "/data/export", {
       error: Schema.Union([DataTransferServiceErrors, RateLimitErrors]),
-      query: BoardExportQuery,
+      query: PostExportQuery,
       success: HttpApiSchema.StreamUint8Array({
         contentType: "text/csv; charset=utf-8",
       }),

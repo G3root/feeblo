@@ -8,6 +8,7 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -128,7 +129,6 @@ const stage = (
     const service = yield* DataImportService;
     return yield* service
       .stageBoardImport({
-        boardId: fixture.boardId,
         bytes,
         fileName: options.fileName ?? "posts.csv",
         memberId: fixture.membershipId,
@@ -177,7 +177,7 @@ layer(TestLayer)("DataImportService", (it) => {
         warningCount: 1,
       });
       expect(job.notices).toEqual([
-        'The file names a different board; all rows import into "Test board".',
+        'The file names a board that does not exist yet; it will be created: "Another board".',
       ]);
 
       const repository = yield* DataTransferRepository;
@@ -188,6 +188,7 @@ layer(TestLayer)("DataImportService", (it) => {
       });
       expect(report.total).toBe(3);
       expect(report.rows[0]).toMatchObject({
+        boardName: "Another board",
         contentPreview: "Body",
         outcome: "pending",
         rowNumber: 2,
@@ -197,10 +198,12 @@ layer(TestLayer)("DataImportService", (it) => {
       // The staged payload's body is never returned whole.
       expect(report.rows[0]).not.toHaveProperty("payload");
       expect(report.rows[1]).toMatchObject({
+        boardName: "Test board",
         outcome: "pending",
         rowNumber: 3,
       });
       expect(report.rows[2]).toMatchObject({
+        boardName: null,
         contentPreview: null,
         message: "The title is required.",
         outcome: "failed",
@@ -240,7 +243,6 @@ layer(TestLayer)("DataImportService", (it) => {
         const notices: readonly string[] = [];
         const rows: readonly NewStagedImportRow[] = [];
         const base = {
-          boardId: fixture.boardId,
           createdByMemberId: fixture.membershipId,
           createdByUserId: fixture.userId,
           fileName: "posts.csv",
@@ -350,30 +352,39 @@ layer(TestLayer)("DataImportService", (it) => {
     })
   );
 
-  it.effect("refuses a board that is not in the workspace", () =>
+  it.effect("fails an empty board when the workspace has no boards", () =>
     Effect.gen(function* () {
       const fixture = yield* makeFixture();
-      const other = yield* makeFixture();
-      const service = yield* DataImportService;
-      const error = yield* Effect.flip(
-        service
-          .stageBoardImport({
-            boardId: other.boardId,
-            bytes: encoder.encode("title\nFirst\n"),
-            fileName: "posts.csv",
-            memberId: fixture.membershipId,
-            organizationId: fixture.organizationId,
-            userId: fixture.userId,
-          })
-          .pipe(
-            Effect.provideService(
-              CurrentSession,
-              makeSession(fixture, "manager")
-            )
-          )
+      const db = yield* currentDb;
+      yield* db
+        .delete(schema.boardTable)
+        .where(eq(schema.boardTable.id, fixture.boardId));
+
+      const job = yield* stage(
+        fixture,
+        encoder.encode(
+          ["title,board", "Named board,Bugs", "Unnamed board,"].join("\n")
+        )
       );
 
-      expect(error._tag).toBe("DataTransferBoardNotFoundError");
+      const repository = yield* DataTransferRepository;
+      const report = yield* repository.listRows({
+        jobId: job.id,
+        limit: 10,
+        offset: 0,
+      });
+      expect(report.rows[0]).toMatchObject({
+        boardName: "Bugs",
+        outcome: "pending",
+      });
+      expect(report.rows[1]).toMatchObject({
+        message:
+          "The board is empty and this workspace has no boards. Name a board in the row.",
+        outcome: "failed",
+      });
+      expect(job.notices).toEqual([
+        'The file names a board that does not exist yet; it will be created: "Bugs".',
+      ]);
     })
   );
 

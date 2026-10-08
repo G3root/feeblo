@@ -16,7 +16,6 @@ import type {
 export const toDataImportJobSummary = (
   job: DataImportJobRecord
 ): TDataImportJobSummary => ({
-  boardId: job.boardId,
   confirmedAt: job.confirmedAt,
   createdAt: job.createdAt,
   createdCount: job.createdCount,
@@ -35,6 +34,7 @@ export const toDataImportJobSummary = (
 export const toDataImportReportRow = (
   row: DataImportRowRecord
 ): TDataImportReportRow => ({
+  boardName: row.boardName,
   contentPreview: row.contentPreview,
   id: row.id,
   message: row.message,

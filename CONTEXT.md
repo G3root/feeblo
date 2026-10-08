@@ -12,7 +12,7 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 ### Data transfer
 
-**Export**: one board's posts rendered as a CSV file the workspace downloads. _Avoid_: download, dump, backup
+**Export**: a workspace's posts — every board's, or one board's — rendered as a CSV file the workspace downloads. _Avoid_: download, dump, backup
 
 **Import job**: one staged CSV upload and its apply progress — the file it came from, the parsed row ledger, and what happened to every row until the job is finished or canceled. _Avoid_: upload, batch, migration
 

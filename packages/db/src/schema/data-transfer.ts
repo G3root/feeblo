@@ -16,16 +16,20 @@ import type {
   TStagedDataImportRow,
 } from "../validation-schema/data-import";
 import { memberTable, organizationTable, userTable } from "./auth";
-import { boardTable, postTable } from "./feedback";
+import { postTable } from "./feedback";
 
 /**
- * One staged board CSV import and its apply progress.
+ * One staged CSV import and its apply progress.
  *
  * The uploaded bytes are never stored: the job records the file's name and
  * SHA-256 hash (for the duplicate-upload warning) and the parsed plan lives in
- * `data_import_row`. `retention_expires_at` is the only thing that deletes a
- * job — the worker sweeps it after the retention window, so a row report is
- * readable for a while and then gone.
+ * `data_import_row`. The job is not scoped to a board — every row names its
+ * destination board and the worker resolves it — so removing a board never
+ * takes the workspace's import history with it.
+ *
+ * `retention_expires_at` is the only thing that deletes a job — the worker
+ * sweeps it after the retention window, so a row report is readable for a
+ * while and then gone.
  */
 export const dataImportJobTable = pgTable(
   "data_import_job",
@@ -34,9 +38,6 @@ export const dataImportJobTable = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
-    boardId: text("board_id")
-      .notNull()
-      .references(() => boardTable.id, { onDelete: "cascade" }),
     /** The member who uploaded the file; null once their account is gone. */
     createdByUserId: text("created_by_user_id").references(() => userTable.id, {
       onDelete: "set null",

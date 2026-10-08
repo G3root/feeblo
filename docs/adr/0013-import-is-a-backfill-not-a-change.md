@@ -8,7 +8,7 @@ Import is **create-only**: an import never updates or matches an existing post. 
 
 An import is a durable job, not a request. The upload parses, validates, and stages every row in one transaction, then waits for a person to confirm the preview; a lease-based worker claims confirmed jobs and applies rows one transaction at a time. The row ledger is the checkpoint: a pass only ever applies `pending` rows, so a crashed pass (whose lease expires and is re-claimed) or a repeated pass can never create a post twice. Rows that fail are recorded with a static, field-scoped message and the pass continues; a pass that fails for an infrastructure reason is marked failed rather than retried in a hot loop, and the posts it already created are kept.
 
-The file bytes are never persisted. Tags are resolved and created once per batch outside the row transactions; authors are resolved through the same `resolveOnBehalfSubject` seam the dashboard and the Public API use, so an imported post is attributed to a contact exactly as an on-behalf post is.
+The file bytes are never persisted. Tags and boards are resolved and created once per batch outside the row transactions; authors are resolved through the same `resolveOnBehalfSubject` seam the dashboard and the Public API use, so an imported post is attributed to a contact exactly as an on-behalf post is.
 
 ## Why
 

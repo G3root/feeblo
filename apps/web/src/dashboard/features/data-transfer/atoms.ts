@@ -4,7 +4,7 @@ import * as Stream from "effect/Stream";
 
 import { DashboardClient, dashboardSWR } from "~/lib/atom-rpc";
 
-/** The boards either transfer can name, for both pickers. */
+/** The boards the export picker can name, read once for the card. */
 export const dataTransferBoardsAtom = Atom.family((organizationId: string) =>
   DashboardClient.query("BoardList", { organizationId }).pipe(
     dashboardSWR("30 seconds"),

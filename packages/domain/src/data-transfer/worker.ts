@@ -1,5 +1,5 @@
 import { transaction, type Database } from "@feeblo/db";
-import { LegidError, PostId } from "@feeblo/id";
+import { BoardId, LegidError, PostId } from "@feeblo/id";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as Crypto from "effect/Crypto";
@@ -12,6 +12,7 @@ import * as Predicate from "effect/Predicate";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 
+import { BoardRepository } from "../board/repository";
 import {
   CrmEntryLimitReachedError,
   InvalidSubjectError,
@@ -29,6 +30,7 @@ import {
   DATA_IMPORT_LEASE_MS,
   DATA_IMPORT_POLL_MS,
 } from "./limits";
+import { boardKey } from "./plan";
 import {
   type ClaimedDataImportJob,
   DataTransferRepository,
@@ -182,6 +184,107 @@ const resolveBatchTags = ({
     return byKey;
   });
 
+/** What a batch needs to place each row: the named board, and which ids still exist. */
+type BatchBoardResolution = {
+  /** Board key to id, for every board the workspace has when the batch starts. */
+  readonly byKey: ReadonlyMap<string, string>;
+  /** The ids in `byKey`; a row's staged id outside this set is stale. */
+  readonly existingIds: ReadonlySet<string>;
+};
+
+/**
+ * Resolves every board the batch's rows name but the workspace does not have
+ * yet, creating them once per batch.
+ *
+ * Runs outside the row writes for the same reason the tag resolver does: a
+ * board insert losing a race against a concurrent dashboard edit must not
+ * poison a row's transaction. A failed create re-reads once and uses the
+ * winner. Boards created for an import are public, matching the dashboard's
+ * default, and are attributed to the uploader when their account still
+ * exists.
+ *
+ * A board the file named may have been deleted since staging; its staged id
+ * is then stale rather than binding, and the row is resolved by name like any
+ * other — the board is recreated if it is still missing. Boards win or lose
+ * as rows, never as the whole pass.
+ */
+const resolveBatchBoards = ({
+  job,
+  rows,
+}: {
+  readonly job: DataImportJobRecord;
+  readonly rows: readonly PendingDataImportRow[];
+}): Effect.Effect<
+  BatchBoardResolution,
+  EffectDrizzleQueryError | LegidError,
+  BoardRepository
+> =>
+  Effect.gen(function* () {
+    const boards = yield* BoardRepository;
+    const byKey = new Map<string, string>();
+    const existingIds = new Set<string>();
+
+    const remember = (
+      candidates: readonly {
+        readonly id: string;
+        readonly name: string;
+        readonly slug: string;
+      }[]
+    ) => {
+      for (const board of candidates) {
+        existingIds.add(board.id);
+        for (const key of [boardKey(board.name), board.slug.toLowerCase()]) {
+          if (key.length > 0 && !byKey.has(key)) {
+            byKey.set(key, board.id);
+          }
+        }
+      }
+    };
+
+    remember(yield* boards.findMany({ organizationId: job.organizationId }));
+
+    const wanted = new Map<string, string>();
+    for (const row of rows) {
+      const payload = row.payload;
+      if (
+        payload === null ||
+        (payload.boardId !== null && existingIds.has(payload.boardId))
+      ) {
+        continue;
+      }
+      const key = boardKey(payload.boardName);
+      if (key.length > 0 && !byKey.has(key) && !wanted.has(key)) {
+        wanted.set(key, payload.boardName);
+      }
+    }
+
+    for (const name of wanted.values()) {
+      const created = yield* boards
+        .create({
+          creatorId: job.createdByUserId,
+          creatorMemberId: job.createdByMemberId,
+          id: yield* BoardId.generate,
+          name,
+          organizationId: job.organizationId,
+          visibility: "PUBLIC",
+        })
+        .pipe(Effect.orElseSucceed((): [] => []));
+      if (created.length > 0) {
+        remember(created);
+        continue;
+      }
+      // The slug won a race (or the insert failed for a reason a re-read can
+      // repair); one re-read is the cheapest correct recovery.
+      remember(
+        yield* boards
+          .findMany({ organizationId: job.organizationId })
+          .pipe(Effect.orElseSucceed((): [] => []))
+      );
+    }
+
+    return { byKey, existingIds };
+  });
+
 /**
  * Applies one `pending` row and records its outcome.
  *
@@ -191,6 +294,7 @@ const resolveBatchTags = ({
  */
 const applyPendingRow = ({
   actor,
+  boardResolution,
   defaultStatusId,
   job,
   repository,
@@ -200,6 +304,7 @@ const applyPendingRow = ({
   writes,
 }: {
   readonly actor: PostWriteActor;
+  readonly boardResolution: BatchBoardResolution;
   readonly defaultStatusId: string;
   readonly job: DataImportJobRecord;
   readonly repository: DataTransferRepository["Service"];
@@ -213,6 +318,19 @@ const applyPendingRow = ({
     if (payload === null) {
       yield* repository.markRowFailed({
         message: "The staged row is unreadable.",
+        rowId: row.id,
+      });
+      return { kind: "failed" } satisfies RowOutcome;
+    }
+
+    const boardId =
+      payload.boardId !== null &&
+      boardResolution.existingIds.has(payload.boardId)
+        ? payload.boardId
+        : boardResolution.byKey.get(boardKey(payload.boardName));
+    if (boardId === undefined) {
+      yield* repository.markRowFailed({
+        message: "The row's board could not be resolved.",
         rowId: row.id,
       });
       return { kind: "failed" } satisfies RowOutcome;
@@ -240,7 +358,7 @@ const applyPendingRow = ({
                 }),
               },
             }),
-            boardId: job.boardId,
+            boardId,
             content: payload.content,
             ...(createdAt !== undefined && { createdAt }),
             ...(payload.etaQuarter !== null && {
@@ -267,7 +385,11 @@ const applyPendingRow = ({
           });
         }
 
-        yield* repository.markRowCreated({ postId, rowId: row.id });
+        yield* repository.markRowCreated({
+          jobId: job.id,
+          postId,
+          rowId: row.id,
+        });
         return {
           content: sanitizeMarkdown(payload.content).sanitizedMarkdown,
           postId,
@@ -369,6 +491,11 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
       return { createdCount: 0, errorCount: 0, jobId: job.id };
     }
 
+    // Created posts queue here until the batch (or a failed pass) embeds
+    // them; hoisted out of the batch body so the failure path below can flush
+    // what the interrupted batch already applied.
+    let embeddings: EmbeddingInput[] = [];
+
     const runBatches = Effect.gen(function* () {
       while (true) {
         // Renew before doing any work: a lease that has moved on must not
@@ -405,10 +532,11 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
           organizationId: job.organizationId,
           rows,
         });
-        const embeddings: EmbeddingInput[] = [];
+        const boardResolution = yield* resolveBatchBoards({ job, rows });
         for (const row of rows) {
           const outcome = yield* applyPendingRow({
             actor,
+            boardResolution,
             defaultStatusId: defaultStatus.id,
             job,
             repository,
@@ -427,6 +555,7 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
           embeddings,
           organizationId: job.organizationId,
         });
+        embeddings = [];
       }
 
       const counts = yield* repository.syncCounts({
@@ -447,12 +576,26 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
           yield* Effect.logError("DataImport.pass_failed").pipe(
             Effect.annotateLogs({ errorTag: errorTag(error), jobId: job.id })
           );
+          // A row's ledger update stops matching once the job leaves
+          // `running` (a cancel mid-batch) or another worker takes the lease.
+          // Recording the ledger's outcomes before the terminal write keeps
+          // those rows counted; the sync is best-effort because the failure
+          // that got here may be the store itself.
+          yield* repository
+            .syncCounts({ jobId: job.id, leaseOwner })
+            .pipe(
+              Effect.catchTag("DataTransferRepositoryError", () => Effect.void)
+            );
           yield* repository.finishJob({
             failureMessage:
               "The import stopped unexpectedly. Posts created before the stop were kept.",
             jobId: job.id,
             leaseOwner,
             status: "failed",
+          });
+          yield* embedCreatedPosts({
+            embeddings,
+            organizationId: job.organizationId,
           });
           return { createdCount: 0, errorCount: 0, jobId: job.id };
         })
@@ -531,6 +674,7 @@ export const runDataImportMaintenance: Effect.Effect<
  * request context.
  */
 export const DataImportWorkerLive = Layer.mergeAll(
+  BoardRepository.layer,
   DataTransferRepository.layer,
   PostStatusRepository.layer,
   TagRepository.layer,

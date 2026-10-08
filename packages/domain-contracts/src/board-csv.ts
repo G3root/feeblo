@@ -15,6 +15,9 @@
  *
  * `vote_count`, `updated_at`, and `url` are read-only decoration — import
  * ignores them, because a file cannot fabricate a vote, a history, or a link.
+ * `board` is the import's routing key: the row lands on the board the cell
+ * names, a missing board is created, and an empty cell falls back to the
+ * workspace's oldest board.
  */
 export const BOARD_POST_CSV_COLUMNS = [
   "title",
@@ -60,13 +63,14 @@ export const BOARD_POST_CSV_HEADER = `${BOARD_POST_CSV_BOM}${[
  * present by type, so adding a column to the contract fails this module until
  * the template names it. The values are deliberately fake and the title says
  * so: an uploader who forgets to delete the row sees exactly which post it
- * was, and the row demonstrates the two non-obvious cells — `tags` are
- * `;`-separated and `eta` is `YYYY-Qn`.
+ * was, and the row demonstrates the three non-obvious cells — `board` picks
+ * the destination (a missing board is created), `tags` are `;`-separated, and
+ * `eta` is `YYYY-Qn`.
  */
 const BOARD_POST_CSV_TEMPLATE_EXAMPLE = {
   author_email: "jane@example.com",
   author_name: "Jane Doe",
-  board: "",
+  board: "Feedback",
   content: "Example: a short description of the idea.",
   created_at: "2026-01-15T10:30:00.000Z",
   eta: "2026-Q1",

@@ -75,6 +75,9 @@ import {
 /** Report rows one page shows; the RPC clamps whatever the client sends. */
 const REPORT_PAGE_SIZE = 100;
 
+/** The export picker's sentinel for "every board"; never a real board id. */
+const ALL_BOARDS = "__all_boards__";
+
 const statusLabel = (status: TDataImportJobSummary["status"]): string => {
   switch (status) {
     case "awaiting_confirmation":
@@ -183,20 +186,25 @@ const fileNameFromContentDisposition = (
   return /filename="([^"]+)"/iu.exec(header)?.[1] ?? null;
 };
 
-/** Matches the export's server-side name: `<board-slug>-posts-<UTC date>.csv`. */
+/**
+ * Matches the export's server-side name: `<board-slug>-posts-<UTC date>.csv`,
+ * or `posts-<UTC date>.csv` for the whole workspace.
+ */
 const fallbackExportFileName = (
   boards: readonly DataTransferBoard[],
-  boardId: string
+  boardId: string | null
 ): string => {
-  const slug =
-    boards.find((board) => board.id === boardId)?.slug ?? "board-posts";
-  return `${slug}-posts-${new Date().toISOString().slice(0, 10)}.csv`;
+  const date = new Date().toISOString().slice(0, 10);
+  if (boardId === null) {
+    return `posts-${date}.csv`;
+  }
+  const slug = boards.find((board) => board.id === boardId)?.slug ?? "posts";
+  return `${slug}-posts-${date}.csv`;
 };
 
 /**
- * The boards either transfer names, kept as one read for both pickers. The
- * atom is a family, so the second card reads the same query the first one
- * mounted.
+ * The boards the export picker names, read once for the card. The atom is a
+ * family, so the picker and the fallback filename read the same query.
  */
 function useTransferBoards(organizationId: string) {
   const boardsResult = useAtomValue(dataTransferBoardsAtom(organizationId));
@@ -222,20 +230,18 @@ function BoardPicker({
   disabled = false,
   onChange,
   organizationId,
-  placeholder,
   value,
 }: {
   readonly disabled?: boolean;
   readonly onChange: (boardId: string) => void;
   readonly organizationId: string;
-  readonly placeholder: string;
   readonly value: string;
 }) {
   const { boards, isLoading } = useTransferBoards(organizationId);
-  const items = boards.map((board) => ({
-    label: board.name,
-    value: board.id,
-  }));
+  const items = [
+    { label: m.leafy_calm_jay(), value: ALL_BOARDS },
+    ...boards.map((board) => ({ label: board.name, value: board.id })),
+  ];
 
   return (
     <Field>
@@ -243,11 +249,11 @@ function BoardPicker({
       <Select
         disabled={disabled}
         items={items}
-        onValueChange={(next) => onChange(next ?? "")}
+        onValueChange={(next) => onChange(next ?? ALL_BOARDS)}
         value={value === "" ? null : value}
       >
         <SelectTrigger className="w-full">
-          <SelectValue placeholder={placeholder} />
+          <SelectValue placeholder={m.swift_calm_bass()} />
         </SelectTrigger>
         <SelectPopup>
           {items.map((item) => (
@@ -266,8 +272,9 @@ function BoardPicker({
 
 /**
  * The upload surface: one dashed target that accepts a click or a drop. The
- * board choice and the upload stay separate on purpose — a file is read only
- * when the person presses Upload, so dropping the wrong file costs nothing.
+ * bytes are read only when the person presses Upload, so dropping the wrong
+ * file costs nothing. There is no board choice: the file's `board` column
+ * routes every row and missing boards are created when the import runs.
  */
 function ImportDropzone({
   disabled,
@@ -384,7 +391,6 @@ function ImportCard({
   readonly organizationId: string;
 }) {
   const apiUrl = resolveApiBase(getRuntimePublicEnv().apiUrl);
-  const [boardId, setBoardId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [pendingJob, setPendingJob] = useState<TDataImportJobSummary | null>(
@@ -392,14 +398,13 @@ function ImportCard({
   );
 
   const handleUpload = async () => {
-    if (file === null || boardId === "") {
+    if (file === null) {
       return;
     }
     setIsUploading(true);
     try {
       const body = new FormData();
       body.append("file", file);
-      body.append("boardId", boardId);
       body.append("organizationId", organizationId);
       const response = await fetch(`${apiUrl}/api/data/import`, {
         body,
@@ -479,13 +484,6 @@ function ImportCard({
 
         {pendingJob === null ? (
           <>
-            <BoardPicker
-              disabled={isUploading}
-              onChange={setBoardId}
-              organizationId={organizationId}
-              placeholder={m.swift_calm_bass()}
-              value={boardId}
-            />
             <ImportDropzone
               disabled={isUploading}
               file={file}
@@ -570,7 +568,7 @@ function ImportCard({
       {pendingJob === null ? (
         <CardFooter className="justify-end">
           <Button
-            disabled={file === null || boardId === "" || isUploading}
+            disabled={file === null || isUploading}
             onClick={() => {
               void handleUpload();
             }}
@@ -584,23 +582,22 @@ function ImportCard({
   );
 }
 
-/** One board out of the workspace, as CSV, through the HTTP download route. */
+/** The workspace's posts as CSV, every board or one, through the download route. */
 function ExportCard({ organizationId }: { readonly organizationId: string }) {
   const apiUrl = resolveApiBase(getRuntimePublicEnv().apiUrl);
   const { boards } = useTransferBoards(organizationId);
-  const [boardId, setBoardId] = useState("");
+  const [selectedBoard, setSelectedBoard] = useState(ALL_BOARDS);
   const [includeArchived, setIncludeArchived] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExport = async () => {
-    if (boardId === "") {
-      return;
-    }
     setIsExporting(true);
     try {
       const url = new URL(`${apiUrl}/api/data/export`);
       url.searchParams.set("organizationId", organizationId);
-      url.searchParams.set("boardId", boardId);
+      if (selectedBoard !== ALL_BOARDS) {
+        url.searchParams.set("boardId", selectedBoard);
+      }
       if (includeArchived) {
         url.searchParams.set("includeArchived", "true");
       }
@@ -621,7 +618,11 @@ function ExportCard({ organizationId }: { readonly organizationId: string }) {
       link.download =
         fileNameFromContentDisposition(
           response.headers.get("Content-Disposition")
-        ) ?? fallbackExportFileName(boards, boardId);
+        ) ??
+        fallbackExportFileName(
+          boards,
+          selectedBoard === ALL_BOARDS ? null : selectedBoard
+        );
       link.href = objectUrl;
       link.click();
       URL.revokeObjectURL(objectUrl);
@@ -641,10 +642,9 @@ function ExportCard({ organizationId }: { readonly organizationId: string }) {
       <CardPanel className="flex flex-1 flex-col gap-4">
         <BoardPicker
           disabled={isExporting}
-          onChange={setBoardId}
+          onChange={setSelectedBoard}
           organizationId={organizationId}
-          placeholder={m.swift_calm_bass()}
-          value={boardId}
+          value={selectedBoard}
         />
         <SwitchCard variant="outline">
           <SwitchCardTitle>{m.lively_green_ibex()}</SwitchCardTitle>
@@ -657,7 +657,7 @@ function ExportCard({ organizationId }: { readonly organizationId: string }) {
       </CardPanel>
       <CardFooter>
         <Button
-          disabled={boardId === ""}
+          disabled={selectedBoard === ""}
           loading={isExporting}
           onClick={() => {
             void handleExport();
@@ -920,6 +920,7 @@ function ImportDetailCard({
               <TableRow>
                 <TableHead>{m.calm_crisp_newt()}</TableHead>
                 <TableHead>{m.keen_bold_kite()}</TableHead>
+                <TableHead>{m.brave_lucky_newt()}</TableHead>
                 <TableHead>{m.soft_calm_mouse()}</TableHead>
                 <TableHead>{m.fresh_plain_bass()}</TableHead>
                 <TableHead>{m.vivid_calm_newt()}</TableHead>
@@ -932,6 +933,7 @@ function ImportDetailCard({
                     {m.quick_plain_dove({ row: row.rowNumber })}
                   </TableCell>
                   <TableCell>{row.title ?? ""}</TableCell>
+                  <TableCell>{row.boardName ?? ""}</TableCell>
                   <TableCell>{row.statusName ?? ""}</TableCell>
                   <TableCell className="max-w-md whitespace-pre-wrap">
                     {row.contentPreview ?? ""}

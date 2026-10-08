@@ -1,7 +1,11 @@
 import { describe, expect, it } from "@effect/vitest";
 
 import type { ParsedBoardPostRow } from "./csv";
-import { planImportRows, type ImportPlanStatus } from "./plan";
+import {
+  planImportRows,
+  type ImportPlanBoard,
+  type ImportPlanStatus,
+} from "./plan";
 
 const PENDING: ImportPlanStatus = {
   id: "status-pending",
@@ -14,6 +18,12 @@ const REVIEW: ImportPlanStatus = {
   type: "REVIEW",
 };
 const STATUSES = [PENDING, REVIEW];
+
+const FEEDBACK: ImportPlanBoard = {
+  id: "board-feedback",
+  name: "Feedback",
+  slug: "feedback",
+};
 
 const parsedRow = (
   overrides: Partial<ParsedBoardPostRow> = {}
@@ -36,7 +46,8 @@ const parsedRow = (
 
 const planOne = (overrides: Partial<ParsedBoardPostRow> = {}) =>
   planImportRows({
-    board: { name: "Feedback", slug: "feedback" },
+    boards: [FEEDBACK],
+    defaultBoard: FEEDBACK,
     defaultStatus: PENDING,
     rows: [parsedRow(overrides)],
     statuses: STATUSES,
@@ -165,9 +176,10 @@ describe("import plan", () => {
     });
   });
 
-  it("notes a file that names another board", () => {
+  it("notes the boards a file will create", () => {
     const plan = planImportRows({
-      board: { name: "Feedback", slug: "feedback" },
+      boards: [FEEDBACK],
+      defaultBoard: FEEDBACK,
       defaultStatus: PENDING,
       rows: [
         parsedRow({ board: "Bugs" }),
@@ -177,18 +189,86 @@ describe("import plan", () => {
     });
 
     expect(plan.notices).toEqual([
-      'The file names 2 other boards; all rows import into "Feedback".',
+      'The file names 2 boards that do not exist yet; they will be created: "Bugs", "Ideas".',
+    ]);
+    expect(plan.rows).toMatchObject([
+      { kind: "pending", payload: { boardId: null, boardName: "Bugs" } },
+      { kind: "pending", payload: { boardId: null, boardName: "Ideas" } },
     ]);
   });
 
   it("treats the board name and slug as the same board", () => {
     const plan = planImportRows({
-      board: { name: "Feedback", slug: "feedback" },
+      boards: [FEEDBACK],
+      defaultBoard: FEEDBACK,
       defaultStatus: PENDING,
       rows: [parsedRow({ board: "feedback" })],
       statuses: STATUSES,
     });
 
     expect(plan.notices).toEqual([]);
+    expect(plan.rows[0]).toMatchObject({
+      kind: "pending",
+      payload: { boardId: FEEDBACK.id, boardName: "Feedback" },
+    });
+  });
+
+  it("matches an existing board named with different separators", () => {
+    const plan = planImportRows({
+      boards: [FEEDBACK],
+      defaultBoard: FEEDBACK,
+      defaultStatus: PENDING,
+      rows: [parsedRow({ board: "  FEEDBACK  " })],
+      statuses: STATUSES,
+    });
+
+    expect(plan.rows[0]).toMatchObject({
+      kind: "pending",
+      payload: { boardId: FEEDBACK.id, boardName: "Feedback" },
+    });
+  });
+
+  it("falls back to the default board when the cell is empty", () => {
+    const plan = planImportRows({
+      boards: [FEEDBACK],
+      defaultBoard: FEEDBACK,
+      defaultStatus: PENDING,
+      rows: [parsedRow({ board: "" })],
+      statuses: STATUSES,
+    });
+
+    expect(plan.rows[0]).toMatchObject({
+      kind: "pending",
+      payload: {
+        boardId: FEEDBACK.id,
+        boardName: "Feedback",
+        warnings: ['The board is empty; imported into "Feedback".'],
+      },
+    });
+  });
+
+  it("fails an empty board when the workspace has no boards", () => {
+    const plan = planImportRows({
+      boards: [],
+      defaultBoard: null,
+      defaultStatus: PENDING,
+      rows: [parsedRow({ board: "" })],
+      statuses: STATUSES,
+    });
+
+    expect(plan.rows[0]).toMatchObject({
+      kind: "failed",
+      message:
+        "The board is empty and this workspace has no boards. Name a board in the row.",
+    });
+  });
+
+  it("fails a board name that cannot become a slug", () => {
+    const plan = planOne({ board: "---" });
+
+    expect(plan.rows[0]).toMatchObject({
+      kind: "failed",
+      message: "The board name is not usable as a board.",
+    });
   });
 });
