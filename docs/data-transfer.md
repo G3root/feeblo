@@ -1,6 +1,6 @@
 # Board CSV transfer
 
-A workspace can export one board's posts to a CSV file and import posts from a CSV file into one board. Both live in **Settings → Data**, need the manager permissions `boards.exportData` and `boards.importPosts`, and are bounded by `DATA_EXPORT_MAX_ROWS` / `DATA_IMPORT_MAX_ROWS` (20,000 rows) and a 10 MB upload cap.
+A workspace can export one board's posts to a CSV file and import posts from a CSV file into one board. Both live in **Settings → Data → Imports & exports**, need the manager permissions `boards.exportData` and `boards.importPosts`, and are bounded by `DATA_EXPORT_MAX_ROWS` / `DATA_IMPORT_MAX_ROWS` (20,000 rows) and a 10 MB upload cap. The page offers the header as a downloadable template (`BOARD_POST_CSV_TEMPLATE`, from `@feeblo/domain-contracts/board-csv`) so a first upload does not have to start from a blank file.
 
 ## The contract
 

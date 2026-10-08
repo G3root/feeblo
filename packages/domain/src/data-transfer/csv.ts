@@ -1,8 +1,21 @@
+import {
+  BOARD_POST_CSV_COLUMNS,
+  BOARD_POST_CSV_DELIMITER as DELIMITER,
+  BOARD_POST_CSV_HEADER,
+  BOARD_POST_CSV_NEWLINE as CRLF,
+  type BoardPostCsvColumn,
+} from "@feeblo/domain-contracts/board-csv";
 import { isNumber } from "@feeblo/utils/runtime-kind";
 import * as Effect from "effect/Effect";
 
 import { DataImportRowLimitError, InvalidBoardPostCsvError } from "./errors";
 import { DATA_IMPORT_MAX_ROWS } from "./limits";
+
+export {
+  BOARD_POST_CSV_COLUMNS,
+  BOARD_POST_CSV_HEADER,
+  type BoardPostCsvColumn,
+};
 
 /**
  * The board-posts CSV codec.
@@ -14,33 +27,10 @@ import { DATA_IMPORT_MAX_ROWS } from "./limits";
  * type inference and object projection stay behind, because a board CSV has a
  * fixed comma-delimited column contract.
  *
- * The header is the contract: a person can open the file in a spreadsheet,
- * write a script against it, or edit it and import it back. Column names use
- * the feature's own vocabulary (`content`, not "body") so the file and the
- * dashboard cannot name the same field differently. This is deliberately not a
- * projection of the Public API's DTOs or of a dashboard response: this surface
- * carries an author email and human-readable names that neither of those
- * publishes (see `docs/adr/0004` and `docs/data-transfer.md`).
- *
- * `vote_count`, `updated_at`, and `url` are read-only decoration — import
- * ignores them, because a file cannot fabricate a vote, a history, or a link.
+ * The column contract itself — the header, the delimiter, and the template the
+ * dashboard downloads — lives in `@feeblo/domain-contracts/board-csv` (ADR
+ * 0002); this module is the reader and writer for it.
  */
-export const BOARD_POST_CSV_COLUMNS = [
-  "title",
-  "content",
-  "status",
-  "board",
-  "tags",
-  "eta",
-  "author_name",
-  "author_email",
-  "vote_count",
-  "created_at",
-  "updated_at",
-  "url",
-] as const;
-
-export type BoardPostCsvColumn = (typeof BOARD_POST_CSV_COLUMNS)[number];
 
 /** One row of an export, already resolved from the database. */
 export type BoardPostCsvRow = {
@@ -87,9 +77,6 @@ export type ParsedBoardPostCsv = {
   readonly notices: readonly string[];
 };
 
-const UTF8_BOM = "\uFEFF";
-const CRLF = "\r\n";
-const DELIMITER = ",";
 const QUOTE = '"';
 const TAG_SEPARATOR = ";";
 
@@ -288,14 +275,6 @@ const rowToCells = (row: BoardPostCsvRow): readonly BoardPostCsvCell[] => [
 ];
 
 // ── The document ────────────────────────────────────────────────────
-
-/**
- * The document's first line: the byte-order mark and the column header.
- *
- * Exported so the export stream can send it once and then one data chunk per
- * database page — a header repeated per page would be a broken file.
- */
-export const BOARD_POST_CSV_HEADER = `${UTF8_BOM}${[...BOARD_POST_CSV_COLUMNS].join(DELIMITER)}${CRLF}`;
 
 /** Renders data rows as CSV lines without a header. */
 export const serializeBoardPostCsvRows = (

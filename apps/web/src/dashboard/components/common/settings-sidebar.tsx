@@ -80,18 +80,6 @@ const settingsItems = [
         to: "/$organizationId/settings/members" as const,
       },
       {
-        label: "Custom Attributes",
-        icon: PropertyNewIcon,
-        permission: "contacts.*" as const,
-        to: "/$organizationId/settings/custom-attributes" as const,
-      },
-      {
-        label: "Data",
-        icon: Database01Icon,
-        permission: "boards.exportData" as const,
-        to: "/$organizationId/settings/data" as const,
-      },
-      {
         label: "Billing",
         icon: CreditCardIcon,
         permission: "billing.update" as const,
@@ -128,6 +116,23 @@ const settingsItems = [
         icon: Chat01Icon,
         permission: "integrations.manage" as const,
         to: "/$organizationId/settings/integrations" as const,
+      },
+    ],
+  },
+  {
+    group: "Data",
+    subItems: [
+      {
+        label: "Imports & exports",
+        icon: Database01Icon,
+        permission: "boards.exportData" as const,
+        to: "/$organizationId/settings/data" as const,
+      },
+      {
+        label: "Custom attributes",
+        icon: PropertyNewIcon,
+        permission: "contacts.*" as const,
+        to: "/$organizationId/settings/custom-attributes" as const,
       },
     ],
   },

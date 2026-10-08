@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import { BOARD_POST_CSV_TEMPLATE } from "@feeblo/domain-contracts/board-csv";
 import * as Effect from "effect/Effect";
 
 import {
@@ -267,6 +268,23 @@ describe("board CSV codec", () => {
       expect(parsed.rows[0]?.eta).toBe(original.eta);
       expect(parsed.rows[0]?.authorEmail).toBe(original.authorEmail);
       expect(parsed.rows[0]?.createdAt).toBe(original.createdAt.toISOString());
+    })
+  );
+
+  it.effect("parses the downloadable template without a notice", () =>
+    Effect.gen(function* () {
+      const parsed = yield* parseBoardPostCsv(BOARD_POST_CSV_TEMPLATE);
+
+      // The template is the contract's own first file: if a column is renamed
+      // or dropped, this test fails before the dashboard hands out a file the
+      // parser ignores.
+      expect(parsed.notices).toEqual([]);
+      expect(parsed.rows).toHaveLength(1);
+      expect(parsed.rows[0]?.title).toBe(
+        "Example: replace this row before uploading"
+      );
+      expect(parsed.rows[0]?.tags).toEqual(["example", "replace-me"]);
+      expect(parsed.rows[0]?.eta).toBe("2026-Q1");
     })
   );
 });
