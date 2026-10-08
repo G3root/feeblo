@@ -131,6 +131,17 @@ body,
   }
 }
 
+/* The reduced-motion spinner: rotation is movement, the pulse is not. */
+@keyframes widget-spinner-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .widget-enter,
   .widget-stagger {
@@ -141,5 +152,16 @@ body,
 
   .widget-pop {
     animation: none;
+  }
+
+  /* A shimmer is movement; the static block still reads as "loading". */
+  [data-slot="skeleton"] {
+    animation: none;
+    background: var(--color-muted);
+  }
+
+  /* Rotation is movement; the pulse keeps the loading state legible. */
+  [data-slot="spinner"] {
+    animation: widget-spinner-pulse 1.5s ease-in-out infinite;
   }
 }

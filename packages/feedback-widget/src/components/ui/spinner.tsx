@@ -13,6 +13,7 @@ export function Spinner(props: ComponentProps<"svg">) {
     <svg
       aria-label="Loading"
       class={cn("animate-spin", local.class)}
+      data-slot="spinner"
       fill="none"
       role="status"
       viewBox="0 0 24 24"
