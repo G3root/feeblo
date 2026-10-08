@@ -69,6 +69,29 @@ describe("rpcSpans", () => {
     })
   );
 
+  it.effect("keeps every method on an HTTP span shared by RPC calls", () =>
+    Effect.gen(function* () {
+      const { spans, tracer } = recordingTracer();
+      yield* Effect.gen(function* () {
+        yield* Effect.void.pipe(Effect.withSpan(`${rpcSpanPrefix}.Ping`));
+        yield* Effect.void.pipe(Effect.withSpan(`${rpcSpanPrefix}.PostCreate`));
+        // A repeated method must not be recorded twice on the shared span.
+        yield* Effect.void.pipe(Effect.withSpan(`${rpcSpanPrefix}.Ping`));
+      }).pipe(Effect.withSpan("http.server POST"), withTracer(tracer));
+
+      const httpSpan = spans[0];
+      const rpcSpans = spans.slice(1);
+      // Each RPC span still names exactly the one method it serves.
+      expect(rpcSpans.map((span) => span.attributes.get("rpc.method"))).toEqual(
+        ["Ping", "PostCreate", "Ping"]
+      );
+      expect(httpSpan?.attributes.get("rpc.method")).toEqual([
+        "Ping",
+        "PostCreate",
+      ]);
+    })
+  );
+
   it.effect("leaves a non-RPC span untouched", () =>
     Effect.gen(function* () {
       const { spans, tracer } = recordingTracer();
@@ -126,6 +149,39 @@ describe("rpcSpans", () => {
 
       expect(spans.at(-1)?.attributes.get("rpc.method")).toBe("Ping");
       expect(httpSpan.attributes.get("rpc.method")).toBe("Ping");
+    })
+  );
+
+  it.effect("keeps every method on an HTTP link shared by RPC calls", () =>
+    Effect.gen(function* () {
+      const { tracer } = recordingTracer();
+      const httpSpan = new Tracer.NativeSpan({
+        annotations: Context.empty(),
+        kind: "internal",
+        links: [],
+        name: "http.server POST",
+        parent: Option.none(),
+        sampled: true,
+        startTime: 0n,
+      });
+      for (const method of ["PostCreate", "PostGet"]) {
+        yield* Effect.void.pipe(
+          Effect.withSpan(`${rpcSpanPrefix}.${method}`, {
+            parent: Tracer.externalSpan({
+              spanId: "1111111111111111",
+              traceId: "22222222222222222222222222222222",
+              sampled: true,
+            }),
+            links: [{ span: httpSpan, attributes: {} }],
+          }),
+          withTracer(tracer)
+        );
+      }
+
+      expect(httpSpan.attributes.get("rpc.method")).toEqual([
+        "PostCreate",
+        "PostGet",
+      ]);
     })
   );
 });

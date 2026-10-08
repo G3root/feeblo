@@ -32,7 +32,7 @@ Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the 
 
 Two policies run in the tracer wrappers the OTLP layer installs (`span-attributes.ts` and `rpc-spans.ts`):
 
-- **RPC methods.** `effect/rpc` names each server span `RpcServer.<Tag>`, but every call shares the same `POST /rpc` HTTP route. `rpc-spans.ts` adds `rpc.system.name=effect` and `rpc.method=<Tag>` to the RPC span, and copies `rpc.method` to the parent HTTP span (or to the HTTP link when the client owns the trace context), so a backend can filter and group by method instead of the anonymous route. The prefix is pinned by `rpcSpanPrefix` in `@feeblo/domain/rpc-router`, which also passes it to `RpcServer.layerHttp`.
+- **RPC methods.** `effect/rpc` names each server span `RpcServer.<Tag>`, but every call shares the same `POST /rpc` HTTP route. `rpc-spans.ts` adds `rpc.system.name=effect` and `rpc.method=<Tag>` to the RPC span, and records `rpc.method` on the parent HTTP span (or on the HTTP link when the client owns the trace context), so a backend can filter and group by method instead of the anonymous route. When one HTTP span serves more than one method, the shared span keeps every distinct method as an array instead of the last write winning; each RPC span still carries the scalar method it serves. The prefix is pinned by `rpcSpanPrefix` in `@feeblo/domain/rpc-router`, which also passes it to `RpcServer.layerHttp`.
 - **Root library spans.** Queue pollers and delivery workers run without a parent request, so Effect SQL's `sql.execute` and `sql.transaction` arrive as roots and every 1 Hz poll becomes a standalone trace. Those root names are dropped; a SQL span under a request keeps its parent and is exported.
 
 ## Local development
