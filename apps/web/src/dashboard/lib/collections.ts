@@ -270,6 +270,45 @@ export const postStatusCollection = createCollection(
     },
     queryClient,
     getKey: (item) => item.id,
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: newStatus } = mutation;
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        throw new Error("Missing organization id");
+      }
+
+      await fetchRpc((rpc) =>
+        rpc.PostStatusCreate({
+          id: newStatus.id,
+          organizationId,
+          type: newStatus.type,
+          label: newStatus.label,
+          color: newStatus.color ?? null,
+          orderIndex: newStatus.orderIndex,
+        })
+      );
+    },
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: updatedStatus } = mutation;
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        throw new Error("Missing organization id");
+      }
+
+      await fetchRpc((rpc) =>
+        rpc.PostStatusUpdate({
+          id: updatedStatus.id,
+          organizationId,
+          type: updatedStatus.type,
+          label: updatedStatus.label,
+          color: updatedStatus.color ?? null,
+        })
+      );
+    },
   })
 );
 

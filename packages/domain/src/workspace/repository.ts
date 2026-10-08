@@ -145,6 +145,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               label: postStatus.label,
               color: postStatus.color,
               orderIndex: postStatus.orderIndex,
+              isDefault: postStatus.isDefault,
               createdAt: now,
               updatedAt: now,
             });

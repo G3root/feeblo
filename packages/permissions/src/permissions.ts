@@ -52,6 +52,7 @@ const PERMISSION_ACTIONS = {
   changelog: ["create", "update", "publish", "delete"],
   "changelog-categories": ["create", "update", "delete"],
   roadmap: ["create", "update", "delete"],
+  statuses: ["create", "update", "delete"],
   tags: ["create", "update", "delete"],
   contacts: ["create", "update", "delete"],
   companies: ["create", "update", "delete"],
@@ -85,6 +86,7 @@ export const PERMISSIONS = [
     PERMISSION_ACTIONS["changelog-categories"]
   ),
   ...createPermissions("roadmap", PERMISSION_ACTIONS.roadmap),
+  ...createPermissions("statuses", PERMISSION_ACTIONS.statuses),
   ...createPermissions("tags", PERMISSION_ACTIONS.tags),
   ...createPermissions("contacts", PERMISSION_ACTIONS.contacts),
   ...createPermissions("companies", PERMISSION_ACTIONS.companies),

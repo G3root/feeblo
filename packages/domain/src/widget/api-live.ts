@@ -1,4 +1,5 @@
 import { transaction } from "@feeblo/db";
+import { pickDefaultPostStatus } from "@feeblo/domain-contracts/post-status-default";
 import { PostId } from "@feeblo/id";
 import { markdownToHtmlCached } from "@feeblo/utils/markdown";
 import * as DateTime from "effect/DateTime";
@@ -314,7 +315,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
             const statuses = yield* postStatusRepository.findMany({
               organizationId,
             });
-            const defaultStatus = statuses[0];
+            const defaultStatus = pickDefaultPostStatus(statuses);
 
             if (!defaultStatus) {
               return yield* new InternalServerError({

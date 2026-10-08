@@ -652,16 +652,20 @@ function GitHubSyncRuleSlot({
   // Optimistic draft derived from the server rule. Field changes render
   // immediately and reset to the server value once the refresh lands (or a
   // failed save reverts the rule).
-  const firstStatusId = statuses[0]?.id;
+  // The workspace's default status, not the first row: this is where a new
+  // sync rule files issues until an admin picks another, and reordering
+  // statuses must not change that.
+  const defaultStatusId =
+    statuses.find((status) => status.isDefault)?.id ?? statuses[0]?.id;
   const baseDraft = useMemo<GitHubSyncRuleDraft>(
     () => ({
-      postStatusId: rule?.postStatusId ?? firstStatusId ?? "",
+      postStatusId: rule?.postStatusId ?? defaultStatusId ?? "",
       upvoterNotificationPolicy:
         rule?.upvoterNotificationPolicy ?? "notify_upvoters",
       enabled: rule?.enabled ?? false,
     }),
     [
-      firstStatusId,
+      defaultStatusId,
       rule?.enabled,
       rule?.postStatusId,
       rule?.upvoterNotificationPolicy,
