@@ -9,10 +9,12 @@ import { type JSX, onMount } from "solid-js";
  * frame, so there is no exit to sequence and nothing a rapid tab switch can
  * queue behind.
  *
- * Pushed views take focus when they mount. The control the visitor activated
- * (a board card, a back arrow) unmounts with the view it belonged to, and
+ * Every view takes focus when it mounts. Navigating between views unmounts
+ * the control the visitor activated (a board card, the back arrow), and
  * without this focus would fall to the document body — the keyboard and
- * screen-reader position would be silently lost.
+ * screen-reader position would be silently lost. A root view needs it for the
+ * same reason: the shell's back control belongs to the pushed view, so its
+ * list would otherwise be left with focus nowhere.
  */
 export function ViewTransition(props: {
   children: JSX.Element;
@@ -21,7 +23,6 @@ export function ViewTransition(props: {
   let element: HTMLDivElement | undefined;
 
   onMount(() => {
-    if (props.kind !== "push") return;
     // A field inside the view may claim focus while mounting (the composer
     // focuses its title). Only take the focus the element would otherwise
     // drop on <body>.

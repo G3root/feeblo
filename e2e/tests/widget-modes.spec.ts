@@ -109,6 +109,10 @@ test("Feeblo Hub moves between updates and feedback inside one placed widget", a
     widget.getByText("The editor now opens instantly and keeps drafts safe.")
   ).toBeVisible();
   await widget.getByRole("link", { name: "Go back" }).click();
+  // The back control unmounts with the pushed view, so the returning root
+  // view has to take focus; otherwise it is dropped on <body> and the
+  // keyboard position is lost.
+  await expect(widget.locator('[data-slot="widget-view"]')).toBeFocused();
   await widget.getByRole("link", { name: "Feedback" }).click();
 
   await widget.getByRole("link", { name: "Feature requests" }).click();
