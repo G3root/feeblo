@@ -24,7 +24,7 @@ export function BoardList(props: { boards: readonly Board[] }) {
 
       <Show
         fallback={
-          <Empty class="mt-6 border">
+          <Empty class="widget-enter mt-6 border" data-enter="fade">
             <EmptyHeader>
               <EmptyTitle>No boards yet</EmptyTitle>
               <EmptyDescription>
