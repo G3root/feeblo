@@ -74,6 +74,7 @@ describe("BillingRpcHandlers", () => {
     client: undefined,
     target: "sandbox",
     webhookSecret: Option.none(),
+    getOrganizationSettings: () => Effect.succeedNone,
     createCheckout: () =>
       Effect.succeed({ url: "https://sandbox.polar.sh/checkout" }),
     createPortal: ({ customerId }: { customerId: string }) =>

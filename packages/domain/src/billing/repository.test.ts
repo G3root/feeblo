@@ -240,6 +240,7 @@ const fakePolarService = (
   client,
   target,
   webhookSecret: Option.none(),
+  getOrganizationSettings: () => Effect.succeedNone,
   createCheckout: () =>
     Effect.succeed({ url: "https://example.test/checkout" }),
   createPortal: ({ customerId }: { customerId: string }) =>
