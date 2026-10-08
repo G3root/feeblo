@@ -1,3 +1,4 @@
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import { PostCard } from "@feeblo/post-ui/post/post-card";
 import { StandaloneUpvoteButton } from "@feeblo/post-ui/upvote-toggle";
 import { Button } from "@feeblo/ui/button";
@@ -10,7 +11,6 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import * as dayjs from "@feeblo/utils/dayjs";
-import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import { MessageMultiple01Icon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 

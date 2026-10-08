@@ -1,6 +1,6 @@
 import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
 
-import { m } from "../paraglide/messages.js";
+import { m } from "./paraglide/messages.js";
 
 // Fallback labels for the canonical status vocabulary, shown only when a
 // workspace has not set a custom `status.label`. Explicit map (not a dynamic
@@ -18,6 +18,13 @@ function isPostStatusType(value: string): value is TPostStatusType {
   return Object.hasOwn(postStatusMessages, value);
 }
 
+/**
+ * Fallback display label derived from the status type, used only when a
+ * status row's `label` is empty (e.g. pre-migration rows).
+ *
+ * The canonical vocabulary is localized through the host-injected Paraglide
+ * runtime; a workspace-defined status type falls back to its title-cased name.
+ */
 export function formatPostStatus(status: string) {
   if (isPostStatusType(status)) {
     return postStatusMessages[status]();
@@ -28,12 +35,4 @@ export function formatPostStatus(status: string) {
     .split("_")
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ");
-}
-
-export function truncate(value: string, maxLength = 180) {
-  if (value.length <= maxLength) {
-    return value;
-  }
-
-  return `${value.slice(0, maxLength - 1).trimEnd()}...`;
 }

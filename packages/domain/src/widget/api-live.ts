@@ -20,6 +20,7 @@ import { CompanyRepository } from "../company/repository";
 import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
 import { parsePersonAttributes } from "../contact/utils";
+import { EntitlementPolicy } from "../entitlement/policies";
 import { Api } from "../http/api";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import {
@@ -28,15 +29,9 @@ import {
 } from "../jwt-secret/verification";
 import { OrganizationRepository } from "../organization/repository";
 import { PostStatusRepository } from "../post-status/repository";
-import {
-  PostEmbeddingService,
-  postEmbeddingInput,
-} from "../post/embedding-service";
+import { PostEmbeddingService } from "../post/embedding-service";
 import { PostRepository } from "../post/repository";
-import {
-  postLexicalSimilarity,
-  SUGGESTION_MAX_DISTANCE,
-} from "../post/suggestions";
+import { makePostSuggestions } from "../post/suggestions";
 import { PostWriteService } from "../post/write";
 import * as RateLimit from "../rate-limit";
 import {
@@ -124,12 +119,24 @@ export const WidgetApiLive = HttpApiBuilder.group(
       const attributeDefinitionRepository =
         yield* AttributeDefinitionRepository;
       const boardRepository = yield* BoardRepository;
+      const changelogRepository = yield* ChangelogRepository;
       const companyRepository = yield* CompanyRepository;
       const contactRepository = yield* ContactRepository;
       const jwtSecretRepository = yield* JwtSecretRepository;
       const organizationRepository = yield* OrganizationRepository;
       const postStatusRepository = yield* PostStatusRepository;
+      const sitePolicy = yield* SitePolicy;
       const writes = yield* PostWriteService;
+      const entitlementPolicy = yield* EntitlementPolicy;
+      const postRepository = yield* PostRepository;
+      const postEmbeddings = yield* PostEmbeddingService;
+      // The same suggestion program the dashboard and public portal RPCs run,
+      // with the widget's public-only rule. Its collaborators are captured
+      // here so the handler does not build a layer per request.
+      const suggestions = makePostSuggestions({
+        candidates: postRepository.findSuggestionCandidates,
+        embeddings: Option.some(postEmbeddings),
+      });
 
       /**
        * The handler's own services, provided around the feedback effect.
@@ -147,11 +154,13 @@ export const WidgetApiLive = HttpApiBuilder.group(
             attributeDefinitionRepository
           ),
           Effect.provideService(BoardRepository, boardRepository),
+          Effect.provideService(ChangelogRepository, changelogRepository),
           Effect.provideService(CompanyRepository, companyRepository),
           Effect.provideService(ContactRepository, contactRepository),
           Effect.provideService(JwtSecretRepository, jwtSecretRepository),
           Effect.provideService(OrganizationRepository, organizationRepository),
-          Effect.provideService(PostStatusRepository, postStatusRepository)
+          Effect.provideService(PostStatusRepository, postStatusRepository),
+          Effect.provideService(SitePolicy, sitePolicy)
         );
 
       return handlers
@@ -161,80 +170,20 @@ export const WidgetApiLive = HttpApiBuilder.group(
               name: "WidgetListUpdates",
               level: "read",
             }),
-            Effect.provide(
-              Layer.mergeAll(ChangelogRepository.layer, SitePolicy.layer)
-            ),
+            provideHandlerEnvironment,
             withRemapDbErrors("Changelog", "select")
           )
         )
         .handle("suggestPosts", ({ payload }) =>
-          Effect.gen(function* () {
-            const repository = yield* PostRepository;
-            const embeddings = yield* PostEmbeddingService;
-            const input = postEmbeddingInput(payload);
-            const queryEmbedding = yield* embeddings
-              .embed(input)
-              .pipe(
-                Effect.catchCause((cause) =>
-                  Effect.logWarning(
-                    "Failed to generate widget suggestion embedding",
-                    cause
-                  ).pipe(Effect.as(Option.none()))
-                )
-              );
-            const candidates = yield* repository.findSuggestionCandidates({
-              boardId: payload.boardId,
-              organizationId: payload.organizationId,
-              publicOnly: true,
-              limit: Option.isSome(queryEmbedding) ? 5 : 25,
-              ...(Option.isSome(queryEmbedding) && {
-                embedding: queryEmbedding.value.vector,
-                embeddingModel: queryEmbedding.value.model,
-              }),
-            });
-            if (Option.isSome(queryEmbedding)) {
-              const matches = candidates
-                .filter(
-                  (candidate) =>
-                    candidate.distance !== null &&
-                    candidate.distance <= SUGGESTION_MAX_DISTANCE
-                )
-                .map(({ id, title, excerpt, slug }) => ({
-                  id,
-                  title,
-                  excerpt,
-                  slug,
-                }));
-              if (matches.length > 0) {
-                return matches;
-              }
-            }
-
-            const lexicalCandidates = Option.isSome(queryEmbedding)
-              ? yield* repository.findSuggestionCandidates({
-                  boardId: payload.boardId,
-                  organizationId: payload.organizationId,
-                  publicOnly: true,
-                  limit: 25,
-                })
-              : candidates;
-
-            return lexicalCandidates
-              .map((post) => ({
-                post,
-                score: postLexicalSimilarity(input, post),
-              }))
-              .filter(({ score }) => score > 0)
-              .sort((left, right) => right.score - left.score)
-              .slice(0, 5)
-              .map(({ post: { id, title, excerpt, slug } }) => ({
+          suggestions({ ...payload, publicOnly: true }).pipe(
+            Effect.map((posts) =>
+              posts.map(({ id, title, excerpt, slug }) => ({
                 id,
                 title,
                 excerpt,
                 slug,
-              }));
-          }).pipe(
-            Effect.provide([PostEmbeddingService.layer, PostRepository.layer]),
+              }))
+            ),
             Effect.mapError(
               () =>
                 new InternalServerError({
@@ -262,7 +211,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
               name: "WidgetListBoards",
               level: "read",
             }),
-            Effect.provide(BoardRepository.layer),
+            provideHandlerEnvironment,
             withRemapDbErrors("Boards", "select")
           )
         )
@@ -391,6 +340,9 @@ export const WidgetApiLive = HttpApiBuilder.group(
                     );
                   })
                 ).pipe(
+                  // The SSO contact upsert creates through the shared intake
+                  // module, which reads the plan decision from the context.
+                  Effect.provideService(EntitlementPolicy, entitlementPolicy),
                   Effect.mapError(
                     () =>
                       new InternalServerError({
@@ -464,11 +416,15 @@ export const WidgetApiLive = HttpApiBuilder.group(
     Layer.mergeAll(
       AttributeDefinitionRepository.layer,
       BoardRepository.layer,
+      ChangelogRepository.layer,
       CompanyRepository.layer,
       ContactRepository.layer,
       JwtSecretRepository.layer,
       OrganizationRepository.layer,
-      PostStatusRepository.layer
+      PostEmbeddingService.layer,
+      PostRepository.layer,
+      PostStatusRepository.layer,
+      SitePolicy.layer
     )
   )
 );

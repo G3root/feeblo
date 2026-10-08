@@ -1,9 +1,9 @@
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { PostCard as SharedPostCard } from "@feeblo/post-ui/post/post-card";
 import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
+import { truncate } from "@feeblo/utils/text";
 import type { ReactNode } from "react";
 
-import { truncate } from "../../lib/utils";
 import { m } from "../../paraglide/messages.js";
 
 // ---------------------------------------------------------------------------

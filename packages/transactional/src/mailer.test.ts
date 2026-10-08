@@ -1,5 +1,7 @@
+import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as React from "react";
 
@@ -34,9 +36,16 @@ const sendWith = (
   sentMessage: MailMessage = message
 ) =>
   Effect.gen(function* () {
-    const mailer = yield* Mailer;
-    return yield* mailer.send(sentMessage);
-  }).pipe(Effect.provide(makeMailerLayer(transport)));
+    // The transport differs per call, so the layer is built in the test's
+    // scope; a shared `it.layer` fixture cannot express a per-call transport.
+    const context = yield* Layer.build(
+      Layer.merge(makeMailerLayer(transport), NodeCrypto.layer)
+    );
+    return yield* Effect.gen(function* () {
+      const mailer = yield* Mailer;
+      return yield* mailer.send(sentMessage);
+    }).pipe(Effect.provideContext(context));
+  }).pipe(Effect.scoped);
 
 describe("Mailer", () => {
   it.effect(

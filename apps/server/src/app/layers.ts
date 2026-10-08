@@ -2,6 +2,7 @@ import { NodeRedis } from "@effect/platform-node";
 import { toAuthHandler } from "@feeblo/auth/auth-handler";
 import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
+import { AssetRepository } from "@feeblo/domain/asset/repository";
 import { BoardRepository } from "@feeblo/domain/board/repository";
 import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
 import { EmailOutboxRepository } from "@feeblo/domain/email-outbox/repository";
@@ -267,6 +268,9 @@ export const makeServiceLayers = ({
   return Layer.mergeAll(
     workflowLayer,
     SiteRepository.layer,
+    // The media-upload surfaces replace a singleton asset through the asset
+    // repository; provided once here rather than rebuilt inside each handler.
+    AssetRepository.layer,
     EmailOutboxRepository.layer,
     // The Public API's post writes record integration events, and the recorder
     // snapshots the post's URL into the event. Required rather than provided
@@ -361,10 +365,10 @@ export const makeServiceLayers = ({
     // private dependencies live in its route layer (`public-api/router.ts`),
     // so what is assembled here is what more than one surface reads.
     S3UploadServiceLive,
-    // Read through the ambient context rather than as a layer requirement
-    // (`currentPublicApiConfig`), so no type catches its absence and the
-    // Public API's own tests supply their own. Dropping this line compiles and
-    // fails only when a request asks for a paging link.
+    // Required by the Public API's route layer (`public-api/router.ts`),
+    // where the operations declare it in `PublicApiDependencies`. Dropping
+    // this line fails the server's type rather than one request that asks for
+    // a paging link.
     PublicApiConfig.layer
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
 };

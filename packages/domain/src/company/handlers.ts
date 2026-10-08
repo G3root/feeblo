@@ -1,4 +1,3 @@
-import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -6,6 +5,7 @@ import * as Option from "effect/Option";
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import { validateAttributeValueEffect } from "../attribute-definition/validation";
 import { ContactRepository } from "../contact/repository";
+import { createCrmEntry } from "../crm-entry/intake";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
@@ -24,8 +24,6 @@ import type {
 export const CompanyRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CompanyRepository;
   const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
-  const workspaceRepository = yield* WorkspaceRepository;
-  const entitlementPolicy = yield* EntitlementPolicy;
   const companyPolicy = yield* CompanyPolicy;
 
   return {
@@ -37,19 +35,9 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Company", "select")
         ),
     CompanyCreate: (args: TCompanyCreate) =>
-      transaction(
-        Effect.gen(function* () {
-          // First lock, first: the workspace row is held for the whole write,
-          // and the CRM plan count below is only authoritative while it is —
-          // two creates arriving near the cap cannot both see room. The
-          // Public API's company create takes the same lock in the same
-          // position, so the two surfaces enforce one limit the same way.
-          yield* workspaceRepository.lockOrganization(args.organizationId);
-          yield* entitlementPolicy.canCreateCrmEntry({
-            organizationId: args.organizationId,
-            crmEntryCount: repository.countCrmEntries(args.organizationId),
-          });
-
+      createCrmEntry({
+        organizationId: args.organizationId,
+        insert: Effect.gen(function* () {
           const attributeValues = args.attributeValues ?? [];
           const definitions =
             yield* attributeDefinitionRepository.findCompanyAttributeDefinitions(
@@ -106,8 +94,8 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
             })
           );
           return company;
-        })
-      ).pipe(
+        }),
+      }).pipe(
         Policy.withPolicy(companyPolicy.canCreate(args.organizationId)),
         withRemapDbErrors("Company", "create")
       ),

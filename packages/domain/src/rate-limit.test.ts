@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
 import * as RateLimit from "./rate-limit";
@@ -10,100 +10,103 @@ const clientIpAddress = (address: string) => ({
 });
 
 describe("publicRpc", () => {
-  it.effect("limits each client and RPC independently", () =>
-    Effect.gen(function* () {
-      yield* Effect.all(
-        Array.from({ length: 60 }, () =>
+  layer(RateLimitService.layerMemory)("with an in-memory service", (it) => {
+    it.effect("limits each client and RPC independently", () =>
+      Effect.gen(function* () {
+        yield* Effect.all(
+          Array.from({ length: 60 }, () =>
+            RateLimit.publicRpc({
+              name: "PostListPublic",
+              level: "read",
+              limit: 60,
+            })
+          ),
+          { concurrency: 1, discard: true }
+        );
+
+        const error = yield* Effect.flip(
           RateLimit.publicRpc({
             name: "PostListPublic",
             level: "read",
             limit: 60,
           })
-        ),
-        { concurrency: 1, discard: true }
-      );
+        );
 
-      const error = yield* Effect.flip(
-        RateLimit.publicRpc({
+        yield* RateLimit.publicRpc({
+          name: "BoardListPublic",
+          level: "read",
+          limit: 60,
+        });
+
+        const secondClientSucceeded = yield* RateLimit.publicRpc({
           name: "PostListPublic",
           level: "read",
           limit: 60,
-        })
-      );
+        }).pipe(
+          Effect.provideServiceEffect(
+            RateLimit.PublicRpcRateLimiter,
+            RateLimitService.use((rateLimitService) =>
+              Effect.succeed(
+                RateLimit.makePublicRpcRateLimiter({
+                  clientIp: clientIpAddress("203.0.113.2"),
+                  rateLimitService,
+                })
+              )
+            )
+          ),
+          Effect.as(true)
+        );
 
-      yield* RateLimit.publicRpc({
-        name: "BoardListPublic",
-        level: "read",
-        limit: 60,
-      });
-
-      const secondClientSucceeded = yield* RateLimit.publicRpc({
-        name: "PostListPublic",
-        level: "read",
-        limit: 60,
+        expect(error._tag).toBe("RateLimitExceededError");
+        expect(secondClientSucceeded).toBe(true);
       }).pipe(
         Effect.provideServiceEffect(
           RateLimit.PublicRpcRateLimiter,
           RateLimitService.use((rateLimitService) =>
             Effect.succeed(
               RateLimit.makePublicRpcRateLimiter({
-                clientIp: clientIpAddress("203.0.113.2"),
+                clientIp: clientIpAddress("203.0.113.1"),
                 rateLimitService,
               })
             )
           )
-        ),
-        Effect.as(true)
-      );
-
-      expect(error._tag).toBe("RateLimitExceededError");
-      expect(secondClientSucceeded).toBe(true);
-    }).pipe(
-      Effect.provideServiceEffect(
-        RateLimit.PublicRpcRateLimiter,
-        RateLimitService.use((rateLimitService) =>
-          Effect.succeed(
-            RateLimit.makePublicRpcRateLimiter({
-              clientIp: clientIpAddress("203.0.113.1"),
-              rateLimitService,
-            })
-          )
         )
-      ),
-      Effect.provide(RateLimitService.layerMemory)
-    )
-  );
+      )
+    );
 
-  it.effect("uses named level defaults when no override is supplied", () =>
-    Effect.gen(function* () {
-      const error = yield* Effect.gen(function* () {
-        const rateLimitService = yield* RateLimitService;
-        const limiter = RateLimit.makePublicRpcRateLimiter({
-          clientIp: clientIpAddress("198.51.100.1"),
-          rateLimitService,
-        });
+    it.effect("uses named level defaults when no override is supplied", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.gen(function* () {
+          const rateLimitService = yield* RateLimitService;
+          const limiter = RateLimit.makePublicRpcRateLimiter({
+            clientIp: clientIpAddress("198.51.100.1"),
+            rateLimitService,
+          });
 
-        return yield* Effect.gen(function* () {
-          yield* Effect.all(
-            Array.from({ length: 5 }, () =>
+          return yield* Effect.gen(function* () {
+            yield* Effect.all(
+              Array.from({ length: 5 }, () =>
+                RateLimit.publicRpc({
+                  name: "PostCreatePublic",
+                  level: "expensive",
+                })
+              ),
+              { concurrency: 1, discard: true }
+            );
+
+            return yield* Effect.flip(
               RateLimit.publicRpc({
                 name: "PostCreatePublic",
                 level: "expensive",
               })
-            ),
-            { concurrency: 1, discard: true }
+            );
+          }).pipe(
+            Effect.provideService(RateLimit.PublicRpcRateLimiter, limiter)
           );
+        });
 
-          return yield* Effect.flip(
-            RateLimit.publicRpc({
-              name: "PostCreatePublic",
-              level: "expensive",
-            })
-          );
-        }).pipe(Effect.provideService(RateLimit.PublicRpcRateLimiter, limiter));
-      }).pipe(Effect.provide(RateLimitService.layerMemory));
-
-      expect(error._tag).toBe("RateLimitExceededError");
-    })
-  );
+        expect(error._tag).toBe("RateLimitExceededError");
+      })
+    );
+  });
 });

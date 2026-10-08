@@ -1,6 +1,6 @@
 import { type APIRequestContext, expect } from "@playwright/test";
 
-const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
+import { apiUrl } from "./urls";
 
 /**
  * Puts a workspace on a paid plan through the test-only `/__e2e/set-plan`
@@ -14,7 +14,7 @@ export async function setPlan(
     plan: "starter" | "professional";
   }
 ) {
-  const response = await request.post(`${apiURL}/__e2e/set-plan`, {
+  const response = await request.post(`${apiUrl()}/__e2e/set-plan`, {
     data: payload,
   });
 

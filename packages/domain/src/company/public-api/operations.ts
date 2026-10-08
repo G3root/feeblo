@@ -1,14 +1,12 @@
-import { schema } from "@feeblo/db";
-import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { currentCompanyRepository } from "../../company/repository";
+import { CompanyRepository } from "../../company/repository";
+import { createCrmEntry } from "../../crm-entry/intake";
 import { PUBLIC_API_PAGE_DEFAULT_LIMIT } from "../../public-api/common";
 import { decodeCursorOrFail, encodeCursor } from "../../public-api/cursor";
-import { currentPublicApiDatabase } from "../../public-api/database";
-import { requireCrmEntryAllowance } from "../../public-api/entitlement";
+import { crmLimitMessage } from "../../public-api/entitlement";
 import {
   ConflictError,
   InternalError,
@@ -18,9 +16,10 @@ import {
   conflictError,
   invalidRequestError,
   notFoundError,
+  planRequiresUpgradeError,
 } from "../../public-api/errors";
 import { onInternalError } from "../../public-api/failure";
-import { currentPublicApiCaller } from "../../public-api/middleware";
+import { PublicApiCaller } from "../../public-api/middleware";
 import { defineOperation } from "../../public-api/operation";
 import { parseName } from "../../public-api/parse";
 import { withRemapDbErrors } from "../../rpc-errors";
@@ -109,7 +108,7 @@ const failIfCompanyIsTaken = (args: {
   readonly organizationId: string;
 }) =>
   Effect.gen(function* () {
-    const companies = yield* currentCompanyRepository;
+    const companies = yield* CompanyRepository;
 
     if (args.name !== null) {
       const nameTaken = yield* companies
@@ -172,8 +171,8 @@ export const listCompaniesOperation = defineOperation(
   },
   ({ cursor, limit }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const companies = yield* currentCompanyRepository;
+      const caller = yield* PublicApiCaller;
+      const companies = yield* CompanyRepository;
 
       const after = yield* decodeCursorOrFail(cursor);
       const pageSize = limit ?? PUBLIC_API_PAGE_DEFAULT_LIMIT;
@@ -214,9 +213,8 @@ export const createCompanyOperation = defineOperation(
   },
   ({ avatar, externalCreatedAt, externalId, name: rawName }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const db = yield* currentPublicApiDatabase;
-      const companies = yield* currentCompanyRepository;
+      const caller = yield* PublicApiCaller;
+      const companies = yield* CompanyRepository;
 
       const name = yield* parseName(rawName);
 
@@ -227,50 +225,44 @@ export const createCompanyOperation = defineOperation(
         organizationId: caller.organizationId,
       });
 
-      // The plan gate and the insert are one transaction: the workspace row is
-      // locked, the check runs after that lock, and only then is the row
+      // The plan gate and the insert are one transaction: the workspace row
+      // is locked, the check runs after that lock, and only then is the row
       // written, so two creates arriving near a plan's cap cannot both see
-      // room. `no key update` rather than `update` because every table in the
-      // workspace points at this row, and the stronger lock would block
-      // unrelated inserts that merely reference the workspace.
-      const created = yield* db
-        .transaction(() =>
-          Effect.gen(function* () {
-            yield* db
-              .select({ id: schema.organizationTable.id })
-              .from(schema.organizationTable)
-              .where(eq(schema.organizationTable.id, caller.organizationId))
-              .for("no key update");
-
-            yield* requireCrmEntryAllowance(caller.organizationId);
-
-            return yield* companies.create(
-              {
-                avatar: avatar ?? null,
-                externalCreatedAt: externalCreatedAt ?? null,
-                externalId: externalId ?? null,
-                name,
-                organizationId: caller.organizationId,
-              },
-              { source: "API" }
-            );
-          })
-        )
-        .pipe(
-          // The domain reports a name collision as a typed failure; the index
-          // race that beats the pre-check is a driver error. Both answer on
-          // the published `CONFLICT`.
-          Effect.catchTag("CompanyAlreadyExistsError", () =>
-            Effect.fail(conflictError(COMPANY_UNIQUE_VIOLATION_MESSAGE))
-          ),
-          withRemapDbErrors({
-            action: "create",
-            entity: "PublicApiCompany",
-            onUniqueViolation: () =>
-              conflictError(COMPANY_UNIQUE_VIOLATION_MESSAGE),
-          }),
-          Effect.catchTag("InternalServerError", () => onInternalError)
-        );
+      // room. The order is `createCrmEntry`'s (`crm-entry/intake.ts`), shared
+      // with the dashboard's own creates.
+      const created = yield* createCrmEntry({
+        organizationId: caller.organizationId,
+        insert: companies.create(
+          {
+            avatar: avatar ?? null,
+            externalCreatedAt: externalCreatedAt ?? null,
+            externalId: externalId ?? null,
+            name,
+            organizationId: caller.organizationId,
+          },
+          { source: "API" }
+        ),
+      }).pipe(
+        // The shared intake module refuses for want of plan room with the
+        // policy's own tag; the Public API publishes that as
+        // `PLAN_REQUIRES_UPGRADE`, like every other plan gate on this API.
+        Effect.catchTag("PolicyDenied", () =>
+          Effect.fail(planRequiresUpgradeError(crmLimitMessage))
+        ),
+        // The domain reports a name collision as a typed failure; the index
+        // race that beats the pre-check is a driver error. Both answer on
+        // the published `CONFLICT`.
+        Effect.catchTag("CompanyAlreadyExistsError", () =>
+          Effect.fail(conflictError(COMPANY_UNIQUE_VIOLATION_MESSAGE))
+        ),
+        withRemapDbErrors({
+          action: "create",
+          entity: "PublicApiCompany",
+          onUniqueViolation: () =>
+            conflictError(COMPANY_UNIQUE_VIOLATION_MESSAGE),
+        }),
+        Effect.catchTag("InternalServerError", () => onInternalError)
+      );
 
       return toPublicApiCompany(toCompanySource(created));
     })
@@ -288,8 +280,8 @@ export const getCompanyOperation = defineOperation(
   },
   ({ companyId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const companies = yield* currentCompanyRepository;
+      const caller = yield* PublicApiCaller;
+      const companies = yield* CompanyRepository;
 
       const company = yield* companies
         .findById({ id: companyId, organizationId: caller.organizationId })
@@ -317,8 +309,8 @@ export const updateCompanyOperation = defineOperation(
   },
   ({ avatar, companyId, externalCreatedAt, externalId, name: rawName }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const companies = yield* currentCompanyRepository;
+      const caller = yield* PublicApiCaller;
+      const companies = yield* CompanyRepository;
 
       // A body that names no field would otherwise be answered as a
       // successful write that changed nothing but `updatedAt`, which tells
@@ -402,8 +394,8 @@ export const deleteCompanyOperation = defineOperation(
   },
   ({ companyId }) =>
     Effect.gen(function* () {
-      const caller = yield* currentPublicApiCaller;
-      const companies = yield* currentCompanyRepository;
+      const caller = yield* PublicApiCaller;
+      const companies = yield* CompanyRepository;
 
       // A company that is already gone is a 404 rather than a success, for
       // the same reason as a tag: the caller cannot tell a delete that

@@ -1,11 +1,10 @@
-import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import { validateAttributeValueEffect } from "../attribute-definition/validation";
-import { CompanyRepository } from "../company/repository";
+import { createCrmEntry } from "../crm-entry/intake";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { consumeDashboardRateLimit } from "../rate-limit";
@@ -27,9 +26,6 @@ import type {
 export const ContactRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* ContactRepository;
   const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
-  const companyRepository = yield* CompanyRepository;
-  const workspaceRepository = yield* WorkspaceRepository;
-  const entitlementPolicy = yield* EntitlementPolicy;
   const contactPolicy = yield* ContactPolicy;
 
   return {
@@ -74,24 +70,9 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
     },
 
     ContactCreate: (args: TContactCreate) =>
-      transaction(
-        Effect.gen(function* () {
-          // First lock, first: the workspace row is held for the whole write,
-          // and the CRM plan count below is only authoritative while it is —
-          // two creates arriving near the cap cannot both see room. The Public
-          // API's company create takes the same lock in the same position, so
-          // the two surfaces enforce one limit the same way. The lock comes
-          // before any child insert because each insert's foreign-key check
-          // holds a key-share on this row that would otherwise deadlock
-          // against it.
-          yield* workspaceRepository.lockOrganization(args.organizationId);
-          yield* entitlementPolicy.canCreateCrmEntry({
-            organizationId: args.organizationId,
-            crmEntryCount: companyRepository.countCrmEntries(
-              args.organizationId
-            ),
-          });
-
+      createCrmEntry({
+        organizationId: args.organizationId,
+        insert: Effect.gen(function* () {
           const attributeValues = args.attributeValues ?? [];
           const definitions =
             yield* attributeDefinitionRepository.findContactAttributeDefinitions(
@@ -140,8 +121,8 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
             })
           );
           return contact;
-        })
-      ).pipe(
+        }),
+      }).pipe(
         Policy.withPolicy(contactPolicy.canCreate(args)),
         withRemapDbErrors("Contact", "create")
       ),
@@ -181,7 +162,6 @@ export const ContactRpcHandlers = ContactRpcs.toLayer(
   Layer.provide(ContactPolicy.layer),
   Layer.provide(EntitlementPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
-  Layer.provide(CompanyRepository.layer),
   Layer.provide(ContactRepository.layer),
   Layer.provide(AttributeDefinitionRepository.layer)
 );

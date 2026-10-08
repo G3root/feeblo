@@ -3,7 +3,6 @@ import { isTrustedProxy } from "@feeblo/domain/client-ip";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 
 import { ServerConfig } from "./config";
@@ -29,18 +28,13 @@ const productionMediaEnvironment = {
 const loadServerConfig = (
   environment: Record<string, string | undefined> = {}
 ) =>
-  ServerConfig.pipe(
-    Effect.provide(
-      ServerConfig.layer.pipe(
-        Layer.provide(
-          ConfigProvider.layer(
-            ConfigProvider.fromUnknown({
-              ...requiredServerEnvironment,
-              ...environment,
-            })
-          )
-        )
-      )
+  ServerConfig.make.pipe(
+    Effect.provideService(
+      ConfigProvider.ConfigProvider,
+      ConfigProvider.fromUnknown({
+        ...requiredServerEnvironment,
+        ...environment,
+      })
     )
   );
 

@@ -1,67 +1,47 @@
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
+import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { defineConfig, devices } from "@playwright/test";
 
-// Anchors the webServer commands to this config's directory so tests can be
-// run from the repo root (via playwright.config.ts) or from e2e/ alike.
-const configDir = path.dirname(fileURLToPath(import.meta.url));
+/**
+ * Each worker runs its own API server, web server, PGlite database and Chromium
+ * process. That is roughly four cores of work, so four workers on a ten-core
+ * laptop starve editor chunks past the ten-second expect timeout. The budget
+ * follows the machine; CI keeps the two workers it has always used.
+ */
+const localWorkers = Math.max(
+  1,
+  Math.min(4, Math.floor(availableParallelism() / 4))
+);
 
-const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3101";
-const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
-const serverPort = new URL(apiURL).port || "3100";
-const webPort = new URL(baseURL).port || "3101";
-const reuseBuiltApps = process.env.E2E_REUSE_BUILD === "true";
-const databaseURL =
-  process.env.E2E_DATABASE_URL ??
-  `pglite:${mkdtempSync(path.join(tmpdir(), "feeblo-e2e-"))}`;
-
-const toIPv4LoopbackURL = (url: string): string => {
-  const readinessURL = new URL(url);
-  if (readinessURL.hostname === "localhost") {
-    readinessURL.hostname = "127.0.0.1";
-  }
-  return readinessURL.toString();
-};
-
-const e2eEnv = {
-  APP_ROOT_DOMAIN: "localhost",
-  APP_URL: baseURL,
-  API_URL: apiURL,
-  AUTH_AUTO_SIGN_IN_AFTER_SIGN_UP: "true",
-  AUTH_EMAIL_VERIFICATION_REQUIRED: "true",
-  AUTH_ENCRYPTION_KEY: "playwright-e2e-local-secret-32-chars",
-  AUTH_TRUSTED_ORIGINS: `${baseURL},${apiURL},*.localhost:${webPort}`,
-  CLOUDFLARE_ADAPTER: "false",
-  DATABASE_URL: databaseURL,
-  E2E_TEST_MAILER: "true",
-  EMAIL_PROVIDER_WEBHOOK_TOKEN: "playwright-email-provider-token",
-  HOST: "127.0.0.1",
-  INTEGRATION_ALLOW_PRIVATE_NETWORK: "true",
-  INTEGRATION_ENCRYPTION_KEY:
-    "b8d5fa3eebc62aead2c54d03abccbfcc2ff84c214a53e4887f63b43f71a5a2d3",
-  MEDIA_PUBLIC_BUCKET_NAME: "feeblo-media-public",
-  MEDIA_UPLOAD_ACCESS_KEY_ID: "feeblo",
-  MEDIA_UPLOAD_ENDPOINT: "http://127.0.0.1:9002",
-  MEDIA_UPLOAD_REGION: "us-east-1",
-  MEDIA_UPLOAD_SECRET_ACCESS_KEY: "password",
-  NODE_ENV: "development",
-  PORT: webPort,
-  SERVER_PORT: serverPort,
-};
-
+/**
+ * There is no `webServer` block here on purpose.
+ *
+ * `e2e/global-setup.ts` starts one API server, one web server and one PGlite
+ * database per Playwright worker on OS-assigned ports. The previous config
+ * started a single pair for the whole run, so every worker wrote to one
+ * database and the servers dropped connections under the concurrent auth
+ * traffic; helpers retried those drops. Isolation removes the cause, so tests
+ * no longer retry.
+ *
+ * The apps must be built before a run. `pnpm --filter @feeblo/e2e test` builds
+ * them; `test:ci` expects the CI `build_app` job to have built them already.
+ */
 export default defineConfig({
   testDir: "./tests",
   outputDir: "./test-results",
+  // Absolute so the root config can spread this config unchanged; a relative
+  // path would resolve against the config that runs, not this one.
+  globalSetup: fileURLToPath(new URL("./global-setup.ts", import.meta.url)),
+  globalTeardown: fileURLToPath(
+    new URL("./global-teardown.ts", import.meta.url)
+  ),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  // The e2e server uses one shared file-backed PGlite instance. Letting
-  // Playwright use all host CPUs creates enough concurrent writes to cause
-  // dropped connections during auth setup, especially on developer laptops.
-  workers: process.env.CI ? 2 : 4,
+  // Each worker runs its own server pair plus PGlite, so the worker count is a
+  // budget for real processes rather than a count of browser tabs.
+  workers: process.env.CI ? 2 : localWorkers,
   reporter: process.env.CI
     ? [["line"], ["github"], ["html", { open: "never" }]]
     : [["list"], ["html", { open: "never" }]],
@@ -70,7 +50,6 @@ export default defineConfig({
     timeout: 10_000,
   },
   use: {
-    baseURL,
     actionTimeout: 15_000,
     navigationTimeout: 20_000,
     screenshot: "only-on-failure",
@@ -84,33 +63,6 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-    },
-  ],
-
-  webServer: [
-    {
-      command: reuseBuiltApps
-        ? "../node_modules/.bin/tsx scripts/migrate-pglite.ts && ../node_modules/.bin/tsx ../apps/server/src/index.ts"
-        : "pnpm run dev:server:e2e",
-      cwd: configDir,
-      env: e2eEnv,
-      reuseExistingServer: false,
-      stdout: "pipe",
-      stderr: "pipe",
-      timeout: 240_000,
-      url: toIPv4LoopbackURL(`${apiURL}/health`),
-    },
-    {
-      command: reuseBuiltApps
-        ? "node ../apps/web/server.mjs"
-        : "pnpm run dev:web:e2e",
-      cwd: configDir,
-      env: e2eEnv,
-      reuseExistingServer: false,
-      stdout: "pipe",
-      stderr: "pipe",
-      timeout: 240_000,
-      url: toIPv4LoopbackURL(baseURL),
     },
   ],
 });

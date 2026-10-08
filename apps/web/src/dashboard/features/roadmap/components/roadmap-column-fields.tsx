@@ -1,4 +1,5 @@
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import { Button } from "@feeblo/ui/button";
 import {
   Collapsible,
@@ -15,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
-import { formatPostStatus } from "@feeblo/web-shared/board/constants";
 import {
   ChevronDownIcon,
   Delete02Icon,

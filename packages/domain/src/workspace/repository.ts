@@ -58,6 +58,54 @@ const makeWorkspaceRepository = Effect.gen(function* () {
         sql`SELECT id FROM ${schema.organizationTable} WHERE id = ${organizationId} FOR NO KEY UPDATE`
       ),
 
+    /**
+     * Locks the user row until the caller's transaction ends.
+     *
+     * The same device as `lockOrganization`, one scope up: a per-user
+     * workspace cap counts rows across workspaces, so no single workspace row
+     * can serialize it. Locking the user serializes each count-and-create
+     * pair per owner, and a concurrent attempt waits here until the first
+     * commits, then counts its insert.
+     *
+     * `no key update` for the same reason as `lockOrganization`: creating a
+     * workspace inserts a `member` row that takes a key-share on this user,
+     * so the stronger lock would block unrelated member inserts that merely
+     * reference the user. Take it before the transaction's first child
+     * insert.
+     */
+    lockUser: (userId: string) =>
+      db.execute(
+        sql`SELECT id FROM ${schema.userTable} WHERE id = ${userId} FOR NO KEY UPDATE`
+      ),
+
+    /**
+     * Workspaces where the user holds the owner role, with their names.
+     *
+     * Ownership is `owner` anywhere in a comma-joined role list, matching
+     * the account-deletion ownership test in `packages/auth/src/server.ts`.
+     * Names travel with the rows because the workspace-creation state
+     * surface lists the workspaces the cap is counting.
+     */
+    findOwnedWorkspaces: (userId: string) =>
+      Effect.gen(function* () {
+        const memberships = yield* db
+          .select({
+            id: schema.organizationTable.id,
+            name: schema.organizationTable.name,
+            role: schema.memberTable.role,
+          })
+          .from(schema.memberTable)
+          .innerJoin(
+            schema.organizationTable,
+            eq(schema.organizationTable.id, schema.memberTable.organizationId)
+          )
+          .where(eq(schema.memberTable.userId, userId));
+
+        return memberships
+          .filter(({ role }) => role.split(",").includes("owner"))
+          .map(({ id, name }) => ({ id, name }));
+      }),
+
     isSubdomainTaken: (subdomain: string) =>
       Effect.gen(function* () {
         const results = yield* db

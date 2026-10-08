@@ -23,6 +23,7 @@ export const PLAN_PRICING_FEATURES = {
       label: "1 Submission Notification Recipient",
     },
     { key: "crmEntries", label: "10 CRM Entries" },
+    { key: "workspaces", label: "3 Workspaces" },
     { key: "roadmap", label: "Roadmap" },
     { key: "changelog", label: "Changelog" },
     { key: "unlimitedEndUsers", label: "Unlimited End Users" },
@@ -37,6 +38,7 @@ export const PLAN_PRICING_FEATURES = {
       label: "Unlimited Submission Notification Recipients",
     },
     { key: "crmEntries", label: "Unlimited CRM Entries" },
+    { key: "workspaces", label: "Unlimited Workspaces" },
     { key: "integrations", label: "Integrations" },
     { key: "publicApi", label: "Public API" },
     {

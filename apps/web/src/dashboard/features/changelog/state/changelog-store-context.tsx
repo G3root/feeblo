@@ -1,6 +1,5 @@
+import { createStoreContext } from "@feeblo/web-shared/xstate";
 import { createStore } from "@xstate/store";
-
-import { createStoreContext } from "~/lib/xstate";
 
 import type { ChangelogStatus } from "../constants";
 

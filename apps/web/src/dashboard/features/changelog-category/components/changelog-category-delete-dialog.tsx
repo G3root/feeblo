@@ -1,13 +1,4 @@
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogPopup,
-  AlertDialogTitle,
-} from "@feeblo/ui/alert-dialog";
-import { Button } from "@feeblo/ui/button";
+import { ConfirmDialog } from "@feeblo/ui/confirm-dialog";
 import { toastManager } from "@feeblo/ui/toast";
 import { settleOptimisticMutation } from "@feeblo/web-shared/collections";
 import { useSelector } from "@xstate/store-react";
@@ -22,49 +13,32 @@ export function ChangelogCategoryDeleteDialog() {
   const open = useSelector(store, (state) => state.context.open);
 
   return (
-    <AlertDialog
-      onOpenChange={() => store.send({ type: "toggle" })}
+    <ConfirmDialog
+      description="This action cannot be undone. Changelogs in this category will keep their content but no longer show the category."
+      onConfirm={() => {
+        const categoryId = store.get().context.data.categoryId;
+        // The row is removed optimistically; close the confirm in the same
+        // tick and settle persistence in the background.
+        store.send({ type: "setOpen", open: false });
+        settleOptimisticMutation(
+          () => changelogCategoryCollection.delete(categoryId),
+          () => {
+            toastManager.add({
+              title: "Category deleted successfully",
+              type: "success",
+            });
+          },
+          () => {
+            toastManager.add({
+              title: "Failed to delete category",
+              type: "error",
+            });
+          }
+        );
+      }}
+      onOpenChange={(open) => store.send({ type: "setOpen", open })}
       open={open}
-    >
-      <AlertDialogPopup>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete Category</AlertDialogTitle>
-          <AlertDialogDescription>
-            This action cannot be undone. Changelogs in this category will keep
-            their content but no longer show the category.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button
-            onClick={() => {
-              const categoryId = store.get().context.data.categoryId;
-              // The row is removed optimistically; close the confirm in the
-              // same tick and settle persistence in the background.
-              store.send({ type: "toggle" });
-              settleOptimisticMutation(
-                () => changelogCategoryCollection.delete(categoryId),
-                () => {
-                  toastManager.add({
-                    title: "Category deleted successfully",
-                    type: "success",
-                  });
-                },
-                () => {
-                  toastManager.add({
-                    title: "Failed to delete category",
-                    type: "error",
-                  });
-                }
-              );
-            }}
-            type="button"
-            variant="destructive"
-          >
-            Continue
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogPopup>
-    </AlertDialog>
+      title="Delete Category"
+    />
   );
 }

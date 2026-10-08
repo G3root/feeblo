@@ -7,13 +7,11 @@ import e2eConfig from "./e2e/playwright.config";
  * root (`npx playwright test e2e/tests/...`) without needing to know that the
  * real config lives in `e2e/`.
  *
- * Without this file, running from the root ignores the `webServer` setup in
- * `e2e/playwright.config.ts` and every test fails with `ECONNREFUSED` against
- * the API server (port 3100) that Playwright was supposed to start.
+ * The servers are started by `e2e/fixtures.ts`, which resolves its paths from
+ * its own location, so a root-level run needs no `webServer` setup here.
  *
  * Relative paths that live in the e2e config (`testDir`, `outputDir`) resolve
- * against the root config file, so they are re-pointed at `e2e/` here. The
- * `webServer` entries keep their explicit `cwd` from the e2e config.
+ * against the root config file, so they are re-pointed at `e2e/` here.
  */
 export default defineConfig({
   ...e2eConfig,

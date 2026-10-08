@@ -11,6 +11,10 @@ describe("plan feature catalog", () => {
       key: "unlimitedPosts",
       label: "Unlimited Posts",
     });
+    expect(rows).toContainEqual({
+      key: "workspaces",
+      label: "3 Workspaces",
+    });
     expect(rows).not.toContainEqual({
       key: "privateBoards",
       label: "Private Boards",
@@ -45,6 +49,7 @@ describe("plan feature catalog", () => {
         changelogCategories: null,
         submissionNotificationRecipients: null,
         crmEntries: null,
+        workspaces: null,
       },
       capabilities: {
         changelog: true,
@@ -70,6 +75,7 @@ describe("plan feature catalog", () => {
         label: "Unlimited Submission Notification Recipients",
       },
       { key: "crmEntries", label: "Unlimited CRM Entries" },
+      { key: "workspaces", label: "Unlimited Workspaces" },
       { key: "roadmap", label: "Roadmap" },
       { key: "changelog", label: "Changelog" },
       { key: "integrations", label: "Integrations" },

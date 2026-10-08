@@ -1,3 +1,4 @@
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as OpenApi from "effect/http-api/OpenApi";
@@ -8,6 +9,8 @@ import {
   PUBLIC_API_ERROR_SCHEMAS,
 } from "../../public-api/errors";
 import type { HandlerOf } from "../../public-api/handler";
+import type { PublicApiCaller } from "../../public-api/middleware";
+import type { PublicApiDependencies } from "../../public-api/operations";
 import { parseLimit, providedQueryParam } from "../../public-api/parse";
 import {
   getEndUserOperation,
@@ -65,7 +68,9 @@ export const endUserEndpoints = [
     ),
 ] as const;
 
-export const endUserHandlers = {
+export const endUserHandlers = (
+  context: Context.Context<PublicApiDependencies>
+) => ({
   listEndUsers: (({ query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
@@ -76,21 +81,31 @@ export const endUserHandlers = {
         externalId: providedQueryParam(query.externalId),
         limit,
       });
-    })) satisfies HandlerOf<PublicApiGroup, "listEndUsers">,
+    }).pipe(Effect.provideContext(context))) satisfies HandlerOf<
+    PublicApiGroup,
+    "listEndUsers",
+    PublicApiCaller
+  >,
 
   // The URL's params are the operation's own input fields, so handing them
   // over cannot drop a field the operation gains.
   getEndUser: (({ params }) =>
-    getEndUserOperation.handler(params)) satisfies HandlerOf<
+    getEndUserOperation
+      .handler(params)
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "getEndUser"
+    "getEndUser",
+    PublicApiCaller
   >,
 
   // The body is the operation's own input, so handing it over cannot drop a
   // field the operation gains.
   upsertEndUser: (({ payload }) =>
-    upsertEndUserOperation.handler(payload)) satisfies HandlerOf<
+    upsertEndUserOperation
+      .handler(payload)
+      .pipe(Effect.provideContext(context))) satisfies HandlerOf<
     PublicApiGroup,
-    "upsertEndUser"
+    "upsertEndUser",
+    PublicApiCaller
   >,
-};
+});

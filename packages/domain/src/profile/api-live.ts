@@ -6,7 +6,6 @@ import * as FileSystem from "effect/FileSystem";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
 
-import { AssetRepository } from "../asset/repository";
 import { replaceSingletonAsset } from "../asset/service";
 import { Api } from "../http/api";
 import { UploadLimitsMiddlewareLive } from "../http/upload-limits";
@@ -16,9 +15,9 @@ import {
   InternalServerError,
   withRemapDbErrors,
 } from "../rpc-errors";
-import { S3UploadService, S3UploadServiceLive } from "../services/s3";
+import { S3UploadService } from "../services/s3";
 import {
-  currentHttpApiSession,
+  CurrentSession,
   HttpApiAuthMiddlewareLive,
 } from "../session-middleware";
 
@@ -35,7 +34,7 @@ export const ProfileApiLive = HttpApiBuilder.group(
   (handlers) =>
     handlers.handle("uploadProfilePicture", ({ payload: { file } }) => {
       return Effect.gen(function* () {
-        const session = yield* currentHttpApiSession;
+        const session = yield* CurrentSession;
 
         if (!ALLOWED_CONTENT_TYPES.has(file.contentType)) {
           return yield* new BadRequestError({
@@ -96,15 +95,11 @@ export const ProfileApiLive = HttpApiBuilder.group(
           });
         }
 
-        const s3Service = yield* S3UploadService.pipe(
-          Effect.provide(S3UploadServiceLive),
-          Effect.mapError(
-            () =>
-              new InternalServerError({
-                message: "Failed to configure media storage",
-              })
-          )
-        );
+        // Media storage is a shared requirement supplied by the composition
+        // root, not a live layer built inside the request: the root provides
+        // the one instance every upload path uses, and a test that supplies a
+        // substitute is not overridden here.
+        const s3Service = yield* S3UploadService;
         const uploaded = yield* s3Service
           .uploadProfileImage({
             bytes,
@@ -135,10 +130,7 @@ export const ProfileApiLive = HttpApiBuilder.group(
         }).pipe(Effect.provideService(S3UploadService, s3Service));
 
         return uploaded;
-      }).pipe(
-        Effect.provide(AssetRepository.layer),
-        withRemapDbErrors("UserProfile", "create")
-      );
+      }).pipe(withRemapDbErrors("UserProfile", "create"));
     })
 ).pipe(
   Layer.provide(HttpApiAuthMiddlewareLive),

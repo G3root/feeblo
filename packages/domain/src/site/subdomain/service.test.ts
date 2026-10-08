@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
 
 import { ProfanityConfig } from "./config";
 import { ProfanityError, ReservedSubdomainError } from "./errors";
@@ -10,23 +9,15 @@ type ConfigOverrides = {
   readonly extraWords?: string[];
 };
 
-const testLayer = (overrides: ConfigOverrides = {}) =>
-  SubdomainValidationService.layer.pipe(
-    Layer.provide(
-      Layer.effect(
-        ProfanityConfig,
-        Effect.succeed({
-          extraWords: overrides.extraWords ?? [],
-        })
-      )
-    )
-  );
-
 const validate = (subdomain: string, overrides?: ConfigOverrides) =>
   Effect.gen(function* () {
-    const { validate } = yield* SubdomainValidationService;
-    return yield* validate(subdomain);
-  }).pipe(Effect.provide(testLayer(overrides)));
+    const service = yield* SubdomainValidationService.make;
+    return yield* service.validate(subdomain);
+  }).pipe(
+    Effect.provideService(ProfanityConfig, {
+      extraWords: overrides?.extraWords ?? [],
+    })
+  );
 
 describe("SubdomainValidationService", () => {
   it.effect("accepts clean subdomains using the bundled dictionary", () =>
