@@ -1,10 +1,11 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { type ComponentProps, splitProps } from "solid-js";
+import { type ComponentProps, Show, splitProps } from "solid-js";
 
 import { cn } from "../../lib/utils";
+import { Spinner } from "./spinner";
 
 export const buttonVariants = cva(
-  "focus-visible:ring-ring focus-visible:ring-offset-background relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border text-base font-medium whitespace-nowrap transition-shadow outline-none before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] focus-visible:ring-2 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-64 data-loading:text-transparent data-loading:select-none sm:text-sm pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4",
+  "focus-visible:ring-ring focus-visible:ring-offset-background relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border text-base font-medium whitespace-nowrap transition-[box-shadow,transform] outline-none before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] focus-visible:ring-2 focus-visible:ring-offset-1 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-64 data-loading:text-transparent data-loading:select-none motion-reduce:active:scale-100 sm:text-sm pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4",
   {
     defaultVariants: {
       size: "default",
@@ -45,12 +46,24 @@ export const buttonVariants = cva(
 );
 
 export function Button(
-  props: ComponentProps<"button"> & VariantProps<typeof buttonVariants>
+  props: ComponentProps<"button"> &
+    VariantProps<typeof buttonVariants> & { loading?: boolean }
 ) {
-  const [local, others] = splitProps(props, ["class", "variant", "size"]);
+  const [local, others] = splitProps(props, [
+    "children",
+    "class",
+    "disabled",
+    "loading",
+    "size",
+    "type",
+    "variant",
+  ]);
+
+  const isDisabled = () => Boolean(local.loading || local.disabled);
 
   return (
     <button
+      aria-disabled={local.loading || undefined}
       class={cn(
         buttonVariants({
           variant: local.variant ?? "default",
@@ -58,8 +71,19 @@ export function Button(
           className: local.class,
         })
       )}
+      data-loading={local.loading ? "" : undefined}
       data-slot="button"
+      disabled={isDisabled()}
+      type={local.type ?? "button"}
       {...others}
-    />
+    >
+      {local.children}
+      <Show when={local.loading}>
+        <Spinner
+          class="pointer-events-none absolute"
+          data-slot="button-loading-indicator"
+        />
+      </Show>
+    </button>
   );
 }

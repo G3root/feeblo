@@ -1,7 +1,7 @@
 import { HashRouter, Route } from "@solidjs/router";
 import { lazy } from "solid-js";
 
-import { preloadBoards } from "./lib/api";
+import { preloadBoards, preloadUpdates } from "./lib/api";
 import { RootComponent } from "./routes/__root";
 
 export { isSupportedLocale, type WidgetConfig } from "./lib/config";
@@ -20,8 +20,12 @@ export function WidgetApp() {
         path="/board/:boardId"
         preload={preloadBoards}
       />
-      <Route component={LazyUpdates} path="/updates" />
-      <Route component={LazyUpdateDetail} path="/updates/:updateId" />
+      <Route component={LazyUpdates} path="/updates" preload={preloadUpdates} />
+      <Route
+        component={LazyUpdateDetail}
+        path="/updates/:updateId"
+        preload={preloadUpdates}
+      />
     </HashRouter>
   );
 }

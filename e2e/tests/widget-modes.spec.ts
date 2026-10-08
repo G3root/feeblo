@@ -108,7 +108,7 @@ test("Feeblo Hub moves between updates and feedback inside one placed widget", a
   await expect(
     widget.getByText("The editor now opens instantly and keeps drafts safe.")
   ).toBeVisible();
-  await widget.getByRole("button", { name: "All updates" }).click();
+  await widget.getByRole("link", { name: "Go back" }).click();
   await widget.getByRole("link", { name: "Feedback" }).click();
 
   await widget.getByRole("link", { name: "Feature requests" }).click();

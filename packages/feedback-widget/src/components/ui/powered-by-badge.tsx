@@ -1,6 +1,6 @@
 export function PoweredByBadge() {
   return (
-    <div class="mt-3 flex items-center justify-center px-2 py-1">
+    <div class="bg-popover flex shrink-0 items-center justify-center px-3 py-2">
       <a
         class="text-muted-foreground hover:border-border hover:bg-muted rounded-lg border border-transparent px-1.5 py-0.5 text-xs font-medium transition-colors dark:hover:bg-white/5"
         draggable={false}
