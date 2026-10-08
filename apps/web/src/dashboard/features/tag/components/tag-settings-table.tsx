@@ -27,11 +27,10 @@ import {
   Tag01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveQuery } from "@tanstack/react-db";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
+import { useOrgTags } from "~/hooks/use-org-tags";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import {
   useTagCreateDialogContext,
@@ -47,20 +46,22 @@ type TagSettingsTableProps = {
 export function TagSettingsTable(props: TagSettingsTableProps) {
   const { emptyDescription, emptyTitle } = props;
   const organizationId = useOrganizationId();
-  const { tagCollection } = useDashboardCollections();
   const createDialogStore = useTagCreateDialogContext();
   const editDialogStore = useTagEditDialogContext();
   const deleteDialogStore = useTagDeleteDialogContext();
 
-  const tagsQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ tag: tagCollection })
-        .where(({ tag }) => eq(tag.organizationId, organizationId))
-        .orderBy(({ tag }) => tag.updatedAt, "desc"),
-  });
-
-  const tags = tagsQuery?.data;
+  const tagsQuery = useOrgTags(organizationId);
+  // The shared org-tags query is unordered; this table keeps its
+  // most-recently-updated-first order locally.
+  const tags = useMemo(
+    () =>
+      tagsQuery.data.toSorted(
+        (left, right) =>
+          new Date(right.updatedAt).getTime() -
+          new Date(left.updatedAt).getTime()
+      ),
+    [tagsQuery.data]
+  );
   const handleCreate = () =>
     createDialogStore.send({ type: "toggle", data: {} });
 

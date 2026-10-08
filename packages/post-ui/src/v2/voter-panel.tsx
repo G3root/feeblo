@@ -24,7 +24,6 @@ import {
   UserAdd01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useState } from "react";
 
 import { m } from "../paraglide/messages.js";
@@ -39,6 +38,7 @@ import {
 } from "./contact-combobox/new-user-dialog";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
+import { usePostUpvotes } from "./use-post-upvotes";
 
 function VoterAvatar({
   className,
@@ -84,16 +84,10 @@ export function VoterPanel() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  const upvotesQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ upvote: upvoteCollection })
-        .where(({ upvote }) =>
-          and(
-            eq(upvote.organizationId, organizationId),
-            eq(upvote.postId, post.id)
-          )
-        ),
+  const upvotesQuery = usePostUpvotes({
+    organizationId,
+    postId: post.id,
+    upvoteCollection,
   });
 
   const upvotes = upvotesQuery.data ?? [];

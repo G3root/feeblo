@@ -2,11 +2,10 @@ import { RoadmapColumnId } from "@feeblo/id";
 import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import { withForm } from "@feeblo/ui/hooks/form";
 import { Separator } from "@feeblo/ui/separator";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useState } from "react";
 
+import { useOrgPostStatuses } from "~/hooks/use-org-post-statuses";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { postStatusCollection } from "~/lib/collections";
 
 import { roadmapFormOpts } from "../shared-form";
 import {
@@ -39,15 +38,7 @@ const RoadmapColumnsSection = withForm({
     const organizationId = useOrganizationId();
     const [openItems, setOpenItems] = useState<string[]>([]);
 
-    const { data: statuses } = useLiveQuery({
-      query: (q) =>
-        q
-          .from({ postStatus: postStatusCollection })
-          .where(({ postStatus }) =>
-            eq(postStatus.organizationId, organizationId)
-          )
-          .orderBy(({ postStatus }) => postStatus.orderIndex, "asc"),
-    });
+    const { data: statuses } = useOrgPostStatuses(organizationId);
 
     const statusOptions = statuses ?? [];
     const openItemIds = new Set(openItems);

@@ -31,6 +31,9 @@ export function WorkspaceSwitcher() {
   const creationState = useAtomValue(workspaceCreationStateAtom);
   const { organizationCollection } = useDashboardCollections();
   const organizationsQuery = useLiveQuery({
+    // Sidebar-level query that re-renders with every dashboard navigation;
+    // the explicit key skips re-deriving identity from the IR.
+    queryKey: ["workspace-organizations", organizationCollection.id],
     query: (q) =>
       q
         .from({ organization: organizationCollection })
@@ -114,6 +117,7 @@ function WorkspacePlan() {
   const organizationId = useOrganizationId();
   const { workspacePlanCollection } = useDashboardCollections();
   const workspacePlan = useLiveQuery({
+    queryKey: ["workspace-plan", workspacePlanCollection.id, organizationId],
     query: (q) =>
       q
         .from({ plan: workspacePlanCollection })

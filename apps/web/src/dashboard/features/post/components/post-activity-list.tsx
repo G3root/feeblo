@@ -45,14 +45,11 @@ import {
 } from "@tanstack/react-db";
 import { useMemo } from "react";
 
-import {
-  boardCollection,
-  contactCollection,
-  postActivityCollection,
-  postCollection,
-  postStatusCollection,
-  tagCollection,
-} from "~/lib/collections";
+import { useOrgBoards } from "~/hooks/use-org-boards";
+import { useOrgContacts } from "~/hooks/use-org-contacts";
+import { useOrgPostStatuses } from "~/hooks/use-org-post-statuses";
+import { useOrgTags } from "~/hooks/use-org-tags";
+import { postActivityCollection, postCollection } from "~/lib/collections";
 
 type NameLookup = ReadonlyMap<string, string>;
 
@@ -233,31 +230,12 @@ export function PostActivityList({
   organizationId: string;
 }) {
   const { data: activities, isLoading } = useLiveQuery(activityQuery);
-  const { data: statuses } = useLiveQuery({
-    query: (query) =>
-      query
-        .from({ status: postStatusCollection })
-        .where(({ status }) => eq(status.organizationId, organizationId)),
-  });
-  const { data: boards } = useLiveQuery({
-    query: (query) =>
-      query
-        .from({ board: boardCollection })
-        .where(({ board }) => eq(board.organizationId, organizationId)),
-  });
-  const { data: tags } = useLiveQuery({
-    query: (query) =>
-      query
-        .from({ tag: tagCollection })
-        .where(({ tag }) => eq(tag.organizationId, organizationId)),
-  });
-  const { data: contacts } = useLiveQuery({
-    query: (query) =>
-      query
-        .from({ contact: contactCollection })
-        .where(({ contact }) => eq(contact.organizationId, organizationId)),
-  });
+  const { data: statuses } = useOrgPostStatuses(organizationId);
+  const { data: boards } = useOrgBoards(organizationId);
+  const { data: tags } = useOrgTags(organizationId);
+  const { data: contacts } = useOrgContacts(organizationId);
   const { data: posts } = useLiveQuery({
+    queryKey: ["post-activity-posts", postCollection.id, organizationId],
     query: (query) =>
       query
         .from({ post: postCollection })

@@ -43,6 +43,12 @@ function EditRoadmapForm() {
   const data = useSelector(store, (state) => state.context.data);
 
   const roadmapQuery = useLiveQuery({
+    queryKey: [
+      "edit-roadmap",
+      roadmapCollection.id,
+      organizationId,
+      data.roadmapId,
+    ],
     query: (q) =>
       q
         .from({ roadmap: roadmapCollection })
@@ -62,6 +68,11 @@ function EditRoadmapForm() {
   });
 
   const columnsQuery = useLiveQuery({
+    queryKey: [
+      "edit-roadmap-columns",
+      roadmapColumnCollection.id,
+      data.roadmapId,
+    ],
     query: (q) =>
       q
         .from({ column: roadmapColumnCollection })

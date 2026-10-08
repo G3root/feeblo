@@ -21,6 +21,14 @@ export function usePostDetail() {
   } = usePostCollections();
 
   const query = useLiveQuery({
+    // Used by every post detail view; the explicit key skips rebuilding the
+    // slug-scoped lookup on re-renders.
+    queryKey: [
+      "post-detail",
+      postDetailCollection.id,
+      organizationId,
+      post.slug,
+    ],
     query: (q) =>
       q
         .from({ detail: postDetailCollection })

@@ -73,6 +73,11 @@ function UpgradePlanDialogPopup() {
   const catalog = usePlanCatalog();
 
   const { data: workspacePlans, isLoading: plansLoading } = useLiveQuery({
+    queryKey: [
+      "upgrade-workspace-plans",
+      workspacePlanCollection.id,
+      organizationId,
+    ],
     query: (q) =>
       q
         .from({ plan: workspacePlanCollection })

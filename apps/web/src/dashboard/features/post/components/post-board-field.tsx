@@ -3,9 +3,9 @@ import { PostBoardSelect } from "@feeblo/post-ui/post-properties";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 
+import { useOrgBoards } from "~/hooks/use-org-boards";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export function PostBoardField({ disabled = false }: { disabled?: boolean }) {
@@ -16,15 +16,9 @@ export function PostBoardField({ disabled = false }: { disabled?: boolean }) {
   );
   const isDisabled = disabled || isLocked || isMerged || !canMovePost;
   const navigate = useNavigate();
-  const { boardCollection, postCollection } = useDashboardCollections();
+  const { postCollection } = useDashboardCollections();
 
-  const { data: allBoards } = useLiveQuery({
-    query: (q) => {
-      return q
-        .from({ board: boardCollection })
-        .where(({ board }) => eq(board.organizationId, organizationId));
-    },
-  });
+  const { data: allBoards } = useOrgBoards(organizationId);
 
   if (!allBoards) {
     return null;

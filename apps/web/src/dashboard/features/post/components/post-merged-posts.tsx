@@ -25,6 +25,14 @@ export function PostMergedPosts() {
     useDashboardCollections();
 
   const { data: mergedPosts } = useLiveQuery({
+    queryKey: [
+      "merged-posts",
+      postCollection.id,
+      boardCollection.id,
+      postStatusCollection.id,
+      organizationId,
+      post.id,
+    ],
     query: (query) =>
       query
         .from({ post: postCollection })

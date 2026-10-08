@@ -68,6 +68,12 @@ function ChangelogContent() {
   const hasActiveCategoryFilter = selectedCategoryIds.length > 0;
 
   const { data: matchingLinks = [] } = useLiveQuery({
+    queryKey: [
+      "portal-changelog-matching-links",
+      publicChangelogCategoryLinkCollection.id,
+      site.organizationId,
+      selectedCategoryIds,
+    ],
     query: (q) =>
       q
         .from({ link: publicChangelogCategoryLinkCollection })
@@ -86,6 +92,14 @@ function ChangelogContent() {
   );
 
   const changelogsQuery = useLiveQuery({
+    queryKey: [
+      "portal-changelogs",
+      publicChangelogCollection.id,
+      site.organizationId,
+      normalizedSearch,
+      hasActiveCategoryFilter,
+      uniqueChangelogIds,
+    ],
     query: (q) =>
       q
         .from({ changelog: publicChangelogCollection })
@@ -112,6 +126,11 @@ function ChangelogContent() {
   });
 
   const { data: categoryLinks = [] } = useLiveQuery({
+    queryKey: [
+      "portal-changelog-category-links",
+      publicChangelogCategoryLinkCollection.id,
+      site.organizationId,
+    ],
     query: (q) =>
       q
         .from({ link: publicChangelogCategoryLinkCollection })

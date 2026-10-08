@@ -39,6 +39,7 @@ export function CommentDisplayItem({
   // pointing at a redirect loop.
   const mergedFromPostId = data.mergedFromPostId;
   const { data: mergedFromPost } = useLiveQuery({
+    queryKey: ["merged-from-post", postCollection.id, mergedFromPostId ?? null],
     query: (q) => {
       if (!mergedFromPostId) {
         return undefined;
@@ -62,6 +63,11 @@ export function CommentDisplayItem({
   // Derive the status-update type by joining the comment's FK onto the
   // org-scoped post status collection (labels/colors live client-side).
   const { data: statusUpdateRows } = useLiveQuery({
+    queryKey: [
+      "post-status-by-id",
+      postStatusCollection.id,
+      data.statusUpdateId ?? "",
+    ],
     query: (q) =>
       q
         .from({ postStatus: postStatusCollection })

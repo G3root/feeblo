@@ -27,8 +27,10 @@ import {
   getCustomAttributeInputValues,
   hasMissingRequiredCustomAttributeValues,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
+import { useCompanyAttributeDefinitions } from "~/hooks/use-attribute-definitions";
+import { useCompanyAttributeValues } from "~/hooks/use-attribute-values";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+import { companyCollection } from "~/lib/collections";
 
 import { useCompanyEditDialogContext } from "../dialog-stores";
 
@@ -56,15 +58,16 @@ export function CompanyEditDialog() {
 
 function CompanyEditFormLoader({ mode }: { mode: "display" | "edit" }) {
   const organizationId = useOrganizationId();
-  const {
-    companyAttributeDefinitionCollection,
-    companyAttributeValueCollection,
-    companyCollection,
-  } = useDashboardCollections();
   const store = useCompanyEditDialogContext();
   const companyId = useSelector(store, (state) => state.context.data.companyId);
 
   const { data } = useLiveQuery({
+    queryKey: [
+      "company-by-id",
+      companyCollection.id,
+      companyId,
+      organizationId,
+    ],
     query: (q) =>
       q
         .from({ company: companyCollection })
@@ -78,21 +81,8 @@ function CompanyEditFormLoader({ mode }: { mode: "display" | "edit" }) {
         .limit(1),
   });
   const company = data?.[0];
-  const definitionsQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ definition: companyAttributeDefinitionCollection })
-        .where(({ definition }) =>
-          eq(definition.organizationId, organizationId)
-        )
-        .orderBy(({ definition }) => definition.createdAt, "asc"),
-  });
-  const valuesQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ value: companyAttributeValueCollection })
-        .where(({ value }) => eq(value.companyId, companyId)),
-  });
+  const definitionsQuery = useCompanyAttributeDefinitions(organizationId);
+  const valuesQuery = useCompanyAttributeValues(companyId);
 
   if (!company) {
     return null;

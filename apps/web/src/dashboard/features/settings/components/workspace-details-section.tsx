@@ -19,6 +19,12 @@ export function WorkspaceDetailsSection() {
   const { allowed: canManageOrganization, isPending: isPolicyPending } =
     usePolicy(hasOwnerOrAdminRole(organizationId));
   const organizationQuery = useLiveQuery({
+    queryKey: [
+      "workspace-details",
+      membershipCollection.id,
+      organizationCollection.id,
+      organizationId,
+    ],
     query: (q) =>
       q
         .from({ membership: membershipCollection })

@@ -45,6 +45,15 @@ export function SubscribeButton() {
   const disabled = isLocked || isMerged;
 
   const subscriptionQuery = useLiveQuery({
+    // Per-post detail query; this callsite is what the dev profiler flagged,
+    // so it takes the explicit-key escape hatch.
+    queryKey: [
+      "post-subscription",
+      postSubscriptionCollection.id,
+      organizationId,
+      postId,
+      session?.user.id ?? null,
+    ],
     query: (q) => {
       if (!(postId && session)) {
         return undefined;

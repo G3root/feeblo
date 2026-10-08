@@ -160,6 +160,12 @@ export function PostMergeMenu() {
 
   // Used to decide whether the "Unmerge a post" picker has anything to show.
   const { data: mergedInPosts } = useLiveQuery({
+    queryKey: [
+      "merge-children-ids",
+      postCollection.id,
+      organizationId,
+      post.id,
+    ],
     query: (query) =>
       query
         .from({ candidate: postCollection })
@@ -334,6 +340,7 @@ function PostMergeCommandDialog({
   // They are excluded from the picker because the repository refuses a source
   // with merged children.
   const { data: parentRows } = useLiveQuery({
+    queryKey: ["merge-parent-rows", postCollection.id, organizationId],
     query: (query) =>
       query
         .from({ post: postCollection })
@@ -359,6 +366,14 @@ function PostMergeCommandDialog({
   // and the viewed post is never its own source or target. The board join
   // labels each candidate so cross-board merges stay unambiguous.
   const { data: candidates } = useLiveQuery({
+    queryKey: [
+      "merge-candidates",
+      postCollection.id,
+      boardCollection.id,
+      postStatusCollection.id,
+      organizationId,
+      post.id,
+    ],
     query: (query) =>
       query
         .from({ post: postCollection })
@@ -593,6 +608,14 @@ function PostUnmergeCommandDialog({
 
   // Every post previously merged into the viewed post, newest first.
   const { data: mergedPosts } = useLiveQuery({
+    queryKey: [
+      "merge-merged-posts",
+      postCollection.id,
+      boardCollection.id,
+      postStatusCollection.id,
+      organizationId,
+      post.id,
+    ],
     query: (query) =>
       query
         .from({ post: postCollection })

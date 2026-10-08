@@ -81,6 +81,7 @@ function SecuritySettingsContent({
   const isGeneratingRef = useRef(false);
 
   const { data: secrets, isLoading } = useLiveQuery({
+    queryKey: ["jwt-secrets", jwtSecretCollection.id, organizationId],
     query: (q) =>
       q
         .from({ secret: jwtSecretCollection })

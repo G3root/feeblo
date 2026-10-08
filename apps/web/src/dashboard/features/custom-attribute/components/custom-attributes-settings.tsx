@@ -29,11 +29,13 @@ import {
   PropertyNewIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 import type { ReactNode } from "react";
 
+import {
+  useCompanyAttributeDefinitions,
+  useContactAttributeDefinitions,
+} from "~/hooks/use-attribute-definitions";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import {
   type CustomAttributeEntityType,
@@ -52,28 +54,12 @@ type AttributeDefinition = {
 
 export function CustomAttributesSettings() {
   const organizationId = useOrganizationId();
-  const {
-    companyAttributeDefinitionCollection,
-    contactAttributeDefinitionCollection,
-  } = useDashboardCollections();
   const dialogStore = useCustomAttributeCreateDialogContext();
   const editDialogStore = useCustomAttributeEditDialogContext();
   const deleteDialogStore = useCustomAttributeDeleteDialogContext();
 
-  const contactAttributesQuery = useLiveQuery({
-    query: (query) =>
-      query
-        .from({ attribute: contactAttributeDefinitionCollection })
-        .where(({ attribute }) => eq(attribute.organizationId, organizationId))
-        .orderBy(({ attribute }) => attribute.createdAt, "asc"),
-  });
-  const companyAttributesQuery = useLiveQuery({
-    query: (query) =>
-      query
-        .from({ attribute: companyAttributeDefinitionCollection })
-        .where(({ attribute }) => eq(attribute.organizationId, organizationId))
-        .orderBy(({ attribute }) => attribute.createdAt, "asc"),
-  });
+  const contactAttributesQuery = useContactAttributeDefinitions(organizationId);
+  const companyAttributesQuery = useCompanyAttributeDefinitions(organizationId);
 
   const openCreateDialog = (entityType: CustomAttributeEntityType) =>
     dialogStore.send({ type: "toggle", data: { entityType } });
