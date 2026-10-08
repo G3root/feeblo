@@ -21,7 +21,11 @@ import * as Redacted from "effect/Redacted";
 import * as Tracer from "effect/Tracer";
 
 import type { TelemetryConfig, TelemetryTarget } from "./config";
-import { allowedSpans } from "./span-attributes";
+import { rpcSpans } from "./rpc-spans";
+import { allowedSpans, rootSpanNoise } from "./span-attributes";
+
+/** Nothing is skipped when the root-span filter is turned off for debugging. */
+const noRootSpans: ReadonlySet<string> = new Set();
 
 /**
  * The base logger every signal shares: structured JSON on the console, so a
@@ -35,9 +39,12 @@ export const telemetryLayer = (
   options?: {
     readonly lifetime?: "process" | "event" | undefined;
     readonly baseLoggers?: Layer.Layer<never, never, never> | undefined;
+    /** Prefix `@feeblo/domain/rpc-router` gives every RPC server span. */
+    readonly rpcSpanPrefix?: string | undefined;
   }
 ) => {
   const lifetime = options?.lifetime ?? "process";
+  const rpcSpanPrefix = options?.rpcSpanPrefix ?? "RpcServer";
   const baseLoggers =
     options?.baseLoggers ??
     Logger.layer([defaultTelemetryLogger], { mergeWithExisting: false });
@@ -64,16 +71,25 @@ export const telemetryLayer = (
       : OtlpTracer.layer(signal(config.traces)).pipe(
           Layer.provide(OtlpSerialization.layerJson),
           Layer.provide(FetchHttpClient.layer),
-          // Wrap the exporter's tracer with the attribute filter and ratio
-          // sampling. `flatMap` replaces the layer output with a value, so the
-          // `Tracer.Tracer` reference is provided without appearing in the
-          // declared output — which is what lets consumers stop requiring it.
+          // Wrap the exporter's tracer with RPC labelling, the attribute
+          // filter, and ratio sampling. `flatMap` replaces the layer output
+          // with a value, so the `Tracer.Tracer` reference is provided without
+          // appearing in the declared output — which is what lets consumers
+          // stop requiring it.
           Layer.flatMap((context) =>
             Layer.succeed(
               Tracer.Tracer,
-              allowedSpans(Context.get(context, Tracer.Tracer), {
-                sampleRate: config.tracesSampleRate,
-              })
+              allowedSpans(
+                rpcSpans(Context.get(context, Tracer.Tracer), {
+                  spanPrefix: rpcSpanPrefix,
+                }),
+                {
+                  sampleRate: config.tracesSampleRate,
+                  dropRootSpans: config.dropRootSpans
+                    ? rootSpanNoise
+                    : noRootSpans,
+                }
+              )
             )
           )
         ),
