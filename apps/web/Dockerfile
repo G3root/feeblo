@@ -33,16 +33,16 @@ COPY --from=prepare /app/messages ./messages
 
 ENV NODE_ENV=production
 
-# `pnpm turbo` re-verifies and reinstalls before running the command, the
-# turbo CLI shim silently falls back to `npm install` when its native
-# `@turbo/*` binary is missing, and the TUI writes nothing to a non-TTY log.
-# Each can hang the build with no output (publish-images run 37678508391 sat
-# 45 minutes). Run the local binary directly, against the `out/json` install
-# that already happened, and bound the step so a stall fails in 15 minutes
-# instead of 45.
-RUN echo "verify-deps-before-run=false" >> .npmrc
+# pnpm 11 defaults `verify-deps-before-run` to "install" and does not read it
+# from `.npmrc`; turbo passes this env var to a task but the pnpm process that
+# decides can miss it, and each task then runs its own concurrent `pnpm
+# install` over the same node_modules (publish-images run 37678508391 hung
+# with two tasks stuck). Pin it at the image level and keep tasks serial so an
+# install can never race another task. `timeout` fails the step in 15 minutes
+# instead of burning the 45 minute job timeout.
+ENV pnpm_config_verify_deps_before_run=false
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    TURBO_TELEMETRY_DISABLED=1 timeout -k 30 900 ./node_modules/.bin/turbo build --ui=stream
+    TURBO_TELEMETRY_DISABLED=1 timeout -k 30 900 ./node_modules/.bin/turbo build --ui=stream --concurrency=1
 
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
