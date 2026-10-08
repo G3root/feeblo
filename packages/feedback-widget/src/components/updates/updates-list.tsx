@@ -2,6 +2,7 @@ import { createAsync } from "@solidjs/router";
 import { For, Show, Suspense } from "solid-js";
 
 import { fetchUpdates } from "../../lib/api";
+import { consumeSurfaceEntry } from "../../lib/motion";
 import { ViewTransition } from "../shell/view-transition";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
 import { UpdateCard } from "./update-card";
@@ -24,6 +25,7 @@ export function UpdatesList() {
 
 function UpdatesListScreen() {
   const updates = createAsync(() => fetchUpdates());
+  const staggerRows = consumeSurfaceEntry("updates");
 
   return (
     <Show keyed when={updates()}>
@@ -53,8 +55,12 @@ function UpdatesListScreen() {
               <For each={items}>
                 {(update, index) => (
                   <li
-                    class="widget-stagger"
-                    style={{ "--stagger": Math.min(index(), 6) }}
+                    class={staggerRows ? "widget-stagger" : undefined}
+                    style={
+                      staggerRows
+                        ? { "--stagger": Math.min(index(), 6) }
+                        : undefined
+                    }
                   >
                     <UpdateCard update={update} />
                   </li>

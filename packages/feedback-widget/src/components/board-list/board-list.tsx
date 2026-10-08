@@ -1,14 +1,18 @@
 import { For, Show } from "solid-js";
 
 import type { Board } from "../../lib/boards";
+import { consumeSurfaceEntry } from "../../lib/motion";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
 import { BoardCard } from "./board-card";
 
 /**
  * The feedback surface's root: one row per public board. The stagger index is
- * capped so a long list does not make its last row wait on its first.
+ * capped so a long list does not make its last row wait on its first, and the
+ * cascade runs only on the surface's first entry in this widget document.
  */
 export function BoardList(props: { boards: readonly Board[] }) {
+  const staggerRows = consumeSurfaceEntry("feedback");
+
   return (
     <div class="p-6">
       <header>
@@ -35,8 +39,12 @@ export function BoardList(props: { boards: readonly Board[] }) {
           <For each={props.boards}>
             {(board, index) => (
               <li
-                class="widget-stagger"
-                style={{ "--stagger": Math.min(index(), 6) }}
+                class={staggerRows ? "widget-stagger" : undefined}
+                style={
+                  staggerRows
+                    ? { "--stagger": Math.min(index(), 6) }
+                    : undefined
+                }
               >
                 <BoardCard board={board} />
               </li>
