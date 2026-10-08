@@ -41,7 +41,7 @@ import {
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import * as dayjs from "@feeblo/utils/dayjs";
-import { isPlainObject, isString } from "@feeblo/utils/runtime-kind";
+import { hasWindow, isPlainObject, isString } from "@feeblo/utils/runtime-kind";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
@@ -133,6 +133,64 @@ const downloadImportTemplate = () => {
   link.href = url;
   link.click();
   URL.revokeObjectURL(url);
+};
+
+/**
+ * The base the file endpoints hang off. In dev the injected API_URL is the
+ * proxy base ("/api") and must become the page origin before the full
+ * `/api/...` path is appended, the same rule `auth-client.ts` applies; an
+ * absolute production API_URL passes through unchanged.
+ */
+const resolveApiBase = (apiUrl: string): string =>
+  apiUrl.startsWith("/") && hasWindow() ? window.location.origin : apiUrl;
+
+/**
+ * The message an error envelope carries, when it is one. The dashboard HTTP
+ * API answers a non-2xx with the tagged error's fields, so `message` is the
+ * server's explanation whenever the failure was one it anticipated.
+ */
+const errorEnvelopeMessage = async (
+  response: Response
+): Promise<string | null> => {
+  const payload: unknown = await response.json().catch(() => null);
+  return isPlainObject(payload) &&
+    Predicate.hasProperty(payload, "message") &&
+    isString(payload.message)
+    ? payload.message
+    : null;
+};
+
+/**
+ * The server's download name when the response exposes it. A cross-origin
+ * response hides `Content-Disposition` unless the CORS policy lists it, so the
+ * caller falls back to the same slug-and-date shape `streamBoardPostCsv`
+ * builds.
+ */
+const fileNameFromContentDisposition = (
+  header: string | null
+): string | null => {
+  if (header === null) {
+    return null;
+  }
+  const encoded = /filename\*=UTF-8''([^;]+)/iu.exec(header)?.[1];
+  if (encoded !== undefined) {
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      return null;
+    }
+  }
+  return /filename="([^"]+)"/iu.exec(header)?.[1] ?? null;
+};
+
+/** Matches the export's server-side name: `<board-slug>-posts-<UTC date>.csv`. */
+const fallbackExportFileName = (
+  boards: readonly DataTransferBoard[],
+  boardId: string
+): string => {
+  const slug =
+    boards.find((board) => board.id === boardId)?.slug ?? "board-posts";
+  return `${slug}-posts-${new Date().toISOString().slice(0, 10)}.csv`;
 };
 
 /**
@@ -325,24 +383,13 @@ function ImportCard({
   readonly onSelectJob: (jobId: string) => void;
   readonly organizationId: string;
 }) {
-  const apiUrl = getRuntimePublicEnv().apiUrl;
+  const apiUrl = resolveApiBase(getRuntimePublicEnv().apiUrl);
   const [boardId, setBoardId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [pendingJob, setPendingJob] = useState<TDataImportJobSummary | null>(
     null
   );
-
-  const messageFromResponse = async (
-    response: Response
-  ): Promise<string | null> => {
-    const payload: unknown = await response.json().catch(() => null);
-    return isPlainObject(payload) &&
-      Predicate.hasProperty(payload, "message") &&
-      isString(payload.message)
-      ? payload.message
-      : null;
-  };
 
   const handleUpload = async () => {
     if (file === null || boardId === "") {
@@ -366,7 +413,7 @@ function ImportCard({
         const title =
           response.status === 409
             ? m.grand_plain_moose()
-            : ((await messageFromResponse(response)) ?? m.solid_calm_cub());
+            : ((await errorEnvelopeMessage(response)) ?? m.solid_calm_cub());
         toastManager.add({ title, type: "error" });
         return;
       }
@@ -539,21 +586,50 @@ function ImportCard({
 
 /** One board out of the workspace, as CSV, through the HTTP download route. */
 function ExportCard({ organizationId }: { readonly organizationId: string }) {
-  const apiUrl = getRuntimePublicEnv().apiUrl;
+  const apiUrl = resolveApiBase(getRuntimePublicEnv().apiUrl);
+  const { boards } = useTransferBoards(organizationId);
   const [boardId, setBoardId] = useState("");
   const [includeArchived, setIncludeArchived] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (boardId === "") {
       return;
     }
-    const url = new URL(`${apiUrl}/api/data/export`);
-    url.searchParams.set("organizationId", organizationId);
-    url.searchParams.set("boardId", boardId);
-    if (includeArchived) {
-      url.searchParams.set("includeArchived", "true");
+    setIsExporting(true);
+    try {
+      const url = new URL(`${apiUrl}/api/data/export`);
+      url.searchParams.set("organizationId", organizationId);
+      url.searchParams.set("boardId", boardId);
+      if (includeArchived) {
+        url.searchParams.set("includeArchived", "true");
+      }
+      // A navigation would show the JSON error envelope (a 404, the row cap)
+      // as the page; reading the response here keeps a failure a toast and a
+      // success an in-page download.
+      const response = await fetch(url, { credentials: "include" });
+      if (!response.ok) {
+        toastManager.add({
+          title: (await errorEnvelopeMessage(response)) ?? m.sunny_kind_gecko(),
+          type: "error",
+        });
+        return;
+      }
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.download =
+        fileNameFromContentDisposition(
+          response.headers.get("Content-Disposition")
+        ) ?? fallbackExportFileName(boards, boardId);
+      link.href = objectUrl;
+      link.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      toastManager.add({ title: m.sunny_kind_gecko(), type: "error" });
+    } finally {
+      setIsExporting(false);
     }
-    window.location.assign(url.toString());
   };
 
   return (
@@ -564,6 +640,7 @@ function ExportCard({ organizationId }: { readonly organizationId: string }) {
       </CardHeader>
       <CardPanel className="flex flex-1 flex-col gap-4">
         <BoardPicker
+          disabled={isExporting}
           onChange={setBoardId}
           organizationId={organizationId}
           placeholder={m.swift_calm_bass()}
@@ -573,12 +650,20 @@ function ExportCard({ organizationId }: { readonly organizationId: string }) {
           <SwitchCardTitle>{m.lively_green_ibex()}</SwitchCardTitle>
           <SwitchCardInput
             checked={includeArchived}
+            disabled={isExporting}
             onCheckedChange={setIncludeArchived}
           />
         </SwitchCard>
       </CardPanel>
       <CardFooter>
-        <Button disabled={boardId === ""} onClick={handleExport} type="button">
+        <Button
+          disabled={boardId === ""}
+          loading={isExporting}
+          onClick={() => {
+            void handleExport();
+          }}
+          type="button"
+        >
           {m.merry_quiet_koi()}
         </Button>
       </CardFooter>
