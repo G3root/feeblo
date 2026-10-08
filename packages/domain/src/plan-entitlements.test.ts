@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getPlanFeatureRows, PLAN_ENTITLEMENTS } from "./plan-entitlements";
+import {
+  getPlanFeatureRows,
+  PAID_PLAN_KEYS,
+  PLAN_ENTITLEMENTS,
+} from "./plan-entitlements";
 
 describe("plan feature catalog", () => {
   it("excludes disabled free capabilities while retaining enabled features", () => {
@@ -98,5 +102,17 @@ describe("plan feature catalog", () => {
       { key: "feedbackBoards", label: "Unlimited Feedback Boards" },
       { key: "privilegedMembers", label: "Unlimited Admin Roles" },
     ]);
+  });
+
+  it("keeps the shared paid-plan list equal to every non-free key of PLAN_ENTITLEMENTS", () => {
+    // `PAID_PLAN_KEYS` is shared with `@feeblo/db/schema/billing`, which
+    // cannot import this package and therefore reads the literal from
+    // `@feeblo/domain-contracts/plan`. A plan added to `PLAN_ENTITLEMENTS`
+    // must be added there too, or SQL-level gating silently misses it.
+    expect([...PAID_PLAN_KEYS].sort()).toEqual(
+      Object.keys(PLAN_ENTITLEMENTS)
+        .filter((plan) => plan !== "free")
+        .sort()
+    );
   });
 });

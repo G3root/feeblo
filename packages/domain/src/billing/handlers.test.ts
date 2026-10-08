@@ -72,6 +72,7 @@ describe("BillingRpcHandlers", () => {
     });
   const PolarServiceTest = Layer.succeed(PolarService, {
     client: undefined,
+    target: "sandbox",
     webhookSecret: Option.none(),
     createCheckout: () =>
       Effect.succeed({ url: "https://sandbox.polar.sh/checkout" }),
@@ -80,7 +81,9 @@ describe("BillingRpcHandlers", () => {
     revokeSubscription: () => Effect.void,
   });
   const TestLayer = Layer.mergeAll(
-    BillingRepository.layer,
+    BillingRepository.layer.pipe(Layer.provide(PolarServiceTest)),
+    // Exposed as well as provided: the revocation pass and the handlers read
+    // the service directly.
     PolarServiceTest
   ).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
 
