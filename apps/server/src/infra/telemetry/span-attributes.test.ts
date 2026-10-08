@@ -5,6 +5,7 @@ import * as Tracer from "effect/Tracer";
 import {
   allowedSpans,
   httpSpanAttributeAllowlist,
+  rootSpanNoise,
   spanAttributeAllowed,
 } from "./span-attributes";
 
@@ -20,8 +21,13 @@ const recordingTracer = () => {
   return { spans, tracer };
 };
 
-const withTracer = (tracer: Tracer.Tracer, sampleRate?: number) =>
-  Effect.provideService(Tracer.Tracer, allowedSpans(tracer, { sampleRate }));
+const withTracer = (
+  tracer: Tracer.Tracer,
+  options?: {
+    readonly sampleRate?: number | undefined;
+    readonly dropRootSpans?: ReadonlySet<string> | undefined;
+  }
+) => Effect.provideService(Tracer.Tracer, allowedSpans(tracer, options));
 
 describe("spanAttributeAllowed", () => {
   it("lets product attributes through", () => {
@@ -60,7 +66,7 @@ describe("allowedSpans", () => {
             "url.query": "token=secret",
           },
         }),
-        withTracer(tracer, 1)
+        withTracer(tracer, { sampleRate: 1 })
       );
 
       const attributes = spans[0]?.attributes;
@@ -80,14 +86,14 @@ describe("allowedSpans", () => {
       const dropped = recordingTracer();
       yield* Effect.void.pipe(
         Effect.withSpan("root"),
-        withTracer(dropped.tracer, 0)
+        withTracer(dropped.tracer, { sampleRate: 0 })
       );
       expect(dropped.spans[0]?.sampled).toBe(false);
 
       const kept = recordingTracer();
       yield* Effect.void.pipe(
         Effect.withSpan("root"),
-        withTracer(kept.tracer, 1)
+        withTracer(kept.tracer, { sampleRate: 1 })
       );
       expect(kept.spans[0]?.sampled).toBe(true);
     })
@@ -99,9 +105,55 @@ describe("allowedSpans", () => {
       yield* Effect.void.pipe(
         Effect.withSpan("child"),
         Effect.withSpan("root", { sampled: false }),
-        withTracer(tracer, 1)
+        withTracer(tracer, { sampleRate: 1 })
       );
       expect(spans.map((span) => span.sampled)).toEqual([false, false]);
+    })
+  );
+
+  it.effect("drops a parentless span named as library noise", () =>
+    Effect.gen(function* () {
+      for (const name of rootSpanNoise) {
+        const { spans, tracer } = recordingTracer();
+        yield* Effect.void.pipe(
+          Effect.withSpan(name),
+          withTracer(tracer, { sampleRate: 1 })
+        );
+        expect(spans[0]?.sampled).toBe(false);
+      }
+    })
+  );
+
+  it.effect("keeps a SQL span that hangs from a request", () =>
+    Effect.gen(function* () {
+      const { spans, tracer } = recordingTracer();
+      yield* Effect.void.pipe(
+        Effect.withSpan("sql.execute"),
+        Effect.withSpan("http.server.request"),
+        withTracer(tracer, { sampleRate: 1 })
+      );
+      expect(spans.map((span) => span.sampled)).toEqual([true, true]);
+    })
+  );
+
+  it.effect("drops only the configured root names", () =>
+    Effect.gen(function* () {
+      const { spans, tracer } = recordingTracer();
+      yield* Effect.void.pipe(
+        Effect.withSpan("custom.noise"),
+        withTracer(tracer, {
+          sampleRate: 1,
+          dropRootSpans: new Set(["custom.noise"]),
+        })
+      );
+      yield* Effect.void.pipe(
+        Effect.withSpan("sql.execute"),
+        withTracer(tracer, {
+          sampleRate: 1,
+          dropRootSpans: new Set(["custom.noise"]),
+        })
+      );
+      expect(spans.map((span) => span.sampled)).toEqual([false, true]);
     })
   );
 });

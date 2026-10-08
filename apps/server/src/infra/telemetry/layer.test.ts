@@ -57,6 +57,7 @@ it.live("exports a span to the configured OTLP endpoint", () =>
   withCollector((url, requests) =>
     Effect.gen(function* () {
       const layer = telemetryLayer({
+        dropRootSpans: true,
         environment: "test",
         service: "feeblo-test",
         traces: { url: `${url}/v1/traces` },
