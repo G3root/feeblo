@@ -257,7 +257,13 @@ const makeBillingRepository = Effect.gen(function* () {
           // every subscription created before it would regress to
           // log-and-acknowledge here, re-opening the missed-redelivery bug.
           // The check does not separate two Feeblo deployments sharing one
-          // Polar org and token — that boundary is the webhook secret.
+          // Polar org: the secret authenticates the org, not the deployment,
+          // and the checksum proves the scheme, not the writer. Tenancy
+          // isolation — one Polar org per deployment, no other actor writing
+          // legid workspace ids into metadata.org — is an operational
+          // invariant of this path (ADR 0014); a shared org is unsupported
+          // here, and the stamped-identifier check is the escalation path
+          // if sharing ever becomes a requirement.
           // Anything failing verification could be an operator-stamped or
           // foreign subscription; touching it could revoke a subscription the
           // operator created directly in Polar, so it is only logged.
