@@ -26,7 +26,16 @@ COPY --from=prepare /app/out/full/ .
 
 ENV NODE_ENV=production
 
-RUN pnpm turbo build
+# `pnpm turbo` re-verifies and reinstalls before running the command, the
+# turbo CLI shim silently falls back to `npm install` when its native
+# `@turbo/*` binary is missing, and the TUI writes nothing to a non-TTY log.
+# Each can hang the build with no output (publish-images run 37678508391 sat
+# 45 minutes). Run the local binary directly, against the `out/json` install
+# that already happened, and bound the step so a stall fails in 15 minutes
+# instead of 45.
+RUN echo "verify-deps-before-run=false" > .npmrc
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    TURBO_TELEMETRY_DISABLED=1 timeout -k 30 900 ./node_modules/.bin/turbo build --ui=stream
 
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
