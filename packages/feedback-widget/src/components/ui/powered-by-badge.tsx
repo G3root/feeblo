@@ -9,7 +9,7 @@ export function PoweredByBadge() {
         target="_blank"
       >
         Powered by{" "}
-        <span class="animate-gradient from-primary/60 via-primary to-primary/60 bg-gradient-to-r bg-[length:200%_auto] bg-clip-text font-semibold text-transparent">
+        <span class="from-primary/60 via-primary to-primary/60 bg-gradient-to-r bg-clip-text font-semibold text-transparent">
           Feeblo
         </span>
       </a>
