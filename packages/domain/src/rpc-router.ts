@@ -14,6 +14,7 @@ import { CommentReactionRpcHandlers } from "./comment-reaction/handlers";
 import { CommentRpcHandlers } from "./comments/handlers";
 import { CompanyRpcHandlers } from "./company/handlers";
 import { ContactRpcHandlers } from "./contact/handlers";
+import { DataTransferRpcHandlers } from "./data-transfer/handlers";
 import { EmailSubscriptionRpcHandlers } from "./email-subscription/handlers";
 import { ExternalResourceRpcHandlers } from "./integration/external-resource/handlers";
 import { JwtSecretRpcHandlers } from "./jwt-secret/handlers";
@@ -74,6 +75,7 @@ export const RpcHandlerRegistrations = {
   CommentReaction: CommentReactionRpcHandlers,
   Comment: CommentRpcHandlers,
   Company: CompanyRpcHandlers,
+  DataTransfer: DataTransferRpcHandlers,
   Site: SiteRpcHandlers,
   Tag: TagRpcHandlers,
   Upvote: UpvoteRpcHandlers,

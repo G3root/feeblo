@@ -2,6 +2,7 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
 
 import { AuthApiLive } from "../auth/api-live";
+import { DataTransferApiLive } from "../data-transfer/api-live";
 import { EmailSubscriptionApiLive } from "../email-subscription/api-live";
 import { MediaApiLive } from "../media/api-live";
 import { OrganizationApiLive } from "../organization/api-live";
@@ -14,6 +15,7 @@ export const HttpRoute = HttpApiBuilder.layer(Api, {
   openapiPath: "/docs/openapi.json",
 }).pipe(
   Layer.provide(AuthApiLive),
+  Layer.provide(DataTransferApiLive),
   Layer.provide(EmailSubscriptionApiLive),
   Layer.provide(MediaApiLive),
   Layer.provide(OrganizationApiLive),

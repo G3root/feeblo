@@ -144,34 +144,42 @@ export interface PostEmbeddingJob {
   readonly title: string;
 }
 
-const generatePostEmbedding = Effect.fn("PostEmbedding.generate")(function* (
-  payload: Omit<PostEmbeddingJob, "embeddingService">
-) {
-  const db = yield* Database.Database;
-  const embeddings = yield* PostEmbeddingService;
-  const embedding = yield* embeddings.embed(postEmbeddingInput(payload));
+/**
+ * Generates and stores a post's search embedding once.
+ *
+ * Not forked: the caller owns the lifetime and the concurrency. An ordinary
+ * create uses {@link schedulePostEmbeddingBestEffort}, which detaches the job;
+ * a bulk import uses this one through a bounded pass, because 20,000 detached
+ * jobs at once is a stampede rather than background work.
+ */
+export const generatePostEmbedding = Effect.fn("PostEmbedding.generate")(
+  function* (payload: Omit<PostEmbeddingJob, "embeddingService">) {
+    const db = yield* Database.Database;
+    const embeddings = yield* PostEmbeddingService;
+    const embedding = yield* embeddings.embed(postEmbeddingInput(payload));
 
-  if (Option.isNone(embedding)) {
-    return;
+    if (Option.isNone(embedding)) {
+      return;
+    }
+
+    const now = yield* DateTime.nowAsDate;
+    yield* db
+      .update(schema.postTable)
+      .set({
+        embeddedAt: now,
+        embedding: [...embedding.value.vector],
+        embeddingModel: embedding.value.model,
+      })
+      .where(
+        and(
+          eq(schema.postTable.id, payload.postId),
+          eq(schema.postTable.organizationId, payload.organizationId),
+          eq(schema.postTable.title, payload.title),
+          eq(schema.postTable.content, payload.content)
+        )
+      );
   }
-
-  const now = yield* DateTime.nowAsDate;
-  yield* db
-    .update(schema.postTable)
-    .set({
-      embeddedAt: now,
-      embedding: [...embedding.value.vector],
-      embeddingModel: embedding.value.model,
-    })
-    .where(
-      and(
-        eq(schema.postTable.id, payload.postId),
-        eq(schema.postTable.organizationId, payload.organizationId),
-        eq(schema.postTable.title, payload.title),
-        eq(schema.postTable.content, payload.content)
-      )
-    );
-});
+);
 
 export const schedulePostEmbeddingBestEffort = ({
   embeddingService,

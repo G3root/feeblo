@@ -1,7 +1,7 @@
 import type { TPostActivityKind } from "@feeblo/domain-contracts/activity-kind";
 import type { TPostStatusType } from "@feeblo/domain-contracts/post-status-type";
 
-import { statusDisplayName } from "../../post-status/public-api/mappers";
+import { statusDisplayName } from "../../post-status/display-name";
 import { toPublicApiTag } from "../../tag/public-api/mappers";
 import type { PublicApiDetailedPost, PublicApiListedPost } from "./repository";
 import type {

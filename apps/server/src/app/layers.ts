@@ -4,6 +4,11 @@ import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
 import { AssetRepository } from "@feeblo/domain/asset/repository";
 import { BoardRepository } from "@feeblo/domain/board/repository";
+import {
+  DataImportWorkerLive,
+  runDataImportMaintenance,
+  runDataImportWorker,
+} from "@feeblo/domain/data-transfer/worker";
 import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
 import { EmailOutboxRepository } from "@feeblo/domain/email-outbox/repository";
 import { EmailProviderFeedbackConfig } from "@feeblo/domain/email-provider-feedback/config";
@@ -265,7 +270,7 @@ export const makeServiceLayers = ({
   const PostWrites = PostWriteService.layer.pipe(
     Layer.provide(PostWriteDependencies)
   );
-  return Layer.mergeAll(
+  const ServiceCore = Layer.mergeAll(
     workflowLayer,
     SiteRepository.layer,
     // The media-upload surfaces replace a singleton asset through the asset
@@ -371,4 +376,16 @@ export const makeServiceLayers = ({
     // a paging link.
     PublicApiConfig.layer
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
+
+  // The import worker and its retention sweep run for the layer's lifetime,
+  // inside the same built graph as the server: one `PostWriteService`, one
+  // optional fan-out set, one database. Providing `ServiceCore` by reference
+  // is what makes the two share it instead of building a second copy.
+  const DataImportWorkerLayer = Layer.effectDiscard(
+    Effect.gen(function* () {
+      yield* runDataImportMaintenance.pipe(Effect.forkScoped);
+      yield* runDataImportWorker().pipe(Effect.forkScoped);
+    })
+  ).pipe(Layer.provide(DataImportWorkerLive), Layer.provideMerge(ServiceCore));
+  return Layer.mergeAll(ServiceCore, DataImportWorkerLayer);
 };

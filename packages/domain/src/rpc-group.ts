@@ -10,6 +10,7 @@ import { CommentReactionRpcs } from "./comment-reaction/rpcs";
 import { CommentRpcs } from "./comments/rpcs";
 import { CompanyRpcs } from "./company/rpcs";
 import { ContactRpcs } from "./contact/rpcs";
+import { DataTransferRpcs } from "./data-transfer/rpcs";
 import { EmailSubscriptionRpcs } from "./email-subscription/rpcs";
 import { DiscordManagementRpcs } from "./integration/discord/rpcs";
 import { ExternalResourceRpcs } from "./integration/external-resource/rpcs";
@@ -69,6 +70,7 @@ export const RpcGroups = [
   ["CommentReaction", CommentReactionRpcs],
   ["Comment", CommentRpcs],
   ["Company", CompanyRpcs],
+  ["DataTransfer", DataTransferRpcs],
   ["Site", SiteRpcs],
   ["Tag", TagRpcs],
   ["Upvote", UpvoteRpcs],

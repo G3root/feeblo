@@ -10,6 +10,14 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Public portal**: The feedback-board and widget surface that is readable without a dashboard session. `*Public` in RPC names — `PostListPublic`, `PostGetPublic` — refers to this surface, not to anonymity and not to the Public API. _Avoid_: Public API, anonymous API
 
+### Data transfer
+
+**Export**: a workspace's posts — every board's, or one board's — rendered as a CSV file the workspace downloads. _Avoid_: download, dump, backup
+
+**Import job**: one staged CSV upload and its apply progress — the file it came from, the parsed row ledger, and what happened to every row until the job is finished or canceled. _Avoid_: upload, batch, migration
+
+**Row report**: one import job's per-row outcomes, keyed by the file's line number. _Avoid_: error log, results
+
 ### Integrations
 
 **Provider**: an external integration family. V1 implements the `webhook`, `slack`, and `discord` providers.

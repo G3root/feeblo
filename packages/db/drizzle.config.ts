@@ -8,6 +8,7 @@ dotenv.config({
 export default defineConfig({
   schema: [
     "./src/schema/auth.ts",
+    "./src/schema/data-transfer.ts",
     "./src/schema/feedback.ts",
     "./src/schema/integration.ts",
     "./src/schema/media.ts",

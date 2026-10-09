@@ -216,3 +216,13 @@ export const ExternalResourceCreateRequestId = makeId(
   "erc",
   { approximateLength }
 );
+
+/** Identifies one staged board CSV import and its apply progress. */
+export const DataImportJobId = makeId("data_import_job", "dij", {
+  approximateLength,
+});
+
+/** Identifies one staged CSV row inside an import job. */
+export const DataImportRowId = makeId("data_import_row", "dir", {
+  approximateLength,
+});
