@@ -11,7 +11,7 @@ import { useId, useRef } from "react";
 
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { useSite } from "~/hooks/use-site";
-import { siteCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
 
 export function SearchEngineIndexing({ canEdit }: { canEdit: boolean }) {
@@ -23,9 +23,12 @@ export function SearchEngineIndexing({ canEdit }: { canEdit: boolean }) {
     }
 
     try {
-      const tx = siteCollection.update(site.id, (draft) => {
-        draft.noIndex = value;
-      });
+      const tx = dashboardCollections.siteCollection.update(
+        site.id,
+        (draft) => {
+          draft.noIndex = value;
+        }
+      );
       await tx.isPersisted.promise;
       toastManager.add({
         title: "Search engine visibility updated",
@@ -82,9 +85,12 @@ export function PublicPublicSiteNameField({ canEdit }: { canEdit: boolean }) {
     }
 
     try {
-      const tx = siteCollection.update(site?.id, (draft) => {
-        draft.name = siteName;
-      });
+      const tx = dashboardCollections.siteCollection.update(
+        site?.id,
+        (draft) => {
+          draft.name = siteName;
+        }
+      );
       await tx.isPersisted.promise;
       toastManager.add({
         title: "Site name updated successfully",
@@ -136,7 +142,7 @@ export function HidePoweredByBranding({
           hidePoweredBy: value,
         })
       );
-      await siteCollection.utils.refetch();
+      await dashboardCollections.siteCollection.utils.refetch();
       toastManager.add({
         title: "Branding updated successfully",
         type: "success",

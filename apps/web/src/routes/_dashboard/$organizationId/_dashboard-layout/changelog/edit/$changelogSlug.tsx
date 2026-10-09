@@ -32,14 +32,7 @@ import {
   ChangelogDeleteDialogProvider,
   ChangelogMoveToDraftDialogProvider,
 } from "~/features/changelog/dialog-stores";
-import {
-  changelogCategoryCollection,
-  changelogCategoryLinkCollection,
-  changelogCollection,
-  changelogPostCollection,
-  postCollection,
-  postStatusCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute(
@@ -47,12 +40,12 @@ export const Route = createFileRoute(
 )({
   beforeLoad: async () => {
     await Promise.all([
-      changelogCollection.preload(),
-      changelogPostCollection.preload(),
-      postCollection.preload(),
-      postStatusCollection.preload(),
-      changelogCategoryCollection.preload(),
-      changelogCategoryLinkCollection.preload(),
+      dashboardCollections.changelogCollection.preload(),
+      dashboardCollections.changelogPostCollection.preload(),
+      dashboardCollections.postCollection.preload(),
+      dashboardCollections.postStatusCollection.preload(),
+      dashboardCollections.changelogCategoryCollection.preload(),
+      dashboardCollections.changelogCategoryLinkCollection.preload(),
     ]);
   },
   component: RouteComponent,

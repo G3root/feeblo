@@ -43,11 +43,7 @@ import {
   formatCustomAttributeValue,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useEntitlements } from "~/hooks/use-entitlements";
-import {
-  companyAttributeDefinitionCollection,
-  companyAttributeValueCollection,
-  companyCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute(
@@ -56,9 +52,9 @@ export const Route = createFileRoute(
   component: RouteComponent,
   beforeLoad: async () => {
     await Promise.all([
-      companyCollection.preload(),
-      companyAttributeDefinitionCollection.preload(),
-      companyAttributeValueCollection.preload(),
+      dashboardCollections.companyCollection.preload(),
+      dashboardCollections.companyAttributeDefinitionCollection.preload(),
+      dashboardCollections.companyAttributeValueCollection.preload(),
     ]);
     return null;
   },

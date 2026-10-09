@@ -37,7 +37,7 @@ import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePlan } from "~/hooks/use-plan";
 import { usePlanCatalog } from "~/hooks/use-plan-catalog";
-import { workspacePlanCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/settings/billing"
@@ -55,7 +55,7 @@ export const Route = createFileRoute(
       session !== null &&
       hasPermission(params.organizationId, "billing.update")(session)
     ) {
-      await workspacePlanCollection.preload();
+      await dashboardCollections.workspacePlanCollection.preload();
     }
     return null;
   },
@@ -107,7 +107,7 @@ function BillingSettingsContent({
     let attempts = 0;
     const timer = window.setInterval(() => {
       attempts += 1;
-      workspacePlanCollection.utils
+      dashboardCollections.workspacePlanCollection.utils
         // `throwOnError` is what makes the catch reachable: without it the
         // refetch resolves with the error in the result and the alert would
         // stay on "pending" through a network failure.
@@ -127,7 +127,9 @@ function BillingSettingsContent({
   const refreshCheckoutConfirmation = async () => {
     setConfirmationStatus("pending");
     try {
-      await workspacePlanCollection.utils.refetch({ throwOnError: true });
+      await dashboardCollections.workspacePlanCollection.utils.refetch({
+        throwOnError: true,
+      });
       setConfirmationStatus("delayed");
     } catch {
       setConfirmationStatus("error");

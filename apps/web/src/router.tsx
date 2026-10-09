@@ -1,17 +1,12 @@
-import {
-  BOARD_QUERY_CLIENT_DEPENDENCY,
-  BOARD_SCOPE_DEPENDENCY,
-  createBoardScope,
-} from "@feeblo/public-feature-board/board-scope";
 import { DbClient } from "@tanstack/react-db";
 import type { QueryClient } from "@tanstack/react-query";
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { routerWithDbClient } from "@tanstack/react-router-with-db";
 import { createIsomorphicFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
 
 import { DashboardPendingShell } from "./dashboard/components/dashboard-pending-shell";
 import { getContext } from "./dashboard/integrations/tanstack-query/root-provider";
+import { getDbClient } from "./lib/db-client";
 import {
   createPublicBoardRewrite,
   type PublicBoardRewrite,
@@ -33,24 +28,6 @@ const getRootDomain = createIsomorphicFn()
   })
   .server(() => process.env.APP_ROOT_DOMAIN ?? "");
 
-/**
- * The current-pathname accessor for the public board's slug scope.
- *
- * The board's collections resolve "which post/changelog entry am I on" from the
- * URL, because their query keys are built lazily (from a subset request, not
- * from a route). The browser reads the live location, since one client spans
- * navigations; the server *captures* the request's pathname while the router is
- * being built, because scope lookups also run after the render (subset
- * unloading, collection cleanup) where no request context exists — and it is
- * the visitor's public spelling, which is what `postSlugFromPath` expects.
- */
-const getBoardPathname = createIsomorphicFn()
-  .client(() => () => window.location.pathname)
-  .server(() => {
-    const { pathname } = new URL(getRequest().url);
-    return () => pathname;
-  });
-
 export interface RouterContext {
   readonly queryClient: QueryClient;
   readonly dbClient: DbClient;
@@ -62,12 +39,9 @@ export function getRouter() {
   // One DB client per request (server) or per document (browser). Collection
   // descriptors are module-level, but every collection they materialize is
   // owned by this client, which is what keeps a Worker isolate from leaking
-  // one board's rows into another's render.
-  const boardScope = createBoardScope({ pathname: getBoardPathname() });
-  const dbClient = new DbClient({
-    [BOARD_QUERY_CLIENT_DEPENDENCY]: queryClient,
-    [BOARD_SCOPE_DEPENDENCY]: boardScope,
-  });
+  // one board's rows into another's render. The dashboard's
+  // `dashboardCollections` accessor materializes through the same instance.
+  const dbClient = getDbClient(() => queryClient);
 
   const router = createTanStackRouter({
     routeTree,

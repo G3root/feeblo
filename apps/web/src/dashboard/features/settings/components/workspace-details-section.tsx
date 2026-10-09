@@ -9,10 +9,7 @@ import { useId, useRef } from "react";
 import { SettingsAvatarControl } from "~/features/settings/components/settings-avatar-control";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import {
-  membershipCollection,
-  organizationCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 export function WorkspaceDetailsSection() {
   const organizationId = useOrganizationId();
@@ -21,9 +18,9 @@ export function WorkspaceDetailsSection() {
   const organizationQuery = useLiveQuery({
     query: (q) =>
       q
-        .from({ membership: membershipCollection })
+        .from({ membership: dashboardCollections.membershipCollection })
         .join(
-          { organization: organizationCollection },
+          { organization: dashboardCollections.organizationCollection },
           ({ membership, organization }) =>
             eq(membership.organizationId, organization.id)
         )
@@ -107,9 +104,12 @@ function WorkspaceNameField({
     }
 
     try {
-      const tx = organizationCollection.update(organizationId, (draft) => {
-        draft.name = name;
-      });
+      const tx = dashboardCollections.organizationCollection.update(
+        organizationId,
+        (draft) => {
+          draft.name = name;
+        }
+      );
       await tx.isPersisted.promise;
       trackEvent("org_renamed", { success: true });
       toastManager.add({
@@ -174,7 +174,7 @@ function WorkspaceLogoButton({
         throw new Error("Failed to upload workspace logo");
       }
 
-      await organizationCollection.utils.refetch();
+      await dashboardCollections.organizationCollection.utils.refetch();
       trackEvent("org_logo_updated", { action: "uploaded", success: true });
       toastManager.add({ title: "Workspace logo updated", type: "success" });
     } catch (error) {
@@ -195,9 +195,12 @@ function WorkspaceLogoButton({
       name={name}
       onRemove={async () => {
         try {
-          const tx = organizationCollection.update(organizationId, (draft) => {
-            draft.logo = null;
-          });
+          const tx = dashboardCollections.organizationCollection.update(
+            organizationId,
+            (draft) => {
+              draft.logo = null;
+            }
+          );
           await tx.isPersisted.promise;
           trackEvent("org_logo_updated", { action: "removed", success: true });
         } catch (error) {

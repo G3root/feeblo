@@ -6,7 +6,7 @@ import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useState } from "react";
 
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { postStatusCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 import { roadmapFormOpts } from "../shared-form";
 import {
@@ -42,7 +42,7 @@ const RoadmapColumnsSection = withForm({
     const { data: statuses } = useLiveQuery({
       query: (q) =>
         q
-          .from({ postStatus: postStatusCollection })
+          .from({ postStatus: dashboardCollections.postStatusCollection })
           .where(({ postStatus }) =>
             eq(postStatus.organizationId, organizationId)
           )

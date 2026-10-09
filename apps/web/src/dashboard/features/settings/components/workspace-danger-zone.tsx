@@ -4,10 +4,7 @@ import { eq, useLiveQuery } from "@tanstack/react-db";
 import { DeleteWorkspaceDialog } from "~/features/settings/components/delete-workspace-dialog";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import {
-  membershipCollection,
-  organizationCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 /**
  * The workspace half of data erasure: an owner can delete a workspace (and
@@ -27,9 +24,9 @@ export function DeleteWorkspaceSection() {
   const organizationQuery = useLiveQuery({
     query: (q) =>
       q
-        .from({ membership: membershipCollection })
+        .from({ membership: dashboardCollections.membershipCollection })
         .join(
-          { organization: organizationCollection },
+          { organization: dashboardCollections.organizationCollection },
           ({ membership, organization }) =>
             eq(membership.organizationId, organization.id)
         )

@@ -2,7 +2,7 @@ import { isPrivilegedRole } from "@feeblo/permissions";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 
-import { invitationsCollection, membersCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 import { useEntitlements } from "./use-entitlements";
 import { useOrganizationId } from "./use-organization-id";
@@ -18,7 +18,7 @@ export const usePrivilegedMemberLimit = () => {
   const membersQuery = useLiveQuery({
     query: (q) =>
       q
-        .from({ member: membersCollection })
+        .from({ member: dashboardCollections.membersCollection })
         .where(({ member }) => eq(member.organizationId, organizationId)),
   });
 
@@ -28,7 +28,7 @@ export const usePrivilegedMemberLimit = () => {
         return undefined;
       }
       return q
-        .from({ invitation: invitationsCollection })
+        .from({ invitation: dashboardCollections.invitationsCollection })
         .where(({ invitation }) =>
           and(
             eq(invitation.organizationId, organizationId),

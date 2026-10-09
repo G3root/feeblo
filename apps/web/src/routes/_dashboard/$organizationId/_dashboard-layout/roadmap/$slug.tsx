@@ -1,13 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { DashboardRoadmapDetailView } from "~/features/roadmap/components/dashboard-roadmap-view";
-import {
-  boardCollection,
-  postCollection,
-  postStatusCollection,
-  roadmapCollection,
-  roadmapColumnCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/_dashboard-layout/roadmap/$slug"
@@ -15,11 +9,11 @@ export const Route = createFileRoute(
   component: RouteComponent,
   beforeLoad: async () => {
     await Promise.all([
-      boardCollection.preload(),
-      postCollection.preload(),
-      postStatusCollection.preload(),
-      roadmapCollection.preload(),
-      roadmapColumnCollection.preload(),
+      dashboardCollections.boardCollection.preload(),
+      dashboardCollections.postCollection.preload(),
+      dashboardCollections.postStatusCollection.preload(),
+      dashboardCollections.roadmapCollection.preload(),
+      dashboardCollections.roadmapColumnCollection.preload(),
     ]);
     return null;
   },
