@@ -11,6 +11,11 @@ import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
+import {
+  type Surface,
+  type SurfaceConfig,
+  withSurfaceRateLimit,
+} from "../surface";
 import { UserRepository } from "../user/repository";
 import { addVoteOnBehalf, removeVoteOnBehalf } from "./on-behalf";
 import { UpvotePolicy } from "./policies";
@@ -26,6 +31,55 @@ import type {
 export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* UpvoteRepository;
   const upvotePolicy = yield* UpvotePolicy;
+
+  // -- Surface-parameterized writes --
+  //
+  // The policy's `source` selects the visibility rule: the dashboard checks
+  // `isUnlocked`, the public portal `isUnlockedPublic`.
+
+  const toggleWrite = {
+    dashboard: {
+      rateLimit: undefined,
+      policy: (args: TUpvoteToggle) =>
+        upvotePolicy.canToggle({
+          organizationId: args.organizationId,
+          postId: args.postId,
+          source: "dashboard",
+        }),
+    },
+    public: {
+      rateLimit: "write",
+      policy: (args: TUpvoteToggle) =>
+        upvotePolicy.canToggle({
+          organizationId: args.organizationId,
+          postId: args.postId,
+          source: "public",
+        }),
+    },
+  } satisfies Record<Surface, SurfaceConfig<TUpvoteToggle>>;
+
+  const toggleVote = <
+    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
+  >(
+    surface: Surface,
+    level: Level,
+    args: TUpvoteToggle
+  ) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+
+      return yield* transaction(
+        repository.toggle({
+          organizationId: args.organizationId,
+          postId: args.postId,
+          userId: session.session.userId,
+        })
+      );
+    }).pipe(
+      Policy.withPolicy(toggleWrite[surface].policy(args)),
+      withRemapDbErrors("Upvote", "update"),
+      withSurfaceRateLimit({ level, operation: "UpvoteToggle", surface })
+    );
 
   return {
     UpvoteList: (args: TUpvoteList) =>
@@ -43,27 +97,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Upvote", "select")
         ),
     UpvoteToggle: (args: TUpvoteToggle) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        const result = yield* transaction(
-          repository.toggle({
-            organizationId: args.organizationId,
-            postId: args.postId,
-            userId: session.session.userId,
-          })
-        );
-
-        return result;
-      }).pipe(
-        Policy.withPolicy(
-          upvotePolicy.canToggle({
-            organizationId: args.organizationId,
-            postId: args.postId,
-            source: "dashboard",
-          })
-        ),
-        withRemapDbErrors("Upvote", "update")
-      ),
+      toggleVote("dashboard", toggleWrite.dashboard.rateLimit, args),
     UpvoteAddOnBehalf: (args: TUpvoteAddOnBehalf) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
@@ -151,33 +185,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Upvote", "select")
       ),
     UpvoteTogglePublic: (args: TUpvoteToggle) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        // Public visibility is enforced via `upvotePolicy.canToggle` with
-        // `source: "public"` (which checks `isUnlockedPublic` internally).
-        const result = yield* transaction(
-          repository.toggle({
-            organizationId: args.organizationId,
-            postId: args.postId,
-            userId: session.session.userId,
-          })
-        );
-
-        return result;
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "UpvoteTogglePublic",
-          level: "write",
-        }),
-        Policy.withPolicy(
-          upvotePolicy.canToggle({
-            organizationId: args.organizationId,
-            postId: args.postId,
-            source: "public",
-          })
-        ),
-        withRemapDbErrors("Upvote", "update")
-      ),
+      toggleVote("public", toggleWrite.public.rateLimit, args),
   };
 });
 
