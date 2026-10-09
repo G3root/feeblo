@@ -12,6 +12,7 @@ import { SesEmailFeedbackWebhook } from "@feeblo/domain/email-provider-feedback/
 import { EmailSubscriptionRepository } from "@feeblo/domain/email-subscription/repository";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { ResolvePrincipalService } from "@feeblo/domain/identity/service";
+import { ChatFeedbackServiceLive } from "@feeblo/domain/integration/chat/feedback-service";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import {
@@ -36,7 +37,6 @@ import { UserRepository } from "@feeblo/domain/user/repository";
 import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
 import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
-import { DiscordFeedbackServiceLive } from "@feeblo/integration-discord/discord-feedback-service";
 import { DiscordUserServiceLive } from "@feeblo/integration-discord/discord-user-service";
 import { DiscordInboundServiceLive } from "@feeblo/integration-discord/inbound-live";
 import { DiscordManagementServiceLive } from "@feeblo/integration-discord/management-live";
@@ -50,7 +50,6 @@ import { makeGitHubProviderLive } from "@feeblo/integration-github/github-provid
 import { SlackInboundServiceLive } from "@feeblo/integration-slack/inbound-live";
 import { SlackManagementServiceLive } from "@feeblo/integration-slack/management-live";
 import { SLACK_OAUTH_SCOPES } from "@feeblo/integration-slack/manifest";
-import { SlackFeedbackServiceLive } from "@feeblo/integration-slack/slack-feedback-service";
 import { SlackUserServiceLive } from "@feeblo/integration-slack/slack-user-service";
 import type { Mailer } from "@feeblo/transactional/mailer";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
@@ -265,6 +264,14 @@ export const makeServiceLayers = ({
   const PostWrites = PostWriteService.layer.pipe(
     Layer.provide(PostWriteDependencies)
   );
+  // The inbound feedback service is one provider-neutral service: Slack and
+  // Discord both deliver a submission into the shared post write path, so the
+  // two inbound services require the same instance rather than each building
+  // its own copy of the write environment.
+  const ChatFeedback = ChatFeedbackServiceLive.pipe(
+    Layer.provide(PostStatusRepository.layer),
+    Layer.provide(PostWrites)
+  );
   return Layer.mergeAll(
     workflowLayer,
     SiteRepository.layer,
@@ -294,12 +301,7 @@ export const makeServiceLayers = ({
     SlackInboundServiceLive.pipe(
       Layer.provide(slackConfigLayer),
       Layer.provide(SlackUserServiceLive),
-      Layer.provide(
-        SlackFeedbackServiceLive.pipe(
-          Layer.provide(PostStatusRepository.layer),
-          Layer.provide(PostWrites)
-        )
-      ),
+      Layer.provide(ChatFeedback),
       Layer.provide(BoardRepository.layer),
       Layer.provide(EmailOutboxConfig.layer),
       Layer.provide(IntegrationEventRecorderLive),
@@ -313,12 +315,7 @@ export const makeServiceLayers = ({
     ),
     DiscordInboundServiceLive.pipe(
       Layer.provide(DiscordUserServiceLive),
-      Layer.provide(
-        DiscordFeedbackServiceLive.pipe(
-          Layer.provide(PostStatusRepository.layer),
-          Layer.provide(PostWrites)
-        )
-      ),
+      Layer.provide(ChatFeedback),
       Layer.provide(BoardRepository.layer),
       Layer.provide(EmailOutboxConfig.layer),
       Layer.provide(IntegrationEventRecorderLive),

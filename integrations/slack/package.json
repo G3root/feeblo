@@ -18,7 +18,6 @@
     "./rpc-handlers": "./src/slack-rpc-handlers.ts",
     "./routers": "./src/slack-routers.ts",
     "./signature": "./src/slack-signature.ts",
-    "./slack-feedback-service": "./src/slack-feedback-service.ts",
     "./slack-user-service": "./src/slack-user-service.ts"
   },
   "scripts": {

@@ -40,6 +40,10 @@ integrations/<provider>/src/
 
 Naming: factories are `make<CamelCaseName>`; Live-layer inputs are `<Name>Input`; router inputs `<Name>RoutersInput`. Export every public module in `package.json` `exports` with a `./<file-without-ext>` subpath.
 
+## Shared chat kernel
+
+`slack` and `discord` are one provider family (see `docs/adr/0016`). They share the provider-neutral kernel in `packages/domain/src/integration/chat/`: the management contract shape, the RPC authorization factory, the inbound feedback intake, the connection lookup/lock, the credential-decryption wrapper, the API-failure mapping, and the OAuth callback parser. A chat provider's `<provider>-management-shared.ts` binds the provider key, label, and credential shape; its `<provider>-rpc-handlers.ts` maps the shared handler record onto its own RPC method names. The protocol work — API client, signature verification, credential material, connection and channel services, payload schemas, routers, manifests, provider registration — stays in the provider package.
+
 ## Shared HTTP plumbing
 
 Header extraction, settings redirects, and the verified-inbound pipeline live once in `integration-core` (`./http-inbound`); provider routers compose them.

@@ -1,4 +1,5 @@
 import { Database } from "@feeblo/db";
+import { parseOAuthCallbackUrl } from "@feeblo/domain/integration/chat/oauth-callback";
 import { DiscordInboundService } from "@feeblo/domain/integration/discord/inbound-service";
 import { DiscordManagementService } from "@feeblo/domain/integration/discord/management-service";
 import {
@@ -28,7 +29,6 @@ import {
   discordInteractionsCapabilityKey,
   discordProviderKey,
 } from "./discord-manifest";
-import { parseDiscordOAuthCallbackUrl } from "./discord-oauth-callback";
 
 /**
  * Discord HTTP surface: the OAuth callback and the single interactions
@@ -118,9 +118,7 @@ export const makeDiscordOAuthCallbackRouter = (appUrl: string) =>
         Effect.gen(function* () {
           // request.url is the relative path (e.g.
           // /discord/oauth/callback?code=…); parse it without a base URL.
-          const { code, error, state } = parseDiscordOAuthCallbackUrl(
-            request.url
-          );
+          const { code, error, state } = parseOAuthCallbackUrl(request.url);
           if (error !== null) {
             return HttpServerResponse.redirect(
               settingsRedirect({

@@ -1,4 +1,5 @@
 import { Database } from "@feeblo/db";
+import { parseOAuthCallbackUrl } from "@feeblo/domain/integration/chat/oauth-callback";
 import { SlackInboundService } from "@feeblo/domain/integration/slack/inbound-service";
 import type { SlackInboundServiceContract } from "@feeblo/domain/integration/slack/inbound-service";
 import { SlackManagementService } from "@feeblo/domain/integration/slack/management-service";
@@ -26,7 +27,6 @@ import {
   slackMessageActionCapabilityKey,
   slackProviderKey,
 } from "./slack-manifest";
-import { parseSlackOAuthCallbackUrl } from "./slack-oauth-callback";
 
 /**
  * Slack HTTP surface: the OAuth callback, the `/feeblo` slash command, and
@@ -139,9 +139,7 @@ export const makeSlackOAuthCallbackRouter = (appUrl: string) =>
         Effect.gen(function* () {
           // request.url is the relative path (e.g.
           // /slack/oauth/callback?code=…); parse it without a base URL.
-          const { code, error, state } = parseSlackOAuthCallbackUrl(
-            request.url
-          );
+          const { code, error, state } = parseOAuthCallbackUrl(request.url);
           if (error !== null) {
             return HttpServerResponse.redirect(
               settingsRedirect({

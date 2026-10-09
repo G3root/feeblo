@@ -1,6 +1,6 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
-import type { SlackIntegrationError } from "@feeblo/domain/integration/slack/errors";
+import type { SlackConnectionServiceContract } from "@feeblo/domain/integration/slack/management-service";
 import type * as S from "@feeblo/domain/integration/slack/schema";
 import {
   BadRequestError,
@@ -62,29 +62,6 @@ const decodeSafeDisplayMetadata = (value: Schema.Json) =>
         })
     )
   );
-
-/**
- * OAuth connection lifecycle: installing a Slack workspace (connect start and
- * completion), listing connections, and disconnecting with credential erasure.
- */
-export interface SlackConnectionServiceContract {
-  readonly connectComplete: (input: {
-    readonly code: string;
-    readonly state: string;
-  }) => Effect.Effect<
-    { readonly organizationId: string },
-    SlackIntegrationError
-  >;
-  readonly connectStart: (
-    input: S.TSlackConnectStart
-  ) => Effect.Effect<S.TSlackConnectStarted, SlackIntegrationError>;
-  readonly disconnect: (
-    input: S.TSlackConnectionDisconnect
-  ) => Effect.Effect<void, SlackIntegrationError>;
-  readonly listConnections: (
-    input: S.TSlackConnectionList
-  ) => Effect.Effect<readonly S.TSlackConnection[], SlackIntegrationError>;
-}
 
 export class SlackConnectionService extends Context.Service<
   SlackConnectionService,

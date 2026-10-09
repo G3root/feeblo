@@ -1,5 +1,5 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
-import { DiscordInboundFailure } from "@feeblo/domain/integration/discord/errors";
+import { ChatInboundFailure } from "@feeblo/domain/integration/chat/errors";
 import { isUniqueViolation } from "@feeblo/domain/rpc-errors";
 import { UserId } from "@feeblo/id";
 import { truncate } from "@feeblo/utils/text";
@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 
 const SYNTHETIC_DISCORD_EMAIL_SUFFIX = "@discord.invalid";
 
@@ -24,7 +25,7 @@ export interface DiscordUserServiceContract {
     readonly displayName: string;
     readonly guildId: string;
     readonly userId: string;
-  }) => Effect.Effect<string, DiscordInboundFailure>;
+  }) => Effect.Effect<string, ChatInboundFailure>;
 }
 
 export class DiscordUserService extends Context.Service<
@@ -85,16 +86,16 @@ export const DiscordUserServiceLive: Layer.Layer<
           .where(eq(schema.userTable.email, syntheticEmail))
           .limit(1);
         if (winner === undefined) {
-          return yield* new DiscordInboundFailure({
+          return yield* new ChatInboundFailure({
             message: "Could not resolve the created Discord user",
           });
         }
         return winner.id;
       }).pipe(
         Effect.mapError((error) =>
-          error instanceof DiscordInboundFailure
+          Schema.is(ChatInboundFailure)(error)
             ? error
-            : new DiscordInboundFailure({
+            : new ChatInboundFailure({
                 message: "Could not resolve Discord user",
               })
         )

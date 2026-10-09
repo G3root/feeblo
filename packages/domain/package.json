@@ -187,6 +187,27 @@
     "./import-export/schema": {
       "default": "./src/import-export/schema.ts"
     },
+    "./integration/chat": {
+      "default": "./src/integration/chat/index.ts"
+    },
+    "./integration/chat/errors": {
+      "default": "./src/integration/chat/errors.ts"
+    },
+    "./integration/chat/feedback-service": {
+      "default": "./src/integration/chat/feedback-service.ts"
+    },
+    "./integration/chat/management-service": {
+      "default": "./src/integration/chat/management-service.ts"
+    },
+    "./integration/chat/management-shared": {
+      "default": "./src/integration/chat/management-shared.ts"
+    },
+    "./integration/chat/oauth-callback": {
+      "default": "./src/integration/chat/oauth-callback.ts"
+    },
+    "./integration/chat/rpc-handlers": {
+      "default": "./src/integration/chat/rpc-handlers.ts"
+    },
     "./integration/config": {
       "default": "./src/integration/config.ts"
     },
@@ -195,9 +216,6 @@
     },
     "./integration/discord/config": {
       "default": "./src/integration/discord/config.ts"
-    },
-    "./integration/discord/errors": {
-      "default": "./src/integration/discord/errors.ts"
     },
     "./integration/discord/inbound-service": {
       "default": "./src/integration/discord/inbound-service.ts"
@@ -276,9 +294,6 @@
     },
     "./integration/slack/config": {
       "default": "./src/integration/slack/config.ts"
-    },
-    "./integration/slack/errors": {
-      "default": "./src/integration/slack/errors.ts"
     },
     "./integration/slack/inbound-service": {
       "default": "./src/integration/slack/inbound-service.ts"

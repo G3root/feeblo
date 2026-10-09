@@ -1,5 +1,5 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
-import { SlackInboundFailure } from "@feeblo/domain/integration/slack/errors";
+import { ChatInboundFailure } from "@feeblo/domain/integration/chat/errors";
 import { UserId } from "@feeblo/id";
 import {
   makeSlackApiClient,
@@ -12,6 +12,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import type * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
 
 const SYNTHETIC_SLACK_EMAIL_SUFFIX = "@slack.invalid";
 
@@ -26,7 +27,7 @@ export interface SlackUserServiceContract {
     readonly organizationId: string;
     readonly slackTeamId: string;
     readonly slackUserId: string;
-  }) => Effect.Effect<string, SlackInboundFailure>;
+  }) => Effect.Effect<string, ChatInboundFailure>;
 }
 
 export class SlackUserService extends Context.Service<
@@ -135,9 +136,9 @@ export const makeSlackUserServiceLive = (
           return winner?.id ?? userId;
         }).pipe(
           Effect.mapError((error) =>
-            error instanceof SlackInboundFailure
+            Schema.is(ChatInboundFailure)(error)
               ? error
-              : new SlackInboundFailure({
+              : new ChatInboundFailure({
                   message: "Could not resolve Slack user",
                 })
           )
