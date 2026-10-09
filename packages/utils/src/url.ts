@@ -4,6 +4,23 @@ export function slugify(str: string) {
   return UrlSlugify(str, { lower: true });
 }
 
+/**
+ * A single DNS label usable as a public-board subdomain: 1–63 characters of
+ * lowercase letters, digits, and internal hyphens, with no leading or
+ * trailing hyphen.
+ *
+ * `slugify` preserves `.`, `@`, `_`, `:`, and `*`, so a name it produced can
+ * still not be a label. `evil@victim` builds `https://evil@victim.<root>`,
+ * whose parsed host is `victim.<root>` — another workspace's board — and
+ * `acme.corp` builds a multi-label host that the wildcard routing cannot
+ * serve. Anything that is going to be interpolated into a hostname is checked
+ * with this first.
+ */
+const SUBDOMAIN_LABEL_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
+export const isValidSubdomainLabel = (value: string): boolean =>
+  SUBDOMAIN_LABEL_PATTERN.test(value);
+
 interface ExtractSubdomainContext {
   rootDomain: string;
   url: string;

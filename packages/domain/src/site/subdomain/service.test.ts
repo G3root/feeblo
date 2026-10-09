@@ -2,7 +2,11 @@ import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
 import { ProfanityConfig } from "./config";
-import { ProfanityError, ReservedSubdomainError } from "./errors";
+import {
+  InvalidSubdomainError,
+  ProfanityError,
+  ReservedSubdomainError,
+} from "./errors";
 import { SubdomainValidationService } from "./service";
 
 type ConfigOverrides = {
@@ -41,6 +45,38 @@ describe("SubdomainValidationService", () => {
       const error = yield* Effect.flip(validate("app"));
       expect(error).toBeInstanceOf(ReservedSubdomainError);
       expect(error.message).toContain("reserved");
+    })
+  );
+
+  it.effect("rejects subdomains that are not single DNS labels", () =>
+    Effect.gen(function* () {
+      // `slugify` preserves every character these cases rely on, so each one
+      // can reach storage and would then be interpolated into a hostname:
+      // `evil@victim` parses as `victim.<root>` (userinfo confusion), and a
+      // dot produces an extra label.
+      for (const slug of [
+        "evil@victim",
+        "acme.corp",
+        "under_score",
+        "colon:port",
+        "star*label",
+        "leading-",
+        "-trailing",
+        "has space",
+        "a".repeat(64),
+      ]) {
+        const error = yield* Effect.flip(validate(slug));
+        expect(error).toBeInstanceOf(InvalidSubdomainError);
+      }
+    })
+  );
+
+  it.effect("accepts every valid DNS label shape", () =>
+    Effect.gen(function* () {
+      for (const slug of ["a", "ab", "my-awesome-workspace", "a".repeat(63)]) {
+        const result = yield* validate(slug);
+        expect(result.valid).toBe(true);
+      }
     })
   );
 

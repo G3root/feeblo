@@ -11,6 +11,7 @@ import {
   PostId,
   WorkspaceId,
 } from "@feeblo/id";
+import { HttpUrl } from "@feeblo/utils/http-url";
 import * as Schema from "effect/Schema";
 
 /** Safe linked-resource details rendered on a Feeblo post. */
@@ -20,7 +21,7 @@ export const PostExternalResourceLink = Schema.Struct({
   provider: IntegrationProviderKey,
   providerDisplayName: Schema.String,
   resourceType: IntegrationExternalResourceType,
-  remoteUrl: Schema.URLFromString,
+  remoteUrl: HttpUrl,
   displayKey: Schema.NullOr(Schema.String),
   title: Schema.NullOr(Schema.String),
   stateKey: Schema.NullOr(Schema.String),
@@ -45,7 +46,7 @@ export const ExternalResourceRecord = Schema.Struct({
   connectionId: IntegrationConnectionId.schema,
   resourceType: IntegrationExternalResourceType,
   remoteId: Schema.NonEmptyString,
-  remoteUrl: Schema.URLFromString,
+  remoteUrl: HttpUrl,
   displayKey: Schema.NullOr(Schema.String),
   title: Schema.NullOr(Schema.String),
   stateKey: Schema.NullOr(Schema.String),

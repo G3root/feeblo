@@ -7,6 +7,7 @@ import {
   UnauthorizedError,
 } from "../rpc-errors";
 import {
+  InvalidSubdomainError,
   ProfanityError,
   ReservedSubdomainError,
 } from "../site/subdomain/errors";
@@ -25,6 +26,7 @@ export const WorkspaceServiceErrors = Schema.Union([
   InternalServerError,
   PolicyDeniedError,
   FailedToCreateWorkspaceError,
+  InvalidSubdomainError,
   ProfanityError,
   ReservedSubdomainError,
 ]);
