@@ -71,14 +71,52 @@ const ProviderRpcLayer = Layer.mergeAll(
   ])
 );
 
-export const makePublicRouters = (
-  mailbox: Ref.Ref<TestMailerState> | undefined,
-  nodeEnv: string
-) => {
-  // E2E routers must never mount in production, even if E2E_TEST_MAILER
-  // provides a mailbox.
+/**
+ * Whether the test-only routers mount.
+ *
+ * Extracted so the rule is testable without building a route tree: an
+ * explicit route flag, a mailbox to serve, and an environment that is not
+ * production. The mailer flag alone must never be enough, because
+ * `/__e2e/emails` hands out every rendered email — including password-reset
+ * links and verification codes — to an unauthenticated caller.
+ */
+export const shouldMountE2eRoutes = ({
+  e2eRoutesEnabled,
+  hasMailbox,
+  nodeEnv,
+}: {
+  readonly e2eRoutesEnabled: boolean;
+  readonly hasMailbox: boolean;
+  readonly nodeEnv: string;
+}): boolean => e2eRoutesEnabled && hasMailbox && nodeEnv !== "production";
+
+export const makePublicRouters = ({
+  e2eRoutesEnabled,
+  mailbox: inputMailbox,
+  nodeEnv,
+}: {
+  /**
+   * Explicit opt-in for the test-only routes. Separate from
+   * `E2E_TEST_MAILER` on purpose: a deployment that only wanted the in-memory
+   * mailer must not also serve `/__e2e/emails`, `/__e2e/set-plan`, or
+   * `/__e2e/seed-roadmap` to the network.
+   */
+  readonly e2eRoutesEnabled: boolean;
+  readonly mailbox: Ref.Ref<TestMailerState> | undefined;
+  readonly nodeEnv: string;
+}) => {
+  // Two independent opt-ins plus the production gate: the mailer flag alone
+  // mounts nothing, and production never mounts them even if both are set
+  // (`ServerConfig` refuses to start with either in production).
+  const mailbox = shouldMountE2eRoutes({
+    e2eRoutesEnabled,
+    hasMailbox: inputMailbox !== undefined,
+    nodeEnv,
+  })
+    ? inputMailbox
+    : undefined;
   const RootRouterLive =
-    mailbox === undefined || nodeEnv === "production"
+    mailbox === undefined
       ? RootRouter
       : Layer.mergeAll(
           RootRouter,

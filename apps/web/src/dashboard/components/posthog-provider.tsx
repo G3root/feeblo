@@ -32,7 +32,14 @@ function ensurePostHog(): Promise<PostHogInstance | null> {
             disable_session_recording: false,
             session_recording: {
               maskAllInputs: true,
-              maskTextSelector: "[data-ph-mask]",
+              // The dashboard renders customer PII as ordinary text (contact
+              // and member emails, post bodies) and shows one-time
+              // credentials — API keys and webhook signing secrets — in a
+              // `<code>` block, so every text node is masked. Replays keep
+              // clicks, navigation, and layout, which is what they are for;
+              // `data-ph-block` stays available for elements that must not be
+              // recorded at all, and the credential blocks use it.
+              maskTextSelector: "*",
               blockSelector: "[data-ph-block]",
             },
           });

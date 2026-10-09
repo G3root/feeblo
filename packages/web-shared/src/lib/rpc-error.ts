@@ -47,6 +47,7 @@ const ALLOWED_USER_FACING_TAGS = new Set<string>([
   "OgImageRequestValidationError",
   "OgImageSiteNotFoundError",
   "OgImagePostNotFoundError",
+  "InvalidSubdomainError",
   "ProfanityError",
   "ReservedSubdomainError",
   "UploadLimitError",

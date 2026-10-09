@@ -1,4 +1,7 @@
-import { getReservedSubdomains } from "@feeblo/utils/url";
+import {
+  getReservedSubdomains,
+  isValidSubdomainLabel,
+} from "@feeblo/utils/url";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -6,19 +9,31 @@ import * as Layer from "effect/Layer";
 import leo from "leo-profanity";
 
 import { ProfanityConfig } from "./config";
-import { ProfanityError, ReservedSubdomainError } from "./errors";
+import {
+  InvalidSubdomainError,
+  ProfanityError,
+  ReservedSubdomainError,
+} from "./errors";
 
 export type SubdomainValidationResult = {
   readonly valid: true;
   readonly message: string;
 };
 
-export type SubdomainValidationError = ProfanityError | ReservedSubdomainError;
+export type SubdomainValidationError =
+  | InvalidSubdomainError
+  | ProfanityError
+  | ReservedSubdomainError;
 
 const validResult: SubdomainValidationResult = {
   valid: true,
   message: "Subdomain is valid",
 };
+
+const invalidError = (subdomain: string) =>
+  new InvalidSubdomainError({
+    message: `"${subdomain}" is not a valid subdomain. Use lowercase letters, numbers, and hyphens.`,
+  });
 
 const reservedError = (subdomain: string) =>
   new ReservedSubdomainError({
@@ -52,6 +67,13 @@ export class SubdomainValidationService extends Context.Service<SubdomainValidat
         never
       > => {
         const normalized = subdomain.toLowerCase();
+
+        // Before reserved and profanity: a value that is not a DNS label is
+        // rejected on its own terms, and it is the value that would be
+        // interpolated into a hostname if it were stored.
+        if (!isValidSubdomainLabel(normalized)) {
+          return Effect.fail(invalidError(subdomain));
+        }
 
         if (reservedSubdomains.includes(normalized)) {
           return Effect.fail(reservedError(subdomain));

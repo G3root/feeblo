@@ -14,6 +14,7 @@ import {
 } from "@feeblo/id";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 
 import { ExternalResourceServiceLive } from "./live";
@@ -209,6 +210,26 @@ describe("external resource service", () => {
           });
           expect(retried.reserved).toBe(true);
         })
+    );
+
+    it.effect("rejects a provider URL that is not http(s) at write time", () =>
+      Effect.gen(function* () {
+        const service = yield* ExternalResourceService;
+        const post = yield* seedPost("non-http");
+        const connection = yield* seedConnection(post.organizationId, "github");
+
+        const exit = yield* Effect.exit(
+          service.recordPostLink({
+            postId: post.postId,
+            resource: {
+              ...resource(post.organizationId, connection),
+              remoteUrl: new URL("javascript:alert(1)"),
+            },
+          })
+        );
+
+        expect(Exit.isFailure(exit)).toBe(true);
+      })
     );
   });
 });

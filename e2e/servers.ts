@@ -108,6 +108,7 @@ const serverEnvironment = (input: {
   AUTH_TRUSTED_ORIGINS: `${input.webURL},${input.apiURL},*.localhost:${input.webPort}`,
   CLOUDFLARE_ADAPTER: "false",
   DATABASE_URL: input.databaseURL,
+  E2E_ROUTES_ENABLED: "true",
   E2E_TEST_MAILER: "true",
   EMAIL_PROVIDER_WEBHOOK_TOKEN: "playwright-email-provider-token",
   HOST: "127.0.0.1",
