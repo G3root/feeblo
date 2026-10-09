@@ -14,14 +14,22 @@ import {
 import { HttpUrl } from "@feeblo/utils/http-url";
 import * as Schema from "effect/Schema";
 
-/** Safe linked-resource details rendered on a Feeblo post. */
+/**
+ * Safe linked-resource details rendered on a Feeblo post.
+ *
+ * The read DTO, so `remoteUrl` stays permissive: a row that predates the
+ * `HttpUrl` write restriction (or was written by a path that bypassed it)
+ * must still decode, and the dashboard renders a non-http value as text
+ * rather than a link. Tightening the read schema would fail the whole
+ * `listPostLinks` decode instead of showing that fallback.
+ */
 export const PostExternalResourceLink = Schema.Struct({
   id: PostExternalResourceLinkId.schema,
   connectionId: IntegrationConnectionId.schema,
   provider: IntegrationProviderKey,
   providerDisplayName: Schema.String,
   resourceType: IntegrationExternalResourceType,
-  remoteUrl: HttpUrl,
+  remoteUrl: Schema.URLFromString,
   displayKey: Schema.NullOr(Schema.String),
   title: Schema.NullOr(Schema.String),
   stateKey: Schema.NullOr(Schema.String),
