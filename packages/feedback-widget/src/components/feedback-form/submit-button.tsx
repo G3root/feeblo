@@ -6,9 +6,13 @@ export function FeedbackFormSubmitButton() {
   const { state } = useFeedbackForm();
 
   return (
-    <Button disabled={state.submission.pending} type="submit">
+    <Button
+      class="w-full"
+      loading={Boolean(state.submission.pending)}
+      type="submit"
+    >
       <Icon class="size-4" name="SentIcon" />
-      {state.submission.pending ? "Creating..." : "Create a new post"}
+      Create a new post
     </Button>
   );
 }

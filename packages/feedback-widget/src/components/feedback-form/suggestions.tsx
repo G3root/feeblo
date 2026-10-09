@@ -1,5 +1,6 @@
 import { For, Show } from "solid-js";
 
+import { Spinner } from "../ui/spinner";
 import { useFeedbackForm } from "./context";
 
 export function FeedbackFormSuggestions() {
@@ -10,30 +11,34 @@ export function FeedbackFormSuggestions() {
       <section
         aria-busy={state.suggestionsPending()}
         aria-label="Similar posts"
-        class="bg-muted/40 overflow-hidden rounded-lg border"
+        class="widget-enter bg-muted/40 overflow-hidden rounded-xl border"
+        data-enter="fade"
       >
-        <div class="border-b px-3 py-2">
-          <p class="text-sm font-medium">
-            {state.suggestionsPending()
-              ? "Updating similar posts"
-              : "Similar posts"}
-          </p>
-          <p class="text-muted-foreground text-xs">
-            Your idea may already have been shared.
-          </p>
+        <div class="flex items-start justify-between gap-2 border-b px-3.5 py-2.5">
+          <div>
+            <p class="text-sm font-medium">Similar posts</p>
+            <p class="text-muted-foreground text-xs">
+              Your idea may already have been shared.
+            </p>
+          </div>
+          <Show when={state.suggestionsPending()}>
+            <Spinner class="text-muted-foreground mt-0.5 size-3.5" />
+          </Show>
         </div>
-        <For each={state.suggestions()}>
-          {(post) => (
-            <div class="flex flex-col gap-0.5 border-b px-3 py-2.5 last:border-b-0">
-              <span class="text-sm font-medium">{post.title}</span>
-              <Show when={post.excerpt}>
-                <span class="text-muted-foreground line-clamp-1 text-xs">
-                  {post.excerpt}
-                </span>
-              </Show>
-            </div>
-          )}
-        </For>
+        <ul>
+          <For each={state.suggestions()}>
+            {(post) => (
+              <li class="flex flex-col gap-0.5 border-b px-3.5 py-2.5 last:border-b-0">
+                <span class="text-sm font-medium">{post.title}</span>
+                <Show when={post.excerpt}>
+                  <span class="text-muted-foreground line-clamp-1 text-xs">
+                    {post.excerpt}
+                  </span>
+                </Show>
+              </li>
+            )}
+          </For>
+        </ul>
       </section>
     </Show>
   );

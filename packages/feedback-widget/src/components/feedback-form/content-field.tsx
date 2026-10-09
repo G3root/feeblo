@@ -8,10 +8,11 @@ export function FeedbackFormContentField() {
 
   return (
     <Textarea
+      aria-label="Details"
       maxLength={WIDGET_CONTENT_MAX_LENGTH}
       name="content"
       onInput={(event) => actions.setContent(event.currentTarget.value)}
-      placeholder="Help us understand what value this feature would bring to your team or workflow"
+      placeholder="What problem would this solve for your team?"
     />
   );
 }

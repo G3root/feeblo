@@ -2,12 +2,17 @@ import { type ComponentProps, splitProps } from "solid-js";
 
 import { cn } from "../../lib/utils";
 
+/**
+ * The coss input surface, flattened: the dashboard's Input wraps a span so
+ * addons can live inside the border, and the widget has no addons, so the
+ * border sits on the control itself.
+ */
 export function Input(props: ComponentProps<"input">) {
   const [local, others] = splitProps(props, ["class"]);
   return (
     <input
       class={cn(
-        "bg-input/50 placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/30 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 h-11 w-full min-w-0 rounded-3xl border border-transparent px-3.5 text-base transition-[color,box-shadow,background-color] outline-none focus-visible:ring-3 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:ring-3 md:text-sm",
+        "border-input bg-background text-foreground placeholder:text-muted-foreground/72 focus-visible:border-ring focus-visible:ring-ring/24 aria-invalid:border-destructive/36 aria-invalid:ring-destructive/16 dark:bg-input/32 h-9 w-full min-w-0 rounded-lg border px-[calc(--spacing(3)-1px)] text-base shadow-xs/5 transition-shadow outline-none not-dark:bg-clip-padding focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-64 sm:h-8.5 sm:text-sm",
         local.class
       )}
       data-slot="input"

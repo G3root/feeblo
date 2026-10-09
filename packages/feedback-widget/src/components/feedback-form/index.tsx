@@ -1,5 +1,4 @@
-import { FeedbackFormActions, FeedbackFormActionsSecondary } from "./actions";
-import { FeedbackFormBackButton } from "./back-button";
+import { FeedbackFormActions } from "./actions";
 import { FeedbackFormContentField } from "./content-field";
 import { FeedbackFormFrame } from "./feedback-form";
 import { FeedbackFormFields } from "./fields";
@@ -21,8 +20,6 @@ export const FeedbackForm = {
   ContentField: FeedbackFormContentField,
   Suggestions: FeedbackFormSuggestions,
   Actions: FeedbackFormActions,
-  ActionsSecondary: FeedbackFormActionsSecondary,
-  BackButton: FeedbackFormBackButton,
   SubmitButton: FeedbackFormSubmitButton,
   Error: FeedbackFormError,
   Success: FeedbackSuccess,

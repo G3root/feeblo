@@ -19,23 +19,136 @@
     "Geist Mono Variable", ui-monospace, SFMono-Regular, monospace;
 }
 
-@keyframes gradient {
-  0% {
-    background-position: 0% 50%;
-  }
-  100% {
-    background-position: 200% 50%;
-  }
-}
-
-.animate-gradient {
-  animation: gradient 3s linear infinite;
-}
-
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/*
+ * Motion tokens.
+ *
+ * The panel is 400px and every interaction in it is repeated, so the motion
+ * budget is small: strong custom curves (the built-in CSS easings are too
+ * weak to read as intentional), 150-240ms, and transform/opacity only so
+ * nothing here can trigger layout. Entrances only — exits stay instant, which
+ * keeps back-navigation and rapid tab switches feeling immediate rather than
+ * queued behind an animation.
+ */
+@theme {
+  --ease-widget-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-widget-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/*
+ * The iframe document is the panel. Pinning the whole chain to the viewport
+ * is what makes the shell a closed layout — the header and the tab bar stay
+ * put while the body between them scrolls — instead of a document that grows
+ * past the iframe. The server-rendered shell sets the same heights inline;
+ * keeping them here covers the dev entry and any shell that drops them.
+ */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* A surface root rises in place; a pushed view slides in like a navigation
+ * push. Both are entry-only: the outgoing view is replaced in the same frame. */
+.widget-enter {
+  transition:
+    opacity 220ms var(--ease-widget-out),
+    transform 220ms var(--ease-widget-drawer);
+}
+
+.widget-enter[data-enter="rise"] {
+  @starting-style {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.widget-enter[data-enter="push"] {
+  @starting-style {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}
+
+.widget-enter[data-enter="fade"] {
+  @starting-style {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+
+/*
+ * List rows cascade in behind their view instead of landing as one block.
+ * The delay is capped by the caller (--stagger: 0..6) so a long list never
+ * makes the last row wait on the first.
+ */
+.widget-stagger {
+  transition:
+    opacity 240ms var(--ease-widget-out),
+    transform 240ms var(--ease-widget-drawer);
+  transition-delay: calc(var(--stagger, 0) * 40ms);
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* The submit confirmation's check: a small overshoot-free pop, not a scale(0)
+ * that makes the mark appear out of nowhere. */
+.widget-pop {
+  animation: widget-pop 320ms var(--ease-widget-out) both;
+}
+
+@keyframes widget-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* The reduced-motion spinner: rotation is movement, the pulse is not. */
+@keyframes widget-spinner-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .widget-enter,
+  .widget-stagger {
+    transition-duration: 150ms;
+    transition-delay: 0ms;
+    transition-property: opacity;
+  }
+
+  .widget-pop {
+    animation: none;
+  }
+
+  /* A shimmer is movement; the static block still reads as "loading". */
+  [data-slot="skeleton"] {
+    animation: none;
+    background: var(--color-muted);
+  }
+
+  /* Rotation is movement; the pulse keeps the loading state legible. */
+  [data-slot="spinner"] {
+    animation: widget-spinner-pulse 1.5s ease-in-out infinite;
+  }
 }

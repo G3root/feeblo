@@ -26,4 +26,8 @@ export function preloadBoards(_args: RoutePreloadFuncArgs) {
   return fetchBoards();
 }
 
+export function preloadUpdates(_args: RoutePreloadFuncArgs) {
+  return fetchUpdates();
+}
+
 export const createFeedBackAction = action(submitFeedback, "createFeedback");

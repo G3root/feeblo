@@ -1,16 +1,17 @@
 import { A } from "@solidjs/router";
 
 import type { Board } from "../../lib/boards";
+import { Icon } from "../ui/icon";
 
 export function BoardCard(props: { board: Board }) {
   return (
     <A
-      aria-label={props.board.name}
-      class="group border-border text-foreground hover:bg-muted/50 focus-visible:ring-ring/30 relative flex w-full items-center gap-3 rounded-lg border p-3 text-base font-medium transition-colors focus-visible:ring-3 dark:hover:bg-white/5"
+      class="group border-border bg-card text-foreground hover:border-foreground/20 hover:bg-accent/40 focus-visible:ring-ring/30 ease-widget-out flex w-full items-center gap-3 rounded-xl border p-3.5 text-base font-medium transition-[border-color,background-color,transform] duration-150 outline-none focus-visible:ring-[3px] active:scale-[0.98] motion-reduce:active:scale-100"
       draggable={false}
       href={`/board/${props.board.id}`}
     >
-      <span class="truncate">{props.board.name}</span>
+      <span class="min-w-0 flex-1 truncate">{props.board.name}</span>
+      <Icon class="text-muted-foreground/50 size-4" name="ArrowRight01Icon" />
     </A>
   );
 }
