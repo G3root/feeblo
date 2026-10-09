@@ -1,6 +1,6 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
-import type { DiscordIntegrationError } from "@feeblo/domain/integration/discord/errors";
+import type { DiscordChannelServiceContract } from "@feeblo/domain/integration/discord/management-service";
 import type * as S from "@feeblo/domain/integration/discord/schema";
 import { InternalServerError, NotFoundError } from "@feeblo/domain/rpc-errors";
 import { IntegrationRouteId } from "@feeblo/id";
@@ -38,20 +38,6 @@ const decodeProviderConfig = (value: Schema.Json) =>
         })
     )
   );
-
-/**
- * Channel listing and channel-notification routing for an active Discord
- * connection: lists the guild's text channels and toggles per-channel
- * notification routes.
- */
-export interface DiscordChannelServiceContract {
-  readonly listChannels: (
-    input: S.TDiscordChannelList
-  ) => Effect.Effect<readonly S.TDiscordChannel[], DiscordIntegrationError>;
-  readonly setChannelNotifications: (
-    input: S.TDiscordChannelNotificationsUpdate
-  ) => Effect.Effect<void, DiscordIntegrationError>;
-}
 
 export class DiscordChannelService extends Context.Service<
   DiscordChannelService,

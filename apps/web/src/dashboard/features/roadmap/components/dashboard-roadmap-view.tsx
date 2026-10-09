@@ -14,13 +14,7 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { createContext, use, useCallback, useMemo } from "react";
 
-import {
-  boardCollection,
-  postCollection,
-  postStatusCollection,
-  roadmapCollection,
-  roadmapColumnCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 import { RoadmapBoard } from "./roadmap-board";
 import { RoadmapDetailActions } from "./roadmap-detail-states";
@@ -80,11 +74,11 @@ function DashboardRoadmapIndexProvider({
   const navigate = useNavigate();
   const { allRoadmaps, isError, isLoading, lanesFor, roadmaps } =
     useRoadmapData({
-      boardCollection,
-      postCollection,
-      postStatusCollection,
-      roadmapCollection,
-      roadmapColumnCollection,
+      boardCollection: dashboardCollections.boardCollection,
+      postCollection: dashboardCollections.postCollection,
+      postStatusCollection: dashboardCollections.postStatusCollection,
+      roadmapCollection: dashboardCollections.roadmapCollection,
+      roadmapColumnCollection: dashboardCollections.roadmapColumnCollection,
       organizationId,
     });
 
@@ -156,11 +150,11 @@ function DashboardRoadmapDetailProvider({
   const navigate = useNavigate();
   const { allRoadmaps, isError, isLoading, lanesFor, roadmaps } =
     useRoadmapData({
-      boardCollection,
-      postCollection,
-      postStatusCollection,
-      roadmapCollection,
-      roadmapColumnCollection,
+      boardCollection: dashboardCollections.boardCollection,
+      postCollection: dashboardCollections.postCollection,
+      postStatusCollection: dashboardCollections.postStatusCollection,
+      roadmapCollection: dashboardCollections.roadmapCollection,
+      roadmapColumnCollection: dashboardCollections.roadmapColumnCollection,
       organizationId,
       slug,
     });

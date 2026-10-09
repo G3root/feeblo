@@ -45,14 +45,7 @@ import {
 } from "@tanstack/react-db";
 import { useMemo } from "react";
 
-import {
-  boardCollection,
-  contactCollection,
-  postActivityCollection,
-  postCollection,
-  postStatusCollection,
-  tagCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 type NameLookup = ReadonlyMap<string, string>;
 
@@ -214,7 +207,7 @@ export function createPostActivityQuery({
 }) {
   return createLiveQueryCollection((query) =>
     query
-      .from({ activity: postActivityCollection })
+      .from({ activity: dashboardCollections.postActivityCollection })
       .where(({ activity }) =>
         and(
           eq(activity.organizationId, organizationId),
@@ -236,31 +229,31 @@ export function PostActivityList({
   const { data: statuses } = useLiveQuery({
     query: (query) =>
       query
-        .from({ status: postStatusCollection })
+        .from({ status: dashboardCollections.postStatusCollection })
         .where(({ status }) => eq(status.organizationId, organizationId)),
   });
   const { data: boards } = useLiveQuery({
     query: (query) =>
       query
-        .from({ board: boardCollection })
+        .from({ board: dashboardCollections.boardCollection })
         .where(({ board }) => eq(board.organizationId, organizationId)),
   });
   const { data: tags } = useLiveQuery({
     query: (query) =>
       query
-        .from({ tag: tagCollection })
+        .from({ tag: dashboardCollections.tagCollection })
         .where(({ tag }) => eq(tag.organizationId, organizationId)),
   });
   const { data: contacts } = useLiveQuery({
     query: (query) =>
       query
-        .from({ contact: contactCollection })
+        .from({ contact: dashboardCollections.contactCollection })
         .where(({ contact }) => eq(contact.organizationId, organizationId)),
   });
   const { data: posts } = useLiveQuery({
     query: (query) =>
       query
-        .from({ post: postCollection })
+        .from({ post: dashboardCollections.postCollection })
         .where(({ post }) => eq(post.organizationId, organizationId)),
   });
 

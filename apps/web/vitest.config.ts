@@ -14,6 +14,9 @@ export default defineConfig({
     alias: {
       // Mirrors the tsconfig's `~/*` → `src/dashboard/*` mapping.
       "~": fileURLToPath(new URL("./src/dashboard", import.meta.url)),
+      // Mirrors the tsconfig's `@/*` → `src/*` mapping; the collections module
+      // reaches the app-level `DbClient` through `@/lib/db-client`.
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
   test: {

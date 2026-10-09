@@ -15,15 +15,7 @@ import {
 } from "@tanstack/react-db";
 import { useDeferredValue, useMemo } from "react";
 
-import {
-  boardCollection,
-  deleteEligibilityCollection,
-  postCollection,
-  postStatusCollection,
-  postTagCollection,
-  tagCollection,
-  upvoteCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import type {
@@ -47,13 +39,13 @@ import type { BoardPostRow } from "./types";
  */
 export async function preloadBoardPostsDataCollections(): Promise<void> {
   await Promise.all([
-    boardCollection.preload(),
-    deleteEligibilityCollection.preload(),
-    postCollection.preload(),
-    postStatusCollection.preload(),
-    tagCollection.preload(),
-    postTagCollection.preload(),
-    upvoteCollection.preload(),
+    dashboardCollections.boardCollection.preload(),
+    dashboardCollections.deleteEligibilityCollection.preload(),
+    dashboardCollections.postCollection.preload(),
+    dashboardCollections.postStatusCollection.preload(),
+    dashboardCollections.tagCollection.preload(),
+    dashboardCollections.postTagCollection.preload(),
+    dashboardCollections.upvoteCollection.preload(),
   ]);
 }
 

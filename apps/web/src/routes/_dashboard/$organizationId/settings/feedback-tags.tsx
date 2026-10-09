@@ -10,14 +10,14 @@ import {
   TagDeleteDialogProvider,
   TagEditDialogProvider,
 } from "~/features/tag/dialog-stores";
-import { tagCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/settings/feedback-tags"
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    await tagCollection.preload();
+    await dashboardCollections.tagCollection.preload();
     return null;
   },
 });

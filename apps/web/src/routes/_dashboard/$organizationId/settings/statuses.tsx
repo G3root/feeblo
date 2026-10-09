@@ -10,14 +10,14 @@ import {
   PostStatusEditDialogProvider,
 } from "~/features/post-status/dialog-stores";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
-import { postStatusCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/settings/statuses"
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    await postStatusCollection.preload();
+    await dashboardCollections.postStatusCollection.preload();
     return null;
   },
 });

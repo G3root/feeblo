@@ -1,4 +1,4 @@
-import { DiscordInboundFailure } from "@feeblo/domain/integration/discord/errors";
+import { ChatInboundFailure } from "@feeblo/domain/integration/chat/errors";
 import { truncate } from "@feeblo/utils/text";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -46,7 +46,7 @@ export const encodeModalMetadata = (metadata: DiscordFeedbackModalMetadata) =>
 /** Decodes the interaction `custom_id` back into modal metadata. */
 export const decodeModalMetadata = (
   customId: string
-): Effect.Effect<DiscordFeedbackModalMetadata, DiscordInboundFailure> => {
+): Effect.Effect<DiscordFeedbackModalMetadata, ChatInboundFailure> => {
   const parts = customId.split(":");
   if (
     parts[0] !== DISCORD_FEEDBACK_MODAL_CUSTOM_ID_PREFIX ||
@@ -54,7 +54,7 @@ export const decodeModalMetadata = (
     parts.length > 5
   ) {
     return Effect.fail(
-      new DiscordInboundFailure({
+      new ChatInboundFailure({
         message: "Discord feedback modal custom id is malformed",
       })
     );
@@ -71,7 +71,7 @@ export const decodeModalMetadata = (
     channelId === undefined
   ) {
     return Effect.fail(
-      new DiscordInboundFailure({
+      new ChatInboundFailure({
         message: "Discord feedback modal custom id is malformed",
       })
     );
@@ -84,7 +84,7 @@ export const decodeModalMetadata = (
   }).pipe(
     Effect.mapError(
       () =>
-        new DiscordInboundFailure({
+        new ChatInboundFailure({
           message: "Discord feedback modal custom id is malformed",
         })
     )

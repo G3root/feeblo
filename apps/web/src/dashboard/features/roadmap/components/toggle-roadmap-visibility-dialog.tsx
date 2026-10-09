@@ -16,7 +16,7 @@ import { useSelector } from "@xstate/store-react";
 
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import { useEntitlements } from "~/hooks/use-entitlements";
-import { roadmapCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 import { useToggleRoadmapVisibilityDialogContext } from "../dialog-stores";
 
@@ -65,7 +65,7 @@ export function ToggleRoadmapVisibilityDialog() {
     store.send({ type: "toggle" });
     settleOptimisticMutation(
       () =>
-        roadmapCollection.update(roadmapId, (draft) => {
+        dashboardCollections.roadmapCollection.update(roadmapId, (draft) => {
           draft.visibility = nextVisibility;
           draft.updatedAt = new Date();
         }),

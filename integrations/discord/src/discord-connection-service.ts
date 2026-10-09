@@ -1,6 +1,6 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
-import type { DiscordIntegrationError } from "@feeblo/domain/integration/discord/errors";
+import type { DiscordConnectionServiceContract } from "@feeblo/domain/integration/discord/management-service";
 import type * as S from "@feeblo/domain/integration/discord/schema";
 import {
   BadRequestError,
@@ -11,7 +11,6 @@ import {
   asLegid,
   IntegrationConnectionId,
   IntegrationRouteId,
-  type LegidFrom,
   WorkspaceId,
 } from "@feeblo/id";
 import {
@@ -61,30 +60,6 @@ const decodeSafeDisplayMetadata = (value: Schema.Json) =>
         })
     )
   );
-
-/**
- * OAuth connection lifecycle: installing a Discord guild (connect start and
- * completion with guild-scoped command registration), listing connections,
- * and disconnecting with credential erasure.
- */
-export interface DiscordConnectionServiceContract {
-  readonly connectComplete: (input: {
-    readonly code: string;
-    readonly state: string;
-  }) => Effect.Effect<
-    { readonly organizationId: LegidFrom<typeof WorkspaceId> },
-    DiscordIntegrationError
-  >;
-  readonly connectStart: (
-    input: S.TDiscordConnectStart
-  ) => Effect.Effect<S.TDiscordConnectStarted, DiscordIntegrationError>;
-  readonly disconnect: (
-    input: S.TDiscordConnectionDisconnect
-  ) => Effect.Effect<void, DiscordIntegrationError>;
-  readonly listConnections: (
-    input: S.TDiscordConnectionList
-  ) => Effect.Effect<readonly S.TDiscordConnection[], DiscordIntegrationError>;
-}
 
 export class DiscordConnectionService extends Context.Service<
   DiscordConnectionService,

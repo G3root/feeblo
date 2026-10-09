@@ -14,6 +14,8 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Provider**: an external integration family. V1 implements the `webhook`, `slack`, and `discord` providers.
 
+**Chat provider**: the provider family Slack and Discord belong to — a chat platform whose channels receive notifications and deliver inbound feedback. Members share one management contract shape and one inbound feedback intake, and differ in OAuth, API, and payload shapes. _Avoid_: messaging provider, bot provider
+
 **Connection**: an organization-owned provider account or endpoint. A V1 webhook endpoint is one connection.
 
 **Capability**: a provider feature, such as outbound event delivery.

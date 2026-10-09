@@ -16,7 +16,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 
 import { useCreateBoardDialogContext } from "~/features/board/dialog-stores";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
-import { upvoteCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -113,7 +113,7 @@ export function RecentPostsSection({
                   <StandaloneUpvoteButton
                     organizationId={organizationId}
                     postId={post.id}
-                    upvoteCollection={upvoteCollection}
+                    upvoteCollection={dashboardCollections.upvoteCollection}
                     variant="compact"
                   />
                 </PostCard.Media>

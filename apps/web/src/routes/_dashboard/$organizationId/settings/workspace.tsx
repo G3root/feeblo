@@ -3,10 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { DeleteWorkspaceSection } from "~/features/settings/components/workspace-danger-zone";
 import { WorkspaceDetailsSection } from "~/features/settings/components/workspace-details-section";
-import {
-  membershipCollection,
-  organizationCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/settings/workspace"
@@ -14,8 +11,8 @@ export const Route = createFileRoute(
   component: WorkspaceSettingsPage,
   beforeLoad: async () => {
     await Promise.all([
-      membershipCollection.preload(),
-      organizationCollection.preload(),
+      dashboardCollections.membershipCollection.preload(),
+      dashboardCollections.organizationCollection.preload(),
     ]);
     return null;
   },

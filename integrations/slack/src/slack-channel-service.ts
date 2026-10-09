@@ -1,6 +1,6 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
-import type { SlackIntegrationError } from "@feeblo/domain/integration/slack/errors";
+import type { SlackChannelServiceContract } from "@feeblo/domain/integration/slack/management-service";
 import type * as S from "@feeblo/domain/integration/slack/schema";
 import { InternalServerError, NotFoundError } from "@feeblo/domain/rpc-errors";
 import { IntegrationRouteId } from "@feeblo/id";
@@ -41,20 +41,6 @@ const decodeProviderConfig = (value: Schema.Json) =>
         })
     )
   );
-
-/**
- * Channel listing and channel-notification routing for an active Slack
- * connection: lists the bot's channels and toggles per-channel notification
- * routes.
- */
-export interface SlackChannelServiceContract {
-  readonly listChannels: (
-    input: S.TSlackChannelList
-  ) => Effect.Effect<readonly S.TSlackChannel[], SlackIntegrationError>;
-  readonly setChannelNotifications: (
-    input: S.TSlackChannelNotificationsUpdate
-  ) => Effect.Effect<void, SlackIntegrationError>;
-}
 
 export class SlackChannelService extends Context.Service<
   SlackChannelService,

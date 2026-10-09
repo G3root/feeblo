@@ -14,7 +14,6 @@ import type { Upvote } from "@feeblo/domain/upvote/schema";
 type PostWithTransientAuthor = {
   author?: TPostCreateAuthor;
 };
-import { hasWindow } from "@feeblo/utils/runtime-kind";
 import {
   createRpcCollectionHelpers,
   eqFilterValue,
@@ -30,14 +29,24 @@ import {
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import {
   BasicIndex,
-  createCollection,
+  collectionOptions,
+  DbClient,
   parseLoadSubsetOptions,
 } from "@tanstack/react-db";
+import type { QueryClient } from "@tanstack/react-query";
+import { createIsomorphicFn } from "@tanstack/react-start";
+import { getRequestUrl } from "@tanstack/react-start/server";
 import * as Duration from "effect/Duration";
 import type * as Schema from "effect/Schema";
 
+import { getDbClient } from "@/lib/db-client";
 import { getContext } from "~/integrations/tanstack-query/root-provider";
 
+import {
+  type DashboardCollectionScope,
+  organizationScopedCollectionId,
+  slugScopedCollectionId,
+} from "./collection-scope";
 import { fetchRpc } from "./runtime";
 
 type CommentReactionRow = Schema.Schema.Type<typeof CommentReaction>;
@@ -45,14 +54,44 @@ type PostReactionRow = Schema.Schema.Type<typeof PostReaction>;
 type PostSubscriptionRow = Schema.Schema.Type<typeof PostSubscription>;
 type UpvoteRow = Schema.Schema.Type<typeof Upvote>;
 
-const queryClient = getContext().queryClient;
+/**
+ * The request's pathname.
+ *
+ * Server rendering reads it from the request rather than `window`, which is
+ * what lets a collection resolve its scope during SSR. The dashboard's
+ * organization is the first path segment and the post slug sits in the path
+ * too, so both branches parse the same string the same way.
+ */
+const currentPathname = createIsomorphicFn()
+  .client(() => window.location.pathname)
+  .server(() => getRequestUrl().pathname);
 
+function currentScope(): DashboardCollectionScope {
+  return {
+    organizationId: getCurrentOrganizationId(),
+    postSlug: getCurrentPostSlug(),
+  };
+}
+
+/**
+ * The client the dashboard's collections materialize through.
+ *
+ * Shared with `getRouter()` so `useDbClient()` and the module-level
+ * `dashboardCollections` accessor cannot end up with two clients (which would
+ * mean two collections per descriptor, two syncs, and two sets of rows).
+ */
+function getBrowserDbClient(): DbClient {
+  return getDbClient(() => getContext().queryClient);
+}
+
+/**
+ * The dashboard's organization, taken from the first path segment.
+ *
+ * Isomorphic through `currentPathname`, so the `queryKey`/`queryFn` helpers
+ * below resolve the same scope during SSR as they do in the browser.
+ */
 function getCurrentOrganizationId() {
-  if (!hasWindow()) {
-    return undefined;
-  }
-
-  const organizationId = window.location.pathname
+  const organizationId = currentPathname()
     .split("/")
     .find((segment) => segment.length > 0);
 
@@ -66,11 +105,7 @@ function getCurrentOrganizationId() {
  * filter (e.g. from a route loader).
  */
 function getCurrentPostSlug() {
-  if (!hasWindow()) {
-    return undefined;
-  }
-
-  return postSlugFromPath(window.location.pathname, "post", 2);
+  return postSlugFromPath(currentPathname(), "post", 2);
 }
 
 const { organizationScopedQueryKey, resolvePostSlug, slugScopedQueryKey } =
@@ -79,113 +114,111 @@ const { organizationScopedQueryKey, resolvePostSlug, slugScopedQueryKey } =
     getPostSlug: getCurrentPostSlug,
   });
 
-/**
- * Every collection carries an explicit `id`.
- *
- * `createCollection` generates a random UUID when the config has none, and
- * Workers forbid generating random values in global scope — which is where
- * this module evaluates, because the SSR bundle imports the whole route tree
- * (including the client-only dashboard routes). A missing `id` therefore
- * crashes every request in production with "Disallowed operation called
- * within global scope".
- */
-export const postCollection = createCollection(
-  queryCollectionOptions({
-    id: "postCollection",
-    queryKey: () => organizationScopedQueryKey("post"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
+export function postCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("postCollection", scope);
 
-      if (!organizationId) {
-        return [];
-      }
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("post"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
 
-      const boardId: string | null = null;
-
-      const data = await fetchRpc(
-        (rpc) => rpc.PostList({ boardId, organizationId }),
-        {
-          signal: ctx.signal,
+        if (!organizationId) {
+          return [];
         }
-      );
 
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    // No `onInsert`: creation persists through the surface's `persistPost`
-    // inside the shared form's optimistic action, so a bare insert fails
-    // fast with `MissingInsertHandlerError` instead of persisting without
-    // a body. Updates and deletes sync here as before.
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedPost } = mutation;
+        const boardId: string | null = null;
 
-      await fetchRpc((rpc) =>
-        rpc.PostUpdate({
-          id: updatedPost.id,
-          statusId: updatedPost.statusId,
-          boardId: updatedPost.boardId,
-          organizationId: updatedPost.organizationId,
-        })
-      );
+        const data = await fetchRpc(
+          (rpc) => rpc.PostList({ boardId, organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
 
-      // The post row is the mutation target (already reconciled optimistically)
-      // and the activity entry is derived from it: refresh the entry detached.
-      refetchInBackground(postActivityCollection.utils.refetch());
-    },
-    onDelete: async ({ transaction }) => {
-      const [firstMutation] = transaction.mutations;
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      // No `onInsert`: creation persists through the surface's `persistPost`
+      // inside the shared form's optimistic action, so a bare insert fails
+      // fast with `MissingInsertHandlerError` instead of persisting without
+      // a body. Updates and deletes sync here as before.
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedPost } = mutation;
 
-      if (!firstMutation) {
-        return;
-      }
+        await fetchRpc((rpc) =>
+          rpc.PostUpdate({
+            id: updatedPost.id,
+            statusId: updatedPost.statusId,
+            boardId: updatedPost.boardId,
+            organizationId: updatedPost.organizationId,
+          })
+        );
 
-      const { organizationId } = firstMutation.original;
-      // Deletes can arrive one at a time (row actions) or as one transaction
-      // with many mutations (bulk selection). Group them into one bulk RPC
-      // per board so both paths share the server call.
-      const postIdsByBoardId = new Map<string, string[]>();
+        // The post row is the mutation target (already reconciled optimistically)
+        // and the activity entry is derived from it: refresh the entry detached.
+        refetchInBackground(
+          client.collection(postActivityCollection(scope)).utils.refetch()
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const [firstMutation] = transaction.mutations;
 
-      for (const mutation of transaction.mutations) {
-        const { original: deletedPost } = mutation;
-        const postIds = postIdsByBoardId.get(deletedPost.boardId) ?? [];
-        postIds.push(deletedPost.id);
-        postIdsByBoardId.set(deletedPost.boardId, postIds);
-      }
+        if (!firstMutation) {
+          return;
+        }
 
-      // Settle every board's RPC before rejecting: `Promise.all` fail-fast
-      // would strand a successful board's optimistic deletes behind the
-      // failing one. The read-back below then runs in both outcomes, so the
-      // rollback a rejection triggers reveals the reconciled rows instead of
-      // resurrecting posts the server already deleted.
-      const results = await Promise.allSettled(
-        [...postIdsByBoardId.entries()].map(([boardId, postIds]) =>
-          fetchRpc((rpc) =>
-            rpc.PostDelete({
-              id: postIds,
-              boardId,
-              organizationId,
-            })
+        const { organizationId } = firstMutation.original;
+        // Deletes can arrive one at a time (row actions) or as one transaction
+        // with many mutations (bulk selection). Group them into one bulk RPC
+        // per board so both paths share the server call.
+        const postIdsByBoardId = new Map<string, string[]>();
+
+        for (const mutation of transaction.mutations) {
+          const { original: deletedPost } = mutation;
+          const postIds = postIdsByBoardId.get(deletedPost.boardId) ?? [];
+          postIds.push(deletedPost.id);
+          postIdsByBoardId.set(deletedPost.boardId, postIds);
+        }
+
+        // Settle every board's RPC before rejecting: `Promise.all` fail-fast
+        // would strand a successful board's optimistic deletes behind the
+        // failing one. The read-back below then runs in both outcomes, so the
+        // rollback a rejection triggers reveals the reconciled rows instead of
+        // resurrecting posts the server already deleted.
+        const results = await Promise.allSettled(
+          [...postIdsByBoardId.entries()].map(([boardId, postIds]) =>
+            fetchRpc((rpc) =>
+              rpc.PostDelete({
+                id: postIds,
+                boardId,
+                organizationId,
+              })
+            )
           )
-        )
-      );
-      // Deleting a survivor also reverts its merged children server-side, so
-      // the synced rows must be refreshed or the restored duplicates stay
-      // hidden behind their stale `mergedIntoPostId`. This collection is the
-      // mutation target, so the read-back is awaited.
-      await postCollection.utils.refetch();
-      // The delete-hint set is derived: refresh it detached so the delete
-      // settles without waiting on a second round trip.
-      refetchInBackground(deleteEligibilityCollection.utils.refetch());
+        );
+        // Deleting a survivor also reverts its merged children server-side, so
+        // the synced rows must be refreshed or the restored duplicates stay
+        // hidden behind their stale `mergedIntoPostId`. This collection is the
+        // mutation target, so the read-back is awaited.
+        await client.collection(postCollection(scope)).utils.refetch();
+        // The delete-hint set is derived: refresh it detached so the delete
+        // settles without waiting on a second round trip.
+        refetchInBackground(
+          client.collection(deleteEligibilityCollection(scope)).utils.refetch()
+        );
 
-      const failure = results.find((result) => result.status === "rejected");
-      if (failure) {
-        throw failure.reason;
-      }
-    },
-  })
-);
+        const failure = results.find((result) => result.status === "rejected");
+        if (failure) {
+          throw failure.reason;
+        }
+      },
+    })
+  );
+}
 
 /**
  * Full-post detail collection backing post detail routes. The org-scoped
@@ -196,130 +229,111 @@ export const postCollection = createCollection(
  * transaction, so no sync handlers by design); all other mutations stay on
  * the list collection.
  */
-export const postDetailCollection = createCollection(
-  queryCollectionOptions({
-    id: "postDetailCollection",
-    // Keyed by the explicit `slug` filter with a fallback to the route
-    // slug, so detail subscribers (routes, content views) share one cache
-    // entry per post regardless of where they subscribe from.
-    queryKey: (opts) => {
-      const filters = parseLoadSubsetOptions(opts).filters;
-      const slug = eqFilterValue(filters, "slug") ?? resolvePostSlug(filters);
-      return organizationScopedQueryKey("post-detail", slug);
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      const filters = parseLoadSubsetOptions(
-        ctx.meta?.loadSubsetOptions
-      ).filters;
-      const slug = eqFilterValue(filters, "slug") ?? resolvePostSlug(filters);
+export function postDetailCollection(scope: DashboardCollectionScope) {
+  const id = slugScopedCollectionId("postDetailCollection", scope);
 
-      if (!(organizationId && slug)) {
-        return [];
-      }
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      // Keyed by the explicit `slug` filter with a fallback to the route
+      // slug, so detail subscribers (routes, content views) share one cache
+      // entry per post regardless of where they subscribe from.
+      queryKey: (opts) => {
+        const filters = parseLoadSubsetOptions(opts).filters;
+        const slug = eqFilterValue(filters, "slug") ?? resolvePostSlug(filters);
+        return organizationScopedQueryKey("post-detail", slug);
+      },
+      syncMode: "on-demand",
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+        const filters = parseLoadSubsetOptions(
+          ctx.meta?.loadSubsetOptions
+        ).filters;
+        const slug = eqFilterValue(filters, "slug") ?? resolvePostSlug(filters);
 
-      const post = await fetchRpc(
-        (rpc) => rpc.PostGet({ organizationId, slug }),
-        { signal: ctx.signal }
-      );
-      return [post];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-postCollection.createIndex((row) => row.createdAt, {
-  indexType: BasicIndex,
-});
-
-postCollection.createIndex((row) => row.statusId, {
-  indexType: BasicIndex,
-});
-
-// Board queries filter by organization (and board) on every navigation;
-// without these the live query scans the full overfetched collection.
-postCollection.createIndex((row) => row.organizationId, {
-  indexType: BasicIndex,
-});
-
-postCollection.createIndex((row) => row.boardId, {
-  indexType: BasicIndex,
-});
-
-export const postStatusCollection = createCollection(
-  queryCollectionOptions({
-    id: "postStatusCollection",
-    queryKey: () => organizationScopedQueryKey("post-status"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.PostStatusList({ organizationId }),
-        {
-          signal: ctx.signal,
+        if (!(organizationId && slug)) {
+          return [];
         }
-      );
 
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newStatus } = mutation;
-      const organizationId = getCurrentOrganizationId();
+        const post = await fetchRpc(
+          (rpc) => rpc.PostGet({ organizationId, slug }),
+          { signal: ctx.signal }
+        );
+        return [post];
+      },
+      getKey: (item) => item.id,
+    })
+  );
+}
 
-      if (!organizationId) {
-        throw new Error("Missing organization id");
-      }
+export function postStatusCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("postStatusCollection", scope);
 
-      await fetchRpc((rpc) =>
-        rpc.PostStatusCreate({
-          id: newStatus.id,
-          organizationId,
-          type: newStatus.type,
-          label: newStatus.label,
-          color: newStatus.color ?? null,
-          orderIndex: newStatus.orderIndex,
-        })
-      );
-    },
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedStatus } = mutation;
-      const organizationId = getCurrentOrganizationId();
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("post-status"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
 
-      if (!organizationId) {
-        throw new Error("Missing organization id");
-      }
+        if (!organizationId) {
+          return [];
+        }
 
-      await fetchRpc((rpc) =>
-        rpc.PostStatusUpdate({
-          id: updatedStatus.id,
-          organizationId,
-          type: updatedStatus.type,
-          label: updatedStatus.label,
-          color: updatedStatus.color ?? null,
-        })
-      );
-    },
-  })
-);
+        const data = await fetchRpc(
+          (rpc) => rpc.PostStatusList({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
 
-postStatusCollection.createIndex((row) => row.organizationId, {
-  indexType: BasicIndex,
-});
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newStatus } = mutation;
+        const organizationId = scope.organizationId;
 
-// Board, changelog, and merge queries join posts against status rows by id.
-postStatusCollection.createIndex((row) => row.id, {
-  indexType: BasicIndex,
-});
+        if (!organizationId) {
+          throw new Error("Missing organization id");
+        }
+
+        await fetchRpc((rpc) =>
+          rpc.PostStatusCreate({
+            id: newStatus.id,
+            organizationId,
+            type: newStatus.type,
+            label: newStatus.label,
+            color: newStatus.color ?? null,
+            orderIndex: newStatus.orderIndex,
+          })
+        );
+      },
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedStatus } = mutation;
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          throw new Error("Missing organization id");
+        }
+
+        await fetchRpc((rpc) =>
+          rpc.PostStatusUpdate({
+            id: updatedStatus.id,
+            organizationId,
+            type: updatedStatus.type,
+            label: updatedStatus.label,
+            color: updatedStatus.color ?? null,
+          })
+        );
+      },
+    })
+  );
+}
 
 /**
  * The changelog write endpoints accept only the statuses a write may set:
@@ -332,182 +346,202 @@ const toWritableChangelogStatus = (
   status: "draft" | "published" | "scheduled"
 ): "draft" | "published" => (status === "scheduled" ? "draft" : status);
 
-export const changelogCollection = createCollection(
-  queryCollectionOptions({
-    id: "changelogCollection",
-    queryKey: () => organizationScopedQueryKey("changelog"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
+export function changelogCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("changelogCollection", scope);
 
-      if (!organizationId) {
-        return [];
-      }
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("changelog"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
 
-      const data = await fetchRpc(
-        (rpc) => rpc.ChangelogList({ organizationId }),
-        {
-          signal: ctx.signal,
+        if (!organizationId) {
+          return [];
         }
-      );
 
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedChangelog } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.ChangelogUpdate({
-          id: updatedChangelog.id,
-          title: updatedChangelog.title,
-          slug: updatedChangelog.slug,
-          content: updatedChangelog.content,
-          assetIds: updatedChangelog.assetIds ?? [],
-          coverImage: updatedChangelog.coverImage ?? null,
-          status: toWritableChangelogStatus(updatedChangelog.status),
-          scheduledAt: updatedChangelog.scheduledAt,
-          publishedAt: updatedChangelog.publishedAt,
-          organizationId: updatedChangelog.organizationId,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedChangelog } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.ChangelogDelete({
-          id: deletedChangelog.id,
-          organizationId: deletedChangelog.organizationId,
-        })
-      );
-    },
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newChangelog } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.ChangelogCreate({
-          id: newChangelog.id,
-          title: newChangelog.title,
-          slug: newChangelog.slug,
-          content: newChangelog.content,
-          assetIds: newChangelog.assetIds ?? [],
-          coverImage: newChangelog.coverImage ?? null,
-          status: toWritableChangelogStatus(newChangelog.status),
-          scheduledAt: newChangelog.scheduledAt,
-          publishedAt: newChangelog.publishedAt,
-          organizationId: newChangelog.organizationId,
-        })
-      );
-    },
-  })
-);
-
-export const changelogCategoryLinkCollection = createCollection(
-  queryCollectionOptions({
-    id: "changelogCategoryLinkCollection",
-    queryKey: () => organizationScopedQueryKey("changelog-category-link"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.ChangelogCategoryListLinks({ organizationId }),
-        {
-          signal: ctx.signal,
-        }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const changelogCategoryCollection = createCollection(
-  queryCollectionOptions({
-    id: "changelogCategoryCollection",
-    queryKey: () => organizationScopedQueryKey("changelog-category"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.ChangelogCategoryList({ organizationId }),
-        {
-          signal: ctx.signal,
-        }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newCategory } = mutation;
-      const iconType = newCategory.iconType;
-
-      if (iconType !== "color") {
-        throw new Error(
-          "Unsupported changelog category icon type; only color is supported"
+        const data = await fetchRpc(
+          (rpc) => rpc.ChangelogList({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
         );
-      }
 
-      await fetchRpc((rpc) =>
-        rpc.ChangelogCategoryCreate({
-          id: newCategory.id,
-          name: newCategory.name,
-          iconType,
-          icon: newCategory.icon,
-          organizationId: newCategory.organizationId,
-        })
-      );
-    },
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedCategory } = mutation;
-      const iconType = updatedCategory.iconType;
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedChangelog } = mutation;
 
-      if (iconType !== "color") {
-        throw new Error(
-          "Unsupported changelog category icon type; only color is supported"
+        await fetchRpc((rpc) =>
+          rpc.ChangelogUpdate({
+            id: updatedChangelog.id,
+            title: updatedChangelog.title,
+            slug: updatedChangelog.slug,
+            content: updatedChangelog.content,
+            assetIds: updatedChangelog.assetIds ?? [],
+            coverImage: updatedChangelog.coverImage ?? null,
+            status: toWritableChangelogStatus(updatedChangelog.status),
+            scheduledAt: updatedChangelog.scheduledAt,
+            publishedAt: updatedChangelog.publishedAt,
+            organizationId: updatedChangelog.organizationId,
+          })
         );
-      }
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedChangelog } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.ChangelogCategoryUpdate({
-          id: updatedCategory.id,
-          name: updatedCategory.name,
-          iconType,
-          icon: updatedCategory.icon,
-          organizationId: updatedCategory.organizationId,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedCategory } = mutation;
+        await fetchRpc((rpc) =>
+          rpc.ChangelogDelete({
+            id: deletedChangelog.id,
+            organizationId: deletedChangelog.organizationId,
+          })
+        );
+      },
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newChangelog } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.ChangelogCategoryDelete({
-          id: deletedCategory.id,
-          organizationId: deletedCategory.organizationId,
-        })
-      );
-    },
-  })
-);
+        await fetchRpc((rpc) =>
+          rpc.ChangelogCreate({
+            id: newChangelog.id,
+            title: newChangelog.title,
+            slug: newChangelog.slug,
+            content: newChangelog.content,
+            assetIds: newChangelog.assetIds ?? [],
+            coverImage: newChangelog.coverImage ?? null,
+            status: toWritableChangelogStatus(newChangelog.status),
+            scheduledAt: newChangelog.scheduledAt,
+            publishedAt: newChangelog.publishedAt,
+            organizationId: newChangelog.organizationId,
+          })
+        );
+      },
+    })
+  );
+}
+
+export function changelogCategoryLinkCollection(
+  scope: DashboardCollectionScope
+) {
+  const id = organizationScopedCollectionId(
+    "changelogCategoryLinkCollection",
+    scope
+  );
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("changelog-category-link"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.ChangelogCategoryListLinks({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+
+        return [...data];
+      },
+      getKey: (item) => item.id,
+    })
+  );
+}
+
+export function changelogCategoryCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId(
+    "changelogCategoryCollection",
+    scope
+  );
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("changelog-category"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.ChangelogCategoryList({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newCategory } = mutation;
+        const iconType = newCategory.iconType;
+
+        if (iconType !== "color") {
+          throw new Error(
+            "Unsupported changelog category icon type; only color is supported"
+          );
+        }
+
+        await fetchRpc((rpc) =>
+          rpc.ChangelogCategoryCreate({
+            id: newCategory.id,
+            name: newCategory.name,
+            iconType,
+            icon: newCategory.icon,
+            organizationId: newCategory.organizationId,
+          })
+        );
+      },
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedCategory } = mutation;
+        const iconType = updatedCategory.iconType;
+
+        if (iconType !== "color") {
+          throw new Error(
+            "Unsupported changelog category icon type; only color is supported"
+          );
+        }
+
+        await fetchRpc((rpc) =>
+          rpc.ChangelogCategoryUpdate({
+            id: updatedCategory.id,
+            name: updatedCategory.name,
+            iconType,
+            icon: updatedCategory.icon,
+            organizationId: updatedCategory.organizationId,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedCategory } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.ChangelogCategoryDelete({
+            id: deletedCategory.id,
+            organizationId: deletedCategory.organizationId,
+          })
+        );
+      },
+    })
+  );
+}
 
 export const getChangelogPostKey = ({
   changelogId,
@@ -517,659 +551,666 @@ export const getChangelogPostKey = ({
   postId: string;
 }) => `${changelogId}:${postId}`;
 
-export const changelogPostCollection = createCollection(
-  queryCollectionOptions({
-    id: "changelogPostCollection",
-    queryKey: () => organizationScopedQueryKey("changelog-post"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      if (!organizationId) {
-        return [];
-      }
+export function changelogPostCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("changelogPostCollection", scope);
 
-      const data = await fetchRpc(
-        (rpc) => rpc.ChangelogPostList({ organizationId }),
-        { signal: ctx.signal }
-      );
-      return [...data];
-    },
-    queryClient,
-    getKey: getChangelogPostKey,
-    onInsert: async ({ transaction }) => {
-      const { modified } = transaction.mutations[0];
-      await fetchRpc((rpc) =>
-        rpc.ChangelogPostCreate({
-          changelogId: modified.changelogId,
-          postId: modified.postId,
-          organizationId: modified.organizationId,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const { original } = transaction.mutations[0];
-      await fetchRpc((rpc) =>
-        rpc.ChangelogPostDelete({
-          changelogId: original.changelogId,
-          postId: original.postId,
-          organizationId: original.organizationId,
-        })
-      );
-    },
-  })
-);
-
-// Changelog completed-posts joins changelog entries against posts by post id.
-changelogPostCollection.createIndex((row) => row.postId, {
-  indexType: BasicIndex,
-});
-
-export const boardCollection = createCollection(
-  queryCollectionOptions({
-    id: "boardCollection",
-    queryKey: () => organizationScopedQueryKey("board"),
-    refetchInterval: Duration.toMillis(Duration.minutes(5)),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc((rpc) => rpc.BoardList({ organizationId }), {
-        signal: ctx.signal,
-      });
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newBoard } = mutation;
-
-      await fetchRpc(
-        (rpc) =>
-          rpc.BoardCreate({
-            id: newBoard.id,
-            name: newBoard.name,
-            visibility: newBoard.visibility,
-            organizationId: newBoard.organizationId,
-          }),
-        {}
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-
-      const { original: deletedBoard } = mutation;
-
-      await fetchRpc(
-        (rpc) =>
-          rpc.BoardDelete({
-            id: deletedBoard.id,
-            organizationId: deletedBoard.organizationId,
-          }),
-        {}
-      );
-    },
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedBoard } = mutation;
-
-      await fetchRpc(
-        (rpc) =>
-          rpc.BoardUpdate({
-            id: updatedBoard.id,
-            name: updatedBoard.name,
-            visibility: updatedBoard.visibility,
-            organizationId: updatedBoard.organizationId,
-          }),
-        {}
-      );
-    },
-  })
-);
-
-boardCollection.createIndex((row) => row.organizationId, {
-  indexType: BasicIndex,
-});
-
-// Post board queries join posts against boards by id.
-boardCollection.createIndex((row) => row.id, {
-  indexType: BasicIndex,
-});
-
-export const tagCollection = createCollection(
-  queryCollectionOptions({
-    id: "tagCollection",
-    queryKey: () => organizationScopedQueryKey("tag"),
-
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc((rpc) => rpc.TagList({ organizationId }), {
-        signal: ctx.signal,
-      });
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newTag } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.TagCreate({
-          id: newTag.id,
-          name: newTag.name,
-          organizationId: newTag.organizationId,
-        })
-      );
-    },
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedTag } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.TagUpdate({
-          id: updatedTag.id,
-          name: updatedTag.name,
-          organizationId: updatedTag.organizationId,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedTag } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.TagDelete({
-          id: deletedTag.id,
-          organizationId: deletedTag.organizationId,
-        })
-      );
-    },
-  })
-);
-
-tagCollection.createIndex((row) => row.organizationId, {
-  indexType: BasicIndex,
-});
-
-export const postTagCollection = createCollection(
-  queryCollectionOptions({
-    id: "postTagCollection",
-    queryKey: () => organizationScopedQueryKey("post-tag"),
-
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.PostTagList({ organizationId }),
-        {
-          signal: ctx.signal,
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("changelog-post"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+        if (!organizationId) {
+          return [];
         }
-      );
 
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-// Tag-filter queries hit all three axes (org scope, post join, tag match).
-postTagCollection.createIndex((row) => row.organizationId, {
-  indexType: BasicIndex,
-});
-
-postTagCollection.createIndex((row) => row.postId, {
-  indexType: BasicIndex,
-});
-
-postTagCollection.createIndex((row) => row.tagId, {
-  indexType: BasicIndex,
-});
-
-export const membershipCollection = createCollection(
-  queryCollectionOptions({
-    id: "membershipCollection",
-    queryKey: ["membership"],
-    staleTime: Duration.toMillis(Duration.minutes(10)),
-    queryFn: async (ctx) =>
-      fetchRpc((rpc) => rpc.MembershipList(), { signal: ctx.signal }).then(
-        (data) => [...data]
-      ),
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-// Workspace details joins memberships against organizations by org id.
-membershipCollection.createIndex((row) => row.organizationId, {
-  indexType: BasicIndex,
-});
-
-export const organizationCollection = createCollection(
-  queryCollectionOptions({
-    id: "organizationCollection",
-    queryKey: ["organizations"],
-    queryFn: async (ctx) => {
-      const data = await fetchRpc((rpc) => rpc.OrganizationList(), {
-        signal: ctx.signal,
-      });
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedOrganization } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.OrganizationUpdate({
-          organizationId: updatedOrganization.id,
-          name: updatedOrganization.name,
-          logo: updatedOrganization.logo,
-        })
-      );
-    },
-  })
-);
-
-// Workspace details joins memberships against organizations by org id.
-organizationCollection.createIndex((row) => row.id, {
-  indexType: BasicIndex,
-});
-
-export const membersCollection = createCollection(
-  queryCollectionOptions({
-    id: "membersCollection",
-    staleTime: Duration.toMillis(Duration.minutes(20)),
-    queryKey: () => organizationScopedQueryKey("members"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.OrganizationMembersList({ organizationId }),
-        { signal: ctx.signal }
-      );
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedMember } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.OrganizationRemoveMember({
-          memberId: deletedMember.id,
-          organizationId: deletedMember.organizationId,
-        })
-      );
-    },
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedMember } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.OrganizationUpdateMemberRole({
-          memberId: updatedMember.id,
-          organizationId: updatedMember.organizationId,
-          role: updatedMember.role,
-        })
-      );
-    },
-  })
-);
-
-export const invitationsCollection = createCollection(
-  queryCollectionOptions({
-    id: "invitationsCollection",
-    queryKey: () => organizationScopedQueryKey("invitations"),
-
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.OrganizationInvitationsList({ organizationId }),
-        { signal: ctx.signal }
-      );
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedInvitation } = mutation;
-      await fetchRpc((rpc) =>
-        rpc.OrganizationCancelInvitation({
-          invitationId: deletedInvitation.id,
-          organizationId: deletedInvitation.organizationId,
-        })
-      );
-    },
-  })
-);
-
-export const commentCollection = createCollection(
-  queryCollectionOptions({
-    id: "commentCollection",
-    queryKey: (opts) =>
-      slugScopedQueryKey("comment", parseLoadSubsetOptions(opts).filters),
-    syncMode: "on-demand",
-
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      const slug = resolvePostSlug(
-        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
-      );
-
-      if (!(organizationId && slug)) {
-        return [];
-      }
-
-      try {
         const data = await fetchRpc(
-          (rpc) => rpc.CommentList({ organizationId, slug }),
+          (rpc) => rpc.ChangelogPostList({ organizationId }),
           { signal: ctx.signal }
         );
         return [...data];
-      } catch {
-        return [];
-      }
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newComment } = mutation;
+      },
+      getKey: getChangelogPostKey,
+      onInsert: async ({ transaction }) => {
+        const { modified } = transaction.mutations[0];
+        await fetchRpc((rpc) =>
+          rpc.ChangelogPostCreate({
+            changelogId: modified.changelogId,
+            postId: modified.postId,
+            organizationId: modified.organizationId,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const { original } = transaction.mutations[0];
+        await fetchRpc((rpc) =>
+          rpc.ChangelogPostDelete({
+            changelogId: original.changelogId,
+            postId: original.postId,
+            organizationId: original.organizationId,
+          })
+        );
+      },
+    })
+  );
+}
 
-      // SAFETY: post-ui attaches the transient author payload declared on
-      // PostWithTransientAuthor above.
-      const author = (newComment as PostWithTransientAuthor).author;
+export function boardCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("boardCollection", scope);
 
-      await fetchRpc(
-        (rpc) =>
-          rpc.CommentCreate({
-            organizationId: newComment.organizationId,
-            visibility: newComment.visibility,
-            content: newComment.content,
-            postId: newComment.postId,
-            parentCommentId: newComment.parentCommentId,
-            id: newComment.id,
-            ...(author ? { author } : undefined),
-            statusUpdateId: newComment.statusUpdateId ?? null,
-          }),
-        {}
-      );
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("board"),
+      refetchInterval: Duration.toMillis(Duration.minutes(5)),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
 
-      // The comment row is the mutation target and is already reconciled
-      // optimistically; the activity timeline, post rows, and delete-hint set
-      // are derived from it, so they refresh detached rather than holding the
-      // insert open for three round trips.
-      refetchInBackground(
-        postActivityCollection.utils.refetch(),
-        postCollection.utils.refetch(),
-        deleteEligibilityCollection.utils.refetch()
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedComment } = mutation;
-
-      await fetchRpc(
-        (rpc) =>
-          rpc.CommentDelete({
-            id: deletedComment.id,
-            organizationId: deletedComment.organizationId,
-            postId: deletedComment.postId,
-          }),
-        {}
-      );
-
-      // Same as the insert path: the optimistic delete already removed the
-      // row, so the derived collections refresh detached.
-      refetchInBackground(
-        postActivityCollection.utils.refetch(),
-        postCollection.utils.refetch(),
-        deleteEligibilityCollection.utils.refetch()
-      );
-    },
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedComment } = mutation;
-
-      await fetchRpc(
-        (rpc) =>
-          rpc.CommentUpdate({
-            id: updatedComment.id,
-            organizationId: updatedComment.organizationId,
-            postId: updatedComment.postId,
-            content: updatedComment.content,
-            visibility: updatedComment.visibility,
-          }),
-        {}
-      );
-
-      // Only the activity entry is derived from an edit: refresh it detached.
-      refetchInBackground(postActivityCollection.utils.refetch());
-    },
-  })
-);
-
-export const postActivityCollection = createCollection(
-  queryCollectionOptions({
-    id: "postActivityCollection",
-    queryKey: (opts) => {
-      const postId = eqFilterValue(
-        parseLoadSubsetOptions(opts).filters,
-        "postId"
-      );
-
-      return postId
-        ? organizationScopedQueryKey("post-activity", "postId", postId)
-        : organizationScopedQueryKey("post-activity");
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      const postId = eqFilterValue(
-        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters,
-        "postId"
-      );
-
-      if (!(organizationId && postId)) {
-        return [];
-      }
-
-      const existingData =
-        queryClient.getQueryData<readonly TPostActivity[]>(ctx.queryKey) ?? [];
-      const since = existingData.reduce<Date | undefined>(
-        (latest, activity) =>
-          latest === undefined || activity.createdAt > latest
-            ? activity.createdAt
-            : latest,
-        undefined
-      );
-      const changes = await fetchRpc(
-        (rpc) =>
-          rpc.PostActivityList({
-            organizationId,
-            postId,
-            ...(since === undefined ? undefined : { since }),
-          }),
-        { signal: ctx.signal }
-      );
-      const merged = new Map(
-        existingData.map((activity) => [activity.id, activity])
-      );
-      for (const activity of changes) {
-        merged.set(activity.id, activity);
-      }
-      // Preserve the full merged history: the timeline renders every activity
-      // and `since` only moves forward, so dropping entries would make that
-      // history permanently unreachable (the backend offers no backfill for
-      // older-than-window rows).
-      const ordered = [...merged.values()].sort(
-        (left, right) => +left.createdAt - +right.createdAt
-      );
-      return ordered;
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const commentReactionCollection = createCollection(
-  queryCollectionOptions({
-    id: "commentReactionCollection",
-    queryKey: (opts) =>
-      slugScopedQueryKey(
-        "comment-reaction",
-        parseLoadSubsetOptions(opts).filters
-      ),
-    syncMode: "on-demand",
-
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      const slug = resolvePostSlug(
-        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
-      );
-
-      if (!(organizationId && slug)) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.CommentReactionList({ organizationId, slug }),
-        {
-          signal: ctx.signal,
+        if (!organizationId) {
+          return [];
         }
-      );
-      return [...data];
-    },
-    queryClient,
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    getKey: getCommentReactionCollectionKey as (
-      item: CommentReactionRow
-    ) => string,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newCommentReaction } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.CommentReactionToggle({
-          organizationId: newCommentReaction.organizationId,
-          postId: newCommentReaction.postId,
-          commentId: newCommentReaction.commentId,
-          emoji: newCommentReaction.emoji,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedCommentReaction } = mutation;
+        const data = await fetchRpc(
+          (rpc) => rpc.BoardList({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newBoard } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.CommentReactionToggle({
-          organizationId: deletedCommentReaction.organizationId,
-          postId: deletedCommentReaction.postId,
-          commentId: deletedCommentReaction.commentId,
-          emoji: deletedCommentReaction.emoji,
-        })
-      );
-    },
-  })
-);
+        await fetchRpc(
+          (rpc) =>
+            rpc.BoardCreate({
+              id: newBoard.id,
+              name: newBoard.name,
+              visibility: newBoard.visibility,
+              organizationId: newBoard.organizationId,
+            }),
+          {}
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
 
-export const upvoteCollection = createCollection(
-  queryCollectionOptions({
-    id: "upvoteCollection",
-    // Lazy key: resolved at query time so navigation between organizations
-    // never reuses another organization's cache entry (matches queryFn).
-    queryKey: () => organizationScopedQueryKey("upvote"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
+        const { original: deletedBoard } = mutation;
 
-      if (!organizationId) {
-        return [];
-      }
+        await fetchRpc(
+          (rpc) =>
+            rpc.BoardDelete({
+              id: deletedBoard.id,
+              organizationId: deletedBoard.organizationId,
+            }),
+          {}
+        );
+      },
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedBoard } = mutation;
 
-      const data = await fetchRpc((rpc) => rpc.UpvoteList({ organizationId }), {
-        signal: ctx.signal,
-      });
-      return [...data];
-    },
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    queryClient,
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    getKey: getUpvoteCollectionKey as (item: UpvoteRow) => string,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newUpvote } = mutation;
+        await fetchRpc(
+          (rpc) =>
+            rpc.BoardUpdate({
+              id: updatedBoard.id,
+              name: updatedBoard.name,
+              visibility: updatedBoard.visibility,
+              organizationId: updatedBoard.organizationId,
+            }),
+          {}
+        );
+      },
+    })
+  );
+}
 
-      await fetchRpc((rpc) =>
-        rpc.UpvoteToggle({
-          organizationId: newUpvote.organizationId,
-          postId: newUpvote.postId,
-        })
-      );
-      // The upvote row is the mutation target and holds the toggle
-      // optimistically; vote counts derive from this collection client-side
-      // (post rows carry no count), so the post rows and the delete-hint set
-      // are derived refreshes that run detached.
-      refetchInBackground(
-        postCollection.utils.refetch(),
-        deleteEligibilityCollection.utils.refetch()
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedUpvote } = mutation;
+export function tagCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("tagCollection", scope);
 
-      await fetchRpc((rpc) =>
-        rpc.UpvoteToggle({
-          organizationId: deletedUpvote.organizationId,
-          postId: deletedUpvote.postId,
-        })
-      );
-      // Same as the insert path: derived refreshes run detached.
-      refetchInBackground(
-        postCollection.utils.refetch(),
-        deleteEligibilityCollection.utils.refetch()
-      );
-    },
-  })
-);
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("tag"),
 
-// Upvote counts are derived per post on every board render; index both the
-// org-scoped subscription filter and the per-post aggregation key.
-upvoteCollection.createIndex((row) => row.organizationId, {
-  indexType: BasicIndex,
-});
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
 
-upvoteCollection.createIndex((row) => row.postId, {
-  indexType: BasicIndex,
-});
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc((rpc) => rpc.TagList({ organizationId }), {
+          signal: ctx.signal,
+        });
+
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newTag } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.TagCreate({
+            id: newTag.id,
+            name: newTag.name,
+            organizationId: newTag.organizationId,
+          })
+        );
+      },
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedTag } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.TagUpdate({
+            id: updatedTag.id,
+            name: updatedTag.name,
+            organizationId: updatedTag.organizationId,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedTag } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.TagDelete({
+            id: deletedTag.id,
+            organizationId: deletedTag.organizationId,
+          })
+        );
+      },
+    })
+  );
+}
+
+export function postTagCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("postTagCollection", scope);
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("post-tag"),
+
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.PostTagList({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+
+        return [...data];
+      },
+      getKey: (item) => item.id,
+    })
+  );
+}
+
+export function membershipCollection(_scope: DashboardCollectionScope) {
+  const id = "membershipCollection";
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: ["membership"],
+      staleTime: Duration.toMillis(Duration.minutes(10)),
+      queryFn: async (ctx) =>
+        fetchRpc((rpc) => rpc.MembershipList(), { signal: ctx.signal }).then(
+          (data) => [...data]
+        ),
+      getKey: (item) => item.id,
+    })
+  );
+}
+
+export function organizationCollection(_scope: DashboardCollectionScope) {
+  const id = "organizationCollection";
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: ["organizations"],
+      queryFn: async (ctx) => {
+        const data = await fetchRpc((rpc) => rpc.OrganizationList(), {
+          signal: ctx.signal,
+        });
+
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedOrganization } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.OrganizationUpdate({
+            organizationId: updatedOrganization.id,
+            name: updatedOrganization.name,
+            logo: updatedOrganization.logo,
+          })
+        );
+      },
+    })
+  );
+}
+
+export function membersCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("membersCollection", scope);
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      staleTime: Duration.toMillis(Duration.minutes(20)),
+      queryKey: () => organizationScopedQueryKey("members"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.OrganizationMembersList({ organizationId }),
+          { signal: ctx.signal }
+        );
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedMember } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.OrganizationRemoveMember({
+            memberId: deletedMember.id,
+            organizationId: deletedMember.organizationId,
+          })
+        );
+      },
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedMember } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.OrganizationUpdateMemberRole({
+            memberId: updatedMember.id,
+            organizationId: updatedMember.organizationId,
+            role: updatedMember.role,
+          })
+        );
+      },
+    })
+  );
+}
+
+export function invitationsCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("invitationsCollection", scope);
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("invitations"),
+
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.OrganizationInvitationsList({ organizationId }),
+          { signal: ctx.signal }
+        );
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedInvitation } = mutation;
+        await fetchRpc((rpc) =>
+          rpc.OrganizationCancelInvitation({
+            invitationId: deletedInvitation.id,
+            organizationId: deletedInvitation.organizationId,
+          })
+        );
+      },
+    })
+  );
+}
+
+export function commentCollection(scope: DashboardCollectionScope) {
+  const id = slugScopedCollectionId("commentCollection", scope);
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: (opts) =>
+        slugScopedQueryKey("comment", parseLoadSubsetOptions(opts).filters),
+      syncMode: "on-demand",
+
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+        const slug = resolvePostSlug(
+          parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+        );
+
+        if (!(organizationId && slug)) {
+          return [];
+        }
+
+        try {
+          const data = await fetchRpc(
+            (rpc) => rpc.CommentList({ organizationId, slug }),
+            { signal: ctx.signal }
+          );
+          return [...data];
+        } catch {
+          return [];
+        }
+      },
+      getKey: (item) => item.id,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newComment } = mutation;
+
+        // SAFETY: post-ui attaches the transient author payload declared on
+        // PostWithTransientAuthor above.
+        const author = (newComment as PostWithTransientAuthor).author;
+
+        await fetchRpc(
+          (rpc) =>
+            rpc.CommentCreate({
+              organizationId: newComment.organizationId,
+              visibility: newComment.visibility,
+              content: newComment.content,
+              postId: newComment.postId,
+              parentCommentId: newComment.parentCommentId,
+              id: newComment.id,
+              ...(author ? { author } : undefined),
+              statusUpdateId: newComment.statusUpdateId ?? null,
+            }),
+          {}
+        );
+
+        // The comment row is the mutation target and is already reconciled
+        // optimistically; the activity timeline, post rows, and delete-hint set
+        // are derived from it, so they refresh detached rather than holding the
+        // insert open for three round trips.
+        refetchInBackground(
+          client.collection(postActivityCollection(scope)).utils.refetch(),
+          client.collection(postCollection(scope)).utils.refetch(),
+          client.collection(deleteEligibilityCollection(scope)).utils.refetch()
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedComment } = mutation;
+
+        await fetchRpc(
+          (rpc) =>
+            rpc.CommentDelete({
+              id: deletedComment.id,
+              organizationId: deletedComment.organizationId,
+              postId: deletedComment.postId,
+            }),
+          {}
+        );
+
+        // Same as the insert path: the optimistic delete already removed the
+        // row, so the derived collections refresh detached.
+        refetchInBackground(
+          client.collection(postActivityCollection(scope)).utils.refetch(),
+          client.collection(postCollection(scope)).utils.refetch(),
+          client.collection(deleteEligibilityCollection(scope)).utils.refetch()
+        );
+      },
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedComment } = mutation;
+
+        await fetchRpc(
+          (rpc) =>
+            rpc.CommentUpdate({
+              id: updatedComment.id,
+              organizationId: updatedComment.organizationId,
+              postId: updatedComment.postId,
+              content: updatedComment.content,
+              visibility: updatedComment.visibility,
+            }),
+          {}
+        );
+
+        // Only the activity entry is derived from an edit: refresh it detached.
+        refetchInBackground(
+          client.collection(postActivityCollection(scope)).utils.refetch()
+        );
+      },
+    })
+  );
+}
+
+export function postActivityCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("postActivityCollection", scope);
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: (opts) => {
+        const postId = eqFilterValue(
+          parseLoadSubsetOptions(opts).filters,
+          "postId"
+        );
+
+        return postId
+          ? organizationScopedQueryKey("post-activity", "postId", postId)
+          : organizationScopedQueryKey("post-activity");
+      },
+      syncMode: "on-demand",
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+        const postId = eqFilterValue(
+          parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters,
+          "postId"
+        );
+
+        if (!(organizationId && postId)) {
+          return [];
+        }
+
+        const existingData =
+          client
+            .requireDependency<QueryClient>("queryClient")
+            .getQueryData<readonly TPostActivity[]>(ctx.queryKey) ?? [];
+        const since = existingData.reduce<Date | undefined>(
+          (latest, activity) =>
+            latest === undefined || activity.createdAt > latest
+              ? activity.createdAt
+              : latest,
+          undefined
+        );
+        const changes = await fetchRpc(
+          (rpc) =>
+            rpc.PostActivityList({
+              organizationId,
+              postId,
+              ...(since === undefined ? undefined : { since }),
+            }),
+          { signal: ctx.signal }
+        );
+        const merged = new Map(
+          existingData.map((activity) => [activity.id, activity])
+        );
+        for (const activity of changes) {
+          merged.set(activity.id, activity);
+        }
+        // Preserve the full merged history: the timeline renders every activity
+        // and `since` only moves forward, so dropping entries would make that
+        // history permanently unreachable (the backend offers no backfill for
+        // older-than-window rows).
+        const ordered = [...merged.values()].sort(
+          (left, right) => +left.createdAt - +right.createdAt
+        );
+        return ordered;
+      },
+      getKey: (item) => item.id,
+    })
+  );
+}
+
+export function commentReactionCollection(scope: DashboardCollectionScope) {
+  const id = slugScopedCollectionId("commentReactionCollection", scope);
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: (opts) =>
+        slugScopedQueryKey(
+          "comment-reaction",
+          parseLoadSubsetOptions(opts).filters
+        ),
+      syncMode: "on-demand",
+
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+        const slug = resolvePostSlug(
+          parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+        );
+
+        if (!(organizationId && slug)) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.CommentReactionList({ organizationId, slug }),
+          {
+            signal: ctx.signal,
+          }
+        );
+        return [...data];
+      },
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      getKey: getCommentReactionCollectionKey as (
+        item: CommentReactionRow
+      ) => string,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newCommentReaction } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.CommentReactionToggle({
+            organizationId: newCommentReaction.organizationId,
+            postId: newCommentReaction.postId,
+            commentId: newCommentReaction.commentId,
+            emoji: newCommentReaction.emoji,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedCommentReaction } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.CommentReactionToggle({
+            organizationId: deletedCommentReaction.organizationId,
+            postId: deletedCommentReaction.postId,
+            commentId: deletedCommentReaction.commentId,
+            emoji: deletedCommentReaction.emoji,
+          })
+        );
+      },
+    })
+  );
+}
+
+export function upvoteCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("upvoteCollection", scope);
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      // Lazy key: resolved at query time so navigation between organizations
+      // never reuses another organization's cache entry (matches queryFn).
+      queryKey: () => organizationScopedQueryKey("upvote"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.UpvoteList({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+        return [...data];
+      },
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      getKey: getUpvoteCollectionKey as (item: UpvoteRow) => string,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newUpvote } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.UpvoteToggle({
+            organizationId: newUpvote.organizationId,
+            postId: newUpvote.postId,
+          })
+        );
+        // The upvote row is the mutation target and holds the toggle
+        // optimistically; vote counts derive from this collection client-side
+        // (post rows carry no count), so the post rows and the delete-hint set
+        // are derived refreshes that run detached.
+        refetchInBackground(
+          client.collection(postCollection(scope)).utils.refetch(),
+          client.collection(deleteEligibilityCollection(scope)).utils.refetch()
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedUpvote } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.UpvoteToggle({
+            organizationId: deletedUpvote.organizationId,
+            postId: deletedUpvote.postId,
+          })
+        );
+        // Same as the insert path: derived refreshes run detached.
+        refetchInBackground(
+          client.collection(postCollection(scope)).utils.refetch(),
+          client.collection(deleteEligibilityCollection(scope)).utils.refetch()
+        );
+      },
+    })
+  );
+}
 
 /**
  * Creator delete hints for the whole organization, synced once. List rows
@@ -1178,735 +1219,1037 @@ upvoteCollection.createIndex((row) => row.postId, {
  * backend delete path re-validates. Presence of a row means eligible.
  * Refetch after engagement mutations (see the call sites below).
  */
-export const deleteEligibilityCollection = createCollection(
-  queryCollectionOptions({
-    id: "deleteEligibilityCollection",
-    queryKey: () => organizationScopedQueryKey("delete-eligibility"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
+export function deleteEligibilityCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId(
+    "deleteEligibilityCollection",
+    scope
+  );
 
-      if (!organizationId) {
-        return [];
-      }
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("delete-eligibility"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
 
-      const result = await fetchRpc(
-        (rpc) => rpc.PostDeleteEligibilityList({ organizationId }),
-        { signal: ctx.signal }
-      );
-      return result.eligibleIds.map((postId) => ({
-        organizationId,
-        postId,
-      }));
-    },
-    queryClient,
-    getKey: (item) => item.postId,
-  })
-);
-
-deleteEligibilityCollection.createIndex((row) => row.postId, {
-  indexType: BasicIndex,
-});
-
-export const postReactionCollection = createCollection(
-  queryCollectionOptions({
-    id: "postReactionCollection",
-    queryKey: (opts) =>
-      slugScopedQueryKey("post-reaction", parseLoadSubsetOptions(opts).filters),
-    syncMode: "on-demand",
-
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      const slug = resolvePostSlug(
-        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
-      );
-
-      if (!(organizationId && slug)) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.PostReactionList({ organizationId, slug }),
-        {
-          signal: ctx.signal,
+        if (!organizationId) {
+          return [];
         }
-      );
-      return [...data];
+
+        const result = await fetchRpc(
+          (rpc) => rpc.PostDeleteEligibilityList({ organizationId }),
+          { signal: ctx.signal }
+        );
+        return result.eligibleIds.map((postId) => ({
+          organizationId,
+          postId,
+        }));
+      },
+      getKey: (item) => item.postId,
+    })
+  );
+}
+
+export function postReactionCollection(scope: DashboardCollectionScope) {
+  const id = slugScopedCollectionId("postReactionCollection", scope);
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: (opts) =>
+        slugScopedQueryKey(
+          "post-reaction",
+          parseLoadSubsetOptions(opts).filters
+        ),
+      syncMode: "on-demand",
+
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+        const slug = resolvePostSlug(
+          parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+        );
+
+        if (!(organizationId && slug)) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.PostReactionList({ organizationId, slug }),
+          {
+            signal: ctx.signal,
+          }
+        );
+        return [...data];
+        // SAFETY: The endpoint/API contract guarantees this response shape.
+      },
       // SAFETY: The endpoint/API contract guarantees this response shape.
-    },
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    queryClient,
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    getKey: getPostReactionCollectionKey as (item: PostReactionRow) => string,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newPostReaction } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.PostReactionToggle({
-          organizationId: newPostReaction.organizationId,
-          postId: newPostReaction.postId,
-          emoji: newPostReaction.emoji,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedPostReaction } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.PostReactionToggle({
-          organizationId: deletedPostReaction.organizationId,
-          postId: deletedPostReaction.postId,
-          emoji: deletedPostReaction.emoji,
-        })
-      );
-    },
-  })
-);
-
-export const siteCollection = createCollection(
-  queryCollectionOptions({
-    id: "siteCollection",
-    queryKey: () => organizationScopedQueryKey("site"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc((rpc) => rpc.SiteList({ organizationId }), {
-        signal: ctx.signal,
-      });
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    refetchInterval: Duration.toMillis(Duration.minutes(30)),
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedSite } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.SiteUpdate({
-          id: updatedSite.id,
-          organizationId: updatedSite.organizationId,
-          changelogVisibility: updatedSite.changelogVisibility,
-          roadmapVisibility: updatedSite.roadmapVisibility,
-          noIndex: updatedSite.noIndex,
-          name: updatedSite.name,
-        })
-      );
-    },
-  })
-);
-
-export const workspacePlanCollection = createCollection(
-  queryCollectionOptions({
-    id: "workspacePlanCollection",
-    queryKey: () => organizationScopedQueryKey("workspace-plan"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.WorkspacePlanGet({ organizationId }),
-        {
-          signal: ctx.signal,
-        }
-      );
-      return [data];
-    },
-    queryClient,
-    getKey: (item) => item.organizationId,
-    staleTime: Number.POSITIVE_INFINITY,
-  })
-);
-
-export const postSubscriptionCollection = createCollection(
-  queryCollectionOptions({
-    id: "postSubscriptionCollection",
-    queryKey: (opts) =>
-      slugScopedQueryKey(
-        "post-subscription",
-        parseLoadSubsetOptions(opts).filters
-      ),
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      const slug = resolvePostSlug(
-        parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
-      );
-
-      if (!(organizationId && slug)) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.PostSubscriptionList({ organizationId, slug }),
-        {
-          signal: ctx.signal,
-        }
-      );
       // SAFETY: The endpoint/API contract guarantees this response shape.
-      return [...data];
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    },
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    queryClient,
-    // SAFETY: The endpoint/API contract guarantees this response shape.
-    getKey: getPostSubscriptionCollectionKey as (
-      item: PostSubscriptionRow
-    ) => string,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newSubscription } = mutation;
+      getKey: getPostReactionCollectionKey as (item: PostReactionRow) => string,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newPostReaction } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.PostSubscriptionCreate({
-          organizationId: newSubscription.organizationId,
-          postId: newSubscription.postId,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedSubscription } = mutation;
+        await fetchRpc((rpc) =>
+          rpc.PostReactionToggle({
+            organizationId: newPostReaction.organizationId,
+            postId: newPostReaction.postId,
+            emoji: newPostReaction.emoji,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedPostReaction } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.PostSubscriptionDelete({
-          organizationId: deletedSubscription.organizationId,
-          postId: deletedSubscription.postId,
-        })
-      );
-    },
-  })
-);
+        await fetchRpc((rpc) =>
+          rpc.PostReactionToggle({
+            organizationId: deletedPostReaction.organizationId,
+            postId: deletedPostReaction.postId,
+            emoji: deletedPostReaction.emoji,
+          })
+        );
+      },
+    })
+  );
+}
 
-export const jwtSecretCollection = createCollection(
-  queryCollectionOptions({
-    id: "jwtSecretCollection",
-    queryKey: () => organizationScopedQueryKey("jwt-secret"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
+export function siteCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("siteCollection", scope);
 
-      if (!organizationId) {
-        return [];
-      }
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("site"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
 
-      const data = await fetchRpc(
-        (rpc) => rpc.JwtSecretList({ organizationId }),
-        { signal: ctx.signal }
-      );
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
+        if (!organizationId) {
+          return [];
+        }
 
-export const contactCollection = createCollection(
-  queryCollectionOptions({
-    id: "contactCollection",
-    queryKey: () => organizationScopedQueryKey("contact"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
+        const data = await fetchRpc((rpc) => rpc.SiteList({ organizationId }), {
+          signal: ctx.signal,
+        });
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      refetchInterval: Duration.toMillis(Duration.minutes(30)),
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedSite } = mutation;
 
-      if (!organizationId) {
-        return [];
-      }
+        await fetchRpc((rpc) =>
+          rpc.SiteUpdate({
+            id: updatedSite.id,
+            organizationId: updatedSite.organizationId,
+            changelogVisibility: updatedSite.changelogVisibility,
+            roadmapVisibility: updatedSite.roadmapVisibility,
+            noIndex: updatedSite.noIndex,
+            name: updatedSite.name,
+          })
+        );
+      },
+    })
+  );
+}
 
-      const data = await fetchRpc(
-        (rpc) => rpc.ContactList({ organizationId }),
-        { signal: ctx.signal }
-      );
+export function workspacePlanCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("workspacePlanCollection", scope);
 
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedContact } = mutation;
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("workspace-plan"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
 
-      await fetchRpc((rpc) =>
-        rpc.ContactUpdate({
-          id: updatedContact.id,
-          organizationId: updatedContact.organizationId,
-          externalId: updatedContact.externalId,
-          email: updatedContact.email,
-          name: updatedContact.name,
-          phone: updatedContact.phone,
-          avatar: updatedContact.avatar,
-          companyId: updatedContact.companyId,
-        })
-      );
-    },
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newContact } = mutation;
+        if (!organizationId) {
+          return [];
+        }
 
-      await fetchRpc((rpc) =>
-        rpc.ContactCreate({
-          id: newContact.id,
-          organizationId: newContact.organizationId,
-          externalId: newContact.externalId,
-          email: newContact.email,
-          name: newContact.name,
-          phone: newContact.phone,
-          avatar: newContact.avatar,
-          companyId: newContact.companyId,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedContact } = mutation;
+        const data = await fetchRpc(
+          (rpc) => rpc.WorkspacePlanGet({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+        return [data];
+      },
+      getKey: (item) => item.organizationId,
+      staleTime: Number.POSITIVE_INFINITY,
+    })
+  );
+}
 
-      await fetchRpc((rpc) =>
-        rpc.ContactDelete({
-          id: deletedContact.id,
-          organizationId: deletedContact.organizationId,
-        })
-      );
-    },
-  })
-);
+export function postSubscriptionCollection(scope: DashboardCollectionScope) {
+  const id = slugScopedCollectionId("postSubscriptionCollection", scope);
 
-export const companyCollection = createCollection(
-  queryCollectionOptions({
-    id: "companyCollection",
-    queryKey: () => organizationScopedQueryKey("company"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: (opts) =>
+        slugScopedQueryKey(
+          "post-subscription",
+          parseLoadSubsetOptions(opts).filters
+        ),
+      syncMode: "on-demand",
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+        const slug = resolvePostSlug(
+          parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
+        );
 
-      if (!organizationId) {
-        return [];
-      }
+        if (!(organizationId && slug)) {
+          return [];
+        }
 
-      const data = await fetchRpc(
-        (rpc) => rpc.CompanyList({ organizationId }),
-        { signal: ctx.signal }
-      );
+        const data = await fetchRpc(
+          (rpc) => rpc.PostSubscriptionList({ organizationId, slug }),
+          {
+            signal: ctx.signal,
+          }
+        );
+        // SAFETY: The endpoint/API contract guarantees this response shape.
+        return [...data];
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      },
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      // SAFETY: The endpoint/API contract guarantees this response shape.
+      getKey: getPostSubscriptionCollectionKey as (
+        item: PostSubscriptionRow
+      ) => string,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newSubscription } = mutation;
 
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedCompany } = mutation;
+        await fetchRpc((rpc) =>
+          rpc.PostSubscriptionCreate({
+            organizationId: newSubscription.organizationId,
+            postId: newSubscription.postId,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedSubscription } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.CompanyUpdate({
-          id: updatedCompany.id,
-          organizationId: updatedCompany.organizationId,
-          externalId: updatedCompany.externalId,
-          name: updatedCompany.name,
-          avatar: updatedCompany.avatar,
-          externalCreatedAt: updatedCompany.externalCreatedAt,
-        })
-      );
-    },
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newCompany } = mutation;
+        await fetchRpc((rpc) =>
+          rpc.PostSubscriptionDelete({
+            organizationId: deletedSubscription.organizationId,
+            postId: deletedSubscription.postId,
+          })
+        );
+      },
+    })
+  );
+}
 
-      await fetchRpc((rpc) =>
-        rpc.CompanyCreate({
-          id: newCompany.id,
-          organizationId: newCompany.organizationId,
-          externalId: newCompany.externalId,
-          name: newCompany.name,
-          avatar: newCompany.avatar,
-          externalCreatedAt: newCompany.externalCreatedAt,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedCompany } = mutation;
+export function jwtSecretCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("jwtSecretCollection", scope);
 
-      await fetchRpc((rpc) =>
-        rpc.CompanyDelete({
-          id: deletedCompany.id,
-          organizationId: deletedCompany.organizationId,
-        })
-      );
-    },
-  })
-);
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("jwt-secret"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.JwtSecretList({ organizationId }),
+          { signal: ctx.signal }
+        );
+        return [...data];
+      },
+      getKey: (item) => item.id,
+    })
+  );
+}
+
+export function contactCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("contactCollection", scope);
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("contact"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.ContactList({ organizationId }),
+          { signal: ctx.signal }
+        );
+
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedContact } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.ContactUpdate({
+            id: updatedContact.id,
+            organizationId: updatedContact.organizationId,
+            externalId: updatedContact.externalId,
+            email: updatedContact.email,
+            name: updatedContact.name,
+            phone: updatedContact.phone,
+            avatar: updatedContact.avatar,
+            companyId: updatedContact.companyId,
+          })
+        );
+      },
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newContact } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.ContactCreate({
+            id: newContact.id,
+            organizationId: newContact.organizationId,
+            externalId: newContact.externalId,
+            email: newContact.email,
+            name: newContact.name,
+            phone: newContact.phone,
+            avatar: newContact.avatar,
+            companyId: newContact.companyId,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedContact } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.ContactDelete({
+            id: deletedContact.id,
+            organizationId: deletedContact.organizationId,
+          })
+        );
+      },
+    })
+  );
+}
+
+export function companyCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("companyCollection", scope);
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("company"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.CompanyList({ organizationId }),
+          { signal: ctx.signal }
+        );
+
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedCompany } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.CompanyUpdate({
+            id: updatedCompany.id,
+            organizationId: updatedCompany.organizationId,
+            externalId: updatedCompany.externalId,
+            name: updatedCompany.name,
+            avatar: updatedCompany.avatar,
+            externalCreatedAt: updatedCompany.externalCreatedAt,
+          })
+        );
+      },
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newCompany } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.CompanyCreate({
+            id: newCompany.id,
+            organizationId: newCompany.organizationId,
+            externalId: newCompany.externalId,
+            name: newCompany.name,
+            avatar: newCompany.avatar,
+            externalCreatedAt: newCompany.externalCreatedAt,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedCompany } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.CompanyDelete({
+            id: deletedCompany.id,
+            organizationId: deletedCompany.organizationId,
+          })
+        );
+      },
+    })
+  );
+}
 
 //Todo scope
-export const contactAttributeDefinitionCollection = createCollection(
-  queryCollectionOptions({
-    id: "contactAttributeDefinitionCollection",
-    queryKey: () => organizationScopedQueryKey("contact-attribute-definition"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
+export function contactAttributeDefinitionCollection(
+  scope: DashboardCollectionScope
+) {
+  const id = organizationScopedCollectionId(
+    "contactAttributeDefinitionCollection",
+    scope
+  );
 
-      if (!organizationId) {
-        return [];
-      }
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () =>
+        organizationScopedQueryKey("contact-attribute-definition"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
 
-      const data = await fetchRpc(
-        (rpc) => rpc.ContactAttributeDefinitionList({ organizationId }),
-        { signal: ctx.signal }
-      );
+        if (!organizationId) {
+          return [];
+        }
 
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: definition } = mutation;
+        const data = await fetchRpc(
+          (rpc) => rpc.ContactAttributeDefinitionList({ organizationId }),
+          { signal: ctx.signal }
+        );
 
-      await fetchRpc((rpc) =>
-        rpc.ContactAttributeDefinitionUpdate({
-          id: definition.id,
-          name: definition.name,
-          key: definition.key,
-          description: definition.description,
-          isRequired: definition.isRequired,
-          organizationId: definition.organizationId,
-        })
-      );
-    },
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: definition } = mutation;
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: definition } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.ContactAttributeDefinitionCreate({
-          id: definition.id,
-          name: definition.name,
-          key: definition.key,
-          description: definition.description,
-          type: definition.type,
-          isRequired: definition.isRequired,
-          organizationId: definition.organizationId,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: definition } = mutation;
+        await fetchRpc((rpc) =>
+          rpc.ContactAttributeDefinitionUpdate({
+            id: definition.id,
+            name: definition.name,
+            key: definition.key,
+            description: definition.description,
+            isRequired: definition.isRequired,
+            organizationId: definition.organizationId,
+          })
+        );
+      },
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: definition } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.ContactAttributeDefinitionDelete({
-          id: definition.id,
-          organizationId: definition.organizationId,
-        })
-      );
-    },
-  })
-);
+        await fetchRpc((rpc) =>
+          rpc.ContactAttributeDefinitionCreate({
+            id: definition.id,
+            name: definition.name,
+            key: definition.key,
+            description: definition.description,
+            type: definition.type,
+            isRequired: definition.isRequired,
+            organizationId: definition.organizationId,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: definition } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.ContactAttributeDefinitionDelete({
+            id: definition.id,
+            organizationId: definition.organizationId,
+          })
+        );
+      },
+    })
+  );
+}
 
 //Todo scope
-export const companyAttributeDefinitionCollection = createCollection(
-  queryCollectionOptions({
-    id: "companyAttributeDefinitionCollection",
-    queryKey: () => organizationScopedQueryKey("company-attribute-definition"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
+export function companyAttributeDefinitionCollection(
+  scope: DashboardCollectionScope
+) {
+  const id = organizationScopedCollectionId(
+    "companyAttributeDefinitionCollection",
+    scope
+  );
 
-      if (!organizationId) {
-        return [];
-      }
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () =>
+        organizationScopedQueryKey("company-attribute-definition"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
 
-      const data = await fetchRpc(
-        (rpc) => rpc.CompanyAttributeDefinitionList({ organizationId }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: definition } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.CompanyAttributeDefinitionUpdate({
-          id: definition.id,
-          name: definition.name,
-          key: definition.key,
-          description: definition.description,
-          isRequired: definition.isRequired,
-          organizationId: definition.organizationId,
-        })
-      );
-    },
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: definition } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.CompanyAttributeDefinitionCreate({
-          id: definition.id,
-          name: definition.name,
-          key: definition.key,
-          description: definition.description,
-          type: definition.type,
-          isRequired: definition.isRequired,
-          organizationId: definition.organizationId,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: definition } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.CompanyAttributeDefinitionDelete({
-          id: definition.id,
-          organizationId: definition.organizationId,
-        })
-      );
-    },
-  })
-);
-
-export const contactAttributeValueCollection = createCollection(
-  queryCollectionOptions({
-    id: "contactAttributeValueCollection",
-    queryKey: () => organizationScopedQueryKey("contact-attribute-value"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.ContactAttributeValueList({ organizationId }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const companyAttributeValueCollection = createCollection(
-  queryCollectionOptions({
-    id: "companyAttributeValueCollection",
-    queryKey: () => organizationScopedQueryKey("company-attribute-value"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.CompanyAttributeValueList({ organizationId }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const roadmapCollection = createCollection(
-  queryCollectionOptions({
-    id: "roadmapCollection",
-    queryKey: () => organizationScopedQueryKey("roadmap"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.RoadmapList({ organizationId }),
-        {
-          signal: ctx.signal,
+        if (!organizationId) {
+          return [];
         }
-      );
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newRoadmap } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.RoadmapCreate({
-          id: newRoadmap.id,
-          organizationId: newRoadmap.organizationId,
-          name: newRoadmap.name,
-          slug: newRoadmap.slug,
-          description: newRoadmap.description,
-          isPrimary: newRoadmap.isPrimary,
-          mode: newRoadmap.mode,
-          visibility: newRoadmap.visibility,
-          filter: newRoadmap.filter,
-        })
-      );
-    },
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedRoadmap } = mutation;
+        const data = await fetchRpc(
+          (rpc) => rpc.CompanyAttributeDefinitionList({ organizationId }),
+          { signal: ctx.signal }
+        );
 
-      await fetchRpc((rpc) =>
-        rpc.RoadmapUpdate({
-          id: updatedRoadmap.id,
-          organizationId: updatedRoadmap.organizationId,
-          name: updatedRoadmap.name,
-          slug: updatedRoadmap.slug,
-          description: updatedRoadmap.description,
-          isPrimary: updatedRoadmap.isPrimary,
-          mode: updatedRoadmap.mode,
-          visibility: updatedRoadmap.visibility,
-          filter: updatedRoadmap.filter,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedRoadmap } = mutation;
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: definition } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.RoadmapDelete({
-          id: deletedRoadmap.id,
-          organizationId: deletedRoadmap.organizationId,
-        })
-      );
+        await fetchRpc((rpc) =>
+          rpc.CompanyAttributeDefinitionUpdate({
+            id: definition.id,
+            name: definition.name,
+            key: definition.key,
+            description: definition.description,
+            isRequired: definition.isRequired,
+            organizationId: definition.organizationId,
+          })
+        );
+      },
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: definition } = mutation;
 
-      // Deleting the primary promotes a successor in the same server
-      // transaction; read the rows back so the cached `isPrimary` flags match
-      // the handoff instead of leaving the organization without a primary in
-      // the client cache.
-      await roadmapCollection.utils.refetch();
-    },
-  })
-);
+        await fetchRpc((rpc) =>
+          rpc.CompanyAttributeDefinitionCreate({
+            id: definition.id,
+            name: definition.name,
+            key: definition.key,
+            description: definition.description,
+            type: definition.type,
+            isRequired: definition.isRequired,
+            organizationId: definition.organizationId,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: definition } = mutation;
 
-export const roadmapColumnCollection = createCollection(
-  queryCollectionOptions({
-    id: "roadmapColumnCollection",
-    queryKey: () => organizationScopedQueryKey("roadmap-column"),
-    queryFn: async (ctx) => {
-      const organizationId = getCurrentOrganizationId();
+        await fetchRpc((rpc) =>
+          rpc.CompanyAttributeDefinitionDelete({
+            id: definition.id,
+            organizationId: definition.organizationId,
+          })
+        );
+      },
+    })
+  );
+}
 
-      if (!organizationId) {
-        return [];
-      }
+export function contactAttributeValueCollection(
+  scope: DashboardCollectionScope
+) {
+  const id = organizationScopedCollectionId(
+    "contactAttributeValueCollection",
+    scope
+  );
 
-      const data = await fetchRpc(
-        (rpc) => rpc.RoadmapColumnList({ organizationId }),
-        { signal: ctx.signal }
-      );
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("contact-attribute-value"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
 
-      return [...data];
-    },
-    queryClient,
-    getKey: (item) => item.id,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newColumn } = mutation;
-      const organizationId = getCurrentOrganizationId();
+        if (!organizationId) {
+          return [];
+        }
 
-      if (!organizationId) {
-        throw new Error("Missing organization id");
-      }
+        const data = await fetchRpc(
+          (rpc) => rpc.ContactAttributeValueList({ organizationId }),
+          { signal: ctx.signal }
+        );
 
-      await fetchRpc((rpc) =>
-        rpc.RoadmapColumnCreate({
-          id: newColumn.id,
-          roadmapId: newColumn.roadmapId,
-          organizationId,
-          name: newColumn.name,
-          position: newColumn.position,
-          config: { type: "status", statusId: newColumn.statusId },
-        })
-      );
-    },
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedColumn } = mutation;
-      const organizationId = getCurrentOrganizationId();
+        return [...data];
+      },
+      getKey: (item) => item.id,
+    })
+  );
+}
 
-      if (!organizationId) {
-        throw new Error("Missing organization id");
-      }
+export function companyAttributeValueCollection(
+  scope: DashboardCollectionScope
+) {
+  const id = organizationScopedCollectionId(
+    "companyAttributeValueCollection",
+    scope
+  );
 
-      await fetchRpc((rpc) =>
-        rpc.RoadmapColumnUpdate({
-          id: updatedColumn.id,
-          roadmapId: updatedColumn.roadmapId,
-          organizationId,
-          name: updatedColumn.name,
-          position: updatedColumn.position,
-          config: { type: "status", statusId: updatedColumn.statusId },
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedColumn } = mutation;
-      const organizationId = getCurrentOrganizationId();
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("company-attribute-value"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
 
-      if (!organizationId) {
-        throw new Error("Missing organization id");
-      }
+        if (!organizationId) {
+          return [];
+        }
 
-      await fetchRpc((rpc) =>
-        rpc.RoadmapColumnDelete({
-          id: deletedColumn.id,
-          roadmapId: deletedColumn.roadmapId,
-          organizationId,
-        })
-      );
-    },
-  })
-);
+        const data = await fetchRpc(
+          (rpc) => rpc.CompanyAttributeValueList({ organizationId }),
+          { signal: ctx.signal }
+        );
 
+        return [...data];
+      },
+      getKey: (item) => item.id,
+    })
+  );
+}
+
+export function roadmapCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("roadmapCollection", scope);
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("roadmap"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.RoadmapList({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newRoadmap } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.RoadmapCreate({
+            id: newRoadmap.id,
+            organizationId: newRoadmap.organizationId,
+            name: newRoadmap.name,
+            slug: newRoadmap.slug,
+            description: newRoadmap.description,
+            isPrimary: newRoadmap.isPrimary,
+            mode: newRoadmap.mode,
+            visibility: newRoadmap.visibility,
+            filter: newRoadmap.filter,
+          })
+        );
+      },
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedRoadmap } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.RoadmapUpdate({
+            id: updatedRoadmap.id,
+            organizationId: updatedRoadmap.organizationId,
+            name: updatedRoadmap.name,
+            slug: updatedRoadmap.slug,
+            description: updatedRoadmap.description,
+            isPrimary: updatedRoadmap.isPrimary,
+            mode: updatedRoadmap.mode,
+            visibility: updatedRoadmap.visibility,
+            filter: updatedRoadmap.filter,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedRoadmap } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.RoadmapDelete({
+            id: deletedRoadmap.id,
+            organizationId: deletedRoadmap.organizationId,
+          })
+        );
+
+        // Deleting the primary promotes a successor in the same server
+        // transaction; read the rows back so the cached `isPrimary` flags match
+        // the handoff instead of leaving the organization without a primary in
+        // the client cache.
+        await client.collection(roadmapCollection(scope)).utils.refetch();
+      },
+    })
+  );
+}
+
+export function roadmapColumnCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("roadmapColumnCollection", scope);
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey("roadmap-column"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.RoadmapColumnList({ organizationId }),
+          { signal: ctx.signal }
+        );
+
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newColumn } = mutation;
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          throw new Error("Missing organization id");
+        }
+
+        await fetchRpc((rpc) =>
+          rpc.RoadmapColumnCreate({
+            id: newColumn.id,
+            roadmapId: newColumn.roadmapId,
+            organizationId,
+            name: newColumn.name,
+            position: newColumn.position,
+            config: { type: "status", statusId: newColumn.statusId },
+          })
+        );
+      },
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedColumn } = mutation;
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          throw new Error("Missing organization id");
+        }
+
+        await fetchRpc((rpc) =>
+          rpc.RoadmapColumnUpdate({
+            id: updatedColumn.id,
+            roadmapId: updatedColumn.roadmapId,
+            organizationId,
+            name: updatedColumn.name,
+            position: updatedColumn.position,
+            config: { type: "status", statusId: updatedColumn.statusId },
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedColumn } = mutation;
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          throw new Error("Missing organization id");
+        }
+
+        await fetchRpc((rpc) =>
+          rpc.RoadmapColumnDelete({
+            id: deletedColumn.id,
+            roadmapId: deletedColumn.roadmapId,
+            organizationId,
+          })
+        );
+      },
+    })
+  );
+}
+
+/**
+ * `createIndex` is a `Collection` method rather than a config field, so an index
+ * cannot live in a descriptor config. Indexes are applied on first
+ * materialization instead, keyed by collection id — which is what `DbClient`
+ * memoizes on — so repeated reads do not stack duplicate indexes.
+ */
+const indexedCollectionIds = new Set<string>();
+
+function withIndexes<TCollection extends { id: string }>(
+  collection: TCollection,
+  addIndexes: (collection: TCollection) => void
+): TCollection {
+  if (!indexedCollectionIds.has(collection.id)) {
+    indexedCollectionIds.add(collection.id);
+    addIndexes(collection);
+  }
+
+  return collection;
+}
+
+/**
+ * Materializes every dashboard collection for the current scope through the
+ * browser `DbClient`.
+ *
+ * Getter-based rather than a frozen map so a collection's identity follows the
+ * current organization (and post) instead of being fixed at module load. The
+ * `DbClient` memoizes by descriptor id, so repeated reads within one scope
+ * return the same instance and React memo dependencies stay stable.
+ */
 export const dashboardCollections = {
-  boardCollection,
-  changelogCategoryCollection,
-  changelogCategoryLinkCollection,
-  changelogCollection,
-  changelogPostCollection,
-  commentCollection,
-  commentReactionCollection,
-  companyCollection,
-  deleteEligibilityCollection,
-  companyAttributeDefinitionCollection,
-  companyAttributeValueCollection,
-  contactAttributeDefinitionCollection,
-  contactAttributeValueCollection,
-  contactCollection,
-  invitationsCollection,
-  jwtSecretCollection,
-  membersCollection,
-  membershipCollection,
-  organizationCollection,
-  postCollection,
-  postDetailCollection,
-  postActivityCollection,
-  postReactionCollection,
-  postStatusCollection,
-  postSubscriptionCollection,
-  roadmapCollection,
-  roadmapColumnCollection,
-  postTagCollection,
-  siteCollection,
-  tagCollection,
-  upvoteCollection,
-  workspacePlanCollection,
+  get boardCollection() {
+    return withIndexes(
+      getBrowserDbClient().collection(boardCollection(currentScope())),
+      (collection) => {
+        collection.createIndex((row) => row.organizationId, {
+          indexType: BasicIndex,
+        });
+        // Post board queries join posts against boards by id.
+        collection.createIndex((row) => row.id, {
+          indexType: BasicIndex,
+        });
+      }
+    );
+  },
+  get changelogCategoryCollection() {
+    return getBrowserDbClient().collection(
+      changelogCategoryCollection(currentScope())
+    );
+  },
+  get changelogCategoryLinkCollection() {
+    return getBrowserDbClient().collection(
+      changelogCategoryLinkCollection(currentScope())
+    );
+  },
+  get changelogCollection() {
+    return getBrowserDbClient().collection(changelogCollection(currentScope()));
+  },
+  get changelogPostCollection() {
+    return withIndexes(
+      getBrowserDbClient().collection(changelogPostCollection(currentScope())),
+      (collection) => {
+        // Changelog completed-posts joins entries against posts by post id.
+        collection.createIndex((row) => row.postId, {
+          indexType: BasicIndex,
+        });
+      }
+    );
+  },
+  get commentCollection() {
+    return getBrowserDbClient().collection(commentCollection(currentScope()));
+  },
+  get commentReactionCollection() {
+    return getBrowserDbClient().collection(
+      commentReactionCollection(currentScope())
+    );
+  },
+  get companyCollection() {
+    return getBrowserDbClient().collection(companyCollection(currentScope()));
+  },
+  get deleteEligibilityCollection() {
+    return withIndexes(
+      getBrowserDbClient().collection(
+        deleteEligibilityCollection(currentScope())
+      ),
+      (collection) => {
+        collection.createIndex((row) => row.postId, {
+          indexType: BasicIndex,
+        });
+      }
+    );
+  },
+  get companyAttributeDefinitionCollection() {
+    return getBrowserDbClient().collection(
+      companyAttributeDefinitionCollection(currentScope())
+    );
+  },
+  get companyAttributeValueCollection() {
+    return getBrowserDbClient().collection(
+      companyAttributeValueCollection(currentScope())
+    );
+  },
+  get contactAttributeDefinitionCollection() {
+    return getBrowserDbClient().collection(
+      contactAttributeDefinitionCollection(currentScope())
+    );
+  },
+  get contactAttributeValueCollection() {
+    return getBrowserDbClient().collection(
+      contactAttributeValueCollection(currentScope())
+    );
+  },
+  get contactCollection() {
+    return getBrowserDbClient().collection(contactCollection(currentScope()));
+  },
+  get invitationsCollection() {
+    return getBrowserDbClient().collection(
+      invitationsCollection(currentScope())
+    );
+  },
+  get jwtSecretCollection() {
+    return getBrowserDbClient().collection(jwtSecretCollection(currentScope()));
+  },
+  get membersCollection() {
+    return getBrowserDbClient().collection(membersCollection(currentScope()));
+  },
+  get membershipCollection() {
+    return withIndexes(
+      getBrowserDbClient().collection(membershipCollection(currentScope())),
+      (collection) => {
+        // Workspace details joins memberships against organizations by org id.
+        collection.createIndex((row) => row.organizationId, {
+          indexType: BasicIndex,
+        });
+      }
+    );
+  },
+  get organizationCollection() {
+    return withIndexes(
+      getBrowserDbClient().collection(organizationCollection(currentScope())),
+      (collection) => {
+        // Workspace details joins memberships against organizations by org id.
+        collection.createIndex((row) => row.id, {
+          indexType: BasicIndex,
+        });
+      }
+    );
+  },
+  get postCollection() {
+    return withIndexes(
+      getBrowserDbClient().collection(postCollection(currentScope())),
+      (collection) => {
+        collection.createIndex((row) => row.createdAt, {
+          indexType: BasicIndex,
+        });
+        collection.createIndex((row) => row.statusId, {
+          indexType: BasicIndex,
+        });
+        collection.createIndex((row) => row.organizationId, {
+          indexType: BasicIndex,
+        });
+        collection.createIndex((row) => row.boardId, {
+          indexType: BasicIndex,
+        });
+      }
+    );
+  },
+  get postDetailCollection() {
+    return getBrowserDbClient().collection(
+      postDetailCollection(currentScope())
+    );
+  },
+  get postActivityCollection() {
+    return getBrowserDbClient().collection(
+      postActivityCollection(currentScope())
+    );
+  },
+  get postReactionCollection() {
+    return getBrowserDbClient().collection(
+      postReactionCollection(currentScope())
+    );
+  },
+  get postStatusCollection() {
+    return withIndexes(
+      getBrowserDbClient().collection(postStatusCollection(currentScope())),
+      (collection) => {
+        collection.createIndex((row) => row.organizationId, {
+          indexType: BasicIndex,
+        });
+        // Board, changelog, and merge queries join posts against status rows by id.
+        collection.createIndex((row) => row.id, {
+          indexType: BasicIndex,
+        });
+      }
+    );
+  },
+  get postSubscriptionCollection() {
+    return getBrowserDbClient().collection(
+      postSubscriptionCollection(currentScope())
+    );
+  },
+  get roadmapCollection() {
+    return getBrowserDbClient().collection(roadmapCollection(currentScope()));
+  },
+  get roadmapColumnCollection() {
+    return getBrowserDbClient().collection(
+      roadmapColumnCollection(currentScope())
+    );
+  },
+  get postTagCollection() {
+    return withIndexes(
+      getBrowserDbClient().collection(postTagCollection(currentScope())),
+      (collection) => {
+        collection.createIndex((row) => row.organizationId, {
+          indexType: BasicIndex,
+        });
+        collection.createIndex((row) => row.postId, {
+          indexType: BasicIndex,
+        });
+        collection.createIndex((row) => row.tagId, {
+          indexType: BasicIndex,
+        });
+      }
+    );
+  },
+  get siteCollection() {
+    return getBrowserDbClient().collection(siteCollection(currentScope()));
+  },
+  get tagCollection() {
+    return withIndexes(
+      getBrowserDbClient().collection(tagCollection(currentScope())),
+      (collection) => {
+        collection.createIndex((row) => row.organizationId, {
+          indexType: BasicIndex,
+        });
+      }
+    );
+  },
+  get upvoteCollection() {
+    return withIndexes(
+      getBrowserDbClient().collection(upvoteCollection(currentScope())),
+      (collection) => {
+        collection.createIndex((row) => row.organizationId, {
+          indexType: BasicIndex,
+        });
+        collection.createIndex((row) => row.postId, {
+          indexType: BasicIndex,
+        });
+      }
+    );
+  },
+  get workspacePlanCollection() {
+    return getBrowserDbClient().collection(
+      workspacePlanCollection(currentScope())
+    );
+  },
 };
 
 export type DashboardCollections = typeof dashboardCollections;
