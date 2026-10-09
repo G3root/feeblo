@@ -225,17 +225,33 @@ export function PostCreateForm() {
     },
   });
 
-  const initialStatus =
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    (store.get().context.data.status as BoardPostStatus | undefined) ??
-    "PLANNED";
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-  const initialStatusId = store.get().context.data.statusId as
+  const explicitStatusId = store.get().context.data.statusId as
     | string
     | undefined;
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+  const explicitStatus = store.get().context.data.status as
+    | BoardPostStatus
+    | undefined;
+  // The workspace's own default, not the first row and not a hardcoded type: a
+  // quick-create from the board files into whichever status the workspace
+  // marked as its default, which is where the widget and the Slack and Discord
+  // integrations file too.
+  //
+  // Resolved from the row data rather than through `pickDefaultPostStatus` in
+  // `@feeblo/domain`: this package is browser code and imports
+  // `@feeblo/domain/*` for types only, because a value import pulls the server
+  // domain graph into the bundle. The rule is the same one that helper states —
+  // the marked default, then the PENDING status, then the first row.
   const initialPostStatus =
-    postStatuses.find((postStatus) => postStatus.id === initialStatusId) ??
-    postStatuses.find((postStatus) => postStatus.type === initialStatus) ??
+    postStatuses.find((postStatus) => postStatus.id === explicitStatusId) ??
+    (explicitStatus === undefined
+      ? undefined
+      : postStatuses.find(
+          (postStatus) => postStatus.type === explicitStatus
+        )) ??
+    postStatuses.find((postStatus) => postStatus.isDefault) ??
+    postStatuses.find((postStatus) => postStatus.type === "PENDING") ??
     postStatuses[0];
 
   const initialBoardId = store.get().context.data.boardId ?? "";

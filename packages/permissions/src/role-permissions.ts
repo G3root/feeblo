@@ -32,6 +32,7 @@ export const ROLE_PERMISSIONS = {
     "changelog-categories.*",
     "tags.*",
     "roadmap.*",
+    "statuses.*",
     "comments.*",
     "contacts.create",
     "contacts.update",

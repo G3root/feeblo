@@ -50,6 +50,7 @@ import { Route as DashboardOrganizationIdSettingsPreferencesRouteImport } from "
 import { Route as DashboardOrganizationIdSettingsProfileRouteImport } from "./routes/_dashboard/$organizationId/settings/profile"
 import { Route as DashboardOrganizationIdSettingsRoadmapRouteImport } from "./routes/_dashboard/$organizationId/settings/roadmap"
 import { Route as DashboardOrganizationIdSettingsSecurityRouteImport } from "./routes/_dashboard/$organizationId/settings/security"
+import { Route as DashboardOrganizationIdSettingsStatusesRouteImport } from "./routes/_dashboard/$organizationId/settings/statuses"
 import { Route as DashboardOrganizationIdSettingsWidgetRouteImport } from "./routes/_dashboard/$organizationId/settings/widget"
 import { Route as DashboardOrganizationIdSettingsWorkspaceRouteImport } from "./routes/_dashboard/$organizationId/settings/workspace"
 import { Route as DashboardOrganizationIdDashboardLayoutChangelogIndexRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/changelog/index"
@@ -296,6 +297,12 @@ const DashboardOrganizationIdSettingsSecurityRoute =
     path: "/security",
     getParentRoute: () => DashboardOrganizationIdSettingsRoute,
   } as any)
+const DashboardOrganizationIdSettingsStatusesRoute =
+  DashboardOrganizationIdSettingsStatusesRouteImport.update({
+    id: "/statuses",
+    path: "/statuses",
+    getParentRoute: () => DashboardOrganizationIdSettingsRoute,
+  } as any)
 const DashboardOrganizationIdSettingsWidgetRoute =
   DashboardOrganizationIdSettingsWidgetRouteImport.update({
     id: "/widget",
@@ -480,6 +487,7 @@ export interface FileRoutesByFullPath {
   "/$organizationId/settings/profile": typeof DashboardOrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof DashboardOrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/security": typeof DashboardOrganizationIdSettingsSecurityRoute
+  "/$organizationId/settings/statuses": typeof DashboardOrganizationIdSettingsStatusesRoute
   "/$organizationId/settings/widget": typeof DashboardOrganizationIdSettingsWidgetRoute
   "/$organizationId/settings/workspace": typeof DashboardOrganizationIdSettingsWorkspaceRoute
   "/$organizationId/": typeof DashboardOrganizationIdDashboardLayoutIndexRoute
@@ -543,6 +551,7 @@ export interface FileRoutesByTo {
   "/$organizationId/settings/profile": typeof DashboardOrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof DashboardOrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/security": typeof DashboardOrganizationIdSettingsSecurityRoute
+  "/$organizationId/settings/statuses": typeof DashboardOrganizationIdSettingsStatusesRoute
   "/$organizationId/settings/widget": typeof DashboardOrganizationIdSettingsWidgetRoute
   "/$organizationId/settings/workspace": typeof DashboardOrganizationIdSettingsWorkspaceRoute
   "/$organizationId/settings": typeof DashboardOrganizationIdSettingsIndexRoute
@@ -609,6 +618,7 @@ export interface FileRoutesById {
   "/_dashboard/$organizationId/settings/profile": typeof DashboardOrganizationIdSettingsProfileRoute
   "/_dashboard/$organizationId/settings/roadmap": typeof DashboardOrganizationIdSettingsRoadmapRoute
   "/_dashboard/$organizationId/settings/security": typeof DashboardOrganizationIdSettingsSecurityRoute
+  "/_dashboard/$organizationId/settings/statuses": typeof DashboardOrganizationIdSettingsStatusesRoute
   "/_dashboard/$organizationId/settings/widget": typeof DashboardOrganizationIdSettingsWidgetRoute
   "/_dashboard/$organizationId/settings/workspace": typeof DashboardOrganizationIdSettingsWorkspaceRoute
   "/_dashboard/$organizationId/_dashboard-layout/": typeof DashboardOrganizationIdDashboardLayoutIndexRoute
@@ -676,6 +686,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/security"
+    | "/$organizationId/settings/statuses"
     | "/$organizationId/settings/widget"
     | "/$organizationId/settings/workspace"
     | "/$organizationId/"
@@ -739,6 +750,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/security"
+    | "/$organizationId/settings/statuses"
     | "/$organizationId/settings/widget"
     | "/$organizationId/settings/workspace"
     | "/$organizationId/settings"
@@ -804,6 +816,7 @@ export interface FileRouteTypes {
     | "/_dashboard/$organizationId/settings/profile"
     | "/_dashboard/$organizationId/settings/roadmap"
     | "/_dashboard/$organizationId/settings/security"
+    | "/_dashboard/$organizationId/settings/statuses"
     | "/_dashboard/$organizationId/settings/widget"
     | "/_dashboard/$organizationId/settings/workspace"
     | "/_dashboard/$organizationId/_dashboard-layout/"
@@ -1127,6 +1140,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DashboardOrganizationIdSettingsSecurityRouteImport
       parentRoute: typeof DashboardOrganizationIdSettingsRoute
     }
+    "/_dashboard/$organizationId/settings/statuses": {
+      id: "/_dashboard/$organizationId/settings/statuses"
+      path: "/statuses"
+      fullPath: "/$organizationId/settings/statuses"
+      preLoaderRoute: typeof DashboardOrganizationIdSettingsStatusesRouteImport
+      parentRoute: typeof DashboardOrganizationIdSettingsRoute
+    }
     "/_dashboard/$organizationId/settings/widget": {
       id: "/_dashboard/$organizationId/settings/widget"
       path: "/widget"
@@ -1396,6 +1416,7 @@ interface DashboardOrganizationIdSettingsRouteChildren {
   DashboardOrganizationIdSettingsProfileRoute: typeof DashboardOrganizationIdSettingsProfileRoute
   DashboardOrganizationIdSettingsRoadmapRoute: typeof DashboardOrganizationIdSettingsRoadmapRoute
   DashboardOrganizationIdSettingsSecurityRoute: typeof DashboardOrganizationIdSettingsSecurityRoute
+  DashboardOrganizationIdSettingsStatusesRoute: typeof DashboardOrganizationIdSettingsStatusesRoute
   DashboardOrganizationIdSettingsWidgetRoute: typeof DashboardOrganizationIdSettingsWidgetRoute
   DashboardOrganizationIdSettingsWorkspaceRoute: typeof DashboardOrganizationIdSettingsWorkspaceRoute
   DashboardOrganizationIdSettingsIndexRoute: typeof DashboardOrganizationIdSettingsIndexRoute
@@ -1435,6 +1456,8 @@ const DashboardOrganizationIdSettingsRouteChildren: DashboardOrganizationIdSetti
       DashboardOrganizationIdSettingsRoadmapRoute,
     DashboardOrganizationIdSettingsSecurityRoute:
       DashboardOrganizationIdSettingsSecurityRoute,
+    DashboardOrganizationIdSettingsStatusesRoute:
+      DashboardOrganizationIdSettingsStatusesRoute,
     DashboardOrganizationIdSettingsWidgetRoute:
       DashboardOrganizationIdSettingsWidgetRoute,
     DashboardOrganizationIdSettingsWorkspaceRoute:

@@ -1,4 +1,5 @@
 import { currentDb, Database, schema } from "@feeblo/db";
+import { pickDefaultPostStatus } from "@feeblo/domain-contracts/post-status-default";
 import { SlackInboundFailure } from "@feeblo/domain/integration/slack/errors";
 import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
 import { PostWriteService } from "@feeblo/domain/post/write";
@@ -70,7 +71,7 @@ export const SlackFeedbackServiceLive: Layer.Layer<
         const statuses = yield* postStatusRepository.findMany({
           organizationId,
         });
-        const defaultStatus = statuses[0];
+        const defaultStatus = pickDefaultPostStatus(statuses);
         if (defaultStatus === undefined) {
           return yield* new SlackInboundFailure({
             message: "Organization has no default post status",

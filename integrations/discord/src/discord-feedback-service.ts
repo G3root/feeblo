@@ -1,4 +1,5 @@
 import { currentDb, Database, schema } from "@feeblo/db";
+import { pickDefaultPostStatus } from "@feeblo/domain-contracts/post-status-default";
 import { DiscordInboundFailure } from "@feeblo/domain/integration/discord/errors";
 import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
 import { PostWriteService } from "@feeblo/domain/post/write";
@@ -70,7 +71,7 @@ export const DiscordFeedbackServiceLive: Layer.Layer<
         const statuses = yield* postStatusRepository.findMany({
           organizationId,
         });
-        const defaultStatus = statuses[0];
+        const defaultStatus = pickDefaultPostStatus(statuses);
         if (defaultStatus === undefined) {
           return yield* new DiscordInboundFailure({
             message: "Organization has no default post status",

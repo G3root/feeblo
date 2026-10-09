@@ -78,7 +78,7 @@ Admin and owner are intentionally equivalent for authorization. `owner` is kept 
 | Settings | Manage teammates | No | No | Yes |
 | Settings | Delete the workspace | No | No | Yes |
 
-The matrix is the authorization contract, including capabilities planned for future product surfaces. Board import, CSV export, create-post-form customization, and configurable post fields or statuses are not currently shipped. They must receive distinct named permissions and matching backend/frontend gates when implemented; no existing generic permission should be reused for them.
+The matrix is the authorization contract, including capabilities planned for future product surfaces. Board import, CSV export, and create-post-form customization are not currently shipped. They must receive distinct named permissions and matching backend/frontend gates when implemented; no existing generic permission should be reused for them.
 
 The Developer row is implemented in pieces: outbound webhook management uses the named `webhooks.manage`, the Public API's keys use the named `apiKeys.manage`, and widget SSO keys still gate on the generic `workspace.update` (see the migration checklist below).
 
@@ -90,8 +90,9 @@ Instead of scattering `role === "owner" || role === "admin"`, every gate is a **
 boards.*             changelog.*         posts.*
 comments.*           members.invite      members.remove
 members.assign       site.*              roadmap.*
-billing.*            contacts.*          companies.*
-webhooks.manage      integrations.manage apiKeys.manage
+statuses.*           billing.*           contacts.*
+companies.*          webhooks.manage     integrations.manage
+apiKeys.manage
 ```
 
 `packages/permissions/src/permissions.ts` is the catalog (id + label + description, anchored to the backend policy it maps to). Its `createPermissions(resource, actions)` utility creates the action permissions and the matching `{resource}.*` wildcard. `roleGrants` resolves a wildcard grant for action checks. `src/role-permissions.ts` is the role → permission table. Roles inherit permissions from lower ranks automatically (`permissionsForRole`).
@@ -147,7 +148,7 @@ The former `member` role was renamed to `manager` (same permissions) and a new l
 | Role | Grants (beyond inheritance) |
 | --- | --- |
 | `contributor` | + `posts.move`, `votes.onBehalf`; other contribution actions use membership/resource policies |
-| `manager` | + `members.remove`, `posts.*` (includes `posts.createOnBehalf`), `changelog.*`, `tags.*`, `roadmap.*`, `comments.*` (includes `comments.createOnBehalf`), CRM create/update |
+| `manager` | + `members.remove`, `posts.*` (includes `posts.createOnBehalf`), `changelog.*`, `tags.*`, `roadmap.*`, `statuses.*`, `comments.*` (includes `comments.createOnBehalf`), CRM create/update |
 | `admin` | + `workspace.*`, `members.*`, `billing.*`, `site.*`, `boards.*`, `contacts.*`, `companies.*` |
 | `owner` | No additional grants; retained as a legacy alias of admin |
 
@@ -158,7 +159,7 @@ The DB `member.role` column is `text` (not an enum), so the rename is a data mig
 **Backend (`packages/domain`):**
 
 - `policy.ts` — `hasMembership`/`hasOrganizationRole`/ `hasOrganizationOwnerOrAdmin`/`isMember` now delegate to `@feeblo/permissions`; new `canPermission(organizationId, permission)` for role gates. `hasOrganizationOwnerOrAdmin` is kept as an alias of `canPermission(orgId, "workspace.update")`.
-- Module policies (`board`, `post`, `changelog`, `tag`, `site`, `contact`, `company`, `attribute-definition`, `membership`, `billing`, `roadmap`, `roadmap-column`) use `canPermission` with named permissions instead of role-literal checks.
+- Module policies (`board`, `post`, `changelog`, `tag`, `site`, `contact`, `company`, `attribute-definition`, `membership`, `billing`, `roadmap`, `roadmap-column`, `post-status`) use `canPermission` with named permissions instead of role-literal checks.
 - `membership/schema.ts` builds `ROLE_LITERAL` from `ROLES`.
 - `plan-entitlements.ts` uses `PRIVILEGED_ROLES`/`isPrivilegedRole` from `@feeblo/permissions` directly (the old `PRIVILEGED_MEMBER_ROLES` / `isPrivilegedMemberRole` aliases were removed). `isPrivilegedRole` is derived from the permission table (`roleGrants(role, "workspace.update")`) rather than a hardcoded role list.
 - The `member.role` / `invitation.role` columns in `packages/db` are typed `.$type<Role>()` / `.$type<Role | null>()`, so repository results stay assignable to the Effect schemas.

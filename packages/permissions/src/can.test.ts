@@ -122,6 +122,7 @@ describe("role permissions", () => {
       expect(roleGrants(role, "changelog.*")).toBe(true);
       expect(roleGrants(role, "tags.*")).toBe(true);
       expect(roleGrants(role, "roadmap.*")).toBe(true);
+      expect(roleGrants(role, "statuses.*")).toBe(true);
       expect(roleGrants(role, "comments.*")).toBe(true);
       expect(roleGrants(role, "members.remove")).toBe(true);
       expect(roleGrants(role, "changelog.create")).toBe(true);
@@ -203,6 +204,7 @@ describe("can()", () => {
       "billing.*",
       "site.*",
       "roadmap.*",
+      "statuses.*",
       "contacts.create",
       "contacts.*",
       "companies.create",
@@ -231,6 +233,7 @@ describe("can()", () => {
       "tags.create",
       "tags.*",
       "roadmap.*",
+      "statuses.*",
       "comments.*",
       "contacts.create",
       "contacts.update",
