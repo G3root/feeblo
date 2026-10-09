@@ -5,6 +5,11 @@ import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
+import {
+  type Surface,
+  type SurfaceConfig,
+  withSurfaceRateLimit,
+} from "../surface";
 import { NotificationPolicy } from "./policies";
 import { NotificationRpcs } from "./rpcs";
 import type { TNotificationList, TNotificationMarkRead } from "./schema";
@@ -56,6 +61,72 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
       });
     });
 
+  // -- Surface-parameterized writes --
+  //
+  // Both surfaces spend the same write limit and scope the query to the
+  // session user; only the admission differs — a member on the dashboard, a
+  // restricted widget session on the portal.
+
+  const markReadWrite = {
+    dashboard: {
+      rateLimit: "write",
+      policy: (args: TNotificationMarkRead) =>
+        notificationPolicy.canAccess(args.organizationId),
+    },
+    public: {
+      rateLimit: "write",
+      policy: (args: TNotificationMarkRead) =>
+        Policy.hasRestrictedOrganizationScope(args.organizationId),
+    },
+  } satisfies Record<Surface, SurfaceConfig<TNotificationMarkRead>>;
+
+  const markAllReadWrite = {
+    dashboard: {
+      rateLimit: "write",
+      policy: ({ organizationId }: { organizationId: string }) =>
+        notificationPolicy.canAccess(organizationId),
+    },
+    public: {
+      rateLimit: "write",
+      policy: ({ organizationId }: { organizationId: string }) =>
+        Policy.hasRestrictedOrganizationScope(organizationId),
+    },
+  } satisfies Record<Surface, SurfaceConfig<{ organizationId: string }>>;
+
+  const markReadFor = <
+    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
+  >(
+    surface: Surface,
+    level: Level,
+    args: TNotificationMarkRead
+  ) =>
+    markReadEffect(args).pipe(
+      Policy.withPolicy(markReadWrite[surface].policy(args)),
+      withRemapDbErrors("Notification", "update"),
+      withSurfaceRateLimit({
+        level,
+        operation: "NotificationMarkRead",
+        surface,
+      })
+    );
+
+  const markAllReadFor = <
+    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
+  >(
+    surface: Surface,
+    level: Level,
+    args: { organizationId: string }
+  ) =>
+    markAllReadEffect(args).pipe(
+      Policy.withPolicy(markAllReadWrite[surface].policy(args)),
+      withRemapDbErrors("Notification", "update"),
+      withSurfaceRateLimit({
+        level,
+        operation: "NotificationMarkAllRead",
+        surface,
+      })
+    );
+
   return {
     NotificationList: (args: TNotificationList) =>
       listNotificationsEffect(args).pipe(
@@ -76,23 +147,11 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Notification", "select")
       ),
     NotificationMarkRead: (args: TNotificationMarkRead) =>
-      markReadEffect(args).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "NotificationMarkRead",
-          level: "write",
-        }),
-        Policy.withPolicy(notificationPolicy.canAccess(args.organizationId)),
-        withRemapDbErrors("Notification", "update")
-      ),
+      markReadFor("dashboard", markReadWrite.dashboard.rateLimit, args),
     NotificationMarkAllRead: ({ organizationId }: { organizationId: string }) =>
-      markAllReadEffect({ organizationId }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "NotificationMarkAllRead",
-          level: "write",
-        }),
-        Policy.withPolicy(notificationPolicy.canAccess(organizationId)),
-        withRemapDbErrors("Notification", "update")
-      ),
+      markAllReadFor("dashboard", markAllReadWrite.dashboard.rateLimit, {
+        organizationId,
+      }),
     // Public-board variants for signed-in end users, who may not be workspace
     // members. Every query is scoped to the session user id, so results can
     // never leak another user's inbox.
@@ -123,31 +182,15 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Notification", "select")
       ),
     NotificationMarkReadPublic: (args: TNotificationMarkRead) =>
-      markReadEffect(args).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "NotificationMarkReadPublic",
-          level: "write",
-        }),
-        Policy.withPolicy(
-          Policy.hasRestrictedOrganizationScope(args.organizationId)
-        ),
-        withRemapDbErrors("Notification", "update")
-      ),
+      markReadFor("public", markReadWrite.public.rateLimit, args),
     NotificationMarkAllReadPublic: ({
       organizationId,
     }: {
       organizationId: string;
     }) =>
-      markAllReadEffect({ organizationId }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "NotificationMarkAllReadPublic",
-          level: "write",
-        }),
-        Policy.withPolicy(
-          Policy.hasRestrictedOrganizationScope(organizationId)
-        ),
-        withRemapDbErrors("Notification", "update")
-      ),
+      markAllReadFor("public", markAllReadWrite.public.rateLimit, {
+        organizationId,
+      }),
   };
 });
 
