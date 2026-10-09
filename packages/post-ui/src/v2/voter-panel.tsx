@@ -51,8 +51,6 @@ function VoterAvatar({
     <UserAvatar
       className={cn("shrink-0", className)}
       image={upvote.user.image}
-      isMember={upvote.voterIsMember}
-      memberLabel={m.sad_soft_tadpole()}
       name={upvote.user.name}
       size="sm"
     />

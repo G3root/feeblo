@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { UpvoteId } from "@feeblo/id";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -54,9 +54,6 @@ const makeUpvoteRepository = Effect.gen(function* () {
             image: schema.userTable.image,
           },
           memberId: schema.upvoteTable.memberId,
-          // Compute the member flag in SQL so the public list can redact the
-          // identifier without losing the avatar's tick.
-          voterIsMember: sql<boolean>`${schema.upvoteTable.memberId} is not null`,
           createdAt: schema.upvoteTable.createdAt,
           updatedAt: schema.upvoteTable.updatedAt,
         })

@@ -15,13 +15,6 @@ export const Upvote = S.Struct({
    */
   mergedFromPostId: S.NullOr(S.String),
   memberId: S.Union([S.String, S.Null]),
-  /**
-   * Whether the voter is a member of the workspace. Derived from `memberId`
-   * in SQL: public reads redact the identifier, and a boolean is not an
-   * identifier, so it survives the redaction and the avatar can draw the
-   * member tick.
-   */
-  voterIsMember: S.Boolean,
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
   user: S.Struct({

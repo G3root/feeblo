@@ -13,7 +13,6 @@ const mocks = vi.hoisted(() => {
   const rows = [
     {
       actorImage: null,
-      actorIsMember: true,
       actorName: "Ada Lovelace",
       body: "Dark mode please",
       createdAt: "2026-01-01T00:00:00.000Z",
@@ -26,7 +25,6 @@ const mocks = vi.hoisted(() => {
     },
     {
       actorImage: null,
-      actorIsMember: false,
       actorName: null,
       body: "Dark mode please",
       createdAt: "2025-12-31T00:00:00.000Z",
@@ -84,12 +82,12 @@ describe("NotificationsMenu", () => {
       name: /New comment on feedback/,
     });
     await expect.element(unread).toBeVisible();
-    // Initials come from the actor the list RPC resolved, with the member
-    // tick pinned to their face.
+    // Initials come from the actor the list RPC resolved. The inbox does not
+    // draw the member tick; that stays on comments and post lists.
     await expect.element(unread.getByText("AL")).toBeVisible();
     expect(
       unread.element().querySelector('[data-slot="member-tick"]')
-    ).not.toBeNull();
+    ).toBeNull();
     await expect.element(unread.getByText(m.sunny_brave_gecko())).toBeVisible();
     // The double tick belongs to the header action, never to a row.
     expect(
@@ -109,8 +107,7 @@ describe("NotificationsMenu", () => {
       .querySelector('[data-slot="notification-read-state"]');
     expect(readMark?.textContent).toBe("");
     expect(readMark?.querySelector("svg")).toBeNull();
-    // A row with no actor shows its event kind's icon, not `??` initials,
-    // and has no face for a member tick.
+    // A row with no actor shows its event kind's icon, not `??` initials.
     const fallbackAvatar = read.element().querySelector('[data-slot="avatar"]');
     expect(fallbackAvatar?.querySelector("svg")).not.toBeNull();
     expect(fallbackAvatar?.textContent).toBe("");

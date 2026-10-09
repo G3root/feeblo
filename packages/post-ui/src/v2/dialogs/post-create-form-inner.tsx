@@ -473,7 +473,6 @@ export function PostCreateForm() {
                         selection ?? {
                           name: session?.user?.name ?? m.noble_merry_owl(),
                           avatarUrl: session?.user?.image ?? null,
-                          isMember: member !== undefined,
                         }
                       }
                       label={m.inner_glad_leopard()}
