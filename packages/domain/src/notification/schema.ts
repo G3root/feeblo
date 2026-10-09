@@ -17,13 +17,6 @@ export const Notification = S.Struct({
    */
   actorName: S.NullOr(S.String),
   actorImage: S.NullOr(S.String),
-  /**
-   * Whether the actor is still a member of the workspace. Resolved at read
-   * time by joining the membership rather than stored on the row: the inbox
-   * draws the member tick on a member's face, and someone who leaves loses it
-   * instead of keeping a stale badge.
-   */
-  actorIsMember: S.Boolean,
   kind: NotificationEventType,
   resourceType: S.String,
   resourceId: S.String,

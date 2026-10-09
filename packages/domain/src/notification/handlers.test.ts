@@ -174,35 +174,32 @@ describe("NotificationRpcHandlers", () => {
         })
       );
 
-      it.effect(
-        "resolves the actor's name, image, and membership for the inbox row",
-        () =>
-          Effect.gen(function* () {
-            const handlers = yield* NotificationRpcHandlersEffect;
-            const fixture = yield* makeFixture();
-            const actor = yield* addMember(fixture);
-            const id = yield* insertNotification(fixture, {
-              actorUserId: actor.userId,
-            });
+      it.effect("resolves the actor's name and image for the inbox row", () =>
+        Effect.gen(function* () {
+          const handlers = yield* NotificationRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const actor = yield* addMember(fixture);
+          const id = yield* insertNotification(fixture, {
+            actorUserId: actor.userId,
+          });
 
-            expect(
-              yield* handlers
-                .NotificationList({
-                  organizationId: fixture.organizationId,
-                })
-                .pipe(Effect.provideService(CurrentSession, session(fixture)))
-            ).toMatchObject([
-              {
-                actorImage: null,
-                actorIsMember: true,
-                actorName: "Second user",
-                id,
-              },
-            ]);
-          })
+          expect(
+            yield* handlers
+              .NotificationList({
+                organizationId: fixture.organizationId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session(fixture)))
+          ).toMatchObject([
+            {
+              actorImage: null,
+              actorName: "Second user",
+              id,
+            },
+          ]);
+        })
       );
 
-      it.effect("clears the member tick for a non-member actor", () =>
+      it.effect("lists a non-member actor's row with their name", () =>
         Effect.gen(function* () {
           const handlers = yield* NotificationRpcHandlersEffect;
           const db = yield* currentDb;
@@ -227,7 +224,6 @@ describe("NotificationRpcHandlers", () => {
               .pipe(Effect.provideService(CurrentSession, session(fixture)))
           ).toMatchObject([
             {
-              actorIsMember: false,
               actorName: "Public visitor",
               id,
             },
