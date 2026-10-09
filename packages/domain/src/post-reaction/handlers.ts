@@ -8,6 +8,11 @@ import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
+import {
+  type Surface,
+  type SurfaceConfig,
+  withSurfaceRateLimit,
+} from "../surface";
 import { PostReactionRepository } from "./repository";
 import { PostReactionRpcs } from "./rpcs";
 import type { TPostReactionList, TPostReactionToggle } from "./schema";
@@ -16,6 +21,67 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostReactionRepository;
   const postPolicy = yield* PostPolicy;
   // const sitePolicy = yield* SitePolicy;
+
+  // -- Surface-parameterized writes --
+  //
+  // The two surfaces read different projections: the dashboard checks
+  // `isUnlocked` in its policy and toggles directly, the public portal checks
+  // `isUnlockedPublic` and lets the repository's `togglePublic` join the
+  // board visibility.
+
+  const toggleWrite = {
+    dashboard: {
+      rateLimit: undefined,
+      policy: (args: TPostReactionToggle) =>
+        Policy.all(
+          Policy.hasMembership(args.organizationId),
+          postPolicy.isUnlocked({
+            organizationId: args.organizationId,
+            postId: args.postId,
+          })
+        ),
+    },
+    public: {
+      rateLimit: "write",
+      policy: (args: TPostReactionToggle) =>
+        Policy.all(
+          Policy.hasRestrictedOrganizationScope(args.organizationId),
+          postPolicy.isUnlockedPublic({
+            organizationId: args.organizationId,
+            postId: args.postId,
+          })
+        ),
+    },
+  } satisfies Record<Surface, SurfaceConfig<TPostReactionToggle>>;
+
+  const toggleReaction = <
+    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
+  >(
+    surface: Surface,
+    level: Level,
+    args: TPostReactionToggle
+  ) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const request = {
+        emoji: args.emoji,
+        organizationId: args.organizationId,
+        postId: args.postId,
+        userId: session.session.userId,
+      };
+
+      return yield* surface === "public"
+        ? repository.togglePublic(request)
+        : repository.toggle(request);
+    }).pipe(
+      Policy.withPolicy(toggleWrite[surface].policy(args)),
+      withRemapDbErrors("PostReaction", "update"),
+      withSurfaceRateLimit({
+        level,
+        operation: "PostReactionToggle",
+        surface,
+      })
+    );
 
   return {
     PostReactionList: (args: TPostReactionList) =>
@@ -29,28 +95,7 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("PostReaction", "select")
         ),
     PostReactionToggle: (args: TPostReactionToggle) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        // Roadmap visibility is enforced at the Post level via
-        // `postPolicy.isUnlocked` in the pipeline below.
-        return yield* repository.toggle({
-          organizationId: args.organizationId,
-          postId: args.postId,
-          userId: session.session.userId,
-          emoji: args.emoji,
-        });
-      }).pipe(
-        Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(args.organizationId),
-            postPolicy.isUnlocked({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            })
-          )
-        ),
-        withRemapDbErrors("PostReaction", "update")
-      ),
+      toggleReaction("dashboard", toggleWrite.dashboard.rateLimit, args),
     PostReactionListPublic: (args: TPostReactionList) =>
       Effect.gen(function* () {
         const sessionOption = yield* OptionalCurrentSession;
@@ -74,32 +119,7 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("PostReaction", "select")
       ),
     PostReactionTogglePublic: (args: TPostReactionToggle) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        // Public roadmap visibility is enforced via `postPolicy.isUnlockedPublic`
-        // in the pipeline below; no additional site-policy gate needed.
-        return yield* repository.togglePublic({
-          organizationId: args.organizationId,
-          postId: args.postId,
-          userId: session.session.userId,
-          emoji: args.emoji,
-        });
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "PostReactionTogglePublic",
-          level: "write",
-        }),
-        Policy.withPolicy(
-          Policy.all(
-            Policy.hasRestrictedOrganizationScope(args.organizationId),
-            postPolicy.isUnlockedPublic({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            })
-          )
-        ),
-        withRemapDbErrors("PostReaction", "update")
-      ),
+      toggleReaction("public", toggleWrite.public.rateLimit, args),
   };
 });
 
