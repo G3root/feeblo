@@ -357,6 +357,63 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       withSurfaceRateLimit({ level, operation: "PostUpdateTitle", surface })
     );
 
+  const createWrite = {
+    dashboard: {
+      rateLimit: undefined,
+      policy: (args: TPostCreate) =>
+        postPolicy.canCreate({
+          onBehalf: args.author !== undefined,
+          organizationId: args.organizationId,
+          source: "dashboard",
+        }),
+    },
+    public: {
+      rateLimit: "expensive",
+      policy: (args: TPostCreate) =>
+        postPolicy.canCreate({
+          organizationId: args.organizationId,
+          source: "public",
+        }),
+    },
+  } satisfies Record<Surface, SurfaceConfig<TPostCreate>>;
+
+  const createPost = <
+    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
+  >(
+    surface: Surface,
+    level: Level,
+    args: TPostCreate
+  ) =>
+    Effect.gen(function* () {
+      // On-behalf attribution is dashboard-only; the public portal cannot
+      // name a customer and the board's create form does not offer one.
+      if (surface === "public" && args.author !== undefined) {
+        return yield* new BadRequestError({
+          message:
+            "Posts cannot be created on behalf of another author from public boards",
+        });
+      }
+
+      const session = yield* CurrentSession;
+
+      return yield* writes.create(
+        args,
+        memberActor(session, args.organizationId),
+        surface === "public" ? { source: "PUBLIC_BOARD" } : undefined
+      );
+    }).pipe(
+      Policy.withPolicy(createWrite[surface].policy(args)),
+      withRemapDbErrors({
+        action: "create",
+        entity: "Post",
+        onUniqueViolation: () =>
+          new PostAlreadyExistsError({
+            message: "A post with this slug already exists",
+          }),
+      }),
+      withSurfaceRateLimit({ level, operation: "PostCreate", surface })
+    );
+
   // -- RPC handlers --
 
   return {
@@ -568,60 +625,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       updatePostTitle("public", updateTitleWrite.public.rateLimit, args),
 
     PostCreate: (args: TPostCreate) =>
-      Effect.flatMap(CurrentSession, (session) =>
-        writes.create(args, memberActor(session, args.organizationId))
-      ).pipe(
-        Policy.withPolicy(
-          postPolicy.canCreate({
-            organizationId: args.organizationId,
-            onBehalf: args.author !== undefined,
-            source: "dashboard",
-          })
-        ),
-        withRemapDbErrors({
-          action: "create",
-          entity: "Post",
-          onUniqueViolation: () =>
-            new PostAlreadyExistsError({
-              message: "A post with this slug already exists",
-            }),
-        })
-      ),
+      createPost("dashboard", createWrite.dashboard.rateLimit, args),
 
     PostCreatePublic: (args: TPostCreate) =>
-      Effect.gen(function* () {
-        if (args.author !== undefined) {
-          return yield* new BadRequestError({
-            message:
-              "Posts cannot be created on behalf of another author from public boards",
-          });
-        }
-        const session = yield* CurrentSession;
-        return yield* writes.create(
-          args,
-          memberActor(session, args.organizationId),
-          { source: "PUBLIC_BOARD" }
-        );
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "PostCreatePublic",
-          level: "expensive",
-        }),
-        Policy.withPolicy(
-          postPolicy.canCreate({
-            organizationId: args.organizationId,
-            source: "public",
-          })
-        ),
-        withRemapDbErrors({
-          action: "create",
-          entity: "Post",
-          onUniqueViolation: () =>
-            new PostAlreadyExistsError({
-              message: "A post with this slug already exists",
-            }),
-        })
-      ),
+      createPost("public", createWrite.public.rateLimit, args),
 
     PostUpdateEta: (args: TPostUpdateEta) =>
       Effect.flatMap(CurrentSession, (session) =>
