@@ -15,6 +15,7 @@ import type {
   TPostStatusDeletePreviewResult,
   TPostStatusDeleteResult,
   TPostStatusList,
+  TPostStatusMakeDefault,
   TPostStatusReorder,
   TPostStatusUpdate,
 } from "./schema";
@@ -189,6 +190,72 @@ const makePostStatusRepository = Effect.gen(function* () {
               updatedAt: now,
             })
             .where(eq(schema.postStatusTable.id, input.id));
+        })
+      ),
+
+    /**
+     * Moves the workspace's default onto one status.
+     *
+     * Two writes, because the flag is exclusive: the row holding it is cleared
+     * before the target is set, since the partial unique index on
+     * `(organization_id) WHERE is_default` allows at most one true row. The
+     * `FOR UPDATE` lock on the workspace's status rows serializes concurrent
+     * calls — the second waits, then reads the committed flag — instead of
+     * racing the two writes to a unique violation.
+     *
+     * Posts do not move: the default is where new posts land, not a status
+     * every post is repointed to.
+     */
+    makeDefault: ({ id, organizationId }: TPostStatusMakeDefault) =>
+      db.transaction((tx) =>
+        Effect.gen(function* () {
+          yield* tx
+            .select({ id: schema.postStatusTable.id })
+            .from(schema.postStatusTable)
+            .where(eq(schema.postStatusTable.organizationId, organizationId))
+            .for("update");
+
+          const target = yield* tx
+            .select({
+              id: schema.postStatusTable.id,
+              isDefault: schema.postStatusTable.isDefault,
+            })
+            .from(schema.postStatusTable)
+            .where(
+              and(
+                eq(schema.postStatusTable.id, id),
+                eq(schema.postStatusTable.organizationId, organizationId)
+              )
+            )
+            .limit(1)
+            .pipe(Effect.map(EffectArray.get(0)));
+
+          if (Option.isNone(target)) {
+            return yield* new NotFoundError({
+              message: "Status does not belong to this workspace",
+            });
+          }
+
+          if (target.value.isDefault) {
+            return;
+          }
+
+          const now = yield* DateTime.nowAsDate;
+
+          yield* tx
+            .update(schema.postStatusTable)
+            .set({ isDefault: false, updatedAt: now })
+            .where(
+              and(
+                eq(schema.postStatusTable.organizationId, organizationId),
+                eq(schema.postStatusTable.isDefault, true)
+              )
+            );
+
+          yield* tx
+            .update(schema.postStatusTable)
+            .set({ isDefault: true, updatedAt: now })
+            .where(eq(schema.postStatusTable.id, id));
         })
       ),
 

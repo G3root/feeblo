@@ -82,6 +82,23 @@ export const PostStatusUpdate = S.Struct({
 
 export type TPostStatusUpdate = S.Schema.Type<typeof PostStatusUpdate>;
 
+/**
+ * Moves the workspace's default onto one status.
+ *
+ * A separate payload from `PostStatusUpdate` because the flag is exclusive:
+ * setting it clears it from whichever row held it, which the label/colour/
+ * section update must not be able to do. Posts do not move — the default is
+ * where new posts land, not a status every post is repointed to.
+ */
+export const PostStatusMakeDefault = S.Struct({
+  id: PostStatusId.schema,
+  organizationId: WorkspaceId.schema,
+});
+
+export type TPostStatusMakeDefault = S.Schema.Type<
+  typeof PostStatusMakeDefault
+>;
+
 export const PostStatusDelete = S.Struct({
   id: PostStatusId.schema,
   organizationId: WorkspaceId.schema,

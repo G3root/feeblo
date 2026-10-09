@@ -13,6 +13,7 @@ import {
   PostStatusDeletePreviewResult,
   PostStatusDeleteResult,
   PostStatusList,
+  PostStatusMakeDefault,
   PostStatusReorder,
   PostStatusUpdate,
 } from "./schema";
@@ -36,6 +37,11 @@ export class PostStatusRpcs extends RpcGroup.make(
   Rpc.make("PostStatusUpdate", {
     success: Schema.Void,
     payload: PostStatusUpdate,
+    error: PostStatusServiceErrors,
+  }).middleware(AuthMiddleware),
+  Rpc.make("PostStatusMakeDefault", {
+    success: Schema.Void,
+    payload: PostStatusMakeDefault,
     error: PostStatusServiceErrors,
   }).middleware(AuthMiddleware),
   Rpc.make("PostStatusDelete", {

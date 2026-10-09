@@ -12,6 +12,7 @@ import { cn } from "@feeblo/ui/utils";
 import { BoardIconMap } from "@feeblo/web-shared/board/constants";
 import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import {
+  CheckmarkBadge01Icon,
   Delete02Icon,
   DragDropVerticalIcon,
   Edit,
@@ -248,6 +249,8 @@ function PostStatusRow({
 }) {
   const editDialog = usePostStatusEditDialogContext();
   const deleteDialog = usePostStatusDeleteDialogContext();
+  const { postStatusCollection } = useDashboardCollections();
+  const [isMakingDefault, setIsMakingDefault] = useState(false);
   const { ref, handleRef, isDragging } = useSortable({
     id: status.id,
     accept: "status",
@@ -259,6 +262,39 @@ function PostStatusRow({
 
   const Icon = BoardIconMap[status.type];
   const label = status.label || formatPostStatus(status.type);
+
+  /**
+   * The flag is exclusive and the old holder is cleared server-side in the
+   * same transaction, so this is not an optimistic collection update: the
+   * rows are read back once the swap has happened.
+   */
+  const makeDefault = () => {
+    if (status.isDefault || isMakingDefault) {
+      return;
+    }
+
+    setIsMakingDefault(true);
+    void (async () => {
+      try {
+        await fetchRpc((rpc) =>
+          rpc.PostStatusMakeDefault({ id: status.id, organizationId })
+        );
+        await postStatusCollection.utils.refetch();
+
+        toastManager.add({
+          title: `${label} is now the default status`,
+          type: "success",
+        });
+      } catch {
+        toastManager.add({
+          title: "Failed to change the default status",
+          type: "error",
+        });
+      } finally {
+        setIsMakingDefault(false);
+      }
+    })();
+  };
 
   return (
     <div
@@ -320,18 +356,27 @@ function PostStatusRow({
                 <span>Edit</span>
               </MenuItem>
               {status.isDefault ? null : (
-                <MenuItem
-                  onClick={() =>
-                    deleteDialog.send({
-                      type: "toggle",
-                      data: { statusId: status.id },
-                    })
-                  }
-                  variant="destructive"
-                >
-                  <HugeiconsIcon icon={Delete02Icon} />
-                  <span>Delete</span>
-                </MenuItem>
+                <>
+                  <MenuItem disabled={isMakingDefault} onClick={makeDefault}>
+                    <HugeiconsIcon
+                      className="text-muted-foreground"
+                      icon={CheckmarkBadge01Icon}
+                    />
+                    <span>Make default</span>
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() =>
+                      deleteDialog.send({
+                        type: "toggle",
+                        data: { statusId: status.id },
+                      })
+                    }
+                    variant="destructive"
+                  >
+                    <HugeiconsIcon icon={Delete02Icon} />
+                    <span>Delete</span>
+                  </MenuItem>
+                </>
               )}
             </MenuPopup>
           </Menu>

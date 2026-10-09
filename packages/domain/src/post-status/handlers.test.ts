@@ -413,6 +413,97 @@ describe("PostStatusRpcHandlers", () => {
       })
     );
 
+    it.effect(
+      "moves the default flag onto another status without moving posts",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostStatusRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const previousDefaultId = yield* insertStatus(fixture, {
+            isDefault: true,
+            orderIndex: 0,
+            type: "PENDING",
+          });
+          const nextDefaultId = yield* insertStatus(fixture, {
+            orderIndex: 1,
+            type: "REVIEW",
+          });
+
+          yield* insertPost(fixture, previousDefaultId, "stays-put");
+
+          yield* handlers
+            .PostStatusMakeDefault({
+              id: nextDefaultId,
+              organizationId: fixture.organizationId,
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
+
+          const statuses = yield* db
+            .select({
+              id: schema.postStatusTable.id,
+              isDefault: schema.postStatusTable.isDefault,
+            })
+            .from(schema.postStatusTable)
+            .where(
+              eq(schema.postStatusTable.organizationId, fixture.organizationId)
+            );
+
+          const defaults = new Map(
+            statuses.map((status) => [status.id, status.isDefault])
+          );
+
+          expect(defaults.get(previousDefaultId)).toBe(false);
+          expect(defaults.get(nextDefaultId)).toBe(true);
+
+          // The flag decides where the *next* post lands; the posts already in
+          // the old default stay there.
+          const posts = yield* db
+            .select({ statusId: schema.postTable.statusId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.organizationId, fixture.organizationId));
+
+          expect(posts).toEqual([{ statusId: previousDefaultId }]);
+        })
+    );
+
+    it.effect("rejects a contributor making a status the default", () =>
+      Effect.gen(function* () {
+        const handlers = yield* PostStatusRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        yield* insertStatus(fixture, {
+          isDefault: true,
+          orderIndex: 0,
+          type: "PENDING",
+        });
+        const nextDefaultId = yield* insertStatus(fixture, {
+          orderIndex: 1,
+          type: "REVIEW",
+        });
+
+        const error = yield* Effect.flip(
+          handlers
+            .PostStatusMakeDefault({
+              id: nextDefaultId,
+              organizationId: fixture.organizationId,
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "contributor")
+              )
+            )
+        );
+
+        expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+
     it.effect("refuses to delete the default status", () =>
       Effect.gen(function* () {
         const handlers = yield* PostStatusRpcHandlersEffect;

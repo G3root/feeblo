@@ -11,6 +11,7 @@ import type {
   TPostStatusDelete,
   TPostStatusDeletePreview,
   TPostStatusList,
+  TPostStatusMakeDefault,
   TPostStatusReorder,
   TPostStatusUpdate,
 } from "./schema";
@@ -73,6 +74,13 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
     PostStatusUpdate: (args: TPostStatusUpdate) =>
       repository
         .update(args)
+        .pipe(
+          Policy.withPolicy(manage(args.organizationId)),
+          withRemapDbErrors("PostStatus", "update")
+        ),
+    PostStatusMakeDefault: (args: TPostStatusMakeDefault) =>
+      repository
+        .makeDefault(args)
         .pipe(
           Policy.withPolicy(manage(args.organizationId)),
           withRemapDbErrors("PostStatus", "update")
