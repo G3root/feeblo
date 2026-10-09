@@ -4,6 +4,10 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 ## Language
 
+### Surfaces
+
+**Surface**: A transport the product answers on. The dashboard and the public portal are the two session-facing RPC surfaces; the Public API is the key-authenticated HTTP surface. A capability present on both RPC surfaces is implemented once and takes its surface, while each surface keeps its own RPC names, middleware, and error contract. _Avoid_: channel, client, platform
+
 ### Feedback
 
 **Post**: A feature request, bug report, or other item of feedback on a board. _Avoid_: Feature, feature request, ticket, issue
