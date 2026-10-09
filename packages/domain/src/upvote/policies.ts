@@ -27,7 +27,7 @@ const makeUpvotePolicy = Effect.gen(function* () {
 
   const canList = (args: TCanList) => {
     if (args.source === "public") {
-      return Policy.policy(() => Effect.succeed(true));
+      return Policy.allow;
     }
 
     return Policy.hasMembership(args.organizationId);

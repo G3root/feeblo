@@ -8,12 +8,13 @@ import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
+import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import {
   type Surface,
-  type SurfaceConfig,
+  type SurfacePair,
   withSurfaceRateLimit,
 } from "../surface";
 import { ChangelogSubscriptionRepository } from "./repository";
@@ -23,6 +24,9 @@ import type {
   TChangelogSubscriptionDelete,
   TChangelogSubscriptionList,
 } from "./schema";
+
+/** The RPCs this group declares; a surface pair's operation must be one. */
+type ChangelogSubscriptionRpcTag = RpcTagsOf<typeof ChangelogSubscriptionRpcs>;
 
 export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* ChangelogSubscriptionRepository;
@@ -120,6 +124,7 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   // a member on the dashboard, a restricted widget session on the portal.
 
   const createWrite = {
+    operation: "ChangelogSubscriptionCreate",
     dashboard: {
       rateLimit: "write",
       policy: (args: TChangelogSubscriptionCreate) =>
@@ -136,9 +141,13 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
           sitePolicy.canViewChangelog(args.organizationId)
         ),
     },
-  } satisfies Record<Surface, SurfaceConfig<TChangelogSubscriptionCreate>>;
+  } satisfies SurfacePair<
+    TChangelogSubscriptionCreate,
+    ChangelogSubscriptionRpcTag
+  >;
 
   const deleteWrite = {
+    operation: "ChangelogSubscriptionDelete",
     dashboard: {
       rateLimit: "write",
       policy: (args: TChangelogSubscriptionDelete) =>
@@ -155,7 +164,10 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
           sitePolicy.canViewChangelog(args.organizationId)
         ),
     },
-  } satisfies Record<Surface, SurfaceConfig<TChangelogSubscriptionDelete>>;
+  } satisfies SurfacePair<
+    TChangelogSubscriptionDelete,
+    ChangelogSubscriptionRpcTag
+  >;
 
   const subscribeFor = <
     Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
@@ -169,7 +181,7 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       withRemapDbErrors("ChangelogSubscription", "create"),
       withSurfaceRateLimit({
         level,
-        operation: "ChangelogSubscriptionCreate",
+        operation: createWrite.operation,
         surface,
       })
     );
@@ -186,7 +198,7 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       withRemapDbErrors("ChangelogSubscription", "delete"),
       withSurfaceRateLimit({
         level,
-        operation: "ChangelogSubscriptionDelete",
+        operation: deleteWrite.operation,
         surface,
       })
     );

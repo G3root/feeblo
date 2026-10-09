@@ -7,15 +7,19 @@ import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
+import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import {
   type Surface,
-  type SurfaceConfig,
+  type SurfacePair,
   withSurfaceRateLimit,
 } from "../surface";
 import { PostReactionRepository } from "./repository";
 import { PostReactionRpcs } from "./rpcs";
 import type { TPostReactionList, TPostReactionToggle } from "./schema";
+
+/** The RPCs this group declares; a surface pair's operation must be one. */
+type PostReactionRpcTag = RpcTagsOf<typeof PostReactionRpcs>;
 
 export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostReactionRepository;
@@ -30,6 +34,7 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
   // board visibility.
 
   const toggleWrite = {
+    operation: "PostReactionToggle",
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostReactionToggle) =>
@@ -52,7 +57,7 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
           })
         ),
     },
-  } satisfies Record<Surface, SurfaceConfig<TPostReactionToggle>>;
+  } satisfies SurfacePair<TPostReactionToggle, PostReactionRpcTag>;
 
   const toggleReaction = <
     Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
@@ -78,7 +83,7 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
       withRemapDbErrors("PostReaction", "update"),
       withSurfaceRateLimit({
         level,
-        operation: "PostReactionToggle",
+        operation: toggleWrite.operation,
         surface,
       })
     );

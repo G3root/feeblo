@@ -7,15 +7,19 @@ import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
+import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import {
   type Surface,
-  type SurfaceConfig,
+  type SurfacePair,
   withSurfaceRateLimit,
 } from "../surface";
 import { CommentReactionRepository } from "./repository";
 import { CommentReactionRpcs } from "./rpcs";
 import type { TCommentReactionList, TCommentReactionToggle } from "./schema";
+
+/** The RPCs this group declares; a surface pair's operation must be one. */
+type CommentReactionRpcTag = RpcTagsOf<typeof CommentReactionRpcs>;
 
 export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CommentReactionRepository;
@@ -30,6 +34,7 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
   // board visibility.
 
   const toggleWrite = {
+    operation: "CommentReactionToggle",
     dashboard: {
       rateLimit: undefined,
       policy: (args: TCommentReactionToggle) =>
@@ -52,7 +57,7 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
           })
         ),
     },
-  } satisfies Record<Surface, SurfaceConfig<TCommentReactionToggle>>;
+  } satisfies SurfacePair<TCommentReactionToggle, CommentReactionRpcTag>;
 
   const toggleReaction = <
     Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
@@ -79,7 +84,7 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
       withRemapDbErrors("CommentReaction", "update"),
       withSurfaceRateLimit({
         level,
-        operation: "CommentReactionToggle",
+        operation: toggleWrite.operation,
         surface,
       })
     );

@@ -93,6 +93,19 @@ export const RpcGroups = [
 export type RpcGroupName = (typeof RpcGroups)[number][0];
 
 /**
+ * The RPC tags a group declares. A handler that derives a rate-limit bucket
+ * name from an operation uses this to tie that operation to the group, so a
+ * rename in `rpcs.ts` is a compile error rather than a stale bucket.
+ */
+export type RpcTagsOf<Group> = Group extends {
+  readonly requests: ReadonlyMap<string, infer R>;
+}
+  ? R extends { readonly _tag: infer Tag extends string }
+    ? Tag
+    : never
+  : never;
+
+/**
  * Every RPC group, merged once.
  *
  * Derived from `RpcGroups` rather than restated, so the group list has one

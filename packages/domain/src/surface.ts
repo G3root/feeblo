@@ -1,4 +1,4 @@
-import type * as Effect from "effect/Effect";
+import * as Effect from "effect/Effect";
 
 import type { Policy } from "./policy";
 import {
@@ -19,14 +19,25 @@ import {
 export type Surface = "dashboard" | "public";
 
 /**
- * One surface's half of a write: the rate limit it consumes (`undefined` when
- * the surface is unlimited) and the policy its handler applies. The record
- * `Record<Surface, SurfaceConfig<TArgs>>` is what makes a surface with no
- * entry a compile error.
+ * One surface's half of a pair: the rate limit it consumes (`undefined` when
+ * the surface is unlimited) and the policy its handler applies. `SurfacePair`
+ * requires both keys, so a surface with no entry is a compile error.
  */
 export type SurfaceConfig<TArgs> = {
   readonly rateLimit: PublicRpcRateLimitLevel | undefined;
   readonly policy: (args: TArgs) => Policy<unknown, unknown>;
+};
+
+/**
+ * One operation's two surfaces, with the RPC tag the rate-limit bucket name
+ * derives from. The tag is tied to the feature's group (`RpcTagsOf`), so a
+ * rename in `rpcs.ts` cannot leave a handler naming a bucket after an RPC
+ * that no longer exists.
+ */
+export type SurfacePair<TArgs, Tag extends string = string> = {
+  readonly operation: Tag;
+  readonly dashboard: SurfaceConfig<TArgs>;
+  readonly public: SurfaceConfig<TArgs>;
 };
 
 /**
@@ -36,6 +47,27 @@ export type SurfaceConfig<TArgs> = {
  */
 export const surfaceRpcName = (operation: string, surface: Surface): string =>
   surface === "public" ? `${operation}Public` : operation;
+
+/**
+ * Applies a surface's policy to a handler. Unlike `Policy.withPolicy`, the
+ * policy may be a `PublicPolicy` (a public portal read on optional auth), and
+ * the channels come from the policy's own type: a session-free policy must
+ * not add `CurrentSession` to the handler's requirements, or the optional-auth
+ * route would ask for a service its middleware never provides.
+ */
+export const withSurfacePolicy =
+  <P extends Policy<unknown, unknown>>(policy: P) =>
+  <A, E, R>(
+    self: Effect.Effect<A, E, R>
+  ): Effect.Effect<A, E | Effect.Error<P>, R | Effect.Services<P>> =>
+    // SAFETY: the two channels are exactly what the policy contributes; the
+    // assertion restates what `Effect.andThen` computes against the widened
+    // constraint type.
+    Effect.andThen(policy, self) as Effect.Effect<
+      A,
+      E | Effect.Error<P>,
+      R | Effect.Services<P>
+    >;
 
 /**
  * Applies `surface`'s rate limit to a handler, with the bucket name derived

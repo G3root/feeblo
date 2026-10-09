@@ -4,16 +4,20 @@ import * as Layer from "effect/Layer";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
+import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
 import {
   type Surface,
-  type SurfaceConfig,
+  type SurfacePair,
   withSurfaceRateLimit,
 } from "../surface";
 import { NotificationPolicy } from "./policies";
 import { NotificationRpcs } from "./rpcs";
 import type { TNotificationList, TNotificationMarkRead } from "./schema";
 import { NotificationService } from "./service";
+
+/** The RPCs this group declares; a surface pair's operation must be one. */
+type NotificationRpcTag = RpcTagsOf<typeof NotificationRpcs>;
 
 export const NotificationRpcHandlersEffect = Effect.gen(function* () {
   const notifications = yield* NotificationService;
@@ -68,6 +72,7 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
   // restricted widget session on the portal.
 
   const markReadWrite = {
+    operation: "NotificationMarkRead",
     dashboard: {
       rateLimit: "write",
       policy: (args: TNotificationMarkRead) =>
@@ -78,9 +83,10 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
       policy: (args: TNotificationMarkRead) =>
         Policy.hasRestrictedOrganizationScope(args.organizationId),
     },
-  } satisfies Record<Surface, SurfaceConfig<TNotificationMarkRead>>;
+  } satisfies SurfacePair<TNotificationMarkRead, NotificationRpcTag>;
 
   const markAllReadWrite = {
+    operation: "NotificationMarkAllRead",
     dashboard: {
       rateLimit: "write",
       policy: ({ organizationId }: { organizationId: string }) =>
@@ -91,7 +97,7 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
       policy: ({ organizationId }: { organizationId: string }) =>
         Policy.hasRestrictedOrganizationScope(organizationId),
     },
-  } satisfies Record<Surface, SurfaceConfig<{ organizationId: string }>>;
+  } satisfies SurfacePair<{ organizationId: string }, NotificationRpcTag>;
 
   const markReadFor = <
     Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
@@ -105,7 +111,7 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
       withRemapDbErrors("Notification", "update"),
       withSurfaceRateLimit({
         level,
-        operation: "NotificationMarkRead",
+        operation: markReadWrite.operation,
         surface,
       })
     );
@@ -122,30 +128,80 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
       withRemapDbErrors("Notification", "update"),
       withSurfaceRateLimit({
         level,
-        operation: "NotificationMarkAllRead",
+        operation: markAllReadWrite.operation,
+        surface,
+      })
+    );
+
+  // -- Surface-parameterized reads --
+  //
+  // Every query is scoped to the session user id, so results can never leak
+  // another user's inbox; only the admission differs — a member on the
+  // dashboard, a restricted widget session on the portal.
+
+  const listRead = {
+    operation: "NotificationList",
+    dashboard: {
+      rateLimit: "read",
+      policy: (args: TNotificationList) =>
+        notificationPolicy.canAccess(args.organizationId),
+    },
+    public: {
+      rateLimit: "read",
+      policy: (args: TNotificationList) =>
+        Policy.hasRestrictedOrganizationScope(args.organizationId),
+    },
+  } satisfies SurfacePair<TNotificationList, NotificationRpcTag>;
+
+  const unreadCountRead = {
+    operation: "NotificationUnreadCount",
+    dashboard: {
+      rateLimit: "read",
+      policy: ({ organizationId }: { organizationId: string }) =>
+        notificationPolicy.canAccess(organizationId),
+    },
+    public: {
+      rateLimit: "read",
+      policy: ({ organizationId }: { organizationId: string }) =>
+        Policy.hasRestrictedOrganizationScope(organizationId),
+    },
+  } satisfies SurfacePair<{ organizationId: string }, NotificationRpcTag>;
+
+  const listFor = <Level extends RateLimit.PublicRpcRateLimitLevel | undefined>(
+    surface: Surface,
+    level: Level,
+    args: TNotificationList
+  ) =>
+    listNotificationsEffect(args).pipe(
+      Policy.withPolicy(listRead[surface].policy(args)),
+      withRemapDbErrors("Notification", "select"),
+      withSurfaceRateLimit({ level, operation: listRead.operation, surface })
+    );
+
+  const unreadCountFor = <
+    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
+  >(
+    surface: Surface,
+    level: Level,
+    args: { organizationId: string }
+  ) =>
+    unreadCountEffect(args).pipe(
+      Policy.withPolicy(unreadCountRead[surface].policy(args)),
+      withRemapDbErrors("Notification", "select"),
+      withSurfaceRateLimit({
+        level,
+        operation: unreadCountRead.operation,
         surface,
       })
     );
 
   return {
     NotificationList: (args: TNotificationList) =>
-      listNotificationsEffect(args).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "NotificationList",
-          level: "read",
-        }),
-        Policy.withPolicy(notificationPolicy.canAccess(args.organizationId)),
-        withRemapDbErrors("Notification", "select")
-      ),
+      listFor("dashboard", listRead.dashboard.rateLimit, args),
     NotificationUnreadCount: ({ organizationId }: { organizationId: string }) =>
-      unreadCountEffect({ organizationId }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "NotificationUnreadCount",
-          level: "read",
-        }),
-        Policy.withPolicy(notificationPolicy.canAccess(organizationId)),
-        withRemapDbErrors("Notification", "select")
-      ),
+      unreadCountFor("dashboard", unreadCountRead.dashboard.rateLimit, {
+        organizationId,
+      }),
     NotificationMarkRead: (args: TNotificationMarkRead) =>
       markReadFor("dashboard", markReadWrite.dashboard.rateLimit, args),
     NotificationMarkAllRead: ({ organizationId }: { organizationId: string }) =>
@@ -156,31 +212,15 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
     // members. Every query is scoped to the session user id, so results can
     // never leak another user's inbox.
     NotificationListPublic: (args: TNotificationList) =>
-      listNotificationsEffect(args).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "NotificationListPublic",
-          level: "read",
-        }),
-        Policy.withPolicy(
-          Policy.hasRestrictedOrganizationScope(args.organizationId)
-        ),
-        withRemapDbErrors("Notification", "select")
-      ),
+      listFor("public", listRead.public.rateLimit, args),
     NotificationUnreadCountPublic: ({
       organizationId,
     }: {
       organizationId: string;
     }) =>
-      unreadCountEffect({ organizationId }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "NotificationUnreadCountPublic",
-          level: "read",
-        }),
-        Policy.withPolicy(
-          Policy.hasRestrictedOrganizationScope(organizationId)
-        ),
-        withRemapDbErrors("Notification", "select")
-      ),
+      unreadCountFor("public", unreadCountRead.public.rateLimit, {
+        organizationId,
+      }),
     NotificationMarkReadPublic: (args: TNotificationMarkRead) =>
       markReadFor("public", markReadWrite.public.rateLimit, args),
     NotificationMarkAllReadPublic: ({

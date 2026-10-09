@@ -70,6 +70,9 @@ export const publicPolicy = <E, R>(
 
 export class DenyAccess extends Data.TaggedError("DenyAccess")<{}> {}
 
+/** A policy that always passes; for a surface whose admission the session middleware already decided. */
+export const allow: PublicPolicy = publicPolicy(() => Effect.succeed(true));
+
 /**
  * Applies a policy as a pre-check to an effect.
  * If the policy fails, the effect will fail with Forbidden.

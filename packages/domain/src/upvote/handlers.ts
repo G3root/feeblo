@@ -10,10 +10,11 @@ import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
+import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import {
   type Surface,
-  type SurfaceConfig,
+  type SurfacePair,
   withSurfaceRateLimit,
 } from "../surface";
 import { UserRepository } from "../user/repository";
@@ -28,6 +29,9 @@ import type {
   TUpvoteToggle,
 } from "./schema";
 
+/** The RPCs this group declares; a surface pair's operation must be one. */
+type UpvoteRpcTag = RpcTagsOf<typeof UpvoteRpcs>;
+
 export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* UpvoteRepository;
   const upvotePolicy = yield* UpvotePolicy;
@@ -38,6 +42,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
   // `isUnlocked`, the public portal `isUnlockedPublic`.
 
   const toggleWrite = {
+    operation: "UpvoteToggle",
     dashboard: {
       rateLimit: undefined,
       policy: (args: TUpvoteToggle) =>
@@ -56,7 +61,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
           source: "public",
         }),
     },
-  } satisfies Record<Surface, SurfaceConfig<TUpvoteToggle>>;
+  } satisfies SurfacePair<TUpvoteToggle, UpvoteRpcTag>;
 
   const toggleVote = <
     Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
@@ -78,7 +83,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
     }).pipe(
       Policy.withPolicy(toggleWrite[surface].policy(args)),
       withRemapDbErrors("Upvote", "update"),
-      withSurfaceRateLimit({ level, operation: "UpvoteToggle", surface })
+      withSurfaceRateLimit({ level, operation: toggleWrite.operation, surface })
     );
 
   return {

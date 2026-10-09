@@ -10,10 +10,11 @@ import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import * as RateLimit from "../rate-limit";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
+import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
 import {
   type Surface,
-  type SurfaceConfig,
+  type SurfacePair,
   withSurfaceRateLimit,
 } from "../surface";
 import { PostSubscriptionRepository } from "./repository";
@@ -23,6 +24,9 @@ import type {
   TPostSubscriptionDelete,
   TPostSubscriptionList,
 } from "./schema";
+
+/** The RPCs this group declares; a surface pair's operation must be one. */
+type PostSubscriptionRpcTag = RpcTagsOf<typeof PostSubscriptionRpcs>;
 
 export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostSubscriptionRepository;
@@ -126,6 +130,7 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   // rate limit.
 
   const createWrite = {
+    operation: "PostSubscriptionCreate",
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostSubscriptionCreate) =>
@@ -148,9 +153,10 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
           })
         ),
     },
-  } satisfies Record<Surface, SurfaceConfig<TPostSubscriptionCreate>>;
+  } satisfies SurfacePair<TPostSubscriptionCreate, PostSubscriptionRpcTag>;
 
   const deleteWrite = {
+    operation: "PostSubscriptionDelete",
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostSubscriptionDelete) =>
@@ -173,7 +179,7 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
           })
         ),
     },
-  } satisfies Record<Surface, SurfaceConfig<TPostSubscriptionDelete>>;
+  } satisfies SurfacePair<TPostSubscriptionDelete, PostSubscriptionRpcTag>;
 
   const subscribeFor = <
     Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
@@ -187,7 +193,7 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       withRemapDbErrors("PostSubscription", "create"),
       withSurfaceRateLimit({
         level,
-        operation: "PostSubscriptionCreate",
+        operation: createWrite.operation,
         surface,
       })
     );
@@ -204,7 +210,7 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       withRemapDbErrors("PostSubscription", "delete"),
       withSurfaceRateLimit({
         level,
-        operation: "PostSubscriptionDelete",
+        operation: deleteWrite.operation,
         surface,
       })
     );

@@ -107,7 +107,7 @@ const makeCommentPolicy = Effect.gen(function* () {
         // same permission the post editor enforces for status transitions.
         args.statusUpdateId != null
           ? Policy.canPermission(args.organizationId, "posts.status")
-          : Policy.policy(() => Effect.succeed(true))
+          : Policy.allow
       );
     }
 
@@ -130,7 +130,7 @@ const makeCommentPolicy = Effect.gen(function* () {
         // matching the post editor's status transition gate.
         args.statusUpdateId != null
           ? Policy.canPermission(args.organizationId, "posts.status")
-          : Policy.policy(() => Effect.succeed(true))
+          : Policy.allow
       );
     }
 
@@ -147,7 +147,7 @@ const makeCommentPolicy = Effect.gen(function* () {
       // matching the post editor's status transition gate.
       args.statusUpdateId != null
         ? Policy.canPermission(args.organizationId, "posts.status")
-        : Policy.policy(() => Effect.succeed(true))
+        : Policy.allow
     );
   };
 

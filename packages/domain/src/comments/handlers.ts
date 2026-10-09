@@ -12,10 +12,11 @@ import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
+import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import {
   type Surface,
-  type SurfaceConfig,
+  type SurfacePair,
   withSurfaceRateLimit,
 } from "../surface";
 import { CommentPolicy } from "./policies";
@@ -31,6 +32,9 @@ import type {
 } from "./schema";
 import { CommentService } from "./service";
 import { applyCommentStatusUpdate } from "./status-update";
+
+/** The RPCs this group declares; a surface pair's operation must be one. */
+type CommentRpcTag = RpcTagsOf<typeof CommentRpcs>;
 
 export const CommentRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CommentRepository;
@@ -60,6 +64,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
   // and their error schemas stay separate in `./rpcs.ts`.
 
   const deleteWrite = {
+    operation: "CommentDelete",
     dashboard: {
       rateLimit: undefined,
       policy: (args: TCommentDelete) =>
@@ -80,9 +85,10 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
           source: "public",
         }),
     },
-  } satisfies Record<Surface, SurfaceConfig<TCommentDelete>>;
+  } satisfies SurfacePair<TCommentDelete, CommentRpcTag>;
 
   const updateWrite = {
+    operation: "CommentUpdate",
     dashboard: {
       rateLimit: undefined,
       policy: (args: TCommentUpdate) =>
@@ -103,7 +109,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
           source: "public",
         }),
     },
-  } satisfies Record<Surface, SurfaceConfig<TCommentUpdate>>;
+  } satisfies SurfacePair<TCommentUpdate, CommentRpcTag>;
 
   const removeComment = <
     Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
@@ -130,7 +136,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     }).pipe(
       Policy.withPolicy(deleteWrite[surface].policy(args)),
       withRemapDbErrors("Comment", "delete"),
-      withSurfaceRateLimit({ level, operation: "CommentDelete", surface })
+      withSurfaceRateLimit({ level, operation: deleteWrite.operation, surface })
     );
 
   const modifyComment = <
@@ -163,10 +169,11 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     }).pipe(
       Policy.withPolicy(updateWrite[surface].policy(args)),
       withRemapDbErrors("Comment", "update"),
-      withSurfaceRateLimit({ level, operation: "CommentUpdate", surface })
+      withSurfaceRateLimit({ level, operation: updateWrite.operation, surface })
     );
 
   const createWrite = {
+    operation: "CommentCreate",
     dashboard: {
       rateLimit: undefined,
       policy: (args: TCommentCreate) =>
@@ -192,7 +199,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
           source: "public",
         }),
     },
-  } satisfies Record<Surface, SurfaceConfig<TCommentCreate>>;
+  } satisfies SurfacePair<TCommentCreate, CommentRpcTag>;
 
   const addComment = <
     Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
@@ -259,7 +266,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     }).pipe(
       Policy.withPolicy(createWrite[surface].policy(args)),
       withRemapDbErrors("Comment", "create"),
-      withSurfaceRateLimit({ level, operation: "CommentCreate", surface })
+      withSurfaceRateLimit({ level, operation: createWrite.operation, surface })
     );
 
   return {

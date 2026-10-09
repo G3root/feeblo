@@ -20,6 +20,7 @@ import {
   InternalServerError,
   withRemapDbErrors,
 } from "../rpc-errors";
+import type { RpcTagsOf } from "../rpc-group";
 import {
   CurrentSession,
   OptionalCurrentSession,
@@ -27,7 +28,7 @@ import {
 } from "../session-middleware";
 import {
   type Surface,
-  type SurfaceConfig,
+  type SurfacePair,
   withSurfaceRateLimit,
 } from "../surface";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -60,6 +61,9 @@ import type {
 } from "./schema";
 import { makePostSuggestions } from "./suggestions";
 import { PostWriteService, type PostWriteActor } from "./write";
+
+/** The RPCs this group declares; a surface pair's operation must be one. */
+type PostRpcTag = RpcTagsOf<typeof PostRpcs>;
 
 export const PostRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostRepository;
@@ -158,6 +162,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   // which is why `PostUpdate`'s public policy adds `hasUnchangedLocation`.
 
   const deleteWrite = {
+    operation: "PostDelete",
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostDelete) =>
@@ -178,9 +183,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           source: "public",
         }),
     },
-  } satisfies Record<Surface, SurfaceConfig<TPostDelete>>;
+  } satisfies SurfacePair<TPostDelete, PostRpcTag>;
 
   const updateWrite = {
+    operation: "PostUpdate",
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostUpdate) =>
@@ -212,9 +218,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           })
         ),
     },
-  } satisfies Record<Surface, SurfaceConfig<TPostUpdate>>;
+  } satisfies SurfacePair<TPostUpdate, PostRpcTag>;
 
   const updateContentWrite = {
+    operation: "PostUpdateContent",
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostUpdateContent) =>
@@ -235,9 +242,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           source: "public",
         }),
     },
-  } satisfies Record<Surface, SurfaceConfig<TPostUpdateContent>>;
+  } satisfies SurfacePair<TPostUpdateContent, PostRpcTag>;
 
   const updateTitleWrite = {
+    operation: "PostUpdateTitle",
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostUpdateTitle) =>
@@ -258,7 +266,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           source: "public",
         }),
     },
-  } satisfies Record<Surface, SurfaceConfig<TPostUpdateTitle>>;
+  } satisfies SurfacePair<TPostUpdateTitle, PostRpcTag>;
 
   const removePost = <
     Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
@@ -282,7 +290,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     ).pipe(
       Policy.withPolicy(deleteWrite[surface].policy(args)),
       withRemapDbErrors("Post", "delete"),
-      withSurfaceRateLimit({ level, operation: "PostDelete", surface })
+      withSurfaceRateLimit({ level, operation: deleteWrite.operation, surface })
     );
 
   const updatePost = <
@@ -305,7 +313,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     ).pipe(
       Policy.withPolicy(updateWrite[surface].policy(args)),
       withRemapDbErrors("Post", "update"),
-      withSurfaceRateLimit({ level, operation: "PostUpdate", surface })
+      withSurfaceRateLimit({ level, operation: updateWrite.operation, surface })
     );
 
   const updatePostContent = <
@@ -330,7 +338,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       withRemapDbErrors("Post", "update"),
       withSurfaceRateLimit({
         level,
-        operation: "PostUpdateContent",
+        operation: updateContentWrite.operation,
         surface,
       })
     );
@@ -354,10 +362,15 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     ).pipe(
       Policy.withPolicy(updateTitleWrite[surface].policy(args)),
       withRemapDbErrors("Post", "update"),
-      withSurfaceRateLimit({ level, operation: "PostUpdateTitle", surface })
+      withSurfaceRateLimit({
+        level,
+        operation: updateTitleWrite.operation,
+        surface,
+      })
     );
 
   const createWrite = {
+    operation: "PostCreate",
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostCreate) =>
@@ -375,7 +388,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           source: "public",
         }),
     },
-  } satisfies Record<Surface, SurfaceConfig<TPostCreate>>;
+  } satisfies SurfacePair<TPostCreate, PostRpcTag>;
 
   const createPost = <
     Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
@@ -411,7 +424,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             message: "A post with this slug already exists",
           }),
       }),
-      withSurfaceRateLimit({ level, operation: "PostCreate", surface })
+      withSurfaceRateLimit({ level, operation: createWrite.operation, surface })
     );
 
   // -- RPC handlers --

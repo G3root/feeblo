@@ -5,7 +5,11 @@ import {
   PublicRpcRateLimiter,
   type PublicRpcRateLimitOptions,
 } from "./rate-limit";
-import { surfaceRpcName, withSurfaceRateLimit } from "./surface";
+import {
+  surfaceRpcName,
+  withSurfacePolicy,
+  withSurfaceRateLimit,
+} from "./surface";
 
 describe("withSurfaceRateLimit", () => {
   it.effect("derives the public bucket name from the operation", () =>
@@ -49,4 +53,32 @@ describe("withSurfaceRateLimit", () => {
   it("names the dashboard RPC without a suffix", () => {
     expect(surfaceRpcName("CommentDelete", "dashboard")).toBe("CommentDelete");
   });
+
+  it("names the public RPC with the Public suffix", () => {
+    expect(surfaceRpcName("CommentDelete", "public")).toBe(
+      "CommentDeletePublic"
+    );
+  });
+});
+
+describe("withSurfacePolicy", () => {
+  it.effect("runs the policy before the handler", () =>
+    Effect.gen(function* () {
+      const order: Array<string> = [];
+
+      const result = yield* Effect.sync(() => {
+        order.push("body");
+        return "kept";
+      }).pipe(
+        withSurfacePolicy(
+          Effect.sync(() => {
+            order.push("policy");
+          })
+        )
+      );
+
+      expect(order).toEqual(["policy", "body"]);
+      expect(result).toBe("kept");
+    })
+  );
 });
