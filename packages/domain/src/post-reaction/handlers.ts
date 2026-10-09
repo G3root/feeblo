@@ -5,10 +5,11 @@ import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
+import { withPublicViewer } from "../public-read";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
-import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
+import { CurrentSession } from "../session-middleware";
 import {
   type Surface,
   type SurfacePair,
@@ -102,20 +103,13 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
     PostReactionToggle: (args: TPostReactionToggle) =>
       toggleReaction("dashboard", toggleWrite.dashboard.rateLimit, args),
     PostReactionListPublic: (args: TPostReactionList) =>
-      Effect.gen(function* () {
-        const sessionOption = yield* OptionalCurrentSession;
-        const sessionUserId =
-          sessionOption._tag === "Some"
-            ? sessionOption.value.session.userId
-            : undefined;
-
-        const reactions = yield* repository.listPublic({
-          slug: args.slug,
-          organizationId: args.organizationId,
-        });
-
-        // Never leak internal reactor identifiers to public callers.
-        return redactActorIdentities(reactions, sessionUserId);
+      withPublicViewer({
+        read: () =>
+          repository.listPublic({
+            slug: args.slug,
+            organizationId: args.organizationId,
+          }),
+        redact: redactActorIdentities,
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "PostReactionListPublic",

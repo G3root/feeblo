@@ -13,7 +13,11 @@ import {
   type PostActivityInput,
   PostActivityRepository,
 } from "../post-activity/repository";
-import { redactCreatorIdentity } from "../public-actor";
+import {
+  redactCreatorIdentities,
+  redactCreatorIdentity,
+} from "../public-actor";
+import { currentPublicViewer, withPublicViewer } from "../public-read";
 import * as RateLimit from "../rate-limit";
 import {
   BadRequestError,
@@ -21,11 +25,7 @@ import {
   withRemapDbErrors,
 } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
-import {
-  CurrentSession,
-  OptionalCurrentSession,
-  type Session,
-} from "../session-middleware";
+import { CurrentSession, type Session } from "../session-middleware";
 import {
   type Surface,
   type SurfacePair,
@@ -446,22 +446,16 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     },
 
     PostListPublic: (args: TPostList) => {
-      return Effect.gen(function* () {
-        const sessionOption = yield* OptionalCurrentSession;
-        const userId =
-          sessionOption._tag === "Some"
-            ? sessionOption.value.session.userId
-            : undefined;
-        // Public post listing is intentionally unauthenticated; board
-        // visibility is enforced inside `findManyPublic` (unlocked boards
-        // only). No site-policy gate needed here.
-        const posts = yield* repository.findManyPublic({
-          organizationId: args.organizationId,
-          boardId: args.boardId,
-        });
-        // Creator identifiers are PII (see `public-actor.ts`): keep them only
-        // on the session user's own rows so "did I create this" still works.
-        return posts.map((post) => redactCreatorIdentity(post, userId));
+      // Public post listing is intentionally unauthenticated; board
+      // visibility is enforced inside `findManyPublic` (unlocked boards
+      // only). No site-policy gate needed here.
+      return withPublicViewer({
+        read: () =>
+          repository.findManyPublic({
+            organizationId: args.organizationId,
+            boardId: args.boardId,
+          }),
+        redact: redactCreatorIdentities,
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "PostListPublic",
@@ -490,27 +484,24 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     },
 
     PostGetPublic: (args: TPostGet) => {
-      return Effect.gen(function* () {
-        const sessionOption = yield* OptionalCurrentSession;
-        const userId =
-          sessionOption._tag === "Some"
-            ? sessionOption.value.session.userId
-            : undefined;
-        // Same visibility rule as PostListPublic: board visibility is
-        // enforced inside `findPublicBySlug` (public boards only). No
-        // site-policy gate needed here.
-        const post = yield* repository.findPublicBySlug({
-          organizationId: args.organizationId,
-          slug: args.slug,
-        });
-        if (post === undefined) {
-          return yield* new PostNotFoundError({
-            message: "Post not found",
-          });
-        }
-        // Same PII rule as PostListPublic: creator identifiers are only
-        // meaningful for the session user's own row.
-        return redactCreatorIdentity(post, userId);
+      // Same visibility rule as PostListPublic: board visibility is enforced
+      // inside `findPublicBySlug` (public boards only). No site-policy gate
+      // needed here.
+      return withPublicViewer({
+        read: () =>
+          Effect.gen(function* () {
+            const post = yield* repository.findPublicBySlug({
+              organizationId: args.organizationId,
+              slug: args.slug,
+            });
+            if (post === undefined) {
+              return yield* new PostNotFoundError({
+                message: "Post not found",
+              });
+            }
+            return post;
+          }),
+        redact: redactCreatorIdentity,
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "PostGetPublic",
@@ -542,16 +533,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     PostSuggestionsPublic: (args: TPostSuggestions) =>
-      Effect.gen(function* () {
-        const sessionOption = yield* OptionalCurrentSession;
-        const userId =
-          sessionOption._tag === "Some"
-            ? sessionOption.value.session.userId
-            : undefined;
-        const posts = yield* suggestions({ ...args, publicOnly: true });
-        // Same PII rule as PostListPublic: creator identifiers are only
-        // meaningful for the session user's own rows.
-        return posts.map((post) => redactCreatorIdentity(post, userId));
+      withPublicViewer({
+        read: () => suggestions({ ...args, publicOnly: true }),
+        redact: redactCreatorIdentities,
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "PostSuggestionsPublic",
@@ -586,13 +570,13 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
     PostDeleteEligibilityListPublic: (args: TPostDeleteEligibilityListPublic) =>
       Effect.gen(function* () {
-        const sessionOption = yield* OptionalCurrentSession;
-        if (sessionOption._tag === "None") {
+        const viewer = yield* currentPublicViewer;
+        if (viewer.userId === undefined) {
           return { eligibleIds: [] };
         }
         const rows = yield* repository.findDeletableIds({
           organizationId: args.organizationId,
-          userId: sessionOption.value.session.userId,
+          userId: viewer.userId,
         });
         return { eligibleIds: rows.map((row) => row.id) };
       }).pipe(

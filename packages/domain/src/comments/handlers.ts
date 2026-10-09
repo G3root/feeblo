@@ -1,6 +1,5 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
@@ -10,10 +9,11 @@ import * as Policy from "../policy";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
+import { withPublicViewer } from "../public-read";
 import * as RateLimit from "../rate-limit";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
-import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
+import { CurrentSession } from "../session-middleware";
 import {
   type Surface,
   type SurfacePair,
@@ -282,25 +282,14 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     CommentListPublic: (args: TCommentList) =>
-      Effect.gen(function* () {
-        const sessionOption = yield* OptionalCurrentSession;
-        const isMember = Option.match(sessionOption, {
-          onNone: () => false,
-          onSome: (session) => Policy.isMember(session, args.organizationId),
-        });
-        const sessionUserId =
-          sessionOption._tag === "Some"
-            ? sessionOption.value.session.userId
-            : undefined;
-
-        const comments = yield* repository.findManyPublic({
-          organizationId: args.organizationId,
-          slug: args.slug,
-          includeInternal: isMember,
-        });
-
-        // Never leak internal commenter identifiers to public callers.
-        return redactActorIdentities(comments, sessionUserId);
+      withPublicViewer({
+        read: (viewer) =>
+          repository.findManyPublic({
+            includeInternal: viewer.isMember(args.organizationId),
+            organizationId: args.organizationId,
+            slug: args.slug,
+          }),
+        redact: redactActorIdentities,
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "CommentListPublic",

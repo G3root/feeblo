@@ -5,10 +5,11 @@ import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
+import { withPublicViewer } from "../public-read";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
-import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
+import { CurrentSession } from "../session-middleware";
 import {
   type Surface,
   type SurfacePair,
@@ -103,20 +104,13 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
     CommentReactionToggle: (args: TCommentReactionToggle) =>
       toggleReaction("dashboard", toggleWrite.dashboard.rateLimit, args),
     CommentReactionListPublic: (args: TCommentReactionList) =>
-      Effect.gen(function* () {
-        const sessionOption = yield* OptionalCurrentSession;
-        const sessionUserId =
-          sessionOption._tag === "Some"
-            ? sessionOption.value.session.userId
-            : undefined;
-
-        const reactions = yield* repository.listPublic({
-          organizationId: args.organizationId,
-          slug: args.slug,
-        });
-
-        // Never leak internal reactor identifiers to public callers.
-        return redactActorIdentities(reactions, sessionUserId);
+      withPublicViewer({
+        read: () =>
+          repository.listPublic({
+            organizationId: args.organizationId,
+            slug: args.slug,
+          }),
+        redact: redactActorIdentities,
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "CommentReactionListPublic",

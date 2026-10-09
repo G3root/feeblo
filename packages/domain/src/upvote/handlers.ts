@@ -8,10 +8,11 @@ import * as Policy from "../policy";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
+import { withPublicViewer } from "../public-read";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
-import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
+import { CurrentSession } from "../session-middleware";
 import {
   type Surface,
   type SurfacePair,
@@ -166,22 +167,15 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Upvote", "update")
       ),
     UpvoteListPublic: (args: TUpvoteList) =>
-      Effect.gen(function* () {
-        const sessionOption = yield* OptionalCurrentSession;
-        const sessionUserId =
-          sessionOption._tag === "Some"
-            ? sessionOption.value.session.userId
-            : undefined;
-
-        const upvotes = yield* repository.list({
-          organizationId: args.organizationId,
-          publicOnly: true,
-          ...(args.postId && { postId: args.postId }),
-          ...(args.slug && { slug: args.slug }),
-        });
-
-        // Never leak internal voter identifiers to public callers.
-        return redactActorIdentities(upvotes, sessionUserId);
+      withPublicViewer({
+        read: () =>
+          repository.list({
+            organizationId: args.organizationId,
+            publicOnly: true,
+            ...(args.postId && { postId: args.postId }),
+            ...(args.slug && { slug: args.slug }),
+          }),
+        redact: redactActorIdentities,
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "UpvoteListPublic",
