@@ -9,7 +9,9 @@ import {
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
+import { refetchInBackground } from "@feeblo/web-shared/collections";
 import { eq, useLiveQuery } from "@tanstack/react-db";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSelector } from "@xstate/store-react";
 import { useEffect, useState } from "react";
 
@@ -31,7 +33,13 @@ const pluralize = (count: number, singular: string, plural: string) =>
 export function PostStatusDeleteDialog() {
   const store = usePostStatusDeleteDialogContext();
   const organizationId = useOrganizationId();
-  const { postStatusCollection } = useDashboardCollections();
+  const queryClient = useQueryClient();
+  const {
+    postCollection,
+    postDetailCollection,
+    postStatusCollection,
+    roadmapColumnCollection,
+  } = useDashboardCollections();
   const open = useSelector(store, (state) => state.context.open);
   const statusId = useSelector(store, (state) => state.context.data.statusId);
   const [preview, setPreview] = useState<DeletePreview | null>(null);
@@ -107,6 +115,26 @@ export function PostStatusDeleteDialog() {
         );
 
         await postStatusCollection.utils.refetch();
+        // The delete repoints every post in the removed status at the default
+        // and cascades the roadmap columns bound to it away. Those rows live in
+        // other collections, so the status list refetch alone leaves a post
+        // detail page reading a `statusId` that no longer exists — an empty
+        // status field — and a roadmap still rendering a column the server
+        // already deleted. Detached: the write has already returned, and a
+        // failed refresh must not report the delete as failed.
+        refetchInBackground(
+          postCollection.utils.refetch(),
+          roadmapColumnCollection.utils.refetch(),
+          // `postDetailCollection` syncs `on-demand`, so its `refetch()` only
+          // covers subsets registered right now. Invalidating the scope marks
+          // a cached detail row stale, so a detail route mounted within the
+          // query client's freshness window refetches instead of reading a
+          // pre-delete statusId out of the cache.
+          postDetailCollection.utils.refetch(),
+          queryClient.invalidateQueries({
+            queryKey: ["post-detail", organizationId],
+          })
+        );
         store.send({ type: "toggle" });
 
         toastManager.add({
