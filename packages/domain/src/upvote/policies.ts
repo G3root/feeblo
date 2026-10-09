@@ -4,18 +4,17 @@ import * as Layer from "effect/Layer";
 
 import * as Policy from "../policy";
 import { PostRepository } from "../post/repository";
-
-type TSource = "dashboard" | "public";
+import type { Surface } from "../surface";
 
 type TCanList = {
   organizationId: string;
-  source: TSource;
+  source: Surface;
 };
 
 type TCanToggle = {
   organizationId: string;
   postId: string;
-  source: TSource;
+  source: Surface;
 };
 
 type TCanVoteOnBehalf = {

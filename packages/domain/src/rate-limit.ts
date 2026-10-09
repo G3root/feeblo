@@ -44,7 +44,7 @@ export const RateLimitErrors = Schema.Union([
   RateLimitUnavailableError,
 ]);
 
-type RateLimitError = RateLimitExceededError | RateLimitUnavailableError;
+export type RateLimitError = RateLimitExceededError | RateLimitUnavailableError;
 
 interface PublicRpcRateLimiterService {
   readonly consume: (

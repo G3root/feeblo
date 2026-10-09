@@ -5,9 +5,8 @@ import * as Option from "effect/Option";
 
 import * as Policy from "../policy";
 import { PostRepository } from "../post/repository";
+import type { Surface } from "../surface";
 import { CommentRepository } from "./repository";
-
-type TSource = "dashboard" | "public";
 
 type TIsOwner = {
   organizationId: string;
@@ -19,7 +18,7 @@ type TCanCreate = {
   organizationId: string;
   visibility: "PUBLIC" | "INTERNAL";
   postId: string;
-  source: TSource;
+  source: Surface;
   parentCommentId?: string | null;
   /** True when the payload attributes the comment to a resolved customer. */
   onBehalf?: boolean;
@@ -31,21 +30,21 @@ type TCanDelete = {
   organizationId: string;
   commentId: string;
   postId: string;
-  source: TSource;
+  source: Surface;
 };
 
 type TCanUpdate = {
   organizationId: string;
   commentId: string;
   postId: string;
-  source: TSource;
+  source: Surface;
 };
 
 type TCanPin = {
   organizationId: string;
   commentId: string;
   postId: string;
-  source: TSource;
+  source: Surface;
 };
 
 const makeCommentPolicy = Effect.gen(function* () {
