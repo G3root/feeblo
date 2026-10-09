@@ -11,6 +11,11 @@ import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
+import {
+  type Surface,
+  type SurfaceConfig,
+  withSurfaceRateLimit,
+} from "../surface";
 import { ChangelogSubscriptionRepository } from "./repository";
 import { ChangelogSubscriptionRpcs } from "./rpcs";
 import type {
@@ -109,6 +114,83 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       return { subscribed: false };
     });
 
+  // -- Surface-parameterized writes --
+  //
+  // Both surfaces spend the same write limit; only the session scope differs:
+  // a member on the dashboard, a restricted widget session on the portal.
+
+  const createWrite = {
+    dashboard: {
+      rateLimit: "write",
+      policy: (args: TChangelogSubscriptionCreate) =>
+        Policy.all(
+          Policy.hasMembership(args.organizationId),
+          sitePolicy.canViewChangelog(args.organizationId)
+        ),
+    },
+    public: {
+      rateLimit: "write",
+      policy: (args: TChangelogSubscriptionCreate) =>
+        Policy.all(
+          Policy.hasRestrictedOrganizationScope(args.organizationId),
+          sitePolicy.canViewChangelog(args.organizationId)
+        ),
+    },
+  } satisfies Record<Surface, SurfaceConfig<TChangelogSubscriptionCreate>>;
+
+  const deleteWrite = {
+    dashboard: {
+      rateLimit: "write",
+      policy: (args: TChangelogSubscriptionDelete) =>
+        Policy.all(
+          Policy.hasMembership(args.organizationId),
+          sitePolicy.canViewChangelog(args.organizationId)
+        ),
+    },
+    public: {
+      rateLimit: "write",
+      policy: (args: TChangelogSubscriptionDelete) =>
+        Policy.all(
+          Policy.hasRestrictedOrganizationScope(args.organizationId),
+          sitePolicy.canViewChangelog(args.organizationId)
+        ),
+    },
+  } satisfies Record<Surface, SurfaceConfig<TChangelogSubscriptionDelete>>;
+
+  const subscribeFor = <
+    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
+  >(
+    surface: Surface,
+    level: Level,
+    args: TChangelogSubscriptionCreate
+  ) =>
+    subscribeEffect(args).pipe(
+      Policy.withPolicy(createWrite[surface].policy(args)),
+      withRemapDbErrors("ChangelogSubscription", "create"),
+      withSurfaceRateLimit({
+        level,
+        operation: "ChangelogSubscriptionCreate",
+        surface,
+      })
+    );
+
+  const unsubscribeFor = <
+    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
+  >(
+    surface: Surface,
+    level: Level,
+    args: TChangelogSubscriptionDelete
+  ) =>
+    unsubscribeEffect(args).pipe(
+      Policy.withPolicy(deleteWrite[surface].policy(args)),
+      withRemapDbErrors("ChangelogSubscription", "delete"),
+      withSurfaceRateLimit({
+        level,
+        operation: "ChangelogSubscriptionDelete",
+        surface,
+      })
+    );
+
   // -- RPC handlers --
 
   return {
@@ -148,64 +230,16 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     ChangelogSubscriptionCreate: (args: TChangelogSubscriptionCreate) =>
-      subscribeEffect(args).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "ChangelogSubscriptionCreate",
-          level: "write",
-        }),
-        Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(args.organizationId),
-            sitePolicy.canViewChangelog(args.organizationId)
-          )
-        ),
-        withRemapDbErrors("ChangelogSubscription", "create")
-      ),
+      subscribeFor("dashboard", createWrite.dashboard.rateLimit, args),
 
     ChangelogSubscriptionCreatePublic: (args: TChangelogSubscriptionCreate) =>
-      subscribeEffect(args).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "ChangelogSubscriptionCreatePublic",
-          level: "write",
-        }),
-        Policy.withPolicy(
-          Policy.all(
-            Policy.hasRestrictedOrganizationScope(args.organizationId),
-            sitePolicy.canViewChangelog(args.organizationId)
-          )
-        ),
-        withRemapDbErrors("ChangelogSubscription", "create")
-      ),
+      subscribeFor("public", createWrite.public.rateLimit, args),
 
     ChangelogSubscriptionDelete: (args: TChangelogSubscriptionDelete) =>
-      unsubscribeEffect(args).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "ChangelogSubscriptionDelete",
-          level: "write",
-        }),
-        Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(args.organizationId),
-            sitePolicy.canViewChangelog(args.organizationId)
-          )
-        ),
-        withRemapDbErrors("ChangelogSubscription", "delete")
-      ),
+      unsubscribeFor("dashboard", deleteWrite.dashboard.rateLimit, args),
 
     ChangelogSubscriptionDeletePublic: (args: TChangelogSubscriptionDelete) =>
-      unsubscribeEffect(args).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "ChangelogSubscriptionDeletePublic",
-          level: "write",
-        }),
-        Policy.withPolicy(
-          Policy.all(
-            Policy.hasRestrictedOrganizationScope(args.organizationId),
-            sitePolicy.canViewChangelog(args.organizationId)
-          )
-        ),
-        withRemapDbErrors("ChangelogSubscription", "delete")
-      ),
+      unsubscribeFor("public", deleteWrite.public.rateLimit, args),
   };
 });
 
