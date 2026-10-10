@@ -4,6 +4,13 @@ import * as Layer from "effect/Layer";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
+import type { RpcTagsOf } from "../rpc-group";
+import {
+  type Surface,
+  type SurfacePair,
+  withSurfacePolicy,
+  withSurfaceRateLimit,
+} from "../surface";
 import { PostStatusRepository } from "./repository";
 import { PostStatusRpcs } from "./rpcs";
 import type {
@@ -16,6 +23,9 @@ import type {
   TPostStatusUpdate,
 } from "./schema";
 
+/** The RPCs this group declares; a surface pair's operation must be one. */
+type PostStatusRpcTag = RpcTagsOf<typeof PostStatusRpcs>;
+
 export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostStatusRepository;
   const read = (organizationId: string) => Policy.hasMembership(organizationId);
@@ -25,34 +35,59 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
   const manage = (organizationId: string) =>
     Policy.canPermission(organizationId, "statuses.*");
 
+  // -- Surface-parameterized reads --
+  //
+  // Statuses are org-public by design: the public portal renders every post
+  // with its status label, so the catalog must be readable without a session.
+  // The public read is per-IP rate limited and returns no PII (id/name/color/
+  // kind only).
+
+  const listRead = {
+    operation: "PostStatusList",
+    dashboard: {
+      rateLimit: undefined,
+      policy: (args: TPostStatusList) => read(args.organizationId),
+    },
+    public: {
+      rateLimit: "read",
+      policy: (_args: TPostStatusList) => Policy.allow,
+    },
+  } satisfies SurfacePair<TPostStatusList, PostStatusRpcTag>;
+
+  const listStatuses = <
+    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
+    P extends Policy.Policy<unknown, unknown>,
+  >(
+    surface: Surface,
+    level: Level,
+    policy: P,
+    args: TPostStatusList
+  ) =>
+    repository
+      .findMany({
+        organizationId: args.organizationId,
+      })
+      .pipe(
+        withSurfacePolicy(policy),
+        withRemapDbErrors("PostStatus", "select"),
+        withSurfaceRateLimit({ level, operation: listRead.operation, surface })
+      );
+
   return {
     PostStatusList: (args: TPostStatusList) =>
-      repository
-        .findMany({
-          organizationId: args.organizationId,
-        })
-        .pipe(
-          Policy.withPolicy(read(args.organizationId)),
-          withRemapDbErrors("PostStatus", "select")
-        ),
+      listStatuses(
+        "dashboard",
+        listRead.dashboard.rateLimit,
+        listRead.dashboard.policy(args),
+        args
+      ),
     PostStatusListPublic: (args: TPostStatusList) =>
-      // Statuses are org-public by design: the public portal renders every
-      // post with its status label, so the status catalog must be readable
-      // without a session (a member-only status list would leak nothing more
-      // but would break the portal's rendering for anonymous visitors). The
-      // endpoint is per-IP rate limited; no PII is returned (id/name/color/
-      // kind only).
-      repository
-        .findMany({
-          organizationId: args.organizationId,
-        })
-        .pipe(
-          RateLimit.withPublicRpcRateLimit({
-            name: "PostStatusListPublic",
-            level: "read",
-          }),
-          withRemapDbErrors("PostStatus", "select")
-        ),
+      listStatuses(
+        "public",
+        listRead.public.rateLimit,
+        listRead.public.policy(args),
+        args
+      ),
     PostStatusCreate: (args: TPostStatusCreate) =>
       repository.create(args).pipe(
         Policy.withPolicy(manage(args.organizationId)),

@@ -5,17 +5,90 @@ import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
+import { withPublicViewer } from "../public-read";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
-import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
+import type { RpcTagsOf } from "../rpc-group";
+import { CurrentSession } from "../session-middleware";
+import {
+  type Surface,
+  type SurfacePair,
+  withSurfaceRateLimit,
+} from "../surface";
 import { CommentReactionRepository } from "./repository";
 import { CommentReactionRpcs } from "./rpcs";
 import type { TCommentReactionList, TCommentReactionToggle } from "./schema";
+
+/** The RPCs this group declares; a surface pair's operation must be one. */
+type CommentReactionRpcTag = RpcTagsOf<typeof CommentReactionRpcs>;
 
 export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CommentReactionRepository;
   const postPolicy = yield* PostPolicy;
   // const sitePolicy = yield* SitePolicy;
+
+  // -- Surface-parameterized writes --
+  //
+  // The two surfaces read different projections: the dashboard checks
+  // `isUnlocked` in its policy and toggles directly, the public portal checks
+  // `isUnlockedPublic` and lets the repository's `togglePublic` join the
+  // board visibility.
+
+  const toggleWrite = {
+    operation: "CommentReactionToggle",
+    dashboard: {
+      rateLimit: undefined,
+      policy: (args: TCommentReactionToggle) =>
+        Policy.all(
+          postPolicy.isUnlocked({
+            organizationId: args.organizationId,
+            postId: args.postId,
+          }),
+          Policy.hasMembership(args.organizationId)
+        ),
+    },
+    public: {
+      rateLimit: "write",
+      policy: (args: TCommentReactionToggle) =>
+        Policy.all(
+          Policy.hasRestrictedOrganizationScope(args.organizationId),
+          postPolicy.isUnlockedPublic({
+            organizationId: args.organizationId,
+            postId: args.postId,
+          })
+        ),
+    },
+  } satisfies SurfacePair<TCommentReactionToggle, CommentReactionRpcTag>;
+
+  const toggleReaction = <
+    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
+  >(
+    surface: Surface,
+    level: Level,
+    args: TCommentReactionToggle
+  ) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const request = {
+        commentId: args.commentId,
+        emoji: args.emoji,
+        organizationId: args.organizationId,
+        postId: args.postId,
+        userId: session.session.userId,
+      };
+
+      return yield* surface === "public"
+        ? repository.togglePublic(request)
+        : repository.toggle(request);
+    }).pipe(
+      Policy.withPolicy(toggleWrite[surface].policy(args)),
+      withRemapDbErrors("CommentReaction", "update"),
+      withSurfaceRateLimit({
+        level,
+        operation: toggleWrite.operation,
+        surface,
+      })
+    );
 
   return {
     CommentReactionList: (args: TCommentReactionList) =>
@@ -29,44 +102,15 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("CommentReaction", "select")
         ),
     CommentReactionToggle: (args: TCommentReactionToggle) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        // Roadmap visibility is enforced at the Post level via
-        // `postPolicy.isUnlocked` in the pipeline below.
-        return yield* repository.toggle({
-          organizationId: args.organizationId,
-          postId: args.postId,
-          commentId: args.commentId,
-          userId: session.session.userId,
-          emoji: args.emoji,
-        });
-      }).pipe(
-        Policy.withPolicy(
-          Policy.all(
-            postPolicy.isUnlocked({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            }),
-            Policy.hasMembership(args.organizationId)
-          )
-        ),
-        withRemapDbErrors("CommentReaction", "update")
-      ),
+      toggleReaction("dashboard", toggleWrite.dashboard.rateLimit, args),
     CommentReactionListPublic: (args: TCommentReactionList) =>
-      Effect.gen(function* () {
-        const sessionOption = yield* OptionalCurrentSession;
-        const sessionUserId =
-          sessionOption._tag === "Some"
-            ? sessionOption.value.session.userId
-            : undefined;
-
-        const reactions = yield* repository.listPublic({
-          organizationId: args.organizationId,
-          slug: args.slug,
-        });
-
-        // Never leak internal reactor identifiers to public callers.
-        return redactActorIdentities(reactions, sessionUserId);
+      withPublicViewer({
+        read: () =>
+          repository.listPublic({
+            organizationId: args.organizationId,
+            slug: args.slug,
+          }),
+        redact: redactActorIdentities,
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "CommentReactionListPublic",
@@ -75,33 +119,7 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("CommentReaction", "select")
       ),
     CommentReactionTogglePublic: (args: TCommentReactionToggle) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        // Public roadmap visibility is enforced via `postPolicy.isUnlockedPublic`
-        // in the pipeline below; no additional site-policy gate needed.
-        return yield* repository.togglePublic({
-          organizationId: args.organizationId,
-          postId: args.postId,
-          commentId: args.commentId,
-          userId: session.session.userId,
-          emoji: args.emoji,
-        });
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "CommentReactionTogglePublic",
-          level: "write",
-        }),
-        Policy.withPolicy(
-          Policy.all(
-            Policy.hasRestrictedOrganizationScope(args.organizationId),
-            postPolicy.isUnlockedPublic({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            })
-          )
-        ),
-        withRemapDbErrors("CommentReaction", "update")
-      ),
+      toggleReaction("public", toggleWrite.public.rateLimit, args),
   };
 });
 

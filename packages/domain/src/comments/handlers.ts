@@ -1,6 +1,5 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
@@ -10,9 +9,16 @@ import * as Policy from "../policy";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
+import { withPublicViewer } from "../public-read";
 import * as RateLimit from "../rate-limit";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
-import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
+import type { RpcTagsOf } from "../rpc-group";
+import { CurrentSession } from "../session-middleware";
+import {
+  type Surface,
+  type SurfacePair,
+  withSurfaceRateLimit,
+} from "../surface";
 import { CommentPolicy } from "./policies";
 import { CommentRepository } from "./repository";
 import { CommentRpcs } from "./rpcs";
@@ -26,6 +32,9 @@ import type {
 } from "./schema";
 import { CommentService } from "./service";
 import { applyCommentStatusUpdate } from "./status-update";
+
+/** The RPCs this group declares; a surface pair's operation must be one. */
+type CommentRpcTag = RpcTagsOf<typeof CommentRpcs>;
 
 export const CommentRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CommentRepository;
@@ -46,6 +55,218 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     userId: session.session.userId,
   });
 
+  // -- Surface-parameterized writes --
+  //
+  // The dashboard RPC and the public portal RPC are two names for one call.
+  // Each write is implemented once and takes its surface; the surface's
+  // policy and rate-limit level come from the `*Write` record, and the bucket
+  // name is derived from the operation. The RPC names, their auth middleware,
+  // and their error schemas stay separate in `./rpcs.ts`.
+
+  const deleteWrite = {
+    operation: "CommentDelete",
+    dashboard: {
+      rateLimit: undefined,
+      policy: (args: TCommentDelete) =>
+        commentPolicy.canDelete({
+          commentId: args.id,
+          organizationId: args.organizationId,
+          postId: args.postId,
+          source: "dashboard",
+        }),
+    },
+    public: {
+      rateLimit: "write",
+      policy: (args: TCommentDelete) =>
+        commentPolicy.canDelete({
+          commentId: args.id,
+          organizationId: args.organizationId,
+          postId: args.postId,
+          source: "public",
+        }),
+    },
+  } satisfies SurfacePair<TCommentDelete, CommentRpcTag>;
+
+  const updateWrite = {
+    operation: "CommentUpdate",
+    dashboard: {
+      rateLimit: undefined,
+      policy: (args: TCommentUpdate) =>
+        commentPolicy.canUpdate({
+          commentId: args.id,
+          organizationId: args.organizationId,
+          postId: args.postId,
+          source: "dashboard",
+        }),
+    },
+    public: {
+      rateLimit: "expensive",
+      policy: (args: TCommentUpdate) =>
+        commentPolicy.canUpdate({
+          commentId: args.id,
+          organizationId: args.organizationId,
+          postId: args.postId,
+          source: "public",
+        }),
+    },
+  } satisfies SurfacePair<TCommentUpdate, CommentRpcTag>;
+
+  const removeComment = <
+    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
+  >(
+    surface: Surface,
+    level: Level,
+    args: TCommentDelete
+  ) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+
+      yield* comments.remove({
+        actor: actorOf(session, args.organizationId),
+        target: {
+          id: args.id,
+          organizationId: args.organizationId,
+          postId: args.postId,
+        },
+      });
+
+      return {
+        message: "Comment deleted successfully",
+      };
+    }).pipe(
+      Policy.withPolicy(deleteWrite[surface].policy(args)),
+      withRemapDbErrors("Comment", "delete"),
+      withSurfaceRateLimit({ level, operation: deleteWrite.operation, surface })
+    );
+
+  const modifyComment = <
+    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
+  >(
+    surface: Surface,
+    level: Level,
+    args: TCommentUpdate
+  ) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, args.organizationId);
+
+      yield* comments.update({
+        actor: actorOf(session, args.organizationId),
+        edit: {
+          authorUserId: session.session.userId,
+          content: args.content,
+          id: args.id,
+          organizationId: args.organizationId,
+          postId: args.postId,
+          // Only members can update visibility.
+          visibility: membership ? args.visibility : undefined,
+        },
+      });
+
+      return {
+        message: "Comment updated successfully",
+      };
+    }).pipe(
+      Policy.withPolicy(updateWrite[surface].policy(args)),
+      withRemapDbErrors("Comment", "update"),
+      withSurfaceRateLimit({ level, operation: updateWrite.operation, surface })
+    );
+
+  const createWrite = {
+    operation: "CommentCreate",
+    dashboard: {
+      rateLimit: undefined,
+      policy: (args: TCommentCreate) =>
+        commentPolicy.canCreate({
+          organizationId: args.organizationId,
+          visibility: args.visibility,
+          postId: args.postId,
+          parentCommentId: args.parentCommentId,
+          statusUpdateId: args.statusUpdateId,
+          source: "dashboard",
+          onBehalf: args.author !== undefined,
+        }),
+    },
+    public: {
+      rateLimit: "expensive",
+      policy: (args: TCommentCreate) =>
+        commentPolicy.canCreate({
+          organizationId: args.organizationId,
+          visibility: args.visibility,
+          postId: args.postId,
+          parentCommentId: args.parentCommentId,
+          statusUpdateId: args.statusUpdateId,
+          source: "public",
+        }),
+    },
+  } satisfies SurfacePair<TCommentCreate, CommentRpcTag>;
+
+  const addComment = <
+    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
+  >(
+    surface: Surface,
+    level: Level,
+    args: TCommentCreate
+  ) =>
+    Effect.gen(function* () {
+      // On-behalf attribution is dashboard-only; the public portal names a
+      // customer nowhere, so the payload cannot carry an author there.
+      if (surface === "public" && args.author !== undefined) {
+        return yield* new BadRequestError({
+          message:
+            "Comments cannot be created on behalf of another author from public boards",
+        });
+      }
+
+      const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, args.organizationId);
+
+      if (args.author !== undefined) {
+        // Per-member abuse bound for on-behalf creations (see
+        // plan-on-behalf.md); self-service comments are unaffected.
+        yield* RateLimit.consumeOnBehalfWriteLimit({
+          organizationId: args.organizationId,
+          userId: session.session.userId,
+        });
+      }
+
+      const actor = actorOf(session, args.organizationId);
+
+      const outboxId = yield* comments.create({
+        actor,
+        author:
+          args.author === undefined
+            ? {
+                kind: "self",
+                memberId: membership?.membershipId ?? null,
+                userId: session.session.userId,
+              }
+            : { kind: "on_behalf", subject: args.author },
+        draft: {
+          content: args.content,
+          id: args.id,
+          organizationId: args.organizationId,
+          parentCommentId: args.parentCommentId,
+          postId: args.postId,
+          visibility: args.visibility,
+        },
+        statusUpdate: applyCommentStatusUpdate(args, actor),
+      });
+
+      // Post-commit wake for the status email intent the status-update comment
+      // recorded; reconciliation closes any lost wake. Both RPC surfaces
+      // record one, so both wake.
+      yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
+
+      return {
+        message: "Comment created successfully",
+      };
+    }).pipe(
+      Policy.withPolicy(createWrite[surface].policy(args)),
+      withRemapDbErrors("Comment", "create"),
+      withSurfaceRateLimit({ level, operation: createWrite.operation, surface })
+    );
+
   return {
     CommentList: (args: TCommentList) =>
       repository
@@ -59,25 +280,14 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     CommentListPublic: (args: TCommentList) =>
-      Effect.gen(function* () {
-        const sessionOption = yield* OptionalCurrentSession;
-        const isMember = Option.match(sessionOption, {
-          onNone: () => false,
-          onSome: (session) => Policy.isMember(session, args.organizationId),
-        });
-        const sessionUserId =
-          sessionOption._tag === "Some"
-            ? sessionOption.value.session.userId
-            : undefined;
-
-        const comments = yield* repository.findManyPublic({
-          organizationId: args.organizationId,
-          slug: args.slug,
-          includeInternal: isMember,
-        });
-
-        // Never leak internal commenter identifiers to public callers.
-        return redactActorIdentities(comments, sessionUserId);
+      withPublicViewer({
+        read: (viewer) =>
+          repository.findManyPublic({
+            includeInternal: viewer.isMember(args.organizationId),
+            organizationId: args.organizationId,
+            slug: args.slug,
+          }),
+        redact: redactActorIdentities,
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "CommentListPublic",
@@ -87,245 +297,22 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     CommentCreate: (args: TCommentCreate) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        const membership = Policy.getMembership(session, args.organizationId);
-
-        if (args.author !== undefined) {
-          // Per-member abuse bound for on-behalf creations (see
-          // plan-on-behalf.md); self-service comments are unaffected.
-          yield* RateLimit.consumeOnBehalfWriteLimit({
-            organizationId: args.organizationId,
-            userId: session.session.userId,
-          });
-        }
-
-        const actor = actorOf(session, args.organizationId);
-
-        const outboxId = yield* comments.create({
-          actor,
-          author:
-            args.author === undefined
-              ? {
-                  kind: "self",
-                  memberId: membership?.membershipId ?? null,
-                  userId: session.session.userId,
-                }
-              : { kind: "on_behalf", subject: args.author },
-          draft: {
-            content: args.content,
-            id: args.id,
-            organizationId: args.organizationId,
-            parentCommentId: args.parentCommentId,
-            postId: args.postId,
-            visibility: args.visibility,
-          },
-          statusUpdate: applyCommentStatusUpdate(args, actor),
-        });
-        // Post-commit wake for the status email intent the status-update
-        // comment recorded; reconciliation closes any lost wake.
-        yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
-
-        return {
-          message: "Comment created successfully",
-        };
-      }).pipe(
-        Policy.withPolicy(
-          commentPolicy.canCreate({
-            organizationId: args.organizationId,
-            visibility: args.visibility,
-            postId: args.postId,
-            parentCommentId: args.parentCommentId,
-            statusUpdateId: args.statusUpdateId,
-            source: "dashboard",
-            onBehalf: args.author !== undefined,
-          })
-        ),
-        withRemapDbErrors("Comment", "create")
-      ),
+      addComment("dashboard", createWrite.dashboard.rateLimit, args),
 
     CommentCreatePublic: (args: TCommentCreate) =>
-      Effect.gen(function* () {
-        if (args.author !== undefined) {
-          return yield* new BadRequestError({
-            message:
-              "Comments cannot be created on behalf of another author from public boards",
-          });
-        }
-
-        const session = yield* CurrentSession;
-        const membership = Policy.getMembership(session, args.organizationId);
-        const actor = actorOf(session, args.organizationId);
-
-        yield* comments.create({
-          actor,
-          author: {
-            kind: "self",
-            memberId: membership?.membershipId ?? null,
-            userId: session.session.userId,
-          },
-          draft: {
-            content: args.content,
-            id: args.id,
-            organizationId: args.organizationId,
-            parentCommentId: args.parentCommentId,
-            postId: args.postId,
-            visibility: args.visibility,
-          },
-          statusUpdate: applyCommentStatusUpdate(args, actor),
-        });
-
-        return {
-          message: "Comment created successfully",
-        };
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "CommentCreatePublic",
-          level: "expensive",
-        }),
-        Policy.withPolicy(
-          commentPolicy.canCreate({
-            organizationId: args.organizationId,
-            visibility: args.visibility,
-            postId: args.postId,
-            parentCommentId: args.parentCommentId,
-            statusUpdateId: args.statusUpdateId,
-            source: "public",
-          })
-        ),
-        withRemapDbErrors("Comment", "create")
-      ),
+      addComment("public", createWrite.public.rateLimit, args),
 
     CommentDelete: (args: TCommentDelete) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-
-        yield* comments.remove({
-          actor: actorOf(session, args.organizationId),
-          target: {
-            id: args.id,
-            organizationId: args.organizationId,
-            postId: args.postId,
-          },
-        });
-
-        return {
-          message: "Comment deleted successfully",
-        };
-      }).pipe(
-        Policy.withPolicy(
-          commentPolicy.canDelete({
-            organizationId: args.organizationId,
-            commentId: args.id,
-            postId: args.postId,
-            source: "dashboard",
-          })
-        ),
-        withRemapDbErrors("Comment", "delete")
-      ),
+      removeComment("dashboard", deleteWrite.dashboard.rateLimit, args),
 
     CommentDeletePublic: (args: TCommentDelete) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-
-        yield* comments.remove({
-          actor: actorOf(session, args.organizationId),
-          target: {
-            id: args.id,
-            organizationId: args.organizationId,
-            postId: args.postId,
-          },
-        });
-
-        return {
-          message: "Comment deleted successfully",
-        };
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "CommentDeletePublic",
-          level: "write",
-        }),
-        Policy.withPolicy(
-          commentPolicy.canDelete({
-            organizationId: args.organizationId,
-            commentId: args.id,
-            postId: args.postId,
-            source: "public",
-          })
-        ),
-        withRemapDbErrors("Comment", "delete")
-      ),
+      removeComment("public", deleteWrite.public.rateLimit, args),
 
     CommentUpdate: (args: TCommentUpdate) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        const membership = Policy.getMembership(session, args.organizationId);
-
-        yield* comments.update({
-          actor: actorOf(session, args.organizationId),
-          edit: {
-            authorUserId: session.session.userId,
-            content: args.content,
-            id: args.id,
-            organizationId: args.organizationId,
-            postId: args.postId,
-            // Only members can update visibility.
-            visibility: membership ? args.visibility : undefined,
-          },
-        });
-
-        return {
-          message: "Comment updated successfully",
-        };
-      }).pipe(
-        Policy.withPolicy(
-          commentPolicy.canUpdate({
-            organizationId: args.organizationId,
-            commentId: args.id,
-            postId: args.postId,
-
-            source: "dashboard",
-          })
-        ),
-        withRemapDbErrors("Comment", "update")
-      ),
+      modifyComment("dashboard", updateWrite.dashboard.rateLimit, args),
 
     CommentUpdatePublic: (args: TCommentUpdate) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        const membership = Policy.getMembership(session, args.organizationId);
-
-        yield* comments.update({
-          actor: actorOf(session, args.organizationId),
-          edit: {
-            authorUserId: session.session.userId,
-            content: args.content,
-            id: args.id,
-            organizationId: args.organizationId,
-            postId: args.postId,
-            // Only members can update visibility.
-            visibility: membership ? args.visibility : undefined,
-          },
-        });
-
-        return {
-          message: "Comment updated successfully",
-        };
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "CommentUpdatePublic",
-          level: "expensive",
-        }),
-        Policy.withPolicy(
-          commentPolicy.canUpdate({
-            organizationId: args.organizationId,
-            commentId: args.id,
-            postId: args.postId,
-            source: "public",
-          })
-        ),
-        withRemapDbErrors("Comment", "update")
-      ),
+      modifyComment("public", updateWrite.public.rateLimit, args),
 
     CommentPin: (args: TCommentPin) =>
       Effect.gen(function* () {

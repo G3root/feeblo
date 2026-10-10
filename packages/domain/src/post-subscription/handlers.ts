@@ -10,7 +10,13 @@ import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import * as RateLimit from "../rate-limit";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
+import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
+import {
+  type Surface,
+  type SurfacePair,
+  withSurfaceRateLimit,
+} from "../surface";
 import { PostSubscriptionRepository } from "./repository";
 import { PostSubscriptionRpcs } from "./rpcs";
 import type {
@@ -18,6 +24,9 @@ import type {
   TPostSubscriptionDelete,
   TPostSubscriptionList,
 } from "./schema";
+
+/** The RPCs this group declares; a surface pair's operation must be one. */
+type PostSubscriptionRpcTag = RpcTagsOf<typeof PostSubscriptionRpcs>;
 
 export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostSubscriptionRepository;
@@ -113,6 +122,99 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       return { subscribed: false };
     });
 
+  // -- Surface-parameterized writes --
+  //
+  // Both bodies above are surface-neutral; the record holds what differs:
+  // the dashboard admits members to unlocked posts, the public portal admits
+  // restricted sessions to public boards, and only the public portal spends a
+  // rate limit.
+
+  const createWrite = {
+    operation: "PostSubscriptionCreate",
+    dashboard: {
+      rateLimit: undefined,
+      policy: (args: TPostSubscriptionCreate) =>
+        Policy.all(
+          Policy.hasMembership(args.organizationId),
+          postPolicy.isUnlocked({
+            organizationId: args.organizationId,
+            postId: args.postId,
+          })
+        ),
+    },
+    public: {
+      rateLimit: "write",
+      policy: (args: TPostSubscriptionCreate) =>
+        Policy.all(
+          Policy.hasRestrictedOrganizationScope(args.organizationId),
+          postPolicy.isUnlockedPublic({
+            organizationId: args.organizationId,
+            postId: args.postId,
+          })
+        ),
+    },
+  } satisfies SurfacePair<TPostSubscriptionCreate, PostSubscriptionRpcTag>;
+
+  const deleteWrite = {
+    operation: "PostSubscriptionDelete",
+    dashboard: {
+      rateLimit: undefined,
+      policy: (args: TPostSubscriptionDelete) =>
+        Policy.all(
+          Policy.hasMembership(args.organizationId),
+          postPolicy.isUnlocked({
+            organizationId: args.organizationId,
+            postId: args.postId,
+          })
+        ),
+    },
+    public: {
+      rateLimit: "write",
+      policy: (args: TPostSubscriptionDelete) =>
+        Policy.all(
+          Policy.hasRestrictedOrganizationScope(args.organizationId),
+          postPolicy.isUnlockedPublic({
+            organizationId: args.organizationId,
+            postId: args.postId,
+          })
+        ),
+    },
+  } satisfies SurfacePair<TPostSubscriptionDelete, PostSubscriptionRpcTag>;
+
+  const subscribeFor = <
+    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
+  >(
+    surface: Surface,
+    level: Level,
+    args: TPostSubscriptionCreate
+  ) =>
+    subscribeEffect(args).pipe(
+      Policy.withPolicy(createWrite[surface].policy(args)),
+      withRemapDbErrors("PostSubscription", "create"),
+      withSurfaceRateLimit({
+        level,
+        operation: createWrite.operation,
+        surface,
+      })
+    );
+
+  const unsubscribeFor = <
+    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
+  >(
+    surface: Surface,
+    level: Level,
+    args: TPostSubscriptionDelete
+  ) =>
+    unsubscribeEffect(args).pipe(
+      Policy.withPolicy(deleteWrite[surface].policy(args)),
+      withRemapDbErrors("PostSubscription", "delete"),
+      withSurfaceRateLimit({
+        level,
+        operation: deleteWrite.operation,
+        surface,
+      })
+    );
+
   // -- RPC handlers --
 
   return {
@@ -147,68 +249,16 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     PostSubscriptionCreate: (args: TPostSubscriptionCreate) =>
-      subscribeEffect(args).pipe(
-        Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(args.organizationId),
-            postPolicy.isUnlocked({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            })
-          )
-        ),
-        withRemapDbErrors("PostSubscription", "create")
-      ),
+      subscribeFor("dashboard", createWrite.dashboard.rateLimit, args),
 
     PostSubscriptionCreatePublic: (args: TPostSubscriptionCreate) =>
-      subscribeEffect(args).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "PostSubscriptionCreatePublic",
-          level: "write",
-        }),
-        Policy.withPolicy(
-          Policy.all(
-            Policy.hasRestrictedOrganizationScope(args.organizationId),
-            postPolicy.isUnlockedPublic({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            })
-          )
-        ),
-        withRemapDbErrors("PostSubscription", "create")
-      ),
+      subscribeFor("public", createWrite.public.rateLimit, args),
 
     PostSubscriptionDelete: (args: TPostSubscriptionDelete) =>
-      unsubscribeEffect(args).pipe(
-        Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(args.organizationId),
-            postPolicy.isUnlocked({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            })
-          )
-        ),
-        withRemapDbErrors("PostSubscription", "delete")
-      ),
+      unsubscribeFor("dashboard", deleteWrite.dashboard.rateLimit, args),
 
     PostSubscriptionDeletePublic: (args: TPostSubscriptionDelete) =>
-      unsubscribeEffect(args).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "PostSubscriptionDeletePublic",
-          level: "write",
-        }),
-        Policy.withPolicy(
-          Policy.all(
-            Policy.hasRestrictedOrganizationScope(args.organizationId),
-            postPolicy.isUnlockedPublic({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            })
-          )
-        ),
-        withRemapDbErrors("PostSubscription", "delete")
-      ),
+      unsubscribeFor("public", deleteWrite.public.rateLimit, args),
   };
 });
 

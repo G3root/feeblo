@@ -4,18 +4,17 @@ import * as Layer from "effect/Layer";
 
 import * as Policy from "../policy";
 import { PostRepository } from "../post/repository";
-
-type TSource = "dashboard" | "public";
+import type { Surface } from "../surface";
 
 type TCanList = {
   organizationId: string;
-  source: TSource;
+  source: Surface;
 };
 
 type TCanToggle = {
   organizationId: string;
   postId: string;
-  source: TSource;
+  source: Surface;
 };
 
 type TCanVoteOnBehalf = {
@@ -28,7 +27,7 @@ const makeUpvotePolicy = Effect.gen(function* () {
 
   const canList = (args: TCanList) => {
     if (args.source === "public") {
-      return Policy.policy(() => Effect.succeed(true));
+      return Policy.allow;
     }
 
     return Policy.hasMembership(args.organizationId);
