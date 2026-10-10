@@ -7,7 +7,10 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 
-import { unsubscribeNotificationPreference } from "./api-live";
+import {
+  unsubscribeNotificationPreference,
+  validateNotificationPreferenceUnsubscribeToken,
+} from "./api-live";
 import { NotificationPreferenceRepository } from "./repository";
 import { NotificationPreferenceTokenService } from "./tokens";
 
@@ -104,6 +107,48 @@ describe("unsubscribeNotificationPreference", () => {
         expect(yield* unsubscribeNotificationPreference(url)).toEqual({
           unsubscribed: true,
         });
+      })
+    );
+
+    it.effect("validates a GET link without changing any preference", () =>
+      Effect.gen(function* () {
+        const tokens = yield* NotificationPreferenceTokenService;
+        const db = yield* currentDb;
+        const fixture = yield* makeFixture();
+        const token = yield* tokens.deriveToken({
+          category: "new_feedback",
+          organizationId: fixture.organizationId,
+          userId: fixture.userId,
+        });
+
+        expect(
+          yield* validateNotificationPreferenceUnsubscribeToken(
+            Redacted.value(token)
+          )
+        ).toEqual({ valid: true });
+
+        // A link prefetch must not have written an opt-out row.
+        const rows = yield* db
+          .select({ id: schema.notificationPreferenceTable.id })
+          .from(schema.notificationPreferenceTable)
+          .where(
+            eq(
+              schema.notificationPreferenceTable.organizationId,
+              fixture.organizationId
+            )
+          );
+        expect(rows).toEqual([]);
+      })
+    );
+
+    it.effect("rejects a forged GET link", () =>
+      Effect.gen(function* () {
+        yield* makeFixture();
+        const error = yield* Effect.flip(
+          validateNotificationPreferenceUnsubscribeToken("forged.token")
+        );
+
+        expect(error._tag).toBe("BadRequestError");
       })
     );
 

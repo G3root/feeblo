@@ -105,3 +105,12 @@ export type TNotificationPreferenceUnsubscribeTokenRequest = S.Schema.Type<
 export const NotificationPreferenceUnsubscribeAccepted = S.Struct({
   unsubscribed: S.Boolean,
 });
+
+/**
+ * The GET link's answer: the token is valid, and the state-changing write
+ * belongs to the POST. Link scanners and mail clients prefetch GET URLs, so a
+ * valid GET must never unsubscribe on its own.
+ */
+export const NotificationPreferenceUnsubscribeLinkAccepted = S.Struct({
+  valid: S.Boolean,
+});

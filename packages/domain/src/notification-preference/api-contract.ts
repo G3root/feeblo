@@ -6,6 +6,7 @@ import { RateLimitErrors } from "../rate-limit";
 import { BadRequestError, InternalServerError } from "../rpc-errors";
 import {
   NotificationPreferenceUnsubscribeAccepted,
+  NotificationPreferenceUnsubscribeLinkAccepted,
   NotificationPreferenceUnsubscribeTokenRequest,
 } from "./schema";
 
@@ -26,7 +27,7 @@ export class NotificationPreferenceApiGroup extends HttpApiGroup.make(
       {
         error: NotificationPreferenceLinkErrors,
         query: NotificationPreferenceUnsubscribeTokenRequest,
-        success: NotificationPreferenceUnsubscribeAccepted,
+        success: NotificationPreferenceUnsubscribeLinkAccepted,
       }
     )
   )

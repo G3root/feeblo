@@ -7,7 +7,43 @@ import { Api } from "../http/api";
 import * as RateLimit from "../rate-limit";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { NotificationPreferenceRepository } from "./repository";
-import { NotificationPreferenceTokenService } from "./tokens";
+import {
+  NotificationPreferenceTokenService,
+  type NotificationPreferenceUnsubscribeClaims,
+} from "./tokens";
+
+const invalidLink = () =>
+  new BadRequestError({
+    message: "Notification preference unsubscribe link is invalid",
+  });
+
+/** Verifies the stateless token and answers its claims, or `BadRequest`. */
+const verifyUnsubscribeToken = (
+  token: string
+): Effect.Effect<
+  NotificationPreferenceUnsubscribeClaims,
+  BadRequestError,
+  NotificationPreferenceTokenService
+> =>
+  Effect.gen(function* () {
+    const tokens = yield* NotificationPreferenceTokenService;
+    const claims = yield* tokens
+      .verifyToken(token)
+      .pipe(Effect.mapError(invalidLink));
+    if (Option.isNone(claims)) {
+      return yield* invalidLink();
+    }
+    return claims.value;
+  });
+
+/**
+ * Validates a one-click unsubscribe link without writing anything.
+ *
+ * Link scanners and mail clients prefetch GET URLs, so the GET side only
+ * confirms the token; the RFC 8058 POST is the state-changing half.
+ */
+export const validateNotificationPreferenceUnsubscribeToken = (token: string) =>
+  verifyUnsubscribeToken(token).pipe(Effect.as({ valid: true }));
 
 /**
  * RFC 8058 one-click unsubscribe for member notification email.
@@ -18,28 +54,15 @@ import { NotificationPreferenceTokenService } from "./tokens";
  */
 export const unsubscribeNotificationPreference = (token: string) =>
   Effect.gen(function* () {
-    const tokens = yield* NotificationPreferenceTokenService;
     const repository = yield* NotificationPreferenceRepository;
-    const claims = yield* tokens.verifyToken(token).pipe(
-      Effect.mapError(
-        () =>
-          new BadRequestError({
-            message: "Notification preference unsubscribe link is invalid",
-          })
-      )
-    );
-    if (Option.isNone(claims)) {
-      return yield* new BadRequestError({
-        message: "Notification preference unsubscribe link is invalid",
-      });
-    }
+    const claims = yield* verifyUnsubscribeToken(token);
     yield* repository
       .setPreference({
-        category: claims.value.category,
+        category: claims.category,
         channel: "email",
         enabled: false,
-        organizationId: claims.value.organizationId,
-        userId: claims.value.userId,
+        organizationId: claims.organizationId,
+        userId: claims.userId,
       })
       .pipe(withRemapDbErrors("NotificationPreference", "update"));
     return { unsubscribed: true };
@@ -48,23 +71,24 @@ export const unsubscribeNotificationPreference = (token: string) =>
 export const NotificationPreferenceApiLive = HttpApiBuilder.group(
   Api,
   "NotificationPreferenceApiGroup",
-  (handlers) => {
-    const unsubscribe = (token: string) =>
-      unsubscribeNotificationPreference(token).pipe(
-        RateLimit.withPublicHttpRateLimit({
-          name: "NotificationPreferenceUnsubscribe",
-          level: "read",
-        })
-      );
-
-    return handlers
+  (handlers) =>
+    handlers
       .handle("unsubscribeNotificationPreferenceLink", ({ query }) =>
-        unsubscribe(query.token)
+        validateNotificationPreferenceUnsubscribeToken(query.token).pipe(
+          RateLimit.withPublicHttpRateLimit({
+            name: "NotificationPreferenceUnsubscribeLink",
+            level: "read",
+          })
+        )
       )
       .handle("unsubscribeNotificationPreference", ({ query }) =>
-        unsubscribe(query.token)
-      );
-  }
+        unsubscribeNotificationPreference(query.token).pipe(
+          RateLimit.withPublicHttpRateLimit({
+            name: "NotificationPreferenceUnsubscribe",
+            level: "write",
+          })
+        )
+      )
 ).pipe(
   Layer.provide(NotificationPreferenceRepository.layer),
   Layer.provide(NotificationPreferenceTokenService.layer)

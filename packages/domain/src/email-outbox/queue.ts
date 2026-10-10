@@ -318,7 +318,16 @@ export const materializeEmailIntent = (outboxId: string) =>
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       return [] as readonly string[];
     }
-    if (intent.state !== "pending") {
+    if (intent.state === "paused_by_plan") {
+      // Legacy plan-paused intents resume here: member deliveries are no
+      // longer plan-gated, and subscriber deliveries are filtered per
+      // recipient at materialization, so the pause no longer applies. A lost
+      // race with another worker resumes nothing and this attempt stops.
+      if (!(yield* repository.resumePausedIntent({ id: intent.id }))) {
+        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+        return [] as readonly string[];
+      }
+    } else if (intent.state !== "pending") {
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       return [] as readonly string[];
     }
