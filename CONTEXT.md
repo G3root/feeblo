@@ -6,7 +6,7 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 ### Surfaces
 
-**Surface**: A transport the product answers on. The dashboard and the public portal are the two session-facing RPC surfaces; the Public API is the key-authenticated HTTP surface. An RPC write present on both RPC surfaces is implemented once and takes its surface, while each surface keeps its own RPC names, middleware, and error contract. _Avoid_: channel, client, platform
+**Surface**: A transport the product answers on. The dashboard and the public portal are the two session-facing RPC surfaces; the Public API is the key-authenticated HTTP surface. An RPC write present on both RPC surfaces is implemented once and takes its surface, while each surface keeps its own RPC names, middleware, and error contract. The portal's RPC names carry a `Public` suffix (`UpvoteToggle` → `UpvoteTogglePublic`), which is what lets a shared body derive its rate-limit bucket from the operation and the surface. _Avoid_: channel, client, platform
 
 ### Feedback
 
