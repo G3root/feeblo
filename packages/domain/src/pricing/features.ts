@@ -18,10 +18,6 @@ export const PLAN_PRICING_FEATURES = {
     { key: "feedbackBoards", label: "2 Feedback Boards" },
     { key: "privilegedMembers", label: "2 Admin Roles" },
     { key: "changelogCategories", label: "3 Changelog Categories" },
-    {
-      key: "submissionNotificationRecipients",
-      label: "1 Submission Notification Recipient",
-    },
     { key: "crmEntries", label: "10 CRM Entries" },
     { key: "workspaces", label: "3 Workspaces" },
     { key: "roadmap", label: "Roadmap" },
@@ -33,10 +29,6 @@ export const PLAN_PRICING_FEATURES = {
     { key: "feedbackBoards", label: "5 Feedback Boards" },
     { key: "privilegedMembers", label: "5 Admin Roles" },
     { key: "changelogCategories", label: "Unlimited Changelog Categories" },
-    {
-      key: "submissionNotificationRecipients",
-      label: "Unlimited Submission Notification Recipients",
-    },
     { key: "crmEntries", label: "Unlimited CRM Entries" },
     { key: "workspaces", label: "Unlimited Workspaces" },
     { key: "integrations", label: "Integrations" },

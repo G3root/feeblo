@@ -9,7 +9,7 @@ import {
 import { createChangelogEmail } from "@feeblo/transactional/templates/changelog";
 import { createEmailSubscriptionVerificationEmail } from "@feeblo/transactional/templates/email-subscription-verification";
 import { createNotificationEmail } from "@feeblo/transactional/templates/notification";
-import { and, asc, eq, gte, inArray, isNull, sql, sum } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, sql, sum } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -25,6 +25,8 @@ import * as Schema from "effect/Schema";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { NotificationPreferenceRepository } from "../notification-preference/repository";
+import { NotificationPreferenceTokenService } from "../notification-preference/tokens";
 import {
   evaluateNotifiedBoardVisibility,
   evaluateOrganizationAccess,
@@ -78,6 +80,98 @@ const noDeliveryIds: readonly string[] = [];
 
 const maximumDeliveryAttempts = 5;
 const maximumInfrastructureFailures = 10;
+
+/** The preference category an email intent's recipients are governed by. */
+const notificationCategoryForIntentKind = (
+  kind: string
+):
+  | "new_feedback"
+  | "post_status_changed"
+  | "changelog_published"
+  | undefined => {
+  switch (kind) {
+    case "submission.created":
+      return "new_feedback";
+    case "post.status_changed":
+    case "post.merged":
+    case "post.unmerged":
+    case "post.closed":
+      return "post_status_changed";
+    case "changelog.published":
+      return "changelog_published";
+    default:
+      return undefined;
+  }
+};
+
+type MemberNotificationRecipient = {
+  readonly email: string;
+  readonly userId: string;
+};
+
+/**
+ * The workspace members who should receive one notification category: a
+ * verified account email, not the actor, and neither the category nor the
+ * workspace-wide pause disabled for them.
+ *
+ * Preferences are sparse, so "no row" means on. A member is filtered out by
+ * the pause row and by their own category row independently; the pause wins
+ * regardless of which audience would otherwise have selected them.
+ */
+const resolveMemberNotificationRecipients = ({
+  category,
+  excludedUserIds,
+  organizationId,
+}: {
+  readonly category:
+    | "new_feedback"
+    | "post_status_changed"
+    | "changelog_published";
+  readonly excludedUserIds: ReadonlySet<string>;
+  readonly organizationId: string;
+}) =>
+  Effect.gen(function* () {
+    const db = yield* Database.Database;
+    const preferences = yield* NotificationPreferenceRepository;
+    const rows = yield* db
+      .select({
+        email: schema.userTable.email,
+        userId: schema.memberTable.userId,
+      })
+      .from(schema.memberTable)
+      .innerJoin(
+        schema.userTable,
+        eq(schema.userTable.id, schema.memberTable.userId)
+      )
+      .where(
+        and(
+          eq(schema.memberTable.organizationId, organizationId),
+          eq(schema.userTable.emailVerified, true)
+        )
+      );
+    const candidates = rows.filter((row) => !excludedUserIds.has(row.userId));
+    if (candidates.length === 0) {
+      // SAFETY: An empty recipient list is a valid result of this resolver.
+      return [] as readonly MemberNotificationRecipient[];
+    }
+    const disabled = yield* preferences.listDisabledForUsers({
+      channel: "email",
+      organizationId,
+      userIds: candidates.map((candidate) => candidate.userId),
+    });
+    const paused = new Set(
+      disabled.filter((row) => row.category === "all").map((row) => row.userId)
+    );
+    const categoryDisabled = new Set(
+      disabled
+        .filter((row) => row.category === category)
+        .map((row) => row.userId)
+    );
+    return candidates.filter(
+      (candidate) =>
+        !paused.has(candidate.userId) && !categoryDisabled.has(candidate.userId)
+    );
+  });
 const materializationBatchSize = 100;
 const reconciliationBatchSize = 100;
 /** Retry delay for a delivery whose `sending` lease has to be reclaimed. */
@@ -224,32 +318,7 @@ export const materializeEmailIntent = (outboxId: string) =>
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       return [] as readonly string[];
     }
-    const eligible = yield* policy.mayMaterializeEmailIntent({
-      organizationId: intent.organizationId,
-      kind: intent.kind,
-    });
-    if (!eligible) {
-      if (intent.state === "pending") {
-        yield* repository.markIntentState({
-          id: intent.id,
-          state: "paused_by_plan",
-        });
-        yield* recordEmailIntentTransition(intent.kind, "paused_by_plan");
-        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-      }
-      // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-      return [] as readonly string[];
-    }
-    if (intent.state === "paused_by_plan") {
-      // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-      if (!(yield* repository.resumePausedIntent({ id: intent.id }))) {
-        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-        return [] as readonly string[];
-        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      }
-      // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-    } else if (intent.state !== "pending") {
+    if (intent.state !== "pending") {
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       return [] as readonly string[];
     }
@@ -345,6 +414,7 @@ export const materializeEmailIntent = (outboxId: string) =>
                   .select({
                     boardSlug: schema.boardTable.slug,
                     boardVisibility: schema.boardTable.visibility,
+                    creatorId: schema.postTable.creatorId,
                     id: schema.postTable.id,
                     slug: schema.postTable.slug,
                     title: schema.postTable.title,
@@ -404,74 +474,30 @@ export const materializeEmailIntent = (outboxId: string) =>
             return noDeliveryIds;
           }
 
-          const recipientLimit =
-            yield* policy.submissionNotificationRecipientLimit(
-              window.organizationId
-            );
-          const members = yield* db.query.memberTable.findMany({
-            where: { organizationId: window.organizationId },
-            columns: { role: true, userId: true },
-            with: { user: { columns: { email: true } } },
-          });
-          const optedInContacts = yield* db
-            .select({
-              email: schema.emailContactTable.email,
-              userId: schema.emailContactTable.userId,
-            })
-            .from(schema.emailSubscriptionTable)
-            .innerJoin(
-              schema.emailContactTable,
-              eq(
-                schema.emailContactTable.id,
-                schema.emailSubscriptionTable.contactId
-              )
-            )
-            .where(
-              and(
-                eq(
-                  schema.emailSubscriptionTable.organizationId,
-                  window.organizationId
-                ),
-                eq(schema.emailSubscriptionTable.topicType, "submission"),
-                isNull(schema.emailSubscriptionTable.topicId),
-                eq(schema.emailSubscriptionTable.state, "active"),
-                eq(schema.emailContactTable.verificationState, "verified")
-              )
-            )
-            // The free plan's single-recipient pick reads the first row; an
-            // explicit order makes that pick deterministic across
-            // materializations.
-            .orderBy(asc(schema.emailContactTable.email));
-          const privilegedUserIds = new Set(
-            members.flatMap((member) =>
-              member.role === "owner" || member.role === "admin"
-                ? [member.userId]
-                : []
-            )
+          // Members are the only audience for the submission summary, and the
+          // preference defaults on. The creator of every post in the window is
+          // dropped — nobody is emailed about their own action — while a
+          // window that mixes authors still reaches each author about the
+          // others' posts.
+          const creatorCounts = new Map<string, number>();
+          for (const row of rows) {
+            if (row.creatorId !== null) {
+              creatorCounts.set(
+                row.creatorId,
+                (creatorCounts.get(row.creatorId) ?? 0) + 1
+              );
+            }
+          }
+          const soleCreatorUserIds = new Set(
+            [...creatorCounts.entries()]
+              .filter(([, count]) => count === rows.length)
+              .map(([userId]) => userId)
           );
-          const ownerEmail = members.find((member) => member.role === "owner")
-            ?.user?.email;
-          // Deterministic single-recipient pick: a privileged staff inbox that
-          // opted in first (the workspace's own admins), else the
-          // alphabetically first opted-in address. The query is ordered, so
-          // two materializations of the same window cannot pick different
-          // recipients on the planner's whim.
-          const configuredFreeRecipient =
-            optedInContacts.find(
-              (contact) =>
-                contact.userId !== null && privilegedUserIds.has(contact.userId)
-            )?.email ?? optedInContacts[0]?.email;
-          const recipients =
-            recipientLimit === 1
-              ? [configuredFreeRecipient ?? ownerEmail].filter(
-                  (email): email is string => email !== undefined
-                )
-              : optedInContacts.flatMap((contact) =>
-                  contact.userId !== null &&
-                  privilegedUserIds.has(contact.userId)
-                    ? [contact.email]
-                    : []
-                );
+          const recipients = yield* resolveMemberNotificationRecipients({
+            category: "new_feedback",
+            excludedUserIds: soleCreatorUserIds,
+            organizationId: window.organizationId,
+          });
           const templatePayload = makeSubmissionNotificationPayload(
             appUrl,
             window.organizationId,
@@ -479,13 +505,21 @@ export const materializeEmailIntent = (outboxId: string) =>
             submissionCount
           );
 
-          const created = yield* Effect.forEach(recipients, (recipientEmail) =>
+          const created = yield* Effect.forEach(recipients, (recipient) =>
             repository.createDelivery({
               outboxId: window.id,
-              recipientEmail,
+              recipientEmail: recipient.email,
               template: "submission-notification",
               templateVersion: 1,
-              templatePayload,
+              templatePayload: {
+                ...templatePayload,
+                unsubscribe: {
+                  category: "new_feedback",
+                  kind: "preference",
+                  organizationId: window.organizationId,
+                  userId: recipient.userId,
+                },
+              },
             })
           );
           yield* repository.markIntentState({
@@ -520,62 +554,121 @@ export const materializeEmailIntent = (outboxId: string) =>
     return yield* transaction(
       Effect.gen(function* () {
         const txDb = yield* Database.Database;
-        const recipients = yield* txDb
-          .select({
-            contactId: schema.emailContactTable.id,
-            email: schema.emailContactTable.email,
-            subscriptionId: schema.emailSubscriptionTable.id,
-          })
-          .from(schema.emailSubscriptionTable)
-          .innerJoin(
-            schema.emailContactTable,
-            eq(
-              schema.emailContactTable.id,
-              schema.emailSubscriptionTable.contactId
-            )
-          )
-          .leftJoin(
-            schema.emailSuppressionTable,
-            eq(
-              schema.emailSuppressionTable.email,
-              schema.emailContactTable.email
-            )
-          )
-          .leftJoin(
-            schema.emailDeliveryTable,
-            and(
-              eq(schema.emailDeliveryTable.outboxId, intent.id),
-              eq(
-                schema.emailDeliveryTable.recipientEmail,
-                schema.emailContactTable.email
+        // Member notifications are entitlement-free; the paid capability only
+        // decides whether the subscriber audience joins them.
+        const subscriberEmailsAllowed = yield* policy.mayEmailSubscribers(
+          intent.organizationId
+        );
+        const recipients = subscriberEmailsAllowed
+          ? yield* txDb
+              .select({
+                contactId: schema.emailContactTable.id,
+                email: schema.emailContactTable.email,
+                subscriptionId: schema.emailSubscriptionTable.id,
+              })
+              .from(schema.emailSubscriptionTable)
+              .innerJoin(
+                schema.emailContactTable,
+                eq(
+                  schema.emailContactTable.id,
+                  schema.emailSubscriptionTable.contactId
+                )
               )
-            )
-          )
-          .where(
-            and(
-              eq(
-                schema.emailSubscriptionTable.organizationId,
-                intent.organizationId
-              ),
-              eq(
-                schema.emailSubscriptionTable.topicType,
-                content.topic.topicType
-              ),
-              content.topic.topicId === null
-                ? isNull(schema.emailSubscriptionTable.topicId)
-                : eq(
-                    schema.emailSubscriptionTable.topicId,
-                    content.topic.topicId
+              .leftJoin(
+                schema.emailSuppressionTable,
+                eq(
+                  schema.emailSuppressionTable.email,
+                  schema.emailContactTable.email
+                )
+              )
+              .leftJoin(
+                schema.emailDeliveryTable,
+                and(
+                  eq(schema.emailDeliveryTable.outboxId, intent.id),
+                  eq(
+                    schema.emailDeliveryTable.recipientEmail,
+                    schema.emailContactTable.email
+                  )
+                )
+              )
+              .where(
+                and(
+                  eq(
+                    schema.emailSubscriptionTable.organizationId,
+                    intent.organizationId
                   ),
-              eq(schema.emailSubscriptionTable.state, "active"),
-              eq(schema.emailContactTable.verificationState, "verified"),
-              isNull(schema.emailSuppressionTable.email),
-              isNull(schema.emailDeliveryTable.id)
-            )
-          )
-          .orderBy(schema.emailSubscriptionTable.id)
-          .limit(materializationBatchSize);
-
+                  eq(
+                    schema.emailSubscriptionTable.topicType,
+                    content.topic.topicType
+                  ),
+                  content.topic.topicId === null
+                    ? isNull(schema.emailSubscriptionTable.topicId)
+                    : eq(
+                        schema.emailSubscriptionTable.topicId,
+                        content.topic.topicId
+                      ),
+                  eq(schema.emailSubscriptionTable.state, "active"),
+                  eq(schema.emailContactTable.verificationState, "verified"),
+                  isNull(schema.emailSuppressionTable.email),
+                  isNull(schema.emailDeliveryTable.id)
+                )
+              )
+              .orderBy(schema.emailSubscriptionTable.id)
+              .limit(materializationBatchSize)
+          : [];
+        // Addresses this intent already targeted — an earlier subscriber batch
+        // or an earlier member pass — plus the batch about to be created, so a
+        // member who is also a subscriber receives exactly one mail and the
+        // subscriber variant wins it.
+        const existingDeliveries = yield* txDb
+          .select({ email: schema.emailDeliveryTable.recipientEmail })
+          .from(schema.emailDeliveryTable)
+          .where(eq(schema.emailDeliveryTable.outboxId, intent.id));
+        const existingAddresses = new Set(
+          existingDeliveries.map((row) => row.email.toLowerCase())
+        );
+        const subscriberAddresses = new Set(
+          recipients.map((recipient) => recipient.email.toLowerCase())
+        );
+        const category = notificationCategoryForIntentKind(intent.kind);
+        const actorUserId =
+          "actorUserId" in intent.payload
+            ? (intent.payload.actorUserId ?? null)
+            : null;
+        const memberRecipients =
+          category === undefined
+            ? []
+            : yield* resolveMemberNotificationRecipients({
+                category,
+                excludedUserIds: new Set(
+                  actorUserId === null ? [] : [actorUserId]
+                ),
+                organizationId: intent.organizationId,
+              });
+        const memberCreated = yield* Effect.forEach(
+          memberRecipients.filter(
+            (member) =>
+              !existingAddresses.has(member.email.toLowerCase()) &&
+              !subscriberAddresses.has(member.email.toLowerCase())
+          ),
+          (member) =>
+            repository.createDelivery({
+              outboxId: intent.id,
+              recipientEmail: member.email,
+              template: content.template,
+              templateVersion: 1,
+              templatePayload: {
+                ...content.templatePayload,
+                reason: "member",
+                unsubscribe: {
+                  category,
+                  kind: "preference",
+                  organizationId: intent.organizationId,
+                  userId: member.userId,
+                },
+              },
+            })
+        );
         const created = yield* Effect.forEach(recipients, (recipient) => {
           // Persist only the subscription ID. The purpose-bound bearer token
           // is derived immediately before send and remains hash-only at rest.
@@ -587,6 +680,7 @@ export const materializeEmailIntent = (outboxId: string) =>
             templateVersion: 1,
             templatePayload: {
               ...content.templatePayload,
+              reason: "subscriber",
               unsubscribe: {
                 kind: "subscription",
                 subscriptionId: recipient.subscriptionId,
@@ -601,7 +695,7 @@ export const materializeEmailIntent = (outboxId: string) =>
           });
           yield* recordEmailIntentTransition(intent.kind, "materialized");
         }
-        return created.flatMap((result) =>
+        return [...memberCreated, ...created].flatMap((result) =>
           result?._tag === "Inserted" ? [result.delivery.id] : []
         );
       })
@@ -618,7 +712,7 @@ const sendDeliveryAttempt = (
     const policy = yield* EntitlementPolicy;
     const db = yield* Database.Database;
     const config = yield* EmailOutboxConfig;
-    const { apiUrl } = config;
+    const { apiUrl, appUrl } = config;
     // Builds an API-origin link embedding a purpose-bound token, but only
     // over HTTPS (loopback excepted); otherwise the send fails terminally.
     const deriveTokenizedUrl = (path: string, token: string) =>
@@ -776,18 +870,6 @@ const sendDeliveryAttempt = (
     });
     if (platformOutcome !== undefined) {
       return platformOutcome;
-    }
-    if (
-      !(yield* policy.mayMaterializeEmailIntent({
-        organizationId: intent.organizationId,
-        kind: intent.kind,
-      }))
-    ) {
-      yield* repository.markDeliveryOutcome({
-        id: delivery.id,
-        state: "paused_by_plan",
-      });
-      return { _tag: "terminal" as const };
     }
     if (
       delivery.contactId !== null &&
@@ -1027,6 +1109,30 @@ const sendDeliveryAttempt = (
             headers: { "List-Unsubscribe": `<${unsubscribe.url}>` },
           };
         }
+        if (unsubscribe.kind === "preference") {
+          // The body link stays the settings page — a human should land on a
+          // page, not JSON — while the mail client's button gets the
+          // one-click endpoint carrying the derived token.
+          const preferences = yield* NotificationPreferenceTokenService;
+          const token = yield* preferences.deriveToken({
+            category: unsubscribe.category,
+            organizationId: unsubscribe.organizationId,
+            userId: unsubscribe.userId,
+          });
+          const oneClickUrl = yield* deriveTokenizedUrl(
+            "/api/notification-preferences/unsubscribe",
+            Redacted.value(token)
+          );
+          return {
+            ...createEmail(
+              `${appUrl}/${unsubscribe.organizationId}/settings/notifications`
+            ),
+            headers: {
+              "List-Unsubscribe": `<${oneClickUrl}>`,
+              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            },
+          };
+        }
         const token = yield* subscriptions.deriveLinkToken({
           purpose: "unsubscribe",
           subscriptionId: unsubscribe.subscriptionId,
@@ -1127,12 +1233,14 @@ const sendDeliveryAttempt = (
       return { _tag: "terminal" as const };
     }
     const mailer = yield* Mailer;
-    const deliveryPlan =
-      (yield* policy.submissionNotificationRecipientLimit(
-        intent.organizationId
-      )) === 1
-        ? "free"
-        : "paid";
+    // The plan label on the provider-submission metric marks whether the
+    // workspace has the subscriber-email capability; member notifications are
+    // never plan-gated.
+    const deliveryPlan = (yield* policy.mayEmailSubscribers(
+      intent.organizationId
+    ))
+      ? "paid"
+      : "free";
     const deferAfterRetryableProviderFailure = (
       error: MailTemporaryDeliveryError | MailUncertainDeliveryError
     ) => {
@@ -1624,6 +1732,7 @@ export const reconcileEmailOutbox = ({
   | EmailSubscriptionRepository
   | EntitlementPolicy
   | EmailOutboxQueues
+  | NotificationPreferenceRepository
 > =>
   Effect.gen(function* () {
     const reconciliationNow = yield* DateTime.now;
@@ -1654,10 +1763,7 @@ export const reconcileEmailOutbox = ({
       ],
       (organizationId) =>
         Effect.gen(function* () {
-          const eligible = yield* policy.mayMaterializeEmailIntent({
-            organizationId,
-            kind: "changelog.published",
-          });
+          const eligible = yield* policy.mayEmailSubscribers(organizationId);
           yield* subscriptions.reconcileSubscriptionPlanStates({
             eligible,
             now: reconciliationNowDate,

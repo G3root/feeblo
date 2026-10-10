@@ -11,6 +11,12 @@ type NotificationEmailProps = {
   readonly title: string;
   readonly unsubscribeUrl: string;
   readonly posts: readonly EmailPost[];
+  /**
+   * Why the recipient got the email. Members are on by default and read a
+   * membership reason; a topic subscriber reads the subscription reason.
+   * Absent means a delivery written before the split, which was subscriber-only.
+   */
+  readonly reason?: "member" | "subscriber" | undefined;
 };
 
 export const NotificationEmail = ({
@@ -21,11 +27,14 @@ export const NotificationEmail = ({
   title,
   unsubscribeUrl,
   posts,
+  reason,
 }: NotificationEmailProps) => (
   <EmailShell
     cta={{ label: actionLabel, href: actionUrl }}
     footerBlurb={
-      "You received this because you enabled this notification for this workspace. You can manage all email notifications from your workspace settings."
+      reason === "member"
+        ? "You received this because you're a member of this workspace. You can manage all email notifications from your workspace settings."
+        : "You received this because you enabled this notification for this workspace. You can manage all email notifications from your workspace settings."
     }
     homeUrl="https://feeblo.com"
     preview={`${eyebrow}: ${title}`}

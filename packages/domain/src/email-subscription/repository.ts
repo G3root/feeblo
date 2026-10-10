@@ -27,7 +27,7 @@ import {
 } from "./tokens";
 
 export type EmailSubscriptionTopicInput =
-  | { readonly topicId: null; readonly topicType: "submission" | "changelog" }
+  | { readonly topicId: null; readonly topicType: "changelog" }
   | { readonly topicId: string; readonly topicType: "post" };
 
 export type RequestEmailSubscriptionInput = {
@@ -511,43 +511,6 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     };
   });
 
-  const configureSubmissionNotificationRecipient = Effect.fn(
-    "EmailSubscriptionRepository.configureSubmissionNotificationRecipient"
-  )(function* (
-    input: RequestEmailSubscriptionInput & {
-      readonly replaceOtherRecipients: boolean;
-    }
-  ) {
-    const configured = yield* requestSubscription(input);
-    if (input.replaceOtherRecipients) {
-      yield* db
-        .update(schema.emailSubscriptionTable)
-        .set({
-          state: "unsubscribed",
-          unsubscribedAt: input.now,
-          updatedAt: input.now,
-        })
-        .where(
-          and(
-            eq(
-              schema.emailSubscriptionTable.organizationId,
-              input.organizationId
-            ),
-            eq(schema.emailSubscriptionTable.topicType, "submission"),
-            isNull(schema.emailSubscriptionTable.topicId),
-            ne(schema.emailSubscriptionTable.id, configured.subscription.id),
-            inArray(schema.emailSubscriptionTable.state, [
-              "active",
-              "pending_verification",
-              "paused_by_plan",
-              "deferred_no_access",
-            ])
-          )
-        );
-    }
-    return configured;
-  });
-
   const findSubscription = Effect.fn(
     "EmailSubscriptionRepository.findSubscription"
   )(function* (input: FindEmailSubscriptionInput) {
@@ -652,63 +615,6 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       return { _tag: "Unsubscribed" as const };
     }
   );
-
-  /** Authenticated topic lookup used for toggle-button subscription state. */
-  const findAuthenticatedSubscription = Effect.fn(
-    "EmailSubscriptionRepository.findAuthenticatedSubscription"
-  )(function* ({
-    organizationId,
-    topic,
-    userId,
-  }: {
-    readonly organizationId: string;
-    readonly topic: EmailSubscriptionTopicInput;
-    readonly userId: string;
-  }) {
-    const rows = yield* db
-      .select({ state: schema.emailSubscriptionTable.state })
-      .from(schema.emailSubscriptionTable)
-      .innerJoin(
-        schema.emailContactTable,
-        eq(schema.emailContactTable.id, schema.emailSubscriptionTable.contactId)
-      )
-      .where(
-        and(
-          eq(schema.emailSubscriptionTable.organizationId, organizationId),
-          topicCondition(schema.emailSubscriptionTable, topic),
-          eq(schema.emailContactTable.organizationId, organizationId),
-          eq(schema.emailContactTable.userId, userId)
-        )
-      );
-    if (rows.length === 0) {
-      return null;
-    }
-    // One user can own several email contacts (several addresses) with
-    // diverging states for the same topic; an unordered `limit(1)` would
-    // return an arbitrary row. Aggregate to a deterministic user-level
-    // result so the toggle reflects the most-subscribed state.
-    const rank = (state: string): number => {
-      switch (state) {
-        case "active":
-          return 0;
-        case "pending_verification":
-          return 1;
-        case "paused_by_plan":
-          return 2;
-        case "deferred_no_access":
-          return 3;
-        default:
-          return 4;
-      }
-    };
-    let best = rows[0]!;
-    for (const candidate of rows) {
-      if (rank(candidate.state) < rank(best.state)) {
-        best = candidate;
-      }
-    }
-    return best;
-  });
 
   /** Authenticated topic unsubscribe; it never accepts a bearer token. */
   const unsubscribeAuthenticatedSubscription = Effect.fn(
@@ -961,8 +867,6 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
 
   return {
     deriveLinkToken,
-    configureSubmissionNotificationRecipient,
-    findAuthenticatedSubscription,
     findSubscription,
     requestSubscription,
     unsubscribe,

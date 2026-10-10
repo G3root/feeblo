@@ -1,11 +1,8 @@
 import { transaction } from "@feeblo/db";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
-import * as DateTime from "effect/DateTime";
-import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 
 import {
   cleanupOrphanedEditorAssets,
@@ -18,11 +15,9 @@ import {
 import { ChangelogPostRepository } from "../changelog-post/repository";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { EmailOutboxRepository } from "../email-outbox/repository";
-import { EntitlementPolicy } from "../entitlement/policies";
-import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
-import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
+import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
@@ -37,18 +32,14 @@ import type {
   TChangelogDelete,
   TChangelogGet,
   TChangelogList,
-  TChangelogSendUpdate,
   TChangelogUpdate,
 } from "./schema";
 
 export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* ChangelogRepository;
   const changelogPostRepository = yield* ChangelogPostRepository;
-  const emailOutbox = yield* EmailOutboxRepository;
-  const entitlementPolicy = yield* EntitlementPolicy;
   const changelogPolicy = yield* ChangelogPolicy;
   const sitePolicy = yield* SitePolicy;
-  const notifications = yield* Effect.serviceOption(NotificationService);
   const publication = yield* makeChangelogPublication;
 
   return {
@@ -127,6 +118,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             const createdOutboxId =
               args.status === "published"
                 ? yield* publication.recordPublishedIntent({
+                    actorUserId: session.session.userId,
                     changelogId: args.id,
                     organizationId: args.organizationId,
                   })
@@ -237,6 +229,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               previousStatus !== "published" && args.status === "published";
             const createdOutboxId = publishedNow
               ? yield* publication.recordPublishedIntent({
+                  actorUserId: session.session.userId,
                   changelogId: args.id,
                   organizationId: args.organizationId,
                 })
@@ -278,108 +271,6 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Changelog", "update")
       );
     },
-
-    ChangelogSendUpdate: (args: TChangelogSendUpdate) =>
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        const membership = Policy.getMembership(session, args.organizationId);
-        const outboxId = yield* transaction(
-          Effect.gen(function* () {
-            const status = yield* repository.findStatus({
-              id: args.id,
-              organizationId: args.organizationId,
-            });
-            if (status !== "published") {
-              return yield* new Policy.PolicyDeniedError({
-                reason: "Only published changelog entries can send updates.",
-              });
-            }
-
-            const mayMaterialize =
-              yield* entitlementPolicy.mayMaterializeEmailIntent({
-                organizationId: args.organizationId,
-                kind: "changelog.update_requested",
-              });
-            if (!mayMaterialize) {
-              return yield* new Policy.PolicyDeniedError({
-                reason: "Changelog subscriber emails require a paid plan.",
-              });
-            }
-
-            const now = yield* DateTime.nowAsDate;
-            const result = yield* emailOutbox
-              .recordIntent({
-                aggregateId: args.id,
-                aggregateType: "changelog",
-                deduplicationKey: `changelog.update_requested:${args.id}:${args.requestId}`,
-                expiresAt: DateTime.fromDateUnsafe(now).pipe(
-                  DateTime.addDuration(Duration.days(7)),
-                  DateTime.toDate
-                ),
-                kind: "changelog.update_requested",
-                organizationId: args.organizationId,
-                payload: {
-                  kind: "changelog.update_requested",
-                  changelogId: args.id,
-                },
-                scheduledAt: now,
-              })
-              .pipe(
-                Effect.tapError((error) =>
-                  Effect.logError(
-                    "Failed to record changelog update email intent",
-                    error
-                  ).pipe(
-                    Effect.annotateLogs({
-                      changelogId: args.id,
-                      organizationId: args.organizationId,
-                    })
-                  )
-                ),
-                Effect.mapError(
-                  () =>
-                    new InternalServerError({
-                      message: "Failed to record changelog update email intent",
-                    })
-                )
-              );
-            // Subscribers with email suppressed still see the update in-app;
-            // deduplicated per request so retries stay silent.
-            if (result._tag === "Inserted") {
-              const context = yield* repository.findNotificationContext({
-                id: args.id,
-                organizationId: args.organizationId,
-              });
-              if (context) {
-                yield* Option.match(notifications, {
-                  onNone: () => Effect.void,
-                  onSome: (service) =>
-                    service.notifyChangelogUpdated({
-                      ...(membership && {
-                        actorUserId: session.session.userId,
-                      }),
-                      changelogId: args.id,
-                      changelogSlug: context.slug,
-                      organizationId: args.organizationId,
-                      requestId: args.requestId,
-                      title: context.title,
-                    }),
-                });
-              }
-            }
-            return result._tag === "Inserted" ? result.intent.id : undefined;
-          })
-        );
-        yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
-      }).pipe(
-        Policy.withPolicy(
-          changelogPolicy.canUpdate({
-            organizationId: args.organizationId,
-            changelogId: args.id,
-          })
-        ),
-        withRemapDbErrors("Changelog", "update")
-      ),
   };
 });
 
@@ -387,12 +278,10 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
   ChangelogRpcHandlersEffect
 ).pipe(
   Layer.provide(SitePolicy.layer),
-  Layer.provide(EntitlementPolicy.layer),
   Layer.provide(ChangelogPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(SiteRepository.layer),
   Layer.provide(ChangelogRepository.layer),
   Layer.provide(ChangelogPostRepository.layer),
-  Layer.provide(EmailOutboxRepository.layer),
-  Layer.provide(NotificationService.layer)
+  Layer.provide(EmailOutboxRepository.layer)
 );

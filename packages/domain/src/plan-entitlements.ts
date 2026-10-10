@@ -17,7 +17,6 @@ export type LimitFeatureKey =
   | "feedbackBoards"
   | "privilegedMembers"
   | "changelogCategories"
-  | "submissionNotificationRecipients"
   | "crmEntries"
   | "workspaces";
 export type CapabilityFeatureKey =
@@ -73,11 +72,6 @@ export const PLAN_FEATURE_CATALOG = {
     singularLabel: "Changelog Category",
     pluralLabel: "Changelog Categories",
   },
-  submissionNotificationRecipients: {
-    kind: "limit",
-    singularLabel: "Submission Notification Recipient",
-    pluralLabel: "Submission Notification Recipients",
-  },
   crmEntries: {
     kind: "limit",
     singularLabel: "CRM Entry",
@@ -127,7 +121,6 @@ const LIMIT_FEATURE_ORDER = defineFeatureOrder<LimitFeatureKey>()([
   "feedbackBoards",
   "privilegedMembers",
   "changelogCategories",
-  "submissionNotificationRecipients",
   "crmEntries",
   "workspaces",
 ] as const);
@@ -152,7 +145,6 @@ export const PLAN_ENTITLEMENTS = {
       feedbackBoards: 2,
       privilegedMembers: 2,
       changelogCategories: 3,
-      submissionNotificationRecipients: 1,
       crmEntries: 10,
       workspaces: 3,
     },
@@ -175,7 +167,6 @@ export const PLAN_ENTITLEMENTS = {
       feedbackBoards: 5,
       privilegedMembers: 5,
       changelogCategories: null,
-      submissionNotificationRecipients: null,
       crmEntries: null,
       workspaces: null,
     },
@@ -198,7 +189,6 @@ export const PLAN_ENTITLEMENTS = {
       feedbackBoards: null,
       privilegedMembers: null,
       changelogCategories: null,
-      submissionNotificationRecipients: null,
       crmEntries: null,
       workspaces: null,
     },

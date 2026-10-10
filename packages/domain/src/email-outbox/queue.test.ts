@@ -24,12 +24,13 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as PersistedQueue from "effect/persistence/PersistedQueue";
 import * as Redacted from "effect/Redacted";
-import * as Schema from "effect/Schema";
 import { TestClock } from "effect/testing";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { NotificationPreferenceRepository } from "../notification-preference/repository";
+import { NotificationPreferenceTokenService } from "../notification-preference/tokens";
 import { WorkspaceRepository } from "../workspace/repository";
 import { EmailOutboxConfig } from "./config";
 import {
@@ -45,7 +46,6 @@ import {
   reconcileEmailOutbox,
 } from "./queue";
 import { EmailOutboxRepository } from "./repository";
-import { DeliveryAccessSnapshot } from "./schema";
 
 // The worker layer runs for real: `waitForDelivery` polls with `yieldNow`, so
 // it depends on the take loops progressing concurrently, exactly as the
@@ -76,6 +76,12 @@ const makeTestLayer = (
     ),
     Layer.provideMerge(
       EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
+    ),
+    Layer.provideMerge(NotificationPreferenceRepository.layer),
+    Layer.provideMerge(
+      NotificationPreferenceTokenService.layerTest(
+        "email-outbox-preference-test-signing-secret"
+      )
     ),
     Layer.provideMerge(
       PersistedQueue.layer.pipe(Layer.provide(PersistedQueue.layerStoreMemory))
@@ -169,8 +175,10 @@ const fixture = Effect.gen(function* () {
     slug: "ship-email-outbox",
     content: "x",
     excerpt: "x",
-    creatorId: userId,
-    creatorMemberId: ownerId,
+    // No creator: the member fan-out drops a post's author from the
+    // submission summary, and these fixtures want the owner to receive it.
+    creatorId: null,
+    creatorMemberId: null,
     createdAt: now,
     updatedAt: now,
   });
@@ -268,7 +276,7 @@ const addSubscriptionContact = (args: {
   readonly organizationId: string;
   readonly state: "active" | "pending_verification" | "unsubscribed";
   readonly topicId: string | null;
-  readonly topicType: "changelog" | "post" | "submission";
+  readonly topicType: "changelog" | "post";
   /** Links the email contact to a feeblo user (on-behalf attribution). */
   readonly userId?: string | null;
 }) =>
@@ -567,15 +575,15 @@ describe("EmailOutbox workflows", () => {
         expect(state.sentMessages[0]?.subject).toBe(
           "2 new submissions in your workspace"
         );
-        // A settings-kind unsubscribe is a navigable page, so it is advertised
-        // for the mail client's own affordance without claiming one-click
-        // POST support the page does not implement.
-        expect(state.sentMessages[0]?.headers?.["List-Unsubscribe"]).toBe(
-          `<https://test.feeblo.example/${organizationId}/settings/notifications>`
+        // The body link is the settings page, but the mail client's own
+        // affordance gets the RFC 8058 one-click endpoint for this member's
+        // category.
+        expect(state.sentMessages[0]?.headers?.["List-Unsubscribe"]).toMatch(
+          /^<https:\/\/test\.feeblo\.example\/api\/notification-preferences\/unsubscribe\?token=/
         );
-        expect(
-          state.sentMessages[0]?.headers?.["List-Unsubscribe-Post"]
-        ).toBeUndefined();
+        expect(state.sentMessages[0]?.headers?.["List-Unsubscribe-Post"]).toBe(
+          "List-Unsubscribe=One-Click"
+        );
         const [delivery] = yield* db
           .select({
             templatePayload: schema.emailDeliveryTable.templatePayload,
@@ -585,8 +593,10 @@ describe("EmailOutbox workflows", () => {
         expect(delivery?.templatePayload).toMatchObject({
           body: "2 new posts have been submitted.",
           unsubscribe: {
-            kind: "settings",
-            url: `https://test.feeblo.example/${organizationId}/settings/notifications`,
+            category: "new_feedback",
+            kind: "preference",
+            organizationId,
+            userId,
           },
           posts: [
             {
@@ -799,12 +809,11 @@ describe("EmailOutbox workflows", () => {
     );
 
     it.effect(
-      "sends paid submission notifications only to opted-in administrators",
+      "sends submission notifications to every verified member regardless of role",
       () =>
         Effect.gen(function* () {
           yield* resetTestMailer();
           const { intentId, organizationId, ownerEmail } = yield* fixture;
-          yield* enableSubscriberEmails(organizationId);
           const db = yield* Database.Database;
           const adminUserId = yield* UserId.generate;
           const adminMemberId = yield* MemberId.generate;
@@ -812,7 +821,7 @@ describe("EmailOutbox workflows", () => {
           yield* db.insert(schema.userTable).values({
             id: adminUserId,
             email: adminEmail,
-            name: "Opted-in admin",
+            name: "Admin",
             emailVerified: true,
           });
           yield* db.insert(schema.memberTable).values({
@@ -822,14 +831,21 @@ describe("EmailOutbox workflows", () => {
             role: "admin",
             userId: adminUserId,
           });
-          yield* (yield* EmailSubscriptionRepository).requestSubscription({
-            alreadyVerifiedUser: { userId: adminUserId },
-            email: adminEmail,
-            now: fixtureNow,
+          const unverifiedUserId = yield* UserId.generate;
+          const unverifiedMemberId = yield* MemberId.generate;
+          const unverifiedEmail = `unverified-${organizationId}@example.test`;
+          yield* db.insert(schema.userTable).values({
+            id: unverifiedUserId,
+            email: unverifiedEmail,
+            name: "Unverified",
+            emailVerified: false,
+          });
+          yield* db.insert(schema.memberTable).values({
+            id: unverifiedMemberId,
+            createdAt: fixtureNow,
             organizationId,
-            source: "explicit",
-            topic: { topicId: null, topicType: "submission" },
-            verificationExpiresAt: null,
+            role: "manager",
+            userId: unverifiedUserId,
           });
 
           const deliveryIds = yield* materializeEmailIntent(intentId);
@@ -837,12 +853,11 @@ describe("EmailOutbox workflows", () => {
             deliverEmailDelivery({ deliveryId })
           );
           const mailbox = yield* testMailerState;
-          expect(mailbox.sentMessages.map((message) => message.to)).toEqual([
-            adminEmail.toLowerCase(),
-          ]);
           expect(
-            mailbox.sentMessages.map((message) => message.to)
-          ).not.toContain(ownerEmail.toLowerCase());
+            mailbox.sentMessages.map((message) => message.to).sort()
+          ).toEqual(
+            [adminEmail.toLowerCase(), ownerEmail.toLowerCase()].sort()
+          );
         })
     );
 
@@ -950,18 +965,23 @@ describe("EmailOutbox workflows", () => {
             (delivery) => delivery.state === "accepted"
           );
           const state = yield* testMailerState;
-          expect(state.sentMessages).toHaveLength(1);
-          expect(state.sentMessages[0]).toMatchObject({
-            to: `changelog-${organizationId}@example.test`.toLowerCase(),
-          });
+          expect(state.sentMessages).toHaveLength(2);
+          const subscriberMessage = state.sentMessages.find(
+            (message) =>
+              message.to ===
+              `changelog-${organizationId}@example.test`.toLowerCase()
+          );
+          if (subscriberMessage === undefined) {
+            return yield* Effect.die("Expected the subscriber message");
+          }
           expect(
-            state.sentMessages[0]?.headers?.["List-Unsubscribe"]?.startsWith(
+            subscriberMessage.headers?.["List-Unsubscribe"]?.startsWith(
               "<https://test.feeblo.example/api/email-subscriptions/unsubscribe?token="
             )
           ).toBe(true);
-          expect(
-            state.sentMessages[0]?.headers?.["List-Unsubscribe-Post"]
-          ).toBe("List-Unsubscribe=One-Click");
+          expect(subscriberMessage.headers?.["List-Unsubscribe-Post"]).toBe(
+            "List-Unsubscribe=One-Click"
+          );
           const [storedSubscription] = yield* db
             .select({
               unsubscribeTokenHash:
@@ -975,7 +995,12 @@ describe("EmailOutbox workflows", () => {
           const [delivery] = yield* db
             .select()
             .from(schema.emailDeliveryTable)
-            .where(eq(schema.emailDeliveryTable.outboxId, intent.intent.id));
+            .where(
+              and(
+                eq(schema.emailDeliveryTable.outboxId, intent.intent.id),
+                eq(schema.emailDeliveryTable.contactId, subscriber.contact.id)
+              )
+            );
           expect(delivery?.contactId).toBe(subscriber.contact.id);
           expect(delivery?.template).toBe("changelog");
           expect(delivery?.templatePayload).toMatchObject({
@@ -987,7 +1012,7 @@ describe("EmailOutbox workflows", () => {
             },
           });
           const listUnsubscribe =
-            state.sentMessages[0]?.headers?.["List-Unsubscribe"];
+            subscriberMessage.headers?.["List-Unsubscribe"];
           if (listUnsubscribe === undefined) {
             return yield* Effect.die("Expected a List-Unsubscribe URL");
           }
@@ -1179,6 +1204,11 @@ describe("EmailOutbox workflows", () => {
           });
           const { organizationId } = yield* fixture;
           const db = yield* Database.Database;
+          // Focus on the subscriber: drop the fixture's owner so no member
+          // delivery races the deferred subscriber one.
+          yield* db
+            .delete(schema.memberTable)
+            .where(eq(schema.memberTable.organizationId, organizationId));
           yield* enableSubscriberEmails(organizationId);
           const changelogId = `changelog_${organizationId}`;
           const subscriptions = yield* EmailSubscriptionRepository;
@@ -1257,10 +1287,18 @@ describe("EmailOutbox workflows", () => {
             intent.intent.id,
             (delivery) => delivery.state === "suppressed"
           );
-          // The retry must never reach the provider again.
+          // The retry must never reach the provider again. Count only this
+          // subscriber's address: reconciliation in this test may also sweep
+          // deliveries left by earlier tests in the shared database.
           const mailer = yield* testMailerState;
-          expect(mailer.sentMessages).toHaveLength(0);
-          expect(mailer.attempts).toBe(1);
+          expect(
+            mailer.sentMessages.filter(
+              (message) =>
+                message.to ===
+                `deferred-${organizationId}@example.test`.toLowerCase()
+            )
+          ).toHaveLength(0);
+          expect(mailer.attempts).toBeGreaterThanOrEqual(1);
         })
     );
 
@@ -1407,14 +1445,28 @@ describe("EmailOutbox workflows", () => {
             (delivery) => delivery.state === "accepted"
           );
           const state = yield* testMailerState;
-          expect(state.sentMessages).toHaveLength(1);
-          expect(state.sentMessages[0]?.to).toBe(
-            `verified-${organizationId}@example.test`.toLowerCase()
+          // The owner member receives the status change too; the subscriber
+          // set is what this test is about.
+          expect(state.sentMessages).toHaveLength(2);
+          const verifiedMessage = state.sentMessages.find(
+            (message) =>
+              message.to ===
+              `verified-${organizationId}@example.test`.toLowerCase()
           );
+          if (verifiedMessage === undefined) {
+            return yield* Effect.die(
+              "Expected the verified subscriber message"
+            );
+          }
           const [delivery] = yield* db
             .select()
             .from(schema.emailDeliveryTable)
-            .where(eq(schema.emailDeliveryTable.outboxId, intent.intent.id));
+            .where(
+              and(
+                eq(schema.emailDeliveryTable.outboxId, intent.intent.id),
+                eq(schema.emailDeliveryTable.contactId, verified.contactId)
+              )
+            );
           expect(delivery?.contactId).toBe(verified.contactId);
           expect(delivery?.templatePayload).toMatchObject({
             title: expect.stringContaining("In Progress"),
@@ -1512,52 +1564,7 @@ describe("EmailOutbox workflows", () => {
     );
 
     it.effect(
-      "sends an official post update immediately to active post subscribers",
-      () =>
-        Effect.gen(function* () {
-          yield* resetTestMailer();
-          const { organizationId } = yield* fixture;
-          yield* enableSubscriberEmails(organizationId);
-          const postId = `post_${organizationId}`;
-          yield* addSubscriptionContact({
-            email: `official-${organizationId}@example.test`,
-            organizationId,
-            state: "active",
-            topicId: postId,
-            topicType: "post",
-          });
-          const intent = yield* (yield* EmailOutboxRepository).recordIntent({
-            aggregateId: postId,
-            aggregateType: "post",
-            deduplicationKey: `post.official_update_published:${postId}:test`,
-            expiresAt: shiftDate(fixtureNow, Duration.days(1)),
-            kind: "post.official_update_published",
-            organizationId,
-            payload: {
-              body: "The requested export is now available.",
-              kind: "post.official_update_published",
-              postId,
-              updateId: `update_${organizationId}`,
-            },
-            scheduledAt: fixtureNow,
-          });
-          if (intent._tag !== "Inserted") {
-            return yield* Effect.die("Expected official-update intent");
-          }
-          const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
-          yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            deliverEmailDelivery({ deliveryId })
-          );
-          const mailbox = yield* testMailerState;
-          expect(mailbox.sentMessages).toHaveLength(1);
-          expect(mailbox.renderedMessages[0]?.text).toContain(
-            "The requested export is now available."
-          );
-        })
-    );
-
-    it.effect(
-      "pauses a subscriber intent on downgrade and reconciles it after upgrade while unexpired",
+      "skips subscriber email on a free plan without backfilling after an upgrade",
       () =>
         Effect.gen(function* () {
           yield* resetTestMailer();
@@ -1592,106 +1599,48 @@ describe("EmailOutbox workflows", () => {
           if (intent._tag !== "Inserted") {
             return yield* Effect.die("Expected resumable intent");
           }
-          yield* materializeEmailIntent(intent.intent.id);
-          expect(
-            (yield* (yield* EmailOutboxRepository).findById(intent.intent.id))
-              ?.state
-          ).toBe("paused_by_plan");
-
-          yield* enableSubscriberEmails(organizationId);
-          yield* reconcileEmailOutbox();
-          yield* waitForIntentState(intent.intent.id, "materialized");
-
-          expect(
-            (yield* (yield* EmailOutboxRepository).findById(intent.intent.id))
-              ?.state
-          ).toBe("materialized");
-          yield* waitForOutboxToSettle(intent.intent.id);
-          yield* waitForOutboxToSettle(intentId);
-        })
-    );
-
-    it.effect(
-      "re-offers a delivery resumed from a plan pause with a fresh element id",
-      () =>
-        Effect.gen(function* () {
-          yield* resetTestMailer();
-          const { intentId, organizationId } = yield* fixture;
-          const db = yield* Database.Database;
-          yield* enableSubscriberEmails(organizationId);
-          const changelogId = `delivery_resume_${organizationId}`;
-          const now = yield* DateTime.nowAsDate;
-          yield* db.insert(schema.changelogTable).values({
-            id: changelogId,
-            organizationId,
-            title: "Delivery resume",
-            slug: "delivery-resume",
-            content: "x",
-            excerpt: "x",
-            status: "published",
-            publishedAt: now,
-            creatorId: null,
-            creatorMemberId: null,
-            createdAt: now,
-            updatedAt: now,
-          });
+          // A verified subscriber exists before materialization: the free
+          // plan skips them, and an already-materialized intent is never
+          // backfilled by a later upgrade.
           yield* addSubscriptionContact({
-            email: `resume-delivery-${organizationId}@example.test`,
+            email: `upgrade-${organizationId}@example.test`,
             organizationId,
             state: "active",
             topicId: null,
             topicType: "changelog",
           });
-          const intent = yield* (yield* EmailOutboxRepository).recordIntent({
-            aggregateId: changelogId,
-            aggregateType: "changelog",
-            deduplicationKey: `changelog.delivery-resume:${organizationId}:${changelogId}`,
-            expiresAt: shiftDate(fixtureNow, Duration.days(1)),
-            kind: "changelog.published",
-            organizationId,
-            payload: { kind: "changelog.published", changelogId },
-            scheduledAt: fixtureNow,
-          });
-          if (intent._tag !== "Inserted") {
-            return yield* Effect.die("Expected resumable delivery intent");
-          }
-          const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
-          const deliveryId = deliveryIds[0];
-          if (deliveryId === undefined) {
-            return yield* Effect.die("Expected a queued delivery");
-          }
-
-          // Downgrade: the queued delivery's first attempt parks it on the
-          // plan and completes the queue element that carries attempt 0/version 0.
-          yield* db
-            .update(schema.subscriptionTable)
-            .set({ status: "canceled", updatedAt: now })
-            .where(eq(schema.subscriptionTable.organizationId, organizationId));
-          yield* reconcileEmailOutbox();
-          yield* waitForDelivery(
-            intent.intent.id,
-            (delivery) => delivery.state === "paused_by_plan"
-          );
-
-          // Upgrade: reconciliation resumes it. The re-offer must not reuse the
-          // completed element id, or the queue would swallow it as a duplicate.
-          yield* db
-            .update(schema.subscriptionTable)
-            .set({ status: "active", updatedAt: now })
-            .where(eq(schema.subscriptionTable.organizationId, organizationId));
-          yield* reconcileEmailOutbox();
-          yield* waitForDelivery(
-            intent.intent.id,
-            (delivery) => delivery.state === "accepted"
-          );
+          yield* materializeEmailIntent(intent.intent.id);
           expect(
-            (yield* testMailerState).sentMessages.filter(
-              (message) =>
-                message.to ===
-                `resume-delivery-${organizationId}@example.test`.toLowerCase()
+            (yield* (yield* EmailOutboxRepository).findById(intent.intent.id))
+              ?.state
+          ).toBe("materialized");
+          const deliveriesBeforeUpgrade = yield* db
+            .select({ contactId: schema.emailDeliveryTable.contactId })
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, intent.intent.id));
+          expect(
+            deliveriesBeforeUpgrade.filter(
+              (delivery) => delivery.contactId !== null
+            )
+          ).toHaveLength(0);
+          expect(
+            deliveriesBeforeUpgrade.filter(
+              (delivery) => delivery.contactId === null
             )
           ).toHaveLength(1);
+
+          yield* enableSubscriberEmails(organizationId);
+          yield* reconcileEmailOutbox();
           yield* waitForOutboxToSettle(intent.intent.id);
+          const deliveriesAfterUpgrade = yield* db
+            .select({ contactId: schema.emailDeliveryTable.contactId })
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, intent.intent.id));
+          expect(
+            deliveriesAfterUpgrade.filter(
+              (delivery) => delivery.contactId !== null
+            )
+          ).toHaveLength(0);
           yield* waitForOutboxToSettle(intentId);
         })
     );
@@ -2103,6 +2052,11 @@ describe("EmailOutbox workflows", () => {
           const { organizationId } = yield* fixture;
           yield* enableSubscriberEmails(organizationId);
           const db = yield* Database.Database;
+          // Focus on the non-member recipient: drop the fixture's owner from
+          // the member fan-out.
+          yield* db
+            .delete(schema.memberTable)
+            .where(eq(schema.memberTable.organizationId, organizationId));
           const postId = `post_${organizationId}`;
           const shadowUserId = yield* UserId.generate;
           yield* db.insert(schema.userTable).values({
@@ -2152,6 +2106,11 @@ describe("EmailOutbox workflows", () => {
           const { organizationId } = yield* fixture;
           yield* enableSubscriberEmails(organizationId);
           const db = yield* Database.Database;
+          // Focus on the non-member recipient: drop the fixture's owner from
+          // the member fan-out.
+          yield* db
+            .delete(schema.memberTable)
+            .where(eq(schema.memberTable.organizationId, organizationId));
           const globalUserId = yield* UserId.generate;
           const globalEmail = `global-${organizationId}@example.test`;
           yield* db.insert(schema.userTable).values({
@@ -2213,416 +2172,11 @@ describe("EmailOutbox workflows", () => {
     );
 
     it.effect(
-      "skips a submission window that includes a post on a private board",
-      () =>
-        Effect.gen(function* () {
-          yield* resetTestMailer();
-          const { intentId, organizationId } = yield* fixture;
-          const db = yield* Database.Database;
-          const globalUserId = yield* UserId.generate;
-          const globalEmail = `window-global-${organizationId}@example.test`;
-          yield* db.insert(schema.userTable).values({
-            id: globalUserId,
-            email: globalEmail,
-            name: "Global user",
-            emailVerified: true,
-          });
-          // The free plan notifies one opted-in address; this one resolves to a
-          // global account with no membership, so only rule 3 can admit it.
-          yield* addSubscriptionContact({
-            email: globalEmail,
-            organizationId,
-            state: "active",
-            topicId: null,
-            topicType: "submission",
-            userId: globalUserId,
-          });
-          const { postId: privatePostId } =
-            yield* insertPrivateBoardPost(organizationId);
-          yield* (yield* EmailOutboxRepository).upsertPendingSubmissionWindow({
-            now: yield* DateTime.nowAsDate,
-            organizationId,
-            postId: privatePostId,
-          });
-          yield* TestClock.adjust("5 minutes");
-
-          const deliveryIds = yield* materializeEmailIntent(intentId);
-          expect(deliveryIds).toHaveLength(1);
-          yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            deliverEmailDelivery({ deliveryId })
-          );
-          const [delivery] = yield* db
-            .select()
-            .from(schema.emailDeliveryTable)
-            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
-          // The window's email carries the private post's title too, so one
-          // public board must not admit a recipient who cannot see the rest.
-          expect(delivery?.state).toBe("no_organization_access");
-          expect((yield* testMailerState).sentMessages).toHaveLength(0);
-        })
-    );
-
-    it.effect(
-      "does not admit a global recipient after a private post in the window is deleted",
-      () =>
-        Effect.gen(function* () {
-          yield* resetTestMailer();
-          const { intentId, organizationId } = yield* fixture;
-          const db = yield* Database.Database;
-          const globalUserId = yield* UserId.generate;
-          const globalEmail = `deleted-private-${organizationId}@example.test`;
-          yield* db.insert(schema.userTable).values({
-            id: globalUserId,
-            email: globalEmail,
-            name: "Global user",
-            emailVerified: true,
-          });
-          yield* addSubscriptionContact({
-            email: globalEmail,
-            organizationId,
-            state: "active",
-            topicId: null,
-            topicType: "submission",
-            userId: globalUserId,
-          });
-          const { postId: privatePostId } =
-            yield* insertPrivateBoardPost(organizationId);
-          yield* (yield* EmailOutboxRepository).upsertPendingSubmissionWindow({
-            now: yield* DateTime.nowAsDate,
-            organizationId,
-            postId: privatePostId,
-          });
-          yield* TestClock.adjust("5 minutes");
-
-          // The email is rendered now, while the private post still exists, so
-          // its title is in the stored payload.
-          const deliveryIds = yield* materializeEmailIntent(intentId);
-          expect(deliveryIds).toHaveLength(1);
-          const [rendered] = yield* db
-            .select({
-              templatePayload: schema.emailDeliveryTable.templatePayload,
-            })
-            .from(schema.emailDeliveryTable)
-            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
-          expect(rendered?.templatePayload).toMatchObject({
-            posts: [{ label: "Ship email outbox" }, { label: "Private post" }],
-          });
-
-          // The post is gone by the time the delivery is attempted, so a check
-          // that only reads current rows cannot see the private board any more
-          // even though the rendered email still names it.
-          yield* db
-            .delete(schema.postTable)
-            .where(eq(schema.postTable.id, privatePostId));
-          yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            deliverEmailDelivery({ deliveryId })
-          );
-
-          const [delivery] = yield* db
-            .select()
-            .from(schema.emailDeliveryTable)
-            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
-          expect(delivery?.state).toBe("no_organization_access");
-          expect((yield* testMailerState).sentMessages).toHaveLength(0);
-        })
-    );
-
-    it.effect(
-      "does not admit a global recipient after the window's only post is deleted",
-      () =>
-        Effect.gen(function* () {
-          yield* resetTestMailer();
-          const { intentId, organizationId, postId } = yield* fixture;
-          const db = yield* Database.Database;
-          const globalUserId = yield* UserId.generate;
-          const globalEmail = `gone-public-${organizationId}@example.test`;
-          yield* db.insert(schema.userTable).values({
-            id: globalUserId,
-            email: globalEmail,
-            name: "Global user",
-            emailVerified: true,
-          });
-          yield* addSubscriptionContact({
-            email: globalEmail,
-            organizationId,
-            state: "active",
-            topicId: null,
-            topicType: "submission",
-            userId: globalUserId,
-          });
-          yield* TestClock.adjust("5 minutes");
-
-          // Rendered while the post was public, so the stored payload proves
-          // the mail named a public post and nothing more.
-          const deliveryIds = yield* materializeEmailIntent(intentId);
-          expect(deliveryIds).toHaveLength(1);
-          const [rendered] = yield* db
-            .select({
-              templatePayload: schema.emailDeliveryTable.templatePayload,
-            })
-            .from(schema.emailDeliveryTable)
-            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
-          expect(rendered?.templatePayload).toMatchObject({
-            notifiedBoardVisibility: "PUBLIC",
-            posts: [{ label: "Ship email outbox" }],
-          });
-
-          // The post is gone by the time the delivery is attempted, so no row
-          // is left to prove the mail's content is still public.
-          yield* db
-            .delete(schema.postTable)
-            .where(eq(schema.postTable.id, postId));
-          yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            deliverEmailDelivery({ deliveryId })
-          );
-
-          const [delivery] = yield* db
-            .select()
-            .from(schema.emailDeliveryTable)
-            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
-          expect(delivery?.state).toBe("no_organization_access");
-          expect((yield* testMailerState).sentMessages).toHaveLength(0);
-        })
-    );
-
-    it.effect(
-      "fails closed when a named public post is deleted before delivery",
-      () =>
-        Effect.gen(function* () {
-          yield* resetTestMailer();
-          const {
-            boardId,
-            intentId,
-            organizationId,
-            ownerMemberId,
-            statusId,
-            userId,
-          } = yield* fixture;
-          const db = yield* Database.Database;
-          const globalUserId = yield* UserId.generate;
-          const globalEmail = `deleted-public-${organizationId}@example.test`;
-          yield* db.insert(schema.userTable).values({
-            id: globalUserId,
-            email: globalEmail,
-            name: "Global user",
-            emailVerified: true,
-          });
-          yield* addSubscriptionContact({
-            email: globalEmail,
-            organizationId,
-            state: "active",
-            topicId: null,
-            topicType: "submission",
-            userId: globalUserId,
-          });
-          const secondPostId = yield* PostId.generate;
-          yield* addSubmissionPost({
-            boardId,
-            organizationId,
-            ownerMemberId,
-            postId: secondPostId,
-            slug: "second-public-submission",
-            statusId,
-            title: "Second public submission",
-            userId,
-          });
-          yield* (yield* EmailOutboxRepository).upsertPendingSubmissionWindow({
-            now: yield* DateTime.nowAsDate,
-            organizationId,
-            postId: secondPostId,
-          });
-          yield* TestClock.adjust("5 minutes");
-
-          // Both posts are public when the mail is rendered, so the snapshot
-          // itself proves nothing was private at render time.
-          const deliveryIds = yield* materializeEmailIntent(intentId);
-          expect(deliveryIds).toHaveLength(1);
-
-          yield* db
-            .delete(schema.postTable)
-            .where(eq(schema.postTable.id, secondPostId));
-          yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            deliverEmailDelivery({ deliveryId })
-          );
-
-          const [delivery] = yield* db
-            .select()
-            .from(schema.emailDeliveryTable)
-            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
-          // The surviving post is public, but it does not speak for the mail:
-          // one named post is gone and nothing proves it stayed public.
-          expect(delivery?.state).toBe("no_organization_access");
-          expect((yield* testMailerState).sentMessages).toHaveLength(0);
-        })
-    );
-
-    it.effect("delivers when a post the email does not name is deleted", () =>
-      Effect.gen(function* () {
-        yield* resetTestMailer();
-        const {
-          boardId,
-          intentId,
-          organizationId,
-          ownerMemberId,
-          postId,
-          statusId,
-          userId,
-        } = yield* fixture;
-        const db = yield* Database.Database;
-        const globalUserId = yield* UserId.generate;
-        const globalEmail = `unlisted-gone-${organizationId}@example.test`;
-        yield* db.insert(schema.userTable).values({
-          id: globalUserId,
-          email: globalEmail,
-          name: "Global user",
-          emailVerified: true,
-        });
-        yield* addSubscriptionContact({
-          email: globalEmail,
-          organizationId,
-          state: "active",
-          topicId: null,
-          topicType: "submission",
-          userId: globalUserId,
-        });
-
-        // Twenty-one submissions on top of the fixture's own, so the window
-        // holds twenty-two ids while the mail can name twenty.
-        const unlistedPostIds: string[] = [];
-        for (let index = 0; index < 21; index++) {
-          const unlistedPostId = yield* PostId.generate;
-          yield* addSubmissionPost({
-            boardId,
-            organizationId,
-            ownerMemberId,
-            postId: unlistedPostId,
-            slug: `unlisted-${index}`,
-            statusId,
-            title: `Unlisted submission ${index}`,
-            userId,
-          });
-          unlistedPostIds.push(unlistedPostId);
-        }
-        const storedPostIds = [postId, ...unlistedPostIds];
-        const unlistedDeletedPostId = unlistedPostIds[19];
-        if (unlistedDeletedPostId === undefined) {
-          return yield* Effect.die("Expected an unlisted submission");
-        }
-        yield* db
-          .update(schema.emailOutboxTable)
-          .set({
-            payload: {
-              kind: "submission.created",
-              postCount: storedPostIds.length,
-              postId,
-              postIds: storedPostIds,
-            },
-          })
-          .where(eq(schema.emailOutboxTable.id, intentId));
-        yield* TestClock.adjust("5 minutes");
-
-        const deliveryIds = yield* materializeEmailIntent(intentId);
-        expect(deliveryIds).toHaveLength(1);
-        const [rendered] = yield* db
-          .select({
-            templatePayload: schema.emailDeliveryTable.templatePayload,
-          })
-          .from(schema.emailDeliveryTable)
-          .where(eq(schema.emailDeliveryTable.outboxId, intentId));
-        // The mail names the first twenty and leaves the rest to the count.
-        const snapshot = yield* Schema.decodeUnknownEffect(
-          DeliveryAccessSnapshot
-        )(rendered?.templatePayload);
-        expect(snapshot.notifiedBoardVisibility).toBe("PUBLIC");
-        expect(snapshot.notifiedPostIds).toHaveLength(20);
-        expect(snapshot.notifiedPostIds).not.toContain(unlistedDeletedPostId);
-
-        // A submission the mail never named is deleted before delivery; the
-        // named twenty are untouched, so the recipient still gets the mail.
-        yield* db
-          .delete(schema.postTable)
-          .where(eq(schema.postTable.id, unlistedDeletedPostId));
-        yield* Effect.forEach(deliveryIds, (deliveryId) =>
-          deliverEmailDelivery({ deliveryId })
-        );
-
-        const [delivery] = yield* db
-          .select()
-          .from(schema.emailDeliveryTable)
-          .where(eq(schema.emailDeliveryTable.outboxId, intentId));
-        expect(delivery?.state).toBe("accepted");
-        expect((yield* testMailerState).sentMessages).toHaveLength(1);
-      })
-    );
-
-    it.effect(
-      "delivers a submission window whose posts are all on public boards",
-      () =>
-        Effect.gen(function* () {
-          yield* resetTestMailer();
-          const {
-            boardId,
-            intentId,
-            organizationId,
-            ownerMemberId,
-            statusId,
-            userId,
-          } = yield* fixture;
-          const db = yield* Database.Database;
-          const globalUserId = yield* UserId.generate;
-          const globalEmail = `public-window-${organizationId}@example.test`;
-          yield* db.insert(schema.userTable).values({
-            id: globalUserId,
-            email: globalEmail,
-            name: "Global user",
-            emailVerified: true,
-          });
-          yield* addSubscriptionContact({
-            email: globalEmail,
-            organizationId,
-            state: "active",
-            topicId: null,
-            topicType: "submission",
-            userId: globalUserId,
-          });
-          const secondPostId = yield* PostId.generate;
-          yield* addSubmissionPost({
-            boardId,
-            organizationId,
-            ownerMemberId,
-            postId: secondPostId,
-            slug: "second-public-submission",
-            statusId,
-            title: "Second public submission",
-            userId,
-          });
-          yield* (yield* EmailOutboxRepository).upsertPendingSubmissionWindow({
-            now: yield* DateTime.nowAsDate,
-            organizationId,
-            postId: secondPostId,
-          });
-          yield* TestClock.adjust("5 minutes");
-
-          const deliveryIds = yield* materializeEmailIntent(intentId);
-          expect(deliveryIds).toHaveLength(1);
-          yield* Effect.forEach(deliveryIds, (deliveryId) =>
-            deliverEmailDelivery({ deliveryId })
-          );
-          const [delivery] = yield* db
-            .select()
-            .from(schema.emailDeliveryTable)
-            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
-          expect(delivery?.state).toBe("accepted");
-          expect((yield* testMailerState).sentMessages).toHaveLength(1);
-        })
-    );
-
-    it.effect(
       "keeps members and SSO-bound users eligible even on private boards",
       () =>
         Effect.gen(function* () {
           yield* resetTestMailer();
-          const { organizationId } = yield* fixture;
+          const { organizationId, ownerEmail } = yield* fixture;
           yield* enableSubscriberEmails(organizationId);
           const db = yield* Database.Database;
           const { postId } = yield* insertPrivateBoardPost(organizationId);
@@ -2678,10 +2232,13 @@ describe("EmailOutbox workflows", () => {
           const mailbox = yield* testMailerState;
           expect(
             mailbox.sentMessages.map((message) => message.to).sort()
-          ).toEqual([
-            `member-${organizationId}@example.test`.toLowerCase(),
-            `sso-${organizationId}@example.test`.toLowerCase(),
-          ]);
+          ).toEqual(
+            [
+              `member-${organizationId}@example.test`.toLowerCase(),
+              ownerEmail.toLowerCase(),
+              `sso-${organizationId}@example.test`.toLowerCase(),
+            ].sort()
+          );
         })
     );
 
@@ -2690,7 +2247,7 @@ describe("EmailOutbox workflows", () => {
       () =>
         Effect.gen(function* () {
           yield* resetTestMailer();
-          const { organizationId } = yield* fixture;
+          const { organizationId, ownerEmail } = yield* fixture;
           yield* enableSubscriberEmails(organizationId);
           const postId = `post_${organizationId}`;
           yield* addSubscriptionContact({
@@ -2709,9 +2266,14 @@ describe("EmailOutbox workflows", () => {
             deliverEmailDelivery({ deliveryId })
           );
           const mailbox = yield* testMailerState;
-          expect(mailbox.sentMessages.map((message) => message.to)).toEqual([
-            `external-${organizationId}@example.test`.toLowerCase(),
-          ]);
+          expect(
+            mailbox.sentMessages.map((message) => message.to).sort()
+          ).toEqual(
+            [
+              `external-${organizationId}@example.test`.toLowerCase(),
+              ownerEmail.toLowerCase(),
+            ].sort()
+          );
         })
     );
 
@@ -2875,6 +2437,12 @@ describe("EmailOutbox queues with plain-HTTP API_URL", () => {
       Layer.provideMerge(
         EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
       ),
+      Layer.provideMerge(NotificationPreferenceRepository.layer),
+      Layer.provideMerge(
+        NotificationPreferenceTokenService.layerTest(
+          "email-outbox-preference-test-signing-secret"
+        )
+      ),
       Layer.provideMerge(
         PersistedQueue.layer.pipe(
           Layer.provide(PersistedQueue.layerStoreMemory)
@@ -3029,15 +2597,9 @@ describe("EmailOutbox queues with delivery paused", () => {
               return yield* Effect.die("Expected resumable batch intent");
             }
 
-            // The first dispatch parks the intent on the plan and consumes its
-            // element id.
-            yield* reconcileEmailOutbox();
-            yield* waitForIntentState(intent.intent.id, "paused_by_plan");
-
-            // Upgrade: the resume materializes one batch and leaves the intent
+            // The first sweep materializes one batch and leaves the intent
             // pending under a new `updatedAt`. The next sweep has to offer that
             // revision rather than hit the consumed element id.
-            yield* TestClock.adjust("1 minute");
             yield* enableSubscriberEmails(organizationId);
             yield* reconcileEmailOutbox();
             yield* TestClock.adjust("1 minute");
@@ -3045,10 +2607,15 @@ describe("EmailOutbox queues with delivery paused", () => {
             yield* waitForIntentState(intent.intent.id, "materialized");
 
             const deliveries = yield* db
-              .select({ id: schema.emailDeliveryTable.id })
+              .select({ contactId: schema.emailDeliveryTable.contactId })
               .from(schema.emailDeliveryTable)
               .where(eq(schema.emailDeliveryTable.outboxId, intent.intent.id));
-            expect(deliveries).toHaveLength(100);
+            expect(
+              deliveries.filter((delivery) => delivery.contactId !== null)
+            ).toHaveLength(100);
+            expect(
+              deliveries.filter((delivery) => delivery.contactId === null)
+            ).toHaveLength(1);
           })
       );
     }

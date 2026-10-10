@@ -37,7 +37,10 @@ const submissionNotificationMaxListed = 20;
  * can see what the email names even after a post is gone; the template decoder
  * ignores it.
  */
-export type SubmissionNotificationPayload = NotificationTemplatePayload & {
+export type SubmissionNotificationPayload = Omit<
+  NotificationTemplatePayload,
+  "unsubscribe"
+> & {
   readonly notifiedBoardVisibility: PostBoardVisibility | null;
   /** The posts the email names, oldest first — the gate's proof set. */
   readonly notifiedPostIds: readonly string[];
@@ -98,6 +101,10 @@ export const makeSubmissionNotificationPayload = (
           ]
         : []),
     ],
+    // The submission summary is member-only; it carries the member reason so
+    // the template footer addresses a workspace member rather than a
+    // subscriber.
+    reason: "member",
     title: isSingle
       ? "New submission in your workspace"
       : `${submissionCount} new submissions in your workspace`,
@@ -113,14 +120,8 @@ export const makeSubmissionNotificationPayload = (
         : listed.every((post) => post.board?.visibility === "PUBLIC")
           ? "PUBLIC"
           : "PRIVATE",
-    unsubscribe: {
-      // The preference is per workspace and per user, so the link names the
-      // workspace whose settings page owns the toggle. The dashboard guard
-      // treats it as an ordinary deep link and only canonicalizes paths that
-      // do not already carry an organization id.
-      kind: "settings",
-      url: `${appUrl}/${organizationId}/settings/notifications`,
-    },
+    // The unsubscribe target is per recipient (a member preference row), so
+    // the materializer adds it when it creates each delivery.
   };
 };
 
@@ -139,10 +140,8 @@ export const emailSubscriptionTopicForIntent = (
 ): EmailSubscriptionTopic | undefined => {
   switch (payload.kind) {
     case "changelog.published":
-    case "changelog.update_requested":
       return { topicId: null, topicType: "changelog" };
     case "post.status_changed":
-    case "post.official_update_published":
     case "post.closed":
       return { topicId: payload.postId, topicType: "post" };
     // The merge reassigns subscriptions to the surviving post, so the
@@ -216,14 +215,12 @@ export const resolveSubscriptionNotificationContent = (
 ) =>
   Effect.gen(function* () {
     switch (intent.payload.kind) {
-      case "changelog.published":
-      case "changelog.update_requested": {
+      case "changelog.published": {
         // All changelog reads use a single transaction so the site visibility,
         // changelog row, organization, and categories are snapshot-consistent.
         // The public URL must point at the public site (customDomain or
         // subdomain.${appRootDomain}), not the dashboard appUrl.
         const changelogId = intent.payload.changelogId;
-        const changelogKind = intent.payload.kind;
         return yield* transaction(
           Effect.gen(function* () {
             const txDb = yield* Database.Database;
@@ -283,7 +280,6 @@ export const resolveSubscriptionNotificationContent = (
               { concurrency: 2 }
             );
             const categoryNames = categories.map((row) => row.name);
-            const published = changelogKind === "changelog.published";
             const publishedAtLabel = changelog.publishedAt
               ? new Intl.DateTimeFormat("en-US", {
                   month: "long",
@@ -304,9 +300,7 @@ export const resolveSubscriptionNotificationContent = (
                 actionUrl: `${publicSiteUrl}/changelog/${changelog.slug}`,
                 body:
                   changelog.excerpt ||
-                  (published
-                    ? "A new changelog entry has been published."
-                    : "A changelog update is available."),
+                  "A new changelog entry has been published.",
                 ...(categoryNames.length > 0 && { categories: categoryNames }),
                 ...(changelog.coverImage && {
                   coverImageUrl: changelog.coverImage,
@@ -323,18 +317,16 @@ export const resolveSubscriptionNotificationContent = (
         );
       }
       case "post.status_changed":
-      case "post.official_update_published":
       case "post.merged":
       case "post.unmerged":
       case "post.closed": {
         // Snapshot post reads transactionally as well.
-        // SAFETY: every payload variant matching these five kind tags carries a postId.
+        // SAFETY: every payload variant matching these four kind tags carries a postId.
         const postId = intent.payload.postId;
         const payloadKind = intent.payload.kind;
-        const payloadBody =
-          intent.payload.kind === "post.official_update_published"
-            ? intent.payload.body
-            : undefined;
+        // Captured outside the transaction closure: TypeScript narrowing of a
+        // property path does not survive into a nested closure.
+        const actorUserId = intent.payload.actorUserId;
         // A merge notification is about the source post but must land on the
         // surviving target: the source is archived and its public URL
         // redirects. An unmerge reverses that: the source is live again, so it
@@ -362,7 +354,7 @@ export const resolveSubscriptionNotificationContent = (
               },
               columns: { slug: true, title: true },
               with: {
-                board: { columns: { slug: true } },
+                board: { columns: { slug: true, visibility: true } },
                 postStatus: { columns: { type: true } },
               },
             });
@@ -378,6 +370,32 @@ export const resolveSubscriptionNotificationContent = (
                   columns: { title: true },
                 })
               : undefined;
+            // The actor is snapshotted into the intent; an integration or an
+            // import has no user id, and the copy falls back to the passive
+            // voice rather than guessing.
+            const actor =
+              actorUserId == null
+                ? undefined
+                : yield* txDb.query.userTable.findFirst({
+                    where: { id: actorUserId },
+                    columns: { name: true },
+                  });
+            const actorName = actor?.name ?? null;
+            // Members can open the dashboard; a public-board link is the
+            // canonical reader view for everyone else (and for members too).
+            // A private board has no public spelling, so it stays on appUrl.
+            const site =
+              post.board?.visibility === "PUBLIC"
+                ? yield* txDb.query.siteTable.findFirst({
+                    where: { organizationId: intent.organizationId },
+                    columns: { customDomain: true, subdomain: true },
+                  })
+                : undefined;
+            const effectiveRootDomain = appRootDomain || new URL(appUrl).host;
+            const url =
+              site == null
+                ? `${appUrl}/${intent.organizationId}/post/${post.board?.slug ?? ""}/${post.slug}`
+                : `${buildPublicSiteUrl(site, effectiveRootDomain)}/p/${post.slug}`;
             // The subject of a merge email is the source post that was
             // folded in, even though the link points at the target. For an
             // unmerge the linked post (the restored source) is the subject.
@@ -386,16 +404,37 @@ export const resolveSubscriptionNotificationContent = (
                 ? (counterpart?.title ?? post.title)
                 : post.title;
             const counterpartTitle = counterpart?.title ?? "another post";
-            const url = `${appUrl}/${intent.organizationId}/post/${post.board?.slug ?? ""}/${post.slug}`;
-            let event = `moved to ${titleCase(post.postStatus?.type ?? "updated")}`;
-            if (payloadKind === "post.official_update_published") {
-              event = "updated by the workspace team";
-            } else if (payloadKind === "post.merged") {
-              event = "merged";
-            } else if (payloadKind === "post.unmerged") {
-              event = "unmerged";
-            } else if (payloadKind === "post.closed") {
-              event = "closed";
+            const statusLabel = titleCase(post.postStatus?.type ?? "updated");
+            let event = `moved to ${statusLabel}`;
+            let body: string;
+            switch (payloadKind) {
+              case "post.merged":
+                event = "merged";
+                body =
+                  actorName === null
+                    ? `"${displayTitle}" was merged into this post.`
+                    : `${actorName} merged "${displayTitle}" into this post.`;
+                break;
+              case "post.unmerged":
+                event = "unmerged";
+                body =
+                  actorName === null
+                    ? `"${displayTitle}" was unmerged from "${counterpartTitle}".`
+                    : `${actorName} unmerged "${displayTitle}" from "${counterpartTitle}".`;
+                break;
+              case "post.closed":
+                event = "closed";
+                body =
+                  actorName === null
+                    ? "This post was closed."
+                    : `${actorName} closed this post.`;
+                break;
+              default:
+                body =
+                  actorName === null
+                    ? `This post was moved to ${statusLabel}.`
+                    : `${actorName} moved this post to ${statusLabel}.`;
+                break;
             }
             return {
               template: "subscription-notification" as const,
@@ -406,15 +445,7 @@ export const resolveSubscriptionNotificationContent = (
               templatePayload: {
                 actionLabel: "View post",
                 actionUrl: url,
-                body:
-                  payloadKind === "post.official_update_published" &&
-                  payloadBody !== undefined
-                    ? payloadBody
-                    : payloadKind === "post.merged"
-                      ? `"${displayTitle}" was merged into this post.`
-                      : payloadKind === "post.unmerged"
-                        ? `"${displayTitle}" was unmerged from "${counterpartTitle}".`
-                        : `A post you follow was ${event}.`,
+                body,
                 eyebrow: "Feedback",
                 posts: [{ label: displayTitle, url }],
                 title: `Post ${event}: ${displayTitle}`,

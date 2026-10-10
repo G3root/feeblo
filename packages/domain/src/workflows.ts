@@ -19,6 +19,8 @@ import {
 import { EmailOutboxRepository } from "./email-outbox/repository";
 import { EmailSubscriptionRepository } from "./email-subscription/repository";
 import { EntitlementPolicy } from "./entitlement/policies";
+import { NotificationPreferenceRepository } from "./notification-preference/repository";
+import { NotificationPreferenceTokenService } from "./notification-preference/tokens";
 import { WelcomeUserWorkflowLayer } from "./user/workflows";
 import { WorkspaceRepository } from "./workspace/repository";
 
@@ -71,6 +73,8 @@ const makeEmailOutboxLayer = (makeMailerLayer: MakeMailerLayer) => {
     Layer.provide(EmailOutboxConfig.layer),
     Layer.provide(EmailOutboxRepository.layer),
     Layer.provide(EmailSubscriptionRepository.layer),
+    Layer.provide(NotificationPreferenceRepository.layer),
+    Layer.provide(NotificationPreferenceTokenService.layer),
     Layer.provide(
       EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
     )

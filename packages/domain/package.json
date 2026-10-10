@@ -313,6 +313,27 @@
     "./membership/schema": {
       "default": "./src/membership/schema.ts"
     },
+    "./notification-preference/api-contract": {
+      "default": "./src/notification-preference/api-contract.ts"
+    },
+    "./notification-preference/api-live": {
+      "default": "./src/notification-preference/api-live.ts"
+    },
+    "./notification-preference/handlers": {
+      "default": "./src/notification-preference/handlers.ts"
+    },
+    "./notification-preference/repository": {
+      "default": "./src/notification-preference/repository.ts"
+    },
+    "./notification-preference/rpcs": {
+      "default": "./src/notification-preference/rpcs.ts"
+    },
+    "./notification-preference/schema": {
+      "default": "./src/notification-preference/schema.ts"
+    },
+    "./notification-preference/tokens": {
+      "default": "./src/notification-preference/tokens.ts"
+    },
     "./notification/schema": {
       "default": "./src/notification/schema.ts"
     },
