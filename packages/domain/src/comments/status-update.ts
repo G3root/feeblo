@@ -8,7 +8,6 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
 import { EmailOutboxRepository } from "../email-outbox/repository";
-import { EntitlementPolicy } from "../entitlement/policies";
 import { recordPostIntegrationEvent as recordPostIntegrationEventShared } from "../integration/post-event-recording";
 import { PostActivityRepository } from "../post-activity/repository";
 import { InternalServerError } from "../rpc-errors";
@@ -30,9 +29,9 @@ const postStatusCoalescingDelayMs = 5 * 60 * 1000;
  *
  * It lives beside the shared write service rather than inside it because the
  * Public API never moves a post's status through a comment, and the services
- * this needs — an integration-event recorder, an email outbox, the plan
- * gate, a post repository — would otherwise become requirements of a route
- * that never exercises them. The dashboard hands the effect to
+ * this needs — an integration-event recorder, an email outbox, a post
+ * repository — would otherwise become requirements of a route that never
+ * exercises them. The dashboard hands the effect to
  * `CommentService.create`, which runs it inside the create's own
  * transaction, so the comment, the timeline entry, the status change, and
  * the email intent still commit or roll back together; the handler wakes the
@@ -55,7 +54,6 @@ export const applyCommentStatusUpdate = (
     const db = yield* currentDb;
     const activityRepository = yield* PostActivityRepository;
     const emailOutbox = yield* EmailOutboxRepository;
-    const entitlementPolicy = yield* EntitlementPolicy;
 
     // Resolve the org-scoped status row (and its type, which the email intent
     // branches on exactly as the editor path does) the request refers to.
@@ -159,16 +157,9 @@ export const applyCommentStatusUpdate = (
     );
 
     // The subscriber email intent, on the same rules the editor's status
-    // write applies: the plan gates it, a closure records its own intent,
-    // and any other move joins the post's pending coalescing window.
+    // write applies: a closure records its own intent, and any other move
+    // joins the post's pending coalescing window.
     const outboxId = yield* Effect.gen(function* () {
-      const maySend = yield* entitlementPolicy.mayMaterializeEmailIntent({
-        organizationId: args.organizationId,
-        kind: "post.status_changed",
-      });
-      if (!maySend) {
-        return undefined;
-      }
       const now = yield* DateTime.nowAsDate;
       if (statusRow.value.type === "CLOSED") {
         const result = yield* emailOutbox
@@ -184,7 +175,11 @@ export const applyCommentStatusUpdate = (
             ),
             kind: "post.closed",
             organizationId: args.organizationId,
-            payload: { kind: "post.closed", postId: args.postId },
+            payload: {
+              actorUserId: actor.userId,
+              kind: "post.closed",
+              postId: args.postId,
+            },
             scheduledAt: now,
           })
           .pipe(
@@ -209,6 +204,7 @@ export const applyCommentStatusUpdate = (
           ),
           organizationId: args.organizationId,
           payload: {
+            actorUserId: actor.userId,
             kind: "post.status_changed",
             postId: args.postId,
             statusId: statusUpdateId,

@@ -490,6 +490,7 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
             const outboxId =
               status === "published"
                 ? yield* publication.recordPublishedIntent({
+                    actorUserId: null,
                     changelogId: created.id,
                     organizationId,
                   })
@@ -615,6 +616,7 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
 
             const outboxId = publishedNow
               ? yield* publication.recordPublishedIntent({
+                  actorUserId: null,
                   changelogId,
                   organizationId,
                 })

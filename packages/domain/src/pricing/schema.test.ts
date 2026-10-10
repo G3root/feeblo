@@ -37,7 +37,6 @@ describe("PlansResponse", () => {
     feedbackBoards: 2,
     privilegedMembers: 2,
     changelogCategories: 3,
-    submissionNotificationRecipients: 1,
     crmEntries: 10,
   };
 

@@ -18,6 +18,7 @@ import { WebhookManagementRpcs } from "./integration/rpcs";
 import { SlackManagementRpcs } from "./integration/slack/rpcs";
 import { JwtSecretRpcs } from "./jwt-secret/rpcs";
 import { MembershipRpcs } from "./membership/rpcs";
+import { NotificationPreferenceRpcs } from "./notification-preference/rpcs";
 import { NotificationRpcs } from "./notification/rpcs";
 import { OrganizationRpcs } from "./organization/rpcs";
 import { PostActivityRpcs } from "./post-activity/rpcs";
@@ -65,6 +66,7 @@ export const RpcGroups = [
   ["ApiKey", ApiKeyRpcs],
   ["Membership", MembershipRpcs],
   ["Notification", NotificationRpcs],
+  ["NotificationPreference", NotificationPreferenceRpcs],
   ["Organization", OrganizationRpcs],
   ["CommentReaction", CommentReactionRpcs],
   ["Comment", CommentRpcs],

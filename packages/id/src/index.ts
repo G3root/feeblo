@@ -71,6 +71,13 @@ export const PostActivityId = makeId("post_activity", "pac", {
 export const NotificationId = makeId("notification", "ntf", {
   approximateLength,
 });
+export const NotificationPreferenceId = makeId(
+  "notification_preference",
+  "npr",
+  {
+    approximateLength,
+  }
+);
 export const SiteId = makeId("site", "sit", {
   approximateLength,
 });

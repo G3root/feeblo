@@ -3,15 +3,16 @@ import {
   EmailIntentKind,
   EmailOutboxState,
 } from "@feeblo/db/validation-schema/email";
+import { NotificationPreferenceCategory } from "@feeblo/db/validation-schema/notification-preference";
 import {
   ChangelogId,
   EmailContactId,
   EmailDeliveryId,
   EmailOutboxId,
   EmailSubscriptionId,
-  PostActivityId,
   PostId,
   PostStatusId,
+  UserId,
   WorkspaceId,
 } from "@feeblo/id";
 import * as Schema from "effect/Schema";
@@ -49,11 +50,12 @@ export const SubmissionCreatedEmailIntentPayload = Schema.Struct({
 export const ChangelogPublishedEmailIntentPayload = Schema.Struct({
   changelogId: ChangelogId.schema,
   kind: Schema.tag("changelog.published"),
-});
-
-export const ChangelogUpdateRequestedEmailIntentPayload = Schema.Struct({
-  changelogId: ChangelogId.schema,
-  kind: Schema.tag("changelog.update_requested"),
+  /**
+   * The member who published the entry, when a session did. Present so the
+   * materializer can drop them from the member fan-out: an author is never
+   * emailed about their own action. An API key or import has no user id.
+   */
+  actorUserId: Schema.optionalKey(Schema.NullOr(UserId.schema)),
 });
 
 export const SubscriptionVerificationRequestedEmailIntentPayload =
@@ -62,34 +64,32 @@ export const SubscriptionVerificationRequestedEmailIntentPayload =
     subscriptionId: EmailSubscriptionId.schema,
   });
 
-export const PostOfficialUpdatePublishedEmailIntentPayload = Schema.Struct({
-  body: Schema.String,
-  kind: Schema.tag("post.official_update_published"),
-  postId: PostId.schema,
-  updateId: PostActivityId.schema,
-});
-
 export const PostStatusChangedEmailIntentPayload = Schema.Struct({
   kind: Schema.tag("post.status_changed"),
   postId: PostId.schema,
   statusId: PostStatusId.schema,
+  /** The member who moved the status; dropped from the member fan-out. */
+  actorUserId: Schema.optionalKey(Schema.NullOr(UserId.schema)),
 });
 
 export const PostMergedEmailIntentPayload = Schema.Struct({
   kind: Schema.tag("post.merged"),
   postId: PostId.schema,
   targetPostId: PostId.schema,
+  actorUserId: Schema.optionalKey(Schema.NullOr(UserId.schema)),
 });
 
 export const PostUnmergedEmailIntentPayload = Schema.Struct({
   kind: Schema.tag("post.unmerged"),
   postId: PostId.schema,
   targetPostId: PostId.schema,
+  actorUserId: Schema.optionalKey(Schema.NullOr(UserId.schema)),
 });
 
 export const PostClosedEmailIntentPayload = Schema.Struct({
   kind: Schema.tag("post.closed"),
   postId: PostId.schema,
+  actorUserId: Schema.optionalKey(Schema.NullOr(UserId.schema)),
 });
 
 /**
@@ -99,10 +99,8 @@ export const PostClosedEmailIntentPayload = Schema.Struct({
 export const EmailIntentPayload = Schema.Union([
   SubmissionCreatedEmailIntentPayload,
   ChangelogPublishedEmailIntentPayload,
-  ChangelogUpdateRequestedEmailIntentPayload,
   SubscriptionVerificationRequestedEmailIntentPayload,
   PostStatusChangedEmailIntentPayload,
-  PostOfficialUpdatePublishedEmailIntentPayload,
   PostMergedEmailIntentPayload,
   PostUnmergedEmailIntentPayload,
   PostClosedEmailIntentPayload,
@@ -170,6 +168,16 @@ export const EmailUnsubscribeTarget = Schema.Union([
     kind: Schema.tag("settings"),
     url: Schema.String,
   }),
+  /**
+   * A member preference toggle. The claims are what the one-click endpoint
+   * writes; the bearer token is derived at send time and never stored.
+   */
+  Schema.Struct({
+    category: NotificationPreferenceCategory,
+    kind: Schema.tag("preference"),
+    organizationId: WorkspaceId.schema,
+    userId: UserId.schema,
+  }),
 ]).pipe(Schema.toTaggedUnion("kind"));
 
 /** Immutable provider-neutral renderer input without a persisted bearer token. */
@@ -184,6 +192,13 @@ export const NotificationTemplatePayload = Schema.Struct({
       url: Schema.String,
     })
   ),
+  /**
+   * Why this recipient got the email; selects the footer copy.
+   * `member` is the default-on workspace audience, `subscriber` an explicit
+   * topic subscription. Absent on deliveries written before the split, which
+   * read as `subscriber` because that was the only audience then.
+   */
+  reason: Schema.optional(Schema.Literals(["member", "subscriber"])),
   title: Schema.String,
   unsubscribe: EmailUnsubscribeTarget,
 });
@@ -202,6 +217,7 @@ export const ChangelogTemplatePayload = Schema.Struct({
   eyebrow: Schema.String,
   organizationName: Schema.optional(Schema.NullOr(Schema.String)),
   publishedAtLabel: Schema.optional(Schema.NullOr(Schema.String)),
+  reason: Schema.optional(Schema.Literals(["member", "subscriber"])),
   title: Schema.String,
   unsubscribe: EmailUnsubscribeTarget,
 });

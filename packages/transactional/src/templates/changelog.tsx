@@ -24,6 +24,12 @@ export type ChangelogEmailProps = {
   readonly organizationName?: string | null | undefined;
   /** Optional human-readable publish date, e.g. "April 12, 2026". */
   readonly publishedAtLabel?: string | null | undefined;
+  /**
+   * Why the recipient got the email. Members are on by default and read a
+   * membership reason; a topic subscriber reads the subscription reason.
+   * Absent means a delivery written before the split, which was subscriber-only.
+   */
+  readonly reason?: "member" | "subscriber" | undefined;
 };
 
 export const ChangelogEmail = ({
@@ -37,10 +43,15 @@ export const ChangelogEmail = ({
   categories,
   organizationName,
   publishedAtLabel,
+  reason,
 }: ChangelogEmailProps) => (
   <EmailShell
     cta={{ label: actionLabel, href: actionUrl }}
-    footerBlurb="You received this because you subscribed to changelog updates for this workspace. You can manage all email notifications from your workspace settings."
+    footerBlurb={
+      reason === "member"
+        ? "You received this because you're a member of this workspace. You can manage all email notifications from your workspace settings."
+        : "You received this because you subscribed to changelog updates for this workspace. You can manage all email notifications from your workspace settings."
+    }
     homeUrl="https://feeblo.com"
     preview={`${eyebrow}: ${title}`}
     title={title}
