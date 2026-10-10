@@ -6,7 +6,7 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 ### Surfaces
 
-**Surface**: A transport the product answers on. The dashboard and the public portal are the two session-facing RPC surfaces; the Public API is the key-authenticated HTTP surface. A capability present on both RPC surfaces is implemented once and takes its surface, while each surface keeps its own RPC names, middleware, and error contract. _Avoid_: channel, client, platform
+**Surface**: A transport the product answers on. The dashboard and the public portal are the two session-facing RPC surfaces; the Public API is the key-authenticated HTTP surface. An RPC write present on both RPC surfaces is implemented once and takes its surface, while each surface keeps its own RPC names, middleware, and error contract. _Avoid_: channel, client, platform
 
 ### Feedback
 
@@ -40,4 +40,4 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Scope**: A capability granted to an API key, drawn from the Public API's own vocabulary. Separate from a permission, which is granted to a member. _Avoid_: permission, role, entitlement
 
-**Operation**: One Public API capability — typed input, output, failure vocabulary, scope, and MCP-style annotations, with one handler. Declared in the feature's `packages/domain/src/<feature>/public-api/operations.ts`. The HTTP endpoint and a future MCP tool are projections of the same operation, so neither surface owns the behavior. _Avoid_: endpoint, handler, route, tool
+**Operation**: One unit of Public API behavior — typed input, output, failure vocabulary, scope, and MCP-style annotations, with one handler. Declared in the feature's `packages/domain/src/<feature>/public-api/operations.ts`. The HTTP endpoint and a future MCP tool are two projections of the same operation, so neither projection owns the behavior. _Avoid_: endpoint, handler, route, tool
