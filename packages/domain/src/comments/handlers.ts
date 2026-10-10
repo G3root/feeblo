@@ -254,11 +254,9 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       });
 
       // Post-commit wake for the status email intent the status-update comment
-      // recorded; reconciliation closes any lost wake. The public portal does
-      // not record one.
-      if (surface === "dashboard") {
-        yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
-      }
+      // recorded; reconciliation closes any lost wake. Both RPC surfaces
+      // record one, so both wake.
+      yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
 
       return {
         message: "Comment created successfully",
