@@ -15,7 +15,7 @@ import { CurrentSession } from "../session-middleware";
 import {
   type Surface,
   type SurfacePair,
-  withSurfaceRateLimit,
+  withSurfacePolicyAndRateLimit,
 } from "../surface";
 import { PostSubscriptionRepository } from "./repository";
 import { PostSubscriptionRpcs } from "./rpcs";
@@ -188,14 +188,13 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     level: Level,
     args: TPostSubscriptionCreate
   ) =>
-    subscribeEffect(args).pipe(
-      Policy.withPolicy(createWrite[surface].policy(args)),
-      withRemapDbErrors("PostSubscription", "create"),
-      withSurfaceRateLimit({
-        level,
-        operation: createWrite.operation,
-        surface,
-      })
+    withSurfacePolicyAndRateLimit({
+      level,
+      operation: createWrite.operation,
+      surface,
+      policy: createWrite[surface].policy(args),
+    })(subscribeEffect(args)).pipe(
+      withRemapDbErrors("PostSubscription", "create")
     );
 
   const unsubscribeFor = <
@@ -205,14 +204,13 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     level: Level,
     args: TPostSubscriptionDelete
   ) =>
-    unsubscribeEffect(args).pipe(
-      Policy.withPolicy(deleteWrite[surface].policy(args)),
-      withRemapDbErrors("PostSubscription", "delete"),
-      withSurfaceRateLimit({
-        level,
-        operation: deleteWrite.operation,
-        surface,
-      })
+    withSurfacePolicyAndRateLimit({
+      level,
+      operation: deleteWrite.operation,
+      surface,
+      policy: deleteWrite[surface].policy(args),
+    })(unsubscribeEffect(args)).pipe(
+      withRemapDbErrors("PostSubscription", "delete")
     );
 
   // -- RPC handlers --

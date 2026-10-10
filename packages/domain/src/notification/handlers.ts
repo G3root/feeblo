@@ -9,7 +9,7 @@ import { CurrentSession } from "../session-middleware";
 import {
   type Surface,
   type SurfacePair,
-  withSurfaceRateLimit,
+  withSurfacePolicyAndRateLimit,
 } from "../surface";
 import { NotificationPolicy } from "./policies";
 import { NotificationRpcs } from "./rpcs";
@@ -106,15 +106,12 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
     level: Level,
     args: TNotificationMarkRead
   ) =>
-    markReadEffect(args).pipe(
-      Policy.withPolicy(markReadWrite[surface].policy(args)),
-      withRemapDbErrors("Notification", "update"),
-      withSurfaceRateLimit({
-        level,
-        operation: markReadWrite.operation,
-        surface,
-      })
-    );
+    withSurfacePolicyAndRateLimit({
+      level,
+      operation: markReadWrite.operation,
+      surface,
+      policy: markReadWrite[surface].policy(args),
+    })(markReadEffect(args)).pipe(withRemapDbErrors("Notification", "update"));
 
   const markAllReadFor = <
     Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
@@ -123,14 +120,13 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
     level: Level,
     args: { organizationId: string }
   ) =>
-    markAllReadEffect(args).pipe(
-      Policy.withPolicy(markAllReadWrite[surface].policy(args)),
-      withRemapDbErrors("Notification", "update"),
-      withSurfaceRateLimit({
-        level,
-        operation: markAllReadWrite.operation,
-        surface,
-      })
+    withSurfacePolicyAndRateLimit({
+      level,
+      operation: markAllReadWrite.operation,
+      surface,
+      policy: markAllReadWrite[surface].policy(args),
+    })(markAllReadEffect(args)).pipe(
+      withRemapDbErrors("Notification", "update")
     );
 
   // -- Surface-parameterized reads --
@@ -172,10 +168,13 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
     level: Level,
     args: TNotificationList
   ) =>
-    listNotificationsEffect(args).pipe(
-      Policy.withPolicy(listRead[surface].policy(args)),
-      withRemapDbErrors("Notification", "select"),
-      withSurfaceRateLimit({ level, operation: listRead.operation, surface })
+    withSurfacePolicyAndRateLimit({
+      level,
+      operation: listRead.operation,
+      surface,
+      policy: listRead[surface].policy(args),
+    })(listNotificationsEffect(args)).pipe(
+      withRemapDbErrors("Notification", "select")
     );
 
   const unreadCountFor = <
@@ -185,14 +184,13 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
     level: Level,
     args: { organizationId: string }
   ) =>
-    unreadCountEffect(args).pipe(
-      Policy.withPolicy(unreadCountRead[surface].policy(args)),
-      withRemapDbErrors("Notification", "select"),
-      withSurfaceRateLimit({
-        level,
-        operation: unreadCountRead.operation,
-        surface,
-      })
+    withSurfacePolicyAndRateLimit({
+      level,
+      operation: unreadCountRead.operation,
+      surface,
+      policy: unreadCountRead[surface].policy(args),
+    })(unreadCountEffect(args)).pipe(
+      withRemapDbErrors("Notification", "select")
     );
 
   return {

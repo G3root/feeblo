@@ -49,53 +49,53 @@ export const surfaceRpcName = (operation: string, surface: Surface): string =>
   surface === "public" ? `${operation}Public` : operation;
 
 /**
- * Applies a surface's policy to a handler. Unlike `Policy.withPolicy`, the
- * policy may be a `PublicPolicy` (a public portal read on optional auth), and
- * the channels come from the policy's own type: a session-free policy must
- * not add `CurrentSession` to the handler's requirements, or the optional-auth
- * route would ask for a service its middleware never provides.
+ * Applies `surface`'s policy, then its rate limit, to a handler body.
+ *
+ * Inside this helper the policy runs before the limiter, so admission is
+ * decided first: a denied caller never spends budget, and only an admitted
+ * caller can be limited. Pair handlers wrap it in the feature's
+ * `withRemapDbErrors` so the policy's own repository probes stay inside the
+ * db-error remapping, and they call it directly — not as a `pipe` step,
+ * where the deferred level conditional degrades and rates both branches
+ * into every surface. `surface.test.ts` pins that composition shape.
+ *
+ * The conditional is load-bearing but deliberately lives as a member of the
+ * error channel, not as the channel's whole shape: a handler whose level is
+ * `undefined` must not be typed as if it could fail with `RateLimitError`,
+ * or `RpcGroup.toLayer` rejects it — while the least-conditional shape
+ * survives direct instantiation, which the whole-type conditional did
+ * not.
  */
-export const withSurfacePolicy =
-  <P extends Policy<unknown, unknown>>(policy: P) =>
-  <A, E, R>(
-    self: Effect.Effect<A, E, R>
-  ): Effect.Effect<A, E | Effect.Error<P>, R | Effect.Services<P>> =>
-    // SAFETY: the two channels are exactly what the policy contributes; the
-    // assertion restates what `Effect.andThen` computes against the widened
-    // constraint type.
-    Effect.andThen(policy, self) as Effect.Effect<
-      A,
-      E | Effect.Error<P>,
-      R | Effect.Services<P>
-    >;
-
-/**
- * Applies `surface`'s rate limit to a handler, with the bucket name derived
- * from the operation. A surface whose level is `undefined` passes through
- * untouched, and the conditional return type is what keeps the dashboard
- * RPC's error schema intact: a handler that cannot fail with `RateLimitError`
- * must not be typed as if it could, or `RpcGroup.toLayer` rejects it.
- */
-export const withSurfaceRateLimit =
-  <Level extends PublicRpcRateLimitLevel | undefined>(options: {
+export const withSurfacePolicyAndRateLimit =
+  <
+    Level extends PublicRpcRateLimitLevel | undefined,
+    P extends Policy<unknown, unknown>,
+  >(options: {
     readonly level: Level;
     readonly operation: string;
     readonly surface: Surface;
+    readonly policy: P;
   }) =>
   <A, E, R>(
     self: Effect.Effect<A, E, R>
-  ): Level extends undefined
-    ? Effect.Effect<A, E, R>
-    : Effect.Effect<A, E | RateLimitError, R> =>
-    // SAFETY: the conditional return type restates the two branches below;
-    // `Level` is what selects the branch, so the assertion cannot lie.
+  ): Effect.Effect<
+    A,
+    E | Effect.Error<P> | (Level extends undefined ? never : RateLimitError),
+    R | Effect.Services<P>
+  > =>
+    // SAFETY: the union-member conditional above restates the two runtime
+    // branches `level` selects; the assertion restates what `Effect.andThen`
+    // and `withPublicRpcRateLimit` compute against the widened constraint.
     (options.level === undefined
-      ? self
-      : self.pipe(
+      ? Effect.andThen(options.policy, self)
+      : Effect.andThen(
+          options.policy,
           withPublicRpcRateLimit({
             level: options.level,
             name: surfaceRpcName(options.operation, options.surface),
-          })
-        )) as Level extends undefined
-      ? Effect.Effect<A, E, R>
-      : Effect.Effect<A, E | RateLimitError, R>;
+          })(self)
+        )) as Effect.Effect<
+      A,
+      E | Effect.Error<P> | (Level extends undefined ? never : RateLimitError),
+      R | Effect.Services<P>
+    >;

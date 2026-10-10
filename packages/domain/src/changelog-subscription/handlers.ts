@@ -15,7 +15,7 @@ import { SiteRepository } from "../site/repository";
 import {
   type Surface,
   type SurfacePair,
-  withSurfaceRateLimit,
+  withSurfacePolicyAndRateLimit,
 } from "../surface";
 import { ChangelogSubscriptionRepository } from "./repository";
 import { ChangelogSubscriptionRpcs } from "./rpcs";
@@ -176,14 +176,13 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     level: Level,
     args: TChangelogSubscriptionCreate
   ) =>
-    subscribeEffect(args).pipe(
-      Policy.withPolicy(createWrite[surface].policy(args)),
-      withRemapDbErrors("ChangelogSubscription", "create"),
-      withSurfaceRateLimit({
-        level,
-        operation: createWrite.operation,
-        surface,
-      })
+    withSurfacePolicyAndRateLimit({
+      level,
+      operation: createWrite.operation,
+      surface,
+      policy: createWrite[surface].policy(args),
+    })(subscribeEffect(args)).pipe(
+      withRemapDbErrors("ChangelogSubscription", "create")
     );
 
   const unsubscribeFor = <
@@ -193,14 +192,13 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     level: Level,
     args: TChangelogSubscriptionDelete
   ) =>
-    unsubscribeEffect(args).pipe(
-      Policy.withPolicy(deleteWrite[surface].policy(args)),
-      withRemapDbErrors("ChangelogSubscription", "delete"),
-      withSurfaceRateLimit({
-        level,
-        operation: deleteWrite.operation,
-        surface,
-      })
+    withSurfacePolicyAndRateLimit({
+      level,
+      operation: deleteWrite.operation,
+      surface,
+      policy: deleteWrite[surface].policy(args),
+    })(unsubscribeEffect(args)).pipe(
+      withRemapDbErrors("ChangelogSubscription", "delete")
     );
 
   // -- RPC handlers --

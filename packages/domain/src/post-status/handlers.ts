@@ -8,8 +8,7 @@ import type { RpcTagsOf } from "../rpc-group";
 import {
   type Surface,
   type SurfacePair,
-  withSurfacePolicy,
-  withSurfaceRateLimit,
+  withSurfacePolicyAndRateLimit,
 } from "../surface";
 import { PostStatusRepository } from "./repository";
 import { PostStatusRpcs } from "./rpcs";
@@ -63,15 +62,14 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
     policy: P,
     args: TPostStatusList
   ) =>
-    repository
-      .findMany({
-        organizationId: args.organizationId,
-      })
-      .pipe(
-        withSurfacePolicy(policy),
-        withRemapDbErrors("PostStatus", "select"),
-        withSurfaceRateLimit({ level, operation: listRead.operation, surface })
-      );
+    withSurfacePolicyAndRateLimit({
+      level,
+      operation: listRead.operation,
+      surface,
+      policy,
+    })(repository.findMany({ organizationId: args.organizationId })).pipe(
+      withRemapDbErrors("PostStatus", "select")
+    );
 
   return {
     PostStatusList: (args: TPostStatusList) =>

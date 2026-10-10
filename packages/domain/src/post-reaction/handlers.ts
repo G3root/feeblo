@@ -13,7 +13,7 @@ import { CurrentSession } from "../session-middleware";
 import {
   type Surface,
   type SurfacePair,
-  withSurfaceRateLimit,
+  withSurfacePolicyAndRateLimit,
 } from "../surface";
 import { PostReactionRepository } from "./repository";
 import { PostReactionRpcs } from "./rpcs";
@@ -67,27 +67,26 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
     level: Level,
     args: TPostReactionToggle
   ) =>
-    Effect.gen(function* () {
-      const session = yield* CurrentSession;
-      const request = {
-        emoji: args.emoji,
-        organizationId: args.organizationId,
-        postId: args.postId,
-        userId: session.session.userId,
-      };
+    withSurfacePolicyAndRateLimit({
+      level,
+      operation: toggleWrite.operation,
+      surface,
+      policy: toggleWrite[surface].policy(args),
+    })(
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const request = {
+          emoji: args.emoji,
+          organizationId: args.organizationId,
+          postId: args.postId,
+          userId: session.session.userId,
+        };
 
-      return yield* surface === "public"
-        ? repository.togglePublic(request)
-        : repository.toggle(request);
-    }).pipe(
-      Policy.withPolicy(toggleWrite[surface].policy(args)),
-      withRemapDbErrors("PostReaction", "update"),
-      withSurfaceRateLimit({
-        level,
-        operation: toggleWrite.operation,
-        surface,
+        return yield* surface === "public"
+          ? repository.togglePublic(request)
+          : repository.toggle(request);
       })
-    );
+    ).pipe(withRemapDbErrors("PostReaction", "update"));
 
   return {
     PostReactionList: (args: TPostReactionList) =>

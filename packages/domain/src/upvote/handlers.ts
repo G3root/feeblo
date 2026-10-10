@@ -16,7 +16,7 @@ import { CurrentSession } from "../session-middleware";
 import {
   type Surface,
   type SurfacePair,
-  withSurfaceRateLimit,
+  withSurfacePolicyAndRateLimit,
 } from "../surface";
 import { UserRepository } from "../user/repository";
 import { addVoteOnBehalf, removeVoteOnBehalf } from "./on-behalf";
@@ -71,21 +71,24 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
     level: Level,
     args: TUpvoteToggle
   ) =>
-    Effect.gen(function* () {
-      const session = yield* CurrentSession;
+    withSurfacePolicyAndRateLimit({
+      level,
+      operation: toggleWrite.operation,
+      surface,
+      policy: toggleWrite[surface].policy(args),
+    })(
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
 
-      return yield* transaction(
-        repository.toggle({
-          organizationId: args.organizationId,
-          postId: args.postId,
-          userId: session.session.userId,
-        })
-      );
-    }).pipe(
-      Policy.withPolicy(toggleWrite[surface].policy(args)),
-      withRemapDbErrors("Upvote", "update"),
-      withSurfaceRateLimit({ level, operation: toggleWrite.operation, surface })
-    );
+        return yield* transaction(
+          repository.toggle({
+            organizationId: args.organizationId,
+            postId: args.postId,
+            userId: session.session.userId,
+          })
+        );
+      })
+    ).pipe(withRemapDbErrors("Upvote", "update"));
 
   return {
     UpvoteList: (args: TUpvoteList) =>
