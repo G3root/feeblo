@@ -9,7 +9,7 @@ export function FeedbackFormFrame(props: { children: JSX.Element }) {
   return (
     <form
       action={createFeedBackAction}
-      class="flex h-full flex-col p-6"
+      class="flex min-h-full flex-col"
       method="post"
     >
       <input name="boardId" type="hidden" value={meta.board.id} />

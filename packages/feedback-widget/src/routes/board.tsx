@@ -1,35 +1,43 @@
 import { createAsync, useParams } from "@solidjs/router";
-import { createMemo, Show } from "solid-js";
+import { Show, Suspense } from "solid-js";
 
 import { FeedbackForm, useFeedbackForm } from "../components/feedback-form";
+import { FeedbackFormSkeleton } from "../components/feedback-form/skeleton";
+import { ViewTransition } from "../components/shell/view-transition";
 import { fetchBoards } from "../lib/api";
-import type { Board } from "../lib/boards";
 
 export function BoardDetailComponent() {
+  return (
+    <ViewTransition kind="push">
+      <Suspense fallback={<FeedbackFormSkeleton />}>
+        <BoardDetailScreen />
+      </Suspense>
+    </ViewTransition>
+  );
+}
+
+function BoardDetailScreen() {
   const params = useParams();
   const boards = createAsync(() => fetchBoards());
-  const board = createMemo(() =>
-    boards()?.find((b) => b.id === params.boardId)
-  );
 
   return (
-    <Show fallback={<FeedbackForm.NotFound />} keyed when={board()}>
-      {(board) => <FeedbackFormView board={board} />}
+    <Show
+      fallback={<FeedbackForm.NotFound />}
+      keyed
+      when={boards()?.find(
+        (board) => board.id === params.boardId || board.slug === params.boardId
+      )}
+    >
+      {(board) => (
+        <FeedbackForm.Provider board={board}>
+          <FeedbackFormScreen />
+        </FeedbackForm.Provider>
+      )}
     </Show>
   );
 }
 
-export default BoardDetailComponent;
-
-function FeedbackFormView(props: { board: Board }) {
-  return (
-    <FeedbackForm.Provider board={props.board}>
-      <FeedbackFormViewInternal />
-    </FeedbackForm.Provider>
-  );
-}
-
-function FeedbackFormViewInternal() {
+function FeedbackFormScreen() {
   const { state } = useFeedbackForm();
 
   return (
@@ -44,14 +52,13 @@ function FeedbackFormViewInternal() {
           <FeedbackForm.ContentField />
           <FeedbackForm.Suggestions />
         </FeedbackForm.Fields>
-        <FeedbackForm.Error />
         <FeedbackForm.Actions>
-          <FeedbackForm.BackButton />
-          <FeedbackForm.ActionsSecondary>
-            <FeedbackForm.SubmitButton />
-          </FeedbackForm.ActionsSecondary>
+          <FeedbackForm.Error />
+          <FeedbackForm.SubmitButton />
         </FeedbackForm.Actions>
       </FeedbackForm.Frame>
     </Show>
   );
 }
+
+export default BoardDetailComponent;

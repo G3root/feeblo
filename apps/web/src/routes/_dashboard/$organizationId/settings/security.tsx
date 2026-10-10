@@ -17,7 +17,7 @@ import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useEntitlements } from "~/hooks/use-entitlements";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { jwtSecretCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
 
 export const Route = createFileRoute(
@@ -30,7 +30,7 @@ export const Route = createFileRoute(
       session !== null &&
       hasPermission(params.organizationId, "workspace.update")(session)
     ) {
-      await jwtSecretCollection.preload();
+      await dashboardCollections.jwtSecretCollection.preload();
     }
     return null;
   },
@@ -83,7 +83,7 @@ function SecuritySettingsContent({
   const { data: secrets, isLoading } = useLiveQuery({
     query: (q) =>
       q
-        .from({ secret: jwtSecretCollection })
+        .from({ secret: dashboardCollections.jwtSecretCollection })
         .where(({ secret }) => eq(secret.organizationId, organizationId)),
   });
 
@@ -134,7 +134,7 @@ function SecuritySettingsContent({
     } finally {
       isGeneratingRef.current = false;
     }
-    await jwtSecretCollection.utils.refetch();
+    await dashboardCollections.jwtSecretCollection.utils.refetch();
   };
 
   const handleRotate = async () => {
@@ -150,7 +150,7 @@ function SecuritySettingsContent({
       toastManager.add({ title: "Failed to rotate secret", type: "error" });
       return;
     }
-    await jwtSecretCollection.utils.refetch();
+    await dashboardCollections.jwtSecretCollection.utils.refetch();
   };
 
   const handleRevoke = async () => {
@@ -168,7 +168,7 @@ function SecuritySettingsContent({
       toastManager.add({ title: "Failed to revoke secret", type: "error" });
       return;
     }
-    await jwtSecretCollection.utils.refetch();
+    await dashboardCollections.jwtSecretCollection.utils.refetch();
   };
 
   return (
@@ -338,7 +338,7 @@ function SecuritySettingsContent({
                                 });
                                 return;
                               }
-                              await jwtSecretCollection.utils.refetch();
+                              await dashboardCollections.jwtSecretCollection.utils.refetch();
                             }}
                             variant="destructive"
                           >

@@ -1,19 +1,35 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
-import { DiscordManagementService } from "@feeblo/domain/integration/discord/management-service";
-import {
-  CurrentSession,
-  type Session,
-} from "@feeblo/domain/session-middleware";
-import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import { WorkspaceId } from "@feeblo/id";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { DiscordManagementRpcHandlersEffect } from "./discord-rpc-handlers";
+import { EntitlementPolicy } from "../../entitlement/policies";
+import { CurrentSession, type Session } from "../../session-middleware";
+import { WorkspaceRepository } from "../../workspace/repository";
+import type {
+  ChatManagementSchemas,
+  ChatManagementServiceContract,
+} from "./management-service";
+import { makeChatManagementRpcHandlers } from "./rpc-handlers";
+
+/** The smallest schema bundle the shared handler factory needs. */
+interface TestChatSchemas extends ChatManagementSchemas {
+  readonly Channel: { readonly id: string };
+  readonly ChannelList: { readonly organizationId: string };
+  readonly ChannelNotificationsUpdate: {
+    readonly channelId: string;
+    readonly organizationId: string;
+  };
+  readonly Connection: { readonly id: string };
+  readonly ConnectionDisconnect: { readonly organizationId: string };
+  readonly ConnectionList: { readonly organizationId: string };
+  readonly ConnectStarted: { readonly authorizeUrl: URL };
+  readonly ConnectStart: { readonly organizationId: string };
+  readonly IntegrationStatus: { readonly configured: boolean };
+}
 
 const TestLayer = Layer.mergeAll(
   Database.PgliteDatabaseLive,
@@ -51,7 +67,7 @@ const seedWorkspace = Effect.fn("test.seedWorkspace")(function* (
   const now = yield* DateTime.nowAsDate;
   yield* db.insert(schema.organizationTable).values({
     id: organizationId,
-    name: "Discord gate workspace",
+    name: "Chat gate workspace",
     slug: organizationId,
     createdAt: now,
   });
@@ -89,37 +105,38 @@ const seedWorkspace = Effect.fn("test.seedWorkspace")(function* (
 });
 
 /** Management service stub that records every forwarded connect request. */
-const makeService = (calls: string[]) =>
-  DiscordManagementService.of({
-    connectComplete: () => Effect.die("not used"),
-    connectStart: ({ organizationId }) =>
-      Effect.sync(() => calls.push(organizationId)).pipe(
-        Effect.as({
-          authorizeUrl: new URL("https://discord.com/oauth2/authorize"),
-        })
-      ),
-    disconnect: () => Effect.die("not used"),
-    listChannels: () => Effect.die("not used"),
-    listConnections: () => Effect.die("not used"),
-    setChannelNotifications: () => Effect.die("not used"),
-    status: Effect.succeed({ configured: true }),
-  });
+const makeService = (
+  calls: string[]
+): ChatManagementServiceContract<TestChatSchemas> => ({
+  connectComplete: () => Effect.die("not used"),
+  connectStart: ({ organizationId }) =>
+    Effect.sync(() => calls.push(organizationId)).pipe(
+      Effect.as({
+        authorizeUrl: new URL("https://example.com/oauth/authorize"),
+      })
+    ),
+  disconnect: () => Effect.die("not used"),
+  listChannels: () => Effect.die("not used"),
+  listConnections: () => Effect.die("not used"),
+  setChannelNotifications: () => Effect.die("not used"),
+  status: Effect.succeed({ configured: true }),
+});
 
-describe("DiscordManagementRpcHandlers", () => {
-  layer(TestLayer)("discord management rpc handlers", (it) => {
+describe("makeChatManagementRpcHandlers", () => {
+  layer(TestLayer)("chat management rpc handlers", (it) => {
     it.effect(
       "denies connect start on the free plan before the service is called",
       () =>
         Effect.gen(function* () {
           const calls: string[] = [];
-          const handlers = yield* DiscordManagementRpcHandlersEffect.pipe(
-            Effect.provideService(DiscordManagementService, makeService(calls))
+          const handlers = yield* makeChatManagementRpcHandlers(
+            makeService(calls)
           );
           const organizationId = yield* seedWorkspace();
 
           const error = yield* Effect.flip(
             handlers
-              .DiscordConnectStart({ organizationId })
+              .connectStart({ organizationId })
               .pipe(
                 Effect.provideService(
                   CurrentSession,
@@ -142,18 +159,18 @@ describe("DiscordManagementRpcHandlers", () => {
       () =>
         Effect.gen(function* () {
           const calls: string[] = [];
-          const handlers = yield* DiscordManagementRpcHandlersEffect.pipe(
-            Effect.provideService(DiscordManagementService, makeService(calls))
+          const handlers = yield* makeChatManagementRpcHandlers(
+            makeService(calls)
           );
           const organizationId = yield* seedWorkspace({ paid: true });
 
           const started = yield* handlers
-            .DiscordConnectStart({ organizationId })
+            .connectStart({ organizationId })
             .pipe(
               Effect.provideService(CurrentSession, makeSession(organizationId))
             );
 
-          expect(started.authorizeUrl.hostname).toBe("discord.com");
+          expect(started.authorizeUrl.hostname).toBe("example.com");
           expect(calls).toEqual([organizationId]);
         })
     );

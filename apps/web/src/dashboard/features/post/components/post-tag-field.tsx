@@ -17,7 +17,7 @@ import {
   type TagSelectOption,
 } from "~/features/tag/components/tag-select";
 import { TagCreateDialogProvider } from "~/features/tag/dialog-stores";
-import { postActivityCollection, tagCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -43,7 +43,7 @@ export function PostTagField() {
   const { data: tags } = useLiveQuery({
     query: (q) => {
       return q
-        .from({ tags: tagCollection })
+        .from({ tags: dashboardCollections.tagCollection })
         .where(({ tags }) => eq(tags.organizationId, organizationId))
         .select(({ tags }) => ({
           id: tags.id,
@@ -107,7 +107,9 @@ export function PostTagField() {
     // are the affected collection, so their read-back is awaited (settled);
     // the tag activity entry is derived and refreshes detached.
     await Promise.allSettled([postTagCollection.utils.refetch()]);
-    refetchInBackground(postActivityCollection.utils.refetch());
+    refetchInBackground(
+      dashboardCollections.postActivityCollection.utils.refetch()
+    );
 
     if (showSuccessToast) {
       toastManager.add({

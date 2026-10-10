@@ -35,6 +35,7 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import { HttpUrl } from "@feeblo/utils/http-url";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -375,7 +376,7 @@ export const IntegrationExternalResourceDraft = Schema.Struct({
   postId: PostId.schema,
   remoteId: Schema.NonEmptyString,
   stateKey: Schema.optionalKey(Schema.NonEmptyString),
-  remoteUrl: Schema.URLFromString,
+  remoteUrl: HttpUrl,
   resourceType: IntegrationExternalResourceType,
   safeMetadata: IntegrationSafeDisplayMetadata,
   title: Schema.optionalKey(Schema.String),

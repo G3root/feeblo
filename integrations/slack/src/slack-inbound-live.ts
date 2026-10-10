@@ -1,8 +1,9 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
 import { BoardRepository } from "@feeblo/domain/board/repository";
 import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
+import { ChatInboundFailure } from "@feeblo/domain/integration/chat/errors";
+import { ChatFeedbackService } from "@feeblo/domain/integration/chat/feedback-service";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
-import { SlackInboundFailure } from "@feeblo/domain/integration/slack/errors";
 import {
   type SlackInboundHttpResponse,
   SlackInboundService,
@@ -27,7 +28,6 @@ import * as Option from "effect/Option";
 import type * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
-import { SlackFeedbackService } from "./slack-feedback-service";
 import {
   buildFeedbackModal,
   buildSuccessModal,
@@ -76,7 +76,7 @@ export const makeSlackInboundServiceLive = (
   | BoardRepository
   | EmailOutboxConfig
   | SlackUserService
-  | SlackFeedbackService
+  | ChatFeedbackService
 > =>
   Layer.effect(
     SlackInboundService,
@@ -86,7 +86,7 @@ export const makeSlackInboundServiceLive = (
       const boardRepository = yield* BoardRepository;
       const emailOutboxConfig = yield* EmailOutboxConfig;
       const slackUserService = yield* SlackUserService;
-      const slackFeedbackService = yield* SlackFeedbackService;
+      const chatFeedbackService = yield* ChatFeedbackService;
 
       const findActiveConnection = (teamId: string) =>
         db
@@ -106,7 +106,7 @@ export const makeSlackInboundServiceLive = (
         readonly credentialsCiphertext: string | null;
       }): Effect.Effect<
         Option.Option<Redacted.Redacted<string>>,
-        SlackInboundFailure
+        ChatInboundFailure
       > =>
         connection.credentialsCiphertext === null
           ? Effect.succeedNone
@@ -116,7 +116,7 @@ export const makeSlackInboundServiceLive = (
             ).pipe(
               Effect.mapError(
                 () =>
-                  new SlackInboundFailure({
+                  new ChatInboundFailure({
                     message: "Slack credentials could not be decrypted",
                   })
               ),
@@ -167,7 +167,7 @@ export const makeSlackInboundServiceLive = (
           }).pipe(
             Effect.mapError(
               () =>
-                new SlackInboundFailure({
+                new ChatInboundFailure({
                   message: "Could not encode feedback modal metadata",
                 })
             )
@@ -185,7 +185,7 @@ export const makeSlackInboundServiceLive = (
           yield* apiClient.viewsOpen({ botToken, triggerId, view }).pipe(
             Effect.mapError(
               () =>
-                new SlackInboundFailure({
+                new ChatInboundFailure({
                   message: "Could not open the Feeblo feedback form",
                 })
             )
@@ -200,7 +200,7 @@ export const makeSlackInboundServiceLive = (
           ).pipe(
             Effect.mapError(
               () =>
-                new SlackInboundFailure({
+                new ChatInboundFailure({
                   message: "Feedback modal metadata is invalid",
                 })
             )
@@ -253,10 +253,11 @@ export const makeSlackInboundServiceLive = (
             slackTeamId: metadata.teamId,
             slackUserId: payload.user.id,
           });
-          const created = yield* slackFeedbackService.createPost({
+          const created = yield* chatFeedbackService.createPost({
             boardId,
             content: details,
             organizationId: metadata.organizationId,
+            source: "SLACK",
             title,
             userId,
           });

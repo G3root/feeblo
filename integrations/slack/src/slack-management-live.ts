@@ -1,6 +1,10 @@
 import type { Database } from "@feeblo/db";
+import { chatManagementServiceRecord } from "@feeblo/domain/integration/chat/management-service";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
-import { SlackManagementService } from "@feeblo/domain/integration/slack/management-service";
+import {
+  SlackManagementService,
+  type SlackManagementSchemas,
+} from "@feeblo/domain/integration/slack/management-service";
 import {
   makeSlackApiClient,
   type SlackApiClient,
@@ -21,7 +25,8 @@ import {
 /**
  * Composes the connection lifecycle and channel services behind the single
  * organization-scoped management boundary. The composition shares one API
- * client and owns no operation logic of its own.
+ * client and owns no operation logic of its own; the method forwarding comes
+ * from the shared chat record.
  */
 export const makeSlackManagementServiceLive = (
   apiClient: SlackApiClient = makeSlackApiClient()
@@ -36,15 +41,13 @@ export const makeSlackManagementServiceLive = (
       const config = yield* SlackIntegrationConfig;
       const connectionService = yield* SlackConnectionService;
       const channelService = yield* SlackChannelService;
-      return SlackManagementService.of({
-        connectComplete: connectionService.connectComplete,
-        connectStart: connectionService.connectStart,
-        disconnect: connectionService.disconnect,
-        listChannels: channelService.listChannels,
-        listConnections: connectionService.listConnections,
-        setChannelNotifications: channelService.setChannelNotifications,
-        status: Effect.sync(() => ({ configured: config.configured })),
-      });
+      return SlackManagementService.of(
+        chatManagementServiceRecord<SlackManagementSchemas>({
+          channelService,
+          connectionService,
+          status: { configured: config.configured },
+        })
+      );
     })
   ).pipe(
     Layer.provide(makeSlackConnectionServiceLive(apiClient)),

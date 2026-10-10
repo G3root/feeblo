@@ -1,4 +1,5 @@
 import { transaction, type Database } from "@feeblo/db";
+import { pickDefaultPostStatus } from "@feeblo/domain-contracts/post-status-default";
 import { BoardId, LegidError, PostId } from "@feeblo/id";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
@@ -478,8 +479,12 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
     const statusRows = yield* statuses.findMany({
       organizationId: job.organizationId,
     });
-    const defaultStatus =
-      statusRows.find((status) => status.type === "PENDING") ?? statusRows[0];
+    // The workspace's stored default, not the `PENDING` type: a workspace may
+    // repoint which status is the default, and several statuses may share a
+    // type (docs/adr/0013-a-status-default-is-stored-and-a-type-may-hold-several),
+    // so `pickDefaultPostStatus` is the rule every other surface that files a
+    // post without a status already follows.
+    const defaultStatus = pickDefaultPostStatus(statusRows);
     if (defaultStatus === undefined) {
       yield* repository.finishJob({
         failureMessage:

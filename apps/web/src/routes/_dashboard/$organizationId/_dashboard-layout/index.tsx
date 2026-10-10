@@ -10,12 +10,7 @@ import { useCreateBoardDialogContext } from "~/features/board/dialog-stores";
 import { RecentPostsSection } from "~/features/dashboard-home/components/recent-posts-section";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import {
-  boardCollection,
-  postCollection,
-  postStatusCollection,
-  upvoteCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/_dashboard-layout/"
@@ -23,10 +18,10 @@ export const Route = createFileRoute(
   component: RouteComponent,
   beforeLoad: async () => {
     await Promise.all([
-      boardCollection.preload(),
-      postCollection.preload(),
-      postStatusCollection.preload(),
-      upvoteCollection.preload(),
+      dashboardCollections.boardCollection.preload(),
+      dashboardCollections.postCollection.preload(),
+      dashboardCollections.postStatusCollection.preload(),
+      dashboardCollections.upvoteCollection.preload(),
     ]);
 
     return null;
@@ -41,10 +36,10 @@ function RouteComponent() {
 
   const { boards, isError, isLoading, recentPosts, statuses } =
     useDashboardHomeStats({
-      boardCollection,
-      postCollection,
-      postStatusCollection,
-      upvoteCollection,
+      boardCollection: dashboardCollections.boardCollection,
+      postCollection: dashboardCollections.postCollection,
+      postStatusCollection: dashboardCollections.postStatusCollection,
+      upvoteCollection: dashboardCollections.upvoteCollection,
       organizationId,
     });
 

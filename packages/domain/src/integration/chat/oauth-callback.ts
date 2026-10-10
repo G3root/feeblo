@@ -1,10 +1,13 @@
 /**
- * Parses the Discord OAuth callback request URL (a relative path such as
- * `/discord/oauth/callback?code=…&state=…`) into its query parameters.
+ * Parses an OAuth callback request URL (a relative path such as
+ * `/slack/oauth/callback?code=…&state=…`) into its query parameters.
  *
  * The server request framework exposes `request.url` as the relative path
- * only, so `new URL` needs a dummy base to parse the query string.
+ * only, so `new URL` needs a dummy base to parse the query string. Slack and
+ * Discord read the same three parameters, so the parser is shared and the
+ * provider routers keep their own redirect behaviour.
  */
+
 /** Query parameters parsed from the OAuth callback URL. */
 export interface OAuthCallbackQuery {
   readonly code: string | null;
@@ -12,9 +15,7 @@ export interface OAuthCallbackQuery {
   readonly state: string | null;
 }
 
-export const parseDiscordOAuthCallbackUrl = (
-  url: string
-): OAuthCallbackQuery => {
+export const parseOAuthCallbackUrl = (url: string): OAuthCallbackQuery => {
   const parsed = new URL(url, "http://localhost");
   return {
     code: parsed.searchParams.get("code"),

@@ -39,12 +39,7 @@ import {
   useContactEditDialogContext,
 } from "~/features/contact/dialog-stores";
 import { useEntitlements } from "~/hooks/use-entitlements";
-import {
-  companyCollection,
-  contactAttributeDefinitionCollection,
-  contactAttributeValueCollection,
-  contactCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute(
@@ -53,10 +48,10 @@ export const Route = createFileRoute(
   component: RouteComponent,
   beforeLoad: async () => {
     await Promise.all([
-      contactCollection.preload(),
-      contactAttributeDefinitionCollection.preload(),
-      contactAttributeValueCollection.preload(),
-      companyCollection.preload(),
+      dashboardCollections.contactCollection.preload(),
+      dashboardCollections.contactAttributeDefinitionCollection.preload(),
+      dashboardCollections.contactAttributeValueCollection.preload(),
+      dashboardCollections.companyCollection.preload(),
     ]);
     return null;
   },

@@ -132,11 +132,7 @@ test(
         await widget
           .getByPlaceholder("Share your product feedback!")
           .fill(feedbackTitle);
-        await widget
-          .getByPlaceholder(
-            "Help us understand what value this feature would bring to your team or workflow"
-          )
-          .fill(feedbackContent);
+        await widget.getByLabel("Details").fill(feedbackContent);
         const createFeedbackResponse = visitorPage.waitForResponse(
           (response) =>
             response.url().includes("/api/widget/v1/feedback") &&

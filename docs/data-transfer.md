@@ -29,7 +29,7 @@ Export writes UTF-8 with a byte-order mark and CRLF line endings so Excel reads 
 
 ## What import does and does not do
 
-Import is **create-only** (ADR 0013). It never matches or updates an existing post — not by slug, not by title. Exporting a board and importing the file again creates duplicates; re-uploading the same bytes warns on the preview (the job stores the file's SHA-256) but is allowed.
+Import is **create-only** (ADR 0017). It never matches or updates an existing post — not by slug, not by title. Exporting a board and importing the file again creates duplicates; re-uploading the same bytes warns on the preview (the job stores the file's SHA-256) but is allowed.
 
 Import is **not scoped to a board**. The upload form asks for a file and nothing else; every row carries its destination in the `board` column, and the row report shows the board each row is planned for. Boards named by the file but missing from the workspace are created once per worker batch, public and attributed to the uploader when their account still exists. A board removed after staging does not take the row report with it: the job is workspace-owned, so deleting a board never deletes an import.
 

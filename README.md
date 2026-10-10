@@ -156,6 +156,8 @@ After adding the webhook to an existing Polar organization, resend `product.crea
 
 The workspace a subscription belongs to is the `metadata.org` value on the checkout, not the Polar customer. Polar resolves a checkout customer by email and allows one customer per email per organization, so a buyer who pays for several workspaces shares one Polar customer and one portal. Deleting an account never deletes a Polar customer for that reason; a deleted workspace's subscription is queued and revoked with retries (see `docs/adr/0013` and `docs/adr/0014`).
 
+Polar also caps a customer at one billable subscription unless the organization enables **Settings → Subscriptions → Allow multiple subscriptions**. Because the customer is resolved by email, that default caps a buyer across workspaces: a person who already pays for one workspace cannot check out a second one, and Polar refuses on its hosted checkout page after Feeblo has handed the buyer off. Enable the setting on any deployment where one person may pay for more than one workspace; the server logs a warning at startup when the token's organization has it off (see `docs/adr/0015`).
+
 ## Deployment
 
 Production deployments use the Docker images referenced in `docker-compose.yml` (`ghcr.io/g3root/feeblo-server` and `ghcr.io/g3root/feeblo-web`). Images are published automatically to GHCR: pushes to `main` produce `edge` and `sha-*` tags, while version tags produce the release version, `major.minor`, `major`, and `latest` tags. The dashboard can alternatively be deployed to Cloudflare using the Wrangler configuration in `apps/web/wrangler.jsonc`.

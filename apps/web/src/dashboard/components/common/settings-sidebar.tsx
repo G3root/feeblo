@@ -18,6 +18,7 @@ import {
   Chat01Icon,
   CreditCardIcon,
   CursorInWindowIcon,
+  DashedLineCircleIcon,
   Database01Icon,
   Folder01Icon,
   LayoutThreeColumnIcon,
@@ -139,6 +140,12 @@ const settingsItems = [
   {
     group: "Feedback & Roadmap",
     subItems: [
+      {
+        label: "Statuses",
+        icon: DashedLineCircleIcon,
+        permission: "statuses.*" as const,
+        to: "/$organizationId/settings/statuses" as const,
+      },
       {
         label: "Roadmap",
         icon: LayoutThreeColumnIcon,

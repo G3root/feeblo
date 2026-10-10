@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { parseSlackOAuthCallbackUrl } from "./slack-oauth-callback";
+import { parseOAuthCallbackUrl } from "./oauth-callback";
 
-describe("parseSlackOAuthCallbackUrl", () => {
+describe("parseOAuthCallbackUrl", () => {
   it("parses code and state from the relative callback path", () => {
-    const parsed = parseSlackOAuthCallbackUrl(
+    const parsed = parseOAuthCallbackUrl(
       "/slack/oauth/callback?code=oauth-code-123&state=%7B%22connectionId%22%3A%22icn_1%22%7D"
     );
     expect(parsed.code).toBe("oauth-code-123");
@@ -12,8 +12,8 @@ describe("parseSlackOAuthCallbackUrl", () => {
     expect(parsed.error).toBeNull();
   });
 
-  it("surfaces the Slack error parameter on denial", () => {
-    const parsed = parseSlackOAuthCallbackUrl(
+  it("surfaces the error parameter on denial", () => {
+    const parsed = parseOAuthCallbackUrl(
       "/slack/oauth/callback?error=access_denied"
     );
     expect(parsed.error).toBe("access_denied");
@@ -22,7 +22,7 @@ describe("parseSlackOAuthCallbackUrl", () => {
   });
 
   it("handles a bare path without query parameters", () => {
-    const parsed = parseSlackOAuthCallbackUrl("/slack/oauth/callback");
+    const parsed = parseOAuthCallbackUrl("/slack/oauth/callback");
     expect(parsed).toEqual({ code: null, error: null, state: null });
   });
 });

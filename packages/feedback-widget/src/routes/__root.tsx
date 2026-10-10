@@ -1,18 +1,18 @@
 import type { RouteSectionProps } from "@solidjs/router";
-import { A, useLocation, useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate } from "@solidjs/router";
 import {
   createSignal,
   ErrorBoundary,
-  For,
   onCleanup,
   onMount,
   Show,
   Suspense,
 } from "solid-js";
 
-import { Button } from "../components/ui/button";
+import { ViewSkeleton } from "../components/shell/view-skeleton";
+import { WidgetShell } from "../components/shell/widget-shell";
 import { ErrorFallback } from "../components/ui/error-fallback";
-import { Icon } from "../components/ui/icon";
+import { fetchBoards, fetchUpdates } from "../lib/api";
 import { getWidgetConfig, moduleForPath } from "../lib/config";
 import { setWidgetContext } from "../lib/context";
 import { setWidgetIdentity } from "../lib/identity";
@@ -27,11 +27,30 @@ export function RootComponent(props: RouteSectionProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const config = getWidgetConfig();
+  let warmed = false;
+
+  /**
+   * Start the configured surfaces' first reads the moment the visitor opens
+   * the widget. The router's query cache then answers the first paint of the
+   * surface they land on, and a tab switch within the same visit resolves
+   * without a cold request.
+   */
+  const warmModuleData = () => {
+    if (warmed) return;
+    warmed = true;
+    if (config.modules.includes("feedback")) {
+      void fetchBoards().catch(() => undefined);
+    }
+    if (config.modules.includes("updates")) {
+      void fetchUpdates().catch(() => undefined);
+    }
+  };
 
   const handleParentMessage = (message: ParentMessage) => {
     switch (message.event) {
       case "SHOW":
         setIsOpen(true);
+        warmModuleData();
         sendToParent({
           event: "WIDGET_OPENED",
           data: { module: moduleForPath(location.pathname) },
@@ -79,85 +98,17 @@ export function RootComponent(props: RouteSectionProps) {
 
   return (
     <Show when={isOpen()}>
-      <div
-        class="bg-popover text-popover-foreground flex h-full min-h-full w-full flex-col"
-        data-feeblo-widget-container
-      >
-        <div class="absolute top-5 right-5 z-10">
-          <Button
-            aria-label="Close"
-            onClick={handleClose}
-            size="icon-lg"
-            variant="ghost"
-          >
-            <Icon name="Cancel01Icon" />
-          </Button>
-        </div>
-
-        <main class="hide-scrollbar min-h-0 flex-1 overflow-y-auto">
-          <ErrorBoundary fallback={(err) => <ErrorFallback error={err} />}>
-            {/*
-             * Route components read `createAsync` data. Without a boundary
-             * Solid renders `undefined` on the first pass and each route's
-             * not-found fallback flashes (or, on a cold load, sits there)
-             * until the request resolves. With one, navigation runs in a
-             * transition and the previous screen is held until the next
-             * route is ready; the skeleton only shows on first load.
-             */}
-            <Suspense fallback={<WidgetLoading />}>{props.children}</Suspense>
-          </ErrorBoundary>
-        </main>
-
-        <Show when={config.mode === "hub"}>
-          <nav
-            aria-label="Feeblo Hub modules"
-            class="bg-popover/95 z-10 m-3 mt-0 flex shrink-0 gap-1 rounded-xl border p-1 shadow-lg backdrop-blur"
-          >
-            <For each={config.modules}>
-              {(module) => (
-                <A
-                  aria-current={
-                    moduleForPath(location.pathname) === module
-                      ? "page"
-                      : undefined
-                  }
-                  class="text-muted-foreground hover:bg-muted hover:text-foreground aria-[current=page]:bg-foreground aria-[current=page]:text-background flex h-10 flex-1 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors"
-                  href={module === "updates" ? "/updates" : "/"}
-                >
-                  <span aria-hidden="true">
-                    {module === "feedback" ? "✦" : "◫"}
-                  </span>
-                  {module === "feedback" ? "Feedback" : "Updates"}
-                </A>
-              )}
-            </For>
-          </nav>
-        </Show>
-      </div>
+      <WidgetShell onClose={handleClose}>
+        <ErrorBoundary fallback={(error) => <ErrorFallback error={error} />}>
+          {/*
+           * This boundary holds the frame while a route's chunk loads. Each
+           * route opens its own boundary for its data, so the skeleton it
+           * shows is the shape of the view being loaded; this one only shows
+           * on a cold start, before a view exists.
+           */}
+          <Suspense fallback={<ViewSkeleton />}>{props.children}</Suspense>
+        </ErrorBoundary>
+      </WidgetShell>
     </Show>
-  );
-}
-
-function WidgetLoading() {
-  return (
-    <div class="p-6" role="status">
-      <span class="sr-only">Loading…</span>
-      <div
-        aria-hidden="true"
-        class="bg-muted h-5 w-40 animate-pulse rounded-md"
-      />
-      <div
-        aria-hidden="true"
-        class="bg-muted mt-3 h-3.5 w-56 animate-pulse rounded-full"
-      />
-      <div
-        aria-hidden="true"
-        class="bg-muted mt-6 h-14 w-full animate-pulse rounded-lg"
-      />
-      <div
-        aria-hidden="true"
-        class="bg-muted mt-3 h-14 w-full animate-pulse rounded-lg"
-      />
-    </div>
   );
 }

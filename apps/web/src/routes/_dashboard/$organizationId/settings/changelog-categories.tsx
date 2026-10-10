@@ -10,14 +10,14 @@ import {
   ChangelogCategoryEditDialogProvider,
 } from "~/features/changelog-category/dialog-stores";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
-import { changelogCategoryCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/settings/changelog-categories"
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    await changelogCategoryCollection.preload();
+    await dashboardCollections.changelogCategoryCollection.preload();
     return null;
   },
 });

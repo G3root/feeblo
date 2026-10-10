@@ -1,37 +1,37 @@
 import * as Context from "effect/Context";
-import type * as Effect from "effect/Effect";
 
-import type { SlackIntegrationError } from "./errors";
+import {
+  type ChatChannelServiceContract,
+  type ChatConnectionServiceContract,
+  type ChatManagementSchemas,
+  type ChatManagementServiceContract,
+} from "../chat/management-service";
 import type * as S from "./schema";
 
-/** Organization-scoped Slack management boundary; read methods never return credentials. */
-export interface SlackManagementServiceContract {
-  /** Completes the OAuth handshake; called by the server callback route. */
-  readonly connectComplete: (input: {
-    readonly code: string;
-    readonly state: string;
-  }) => Effect.Effect<
-    { readonly organizationId: string },
-    SlackIntegrationError
-  >;
-  readonly connectStart: (
-    input: S.TSlackConnectStart
-  ) => Effect.Effect<S.TSlackConnectStarted, SlackIntegrationError>;
-  readonly disconnect: (
-    input: S.TSlackConnectionDisconnect
-  ) => Effect.Effect<void, SlackIntegrationError>;
-  readonly listChannels: (
-    input: S.TSlackChannelList
-  ) => Effect.Effect<readonly S.TSlackChannel[], SlackIntegrationError>;
-  readonly listConnections: (
-    input: S.TSlackConnectionList
-  ) => Effect.Effect<readonly S.TSlackConnection[], SlackIntegrationError>;
-  readonly setChannelNotifications: (
-    input: S.TSlackChannelNotificationsUpdate
-  ) => Effect.Effect<void, SlackIntegrationError>;
-  /** Reports whether the Slack integration is configured for this deployment. */
-  readonly status: Effect.Effect<S.TSlackIntegrationStatus, never>;
+/** The Slack shapes the shared chat management contract is parameterised by. */
+export interface SlackManagementSchemas extends ChatManagementSchemas {
+  readonly Channel: S.TSlackChannel;
+  readonly ChannelList: S.TSlackChannelList;
+  readonly ChannelNotificationsUpdate: S.TSlackChannelNotificationsUpdate;
+  readonly Connection: S.TSlackConnection;
+  readonly ConnectionDisconnect: S.TSlackConnectionDisconnect;
+  readonly ConnectionList: S.TSlackConnectionList;
+  readonly ConnectStarted: S.TSlackConnectStarted;
+  readonly ConnectStart: S.TSlackConnectStart;
+  readonly IntegrationStatus: S.TSlackIntegrationStatus;
 }
+
+/** Organization-scoped Slack management boundary; read methods never return credentials. */
+export type SlackManagementServiceContract =
+  ChatManagementServiceContract<SlackManagementSchemas>;
+
+/** The connection lifecycle half of the Slack management contract. */
+export type SlackConnectionServiceContract =
+  ChatConnectionServiceContract<SlackManagementSchemas>;
+
+/** The channel half of the Slack management contract. */
+export type SlackChannelServiceContract =
+  ChatChannelServiceContract<SlackManagementSchemas>;
 
 /** Service key implemented by the server composition root for Slack commands. */
 export class SlackManagementService extends Context.Service<

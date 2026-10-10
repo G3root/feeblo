@@ -1,3 +1,4 @@
+import { pickDefaultPostStatus } from "@feeblo/domain-contracts/post-status-default";
 import { DataImportJobId, type LegidError } from "@feeblo/id";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
@@ -296,9 +297,13 @@ const makeDataImportService = Effect.gen(function* () {
       const statusRows = yield* statuses
         .findMany({ organizationId: input.organizationId })
         .pipe(withRemapDbErrors("PostStatus", "select"));
-      const fallbackStatus =
-        statusRows.find((status) => status.type === "PENDING") ?? statusRows[0];
-      if (fallbackStatus === undefined) {
+      // The workspace's stored default, not the `PENDING` type: a workspace may
+      // repoint which status is the default, and several statuses may share a
+      // type (docs/adr/0013-a-status-default-is-stored-and-a-type-may-hold-several).
+      // The name the row report shows for a substituted status must be the one
+      // the worker's rows actually land in.
+      const defaultStatus = pickDefaultPostStatus(statusRows);
+      if (defaultStatus === undefined) {
         return yield* new InternalServerError({
           message:
             "This workspace has no post statuses. Add one before importing posts.",
@@ -316,7 +321,7 @@ const makeDataImportService = Effect.gen(function* () {
       const plan = planImportRows({
         boards: sortedBoards,
         defaultBoard,
-        defaultStatus: fallbackStatus,
+        defaultStatus,
         rows: parsed.rows,
         statuses: statusRows,
       });

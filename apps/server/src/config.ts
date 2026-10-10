@@ -18,6 +18,17 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       const nodeEnv = yield* Config.String("NODE_ENV").pipe(
         Config.withDefault("development")
       );
+      // Test-only switches. `E2E_TEST_MAILER` substitutes an in-memory
+      // mailbox for SMTP; `E2E_ROUTES_ENABLED` is the separate, explicit
+      // opt-in for the routes that expose that mailbox and the test seeding
+      // endpoints. They are read here rather than in `program.ts` so the
+      // production refusal below sees them.
+      const e2eTestMailer = yield* Config.Boolean("E2E_TEST_MAILER").pipe(
+        Config.withDefault(false)
+      );
+      const e2eRoutesEnabled = yield* Config.Boolean("E2E_ROUTES_ENABLED").pipe(
+        Config.withDefault(false)
+      );
       const githubAppId = yield* Config.String(
         "GITHUB_INTEGRATION_APP_ID"
       ).pipe(Config.option, Effect.map(Option.getOrUndefined));
@@ -192,6 +203,21 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
           );
         }
       }
+      // The test mailbox holds every rendered email, including
+      // password-reset links and verification codes, and the seeding routes
+      // write plans and roadmaps into arbitrary workspaces. Neither may exist
+      // in production; failing at startup is louder than silently not
+      // mounting them.
+      if (nodeEnv === "production" && (e2eTestMailer || e2eRoutesEnabled)) {
+        return yield* Effect.fail(
+          new Config.ConfigError(
+            new ConfigProvider.SourceError({
+              message:
+                "E2E_TEST_MAILER and E2E_ROUTES_ENABLED must not be set in production: they expose the test mailbox and the test-only seeding routes.",
+            })
+          )
+        );
+      }
       const sentryEnvironment = yield* Config.String("SENTRY_ENVIRONMENT").pipe(
         Config.withDefault(nodeEnv)
       );
@@ -260,6 +286,8 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         githubWebhookSecret,
         integrationConnectionConcurrency,
         integrationGlobalConcurrency,
+        e2eRoutesEnabled,
+        e2eTestMailer,
         nodeEnv,
         redisUrl,
         sentryDsn,

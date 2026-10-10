@@ -68,10 +68,7 @@ import {
 export const makeServerApp = Effect.gen(function* () {
   const config = yield* ServerConfig;
 
-  const useTestMailer = yield* Config.Boolean("E2E_TEST_MAILER").pipe(
-    Config.withDefault(false)
-  );
-  const mailbox = useTestMailer ? yield* TestMailer.make : undefined;
+  const mailbox = config.e2eTestMailer ? yield* TestMailer.make : undefined;
   const makeMailerLayer = (): Layer.Layer<
     Mailer,
     Layer.Error<typeof Mailer.layer>
@@ -129,7 +126,11 @@ export const makeServerApp = Effect.gen(function* () {
     workflowLayer: WorkFlowLayer,
   });
 
-  const PublicRouters = makePublicRouters(mailbox, config.nodeEnv);
+  const PublicRouters = makePublicRouters({
+    e2eRoutesEnabled: config.e2eRoutesEnabled,
+    mailbox,
+    nodeEnv: config.nodeEnv,
+  });
   const MergedRoutes = makeMergedRoutes({
     appUrl: config.appUrl,
     integrationRuntime,

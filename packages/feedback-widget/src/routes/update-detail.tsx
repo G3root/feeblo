@@ -1,25 +1,35 @@
 import { createAsync, useParams } from "@solidjs/router";
-import { createMemo, Show } from "solid-js";
+import { Show, Suspense } from "solid-js";
 
-import { UpdateDetail } from "../components/updates/update-detail";
+import { ViewTransition } from "../components/shell/view-transition";
+import {
+  UpdateDetail,
+  UpdateNotFound,
+} from "../components/updates/update-detail";
+import { UpdateDetailSkeleton } from "../components/updates/update-detail-skeleton";
 import { fetchUpdates } from "../lib/api";
 
 export default function UpdateDetailRoute() {
+  return (
+    <ViewTransition kind="push">
+      <Suspense fallback={<UpdateDetailSkeleton />}>
+        <UpdateDetailScreen />
+      </Suspense>
+    </ViewTransition>
+  );
+}
+
+function UpdateDetailScreen() {
   const params = useParams();
   const updates = createAsync(() => fetchUpdates());
-  const update = createMemo(() =>
-    updates()?.find((item) => item.id === params.updateId)
-  );
 
   return (
     <Show
-      fallback={
-        <p class="text-muted-foreground p-6 text-sm">Update not found.</p>
-      }
+      fallback={<UpdateNotFound />}
       keyed
-      when={update()}
+      when={updates()?.find((item) => item.id === params.updateId)}
     >
-      {(item) => <UpdateDetail update={item} />}
+      {(update) => <UpdateDetail update={update} />}
     </Show>
   );
 }

@@ -6,12 +6,12 @@ export function FeedbackFormError() {
   return (
     <>
       {state.submission.result?.ok === false && (
-        <p class="text-destructive text-sm">
+        <p class="text-destructive text-sm" role="alert">
           {state.submission.result.message}
         </p>
       )}
       {state.submission.error && (
-        <p class="text-destructive text-sm">
+        <p class="text-destructive text-sm" role="alert">
           Something went wrong. Please try again.
         </p>
       )}

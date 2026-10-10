@@ -39,20 +39,7 @@ import {
 } from "~/features/post/components/post-page-sections";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { PostTagField } from "~/features/post/components/post-tag-field";
-import {
-  boardCollection,
-  commentCollection,
-  commentReactionCollection,
-  deleteEligibilityCollection,
-  postCollection,
-  postDetailCollection,
-  postReactionCollection,
-  postStatusCollection,
-  postSubscriptionCollection,
-  postTagCollection,
-  tagCollection,
-  upvoteCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 /**
@@ -73,14 +60,16 @@ function createPostSubsetQueries(organizationId: string, postSlug: string) {
     // before the pending shell clears.
     postDetail: createLiveQueryCollection((query) =>
       query
-        .from({ post: postDetailCollection })
+        .from({ post: dashboardCollections.postDetailCollection })
         .where(({ post }) =>
           and(eq(post.organizationId, organizationId), eq(post.slug, postSlug))
         )
     ),
     commentReactions: createLiveQueryCollection((query) =>
       query
-        .from({ commentReaction: commentReactionCollection })
+        .from({
+          commentReaction: dashboardCollections.commentReactionCollection,
+        })
         .where(({ commentReaction }) =>
           and(
             eq(commentReaction.organizationId, organizationId),
@@ -90,7 +79,7 @@ function createPostSubsetQueries(organizationId: string, postSlug: string) {
     ),
     comments: createLiveQueryCollection((query) =>
       query
-        .from({ comment: commentCollection })
+        .from({ comment: dashboardCollections.commentCollection })
         .where(({ comment }) =>
           and(
             eq(comment.organizationId, organizationId),
@@ -100,7 +89,7 @@ function createPostSubsetQueries(organizationId: string, postSlug: string) {
     ),
     postReactions: createLiveQueryCollection((query) =>
       query
-        .from({ postReaction: postReactionCollection })
+        .from({ postReaction: dashboardCollections.postReactionCollection })
         .where(({ postReaction }) =>
           and(
             eq(postReaction.organizationId, organizationId),
@@ -113,7 +102,7 @@ function createPostSubsetQueries(organizationId: string, postSlug: string) {
     // on too. An org-scoped load is enough to resolve that same slug key.
     postSubscription: createLiveQueryCollection((query) =>
       query
-        .from({ subscription: postSubscriptionCollection })
+        .from({ subscription: dashboardCollections.postSubscriptionCollection })
         .where(({ subscription }) =>
           eq(subscription.organizationId, organizationId)
         )
@@ -132,13 +121,13 @@ export const Route = createFileRoute(
     );
 
     await Promise.all([
-      boardCollection.preload(),
-      deleteEligibilityCollection.preload(),
-      postCollection.preload(),
-      postStatusCollection.preload(),
-      postTagCollection.preload(),
-      tagCollection.preload(),
-      upvoteCollection.preload(),
+      dashboardCollections.boardCollection.preload(),
+      dashboardCollections.deleteEligibilityCollection.preload(),
+      dashboardCollections.postCollection.preload(),
+      dashboardCollections.postStatusCollection.preload(),
+      dashboardCollections.postTagCollection.preload(),
+      dashboardCollections.tagCollection.preload(),
+      dashboardCollections.upvoteCollection.preload(),
       subsetQueries.postDetail.preload(),
       subsetQueries.comments.preload(),
       subsetQueries.commentReactions.preload(),

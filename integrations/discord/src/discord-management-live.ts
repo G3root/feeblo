@@ -1,9 +1,13 @@
 import type { Database } from "@feeblo/db";
+import { chatManagementServiceRecord } from "@feeblo/domain/integration/chat/management-service";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
-import { DiscordManagementService } from "@feeblo/domain/integration/discord/management-service";
 import {
-  type DiscordApiClient,
+  DiscordManagementService,
+  type DiscordManagementSchemas,
+} from "@feeblo/domain/integration/discord/management-service";
+import {
   makeDiscordApiClient,
+  type DiscordApiClient,
 } from "@feeblo/integration-discord";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -21,7 +25,8 @@ import {
 /**
  * Composes the connection lifecycle and channel services behind the single
  * organization-scoped management boundary. The composition shares one API
- * client and owns no operation logic of its own.
+ * client and owns no operation logic of its own; the method forwarding comes
+ * from the shared chat record.
  */
 export const makeDiscordManagementServiceLive = (
   apiClient: DiscordApiClient = makeDiscordApiClient()
@@ -36,15 +41,13 @@ export const makeDiscordManagementServiceLive = (
       const config = yield* DiscordIntegrationConfig;
       const connectionService = yield* DiscordConnectionService;
       const channelService = yield* DiscordChannelService;
-      return DiscordManagementService.of({
-        connectComplete: connectionService.connectComplete,
-        connectStart: connectionService.connectStart,
-        disconnect: connectionService.disconnect,
-        listChannels: channelService.listChannels,
-        listConnections: connectionService.listConnections,
-        setChannelNotifications: channelService.setChannelNotifications,
-        status: Effect.sync(() => ({ configured: config.configured })),
-      });
+      return DiscordManagementService.of(
+        chatManagementServiceRecord<DiscordManagementSchemas>({
+          channelService,
+          connectionService,
+          status: { configured: config.configured },
+        })
+      );
     })
   ).pipe(
     Layer.provide(makeDiscordConnectionServiceLive(apiClient)),

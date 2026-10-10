@@ -106,7 +106,6 @@ function useUpvote({
         postId,
         userId,
         memberId: membership?.membershipId ?? null,
-        voterIsMember: membership !== undefined,
         // Optimistic votes are cast on this post, never merged in.
         mergedFromPostId: null,
         user: {

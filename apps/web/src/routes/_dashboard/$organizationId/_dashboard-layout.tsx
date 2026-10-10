@@ -1,11 +1,7 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 import { DashboardLayout } from "~/layouts/dashboard-layout";
-import {
-  boardCollection,
-  organizationCollection,
-  workspacePlanCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/_dashboard-layout"
@@ -16,9 +12,9 @@ export const Route = createFileRoute(
     // …) preload in their own routes so settings/members/billing never pay
     // for board data and vice versa.
     await Promise.all([
-      organizationCollection.preload(),
-      boardCollection.preload(),
-      workspacePlanCollection.preload(),
+      dashboardCollections.organizationCollection.preload(),
+      dashboardCollections.boardCollection.preload(),
+      dashboardCollections.workspacePlanCollection.preload(),
     ]);
     return null;
   },
