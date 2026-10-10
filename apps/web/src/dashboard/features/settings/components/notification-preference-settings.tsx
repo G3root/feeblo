@@ -117,6 +117,7 @@ export function NotificationPreferenceSettings() {
           <SwitchCardDescription>{copy.description}</SwitchCardDescription>
         </SwitchCardContent>
         <SwitchCardInput
+          aria-label={copy.title}
           checked={state.categories[category]}
           disabled={
             state.pausedAll ||
@@ -148,6 +149,7 @@ export function NotificationPreferenceSettings() {
           </SwitchCardDescription>
         </SwitchCardContent>
         <SwitchCardInput
+          aria-label="Pause all notification emails"
           checked={state.pausedAll}
           disabled={preferenceQuery.isPending || pendingTarget !== null}
           onCheckedChange={(next) => void setPreference("all", !next)}
