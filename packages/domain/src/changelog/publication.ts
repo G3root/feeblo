@@ -4,7 +4,6 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
 import { EmailOutboxRepository } from "../email-outbox/repository";
-import { EntitlementPolicy } from "../entitlement/policies";
 import { NotificationService } from "../notification/service";
 import { InternalServerError } from "../rpc-errors";
 
@@ -12,6 +11,7 @@ import { InternalServerError } from "../rpc-errors";
 const PUBLISHED_INTENT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 type TRecordPublishedIntent = {
+  readonly actorUserId?: string | null;
   readonly changelogId: string;
   readonly organizationId: string;
 };
@@ -42,31 +42,27 @@ type TNotifyPublished = {
  */
 export const makeChangelogPublication = Effect.gen(function* () {
   const emailOutbox = yield* EmailOutboxRepository;
-  const entitlementPolicy = yield* EntitlementPolicy;
   const notifications = yield* Effect.serviceOption(NotificationService);
 
   /**
    * Records the durable email intent for an entry that just became published.
    *
-   * Returns the outbox id to wake after the transaction commits, or
-   * `undefined` when the workspace's plan does not include subscriber emails —
-   * in which case the write still succeeds and the entry is published.
+   * Returns the outbox id to wake after the transaction commits. The intent is
+   * written in the caller's transaction, so a status change cannot commit
+   * while its intent does not: a published entry without an intent would be one
+   * the recipients were silently never told about.
    *
-   * The intent is written in the caller's transaction, so a status change
-   * cannot commit while its intent does not: a published entry without an
-   * intent would be one the subscribers were silently never told about.
+   * `actorUserId` is the member who published it, when a session did. The
+   * materializer drops that user from the member fan-out; a machine key or an
+   * import passes `null` and excludes nobody.
    */
   const recordPublishedIntent = Effect.fn(
     "Changelog.recordPublishedEmailIntent"
-  )(function* ({ changelogId, organizationId }: TRecordPublishedIntent) {
-    const mayMaterialize = yield* entitlementPolicy.mayMaterializeEmailIntent({
-      organizationId,
-      kind: "changelog.published",
-    });
-    if (!mayMaterialize) {
-      return undefined;
-    }
-
+  )(function* ({
+    actorUserId = null,
+    changelogId,
+    organizationId,
+  }: TRecordPublishedIntent) {
     const now = yield* DateTime.nowAsDate;
     const result = yield* emailOutbox
       .recordIntent({
@@ -80,6 +76,7 @@ export const makeChangelogPublication = Effect.gen(function* () {
         kind: "changelog.published",
         organizationId,
         payload: {
+          actorUserId,
           kind: "changelog.published",
           changelogId,
         },

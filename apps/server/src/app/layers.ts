@@ -21,6 +21,8 @@ import {
 } from "@feeblo/domain/integration/external-resource/service";
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
+import { NotificationPreferenceRepository } from "@feeblo/domain/notification-preference/repository";
+import { NotificationPreferenceTokenService } from "@feeblo/domain/notification-preference/tokens";
 import { NotificationService } from "@feeblo/domain/notification/service";
 import { PostActivityRepository } from "@feeblo/domain/post-activity/repository";
 import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
@@ -292,6 +294,8 @@ export const makeServiceLayers = ({
       Layer.provide(FetchHttpClient.layer)
     ),
     EmailSubscriptionRepository.layer,
+    NotificationPreferenceRepository.layer,
+    NotificationPreferenceTokenService.layer,
     integrationRuntime.layer,
     ExternalResources,
     SlackManagementServiceLive.pipe(

@@ -26,7 +26,6 @@ import { EmailOutboxConfig } from "../email-outbox/config";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
-import { EntitlementPolicy } from "../entitlement/policies";
 import {
   resolveOnBehalfSubject,
   subscribeOnBehalfSubject,
@@ -222,7 +221,6 @@ const makePostWriteService = Effect.gen(function* () {
   const emailOutbox = yield* EmailOutboxRepository;
   const emailOutboxConfig = yield* EmailOutboxConfig;
   const emailSubscriptions = yield* EmailSubscriptionRepository;
-  const entitlementPolicy = yield* EntitlementPolicy;
   const integrationEventRecorder = yield* IntegrationEventRecorder;
   const activityRepository = yield* PostActivityRepository;
   const repository = yield* PostRepository;
@@ -250,7 +248,6 @@ const makePostWriteService = Effect.gen(function* () {
     Context.add(EmailOutboxConfig, emailOutboxConfig),
     Context.add(EmailOutboxRepository, emailOutbox),
     Context.add(EmailSubscriptionRepository, emailSubscriptions),
-    Context.add(EntitlementPolicy, entitlementPolicy),
     Context.add(IntegrationEventRecorder, integrationEventRecorder),
     Context.add(PostActivityRepository, activityRepository),
     Context.add(PostRepository, repository),
@@ -960,77 +957,75 @@ const makePostWriteService = Effect.gen(function* () {
             title: finalTitle,
           });
 
-          const maySend = yield* entitlementPolicy.mayMaterializeEmailIntent({
-            organizationId: args.organizationId,
-            kind: "post.status_changed",
-          });
-          if (maySend) {
-            const now = yield* DateTime.nowAsDate;
-            if (nextStatus?.type === "CLOSED") {
-              const result = yield* emailOutbox
-                .recordIntent({
-                  aggregateId: args.id,
-                  aggregateType: "post",
-                  // Timestamped like the merge and unmerge intents, so closing
-                  // a post, reopening it, and closing it again announces each
-                  // closure instead of matching the first attempt forever.
-                  deduplicationKey: `post.closed:${args.organizationId}:${args.id}:${args.statusId}:${now.getTime()}`,
-                  expiresAt: DateTime.fromDateUnsafe(now).pipe(
-                    DateTime.addDuration(Duration.days(7)),
-                    DateTime.toDate
-                  ),
+          const now = yield* DateTime.nowAsDate;
+          if (nextStatus?.type === "CLOSED") {
+            const result = yield* emailOutbox
+              .recordIntent({
+                aggregateId: args.id,
+                aggregateType: "post",
+                // Timestamped like the merge and unmerge intents, so closing
+                // a post, reopening it, and closing it again announces each
+                // closure instead of matching the first attempt forever.
+                deduplicationKey: `post.closed:${args.organizationId}:${args.id}:${args.statusId}:${now.getTime()}`,
+                expiresAt: DateTime.fromDateUnsafe(now).pipe(
+                  DateTime.addDuration(Duration.days(7)),
+                  DateTime.toDate
+                ),
+                kind: "post.closed",
+                organizationId: args.organizationId,
+                payload: {
+                  actorUserId: member?.userId ?? null,
                   kind: "post.closed",
-                  organizationId: args.organizationId,
-                  payload: { kind: "post.closed", postId: args.id },
-                  scheduledAt: now,
-                })
-                .pipe(
-                  Effect.mapError(
-                    () =>
-                      new InternalServerError({
-                        message: "Could not record post closure email intent.",
-                      })
-                  )
-                );
-              outboxId =
-                result._tag === "Inserted" ? result.intent.id : undefined;
-            } else {
-              const result = yield* emailOutbox
-                .upsertPendingStatusChange({
-                  aggregateId: args.id,
-                  aggregateType: "post",
-                  deduplicationKey: `post.status_changed:${args.organizationId}:${args.id}:${now.getTime()}`,
-                  expiresAt: DateTime.fromDateUnsafe(now).pipe(
-                    DateTime.addDuration(
-                      Duration.millis(postStatusCoalescingDelayMs)
-                    ),
-                    DateTime.addDuration(Duration.days(7)),
-                    DateTime.toDate
+                  postId: args.id,
+                },
+                scheduledAt: now,
+              })
+              .pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message: "Could not record post closure email intent.",
+                    })
+                )
+              );
+            outboxId =
+              result._tag === "Inserted" ? result.intent.id : undefined;
+          } else {
+            const result = yield* emailOutbox
+              .upsertPendingStatusChange({
+                aggregateId: args.id,
+                aggregateType: "post",
+                deduplicationKey: `post.status_changed:${args.organizationId}:${args.id}:${now.getTime()}`,
+                expiresAt: DateTime.fromDateUnsafe(now).pipe(
+                  DateTime.addDuration(
+                    Duration.millis(postStatusCoalescingDelayMs)
                   ),
-                  organizationId: args.organizationId,
-                  payload: {
-                    kind: "post.status_changed",
-                    postId: args.id,
-                    statusId: args.statusId,
-                  },
-                  scheduledAt: DateTime.fromDateUnsafe(now).pipe(
-                    DateTime.addDuration(
-                      Duration.millis(postStatusCoalescingDelayMs)
-                    ),
-                    DateTime.toDate
+                  DateTime.addDuration(Duration.days(7)),
+                  DateTime.toDate
+                ),
+                organizationId: args.organizationId,
+                payload: {
+                  actorUserId: member?.userId ?? null,
+                  kind: "post.status_changed",
+                  postId: args.id,
+                  statusId: args.statusId,
+                },
+                scheduledAt: DateTime.fromDateUnsafe(now).pipe(
+                  DateTime.addDuration(
+                    Duration.millis(postStatusCoalescingDelayMs)
                   ),
-                })
-                .pipe(
-                  Effect.mapError(
-                    () =>
-                      new InternalServerError({
-                        message: "Could not record post status email intent.",
-                      })
-                  )
-                );
-              outboxId =
-                result._tag === "Written" ? result.intent.id : undefined;
-            }
+                  DateTime.toDate
+                ),
+              })
+              .pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message: "Could not record post status email intent.",
+                    })
+                )
+              );
+            outboxId = result._tag === "Written" ? result.intent.id : undefined;
           }
 
           yield* Option.match(notifications, {
@@ -1192,14 +1187,6 @@ const makePostWriteService = Effect.gen(function* () {
                 targetPostId: args.targetPostId,
               }),
           });
-          if (
-            !(yield* entitlementPolicy.mayMaterializeEmailIntent({
-              kind: "post.merged",
-              organizationId: args.organizationId,
-            }))
-          ) {
-            return undefined;
-          }
           const now = yield* DateTime.nowAsDate;
           const result = yield* emailOutbox
             .recordIntent({
@@ -1213,6 +1200,7 @@ const makePostWriteService = Effect.gen(function* () {
               kind: "post.merged",
               organizationId: args.organizationId,
               payload: {
+                actorUserId: member?.userId ?? null,
                 kind: "post.merged",
                 postId: args.sourcePostId,
                 targetPostId: args.targetPostId,
@@ -1269,14 +1257,6 @@ const makePostWriteService = Effect.gen(function* () {
                 targetPostId,
               }),
           });
-          if (
-            !(yield* entitlementPolicy.mayMaterializeEmailIntent({
-              kind: "post.unmerged",
-              organizationId: args.organizationId,
-            }))
-          ) {
-            return undefined;
-          }
           const now = yield* DateTime.nowAsDate;
           const result = yield* emailOutbox
             .recordIntent({
@@ -1292,6 +1272,7 @@ const makePostWriteService = Effect.gen(function* () {
               kind: "post.unmerged",
               organizationId: args.organizationId,
               payload: {
+                actorUserId: member?.userId ?? null,
                 kind: "post.unmerged",
                 postId: args.sourcePostId,
                 targetPostId,

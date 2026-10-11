@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
@@ -215,11 +216,13 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
             yield* findChangelogRow({ organizationId, userId: user.userId })
           ).toHaveLength(1);
           expect(
-            yield* emailRepository.findAuthenticatedSubscription({
-              organizationId,
-              topic: { topicId: null, topicType: "changelog" },
-              userId: user.userId,
-            })
+            Option.getOrUndefined(
+              yield* emailRepository.findSubscription({
+                email: user.email,
+                organizationId,
+                topic: { topicId: null, topicType: "changelog" },
+              })
+            )
           ).toMatchObject({ state: "active" });
 
           expect(
@@ -231,11 +234,13 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
             yield* findChangelogRow({ organizationId, userId: user.userId })
           ).toHaveLength(0);
           expect(
-            yield* emailRepository.findAuthenticatedSubscription({
-              organizationId,
-              topic: { topicId: null, topicType: "changelog" },
-              userId: user.userId,
-            })
+            Option.getOrUndefined(
+              yield* emailRepository.findSubscription({
+                email: user.email,
+                organizationId,
+                topic: { topicId: null, topicType: "changelog" },
+              })
+            )
           ).toMatchObject({ state: "unsubscribed" });
         })
     );

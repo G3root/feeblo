@@ -36,6 +36,10 @@ import type {
 } from "../validation-schema/email";
 import type { TEntitySource } from "../validation-schema/entity-source";
 import type { TNotificationEventType } from "../validation-schema/notification-kind";
+import type {
+  TNotificationPreferenceChannel,
+  TNotificationPreferenceTarget,
+} from "../validation-schema/notification-preference";
 import type { TPostSource } from "../validation-schema/post-source";
 import {
   PostStatusType,
@@ -1496,6 +1500,47 @@ export const notificationTable = pgTable(
   ]
 );
 
+/**
+ * One explicit divergence from a notification default, keyed by
+ * `(organization, user, channel, category)`.
+ *
+ * Rows are sparse: absence and `enabled: true` both mean the default, which is
+ * on for every category today. A reader therefore treats a row as meaningful
+ * only when it disables something (`enabled: false`). The `all` category is the
+ * workspace-wide pause; the channel is part of the key so the in-app phase can
+ * add rows without a migration.
+ */
+export const notificationPreferenceTable = pgTable(
+  "notification_preference",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => userTable.id, { onDelete: "cascade" }),
+    channel: text("channel").$type<TNotificationPreferenceChannel>().notNull(),
+    category: text("category").$type<TNotificationPreferenceTarget>().notNull(),
+    enabled: boolean("enabled").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("notification_preference_org_user_channel_category_uidx").on(
+      table.organizationId,
+      table.userId,
+      table.channel,
+      table.category
+    ),
+  ]
+);
+
 export type InsertComment = typeof commentTable.$inferInsert;
 export type PostSubscription = typeof postSubscriptionTable.$inferSelect;
 export type NewPostSubscription = typeof postSubscriptionTable.$inferInsert;
@@ -1503,3 +1548,7 @@ export type ChangelogSubscription =
   typeof changelogSubscriptionTable.$inferSelect;
 export type NewChangelogSubscription =
   typeof changelogSubscriptionTable.$inferInsert;
+export type NotificationPreference =
+  typeof notificationPreferenceTable.$inferSelect;
+export type NewNotificationPreference =
+  typeof notificationPreferenceTable.$inferInsert;

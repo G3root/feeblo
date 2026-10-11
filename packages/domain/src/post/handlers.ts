@@ -1,11 +1,8 @@
 import { transaction } from "@feeblo/db";
 import * as Permissions from "@feeblo/permissions";
-import * as DateTime from "effect/DateTime";
-import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
@@ -15,11 +12,7 @@ import {
 } from "../post-activity/repository";
 import { redactCreatorIdentity } from "../public-actor";
 import * as RateLimit from "../rate-limit";
-import {
-  BadRequestError,
-  InternalServerError,
-  withRemapDbErrors,
-} from "../rpc-errors";
+import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import {
   CurrentSession,
   OptionalCurrentSession,
@@ -58,8 +51,6 @@ import { PostWriteService, type PostWriteActor } from "./write";
 
 export const PostRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostRepository;
-  const emailOutbox = yield* EmailOutboxRepository;
-  const entitlementPolicy = yield* EntitlementPolicy;
   const activityRepository = yield* PostActivityRepository;
   const postPolicy = yield* PostPolicy;
   const embeddingService = yield* Effect.serviceOption(PostEmbeddingService);
@@ -678,8 +669,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
-        const now = yield* DateTime.nowAsDate;
-        const outboxId = yield* transaction(
+        // An official update is a timeline event only. It used to also email
+        // post subscribers; that notification is gone with the three-email
+        // model, so the write stands alone.
+        yield* transaction(
           Effect.gen(function* () {
             yield* requireNotMergedActivityState({
               id: args.postId,
@@ -694,47 +687,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               organizationId: args.organizationId,
               postId: args.postId,
             });
-            if (
-              !(yield* entitlementPolicy.mayMaterializeEmailIntent({
-                organizationId: args.organizationId,
-                kind: "post.official_update_published",
-              }))
-            ) {
-              return undefined;
-            }
-            const recorded = yield* emailOutbox
-              .recordIntent({
-                aggregateId: args.postId,
-                aggregateType: "post",
-                deduplicationKey: `post.official_update_published:${args.updateId}`,
-                expiresAt: DateTime.fromDateUnsafe(now).pipe(
-                  DateTime.addDuration(Duration.days(7)),
-                  DateTime.toDate
-                ),
-                kind: "post.official_update_published",
-                organizationId: args.organizationId,
-                payload: {
-                  body: args.body,
-                  kind: "post.official_update_published",
-                  postId: args.postId,
-                  updateId: args.updateId,
-                },
-                scheduledAt: now,
-              })
-              .pipe(
-                Effect.mapError(
-                  () =>
-                    new InternalServerError({
-                      message: "Could not record official update email intent.",
-                    })
-                )
-              );
-            return recorded._tag === "Inserted"
-              ? recorded.intent.id
-              : undefined;
           })
         );
-        yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
       }).pipe(
         Policy.withPolicy(
           postPolicy.canAdminUpdate({

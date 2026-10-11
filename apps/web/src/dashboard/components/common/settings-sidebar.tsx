@@ -51,6 +51,11 @@ const settingsItems = [
         icon: Settings05Icon,
         to: "/$organizationId/settings/preferences" as const,
       },
+      {
+        label: "Notifications",
+        icon: Mail01Icon,
+        to: "/$organizationId/settings/notifications" as const,
+      },
     ],
   },
   {
@@ -96,14 +101,6 @@ const settingsItems = [
         icon: LockIcon,
         permission: "workspace.update" as const,
         to: "/$organizationId/settings/security" as const,
-      },
-      {
-        label: "Notifications",
-        icon: Mail01Icon,
-        // Submission notification email only reaches owners and
-        // administrators, and the RPC enforces exactly that grant.
-        permission: "workspace.update" as const,
-        to: "/$organizationId/settings/notifications" as const,
       },
       {
         label: "Webhooks",

@@ -1,4 +1,3 @@
-import type { TEmailIntentKind } from "@feeblo/db/validation-schema/email";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -237,31 +236,14 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     return entitlements.capabilities.subscriberEmails;
   });
 
-  /** Whether the workspace plan currently permits an email intent to materialize. */
-  const mayMaterializeEmailIntent = Effect.fn(
-    "EntitlementPolicy.mayMaterializeEmailIntent"
-  )(function* ({
-    organizationId,
-    kind,
-  }: {
-    readonly organizationId: string;
-    readonly kind: TEmailIntentKind;
-  }) {
-    if (kind === "submission.created") {
-      return true;
-    }
-
-    const { entitlements } = yield* findEntitlements(organizationId);
-    return entitlements.capabilities.subscriberEmails;
-  });
-
-  /** Maximum submission-notification recipients, or `null` when unlimited. */
-  const submissionNotificationRecipientLimit = Effect.fn(
-    "EntitlementPolicy.submissionNotificationRecipientLimit"
-  )(function* (organizationId: string) {
-    const { entitlements } = yield* findEntitlements(organizationId);
-    return entitlements.limits.submissionNotificationRecipients;
-  });
+  /**
+   * Whether the workspace plan includes delivery to end-user subscribers.
+   *
+   * Member notifications are not gated: every plan emails members. This
+   * capability only decides whether the subscriber audience is allowed in
+   * addition to them.
+   */
+  const mayEmailSubscribers = mayCreatePublicEmailSubscriptions;
 
   /** Whether the workspace plan permits hiding the Feeblo branding. */
   const mayRemoveBranding = Effect.fn("EntitlementPolicy.mayRemoveBranding")(
@@ -307,8 +289,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     canCreateChangelogCategory,
     canCreateCrmEntry,
     mayCreatePublicEmailSubscriptions,
-    mayMaterializeEmailIntent,
-    submissionNotificationRecipientLimit,
+    mayEmailSubscribers,
     mayUseIntegrations,
     canUseIntegrations,
     mayRemoveBranding,
