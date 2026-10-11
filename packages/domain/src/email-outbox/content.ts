@@ -78,11 +78,11 @@ export const makeSubmissionNotificationPayload = (
   return {
     actionLabel: "View dashboard",
     actionUrl: appUrl,
-    // A single submission keeps the wording it had before windows existed; the
-    // count only appears once a window actually coalesced two or more.
+    // A single post keeps the one-post wording; the count only appears once a
+    // window actually coalesced two or more.
     body: isSingle
-      ? "A new post has been submitted."
-      : `${submissionCount} new posts have been submitted.`,
+      ? "A new post was submitted."
+      : `${submissionCount} new posts were submitted.`,
     eyebrow: "Feedback",
     posts: [
       ...listed.map((post) => ({
@@ -94,8 +94,8 @@ export const makeSubmissionNotificationPayload = (
             {
               label:
                 remaining === 1
-                  ? "and 1 more submitted post"
-                  : `and ${remaining} more submitted posts`,
+                  ? "and 1 more post"
+                  : `and ${remaining} more posts`,
               url: appUrl,
             },
           ]
@@ -106,8 +106,8 @@ export const makeSubmissionNotificationPayload = (
     // subscriber.
     reason: "member",
     title: isSingle
-      ? "New submission in your workspace"
-      : `${submissionCount} new submissions in your workspace`,
+      ? "New post in your workspace"
+      : `${submissionCount} new posts in your workspace`,
     // Only the listed posts are named in the mail, so only they need proving —
     // their ids ride along so the send-time gate resolves current rows over the
     // named set rather than over the window's full stored list. An empty list
@@ -299,8 +299,7 @@ export const resolveSubscriptionNotificationContent = (
                 actionLabel: "View changelog",
                 actionUrl: `${publicSiteUrl}/changelog/${changelog.slug}`,
                 body:
-                  changelog.excerpt ||
-                  "A new changelog entry has been published.",
+                  changelog.excerpt || "A new changelog entry was published.",
                 ...(categoryNames.length > 0 && { categories: categoryNames }),
                 ...(changelog.coverImage && {
                   coverImageUrl: changelog.coverImage,

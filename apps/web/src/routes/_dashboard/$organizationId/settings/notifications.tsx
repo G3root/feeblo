@@ -22,7 +22,7 @@ function NotificationsSettingsPage() {
       <SettingsLayout.Header>
         <SettingsLayout.HeaderTitle>Notifications</SettingsLayout.HeaderTitle>
         <SettingsLayout.HeaderDescription>
-          Choose which emails this workspace sends to your account.
+          Choose which notification emails this workspace sends you.
         </SettingsLayout.HeaderDescription>
       </SettingsLayout.Header>
       <SettingsLayout.Content>

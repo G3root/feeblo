@@ -49,8 +49,8 @@ export const ChangelogEmail = ({
     cta={{ label: actionLabel, href: actionUrl }}
     footerBlurb={
       reason === "member"
-        ? "You received this because you're a member of this workspace. You can manage all email notifications from your workspace settings."
-        : "You received this because you subscribed to changelog updates for this workspace. You can manage all email notifications from your workspace settings."
+        ? "You received this because you're a member of this workspace. Manage all email notifications in your workspace settings."
+        : "You received this because you subscribed to changelog updates for this workspace. Use the Unsubscribe link below to stop these emails."
     }
     homeUrl="https://feeblo.com"
     preview={`${eyebrow}: ${title}`}

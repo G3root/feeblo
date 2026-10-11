@@ -29,17 +29,16 @@ const preferenceQueryKey = (organizationId: string) => [
 const categoryCopy = {
   new_feedback: {
     title: "New feedback",
-    description:
-      "Email when someone submits a new post in this workspace, whichever board it lands on.",
+    description: "Email me when someone submits a post on any board.",
   },
   post_status_changed: {
     title: "Post status changes",
     description:
-      "Email when a post moves status, is closed, or is merged or unmerged.",
+      "Email me when a post changes status, closes, merges, or unmerges.",
   },
   changelog_published: {
     title: "Changelog published",
-    description: "Email when a changelog entry goes live.",
+    description: "Email me when a changelog entry is published.",
   },
 } satisfies Record<PreferenceCategory, { description: string; title: string }>;
 
@@ -98,7 +97,7 @@ export function NotificationPreferenceSettings() {
   if (preferenceQuery.isError) {
     return (
       <p className="text-muted-foreground text-sm">
-        Notification preferences could not be loaded. Reload the page to try
+        Your notification preferences did not load. Reload the page to try
         again.
       </p>
     );
@@ -134,9 +133,8 @@ export function NotificationPreferenceSettings() {
     <div className="flex flex-col gap-6">
       {session?.user.emailVerified === false ? (
         <p className="text-muted-foreground text-sm">
-          Your account email is not verified yet, so no notification emails can
-          be delivered. Verify it from your profile settings to start receiving
-          them.
+          Your account email is not verified yet. Verify it in your profile
+          settings to start receiving notification emails.
         </p>
       ) : null}
 
@@ -144,8 +142,8 @@ export function NotificationPreferenceSettings() {
         <SwitchCardContent>
           <SwitchCardTitle>Pause all notification emails</SwitchCardTitle>
           <SwitchCardDescription>
-            Stop every notification email for this workspace. Your per-category
-            choices below are kept for when you turn it back on.
+            Stop all notification emails for this workspace. Your choices below
+            are saved and apply again when you turn the pause off.
           </SwitchCardDescription>
         </SwitchCardContent>
         <SwitchCardInput

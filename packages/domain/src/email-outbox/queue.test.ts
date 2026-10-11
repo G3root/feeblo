@@ -573,7 +573,7 @@ describe("EmailOutbox workflows", () => {
         const state = yield* testMailerState;
         expect(state.sentMessages).toHaveLength(1);
         expect(state.sentMessages[0]?.subject).toBe(
-          "2 new submissions in your workspace"
+          "2 new posts in your workspace"
         );
         // The body link is the settings page, but the mail client's own
         // affordance gets the RFC 8058 one-click endpoint for this member's
@@ -591,7 +591,7 @@ describe("EmailOutbox workflows", () => {
           .from(schema.emailDeliveryTable)
           .where(eq(schema.emailDeliveryTable.outboxId, intentId));
         expect(delivery?.templatePayload).toMatchObject({
-          body: "2 new posts have been submitted.",
+          body: "2 new posts were submitted.",
           unsubscribe: {
             category: "new_feedback",
             kind: "preference",
@@ -638,7 +638,7 @@ describe("EmailOutbox workflows", () => {
 
         const state = yield* testMailerState;
         expect(state.sentMessages[0]?.subject).toBe(
-          "350 new submissions in your workspace"
+          "350 new posts in your workspace"
         );
         const [delivery] = yield* db
           .select({
@@ -647,10 +647,10 @@ describe("EmailOutbox workflows", () => {
           .from(schema.emailDeliveryTable)
           .where(eq(schema.emailDeliveryTable.outboxId, intentId));
         expect(delivery?.templatePayload).toMatchObject({
-          body: "350 new posts have been submitted.",
+          body: "350 new posts were submitted.",
           posts: [
             { label: "Ship email outbox" },
-            { label: "and 349 more submitted posts" },
+            { label: "and 349 more posts" },
           ],
         });
       })
@@ -696,8 +696,8 @@ describe("EmailOutbox workflows", () => {
             .from(schema.emailDeliveryTable)
             .where(eq(schema.emailDeliveryTable.outboxId, intentId));
           expect(delivery?.templatePayload).toMatchObject({
-            body: "4 new posts have been submitted.",
-            posts: [{ label: "and 4 more submitted posts" }],
+            body: "4 new posts were submitted.",
+            posts: [{ label: "and 4 more posts" }],
           });
         })
     );
@@ -751,7 +751,7 @@ describe("EmailOutbox workflows", () => {
           .from(schema.emailDeliveryTable)
           .where(eq(schema.emailDeliveryTable.outboxId, intentId));
         expect(delivery?.templatePayload).toMatchObject({
-          body: "A new post has been submitted.",
+          body: "A new post was submitted.",
           posts: [{ label: "Ship email outbox" }],
         });
       })
@@ -1820,10 +1820,10 @@ describe("EmailOutbox workflows", () => {
             templatePayload: {
               actionLabel: "View dashboard",
               actionUrl: "https://app.feeblo.com",
-              body: "A new post has been submitted.",
+              body: "A new post was submitted.",
               eyebrow: "Feedback",
               posts: [],
-              title: "New submission in your workspace",
+              title: "New post in your workspace",
               unsubscribe: {
                 kind: "settings",
                 url: `https://app.feeblo.com/${organizationId}/settings/notifications`,
@@ -1863,10 +1863,10 @@ describe("EmailOutbox workflows", () => {
             templatePayload: {
               actionLabel: "View dashboard",
               actionUrl: "https://app.feeblo.com",
-              body: "A new post has been submitted.",
+              body: "A new post was submitted.",
               eyebrow: "Feedback",
               posts: [],
-              title: "New submission in your workspace",
+              title: "New post in your workspace",
               unsubscribe: {
                 kind: "settings",
                 url: `https://app.feeblo.com/${organizationId}/settings/notifications`,
@@ -1929,10 +1929,10 @@ describe("EmailOutbox workflows", () => {
             templatePayload: {
               actionLabel: "View dashboard",
               actionUrl: "https://app.feeblo.com",
-              body: "A new post has been submitted.",
+              body: "A new post was submitted.",
               eyebrow: "Feedback",
               posts: [],
-              title: "New submission in your workspace",
+              title: "New post in your workspace",
               unsubscribe: {
                 kind: "settings",
                 url: `https://app.feeblo.com/${organizationId}/settings/notifications`,
