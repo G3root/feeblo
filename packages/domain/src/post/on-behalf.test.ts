@@ -583,6 +583,121 @@ describe("PostRpcHandlers on-behalf", () => {
       );
     });
 
+    describe("staff attribution", () => {
+      /** A second workspace member the actor can attribute to on behalf. */
+      const insertTeammate = (fixture: Fixture) =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const now = yield* DateTime.nowAsDate;
+          yield* db.insert(schema.userTable).values({
+            id: `user_teammate_${fixture.organizationId}`,
+            email: `teammate_${fixture.organizationId}@example.com`,
+            name: "Teammate",
+            emailVerified: true,
+          });
+          yield* db.insert(schema.memberTable).values({
+            id: `member_teammate_${fixture.organizationId}`,
+            organizationId: fixture.organizationId,
+            userId: `user_teammate_${fixture.organizationId}`,
+            role: "contributor",
+            createdAt: now,
+          });
+          return {
+            userId: `user_teammate_${fixture.organizationId}`,
+            memberId: `member_teammate_${fixture.organizationId}`,
+          };
+        });
+
+      const countContacts = (organizationId: string) =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const rows = yield* db
+            .select({ id: schema.contactTable.id })
+            .from(schema.contactTable)
+            .where(eq(schema.contactTable.organizationId, organizationId));
+          return rows.length;
+        });
+
+      it.effect(
+        "pegs a staff-authored post to the member row, not a customer",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const db = yield* currentDb;
+            const fixture = yield* makeFixture("manager");
+            const teammate = yield* insertTeammate(fixture);
+            const postId = yield* PostId.generate;
+
+            yield* handlers
+              .PostCreate({
+                ...postCreateInput(fixture, postId, "Staff authored"),
+                author: { userId: teammate.userId },
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "manager")
+                )
+              );
+
+            const post = yield* getPost(postId);
+            expect(post).toMatchObject({
+              contactId: null,
+              creatorId: teammate.userId,
+              creatorMemberId: teammate.memberId,
+            });
+            // Staff attribution spends no CRM entry: no contact exists.
+            expect(yield* countContacts(fixture.organizationId)).toBe(0);
+
+            const [activity] = yield* db
+              .select({ metadata: schema.postActivityTable.metadata })
+              .from(schema.postActivityTable)
+              .where(
+                and(
+                  eq(schema.postActivityTable.postId, postId),
+                  eq(schema.postActivityTable.kind, "POST_CREATED")
+                )
+              )
+              .limit(1);
+            expect(activity?.metadata).toEqual({
+              onBehalfOf: { userId: teammate.userId },
+            });
+          })
+      );
+
+      it.effect("reattributes a customer post to a staff member", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("manager");
+          const teammate = yield* insertTeammate(fixture);
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, "manager");
+
+          yield* handlers
+            .PostCreate({
+              ...postCreateInput(fixture, postId, "Customer authored"),
+              author: { email: "customer@example.com", name: "Customer" },
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          yield* handlers
+            .PostUpdateAuthor({
+              id: postId,
+              organizationId: fixture.organizationId,
+              author: { userId: teammate.userId },
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const post = yield* getPost(postId);
+          expect(post).toMatchObject({
+            contactId: null,
+            creatorId: teammate.userId,
+            creatorMemberId: teammate.memberId,
+          });
+        })
+      );
+    });
+
     describe("PostUpdateAuthor", () => {
       it.effect("reattributes a self-authored post to a new customer", () =>
         Effect.gen(function* () {

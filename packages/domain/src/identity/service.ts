@@ -50,9 +50,19 @@ export interface ResolvePrincipalInput {
 }
 
 export interface ResolvedPrincipal {
-  contactId: string;
+  /**
+   * The customer record the action is attributed to. Null when the subject is
+   * a workspace member: staff resolve to their account, never to a contact
+   * (`docs/on-behalf.md`, "Resolution").
+   */
+  contactId: string | null;
   /** The linked account: a real user, a provisioned shadow user, or null. */
   userId: string | null;
+  /**
+   * The workspace member row when the subject is staff. Null for customers,
+   * and absent when a caller constructs a customer principal by hand.
+   */
+  memberId?: string | null;
 }
 
 type Contact = typeof schema.contactTable.$inferSelect;
@@ -127,6 +137,24 @@ const makeResolvePrincipalService = Effect.gen(function* () {
         eq(schema.contactTable.externalId, externalId)
       )
     );
+
+  /**
+   * The workspace's member row for an account, or null when the account has
+   * not joined this workspace. A member subject is staff: attribution must
+   * resolve to that account, and never mint a customer contact for it.
+   */
+  const findMembership = (organizationId: string, userId: string) =>
+    db
+      .select({ memberId: schema.memberTable.id })
+      .from(schema.memberTable)
+      .where(
+        and(
+          eq(schema.memberTable.organizationId, organizationId),
+          eq(schema.memberTable.userId, userId)
+        )
+      )
+      .limit(1)
+      .pipe(Effect.map((rows) => rows[0]?.memberId ?? null));
 
   /**
    * Runs detectors in order and returns the first match. Insert-conflict
@@ -311,6 +339,23 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             yield* findContactByUser(organizationId, user.value.id)
           );
           if (!contact) {
+            // A member is staff, not a customer: attribute to the account and
+            // keep the member row so the member tick survives. No contact is
+            // created and no CRM-entry allowance is spent. An existing contact
+            // for this account (linked before this rule, or created when the
+            // human was a customer first) still wins below.
+            const memberId = yield* findMembership(
+              organizationId,
+              user.value.id
+            );
+            if (memberId !== null) {
+              return {
+                contactId: null,
+                memberId,
+                userId: user.value.id,
+              };
+            }
+
             // Avoid tripping the `(organization_id, email)` unique index by
             // matching on a usable address before inserting. Synthetic
             // inboxes are excluded: they are never usable contact emails.
@@ -474,6 +519,15 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             const linked = Option.getOrUndefined(
               yield* findContactByUser(organizationId, user.id)
             );
+            // A workspace member stays staff even when they are resolved by
+            // the email they typed: no contact is minted for them. An
+            // existing contact for the account still wins.
+            if (!linked) {
+              const memberId = yield* findMembership(organizationId, user.id);
+              if (memberId !== null) {
+                return { contactId: null, memberId, userId: user.id };
+              }
+            }
             if (linked) {
               const contact = yield* enrichContact(linked, subject);
               return {

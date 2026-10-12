@@ -524,11 +524,20 @@ const makePostWriteService = Effect.gen(function* () {
               ? subject.userId
               : (userId ?? options.creatorUserId ?? null),
             ...(writeSource !== undefined && { source: writeSource }),
-            // On-behalf posts keep staff attribution out of the author fields.
-            ...(member !== null &&
-              member.memberId !== null &&
-              !subject && { creatorMemberId: member.memberId }),
-            ...(subject && { contactId: subject.contactId }),
+            // An on-behalf staff subject keeps its member row so the member
+            // tick survives; a customer subject has none. A self-authored post
+            // keeps the acting member, exactly as before.
+            ...(subject
+              ? {
+                  creatorMemberId: subject.memberId ?? null,
+                  ...(subject.contactId !== null && {
+                    contactId: subject.contactId,
+                  }),
+                }
+              : member !== null &&
+                member.memberId !== null && {
+                  creatorMemberId: member.memberId,
+                }),
           });
           yield* commitPreparedEditorAssets(prepared.promotions);
           yield* syncPostAssetReferences({
@@ -870,10 +879,10 @@ const makePostWriteService = Effect.gen(function* () {
             const onBehalfMetadata = toOnBehalfMetadata(subject);
             yield* repository.updateAuthor({
               contactId: subject.contactId,
-              // On-behalf posts keep staff attribution out of the author
-              // fields, matching the create path.
+              // A staff subject keeps its member row; a customer subject has
+              // none (see the create path).
               creatorId: subject.userId,
-              creatorMemberId: null,
+              creatorMemberId: subject.memberId ?? null,
               id: args.id,
               organizationId: args.organizationId,
             });

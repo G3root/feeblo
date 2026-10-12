@@ -898,7 +898,8 @@ const makePostRepository = Effect.gen(function* () {
       organizationId: string;
       creatorId: string | null;
       creatorMemberId: string | null;
-      contactId: string;
+      /** Null for a staff subject: staff never resolve to a contact. */
+      contactId: string | null;
     }) =>
       db
         .update(schema.postTable)

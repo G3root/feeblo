@@ -304,6 +304,16 @@ describe("UpvoteRpcHandlers on-behalf", () => {
               userId: memberUserId,
               memberId: `member_${fixture.organizationId}`,
             });
+
+            // Staff attribution mints no customer contact for the voter, so
+            // the CRM-entry allowance is never spent on a teammate.
+            const contacts = yield* db
+              .select({ id: schema.contactTable.id })
+              .from(schema.contactTable)
+              .where(
+                eq(schema.contactTable.organizationId, fixture.organizationId)
+              );
+            expect(contacts).toHaveLength(0);
           })
       );
 

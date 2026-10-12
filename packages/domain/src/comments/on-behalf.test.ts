@@ -301,6 +301,65 @@ describe("CommentRpcHandlers on-behalf", () => {
           })
       );
 
+      it.effect(
+        "keeps a staff subject's member row and creates no contact",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* CommentRpcHandlersEffect;
+            const db = yield* currentDb;
+            const fixture = yield* makeFixture("manager");
+            const commentId = yield* CommentId.generate;
+            const teammateUserId = `teammate_${fixture.organizationId}`;
+            const teammateMemberId = `member_teammate_${fixture.organizationId}`;
+            yield* db.insert(schema.userTable).values({
+              id: teammateUserId,
+              email: `teammate_${fixture.organizationId}@example.com`,
+              name: "Teammate",
+              emailVerified: true,
+            });
+            yield* db.insert(schema.memberTable).values({
+              id: teammateMemberId,
+              organizationId: fixture.organizationId,
+              userId: teammateUserId,
+              role: "contributor",
+              createdAt: yield* DateTime.nowAsDate,
+            });
+
+            yield* handlers
+              .CommentCreate({
+                ...commentCreateInput(fixture, commentId, "Staff recorded"),
+                author: { userId: teammateUserId },
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "manager")
+                )
+              );
+
+            // Staff attribution keeps the member tick and mints no customer
+            // contact for the teammate.
+            const comment = yield* getComment(commentId);
+            expect(comment).toMatchObject({
+              memberId: teammateMemberId,
+              userId: teammateUserId,
+            });
+
+            const contacts = yield* db
+              .select({ id: schema.contactTable.id })
+              .from(schema.contactTable)
+              .where(
+                eq(schema.contactTable.organizationId, fixture.organizationId)
+              );
+            expect(contacts).toHaveLength(0);
+
+            const activity = yield* getActivity(fixture.postId, commentId);
+            expect(activity?.metadata).toEqual({
+              onBehalfOf: { userId: teammateUserId },
+            });
+          })
+      );
+
       it.effect("denies contributors", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;

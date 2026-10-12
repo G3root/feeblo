@@ -5,7 +5,7 @@ Workspace members can create posts, add voters, and publish comments that are at
 ## Vocabulary
 
 - **Actor** (principal): the authenticated staff member performing an action. Always recorded for audit (`post_activity.actorId` / `actorMemberId`).
-- **Subject**: the customer an action is attributed to. Always resolved to a **contact** — the workspace-scoped customer record (`contact` table, unique `(organization_id, email)` and `(organization_id, external_id)`).
+- **Subject**: the person an action is attributed to. A customer subject resolves to a **contact** — the workspace-scoped customer record (`contact` table, unique `(organization_id, email)` and `(organization_id, external_id)`). A staff subject resolves to their **member row**; staff are never contacts and never consume a CRM entry (see ADR 0017).
 - **Shadow user**: an attribution-only account (`user` row with a synthetic `behalf-*@feeblo.com` address, `emailVerified = false`, `restrictedToOrganizationId` set). Shadow users have no credentials, can never authenticate, and exist only so votes and comments — which require a `user_id` — can be attributed to customers who never signed up.
 - **SSO portal user**: a real customer account created through widget SSO (`sso-*@feeblo.com`, `emailVerified = true`, org-restricted). Distinct from a shadow user: their identity was proven by the customer's identity provider.
 - **Deferred subscription**: an `email_subscription` in state `deferred_no_access`. Created for subjects without verified accounts; never emailed until the subject gains organization access (see below).
@@ -26,6 +26,8 @@ userId  >  contactId  >  externalId  >  email (+ name/avatar enrichment)
 | Email matches a global user with no contact here | Contact created and linked to that real account — never shadowed. |
 | Email matches an account restricted to another organization | Invisible; a fresh org-scoped contact (and shadow, if needed) is created instead. |
 | Email matches this org's SSO portal user | Adopted — same human, proven identity. |
+| Account is a workspace member | Resolved to the account and its member row. No contact is created, and the plan's CRM-entry allowance is not spent (ADR 0017). An existing contact for that account still wins. |
+| Account is a member of another organization | A customer here: contact (and shadow, if needed) created in this workspace. |
 | No match anywhere | New contact, plus a shadow user when required. |
 
 Subject fields never overwrite known contact data; they backfill empty name/avatar only. Inserts tolerate unique-index races by re-reading the winner.
@@ -46,7 +48,7 @@ Voter management is deliberately **not** a toggle: `UpvoteAddOnBehalf` is idempo
 
 ## Provenance
 
-`post.source` stays `DASHBOARD`; on-behalf facts live in `post_activity.metadata` as `{ onBehalfOf: { contactId, userId? } }` with the admin recorded as the actor. Activity kinds `VOTE_ADDED` / `VOTE_REMOVED` record voter management and `AUTHOR_CHANGED` records dashboard author reassignment (`PostUpdateAuthor`), which reuses the creation-time resolution rules and subscribes the new author as `post_creator`. Dashboard post rows display contact-only authors (no linked user row) under their contact name; public rows never fall back, so customer names stay off public boards. Timelines render "created by Sarah on behalf of john@acme.com".
+`post.source` stays `DASHBOARD`; on-behalf facts live in `post_activity.metadata` as `{ onBehalfOf: { contactId?, userId? } }` with the admin recorded as the actor. A customer subject carries `contactId` and usually a `userId`; a staff subject carries `userId` only, which the timeline resolves against the member list (ADR 0017). Activity kinds `VOTE_ADDED` / `VOTE_REMOVED` record voter management and `AUTHOR_CHANGED` records dashboard author reassignment (`PostUpdateAuthor`), which reuses the creation-time resolution rules and subscribes the new author as `post_creator`. Dashboard post rows display contact-only authors (no linked user row) under their contact name; public rows never fall back, so customer names stay off public boards. Timelines render "created by Sarah on behalf of john@acme.com", and a staff subject renders as "on behalf of Bob (workspace member)".
 
 ## Notifications
 
@@ -82,7 +84,7 @@ Split identities therefore cannot persist: the first time the customer signs up 
 
 ## Picker search
 
-`ContactSearch` backs the author/voter/commenter comboboxes: org-scoped, two indexed queries (contacts over trigram indexes + members via `member⨝user`) merged in TS and ranked exact email → email prefix → name prefix → substring, returning `isMember`, `hasAccess`, and `alreadyVoted` badges so the UI can hint "will/won't be notified" before submitting. Author pickers (`AuthorPicker`: post-create `Post author`, dashboard `Change author`) ignore voting state — `alreadyVoted` neither disables rows nor shows a badge there, so a voter can always be reattributed as the author. Only the voter picker disables `alreadyVoted` rows. Member rows carry `contactId: null` — members are staff, never contacts; submit paths resolve via `userId`. A contact row already linked to a member is hidden in favor of the member row. Without post context the board is unknown, so `hasAccess` for an unrestricted verified global user is provisional — eligibility cannot be determined until the post's board visibility is known (callers with a post pass `postId`). An empty result is the create-new-customer entry point. The RPC enforces a per-member dashboard read rate limit (300/minute) alongside the two-character minimum; on-behalf writes (posts, voter add/remove, comments) share a per-member 60/minute bound.
+`ContactSearch` backs the author/voter/commenter comboboxes: org-scoped, two indexed queries (contacts over trigram indexes + members via `member⨝user`) merged in TS and ranked exact email → email prefix → name prefix → substring, returning `isMember`, `hasAccess`, and `alreadyVoted` badges so the UI can hint "will/won't be notified" before submitting. Author pickers (`AuthorPicker`: post-create `Post author`, dashboard `Change author`) ignore voting state — `alreadyVoted` neither disables rows nor shows a badge there, so a voter can always be reattributed as the author. Only the voter picker disables `alreadyVoted` rows. Member rows carry `contactId: null` — members are staff, never contacts; submit paths resolve via `userId`, and resolution keeps it that way (ADR 0017). A contact row already linked to a member is hidden in favor of the member row. Without post context the board is unknown, so `hasAccess` for an unrestricted verified global user is provisional — eligibility cannot be determined until the post's board visibility is known (callers with a post pass `postId`). An empty result is the create-new-customer entry point. The RPC enforces a per-member dashboard read rate limit (300/minute) alongside the two-character minimum; on-behalf writes (posts, voter add/remove, comments) share a per-member 60/minute bound.
 
 ## Where things live
 
