@@ -3,8 +3,8 @@ import { StatusField } from "@feeblo/post-ui/post-properties";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 
+import { useOrgPostStatuses } from "~/hooks/use-org-post-statuses";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export function PostStatusSelect({ disabled = false }: { disabled?: boolean }) {
@@ -13,16 +13,9 @@ export function PostStatusSelect({ disabled = false }: { disabled?: boolean }) {
     hasPermission(organizationId, "posts.status")
   );
   const isDisabled = disabled || isLocked || isMerged || !canChangeStatus;
-  const { postCollection, postStatusCollection } = useDashboardCollections();
+  const { postCollection } = useDashboardCollections();
 
-  const { data: postStatuses } = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ postStatus: postStatusCollection })
-        .where(({ postStatus }) =>
-          eq(postStatus.organizationId, organizationId)
-        ),
-  });
+  const { data: postStatuses } = useOrgPostStatuses(organizationId);
 
   if (!postStatuses) {
     return null;

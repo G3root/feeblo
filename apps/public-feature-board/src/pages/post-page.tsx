@@ -105,6 +105,12 @@ export function PostPage({ slug }: { readonly slug: string }) {
   // collection translates `PostNotFoundError`), which falls through to the
   // merge resolver below.
   const postQuery = useLiveQuery({
+    queryKey: [
+      "portal-post",
+      publicPostDetailCollection.id,
+      site.organizationId,
+      slug,
+    ],
     query: (q) => {
       if (!site.organizationId) {
         return undefined;
@@ -125,6 +131,11 @@ export function PostPage({ slug }: { readonly slug: string }) {
   // Board and status stay small org-scoped collections; look them up by the
   // detail row's ids instead of joining the full post list.
   const { data: board } = useLiveQuery({
+    queryKey: [
+      "portal-post-board",
+      publicBoardCollection.id,
+      post?.boardId ?? null,
+    ],
     query: (q) => {
       if (!post) {
         return undefined;
@@ -137,6 +148,11 @@ export function PostPage({ slug }: { readonly slug: string }) {
     },
   });
   const { data: postStatus } = useLiveQuery({
+    queryKey: [
+      "portal-post-status",
+      publicPostStatusCollection.id,
+      post?.statusId ?? null,
+    ],
     query: (q) => {
       if (!post) {
         return undefined;
@@ -152,6 +168,15 @@ export function PostPage({ slug }: { readonly slug: string }) {
   const postId = post?.id ?? "";
 
   const postTagsQuery = useLiveQuery({
+    // Keyed because this callsite is the one that tripped the dev profiler's
+    // single-render warning; the key skips rebuilding the join on every render.
+    queryKey: [
+      "portal-post-tags",
+      publicPostTagCollection.id,
+      publicTagCollection.id,
+      site.organizationId,
+      postId,
+    ],
     query: (q) =>
       q
         .from({ postTag: publicPostTagCollection })

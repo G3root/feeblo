@@ -33,7 +33,8 @@ Use the current TanStack DB source, not memory or older examples.
    `@tanstack/db` **0.9.2**, `@tanstack/react-db` **0.4.1**,
    `@tanstack/query-db-collection` **1.2.15**, `@tanstack/db-ivm` **0.1.22**.
    The package sources under `node_modules/@tanstack/*` are authoritative for
-   the installed version; the clone is for docs, examples, and tests.
+   the installed version; the clone tracks upstream `main`, which can be ahead
+   of this catalog. When they disagree, the installed sources win.
 3. Search `node_modules/@tanstack/*/skills` and the cloned repo for exact APIs,
    examples, tests, and naming patterns before writing TanStack DB code.
 4. Inspect existing repo code first and follow its patterns. The two collection
@@ -69,9 +70,13 @@ none of them are installed in this repo.
 ## Repo Rules
 
 - **`useLiveQuery` takes the config object** — `useLiveQuery({ query: (q) => ... })`.
-  Never pass a legacy dependency array; the repo was migrated off it. Query
-  identity is derived from the structured query IR, so captured values re-run
-  the query automatically. Use `queryKey` only for opaque `.fn.*` queries.
+  Never pass a legacy dependency array; the repo was migrated off it. Every
+  config in this repo also carries an explicit `queryKey`: the repo does not
+  rely on the library's IR-derived identity. The key replaces identity
+  entirely, so it must list every captured input plus the collection id(s), and
+  sibling queries over one collection need distinct labels. Prefer a shared
+  hook (`~/hooks/use-org-*`, `@feeblo/post-ui/use-post-*`) over a new inline
+  query when the shape repeats.
 - **Always prefer query operators over JS** — `eq`, `inArray`, `like`, etc. are
   incrementally maintained; `.filter()` in JS re-runs from scratch.
 - **The update API is Immer-style** — `collection.update(id, (draft) => { ... })`.

@@ -42,8 +42,8 @@ import {
   Users,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useMemo } from "react";
 
 import { UpgradePlanDialog } from "~/features/billing/components/upgrade-dialog";
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
@@ -52,9 +52,9 @@ import {
   useDeleteBoardDialogContext,
   useRenameBoardDialogContext,
 } from "~/features/board/dialog-stores";
+import { useOrgBoards } from "~/hooks/use-org-boards";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePublicSiteUrl } from "~/hooks/use-site";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { NavUser } from "./nav-user";
 import { WorkspaceSwitcher } from "./workspace-switcher";
@@ -228,16 +228,18 @@ function CreateBoardButton() {
 
 function BoardList() {
   const organizationId = useOrganizationId();
-  const { boardCollection } = useDashboardCollections();
-
-  const boardQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ board: boardCollection })
-        .where((board) => eq(board.board.organizationId, organizationId))
-
-        .orderBy((board) => board.board.createdAt, "desc"),
-  });
+  const boardQuery = useOrgBoards(organizationId);
+  // The shared org-boards query is unordered; the sidebar keeps its
+  // newest-first order locally.
+  const boards = useMemo(
+    () =>
+      (boardQuery.data ?? []).toSorted(
+        (left, right) =>
+          new Date(right.createdAt).getTime() -
+          new Date(left.createdAt).getTime()
+      ),
+    [boardQuery.data]
+  );
 
   if (boardQuery.isLoading) {
     return (
@@ -256,7 +258,7 @@ function BoardList() {
 
   return (
     <SkeletonLoader isLoading={false}>
-      {boardQuery.data.map((board) => (
+      {boards.map((board) => (
         <BoardItem
           boardPublicId={board.id}
           boardSlug={board.slug}

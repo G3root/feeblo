@@ -58,6 +58,15 @@ function ChangelogIndexContent({ organizationId }: { organizationId: string }) {
   const normalizedSearch = search.trim();
 
   const changelogsQuery = useLiveQuery({
+    // Search/filter hot path on the changelog list; every captured input is
+    // part of the key.
+    queryKey: [
+      "changelog-index",
+      changelogCollection.id,
+      organizationId,
+      statuses,
+      normalizedSearch,
+    ],
     query: (q) =>
       q
         .from({ changelog: changelogCollection })

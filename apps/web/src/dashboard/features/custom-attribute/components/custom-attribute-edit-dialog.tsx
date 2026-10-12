@@ -87,6 +87,7 @@ function CustomAttributeEditForm() {
   const collection = getCollection(entityType, collections);
 
   const { data } = useLiveQuery({
+    queryKey: ["attribute-by-id", collection.id, attributeId, organizationId],
     query: (q) =>
       q
         .from({ attribute: collection })

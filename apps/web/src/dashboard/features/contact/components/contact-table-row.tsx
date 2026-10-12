@@ -13,13 +13,12 @@ import {
   Ellipsis,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 
 import {
   type CustomAttributeDefinition,
   formatCustomAttributeValue,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+import { useContactAttributeValues } from "~/hooks/use-attribute-values";
 
 const mediumDateFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
@@ -66,13 +65,7 @@ export function ContactTableRow({
   onEdit: () => void;
   updatePolicy: ClientPolicy;
 }) {
-  const { contactAttributeValueCollection } = useDashboardCollections();
-  const { data: values = [] } = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ value: contactAttributeValueCollection })
-        .where(({ value }) => eq(value.contactId, contact.id)),
-  });
+  const { data: values = [] } = useContactAttributeValues(contact.id);
   const valuesByAttributeId = new Map(
     values.map((value) => [value.attributeId, value])
   );

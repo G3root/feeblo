@@ -24,6 +24,13 @@ function ChangelogCategoryBadge({ categoryId }: { categoryId: string }) {
   const { publicChangelogCategoryCollection } = usePublicCollections();
 
   const categoryQuery = useLiveQuery({
+    // One instance per category chip, so keying it avoids a per-chip IR
+    // rebuild on every changelog row render.
+    queryKey: [
+      "portal-changelog-category",
+      publicChangelogCategoryCollection.id,
+      categoryId,
+    ],
     query: (q) =>
       q
         .from({ category: publicChangelogCategoryCollection })

@@ -128,6 +128,14 @@ export function useRoadmapData<
   TRoadmapColumnRow
 >): UseRoadmapDataResult {
   const roadmapsQuery = useLiveQuery({
+    // Shared roadmap hook (dashboard and portal); the explicit keys list every
+    // captured input plus the collections each query reads.
+    queryKey: [
+      "roadmap-roadmaps",
+      roadmapCollection.id,
+      organizationId,
+      slug ?? null,
+    ],
     query: (q) => {
       if (!organizationId) {
         return undefined;
@@ -157,6 +165,12 @@ export function useRoadmapData<
   });
 
   const allRoadmapsQuery = useLiveQuery({
+    queryKey: [
+      "roadmap-all-roadmaps",
+      roadmapCollection.id,
+      organizationId,
+      slug ?? null,
+    ],
     query: (q) => {
       if (!organizationId || slug === undefined) {
         return undefined;
@@ -182,6 +196,13 @@ export function useRoadmapData<
   });
 
   const columnsQuery = useLiveQuery({
+    queryKey: [
+      "roadmap-columns",
+      roadmapColumnCollection.id,
+      postStatusCollection.id,
+      roadmapCollection.id,
+      organizationId,
+    ],
     query: (q) => {
       if (!organizationId) {
         return undefined;
@@ -218,6 +239,13 @@ export function useRoadmapData<
   });
 
   const postsQuery = useLiveQuery({
+    queryKey: [
+      "roadmap-posts",
+      postCollection.id,
+      postStatusCollection.id,
+      boardCollection.id,
+      organizationId,
+    ],
     query: (q) => {
       if (!organizationId) {
         return undefined;

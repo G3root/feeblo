@@ -22,7 +22,6 @@ import {
   Tag01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import {
   createContext,
@@ -32,7 +31,8 @@ import {
   useMemo,
 } from "react";
 
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+import { useOrgPostStatuses } from "~/hooks/use-org-post-statuses";
+import { useOrgTags } from "~/hooks/use-org-tags";
 
 import {
   type BoardStatusOperator,
@@ -104,32 +104,9 @@ function BoardFilterRoot({
   organizationId: string;
 }) {
   const store = useBoardStore();
-  const { postStatusCollection, tagCollection } = useDashboardCollections();
   const filters = useBoardFilterState();
-  const { data: postStatuses } = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ postStatus: postStatusCollection })
-        .where(({ postStatus }) =>
-          eq(postStatus.organizationId, organizationId)
-        )
-        .select(({ postStatus }) => ({
-          id: postStatus.id,
-          type: postStatus.type,
-          label: postStatus.label,
-        })),
-  });
-  const { data: tags } = useLiveQuery({
-    query: (q) => {
-      return q
-        .from({ tags: tagCollection })
-        .where(({ tags }) => eq(tags.organizationId, organizationId))
-        .select(({ tags }) => ({
-          id: tags.id,
-          name: tags.name,
-        }));
-    },
-  });
+  const { data: postStatuses } = useOrgPostStatuses(organizationId);
+  const { data: tags } = useOrgTags(organizationId);
 
   const clearStatusFilter = useCallback(() => {
     store.send({ type: "setStatusOperator", operator: "isAnyOf" });
