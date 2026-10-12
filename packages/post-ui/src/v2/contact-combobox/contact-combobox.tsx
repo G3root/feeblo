@@ -453,16 +453,24 @@ export function ContactCombobox({
             {(option) =>
               option.kind === "create" ? (
                 <ComboboxItem key={`create:${option.email}`} value={option}>
-                  <span className="flex items-center gap-2">
+                  <span className="flex min-w-0 items-start gap-2">
                     <HugeiconsIcon
-                      className="text-muted-foreground"
+                      className="text-muted-foreground mt-0.5"
                       icon={UserAdd01Icon}
                       strokeWidth={2}
                     />
-                    <span>
-                      {results.length === 0
-                        ? m.misty_red_vole({ email: option.email })
-                        : m.agent_gross_anteater({ email: option.email })}
+                    <span className="min-w-0">
+                      <span className="block truncate">
+                        {results.length === 0
+                          ? m.misty_red_vole({ email: option.email })
+                          : m.agent_gross_anteater({ email: option.email })}
+                      </span>
+                      {/* A brand-new address has no account here, so the
+                          action grants attribution before (or instead of)
+                          notification. Say so before the admin submits. */}
+                      <span className="text-muted-foreground block text-xs">
+                        {m.hour_smart_wombat()}
+                      </span>
                     </span>
                   </span>
                 </ComboboxItem>

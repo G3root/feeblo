@@ -2,6 +2,7 @@ import { Profiler, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
+import { CommentComposerAuthorChip } from "./author-chip";
 import { useCommentComposer } from "./context";
 import { CommentComposerProvider } from "./provider";
 import { SubmitButton } from "./submit-button";
@@ -134,5 +135,36 @@ describe("CommentComposer rerender behavior", () => {
     const submit = view.getByRole("button");
     await expect.element(submit).toHaveAttribute("data-loading", "");
     await expect.element(submit).toBeDisabled();
+  });
+
+  it("renders no author chip while the session user authors", async () => {
+    const view = await render(
+      <CommentComposerProvider onSubmit={() => {}}>
+        <CommentComposerAuthorChip />
+      </CommentComposerProvider>
+    );
+
+    await expect
+      .element(view.getByText("Comment as customer:"))
+      .not.toBeInTheDocument();
+  });
+
+  it("shows the staged customer and returns authorship on dismiss", async () => {
+    const onAuthorClear = vi.fn();
+    const view = await render(
+      <CommentComposerProvider
+        authorDisplay="Jane Customer"
+        onAuthorClear={onAuthorClear}
+        onSubmit={() => {}}
+      >
+        <CommentComposerAuthorChip />
+      </CommentComposerProvider>
+    );
+
+    await expect.element(view.getByText("Jane Customer")).toBeVisible();
+    await expect.element(view.getByText("Comment as customer:")).toBeVisible();
+
+    await view.getByRole("button", { name: "Remove selected person" }).click();
+    expect(onAuthorClear).toHaveBeenCalledTimes(1);
   });
 });

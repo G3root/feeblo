@@ -204,6 +204,11 @@ describe("ContactCombobox", () => {
     await typeQuery(screen, "nobody@example.com");
     const createRow = screen.getByText(/as new customer/);
     await expect.element(createRow).toBeVisible();
+    // The create-new path grants attribution before (or instead of)
+    // notification, and the picker says so before the admin submits.
+    await expect
+      .element(screen.getByText(/Won't be notified until they have access/))
+      .toBeVisible();
 
     await createRow.click();
     expect(onSelect).toHaveBeenCalledWith({ email: "nobody@example.com" });

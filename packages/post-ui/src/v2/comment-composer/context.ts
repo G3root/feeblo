@@ -52,6 +52,11 @@ export type CommentComposerActions = {
     email: string;
     name: string;
   }) => void | Promise<void>;
+  /**
+   * Returns authorship to the session user. Present only when the host opted
+   * in, so the author chip shows its dismiss control only then.
+   */
+  onAuthorClear?: () => void;
   onCancel?: () => void;
   onContentChange: (content: string) => void;
   onSubmit?: () => void;
