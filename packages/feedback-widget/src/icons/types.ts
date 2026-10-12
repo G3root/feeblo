@@ -2,8 +2,11 @@
 
 export const iconNames = [
   "ArrowLeft01Icon",
+  "ArrowRight01Icon",
   "Cancel01Icon",
   "CheckIcon",
+  "Idea01Icon",
+  "NewspaperIcon",
   "SentIcon",
 ] as const
 

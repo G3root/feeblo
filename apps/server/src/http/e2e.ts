@@ -45,7 +45,8 @@ const SeedRoadmapPayload = Schema.Struct({
 
 /**
  * Test-only seeding route. Mounted next to the test mailbox router only when
- * the server runs with E2E_TEST_MAILER=true, so production never serves it.
+ * the server runs with E2E_ROUTES_ENABLED=true, so production never serves
+ * it (see `makePublicRouters` and the production refusal in `ServerConfig`).
  * Lets Playwright specs give a workspace extra status roadmaps without going
  * through roadmap CRUD (intentionally disabled until phase 2).
  */
@@ -133,10 +134,11 @@ const SetPlanPayload = Schema.Struct({
 
 /**
  * Test-only plan seeding route. Mounted next to the test mailbox router only
- * when the server runs with E2E_TEST_MAILER=true, so production never serves
- * it. Lets Playwright specs put a workspace on a paid plan (Starter or
- * Professional) so entitlement-gated features like widget SSO can be tested
- * end-to-end without going through the Polar checkout flow.
+ * when the server runs with E2E_ROUTES_ENABLED=true, so production never
+ * serves it (see `makePublicRouters` and the production refusal in
+ * `ServerConfig`). Lets Playwright specs put a workspace on a paid plan
+ * (Starter or Professional) so entitlement-gated features like widget SSO can
+ * be tested end-to-end without going through the Polar checkout flow.
  */
 export const e2eSetPlanRouter = HttpRouter.use((router) =>
   Effect.gen(function* () {

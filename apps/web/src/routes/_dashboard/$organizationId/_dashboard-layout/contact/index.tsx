@@ -42,12 +42,7 @@ import { useContactAttributeDefinitions } from "~/hooks/use-attribute-definition
 import { useEntitlements } from "~/hooks/use-entitlements";
 import { useOrgCompanies } from "~/hooks/use-org-companies";
 import { useOrgContacts } from "~/hooks/use-org-contacts";
-import {
-  companyCollection,
-  contactAttributeDefinitionCollection,
-  contactAttributeValueCollection,
-  contactCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/_dashboard-layout/contact/"
@@ -55,10 +50,10 @@ export const Route = createFileRoute(
   component: RouteComponent,
   beforeLoad: async () => {
     await Promise.all([
-      contactCollection.preload(),
-      contactAttributeDefinitionCollection.preload(),
-      contactAttributeValueCollection.preload(),
-      companyCollection.preload(),
+      dashboardCollections.contactCollection.preload(),
+      dashboardCollections.contactAttributeDefinitionCollection.preload(),
+      dashboardCollections.contactAttributeValueCollection.preload(),
+      dashboardCollections.companyCollection.preload(),
     ]);
     return null;
   },

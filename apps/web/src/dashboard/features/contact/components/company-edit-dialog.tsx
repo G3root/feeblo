@@ -30,7 +30,7 @@ import {
 import { useCompanyAttributeDefinitions } from "~/hooks/use-attribute-definitions";
 import { useCompanyAttributeValues } from "~/hooks/use-attribute-values";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { companyCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { useCompanyEditDialogContext } from "../dialog-stores";
 
@@ -58,6 +58,7 @@ export function CompanyEditDialog() {
 
 function CompanyEditFormLoader({ mode }: { mode: "display" | "edit" }) {
   const organizationId = useOrganizationId();
+  const { companyCollection } = useDashboardCollections();
   const store = useCompanyEditDialogContext();
   const companyId = useSelector(store, (state) => state.context.data.companyId);
 

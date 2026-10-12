@@ -14,10 +14,7 @@ import {
 import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import {
-  companyAttributeDefinitionCollection,
-  contactAttributeDefinitionCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/settings/custom-attributes"
@@ -30,8 +27,8 @@ export const Route = createFileRoute(
       hasPermission(params.organizationId, "contacts.*")(session)
     ) {
       await Promise.all([
-        contactAttributeDefinitionCollection.preload(),
-        companyAttributeDefinitionCollection.preload(),
+        dashboardCollections.contactAttributeDefinitionCollection.preload(),
+        dashboardCollections.companyAttributeDefinitionCollection.preload(),
       ]);
     }
     return null;

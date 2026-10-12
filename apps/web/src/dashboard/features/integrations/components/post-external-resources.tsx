@@ -1,6 +1,7 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
+import { isHttpUrl } from "@feeblo/utils/http-url";
 import { Link03Icon, LinkSquare02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import * as Option from "effect/Option";
@@ -180,14 +181,23 @@ function PostExternalResourceCard({
       )}
     </>
   );
-  return (
+  const href = resource.remoteUrl.toString();
+  const className =
+    "hover:bg-muted flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm";
+
+  // Defense in depth beside the storage boundary: if a row ever carries a URL
+  // that is not http(s), render it as plain text rather than a link, so a
+  // `javascript:` value cannot execute here.
+  return isHttpUrl(href) ? (
     <a
-      className="hover:bg-muted flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
-      href={resource.remoteUrl.toString()}
+      className={className}
+      href={href}
       rel="noopener noreferrer"
       target="_blank"
     >
       {content}
     </a>
+  ) : (
+    <div className={className}>{content}</div>
   );
 }

@@ -291,3 +291,38 @@ describe("ServerConfig production media storage", () => {
     })
   );
 });
+
+describe("ServerConfig E2E switches", () => {
+  const production = {
+    NODE_ENV: "production",
+    REDIS_URL: "redis://redis:6379/0",
+    ...productionMediaEnvironment,
+  };
+
+  it.effect("defaults both switches off", () =>
+    Effect.gen(function* () {
+      const config = yield* loadServerConfig({});
+
+      expect(config.e2eRoutesEnabled).toBe(false);
+      expect(config.e2eTestMailer).toBe(false);
+    })
+  );
+
+  it.effect("refuses to start in production with either switch on", () =>
+    Effect.gen(function* () {
+      for (const environment of [
+        { E2E_TEST_MAILER: "true" },
+        { E2E_ROUTES_ENABLED: "true" },
+      ]) {
+        const exit = yield* Effect.exit(
+          loadServerConfig({ ...production, ...environment })
+        );
+
+        expect(
+          Exit.isFailure(exit),
+          `${Object.keys(environment)[0]} should be refused`
+        ).toBe(true);
+      }
+    })
+  );
+});

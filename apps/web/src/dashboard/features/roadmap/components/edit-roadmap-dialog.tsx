@@ -14,7 +14,7 @@ import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { roadmapCollection, roadmapColumnCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 import { useEditRoadmapDialogContext } from "../dialog-stores";
 import { type RoadmapFormValues, roadmapFormOpts } from "../shared-form";
@@ -45,13 +45,13 @@ function EditRoadmapForm() {
   const roadmapQuery = useLiveQuery({
     queryKey: [
       "edit-roadmap",
-      roadmapCollection.id,
+      dashboardCollections.roadmapCollection.id,
       organizationId,
       data.roadmapId,
     ],
     query: (q) =>
       q
-        .from({ roadmap: roadmapCollection })
+        .from({ roadmap: dashboardCollections.roadmapCollection })
         .where(({ roadmap }) =>
           and(
             eq(roadmap.organizationId, organizationId),
@@ -70,12 +70,12 @@ function EditRoadmapForm() {
   const columnsQuery = useLiveQuery({
     queryKey: [
       "edit-roadmap-columns",
-      roadmapColumnCollection.id,
+      dashboardCollections.roadmapColumnCollection.id,
       data.roadmapId,
     ],
     query: (q) =>
       q
-        .from({ column: roadmapColumnCollection })
+        .from({ column: dashboardCollections.roadmapColumnCollection })
         .where(({ column }) => eq(column.roadmapId, data.roadmapId))
         .orderBy(({ column }) => column.position, "asc"),
   });
@@ -135,13 +135,16 @@ function EditRoadmapFormFields({
       const oldSlug = roadmap.slug;
       const newSlugifiedValue = slugify(value.name);
       try {
-        const tx = roadmapCollection.update(roadmapId, (draft) => {
-          draft.name = value.name;
-          draft.slug = newSlugifiedValue;
-          draft.description = value.description ?? null;
-          draft.visibility = value.visibility;
-          draft.updatedAt = new Date();
-        });
+        const tx = dashboardCollections.roadmapCollection.update(
+          roadmapId,
+          (draft) => {
+            draft.name = value.name;
+            draft.slug = newSlugifiedValue;
+            draft.description = value.description ?? null;
+            draft.visibility = value.visibility;
+            draft.updatedAt = new Date();
+          }
+        );
 
         if (newSlugifiedValue !== oldSlug) {
           window.history.replaceState(
@@ -163,7 +166,8 @@ function EditRoadmapFormFields({
         for (const column of columns) {
           if (!nextIds.has(column.id)) {
             mutations.push(
-              roadmapColumnCollection.delete(column.id).isPersisted.promise
+              dashboardCollections.roadmapColumnCollection.delete(column.id)
+                .isPersisted.promise
             );
           }
         }
@@ -175,7 +179,7 @@ function EditRoadmapFormFields({
 
           if (!persisted) {
             mutations.push(
-              roadmapColumnCollection.insert({
+              dashboardCollections.roadmapColumnCollection.insert({
                 id: column.id,
                 roadmapId,
                 name: column.name,
@@ -194,12 +198,15 @@ function EditRoadmapFormFields({
             persisted.position !== index
           ) {
             mutations.push(
-              roadmapColumnCollection.update(column.id, (draft) => {
-                draft.name = column.name;
-                draft.statusId = column.statusId;
-                draft.position = index;
-                draft.updatedAt = now;
-              }).isPersisted.promise
+              dashboardCollections.roadmapColumnCollection.update(
+                column.id,
+                (draft) => {
+                  draft.name = column.name;
+                  draft.statusId = column.statusId;
+                  draft.position = index;
+                  draft.updatedAt = now;
+                }
+              ).isPersisted.promise
             );
           }
         }

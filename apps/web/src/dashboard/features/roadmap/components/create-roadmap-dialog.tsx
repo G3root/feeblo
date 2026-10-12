@@ -15,7 +15,7 @@ import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { roadmapCollection, roadmapColumnCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 import { useCreateRoadmapDialogContext } from "../dialog-stores";
 import { roadmapFormOpts } from "../shared-form";
@@ -51,10 +51,14 @@ function CreateRoadmapForm() {
   const store = useCreateRoadmapDialogContext();
 
   const { data: roadmaps, isLoading } = useLiveQuery({
-    queryKey: ["create-roadmap-list", roadmapCollection.id, organizationId],
+    queryKey: [
+      "create-roadmap-list",
+      dashboardCollections.roadmapCollection.id,
+      organizationId,
+    ],
     query: (q) =>
       q
-        .from({ roadmap: roadmapCollection })
+        .from({ roadmap: dashboardCollections.roadmapCollection })
         .where(({ roadmap }) => eq(roadmap.organizationId, organizationId)),
   });
 
@@ -67,7 +71,7 @@ function CreateRoadmapForm() {
       try {
         const now = new Date();
         const roadmapId = await RoadmapId.unsafeGenerate();
-        const tx = roadmapCollection.insert({
+        const tx = dashboardCollections.roadmapCollection.insert({
           id: roadmapId,
           createdAt: now,
           updatedAt: now,
@@ -85,15 +89,16 @@ function CreateRoadmapForm() {
 
         await Promise.all(
           value.columns.map(async (column, index) => {
-            const columnTx = roadmapColumnCollection.insert({
-              id: column.id,
-              roadmapId,
-              name: column.name,
-              position: index,
-              statusId: column.statusId,
-              createdAt: now,
-              updatedAt: now,
-            });
+            const columnTx =
+              dashboardCollections.roadmapColumnCollection.insert({
+                id: column.id,
+                roadmapId,
+                name: column.name,
+                position: index,
+                statusId: column.statusId,
+                createdAt: now,
+                updatedAt: now,
+              });
 
             await columnTx.isPersisted.promise;
           })

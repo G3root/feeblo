@@ -1,6 +1,6 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
 
-import { tagCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 /**
  * The organization's tags. Consumers that need a different order sort
@@ -8,6 +8,7 @@ import { tagCollection } from "~/lib/collections";
  * same live query.
  */
 export function useOrgTags(organizationId: string) {
+  const { tagCollection } = useDashboardCollections();
   return useLiveQuery({
     queryKey: ["org-tags", tagCollection.id, organizationId],
     query: (q) =>

@@ -49,7 +49,7 @@ import { useOrgBoards } from "~/hooks/use-org-boards";
 import { useOrgContacts } from "~/hooks/use-org-contacts";
 import { useOrgPostStatuses } from "~/hooks/use-org-post-statuses";
 import { useOrgTags } from "~/hooks/use-org-tags";
-import { postActivityCollection, postCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 type NameLookup = ReadonlyMap<string, string>;
 
@@ -211,7 +211,7 @@ export function createPostActivityQuery({
 }) {
   return createLiveQueryCollection((query) =>
     query
-      .from({ activity: postActivityCollection })
+      .from({ activity: dashboardCollections.postActivityCollection })
       .where(({ activity }) =>
         and(
           eq(activity.organizationId, organizationId),
@@ -235,10 +235,14 @@ export function PostActivityList({
   const { data: tags } = useOrgTags(organizationId);
   const { data: contacts } = useOrgContacts(organizationId);
   const { data: posts } = useLiveQuery({
-    queryKey: ["post-activity-posts", postCollection.id, organizationId],
+    queryKey: [
+      "post-activity-posts",
+      dashboardCollections.postCollection.id,
+      organizationId,
+    ],
     query: (query) =>
       query
-        .from({ post: postCollection })
+        .from({ post: dashboardCollections.postCollection })
         .where(({ post }) => eq(post.organizationId, organizationId)),
   });
 

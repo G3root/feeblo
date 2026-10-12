@@ -5,7 +5,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { roadmapCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 import { useDeleteRoadmapDialogContext } from "../dialog-stores";
 
@@ -32,7 +32,7 @@ export function DeleteRoadmapDialog() {
         });
 
         settleOptimisticMutation(
-          () => roadmapCollection.delete(id),
+          () => dashboardCollections.roadmapCollection.delete(id),
           () => {
             toastManager.add({
               title: "Roadmap deleted successfully",

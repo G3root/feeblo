@@ -1,28 +1,39 @@
 import { createAsync } from "@solidjs/router";
-import { Show } from "solid-js";
+import { Show, Suspense } from "solid-js";
 
 import { BoardList } from "../components/board-list/board-list";
+import { BoardListSkeleton } from "../components/board-list/board-list-skeleton";
+import { ViewTransition } from "../components/shell/view-transition";
 import { UpdatesList } from "../components/updates/updates-list";
 import { fetchBoards } from "../lib/api";
 import { getWidgetConfig } from "../lib/config";
 
+/**
+ * The widget's landing route. With feedback enabled it is the feedback
+ * surface's root; an updates-only config renders the updates list here so a
+ * bare `#/` never dead-ends (the SDK lands such configs on `#/updates`).
+ */
 export function IndexComponent() {
   const config = getWidgetConfig();
-  if (config.mode === "updates" || !config.modules.includes("feedback")) {
-    return <UpdatesList />;
-  }
+
+  return (
+    <Show fallback={<UpdatesList />} when={config.modules.includes("feedback")}>
+      <BoardListRoute />
+    </Show>
+  );
+}
+
+function BoardListRoute() {
   const boards = createAsync(() => fetchBoards());
 
   return (
-    <Show
-      fallback={
-        <div class="text-muted-foreground p-6 text-sm">Loading boards...</div>
-      }
-      keyed
-      when={boards()}
-    >
-      {(boards) => <BoardList boards={boards} />}
-    </Show>
+    <ViewTransition kind="root">
+      <Suspense fallback={<BoardListSkeleton />}>
+        <Show keyed when={boards()}>
+          {(list) => <BoardList boards={list} />}
+        </Show>
+      </Suspense>
+    </ViewTransition>
   );
 }
 

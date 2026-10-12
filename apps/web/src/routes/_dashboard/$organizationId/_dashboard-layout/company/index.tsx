@@ -47,11 +47,7 @@ import { useCompanyAttributeValues } from "~/hooks/use-attribute-values";
 import { useEntitlements } from "~/hooks/use-entitlements";
 import { useOrgCompanies } from "~/hooks/use-org-companies";
 import { useOrgContacts } from "~/hooks/use-org-contacts";
-import {
-  companyAttributeDefinitionCollection,
-  companyAttributeValueCollection,
-  companyCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/_dashboard-layout/company/"
@@ -59,9 +55,9 @@ export const Route = createFileRoute(
   component: RouteComponent,
   beforeLoad: async () => {
     await Promise.all([
-      companyCollection.preload(),
-      companyAttributeDefinitionCollection.preload(),
-      companyAttributeValueCollection.preload(),
+      dashboardCollections.companyCollection.preload(),
+      dashboardCollections.companyAttributeDefinitionCollection.preload(),
+      dashboardCollections.companyAttributeValueCollection.preload(),
     ]);
     return null;
   },

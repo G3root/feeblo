@@ -6,14 +6,12 @@ const settingsPath = (organizationUrl: string, suffix: string) =>
   `${new URL(organizationUrl).pathname.replace(/\/$/, "")}${suffix}`;
 
 /**
- * The page the "unsubscribe" link in submission-notification email points at.
- * The email itself coalesces submissions behind a five-minute quiet window, so
- * this exercises the destination and the preference RPC rather than waiting
- * for a send.
+ * The member preference page, and the body destination of the unsubscribe
+ * link in notification email. The email itself coalesces behind a quiet
+ * window, so this exercises the page and the preference RPC rather than
+ * waiting for a send.
  */
-test("the submission notification preference toggles and persists", async ({
-  page,
-}) => {
+test("notification preferences toggle and persist", async ({ page }) => {
   const owner = await createAuthenticatedWorkspace(page);
 
   await page.goto(
@@ -22,22 +20,56 @@ test("the submission notification preference toggles and persists", async ({
   await expect(
     page.getByRole("heading", { name: "Notifications" })
   ).toBeVisible();
-  await expect(page.getByRole("switch")).not.toBeChecked();
 
-  await page.getByRole("switch").click();
-  await expect(
-    page.getByText("Submission emails turned on", { exact: true })
-  ).toBeVisible();
+  const pause = page.getByRole("switch", {
+    name: "Pause all notification emails",
+  });
+  const newFeedback = page.getByRole("switch", { name: "New feedback" });
+  const statusChanges = page.getByRole("switch", {
+    name: "Post status changes",
+  });
 
-  // The preference is server state, not component state.
+  // Every category is on by default and the workspace pause is off.
+  await expect(pause).not.toBeChecked();
+  await expect(newFeedback).toBeChecked();
+  await expect(statusChanges).toBeChecked();
+
+  // A category toggles independently, and the write is server state rather
+  // than component state.
+  await newFeedback.click();
+  await expect(newFeedback).not.toBeChecked();
   await page.reload();
-  await expect(page.getByRole("switch")).toBeChecked();
-
-  await page.getByRole("switch").click();
   await expect(
-    page.getByText("Submission emails turned off", { exact: true })
-  ).toBeVisible();
+    page.getByRole("switch", { name: "New feedback" })
+  ).not.toBeChecked();
+  await expect(
+    page.getByRole("switch", { name: "Post status changes" })
+  ).toBeChecked();
 
+  // The changelog tab holds its own toggle.
+  await page.getByRole("tab", { name: "Changelog" }).click();
+  const changelog = page.getByRole("switch", {
+    name: "Changelog published",
+  });
+  await expect(changelog).toBeChecked();
+
+  // The workspace pause disables the categories but keeps their state.
+  await pause.click();
+  await expect(changelog).toBeDisabled();
   await page.reload();
-  await expect(page.getByRole("switch")).not.toBeChecked();
+  await page.getByRole("tab", { name: "Changelog" }).click();
+  await expect(
+    page.getByRole("switch", { name: "Pause all notification emails" })
+  ).toBeChecked();
+  await expect(
+    page.getByRole("switch", { name: "Changelog published" })
+  ).toBeDisabled();
+
+  // Turning the pause back off restores the category choices.
+  await page
+    .getByRole("switch", { name: "Pause all notification emails" })
+    .click();
+  await expect(
+    page.getByRole("switch", { name: "Changelog published" })
+  ).toBeChecked();
 });

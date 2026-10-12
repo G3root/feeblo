@@ -1,6 +1,6 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
 
-import { boardCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 /**
  * The organization's boards in collection order.
@@ -9,6 +9,7 @@ import { boardCollection } from "~/lib/collections";
  * the sidebar, board pickers, and dialogs share the same live query.
  */
 export function useOrgBoards(organizationId: string) {
+  const { boardCollection } = useDashboardCollections();
   return useLiveQuery({
     queryKey: ["org-boards", boardCollection.id, organizationId],
     query: (q) =>

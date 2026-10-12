@@ -34,23 +34,13 @@ describe("email entitlement policy", () => {
             createdAt: yield* DateTime.nowAsDate,
           });
 
-          const recipientLimit =
-            yield* policy.submissionNotificationRecipientLimit(organizationId);
           const maySubscribe =
             yield* policy.mayCreatePublicEmailSubscriptions(organizationId);
-          const maySendSubmission = yield* policy.mayMaterializeEmailIntent({
-            organizationId,
-            kind: "submission.created",
-          });
-          const maySendStatus = yield* policy.mayMaterializeEmailIntent({
-            organizationId,
-            kind: "post.status_changed",
-          });
+          const mayEmailSubscribers =
+            yield* policy.mayEmailSubscribers(organizationId);
 
-          expect(recipientLimit).toBe(1);
           expect(maySubscribe).toBe(false);
-          expect(maySendSubmission).toBe(true);
-          expect(maySendStatus).toBe(false);
+          expect(mayEmailSubscribers).toBe(false);
         })
     );
 
@@ -98,18 +88,13 @@ describe("email entitlement policy", () => {
             updatedAt: now,
           });
 
-          const recipientLimit =
-            yield* policy.submissionNotificationRecipientLimit(organizationId);
           const maySubscribe =
             yield* policy.mayCreatePublicEmailSubscriptions(organizationId);
-          const mayPublishChangelog = yield* policy.mayMaterializeEmailIntent({
-            organizationId,
-            kind: "changelog.published",
-          });
+          const mayEmailSubscribers =
+            yield* policy.mayEmailSubscribers(organizationId);
 
-          expect(recipientLimit).toBeNull();
           expect(maySubscribe).toBe(true);
-          expect(mayPublishChangelog).toBe(true);
+          expect(mayEmailSubscribers).toBe(true);
         })
     );
   });

@@ -27,7 +27,16 @@ const PERMISSION_ACTIONS = {
   members: ["invite", "remove", "assign"],
   billing: ["update"],
   site: ["update"],
-  boards: ["create", "update", "delete"],
+  boards: [
+    "create",
+    "update",
+    "delete",
+    // Board CSV transfer (docs/data-transfer.md). Importing posts and reading
+    // the environment's data back out are separate authorities: a workspace
+    // may want the audit trail of an export without letting a bulk write in.
+    "importPosts",
+    "exportData",
+  ],
   posts: [
     "update",
     "delete",
@@ -52,6 +61,7 @@ const PERMISSION_ACTIONS = {
   changelog: ["create", "update", "publish", "delete"],
   "changelog-categories": ["create", "update", "delete"],
   roadmap: ["create", "update", "delete"],
+  statuses: ["create", "update", "delete"],
   tags: ["create", "update", "delete"],
   contacts: ["create", "update", "delete"],
   companies: ["create", "update", "delete"],
@@ -85,6 +95,7 @@ export const PERMISSIONS = [
     PERMISSION_ACTIONS["changelog-categories"]
   ),
   ...createPermissions("roadmap", PERMISSION_ACTIONS.roadmap),
+  ...createPermissions("statuses", PERMISSION_ACTIONS.statuses),
   ...createPermissions("tags", PERMISSION_ACTIONS.tags),
   ...createPermissions("contacts", PERMISSION_ACTIONS.contacts),
   ...createPermissions("companies", PERMISSION_ACTIONS.companies),

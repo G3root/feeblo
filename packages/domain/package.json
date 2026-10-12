@@ -142,6 +142,21 @@
     "./content-limits": {
       "default": "./src/content-limits.ts"
     },
+    "./data-transfer/errors": {
+      "default": "./src/data-transfer/errors.ts"
+    },
+    "./data-transfer/limits": {
+      "default": "./src/data-transfer/limits.ts"
+    },
+    "./data-transfer/repository": {
+      "default": "./src/data-transfer/repository.ts"
+    },
+    "./data-transfer/schema": {
+      "default": "./src/data-transfer/schema.ts"
+    },
+    "./data-transfer/worker": {
+      "default": "./src/data-transfer/worker.ts"
+    },
     "./email-outbox/config": {
       "default": "./src/email-outbox/config.ts"
     },
@@ -178,14 +193,35 @@
     "./identity/linking": {
       "default": "./src/identity/linking.ts"
     },
-    "./identity/service": {
-      "default": "./src/identity/service.ts"
-    },
     "./identity/on-behalf": {
       "default": "./src/identity/on-behalf.ts"
     },
+    "./identity/service": {
+      "default": "./src/identity/service.ts"
+    },
     "./import-export/schema": {
       "default": "./src/import-export/schema.ts"
+    },
+    "./integration/chat": {
+      "default": "./src/integration/chat/index.ts"
+    },
+    "./integration/chat/errors": {
+      "default": "./src/integration/chat/errors.ts"
+    },
+    "./integration/chat/feedback-service": {
+      "default": "./src/integration/chat/feedback-service.ts"
+    },
+    "./integration/chat/management-service": {
+      "default": "./src/integration/chat/management-service.ts"
+    },
+    "./integration/chat/management-shared": {
+      "default": "./src/integration/chat/management-shared.ts"
+    },
+    "./integration/chat/oauth-callback": {
+      "default": "./src/integration/chat/oauth-callback.ts"
+    },
+    "./integration/chat/rpc-handlers": {
+      "default": "./src/integration/chat/rpc-handlers.ts"
     },
     "./integration/config": {
       "default": "./src/integration/config.ts"
@@ -195,9 +231,6 @@
     },
     "./integration/discord/config": {
       "default": "./src/integration/discord/config.ts"
-    },
-    "./integration/discord/errors": {
-      "default": "./src/integration/discord/errors.ts"
     },
     "./integration/discord/inbound-service": {
       "default": "./src/integration/discord/inbound-service.ts"
@@ -277,9 +310,6 @@
     "./integration/slack/config": {
       "default": "./src/integration/slack/config.ts"
     },
-    "./integration/slack/errors": {
-      "default": "./src/integration/slack/errors.ts"
-    },
     "./integration/slack/inbound-service": {
       "default": "./src/integration/slack/inbound-service.ts"
     },
@@ -312,6 +342,27 @@
     },
     "./membership/schema": {
       "default": "./src/membership/schema.ts"
+    },
+    "./notification-preference/api-contract": {
+      "default": "./src/notification-preference/api-contract.ts"
+    },
+    "./notification-preference/api-live": {
+      "default": "./src/notification-preference/api-live.ts"
+    },
+    "./notification-preference/handlers": {
+      "default": "./src/notification-preference/handlers.ts"
+    },
+    "./notification-preference/repository": {
+      "default": "./src/notification-preference/repository.ts"
+    },
+    "./notification-preference/rpcs": {
+      "default": "./src/notification-preference/rpcs.ts"
+    },
+    "./notification-preference/schema": {
+      "default": "./src/notification-preference/schema.ts"
+    },
+    "./notification-preference/tokens": {
+      "default": "./src/notification-preference/tokens.ts"
     },
     "./notification/schema": {
       "default": "./src/notification/schema.ts"
@@ -373,14 +424,14 @@
     "./post/embedding-service": {
       "default": "./src/post/embedding-service.ts"
     },
-    "./post/write": {
-      "default": "./src/post/write.ts"
-    },
     "./post/repository": {
       "default": "./src/post/repository.ts"
     },
     "./post/schema": {
       "default": "./src/post/schema.ts"
+    },
+    "./post/write": {
+      "default": "./src/post/write.ts"
     },
     "./pricing/schema": {
       "default": "./src/pricing/schema.ts"

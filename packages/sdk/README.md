@@ -145,10 +145,10 @@ Feeblo.identify({
 You can also use the same JWT to sign users into your public Feeblo board automatically. Redirect them to:
 
 ```
-https://feedback.yourdomain.com/?ssoToken=JWT
+https://feedback.yourdomain.com/#ssoToken=JWT
 ```
 
-Feeblo will verify the token, create a session, and redirect the user back with the token removed from the URL.
+The token belongs in the URL **fragment**, never the query string: a fragment is not sent to the server, does not appear in `Referer`, and does not reach access logs or analytics. Feeblo will verify the token, create a session, and strip it from the URL.
 
 Links marked with `data-feeblo-link` receive the JWT from the most recent `identify` call automatically when the user interacts with them:
 
@@ -156,7 +156,7 @@ Links marked with `data-feeblo-link` receive the JWT from the most recent `ident
 <a href="https://feedback.yourdomain.com/" data-feeblo-link> Give feedback </a>
 ```
 
-The SDK adds `?ssoToken=JWT` on mouse, keyboard, and context-menu interaction. The public board exchanges it for a restricted session cookie and immediately removes the token from the visible URL.
+The SDK adds `#ssoToken=JWT` — in the fragment, never the query string — on mouse, keyboard, and context-menu interaction. The public board exchanges it for a restricted session cookie and immediately removes the token from the visible URL.
 
 For safety, the token is only attached to links whose origin is the embedding page origin, a subdomain of the embedding page host (for example `feedback.yourdomain.com` from `yourdomain.com`), the configured `baseUrl` widget host, or an origin listed in `autoLoginOrigins`. List any other feedback domain explicitly:
 

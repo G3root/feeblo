@@ -14,10 +14,12 @@ import { CommentReactionRpcHandlers } from "./comment-reaction/handlers";
 import { CommentRpcHandlers } from "./comments/handlers";
 import { CompanyRpcHandlers } from "./company/handlers";
 import { ContactRpcHandlers } from "./contact/handlers";
+import { DataTransferRpcHandlers } from "./data-transfer/handlers";
 import { EmailSubscriptionRpcHandlers } from "./email-subscription/handlers";
 import { ExternalResourceRpcHandlers } from "./integration/external-resource/handlers";
 import { JwtSecretRpcHandlers } from "./jwt-secret/handlers";
 import { MembershipRpcHandlers } from "./membership/handlers";
+import { NotificationPreferenceRpcHandlers } from "./notification-preference/handlers";
 import { NotificationRpcHandlers } from "./notification/handlers";
 import { OrganizationRpcHandlers } from "./organization/handlers";
 import { PostActivityRpcHandlers } from "./post-activity/handlers";
@@ -70,10 +72,12 @@ export const RpcHandlerRegistrations = {
   ApiKey: ApiKeyRpcHandlers,
   Membership: MembershipRpcHandlers,
   Notification: NotificationRpcHandlers,
+  NotificationPreference: NotificationPreferenceRpcHandlers,
   Organization: OrganizationRpcHandlers,
   CommentReaction: CommentReactionRpcHandlers,
   Comment: CommentRpcHandlers,
   Company: CompanyRpcHandlers,
+  DataTransfer: DataTransferRpcHandlers,
   Site: SiteRpcHandlers,
   Tag: TagRpcHandlers,
   Upvote: UpvoteRpcHandlers,

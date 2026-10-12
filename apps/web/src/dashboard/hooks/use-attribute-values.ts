@@ -1,15 +1,13 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
 
-import {
-  companyAttributeValueCollection,
-  contactAttributeValueCollection,
-} from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 /**
  * Attribute values for one contact/company. These run once per table row, so
  * the explicit keys keep a list render from rebuilding each row's IR.
  */
 export function useContactAttributeValues(contactId: string) {
+  const { contactAttributeValueCollection } = useDashboardCollections();
   return useLiveQuery({
     queryKey: [
       "contact-attribute-values",
@@ -24,6 +22,7 @@ export function useContactAttributeValues(contactId: string) {
 }
 
 export function useCompanyAttributeValues(companyId: string) {
+  const { companyAttributeValueCollection } = useDashboardCollections();
   return useLiveQuery({
     queryKey: [
       "company-attribute-values",

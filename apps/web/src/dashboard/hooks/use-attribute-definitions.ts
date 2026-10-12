@@ -1,9 +1,6 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
 
-import {
-  companyAttributeDefinitionCollection,
-  contactAttributeDefinitionCollection,
-} from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 /**
  * The organization's attribute definitions, oldest first. The contact and
@@ -11,6 +8,7 @@ import {
  * with its own identity.
  */
 export function useContactAttributeDefinitions(organizationId: string) {
+  const { contactAttributeDefinitionCollection } = useDashboardCollections();
   return useLiveQuery({
     queryKey: [
       "attribute-definitions",
@@ -26,6 +24,7 @@ export function useContactAttributeDefinitions(organizationId: string) {
 }
 
 export function useCompanyAttributeDefinitions(organizationId: string) {
+  const { companyAttributeDefinitionCollection } = useDashboardCollections();
   return useLiveQuery({
     queryKey: [
       "attribute-definitions",

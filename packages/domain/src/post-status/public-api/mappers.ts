@@ -1,5 +1,6 @@
 import type { TPostStatusType } from "@feeblo/domain-contracts/post-status-type";
 
+import { statusDisplayName } from "../display-name";
 import type { TPublicApiStatusDetail } from "./schema";
 
 /**
@@ -38,25 +39,11 @@ export const toStatusSource = (row: {
  * The human-readable name of a status.
  *
  * `post_status.label` is user-facing and may be empty until a workspace
- * customizes it, and an API response with an empty status name is useless. The
- * dashboard and portal fall back to the same humanized type through
- * `@feeblo/web-shared/board/constants`, which this package cannot import
- * without inverting the dependency direction, so the rule is restated here —
- * once, for both the status resource and the status embedded in a post payload.
+ * customizes it, and an API response with an empty status name is useless.
+ * The rule lives in `../display-name` so the post list, the status resource,
+ * and the board CSV export all name a status the same way.
  */
-export const statusDisplayName = (
-  label: string,
-  type: TPostStatusType
-): string => {
-  const trimmed = label.trim();
-  if (trimmed.length > 0) {
-    return trimmed;
-  }
-
-  const [first = "", ...rest] = type.toLowerCase().split("_");
-  const capitalized = first.charAt(0).toUpperCase() + first.slice(1);
-  return [capitalized, ...rest].join(" ");
-};
+export { statusDisplayName } from "../display-name";
 
 /** One status as the status endpoint returns it. */
 export const toPublicApiStatusDetail = (

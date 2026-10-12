@@ -16,7 +16,6 @@ import {
 } from "../rate-limit";
 import { RateLimitService } from "../rate-limit/service";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
-import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -28,8 +27,6 @@ import {
   type EmailSubscriptionInputError,
   type EmailSubscriptionTokenRequest,
   parseEmailAddress,
-  type SubmissionNotificationPreferenceQuery,
-  type SubmissionNotificationPreferenceRequest,
 } from "./schema";
 import type { EmailSubscriptionTokenError } from "./tokens";
 
@@ -160,8 +157,6 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
 /** RPC adapter which deliberately removes redacted link tokens from responses. */
 export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   const consent = yield* EmailSubscriptionConsentHandlersEffect;
-  const entitlementPolicy = yield* EntitlementPolicy;
-  const repository = yield* EmailSubscriptionRepository;
   const sitePolicy = yield* SitePolicy;
 
   const internalConsentFailure = (
@@ -180,27 +175,6 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
         )
       )
     );
-
-  /**
-   * Submission notifications only ever go to owners and administrators, so
-   * reading or writing the preference is authorized the same way and the
-   * refusal reason describes both operations.
-   */
-  const requireSubmissionNotificationAdmin = (organizationId: string) =>
-    Effect.gen(function* () {
-      const session = yield* CurrentSession;
-      const membership = Policy.getMembership(session, organizationId);
-      if (
-        membership === undefined ||
-        (membership.role !== "owner" && membership.role !== "admin")
-      ) {
-        return yield* new Policy.PolicyDeniedError({
-          reason:
-            "Only workspace owners and administrators can receive submission notification email.",
-        });
-      }
-      return session;
-    });
 
   return {
     EmailSubscriptionChangelogSubscribePublic: ({
@@ -234,63 +208,6 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       consent.verifySubscription({ verificationToken: token }).pipe(
         Effect.catchTags({
           EmailSubscriptionDataError: internalConsentFailure,
-          EmailSubscriptionTokenError: internalConsentFailure,
-        }),
-        withRemapDbErrors("EmailSubscription", "update")
-      ),
-    EmailSubmissionNotificationPreferenceGet: ({
-      organizationId,
-    }: SubmissionNotificationPreferenceQuery) =>
-      Effect.gen(function* () {
-        const session =
-          yield* requireSubmissionNotificationAdmin(organizationId);
-        const subscription = yield* repository.findAuthenticatedSubscription({
-          organizationId,
-          topic: { topicId: null, topicType: "submission" },
-          userId: session.session.userId,
-        });
-        return { enabled: subscription?.state === "active" };
-      }).pipe(withRemapDbErrors("EmailSubscription", "select")),
-    EmailSubmissionNotificationPreferenceSet: ({
-      enabled,
-      organizationId,
-    }: SubmissionNotificationPreferenceRequest) =>
-      Effect.gen(function* () {
-        const session =
-          yield* requireSubmissionNotificationAdmin(organizationId);
-        const now = yield* DateTime.nowAsDate;
-        if (enabled) {
-          const recipientLimit =
-            yield* entitlementPolicy.submissionNotificationRecipientLimit(
-              organizationId
-            );
-          yield* transaction(
-            repository.configureSubmissionNotificationRecipient({
-              alreadyVerifiedUser: { userId: session.session.userId },
-              email: session.user.email,
-              now,
-              organizationId,
-              replaceOtherRecipients: recipientLimit === 1,
-              source: "explicit",
-              topic: { topicId: null, topicType: "submission" },
-              verificationExpiresAt: null,
-            })
-          );
-        } else {
-          yield* transaction(
-            repository.unsubscribeAuthenticatedSubscription({
-              now,
-              organizationId,
-              topic: { topicId: null, topicType: "submission" },
-              userId: session.session.userId,
-            })
-          );
-        }
-        return { enabled };
-      }).pipe(
-        Effect.catchTags({
-          EmailSubscriptionDataError: internalConsentFailure,
-          EmailSubscriptionInputError: internalConsentFailure,
           EmailSubscriptionTokenError: internalConsentFailure,
         }),
         withRemapDbErrors("EmailSubscription", "update")

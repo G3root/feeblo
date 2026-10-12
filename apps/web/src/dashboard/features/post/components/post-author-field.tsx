@@ -76,7 +76,6 @@ export function PostAuthorField() {
       display={{
         name: post.user.name ?? "Unknown author",
         avatarUrl: post.user.image,
-        isMember: post.authorIsMember,
       }}
       label="Change author"
       onSelect={handleSelect}

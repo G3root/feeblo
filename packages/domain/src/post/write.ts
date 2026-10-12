@@ -26,7 +26,6 @@ import { EmailOutboxConfig } from "../email-outbox/config";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
-import { EntitlementPolicy } from "../entitlement/policies";
 import {
   resolveOnBehalfSubject,
   subscribeOnBehalfSubject,
@@ -93,7 +92,13 @@ export type PostWriteActor =
       readonly name: string | null | undefined;
       readonly userId: string;
     }
-  | { readonly kind: "api_key" };
+  | { readonly kind: "api_key" }
+  /**
+   * A bulk backfill with nobody to attribute it to — the uploader's account
+   * is gone, or the job predates them. Timeline entries record no actor and
+   * the person-shaped side effects are skipped, exactly as for a key.
+   */
+  | { readonly kind: "import" };
 
 /** What a create needs, decoupled from the RPC request schema. */
 export type PostCreateWrite = {
@@ -144,6 +149,16 @@ type PostCreateWriteOptions = {
    * must not put its author on the watch-list.
    */
   readonly creatorUserId?: string;
+  /**
+   * `"backfill"` marks a historical bulk load (a CSV import) rather than a
+   * live change. It skips the person-shaped side effects a backfilled post
+   * must not fire — the integration event, the creator's subscription, the
+   * submission notification, and the per-row embedding job — and the
+   * on-behalf abuse bound, which exists to pace interactive writes rather
+   * than a bounded batch. The post, its slug, its sanitized content and its
+   * timeline entry are identical in both modes.
+   */
+  readonly mode?: "interactive" | "backfill";
 };
 
 /**
@@ -222,7 +237,6 @@ const makePostWriteService = Effect.gen(function* () {
   const emailOutbox = yield* EmailOutboxRepository;
   const emailOutboxConfig = yield* EmailOutboxConfig;
   const emailSubscriptions = yield* EmailSubscriptionRepository;
-  const entitlementPolicy = yield* EntitlementPolicy;
   const integrationEventRecorder = yield* IntegrationEventRecorder;
   const activityRepository = yield* PostActivityRepository;
   const repository = yield* PostRepository;
@@ -250,7 +264,6 @@ const makePostWriteService = Effect.gen(function* () {
     Context.add(EmailOutboxConfig, emailOutboxConfig),
     Context.add(EmailOutboxRepository, emailOutbox),
     Context.add(EmailSubscriptionRepository, emailSubscriptions),
-    Context.add(EntitlementPolicy, entitlementPolicy),
     Context.add(IntegrationEventRecorder, integrationEventRecorder),
     Context.add(PostActivityRepository, activityRepository),
     Context.add(PostRepository, repository),
@@ -435,6 +448,7 @@ const makePostWriteService = Effect.gen(function* () {
     options: PostCreateWriteOptions = {}
   ) =>
     Effect.gen(function* () {
+      const backfill = options.mode === "backfill";
       // Optional capabilities resolve from the running context, so a
       // composition that omits them skips the fan-out instead of failing.
       const notifications = yield* Effect.serviceOption(NotificationService);
@@ -446,7 +460,7 @@ const makePostWriteService = Effect.gen(function* () {
       const { source, ...write } = args;
       const writeSource = options.source ?? source;
 
-      if (member !== null && args.author !== undefined) {
+      if (!backfill && member !== null && args.author !== undefined) {
         // Per-member abuse bound for on-behalf creations (see
         // plan-on-behalf.md); self-service creates are unaffected. Runs before
         // asset prep so a limited request does no work.
@@ -549,122 +563,123 @@ const makePostWriteService = Effect.gen(function* () {
             kind: "POST_CREATED",
             ...(onBehalfMetadata && { metadata: onBehalfMetadata }),
           });
-          yield* recordPostIntegrationEvent({
-            actor,
-            boardId: args.boardId,
-            eventType: "post.created",
-            ...(args.metadata !== undefined && { metadata: args.metadata }),
-            organizationId: args.organizationId,
-            postId: args.id,
-            postSlug: persistedSlug,
-            statusId: args.statusId,
-            title: args.title,
-          });
-
-          // The creator of a post is automatically subscribed to it.
-          // On-behalf posts subscribe the resolved customer instead of the
-          // staff actor, following the same notification-eligibility rules: a
-          // verified account is trusted, everyone else is deferred until
-          // identity linking grants them access. A machine key has no person
-          // behind it, so there is nobody to subscribe — an inbound create
-          // attributes the post to its resolved author without watch-listing
-          // them.
-          const subscriptionNow = yield* DateTime.nowAsDate;
-          if (subject === undefined) {
-            const creator =
-              member !== null
-                ? {
-                    email: member.email,
-                    memberId: member.memberId,
-                    userId: member.userId,
-                  }
-                : undefined;
-            if (creator !== undefined) {
-              yield* subscriptionRepository.subscribe({
-                organizationId: args.organizationId,
-                postId: args.id,
-                userId: creator.userId,
-                ...(creator.memberId !== null && {
-                  memberId: creator.memberId,
-                }),
-              });
-              if (creator.email !== undefined) {
-                yield* emailSubscriptions
-                  .requestSubscription({
-                    alreadyVerifiedUser: { userId: creator.userId },
-                    email: creator.email,
-                    now: subscriptionNow,
-                    organizationId: args.organizationId,
-                    source: "post_creator",
-                    topic: { topicId: args.id, topicType: "post" },
-                    verificationExpiresAt: DateTime.fromDateUnsafe(
-                      subscriptionNow
-                    ).pipe(
-                      DateTime.addDuration(Duration.days(1)),
-                      DateTime.toDate
-                    ),
-                  })
-                  .pipe(
-                    Effect.mapError(
-                      () =>
-                        new InternalServerError({
-                          message:
-                            "Could not record the post creator email subscription.",
-                        })
-                    )
-                  );
-              }
-            }
-          } else {
-            // In-app watch-list parity for the attributed author.
-            if (subject.userId !== null) {
-              yield* subscriptionRepository.subscribe({
-                organizationId: args.organizationId,
-                postId: args.id,
-                userId: subject.userId,
-              });
-            }
-            yield* subscribeOnBehalfSubject({
-              organizationId: args.organizationId,
-              topicId: args.id,
-              subject,
-              source: "post_creator",
-              subjectKind: "post author",
-              now: subscriptionNow,
-            });
-          }
-
-          const submissionWindow = yield* emailOutbox
-            .upsertPendingSubmissionWindow({
-              now: subscriptionNow,
+          let outboxId: string | undefined;
+          if (!backfill) {
+            yield* recordPostIntegrationEvent({
+              actor,
+              boardId: args.boardId,
+              eventType: "post.created",
+              ...(args.metadata !== undefined && { metadata: args.metadata }),
               organizationId: args.organizationId,
               postId: args.id,
-            })
-            .pipe(
-              Effect.mapError(
-                () =>
-                  new InternalServerError({
-                    message: "Could not record submission email intent.",
-                  })
-              )
-            );
-          yield* Option.match(notifications, {
-            onNone: () => Effect.void,
-            onSome: (service) =>
-              service.notifySubmission({
+              postSlug: persistedSlug,
+              statusId: args.statusId,
+              title: args.title,
+            });
+
+            // The creator of a post is automatically subscribed to it.
+            // On-behalf posts subscribe the resolved customer instead of the
+            // staff actor, following the same notification-eligibility rules: a
+            // verified account is trusted, everyone else is deferred until
+            // identity linking grants them access. A machine key has no person
+            // behind it, so there is nobody to subscribe — an inbound create
+            // attributes the post to its resolved author without watch-listing
+            // them.
+            const subscriptionNow = yield* DateTime.nowAsDate;
+            if (subject === undefined) {
+              const creator =
+                member !== null
+                  ? {
+                      email: member.email,
+                      memberId: member.memberId,
+                      userId: member.userId,
+                    }
+                  : undefined;
+              if (creator !== undefined) {
+                yield* subscriptionRepository.subscribe({
+                  organizationId: args.organizationId,
+                  postId: args.id,
+                  userId: creator.userId,
+                  ...(creator.memberId !== null && {
+                    memberId: creator.memberId,
+                  }),
+                });
+                if (creator.email !== undefined) {
+                  yield* emailSubscriptions
+                    .requestSubscription({
+                      alreadyVerifiedUser: { userId: creator.userId },
+                      email: creator.email,
+                      now: subscriptionNow,
+                      organizationId: args.organizationId,
+                      source: "post_creator",
+                      topic: { topicId: args.id, topicType: "post" },
+                      verificationExpiresAt: DateTime.fromDateUnsafe(
+                        subscriptionNow
+                      ).pipe(
+                        DateTime.addDuration(Duration.days(1)),
+                        DateTime.toDate
+                      ),
+                    })
+                    .pipe(
+                      Effect.mapError(
+                        () =>
+                          new InternalServerError({
+                            message:
+                              "Could not record the post creator email subscription.",
+                          })
+                      )
+                    );
+                }
+              }
+            } else {
+              // In-app watch-list parity for the attributed author.
+              if (subject.userId !== null) {
+                yield* subscriptionRepository.subscribe({
+                  organizationId: args.organizationId,
+                  postId: args.id,
+                  userId: subject.userId,
+                });
+              }
+              yield* subscribeOnBehalfSubject({
+                organizationId: args.organizationId,
+                topicId: args.id,
+                subject,
+                source: "post_creator",
+                subjectKind: "post author",
+                now: subscriptionNow,
+              });
+            }
+
+            const submissionWindow = yield* emailOutbox
+              .upsertPendingSubmissionWindow({
+                now: subscriptionNow,
                 organizationId: args.organizationId,
                 postId: args.id,
-                actorUserId: member?.userId ?? null,
-              }),
-          });
+              })
+              .pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message: "Could not record submission email intent.",
+                    })
+                )
+              );
+            yield* Option.match(notifications, {
+              onNone: () => Effect.void,
+              onSome: (service) =>
+                service.notifySubmission({
+                  organizationId: args.organizationId,
+                  postId: args.id,
+                  actorUserId: member?.userId ?? null,
+                }),
+            });
 
-          return {
-            slug: persistedSlug,
-            outboxId:
-              submissionWindow._tag === "Written"
-                ? submissionWindow.intentId
-                : undefined,
-          };
+            if (submissionWindow._tag === "Written") {
+              outboxId = submissionWindow.intentId;
+            }
+          }
+
+          return { slug: persistedSlug, outboxId };
         })
       ).pipe(
         Effect.tapCause(() =>
@@ -674,12 +689,14 @@ const makePostWriteService = Effect.gen(function* () {
       );
 
       yield* wakeEmailOutboxBestEffort(persisted.outboxId, args.organizationId);
-      yield* scheduleEmbedding({
-        content: prepared.content,
-        id: args.id,
-        organizationId: args.organizationId,
-        title: args.title,
-      });
+      if (!backfill) {
+        yield* scheduleEmbedding({
+          content: prepared.content,
+          id: args.id,
+          organizationId: args.organizationId,
+          title: args.title,
+        });
+      }
 
       // The slug actually persisted by the insert (including any collision
       // suffix) so callers can reference the stored post.
@@ -960,77 +977,75 @@ const makePostWriteService = Effect.gen(function* () {
             title: finalTitle,
           });
 
-          const maySend = yield* entitlementPolicy.mayMaterializeEmailIntent({
-            organizationId: args.organizationId,
-            kind: "post.status_changed",
-          });
-          if (maySend) {
-            const now = yield* DateTime.nowAsDate;
-            if (nextStatus?.type === "CLOSED") {
-              const result = yield* emailOutbox
-                .recordIntent({
-                  aggregateId: args.id,
-                  aggregateType: "post",
-                  // Timestamped like the merge and unmerge intents, so closing
-                  // a post, reopening it, and closing it again announces each
-                  // closure instead of matching the first attempt forever.
-                  deduplicationKey: `post.closed:${args.organizationId}:${args.id}:${args.statusId}:${now.getTime()}`,
-                  expiresAt: DateTime.fromDateUnsafe(now).pipe(
-                    DateTime.addDuration(Duration.days(7)),
-                    DateTime.toDate
-                  ),
+          const now = yield* DateTime.nowAsDate;
+          if (nextStatus?.type === "CLOSED") {
+            const result = yield* emailOutbox
+              .recordIntent({
+                aggregateId: args.id,
+                aggregateType: "post",
+                // Timestamped like the merge and unmerge intents, so closing
+                // a post, reopening it, and closing it again announces each
+                // closure instead of matching the first attempt forever.
+                deduplicationKey: `post.closed:${args.organizationId}:${args.id}:${args.statusId}:${now.getTime()}`,
+                expiresAt: DateTime.fromDateUnsafe(now).pipe(
+                  DateTime.addDuration(Duration.days(7)),
+                  DateTime.toDate
+                ),
+                kind: "post.closed",
+                organizationId: args.organizationId,
+                payload: {
+                  actorUserId: member?.userId ?? null,
                   kind: "post.closed",
-                  organizationId: args.organizationId,
-                  payload: { kind: "post.closed", postId: args.id },
-                  scheduledAt: now,
-                })
-                .pipe(
-                  Effect.mapError(
-                    () =>
-                      new InternalServerError({
-                        message: "Could not record post closure email intent.",
-                      })
-                  )
-                );
-              outboxId =
-                result._tag === "Inserted" ? result.intent.id : undefined;
-            } else {
-              const result = yield* emailOutbox
-                .upsertPendingStatusChange({
-                  aggregateId: args.id,
-                  aggregateType: "post",
-                  deduplicationKey: `post.status_changed:${args.organizationId}:${args.id}:${now.getTime()}`,
-                  expiresAt: DateTime.fromDateUnsafe(now).pipe(
-                    DateTime.addDuration(
-                      Duration.millis(postStatusCoalescingDelayMs)
-                    ),
-                    DateTime.addDuration(Duration.days(7)),
-                    DateTime.toDate
+                  postId: args.id,
+                },
+                scheduledAt: now,
+              })
+              .pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message: "Could not record post closure email intent.",
+                    })
+                )
+              );
+            outboxId =
+              result._tag === "Inserted" ? result.intent.id : undefined;
+          } else {
+            const result = yield* emailOutbox
+              .upsertPendingStatusChange({
+                aggregateId: args.id,
+                aggregateType: "post",
+                deduplicationKey: `post.status_changed:${args.organizationId}:${args.id}:${now.getTime()}`,
+                expiresAt: DateTime.fromDateUnsafe(now).pipe(
+                  DateTime.addDuration(
+                    Duration.millis(postStatusCoalescingDelayMs)
                   ),
-                  organizationId: args.organizationId,
-                  payload: {
-                    kind: "post.status_changed",
-                    postId: args.id,
-                    statusId: args.statusId,
-                  },
-                  scheduledAt: DateTime.fromDateUnsafe(now).pipe(
-                    DateTime.addDuration(
-                      Duration.millis(postStatusCoalescingDelayMs)
-                    ),
-                    DateTime.toDate
+                  DateTime.addDuration(Duration.days(7)),
+                  DateTime.toDate
+                ),
+                organizationId: args.organizationId,
+                payload: {
+                  actorUserId: member?.userId ?? null,
+                  kind: "post.status_changed",
+                  postId: args.id,
+                  statusId: args.statusId,
+                },
+                scheduledAt: DateTime.fromDateUnsafe(now).pipe(
+                  DateTime.addDuration(
+                    Duration.millis(postStatusCoalescingDelayMs)
                   ),
-                })
-                .pipe(
-                  Effect.mapError(
-                    () =>
-                      new InternalServerError({
-                        message: "Could not record post status email intent.",
-                      })
-                  )
-                );
-              outboxId =
-                result._tag === "Written" ? result.intent.id : undefined;
-            }
+                  DateTime.toDate
+                ),
+              })
+              .pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message: "Could not record post status email intent.",
+                    })
+                )
+              );
+            outboxId = result._tag === "Written" ? result.intent.id : undefined;
           }
 
           yield* Option.match(notifications, {
@@ -1192,14 +1207,6 @@ const makePostWriteService = Effect.gen(function* () {
                 targetPostId: args.targetPostId,
               }),
           });
-          if (
-            !(yield* entitlementPolicy.mayMaterializeEmailIntent({
-              kind: "post.merged",
-              organizationId: args.organizationId,
-            }))
-          ) {
-            return undefined;
-          }
           const now = yield* DateTime.nowAsDate;
           const result = yield* emailOutbox
             .recordIntent({
@@ -1213,6 +1220,7 @@ const makePostWriteService = Effect.gen(function* () {
               kind: "post.merged",
               organizationId: args.organizationId,
               payload: {
+                actorUserId: member?.userId ?? null,
                 kind: "post.merged",
                 postId: args.sourcePostId,
                 targetPostId: args.targetPostId,
@@ -1269,14 +1277,6 @@ const makePostWriteService = Effect.gen(function* () {
                 targetPostId,
               }),
           });
-          if (
-            !(yield* entitlementPolicy.mayMaterializeEmailIntent({
-              kind: "post.unmerged",
-              organizationId: args.organizationId,
-            }))
-          ) {
-            return undefined;
-          }
           const now = yield* DateTime.nowAsDate;
           const result = yield* emailOutbox
             .recordIntent({
@@ -1292,6 +1292,7 @@ const makePostWriteService = Effect.gen(function* () {
               kind: "post.unmerged",
               organizationId: args.organizationId,
               payload: {
+                actorUserId: member?.userId ?? null,
                 kind: "post.unmerged",
                 postId: args.sourcePostId,
                 targetPostId,

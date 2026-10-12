@@ -665,12 +665,6 @@ const makeNotificationService = Effect.gen(function* () {
             // fallback icon expect.
             actorName: schema.userTable.name,
             actorImage: schema.userTable.image,
-            // The member tick the inbox draws on an actor's face. The actor's
-            // membership is joined per organization, not carried on the
-            // notification, so it reflects their current membership. A
-            // non-member actor (a public-board commenter, say) has no joined
-            // row and reports `false`.
-            actorIsMember: sql<boolean>`${schema.memberTable.id} is not null`,
             kind: schema.notificationTable.kind,
             resourceType: schema.notificationTable.resourceType,
             resourceId: schema.notificationTable.resourceId,
@@ -684,19 +678,6 @@ const makeNotificationService = Effect.gen(function* () {
           .leftJoin(
             schema.userTable,
             eq(schema.userTable.id, schema.notificationTable.actorUserId)
-          )
-          .leftJoin(
-            schema.memberTable,
-            and(
-              eq(
-                schema.memberTable.organizationId,
-                schema.notificationTable.organizationId
-              ),
-              eq(
-                schema.memberTable.userId,
-                schema.notificationTable.actorUserId
-              )
-            )
           )
           .where(
             and(

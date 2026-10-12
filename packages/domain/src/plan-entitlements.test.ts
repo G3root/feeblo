@@ -51,7 +51,6 @@ describe("plan feature catalog", () => {
         feedbackBoards: 5,
         privilegedMembers: 5,
         changelogCategories: null,
-        submissionNotificationRecipients: null,
         crmEntries: null,
         workspaces: null,
       },
@@ -74,10 +73,6 @@ describe("plan feature catalog", () => {
       { key: "feedbackBoards", label: "5 Feedback Boards" },
       { key: "privilegedMembers", label: "5 Admin Roles" },
       { key: "changelogCategories", label: "Unlimited Changelog Categories" },
-      {
-        key: "submissionNotificationRecipients",
-        label: "Unlimited Submission Notification Recipients",
-      },
       { key: "crmEntries", label: "Unlimited CRM Entries" },
       { key: "workspaces", label: "Unlimited Workspaces" },
       { key: "roadmap", label: "Roadmap" },

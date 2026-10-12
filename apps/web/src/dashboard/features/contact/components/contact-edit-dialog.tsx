@@ -39,7 +39,7 @@ import { useContactAttributeDefinitions } from "~/hooks/use-attribute-definition
 import { useContactAttributeValues } from "~/hooks/use-attribute-values";
 import { useOrgCompanies } from "~/hooks/use-org-companies";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { contactCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { useContactEditDialogContext } from "../dialog-stores";
 
@@ -65,6 +65,7 @@ export function ContactEditDialog() {
 
 function ContactEditForm() {
   const organizationId = useOrganizationId();
+  const { contactCollection } = useDashboardCollections();
   const store = useContactEditDialogContext();
   const contactId = useSelector(store, (state) => state.context.data.contactId);
   const { data } = useLiveQuery({

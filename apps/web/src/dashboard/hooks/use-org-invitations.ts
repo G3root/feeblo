@@ -1,6 +1,6 @@
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 
-import { invitationsCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 /**
  * The organization's pending invitations. `enabled` carries the policy gate
@@ -14,6 +14,7 @@ export function useOrgInvitations({
   organizationId: string;
   enabled: boolean;
 }) {
+  const { invitationsCollection } = useDashboardCollections();
   return useLiveQuery({
     queryKey: [
       "org-invitations",

@@ -1,10 +1,16 @@
+import { describe, expect, it } from "@effect/vitest";
 import { AlreadyCanceledSubscription } from "@polar-sh/sdk/models/errors/alreadycanceledsubscription";
 import { PolarError } from "@polar-sh/sdk/models/errors/polarerror";
 import { ResourceNotFound } from "@polar-sh/sdk/models/errors/resourcenotfound";
 import { SubscriptionLocked } from "@polar-sh/sdk/models/errors/subscriptionlocked";
-import { describe, expect, it } from "vitest";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 
-import { classifyPolarRevokeFailure, describeRevokeFailure } from "./service";
+import {
+  classifyPolarRevokeFailure,
+  describeRevokeFailure,
+  readOrganizationSubscriptionSettings,
+} from "./service";
 
 const httpMeta = (status: number) => ({
   body: "{}",
@@ -97,4 +103,45 @@ describe("describeRevokeFailure", () => {
       "no Polar answer (transport error)"
     );
   });
+});
+
+describe("readOrganizationSubscriptionSettings", () => {
+  it.effect("reads the token organization's settings", () =>
+    Effect.gen(function* () {
+      const settings = yield* readOrganizationSubscriptionSettings(() =>
+        Promise.resolve({
+          result: {
+            items: [
+              { subscriptionSettings: { allowMultipleSubscriptions: false } },
+            ],
+          },
+        })
+      );
+
+      expect(Option.isSome(settings)).toBe(true);
+      expect(Option.getOrThrow(settings).allowMultipleSubscriptions).toBe(
+        false
+      );
+    })
+  );
+
+  it.effect("reads an empty organization list as no settings", () =>
+    Effect.gen(function* () {
+      const settings = yield* readOrganizationSubscriptionSettings(() =>
+        Promise.resolve({ result: { items: [] } })
+      );
+
+      expect(Option.isNone(settings)).toBe(true);
+    })
+  );
+
+  it.effect("reads a failed lookup as no settings", () =>
+    Effect.gen(function* () {
+      const settings = yield* readOrganizationSubscriptionSettings(() =>
+        Promise.reject(new Error("Polar unreachable"))
+      );
+
+      expect(Option.isNone(settings)).toBe(true);
+    })
+  );
 });

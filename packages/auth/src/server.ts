@@ -122,6 +122,25 @@ export const initAuthHandler = (
       );
     }
 
+    // Polar caps a customer at one billable subscription by default, enforced
+    // on its hosted checkout page. Feeblo resolves a checkout customer by
+    // email (ADR 0013), so the cap is per buyer across workspaces: with the
+    // default, a person who already pays for one workspace cannot check out
+    // another, and the refusal lands on Polar's page after Feeblo has already
+    // handed the buyer off. Warn at startup so the operator sees the
+    // misconfiguration before a customer does. See docs/adr/0015.
+    if (polarService.client) {
+      const settings = yield* polarService.getOrganizationSettings();
+      if (
+        Option.isSome(settings) &&
+        !settings.value.allowMultipleSubscriptions
+      ) {
+        yield* Effect.logWarning(
+          "Polar allows only one active subscription per customer: a buyer who already pays for one workspace cannot check out another. Enable Organization Settings → Subscriptions → Allow multiple subscriptions."
+        );
+      }
+    }
+
     const isTest = nodeEnv === "test";
 
     const trustedOrigins = yield* getTrustedOrigins;

@@ -18,7 +18,7 @@ import {
 } from "~/features/tag/components/tag-select";
 import { TagCreateDialogProvider } from "~/features/tag/dialog-stores";
 import { useOrgTags } from "~/hooks/use-org-tags";
-import { postActivityCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -99,7 +99,9 @@ export function PostTagField() {
     // are the affected collection, so their read-back is awaited (settled);
     // the tag activity entry is derived and refreshes detached.
     await Promise.allSettled([postTagCollection.utils.refetch()]);
-    refetchInBackground(postActivityCollection.utils.refetch());
+    refetchInBackground(
+      dashboardCollections.postActivityCollection.utils.refetch()
+    );
 
     if (showSuccessToast) {
       toastManager.add({

@@ -38,6 +38,7 @@ const TestConfigProvider = ConfigProvider.fromUnknown({
   APP_URL: "https://app.feeblo.test",
   AUTH_ENCRYPTION_KEY: "test-auth-encryption-key-0123456789abcdef",
   DATABASE_URL: "pglite:memory://",
+  E2E_ROUTES_ENABLED: "true",
   E2E_TEST_MAILER: "true",
   INTEGRATION_ENCRYPTION_KEY:
     "test-integration-encryption-key-0123456789abcdef",

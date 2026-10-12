@@ -4,6 +4,11 @@ import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
 import { AssetRepository } from "@feeblo/domain/asset/repository";
 import { BoardRepository } from "@feeblo/domain/board/repository";
+import {
+  DataImportWorkerLive,
+  runDataImportMaintenance,
+  runDataImportWorker,
+} from "@feeblo/domain/data-transfer/worker";
 import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
 import { EmailOutboxRepository } from "@feeblo/domain/email-outbox/repository";
 import { EmailProviderFeedbackConfig } from "@feeblo/domain/email-provider-feedback/config";
@@ -12,6 +17,7 @@ import { SesEmailFeedbackWebhook } from "@feeblo/domain/email-provider-feedback/
 import { EmailSubscriptionRepository } from "@feeblo/domain/email-subscription/repository";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { ResolvePrincipalService } from "@feeblo/domain/identity/service";
+import { ChatFeedbackServiceLive } from "@feeblo/domain/integration/chat/feedback-service";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import {
@@ -20,6 +26,8 @@ import {
 } from "@feeblo/domain/integration/external-resource/service";
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
+import { NotificationPreferenceRepository } from "@feeblo/domain/notification-preference/repository";
+import { NotificationPreferenceTokenService } from "@feeblo/domain/notification-preference/tokens";
 import { NotificationService } from "@feeblo/domain/notification/service";
 import { PostActivityRepository } from "@feeblo/domain/post-activity/repository";
 import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
@@ -36,7 +44,6 @@ import { UserRepository } from "@feeblo/domain/user/repository";
 import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
 import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
-import { DiscordFeedbackServiceLive } from "@feeblo/integration-discord/discord-feedback-service";
 import { DiscordUserServiceLive } from "@feeblo/integration-discord/discord-user-service";
 import { DiscordInboundServiceLive } from "@feeblo/integration-discord/inbound-live";
 import { DiscordManagementServiceLive } from "@feeblo/integration-discord/management-live";
@@ -50,7 +57,6 @@ import { makeGitHubProviderLive } from "@feeblo/integration-github/github-provid
 import { SlackInboundServiceLive } from "@feeblo/integration-slack/inbound-live";
 import { SlackManagementServiceLive } from "@feeblo/integration-slack/management-live";
 import { SLACK_OAUTH_SCOPES } from "@feeblo/integration-slack/manifest";
-import { SlackFeedbackServiceLive } from "@feeblo/integration-slack/slack-feedback-service";
 import { SlackUserServiceLive } from "@feeblo/integration-slack/slack-user-service";
 import type { Mailer } from "@feeblo/transactional/mailer";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
@@ -265,7 +271,15 @@ export const makeServiceLayers = ({
   const PostWrites = PostWriteService.layer.pipe(
     Layer.provide(PostWriteDependencies)
   );
-  return Layer.mergeAll(
+  // The inbound feedback service is one provider-neutral service: Slack and
+  // Discord both deliver a submission into the shared post write path, so the
+  // two inbound services require the same instance rather than each building
+  // its own copy of the write environment.
+  const ChatFeedback = ChatFeedbackServiceLive.pipe(
+    Layer.provide(PostStatusRepository.layer),
+    Layer.provide(PostWrites)
+  );
+  const ServiceCore = Layer.mergeAll(
     workflowLayer,
     SiteRepository.layer,
     // The media-upload surfaces replace a singleton asset through the asset
@@ -285,6 +299,8 @@ export const makeServiceLayers = ({
       Layer.provide(FetchHttpClient.layer)
     ),
     EmailSubscriptionRepository.layer,
+    NotificationPreferenceRepository.layer,
+    NotificationPreferenceTokenService.layer,
     integrationRuntime.layer,
     ExternalResources,
     SlackManagementServiceLive.pipe(
@@ -294,12 +310,7 @@ export const makeServiceLayers = ({
     SlackInboundServiceLive.pipe(
       Layer.provide(slackConfigLayer),
       Layer.provide(SlackUserServiceLive),
-      Layer.provide(
-        SlackFeedbackServiceLive.pipe(
-          Layer.provide(PostStatusRepository.layer),
-          Layer.provide(PostWrites)
-        )
-      ),
+      Layer.provide(ChatFeedback),
       Layer.provide(BoardRepository.layer),
       Layer.provide(EmailOutboxConfig.layer),
       Layer.provide(IntegrationEventRecorderLive),
@@ -313,12 +324,7 @@ export const makeServiceLayers = ({
     ),
     DiscordInboundServiceLive.pipe(
       Layer.provide(DiscordUserServiceLive),
-      Layer.provide(
-        DiscordFeedbackServiceLive.pipe(
-          Layer.provide(PostStatusRepository.layer),
-          Layer.provide(PostWrites)
-        )
-      ),
+      Layer.provide(ChatFeedback),
       Layer.provide(BoardRepository.layer),
       Layer.provide(EmailOutboxConfig.layer),
       Layer.provide(IntegrationEventRecorderLive),
@@ -371,4 +377,16 @@ export const makeServiceLayers = ({
     // a paging link.
     PublicApiConfig.layer
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
+
+  // The import worker and its retention sweep run for the layer's lifetime,
+  // inside the same built graph as the server: one `PostWriteService`, one
+  // optional fan-out set, one database. Providing `ServiceCore` by reference
+  // is what makes the two share it instead of building a second copy.
+  const DataImportWorkerLayer = Layer.effectDiscard(
+    Effect.gen(function* () {
+      yield* runDataImportMaintenance.pipe(Effect.forkScoped);
+      yield* runDataImportWorker().pipe(Effect.forkScoped);
+    })
+  ).pipe(Layer.provide(DataImportWorkerLive), Layer.provideMerge(ServiceCore));
+  return Layer.mergeAll(ServiceCore, DataImportWorkerLayer);
 };

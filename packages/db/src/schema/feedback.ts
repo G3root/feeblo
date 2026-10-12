@@ -36,6 +36,10 @@ import type {
 } from "../validation-schema/email";
 import type { TEntitySource } from "../validation-schema/entity-source";
 import type { TNotificationEventType } from "../validation-schema/notification-kind";
+import type {
+  TNotificationPreferenceChannel,
+  TNotificationPreferenceTarget,
+} from "../validation-schema/notification-preference";
 import type { TPostSource } from "../validation-schema/post-source";
 import {
   PostStatusType,
@@ -76,48 +80,62 @@ export type TPostStatus = TPostStatusType;
 
 export const POST_STATUS_TYPES = PostStatusType.literals;
 
+/**
+ * The statuses every new workspace starts with.
+ *
+ * `PENDING` is the default: it is the status a post lands in when the caller
+ * names none, and the status a workspace cannot delete. The other five are
+ * ordinary rows a workspace may rename, recolor, reorder, or delete.
+ */
 export const DEFAULT_POST_STATUSES = [
   {
     orderIndex: 0,
     type: "PENDING",
     label: "Pending",
     color: DEFAULT_POST_STATUS_COLORS.PENDING,
+    isDefault: true,
   },
   {
     orderIndex: 1,
     type: "REVIEW",
     label: "Review",
     color: DEFAULT_POST_STATUS_COLORS.REVIEW,
+    isDefault: false,
   },
   {
     orderIndex: 2,
     type: "PLANNED",
     label: "Planned",
     color: DEFAULT_POST_STATUS_COLORS.PLANNED,
+    isDefault: false,
   },
   {
     orderIndex: 3,
     type: "IN_PROGRESS",
     label: "In Progress",
     color: DEFAULT_POST_STATUS_COLORS.IN_PROGRESS,
+    isDefault: false,
   },
   {
     orderIndex: 4,
     type: "COMPLETED",
     label: "Completed",
     color: DEFAULT_POST_STATUS_COLORS.COMPLETED,
+    isDefault: false,
   },
   {
     orderIndex: 5,
     type: "CLOSED",
     label: "Closed",
     color: DEFAULT_POST_STATUS_COLORS.CLOSED,
+    isDefault: false,
   },
 ] as const satisfies ReadonlyArray<{
   orderIndex: number;
   type: TPostStatus;
   label: string;
   color: string;
+  isDefault: boolean;
 }>;
 
 export const DEFAULT_CHANGELOG_CATEGORIES = [
@@ -240,6 +258,12 @@ export const postStatusTable = pgTable(
     // Reserved for future icon payloads; kept in the db schema only.
     icon: text("icon"),
     orderIndex: integer("order_index").notNull(),
+    // The status a post lands in when no status is named, and the one status
+    // a workspace may not delete: deleting a status repoints its posts here.
+    // Enforced to be exactly one per workspace by the partial unique index
+    // below, so "which status is the default" is a database fact rather than
+    // an ordering convention.
+    isDefault: boolean("is_default").default(false).notNull(),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
@@ -257,14 +281,18 @@ export const postStatusTable = pgTable(
       table.organizationId,
       table.id
     ),
-    uniqueIndex("post_status_organizationId_type_uidx").on(
-      table.organizationId,
-      table.type
-    ),
     uniqueIndex("post_status_organizationId_orderIndex_uidx").on(
       table.organizationId,
       table.orderIndex
     ),
+    // Replaces a unique index on (organizationId, type): a workspace may now
+    // keep several statuses of one type, which is what makes the statuses
+    // settings page's per-section "New" possible. The invariant worth
+    // enforcing moved from "one status per type" to "one default per
+    // workspace".
+    uniqueIndex("post_status_organizationId_default_uidx")
+      .on(table.organizationId)
+      .where(sql`${table.isDefault}`),
   ]
 );
 
@@ -1472,6 +1500,47 @@ export const notificationTable = pgTable(
   ]
 );
 
+/**
+ * One explicit divergence from a notification default, keyed by
+ * `(organization, user, channel, category)`.
+ *
+ * Rows are sparse: absence and `enabled: true` both mean the default, which is
+ * on for every category today. A reader therefore treats a row as meaningful
+ * only when it disables something (`enabled: false`). The `all` category is the
+ * workspace-wide pause; the channel is part of the key so the in-app phase can
+ * add rows without a migration.
+ */
+export const notificationPreferenceTable = pgTable(
+  "notification_preference",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => userTable.id, { onDelete: "cascade" }),
+    channel: text("channel").$type<TNotificationPreferenceChannel>().notNull(),
+    category: text("category").$type<TNotificationPreferenceTarget>().notNull(),
+    enabled: boolean("enabled").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("notification_preference_org_user_channel_category_uidx").on(
+      table.organizationId,
+      table.userId,
+      table.channel,
+      table.category
+    ),
+  ]
+);
+
 export type InsertComment = typeof commentTable.$inferInsert;
 export type PostSubscription = typeof postSubscriptionTable.$inferSelect;
 export type NewPostSubscription = typeof postSubscriptionTable.$inferInsert;
@@ -1479,3 +1548,7 @@ export type ChangelogSubscription =
   typeof changelogSubscriptionTable.$inferSelect;
 export type NewChangelogSubscription =
   typeof changelogSubscriptionTable.$inferInsert;
+export type NotificationPreference =
+  typeof notificationPreferenceTable.$inferSelect;
+export type NewNotificationPreference =
+  typeof notificationPreferenceTable.$inferInsert;

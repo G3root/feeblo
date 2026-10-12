@@ -4,13 +4,13 @@ export function FeedbackFormHeader() {
   const { meta } = useFeedbackForm();
 
   return (
-    <div class="mb-5 flex gap-2.5">
-      {/* <span class="text-muted-foreground/60 dark:text-muted-foreground/50">
-        <Icon class="size-4" name="MessageSquare" />
-      </span> */}
-      <p class="text-foreground text-lg font-medium first-letter:uppercase">
+    <header class="px-6 pt-1">
+      <h1 class="text-foreground text-lg font-medium first-letter:uppercase">
         {meta.board.name}
+      </h1>
+      <p class="text-muted-foreground mt-1 text-sm">
+        Tell us what you need. We read every post.
       </p>
-    </div>
+    </header>
   );
 }

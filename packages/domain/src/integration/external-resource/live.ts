@@ -5,6 +5,7 @@ import {
   IntegrationExternalResourceId,
   PostExternalResourceLinkId,
 } from "@feeblo/id";
+import { isHttpUrl } from "@feeblo/utils/http-url";
 import { and, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -22,6 +23,24 @@ const databaseError = (operation: string) => () =>
   new InternalServerError({
     message: `External resource ${operation} failed.`,
   });
+
+/**
+ * Rejects a provider-supplied URL the dashboard would render as a link.
+ *
+ * The typed schema (`HttpUrl`) already says http(s), but providers build
+ * drafts as plain values rather than through a decoder, so this is the one
+ * runtime chokepoint every provider — the delivery worker and the
+ * user-requested GitHub issue path — writes through. A `javascript:` or
+ * `data:` URL stored here would execute in the dashboard's origin on click.
+ */
+const requireHttpRemoteUrl = (remoteUrl: URL) =>
+  isHttpUrl(remoteUrl.toString())
+    ? Effect.void
+    : Effect.fail(
+        new InternalServerError({
+          message: "External resource URL must use http or https.",
+        })
+      );
 
 const decodePostLink = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(PostExternalResourceLink)(value).pipe(
@@ -41,6 +60,7 @@ const makeExternalResourceService = Effect.gen(function* () {
     db
       .transaction(() =>
         Effect.gen(function* () {
+          yield* requireHttpRemoteUrl(input.resource.remoteUrl);
           const resourceId = yield* IntegrationExternalResourceId.generate.pipe(
             Effect.mapError(databaseError("identifier generation"))
           );

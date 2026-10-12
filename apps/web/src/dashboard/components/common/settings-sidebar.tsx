@@ -18,6 +18,8 @@ import {
   Chat01Icon,
   CreditCardIcon,
   CursorInWindowIcon,
+  DashedLineCircleIcon,
+  Database01Icon,
   Folder01Icon,
   LayoutThreeColumnIcon,
   LockIcon,
@@ -50,6 +52,11 @@ const settingsItems = [
         icon: Settings05Icon,
         to: "/$organizationId/settings/preferences" as const,
       },
+      {
+        label: "Notifications",
+        icon: Mail01Icon,
+        to: "/$organizationId/settings/notifications" as const,
+      },
     ],
   },
   {
@@ -79,12 +86,6 @@ const settingsItems = [
         to: "/$organizationId/settings/members" as const,
       },
       {
-        label: "Custom Attributes",
-        icon: PropertyNewIcon,
-        permission: "contacts.*" as const,
-        to: "/$organizationId/settings/custom-attributes" as const,
-      },
-      {
         label: "Billing",
         icon: CreditCardIcon,
         permission: "billing.update" as const,
@@ -95,14 +96,6 @@ const settingsItems = [
         icon: LockIcon,
         permission: "workspace.update" as const,
         to: "/$organizationId/settings/security" as const,
-      },
-      {
-        label: "Notifications",
-        icon: Mail01Icon,
-        // Submission notification email only reaches owners and
-        // administrators, and the RPC enforces exactly that grant.
-        permission: "workspace.update" as const,
-        to: "/$organizationId/settings/notifications" as const,
       },
       {
         label: "Webhooks",
@@ -125,8 +118,33 @@ const settingsItems = [
     ],
   },
   {
+    group: "Data",
+    subItems: [
+      {
+        label: "Imports & exports",
+        icon: Database01Icon,
+        // Either grant opens the page: it shows the import card and the
+        // export card independently, so a role with only one still belongs here.
+        permissions: ["boards.exportData", "boards.importPosts"] as const,
+        to: "/$organizationId/settings/data" as const,
+      },
+      {
+        label: "Custom attributes",
+        icon: PropertyNewIcon,
+        permission: "contacts.*" as const,
+        to: "/$organizationId/settings/custom-attributes" as const,
+      },
+    ],
+  },
+  {
     group: "Feedback & Roadmap",
     subItems: [
+      {
+        label: "Statuses",
+        icon: DashedLineCircleIcon,
+        permission: "statuses.*" as const,
+        to: "/$organizationId/settings/statuses" as const,
+      },
       {
         label: "Roadmap",
         icon: LayoutThreeColumnIcon,
@@ -198,17 +216,28 @@ export function SettingsSidebar({
                 {group.subItems.map((item) => {
                   const permission =
                     "permission" in item ? item.permission : undefined;
+                  const permissions =
+                    "permissions" in item ? item.permissions : undefined;
                   const canAccess =
-                    permission === undefined ||
-                    (session != null &&
-                      hasPermission(organizationId, permission)(session));
+                    permission === undefined && permissions === undefined
+                      ? true
+                      : session != null &&
+                        (permission === undefined
+                          ? (permissions ?? []).some((candidate) =>
+                              hasPermission(organizationId, candidate)(session)
+                            )
+                          : hasPermission(organizationId, permission)(session));
+                  const itemPath = `/${organizationId}/settings/${item.to
+                    .split("/")
+                    .slice(3)
+                    .join("/")}`;
 
                   return (
                     <SidebarMenuItem key={item.to}>
                       <SidebarMenuButton
                         isActive={
-                          pathname ===
-                          `/${organizationId}/settings/${item.to.split("/").slice(3)}`
+                          pathname === itemPath ||
+                          pathname.startsWith(`${itemPath}/`)
                         }
                         render={(renderProps) =>
                           canAccess ? (

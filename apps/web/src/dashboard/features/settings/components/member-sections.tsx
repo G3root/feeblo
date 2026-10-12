@@ -52,7 +52,7 @@ import { useOrgInvitations } from "~/hooks/use-org-invitations";
 import { useOrgMembers } from "~/hooks/use-org-members";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePrivilegedMemberLimit } from "~/hooks/use-privileged-member-limit";
-import { invitationsCollection, membersCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 interface OrganizationMemberRow {
@@ -617,7 +617,7 @@ function InvitationListItem({
               // The row is removed optimistically; the toast reports the
               // persistence outcome without holding the click.
               settleOptimisticMutation(
-                () => invitationsCollection.delete(id),
+                () => dashboardCollections.invitationsCollection.delete(id),
                 () => {
                   trackEvent("org_invitation_revoked", { success: true });
                   toastManager.add({
@@ -713,8 +713,10 @@ function InviteMemberForm() {
       // The invitation is the entity this write created; the member list only
       // changes once the invite is accepted, so it refreshes detached instead
       // of gating the success toast.
-      await invitationsCollection.utils.refetch();
-      refetchInBackground(membersCollection.utils.refetch());
+      await dashboardCollections.invitationsCollection.utils.refetch();
+      refetchInBackground(
+        dashboardCollections.membersCollection.utils.refetch()
+      );
       trackEvent("org_member_invited", { role: value.role, success: true });
       toastManager.add({
         title: "Invitation sent",
