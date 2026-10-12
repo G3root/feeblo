@@ -897,23 +897,22 @@ const makePostWriteService = Effect.gen(function* () {
             // The new author inherits the creator subscription exactly as if
             // the post had been created on their behalf: a verified account
             // is trusted, everyone else defers until identity linking grants
-            // them access. The previous author is unsubscribed first —
-            // otherwise they keep receiving status mail for a post no longer
-            // attributed to them. Only identifiers that differ from the new
-            // subject's are retired, so a shared address survives for the
-            // fresh subscribe below.
+            // them access. The previous author's creator subscription is
+            // retired first — otherwise they keep receiving status mail for a
+            // post no longer attributed to them. Only identifiers that differ
+            // from the new subject's are retired, so a shared address survives
+            // for the fresh subscribe below.
             const subscriptionNow = yield* DateTime.nowAsDate;
             const retiredUserId =
               previous.creatorId !== null &&
               previous.creatorId !== subject.userId
                 ? previous.creatorId
                 : null;
-            if (retiredUserId !== null) {
-              yield* subscriptionRepository.unsubscribe({
-                postId: args.id,
-                userId: retiredUserId,
-              });
-            }
+            // The in-app follower row carries no source, so it cannot be told
+            // apart from a follow its owner chose on purpose. It is left in
+            // place: silently dropping a member's own follow is worse than a
+            // stale follow they can toggle off, and for a customer the row is
+            // inert (in-app notifications are member-only).
             let retiredContactEmail: string | null = null;
             if (
               previous.contactId !== null &&
@@ -931,6 +930,11 @@ const makePostWriteService = Effect.gen(function* () {
                 contactEmail: retiredContactEmail,
                 now: subscriptionNow,
                 organizationId: args.organizationId,
+                // Only the creator-derived subscription belonged to the role
+                // of author. An explicit opt-in or an admin_added_voter row is
+                // the recipient's own standing follow and survives the
+                // reattribution.
+                source: "post_creator",
                 topic: { topicId: args.id, topicType: "post" },
                 userId: retiredUserId,
               });

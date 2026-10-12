@@ -54,7 +54,7 @@ Voter management is deliberately **not** a toggle: `UpvoteAddOnBehalf` is idempo
 
 In-app notifications are unchanged: recipients are workspace members only.
 
-Email follows attribution. Post creators are auto-subscribed (`post_creator` source); a voter added on behalf is explicitly subscribed (`admin_added_voter` source); self-service voting and commenting subscribe nobody.
+Email follows attribution. Post creators are auto-subscribed (`post_creator` source); a voter added on behalf is explicitly subscribed (`admin_added_voter` source); self-service voting and commenting subscribe nobody. Reassigning a post's author retires only the previous author's `post_creator` subscription: an `explicit` opt-in or an `admin_added_voter` row is the recipient's own standing follow and survives the change.
 
 **Eligibility rule** — before any post-update email materializes, the recipient must pass the organization-access check, re-evaluated per delivery attempt beside plan/consent/suppression:
 

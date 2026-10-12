@@ -681,15 +681,19 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
   });
 
   /**
-   * Author-reassignment cleanup: retires every email subscription the
-   * previous author holds for one topic. Unlike
+   * Author-reassignment cleanup: retires the previous author's
+   * creator-derived email subscription for one topic. Unlike
    * `unsubscribeAuthenticatedSubscription` this includes
    * `deferred_no_access` rows — a deferred row for a removed contact-only
    * author must not activate on later identity linking and start notifying
-   * them about a post they no longer author. No-op when neither identifier
-   * is provided or nothing matches. Callers pass only identifiers that
-   * differ from the new subject's, so a shared address is never retired
-   * before the fresh subscribe below re-establishes it.
+   * them about a post they no longer author.
+   *
+   * Only rows whose `source` matches are retired. An `explicit` opt-in or an
+   * `admin_added_voter` row is the recipient's own standing follow and
+   * survives the reattribution. No-op when neither identifier is provided or
+   * nothing matches. Callers pass only identifiers that differ from the new
+   * subject's, so a shared address is never retired before the fresh
+   * subscribe below re-establishes it.
    */
   const unsubscribePreviousAuthorTopic = Effect.fn(
     "EmailSubscriptionRepository.unsubscribePreviousAuthorTopic"
@@ -697,6 +701,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     contactEmail,
     now,
     organizationId,
+    source,
     topic,
     userId,
   }: {
@@ -704,6 +709,8 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     readonly contactEmail: string | null;
     readonly now: Date;
     readonly organizationId: string;
+    /** Only subscriptions created by this source are retired. */
+    readonly source: Subscription["source"];
     readonly topic: EmailSubscriptionTopicInput;
     /** Previous author's user row; null for contact-only authors. */
     readonly userId: string | null;
@@ -746,6 +753,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
             schema.emailSubscriptionTable.contactId,
             contacts.map((contact) => contact.id)
           ),
+          eq(schema.emailSubscriptionTable.source, source),
           ne(schema.emailSubscriptionTable.state, "unsubscribed")
         )
       )
