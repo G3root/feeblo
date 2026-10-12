@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { UserId } from "@feeblo/id";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, getTableName, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -383,50 +383,45 @@ const makeUserRepository = Effect.gen(function* () {
           return false;
         }
 
-        // Every table that can name a customer, plus the notification row a
-        // shadow can never read but must not silently lose.
-        const referenceChecks = [
-          db
-            .select({ id: schema.contactTable.id })
-            .from(schema.contactTable)
-            .where(eq(schema.contactTable.userId, userId))
-            .limit(1),
-          db
-            .select({ id: schema.postTable.id })
-            .from(schema.postTable)
-            .where(eq(schema.postTable.creatorId, userId))
-            .limit(1),
-          db
-            .select({ id: schema.upvoteTable.id })
-            .from(schema.upvoteTable)
-            .where(eq(schema.upvoteTable.userId, userId))
-            .limit(1),
-          db
-            .select({ id: schema.commentTable.id })
-            .from(schema.commentTable)
-            .where(eq(schema.commentTable.userId, userId))
-            .limit(1),
-          db
-            .select({ id: schema.postSubscriptionTable.id })
-            .from(schema.postSubscriptionTable)
-            .where(eq(schema.postSubscriptionTable.userId, userId))
-            .limit(1),
-          db
-            .select({ id: schema.emailContactTable.id })
-            .from(schema.emailContactTable)
-            .where(eq(schema.emailContactTable.userId, userId))
-            .limit(1),
-          db
-            .select({ id: schema.notificationTable.id })
-            .from(schema.notificationTable)
-            .where(eq(schema.notificationTable.recipientUserId, userId))
-            .limit(1),
-        ];
-        for (const check of referenceChecks) {
-          const rows = yield* check;
-          if (rows.length > 0) {
-            return false;
-          }
+        // Every durable row that can name this account, each probed with an
+        // EXISTS over its foreign-key index so the whole check is one round
+        // trip. Two groups are deliberately absent:
+        //
+        // - Credential rows (`session`, `account`, `two_factor`) cascade by
+        //   design. A shadow can never hold one, and removing a broken
+        //   credential is the cleanup's job rather than data loss.
+        // - References that are `ON DELETE SET NULL` (`api_key`, `board`,
+        //   `tag`, `changelog`, `post_activity.actor_id`,
+        //   `notification.actor_user_id`) keep their row and only lose a
+        //   pointer. A shadow is ever only a subject, never a creator or an
+        //   actor, so those pointers cannot name it.
+        //
+        // `contact` and `email_contact` are set-null too; they are listed
+        // because their pointers are the attribution link a later write
+        // adopts again.
+        const [references = null] = yield* db
+          .select({
+            asset: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.assetTable))} WHERE ${schema.assetTable.userId} = ${userId})`,
+            changelogSubscription: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.changelogSubscriptionTable))} WHERE ${schema.changelogSubscriptionTable.userId} = ${userId})`,
+            comment: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.commentTable))} WHERE ${schema.commentTable.userId} = ${userId})`,
+            commentReaction: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.commentReactionTable))} WHERE ${schema.commentReactionTable.userId} = ${userId})`,
+            contact: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.contactTable))} WHERE ${schema.contactTable.userId} = ${userId})`,
+            emailContact: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.emailContactTable))} WHERE ${schema.emailContactTable.userId} = ${userId})`,
+            invitation: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.invitationTable))} WHERE ${schema.invitationTable.inviterId} = ${userId})`,
+            member: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.memberTable))} WHERE ${schema.memberTable.userId} = ${userId})`,
+            notification: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.notificationTable))} WHERE ${schema.notificationTable.recipientUserId} = ${userId})`,
+            notificationPreference: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.notificationPreferenceTable))} WHERE ${schema.notificationPreferenceTable.userId} = ${userId})`,
+            post: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.postTable))} WHERE ${schema.postTable.creatorId} = ${userId})`,
+            postReaction: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.postReactionTable))} WHERE ${schema.postReactionTable.userId} = ${userId})`,
+            postSubscription: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.postSubscriptionTable))} WHERE ${schema.postSubscriptionTable.userId} = ${userId})`,
+            upvote: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.upvoteTable))} WHERE ${schema.upvoteTable.userId} = ${userId})`,
+          })
+          .from(schema.userTable)
+          .where(eq(schema.userTable.id, userId))
+          .limit(1);
+
+        if (references === null || Object.values(references).some(Boolean)) {
+          return false;
         }
 
         yield* db

@@ -306,12 +306,20 @@ export function ContactCombobox({
     ? [{ kind: "create", email: trimmedQuery }]
     : [];
 
-  // Plan room is asked once, when the entry point first appears. `null` means
-  // "not asked yet" and leaves the row selectable: the write path re-checks
-  // the cap inside its transaction, so a stale hint can never over-grant.
-  const [canCreateContact, setCanCreateContact] = useState<boolean | null>(
-    null
-  );
+  // Plan room is asked once per workspace, when the entry point first
+  // appears. The answer is stored with the workspace it describes, so a
+  // switch to another workspace reads as "not asked yet" and probes again
+  // even when the previous answer was `false`. `null` leaves the row
+  // selectable: the write path re-checks the cap inside its transaction, so
+  // a stale hint can never over-grant.
+  const [createEligibilityResult, setCreateEligibilityResult] = useState<{
+    canCreate: boolean;
+    organizationId: string;
+  } | null>(null);
+  const canCreateContact =
+    createEligibilityResult?.organizationId === organizationId
+      ? createEligibilityResult.canCreate
+      : null;
   const createEligibilityRef = useRef(createEligibility);
   useEffect(() => {
     createEligibilityRef.current = createEligibility;
@@ -321,10 +329,14 @@ export function ContactCombobox({
       return;
     }
     let isCurrent = true;
-    createEligibilityRef.current({ organizationId }).then(
+    const probedOrganizationId = organizationId;
+    createEligibilityRef.current({ organizationId: probedOrganizationId }).then(
       ({ canCreate }) => {
         if (isCurrent) {
-          setCanCreateContact(canCreate);
+          setCreateEligibilityResult({
+            canCreate,
+            organizationId: probedOrganizationId,
+          });
         }
       },
       () => {

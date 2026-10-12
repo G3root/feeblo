@@ -31,8 +31,8 @@ export function ContactDeleteDialog() {
           </span>
           {contact?.userId ? (
             <span className="block">
-              This person has a Feeblo account, so they keep their access after
-              the contact is deleted.
+              This contact is linked to a Feeblo account. Deleting the contact
+              does not change that account's access or email settings.
             </span>
           ) : null}
         </>

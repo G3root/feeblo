@@ -255,6 +255,42 @@ describe("ContactCombobox", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it("re-probes plan room when the workspace changes", async () => {
+    const createEligibility = vi.fn(
+      ({ organizationId }: { organizationId: string }) =>
+        Promise.resolve({ canCreate: organizationId === "org-b" })
+    );
+    const onSelect = vi.fn();
+    const renderCombobox = (organizationId: string) => (
+      <ContactCombobox
+        createEligibility={createEligibility}
+        label="Search customers"
+        onSelect={onSelect}
+        organizationId={organizationId}
+        search={() => Promise.resolve([])}
+        value={null}
+      />
+    );
+
+    const screen = await render(renderCombobox("org-a"));
+    await typeQuery(screen, "switch@example.com");
+    await expect
+      .element(screen.getByText(/Your plan has no room for another customer/))
+      .toBeVisible();
+
+    // The cached answer belongs to the workspace that produced it, so the
+    // new workspace is probed even though the previous answer was `false`.
+    await screen.rerender(renderCombobox("org-b"));
+    await vi.waitFor(() => {
+      expect(createEligibility).toHaveBeenCalledWith({
+        organizationId: "org-b",
+      });
+    });
+    await expect
+      .element(screen.getByText(/Won't be notified until they have access/))
+      .toBeVisible();
+  });
+
   it("keeps the create entry selectable while the plan has room", async () => {
     const onSelect = vi.fn();
     const screen = await render(

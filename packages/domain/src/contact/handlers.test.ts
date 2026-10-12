@@ -306,6 +306,63 @@ describe("ContactRpcHandlers", () => {
         })
     );
 
+    it.effect("keeps the shadow account while an uploaded asset remains", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ContactRpcHandlersEffect;
+        const db = yield* currentDb;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+        const now = yield* DateTime.nowAsDate;
+        const shadowId = `shadow_asset_${fixture.organizationId}`;
+        yield* db.insert(schema.userTable).values({
+          id: shadowId,
+          name: "Asset Customer",
+          email: "behalf-9182abcd@feeblo.com",
+          emailVerified: false,
+          restrictedToOrganizationId: fixture.organizationId,
+          createdAt: now,
+          updatedAt: now,
+        });
+        const contactId = yield* ContactId.generate;
+        yield* db.insert(schema.contactTable).values({
+          id: contactId,
+          organizationId: fixture.organizationId,
+          email: "shadow-asset@example.com",
+          name: "Asset Customer",
+          userId: shadowId,
+          createdAt: now,
+          updatedAt: now,
+        });
+        // An uploaded file cascades on user delete, so it must keep the
+        // account alive rather than disappear with the contact.
+        yield* db.insert(schema.assetTable).values({
+          id: `asset_${fixture.organizationId}`,
+          bucket: "uploads",
+          key: `asset_${fixture.organizationId}.png`,
+          url: "https://example.com/asset.png",
+          kind: "editor_image",
+          // `asset_owner_check` allows a user or an organization, never
+          // both.
+          userId: shadowId,
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        yield* handlers
+          .ContactDelete({
+            id: contactId,
+            organizationId: fixture.organizationId,
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        const [shadow] = yield* db
+          .select({ id: schema.userTable.id })
+          .from(schema.userTable)
+          .where(eq(schema.userTable.id, shadowId));
+        expect(shadow?.id).toBe(shadowId);
+      })
+    );
+
     it.effect("keeps the shadow account while a reference remains", () =>
       Effect.gen(function* () {
         const handlers = yield* ContactRpcHandlersEffect;

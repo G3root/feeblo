@@ -883,9 +883,10 @@ const makePostRepository = Effect.gen(function* () {
         .pipe(Effect.asVoid),
 
     /**
-     * Re-attributes a post to a resolved on-behalf subject. Mirrors the
-     * create path: staff attribution stays out of the author fields, so
-     * `creatorMemberId` is always cleared and `contactId` always set.
+     * Re-attributes a post to a resolved on-behalf subject. A customer
+     * subject sets `contactId` and clears `creatorMemberId`; a workspace
+     * member keeps its member row and may have a null `contactId`
+     * (ADR 0017).
      */
     updateAuthor: ({
       id,
