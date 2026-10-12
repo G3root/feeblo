@@ -455,6 +455,38 @@ describe("ContactRpcHandlers", () => {
       })
     );
 
+    it.effect("answers whether the plan has room for another CRM entry", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ContactRpcHandlersEffect;
+        const db = yield* currentDb;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+
+        const room = yield* handlers
+          .ContactCreateEligibility({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, session));
+        expect(room.canCreate).toBe(true);
+
+        // `free` is the only capped plan and allows 10 CRM entries; the
+        // picker's row must stop being offered at the cap.
+        const now = yield* DateTime.nowAsDate;
+        yield* db.insert(schema.contactTable).values(
+          Array.from({ length: 10 }, (_, index) => ({
+            id: `contact_filler_${fixture.organizationId}_${index}`,
+            organizationId: fixture.organizationId,
+            email: `filler-${index}@example.com`,
+            createdAt: now,
+            updatedAt: now,
+          }))
+        );
+
+        const full = yield* handlers
+          .ContactCreateEligibility({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, session));
+        expect(full.canCreate).toBe(false);
+      })
+    );
+
     it.effect("rejects contributors (contacts.create is manager+)", () =>
       Effect.gen(function* () {
         const handlers = yield* ContactRpcHandlersEffect;

@@ -99,6 +99,20 @@ export const searchContacts: ContactSearchFn = ({
   );
 
 /**
+ * The plan-room probe that decides whether the create-new-customer row is
+ * offered. Separate from `ContactSearch` so the picker does not pay for two
+ * counts on every keystroke; it runs once, when the entry point appears.
+ */
+export type ContactCreateEligibilityFn = (input: {
+  organizationId: string;
+}) => Promise<{ canCreate: boolean }>;
+
+/** Live eligibility transport; injectable so stories/tests stay hermetic. */
+export const fetchContactCreateEligibility: ContactCreateEligibilityFn = ({
+  organizationId,
+}) => fetchRpc((rpc) => rpc.ContactCreateEligibility({ organizationId }));
+
+/**
  * Projects a selection onto the wire shape shared by `PostCreate.author`,
  * `CommentCreate.author` and `UpvoteAddOnBehalf.author`, dropping the
  * display-only hints.
@@ -171,6 +185,8 @@ export interface ContactComboboxProps {
    * attribution, and the badge is hidden there as noise.
    */
   disableAlreadyVoted?: boolean;
+  /** Replace the plan-room probe (stories/tests). */
+  createEligibility?: ContactCreateEligibilityFn;
   /** Accessible name for the search input. */
   label?: string;
   organizationId: string;
@@ -187,6 +203,7 @@ export interface ContactComboboxProps {
 }
 
 export function ContactCombobox({
+  createEligibility = fetchContactCreateEligibility,
   disabled = false,
   disableAlreadyVoted = true,
   label = m.best_mealy_lynx(),
@@ -284,10 +301,42 @@ export function ContactCombobox({
       contact.email !== null &&
       contact.email.toLowerCase() === trimmedQuery.toLowerCase()
   );
-  const createOption: ContactOption[] =
-    queryLooksLikeEmail && !searchFailed && !exactEmailHit
-      ? [{ kind: "create", email: trimmedQuery }]
-      : [];
+  const offersCreate = queryLooksLikeEmail && !searchFailed && !exactEmailHit;
+  const createOption: ContactOption[] = offersCreate
+    ? [{ kind: "create", email: trimmedQuery }]
+    : [];
+
+  // Plan room is asked once, when the entry point first appears. `null` means
+  // "not asked yet" and leaves the row selectable: the write path re-checks
+  // the cap inside its transaction, so a stale hint can never over-grant.
+  const [canCreateContact, setCanCreateContact] = useState<boolean | null>(
+    null
+  );
+  const createEligibilityRef = useRef(createEligibility);
+  useEffect(() => {
+    createEligibilityRef.current = createEligibility;
+  });
+  useEffect(() => {
+    if (!offersCreate || canCreateContact !== null) {
+      return;
+    }
+    let isCurrent = true;
+    createEligibilityRef.current({ organizationId }).then(
+      ({ canCreate }) => {
+        if (isCurrent) {
+          setCanCreateContact(canCreate);
+        }
+      },
+      () => {
+        // Leave the row selectable: a failed probe proves nothing, and the
+        // write path answers the cap with copy of its own.
+      }
+    );
+    return () => {
+      isCurrent = false;
+    };
+  }, [canCreateContact, offersCreate, organizationId]);
+
   const options: ContactOption[] = [
     ...results.map((contact): ContactOption => ({ kind: "contact", contact })),
     ...createOption,
@@ -452,7 +501,11 @@ export function ContactCombobox({
           <ComboboxList>
             {(option) =>
               option.kind === "create" ? (
-                <ComboboxItem key={`create:${option.email}`} value={option}>
+                <ComboboxItem
+                  disabled={canCreateContact === false}
+                  key={`create:${option.email}`}
+                  value={option}
+                >
                   <span className="flex min-w-0 items-start gap-2">
                     <HugeiconsIcon
                       className="text-muted-foreground mt-0.5"
@@ -469,7 +522,9 @@ export function ContactCombobox({
                           action grants attribution before (or instead of)
                           notification. Say so before the admin submits. */}
                       <span className="text-muted-foreground block text-xs">
-                        {m.hour_smart_wombat()}
+                        {canCreateContact === false
+                          ? m.brave_tidy_quokka()
+                          : m.hour_smart_wombat()}
                       </span>
                     </span>
                   </span>

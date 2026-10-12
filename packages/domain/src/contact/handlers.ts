@@ -6,6 +6,7 @@ import * as Option from "effect/Option";
 
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import { validateAttributeValueEffect } from "../attribute-definition/validation";
+import { CompanyRepository } from "../company/repository";
 import { createCrmEntry } from "../crm-entry/intake";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
@@ -21,6 +22,7 @@ import { type ContactSearchArgs, ContactRepository } from "./repository";
 import { ContactRpcs } from "./rpcs";
 import type {
   TContactCreate,
+  TContactCreateEligibility,
   TContactDelete,
   TContactList,
   TContactSearch,
@@ -31,8 +33,10 @@ import type {
 export const ContactRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* ContactRepository;
   const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
+  const companyRepository = yield* CompanyRepository;
   const contactPolicy = yield* ContactPolicy;
   const emailSubscriptions = yield* EmailSubscriptionRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
   const userRepository = yield* UserRepository;
 
   return {
@@ -75,6 +79,39 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Contact", "select")
       );
     },
+
+    /**
+     * Answers whether one more CRM entry fits the plan, for the picker's
+     * create-new-customer row. It reads the same two counts the write path
+     * reads and shares the picker's read rate limit; the write path still
+     * decides inside its transaction, so this is a hint that can safely go
+     * stale.
+     */
+    ContactCreateEligibility: (args: TContactCreateEligibility) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        yield* consumeDashboardRateLimit({
+          key: `contact-search:${args.organizationId}:${session.session.userId}`,
+          name: "contact-search",
+        });
+        const [contacts, companies] = yield* Effect.all([
+          repository.countByOrganizationId(args.organizationId),
+          companyRepository.countByOrganizationId(args.organizationId),
+        ]);
+        const canCreate = yield* entitlementPolicy
+          .canCreateCrmEntry({
+            organizationId: args.organizationId,
+            crmEntryCount: Effect.succeed(contacts + companies),
+          })
+          .pipe(
+            Effect.as(true),
+            Effect.catchTag("PolicyDenied", () => Effect.succeed(false))
+          );
+        return { canCreate };
+      }).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Contact", "select")
+      ),
 
     ContactCreate: (args: TContactCreate) =>
       createCrmEntry({
@@ -207,6 +244,7 @@ export const ContactRpcHandlers = ContactRpcs.toLayer(
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(ContactRepository.layer),
   Layer.provide(AttributeDefinitionRepository.layer),
+  Layer.provide(CompanyRepository.layer),
   Layer.provide(EmailSubscriptionRepository.layer),
   Layer.provide(UserRepository.layer)
 );

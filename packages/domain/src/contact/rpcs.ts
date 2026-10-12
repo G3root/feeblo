@@ -8,6 +8,7 @@ import { ContactServiceErrors } from "./errors";
 import {
   Contact,
   ContactCreate,
+  ContactCreateEligibility,
   ContactDelete,
   ContactList,
   ContactSearch,
@@ -46,6 +47,12 @@ export class ContactRpcs extends RpcGroup.make(
     success: Schema.Void,
     payload: ContactDelete,
     error: ContactServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("ContactCreateEligibility", {
+    success: Schema.Struct({ canCreate: Schema.Boolean }),
+    payload: ContactCreateEligibility,
+    error: Schema.Union([ContactServiceErrors, RateLimitErrors]),
   }).middleware(AuthMiddleware),
 
   Rpc.make("ContactUnsubscribe", {
