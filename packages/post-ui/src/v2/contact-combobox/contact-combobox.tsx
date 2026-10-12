@@ -306,12 +306,14 @@ export function ContactCombobox({
     ? [{ kind: "create", email: trimmedQuery }]
     : [];
 
-  // Plan room is asked once per workspace, when the entry point first
-  // appears. The answer is stored with the workspace it describes, so a
-  // switch to another workspace reads as "not asked yet" and probes again
-  // even when the previous answer was `false`. `null` leaves the row
-  // selectable: the write path re-checks the cap inside its transaction, so
-  // a stale hint can never over-grant.
+  // Plan room is asked when the create entry appears. The answer is stored
+  // with the workspace it describes, so a switch to another workspace reads
+  // as "not asked yet" and probes again even when the previous answer was
+  // `false`. The picker's open handler drops the answer each time it opens,
+  // so a plan that changed while the picker was closed is measured against
+  // the current cap. `null` leaves the row selectable: the write path
+  // re-checks the cap inside its transaction, so a stale hint can never
+  // over-grant.
   const [createEligibilityResult, setCreateEligibilityResult] = useState<{
     canCreate: boolean;
     organizationId: string;
@@ -389,6 +391,15 @@ export function ContactCombobox({
     setOpen(false);
   };
 
+  // Opening the picker invalidates the cached plan-room answer so the effect
+  // below probes again when the create entry appears.
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (nextOpen) {
+      setCreateEligibilityResult(null);
+    }
+  };
+
   // A picked subject replaces the input with a readable summary row so the
   // attribution stays visible until submit; clearing returns to search mode.
   // The empty-object default (no subject picked) must read as "nothing
@@ -452,7 +463,7 @@ export function ContactCombobox({
         }
         setQuery(nextQuery);
       }}
-      onOpenChange={setOpen}
+      onOpenChange={handleOpenChange}
       onValueChange={handleSelect}
       open={open}
     >

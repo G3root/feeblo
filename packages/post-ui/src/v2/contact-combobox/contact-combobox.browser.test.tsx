@@ -291,6 +291,44 @@ describe("ContactCombobox", () => {
       .toBeVisible();
   });
 
+  it("re-probes plan room when the picker reopens", async () => {
+    const createEligibility = vi
+      .fn(({ organizationId }: { organizationId: string }) =>
+        Promise.resolve({ canCreate: organizationId === "organization-id" })
+      )
+      .mockResolvedValueOnce({ canCreate: true })
+      .mockResolvedValueOnce({ canCreate: false });
+    const onSelect = vi.fn();
+    const screen = await render(
+      <ContactCombobox
+        createEligibility={createEligibility}
+        label="Search customers"
+        onSelect={onSelect}
+        organizationId="organization-id"
+        search={() => Promise.resolve([])}
+        value={null}
+      />
+    );
+
+    await typeQuery(screen, "filled@example.com");
+    await expect
+      .element(screen.getByText(/Won't be notified until they have access/))
+      .toBeVisible();
+
+    // Reopening drops the cached answer, so the second probe observes the
+    // plan now being full and disables the create row again.
+    const input = screen.getByRole("combobox");
+    await input.fill("");
+    input.element().blur();
+    await input.click();
+    await input.fill("filled@example.com");
+
+    await expect
+      .element(screen.getByText(/Your plan has no room for another customer/))
+      .toBeVisible();
+    expect(createEligibility).toHaveBeenCalledTimes(2);
+  });
+
   it("keeps the create entry selectable while the plan has room", async () => {
     const onSelect = vi.fn();
     const screen = await render(
