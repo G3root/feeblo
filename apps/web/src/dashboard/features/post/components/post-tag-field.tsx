@@ -17,6 +17,7 @@ import {
   type TagSelectOption,
 } from "~/features/tag/components/tag-select";
 import { TagCreateDialogProvider } from "~/features/tag/dialog-stores";
+import { useOrgTags } from "~/hooks/use-org-tags";
 import { dashboardCollections } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -40,19 +41,10 @@ export function PostTagField() {
   const disabled = isLocked || isMerged || !canChangeTags;
   const { postTagCollection } = useDashboardCollections();
 
-  const { data: tags } = useLiveQuery({
-    query: (q) => {
-      return q
-        .from({ tags: dashboardCollections.tagCollection })
-        .where(({ tags }) => eq(tags.organizationId, organizationId))
-        .select(({ tags }) => ({
-          id: tags.id,
-          name: tags.name,
-        }));
-    },
-  });
+  const { data: tags } = useOrgTags(organizationId);
 
   const { data: postTags } = useLiveQuery({
+    queryKey: ["post-tags", postTagCollection.id, post.id, organizationId],
     query: (q) => {
       if (!post.id) {
         return undefined;

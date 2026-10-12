@@ -26,6 +26,13 @@ export function PostMergedAlert() {
   const mergedIntoPostId = post.mergedIntoPostId;
 
   const { data: target } = useLiveQuery({
+    queryKey: [
+      "merged-target",
+      postCollection.id,
+      boardCollection.id,
+      mergedIntoPostId ?? null,
+      organizationId,
+    ],
     query: (query) => {
       if (!mergedIntoPostId) {
         return undefined;

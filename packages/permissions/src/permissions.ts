@@ -27,7 +27,16 @@ const PERMISSION_ACTIONS = {
   members: ["invite", "remove", "assign"],
   billing: ["update"],
   site: ["update"],
-  boards: ["create", "update", "delete"],
+  boards: [
+    "create",
+    "update",
+    "delete",
+    // Board CSV transfer (docs/data-transfer.md). Importing posts and reading
+    // the environment's data back out are separate authorities: a workspace
+    // may want the audit trail of an export without letting a bulk write in.
+    "importPosts",
+    "exportData",
+  ],
   posts: [
     "update",
     "delete",

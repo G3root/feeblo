@@ -50,6 +50,15 @@ export function PostCollectionDataProvider({
   } = usePostCollections();
   const contributorCase = isPostCreator && !canManageAllPosts;
   const eligibilityQuery = useLiveQuery({
+    // This provider mounts once per post card, so the hook re-renders with the
+    // whole list; the explicit key keeps identity work off that path.
+    queryKey: [
+      "post-delete-eligibility",
+      deleteEligibilityCollection?.id ?? null,
+      organizationId,
+      post?.id ?? null,
+      contributorCase,
+    ],
     query: (q) => {
       if (!contributorCase || !deleteEligibilityCollection || !post?.id) {
         return undefined;

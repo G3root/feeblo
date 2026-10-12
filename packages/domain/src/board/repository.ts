@@ -8,8 +8,9 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 interface TBoardCreate {
-  creatorId: string;
-  creatorMemberId: string;
+  /** Null when the board is created by an import whose uploader is gone. */
+  creatorId: string | null;
+  creatorMemberId: string | null;
   id: string;
   name: string;
   organizationId: string;

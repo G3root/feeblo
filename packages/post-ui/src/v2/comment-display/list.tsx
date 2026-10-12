@@ -180,6 +180,13 @@ export function CommentsList() {
   // post's page renders its comments from one slug-scoped subset and an
   // unmerge only changes the rows inside that same subset.
   const commentsQuery = useLiveQuery({
+    queryKey: [
+      "post-comments",
+      commentCollection.id,
+      organizationId,
+      postSlug,
+      isMember,
+    ],
     query: (q) =>
       q
         .from({ comment: commentCollection })

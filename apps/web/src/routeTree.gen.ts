@@ -63,6 +63,7 @@ import { Route as DashboardOrganizationIdDashboardLayoutFeedbackActiveRouteImpor
 import { Route as DashboardOrganizationIdDashboardLayoutFeedbackBacklogRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/feedback/backlog"
 import { Route as DashboardOrganizationIdDashboardLayoutRoadmapIndexRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/roadmap/index"
 import { Route as DashboardOrganizationIdDashboardLayoutRoadmapSlugRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/roadmap/$slug"
+import { Route as DashboardOrganizationIdSettingsDataIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/data/index"
 import { Route as DashboardOrganizationIdSettingsIntegrationsIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/integrations/index"
 import { Route as DashboardOrganizationIdSettingsWebhooksIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/webhooks/index"
 import { Route as DashboardOrganizationIdSettingsWebhooksConnectionIdRouteImport } from "./routes/_dashboard/$organizationId/settings/webhooks/$connectionId"
@@ -71,6 +72,7 @@ import { Route as DashboardOrganizationIdDashboardLayoutBoardBoardSlugActiveRout
 import { Route as DashboardOrganizationIdDashboardLayoutBoardBoardSlugBacklogRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
 import { Route as DashboardOrganizationIdDashboardLayoutChangelogEditChangelogSlugRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
 import { Route as DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
+import { Route as DashboardOrganizationIdSettingsDataImportsJobIdRouteImport } from "./routes/_dashboard/$organizationId/settings/data/imports/$jobId"
 import { Route as DashboardOrganizationIdSettingsIntegrationsDiscordIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/integrations/discord/index"
 import { Route as DashboardOrganizationIdSettingsIntegrationsGithubIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/integrations/github/index"
 import { Route as DashboardOrganizationIdSettingsIntegrationsSlackIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/integrations/slack/index"
@@ -375,6 +377,12 @@ const DashboardOrganizationIdDashboardLayoutRoadmapSlugRoute =
     path: "/roadmap/$slug",
     getParentRoute: () => DashboardOrganizationIdDashboardLayoutRoute,
   } as any)
+const DashboardOrganizationIdSettingsDataIndexRoute =
+  DashboardOrganizationIdSettingsDataIndexRouteImport.update({
+    id: "/data/",
+    path: "/data/",
+    getParentRoute: () => DashboardOrganizationIdSettingsRoute,
+  } as any)
 const DashboardOrganizationIdSettingsIntegrationsIndexRoute =
   DashboardOrganizationIdSettingsIntegrationsIndexRouteImport.update({
     id: "/integrations/",
@@ -429,6 +437,12 @@ const DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute =
       getParentRoute: () => DashboardOrganizationIdDashboardLayoutRoute,
     } as any,
   )
+const DashboardOrganizationIdSettingsDataImportsJobIdRoute =
+  DashboardOrganizationIdSettingsDataImportsJobIdRouteImport.update({
+    id: "/data/imports/$jobId",
+    path: "/data/imports/$jobId",
+    getParentRoute: () => DashboardOrganizationIdSettingsRoute,
+  } as any)
 const DashboardOrganizationIdSettingsIntegrationsDiscordIndexRoute =
   DashboardOrganizationIdSettingsIntegrationsDiscordIndexRouteImport.update({
     id: "/integrations/discord/",
@@ -503,12 +517,14 @@ export interface FileRoutesByFullPath {
   "/$organizationId/contact/": typeof DashboardOrganizationIdDashboardLayoutContactIndexRoute
   "/$organizationId/feedback/": typeof DashboardOrganizationIdDashboardLayoutFeedbackIndexRoute
   "/$organizationId/roadmap/": typeof DashboardOrganizationIdDashboardLayoutRoadmapIndexRoute
+  "/$organizationId/settings/data/": typeof DashboardOrganizationIdSettingsDataIndexRoute
   "/$organizationId/settings/integrations/": typeof DashboardOrganizationIdSettingsIntegrationsIndexRoute
   "/$organizationId/settings/webhooks/": typeof DashboardOrganizationIdSettingsWebhooksIndexRoute
   "/$organizationId/board/$boardSlug/active": typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
   "/$organizationId/board/$boardSlug/backlog": typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/changelog/edit/$changelogSlug": typeof DashboardOrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
   "/$organizationId/post/$boardSlug/$postSlug": typeof DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
+  "/$organizationId/settings/data/imports/$jobId": typeof DashboardOrganizationIdSettingsDataImportsJobIdRoute
   "/$organizationId/board/$boardSlug/": typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
   "/$organizationId/settings/integrations/discord/": typeof DashboardOrganizationIdSettingsIntegrationsDiscordIndexRoute
   "/$organizationId/settings/integrations/github/": typeof DashboardOrganizationIdSettingsIntegrationsGithubIndexRoute
@@ -566,12 +582,14 @@ export interface FileRoutesByTo {
   "/$organizationId/contact": typeof DashboardOrganizationIdDashboardLayoutContactIndexRoute
   "/$organizationId/feedback": typeof DashboardOrganizationIdDashboardLayoutFeedbackIndexRoute
   "/$organizationId/roadmap": typeof DashboardOrganizationIdDashboardLayoutRoadmapIndexRoute
+  "/$organizationId/settings/data": typeof DashboardOrganizationIdSettingsDataIndexRoute
   "/$organizationId/settings/integrations": typeof DashboardOrganizationIdSettingsIntegrationsIndexRoute
   "/$organizationId/settings/webhooks": typeof DashboardOrganizationIdSettingsWebhooksIndexRoute
   "/$organizationId/board/$boardSlug/active": typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
   "/$organizationId/board/$boardSlug/backlog": typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/changelog/edit/$changelogSlug": typeof DashboardOrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
   "/$organizationId/post/$boardSlug/$postSlug": typeof DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
+  "/$organizationId/settings/data/imports/$jobId": typeof DashboardOrganizationIdSettingsDataImportsJobIdRoute
   "/$organizationId/board/$boardSlug": typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
   "/$organizationId/settings/integrations/discord": typeof DashboardOrganizationIdSettingsIntegrationsDiscordIndexRoute
   "/$organizationId/settings/integrations/github": typeof DashboardOrganizationIdSettingsIntegrationsGithubIndexRoute
@@ -634,12 +652,14 @@ export interface FileRoutesById {
   "/_dashboard/$organizationId/_dashboard-layout/contact/": typeof DashboardOrganizationIdDashboardLayoutContactIndexRoute
   "/_dashboard/$organizationId/_dashboard-layout/feedback/": typeof DashboardOrganizationIdDashboardLayoutFeedbackIndexRoute
   "/_dashboard/$organizationId/_dashboard-layout/roadmap/": typeof DashboardOrganizationIdDashboardLayoutRoadmapIndexRoute
+  "/_dashboard/$organizationId/settings/data/": typeof DashboardOrganizationIdSettingsDataIndexRoute
   "/_dashboard/$organizationId/settings/integrations/": typeof DashboardOrganizationIdSettingsIntegrationsIndexRoute
   "/_dashboard/$organizationId/settings/webhooks/": typeof DashboardOrganizationIdSettingsWebhooksIndexRoute
   "/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/active": typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
   "/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/backlog": typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/_dashboard/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug": typeof DashboardOrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
   "/_dashboard/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug": typeof DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
+  "/_dashboard/$organizationId/settings/data/imports/$jobId": typeof DashboardOrganizationIdSettingsDataImportsJobIdRoute
   "/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/": typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
   "/_dashboard/$organizationId/settings/integrations/discord/": typeof DashboardOrganizationIdSettingsIntegrationsDiscordIndexRoute
   "/_dashboard/$organizationId/settings/integrations/github/": typeof DashboardOrganizationIdSettingsIntegrationsGithubIndexRoute
@@ -702,12 +722,14 @@ export interface FileRouteTypes {
     | "/$organizationId/contact/"
     | "/$organizationId/feedback/"
     | "/$organizationId/roadmap/"
+    | "/$organizationId/settings/data/"
     | "/$organizationId/settings/integrations/"
     | "/$organizationId/settings/webhooks/"
     | "/$organizationId/board/$boardSlug/active"
     | "/$organizationId/board/$boardSlug/backlog"
     | "/$organizationId/changelog/edit/$changelogSlug"
     | "/$organizationId/post/$boardSlug/$postSlug"
+    | "/$organizationId/settings/data/imports/$jobId"
     | "/$organizationId/board/$boardSlug/"
     | "/$organizationId/settings/integrations/discord/"
     | "/$organizationId/settings/integrations/github/"
@@ -765,12 +787,14 @@ export interface FileRouteTypes {
     | "/$organizationId/contact"
     | "/$organizationId/feedback"
     | "/$organizationId/roadmap"
+    | "/$organizationId/settings/data"
     | "/$organizationId/settings/integrations"
     | "/$organizationId/settings/webhooks"
     | "/$organizationId/board/$boardSlug/active"
     | "/$organizationId/board/$boardSlug/backlog"
     | "/$organizationId/changelog/edit/$changelogSlug"
     | "/$organizationId/post/$boardSlug/$postSlug"
+    | "/$organizationId/settings/data/imports/$jobId"
     | "/$organizationId/board/$boardSlug"
     | "/$organizationId/settings/integrations/discord"
     | "/$organizationId/settings/integrations/github"
@@ -832,12 +856,14 @@ export interface FileRouteTypes {
     | "/_dashboard/$organizationId/_dashboard-layout/contact/"
     | "/_dashboard/$organizationId/_dashboard-layout/feedback/"
     | "/_dashboard/$organizationId/_dashboard-layout/roadmap/"
+    | "/_dashboard/$organizationId/settings/data/"
     | "/_dashboard/$organizationId/settings/integrations/"
     | "/_dashboard/$organizationId/settings/webhooks/"
     | "/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/active"
     | "/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
     | "/_dashboard/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
     | "/_dashboard/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
+    | "/_dashboard/$organizationId/settings/data/imports/$jobId"
     | "/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/"
     | "/_dashboard/$organizationId/settings/integrations/discord/"
     | "/_dashboard/$organizationId/settings/integrations/github/"
@@ -1231,6 +1257,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutRoadmapSlugRouteImport
       parentRoute: typeof DashboardOrganizationIdDashboardLayoutRoute
     }
+    "/_dashboard/$organizationId/settings/data/": {
+      id: "/_dashboard/$organizationId/settings/data/"
+      path: "/data"
+      fullPath: "/$organizationId/settings/data/"
+      preLoaderRoute: typeof DashboardOrganizationIdSettingsDataIndexRouteImport
+      parentRoute: typeof DashboardOrganizationIdSettingsRoute
+    }
     "/_dashboard/$organizationId/settings/integrations/": {
       id: "/_dashboard/$organizationId/settings/integrations/"
       path: "/integrations"
@@ -1286,6 +1319,13 @@ declare module "@tanstack/react-router" {
       fullPath: "/$organizationId/post/$boardSlug/$postSlug"
       preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport
       parentRoute: typeof DashboardOrganizationIdDashboardLayoutRoute
+    }
+    "/_dashboard/$organizationId/settings/data/imports/$jobId": {
+      id: "/_dashboard/$organizationId/settings/data/imports/$jobId"
+      path: "/data/imports/$jobId"
+      fullPath: "/$organizationId/settings/data/imports/$jobId"
+      preLoaderRoute: typeof DashboardOrganizationIdSettingsDataImportsJobIdRouteImport
+      parentRoute: typeof DashboardOrganizationIdSettingsRoute
     }
     "/_dashboard/$organizationId/settings/integrations/discord/": {
       id: "/_dashboard/$organizationId/settings/integrations/discord/"
@@ -1421,8 +1461,10 @@ interface DashboardOrganizationIdSettingsRouteChildren {
   DashboardOrganizationIdSettingsWorkspaceRoute: typeof DashboardOrganizationIdSettingsWorkspaceRoute
   DashboardOrganizationIdSettingsIndexRoute: typeof DashboardOrganizationIdSettingsIndexRoute
   DashboardOrganizationIdSettingsWebhooksConnectionIdRoute: typeof DashboardOrganizationIdSettingsWebhooksConnectionIdRoute
+  DashboardOrganizationIdSettingsDataIndexRoute: typeof DashboardOrganizationIdSettingsDataIndexRoute
   DashboardOrganizationIdSettingsIntegrationsIndexRoute: typeof DashboardOrganizationIdSettingsIntegrationsIndexRoute
   DashboardOrganizationIdSettingsWebhooksIndexRoute: typeof DashboardOrganizationIdSettingsWebhooksIndexRoute
+  DashboardOrganizationIdSettingsDataImportsJobIdRoute: typeof DashboardOrganizationIdSettingsDataImportsJobIdRoute
   DashboardOrganizationIdSettingsIntegrationsDiscordIndexRoute: typeof DashboardOrganizationIdSettingsIntegrationsDiscordIndexRoute
   DashboardOrganizationIdSettingsIntegrationsGithubIndexRoute: typeof DashboardOrganizationIdSettingsIntegrationsGithubIndexRoute
   DashboardOrganizationIdSettingsIntegrationsSlackIndexRoute: typeof DashboardOrganizationIdSettingsIntegrationsSlackIndexRoute
@@ -1466,10 +1508,14 @@ const DashboardOrganizationIdSettingsRouteChildren: DashboardOrganizationIdSetti
       DashboardOrganizationIdSettingsIndexRoute,
     DashboardOrganizationIdSettingsWebhooksConnectionIdRoute:
       DashboardOrganizationIdSettingsWebhooksConnectionIdRoute,
+    DashboardOrganizationIdSettingsDataIndexRoute:
+      DashboardOrganizationIdSettingsDataIndexRoute,
     DashboardOrganizationIdSettingsIntegrationsIndexRoute:
       DashboardOrganizationIdSettingsIntegrationsIndexRoute,
     DashboardOrganizationIdSettingsWebhooksIndexRoute:
       DashboardOrganizationIdSettingsWebhooksIndexRoute,
+    DashboardOrganizationIdSettingsDataImportsJobIdRoute:
+      DashboardOrganizationIdSettingsDataImportsJobIdRoute,
     DashboardOrganizationIdSettingsIntegrationsDiscordIndexRoute:
       DashboardOrganizationIdSettingsIntegrationsDiscordIndexRoute,
     DashboardOrganizationIdSettingsIntegrationsGithubIndexRoute:

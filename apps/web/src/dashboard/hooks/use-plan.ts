@@ -8,6 +8,13 @@ export const usePlan = () => {
   const organizationId = useOrganizationId();
 
   const query = useLiveQuery({
+    // Called from billing, customize, entitlements, and changelog categories,
+    // so identity work here repeats with every dashboard surface.
+    queryKey: [
+      "plan",
+      dashboardCollections.workspacePlanCollection.id,
+      organizationId,
+    ],
     query: (q) =>
       q
         .from({ plan: dashboardCollections.workspacePlanCollection })

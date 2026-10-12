@@ -40,7 +40,11 @@ function useUpvote({
 }: UseUpvoteParams) {
   const { data: session } = useAuthState();
 
+  // Explicit queryKeys: this hook runs once per card and re-renders on every
+  // optimistic vote, so both queries take the hot-path escape hatch instead of
+  // rebuilding and hashing their IR each render.
   const upvotesQuery = useLiveQuery({
+    queryKey: ["post-upvotes", upvoteCollection.id, organizationId, postId],
     query: (q) =>
       q
         .from({ upvote: upvoteCollection })
@@ -55,6 +59,13 @@ function useUpvote({
   const upvotes = upvotesQuery.data;
 
   const userUpvoteQuery = useLiveQuery({
+    queryKey: [
+      "post-user-upvote",
+      upvoteCollection.id,
+      organizationId,
+      postId,
+      session?.user.id ?? null,
+    ],
     query: (q) => {
       if (!session) return undefined;
       return q
