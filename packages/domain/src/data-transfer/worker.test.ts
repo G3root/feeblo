@@ -550,6 +550,7 @@ layer(TestLayer)("DataImportWorker", (it) => {
       const error = yield* Effect.flip(
         repository.markRowCreated({
           jobId: canceledJob.id,
+          leaseOwner: "worker-1",
           postId: post.id,
           rowId,
         })
@@ -561,6 +562,62 @@ layer(TestLayer)("DataImportWorker", (it) => {
         .from(schema.dataImportRowTable)
         .where(eq(schema.dataImportRowTable.id, rowId));
       expect(stored?.outcome).toBe("pending");
+    })
+  );
+
+  it.effect("a lapsed lease cannot mark a pending row created", () =>
+    Effect.gen(function* () {
+      recordedIntegrationEvents.length = 0;
+      const fixture = yield* makeFixture();
+      // A real post for the second job's row to point at, so the assertion
+      // isolates the lease guard from the row's foreign key.
+      yield* stageAndConfirm(fixture, "title\nFirst post\n");
+      yield* runDataImportPass(yield* claim("worker-1"));
+
+      const db = yield* currentDb;
+      const [post] = yield* db
+        .select({ id: schema.postTable.id })
+        .from(schema.postTable)
+        .where(eq(schema.postTable.organizationId, fixture.organizationId));
+      if (post === undefined) {
+        throw new Error("Expected the first import to create a post.");
+      }
+
+      const job = yield* stageAndConfirm(fixture, "title\nSecond post\n");
+      // Worker 2 claims the job while worker 1's lease is still in hand.
+      yield* claim("worker-2");
+
+      const rows = yield* db
+        .select({ id: schema.dataImportRowTable.id })
+        .from(schema.dataImportRowTable)
+        .where(eq(schema.dataImportRowTable.jobId, job.id));
+      const rowId = rows[0]?.id;
+      if (rowId === undefined) {
+        throw new Error("Expected the second job's staged row to exist.");
+      }
+
+      const repository = yield* DataTransferRepository;
+      const stale = yield* Effect.flip(
+        repository.markRowCreated({
+          jobId: job.id,
+          leaseOwner: "worker-1",
+          postId: post.id,
+          rowId,
+        })
+      );
+      expect(stale._tag).toBe("DataTransferRepositoryError");
+
+      yield* repository.markRowCreated({
+        jobId: job.id,
+        leaseOwner: "worker-2",
+        postId: post.id,
+        rowId,
+      });
+      const [stored] = yield* db
+        .select({ outcome: schema.dataImportRowTable.outcome })
+        .from(schema.dataImportRowTable)
+        .where(eq(schema.dataImportRowTable.id, rowId));
+      expect(stored?.outcome).toBe("created");
     })
   );
 

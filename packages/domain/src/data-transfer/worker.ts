@@ -298,6 +298,7 @@ const applyPendingRow = ({
   boardResolution,
   defaultStatusId,
   job,
+  leaseOwner,
   repository,
   row,
   tagIdsByKey,
@@ -308,6 +309,7 @@ const applyPendingRow = ({
   readonly boardResolution: BatchBoardResolution;
   readonly defaultStatusId: string;
   readonly job: DataImportJobRecord;
+  readonly leaseOwner: string;
   readonly repository: DataTransferRepository["Service"];
   readonly row: PendingDataImportRow;
   readonly tagIdsByKey: ReadonlyMap<string, string>;
@@ -388,6 +390,7 @@ const applyPendingRow = ({
 
         yield* repository.markRowCreated({
           jobId: job.id,
+          leaseOwner,
           postId,
           rowId: row.id,
         });
@@ -544,6 +547,7 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
             boardResolution,
             defaultStatusId: defaultStatus.id,
             job,
+            leaseOwner,
             repository,
             row,
             tagIdsByKey,

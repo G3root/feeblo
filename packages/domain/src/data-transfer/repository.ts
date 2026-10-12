@@ -316,13 +316,14 @@ export interface DataTransferRepositoryContract {
     DataTransferRepositoryError
   >;
   /**
-   * Marks one row created, but only while it is still `pending` and its job
-   * is still `running`. An empty update means another worker owns this job
-   * now, or a cancel landed mid-batch; failing here is what rolls the row's
-   * post insert back with it.
+   * Marks one row created, but only while it is still `pending`, its job is
+   * still `running`, and the caller still holds that job's lease. An empty
+   * update means another worker owns the job now, or a cancel landed
+   * mid-batch; failing here is what rolls the row's post insert back with it.
    */
   readonly markRowCreated: (input: {
     readonly jobId: string;
+    readonly leaseOwner: string;
     readonly rowId: string;
     readonly postId: string;
   }) => Effect.Effect<void, DataTransferRepositoryError>;
@@ -1050,7 +1051,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
           )
       ),
 
-    markRowCreated: ({ jobId, rowId, postId }) =>
+    markRowCreated: ({ jobId, leaseOwner, rowId, postId }) =>
       guard(
         "markRowCreated",
         Effect.gen(function* () {
@@ -1070,7 +1071,9 @@ const makeDataTransferRepository = Effect.gen(function* () {
                 // The job check is what makes a cancel win the race: a
                 // cancellation that lands while this transaction is open
                 // leaves the post unapplied instead of creating it after
-                // the cancel the uploader already saw.
+                // the cancel the uploader already saw. The lease check is
+                // what keeps a worker whose lease expired from writing for
+                // the rest of its batch after another worker took over.
                 exists(
                   db
                     .select({ id: schema.dataImportJobTable.id })
@@ -1078,7 +1081,8 @@ const makeDataTransferRepository = Effect.gen(function* () {
                     .where(
                       and(
                         eq(schema.dataImportJobTable.id, jobId),
-                        eq(schema.dataImportJobTable.status, "running")
+                        eq(schema.dataImportJobTable.status, "running"),
+                        eq(schema.dataImportJobTable.leaseOwner, leaseOwner)
                       )
                     )
                 )

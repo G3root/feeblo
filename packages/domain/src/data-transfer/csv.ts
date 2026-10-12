@@ -111,26 +111,34 @@ const DANGEROUS_PATTERNS = [
   /^=IMAGE\s*\(/iu,
 ];
 
-/** Prefix a value with an apostrophe when a spreadsheet would evaluate it. */
-const escapeFormula = (value: string): string => {
-  if (value.length === 0) {
-    return value;
-  }
-  if (FORMULA_PREFIXES.has(value[0] ?? "")) {
-    return `'${value}`;
-  }
-  return DANGEROUS_PATTERNS.some((pattern) => pattern.test(value))
-    ? `'${value}`
-    : value;
-};
+/** True when a spreadsheet reads the value as a formula. */
+const isFormulaLike = (value: string): boolean =>
+  value.length > 0 &&
+  (FORMULA_PREFIXES.has(value[0] ?? "") ||
+    DANGEROUS_PATTERNS.some((pattern) => pattern.test(value)));
 
 /**
- * Undo {@link escapeFormula}: drop a leading apostrophe only when the
- * character behind it is one the writer escapes for, so an apostrophe a human
- * typed stays where it is.
+ * True when the value needs the writer's apostrophe marker.
+ *
+ * A value needs it when a spreadsheet would evaluate it, and also when it
+ * starts with typed apostrophes that hide such a value. Without the second
+ * marker, the reader cannot tell a typed apostrophe from one the writer added,
+ * and the round trip drops the typed one.
+ */
+const looksEscaped = (value: string): boolean =>
+  isFormulaLike(value.replace(/^'+/, ""));
+
+/** Prefix a value with an apostrophe when a spreadsheet would evaluate it. */
+const escapeFormula = (value: string): string =>
+  looksEscaped(value) ? `'${value}` : value;
+
+/**
+ * Undo {@link escapeFormula}: drop a leading apostrophe only when the value
+ * behind it is one the writer escapes for, so an apostrophe a human typed
+ * stays where it is.
  */
 const unescapeFormula = (value: string): string =>
-  value.startsWith("'") && FORMULA_PREFIXES.has(value[1] ?? "")
+  value.startsWith("'") && looksEscaped(value.slice(1))
     ? value.slice(1)
     : value;
 
@@ -535,8 +543,12 @@ export const parseBoardPostCsv = (
     const rows = dataRecords.map((record): ParsedBoardPostRow => {
       const value = (column: BoardPostCsvColumn): string => {
         const index = columnIndex.get(column);
-        const raw =
-          index === undefined ? "" : (record.cells[index] ?? "").trim();
+        const cell = index === undefined ? "" : (record.cells[index] ?? "");
+        // The content column is a body: a leading indent or a trailing blank
+        // line can be deliberate, so only the writer's formula marker is
+        // removed. Every other column is a scalar, where surrounding
+        // whitespace is noise.
+        const raw = column === "content" ? cell : cell.trim();
         return FREE_TEXT_COLUMNS.has(column) ? unescapeFormula(raw) : raw;
       };
       return {

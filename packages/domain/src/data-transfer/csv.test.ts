@@ -50,6 +50,34 @@ describe("board CSV codec", () => {
     })
   );
 
+  it.effect(
+    "keeps the edges of a content cell and trims the other columns",
+    () =>
+      Effect.gen(function* () {
+        const parsed = yield* parseBoardPostCsv(
+          'title,content\n"  Title  ","  Body  "\n'
+        );
+
+        expect(parsed.rows[0]?.title).toBe("Title");
+        expect(parsed.rows[0]?.content).toBe("  Body  ");
+      })
+  );
+
+  it.effect("round-trips an apostrophe in front of a formula", () =>
+    Effect.gen(function* () {
+      const original = row({ content: "'=1+1", title: "'@user" });
+
+      const document = serializeBoardPostCsv([original]);
+      // The typed apostrophe gets a second marker, so the reader knows the
+      // first one is part of the value rather than a writer marker.
+      expect(document).toContain("\"''=1+1\"");
+
+      const parsed = yield* parseBoardPostCsv(document);
+      expect(parsed.rows[0]?.content).toBe("'=1+1");
+      expect(parsed.rows[0]?.title).toBe("'@user");
+    })
+  );
+
   it.effect("reports the physical line a record starts on", () =>
     Effect.gen(function* () {
       const parsed = yield* parseBoardPostCsv(

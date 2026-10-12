@@ -9,9 +9,12 @@ import { z } from "zod";
  * the default report, not an error boundary.
  */
 export const reviewSearchSchema = z.object({
-  filter: z.enum(["failed", "warned", "pending", "created"]).optional(),
-  board: z.string().min(1).optional(),
-  message: z.string().min(1).optional(),
+  filter: z
+    .enum(["failed", "warned", "pending", "created"])
+    .optional()
+    .catch(undefined),
+  board: z.string().min(1).optional().catch(undefined),
+  message: z.string().min(1).optional().catch(undefined),
   page: z.coerce.number().int().min(0).optional().catch(undefined),
   size: z.coerce.number().int().min(25).max(500).optional().catch(undefined),
   sort: z.enum(["row_asc", "row_desc"]).optional().catch(undefined),
