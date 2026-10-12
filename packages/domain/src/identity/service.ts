@@ -266,10 +266,15 @@ const makeResolvePrincipalService = Effect.gen(function* () {
         new Error("Contact insert conflicted but no winner was found")
       ),
     }).pipe(
-      Effect.catchTag("PolicyDenied", () =>
+      // The policy's own reason names the plan and the cap (for example
+      // "The free plan allows up to 10 CRM entries."); it is the copy the
+      // admin needs, so carry it across the tag translation.
+      Effect.catchTag("PolicyDenied", (error) =>
         Effect.fail(
           new CrmEntryLimitReachedError({
-            message: "This workspace's plan has no room for another CRM entry.",
+            message:
+              error.reason ??
+              "This workspace's plan has no room for another CRM entry.",
           })
         )
       ),
