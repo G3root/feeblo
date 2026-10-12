@@ -21,6 +21,7 @@ import { TestClock } from "effect/testing";
 import { BoardRepository } from "../board/repository";
 import { PostStatusRepository } from "../post-status/repository";
 import { CurrentSession, type Session } from "../session-middleware";
+import { streamImportProblemsCsv } from "./import-problems-csv";
 import { DataImportService, type DataImportJobDetail } from "./import-service";
 import { DATA_IMPORT_WATCH_MS } from "./limits";
 import {
@@ -41,6 +42,7 @@ type Fixture = {
 };
 
 const encoder = new TextEncoder();
+const textDecoder = new TextDecoder();
 
 const makeFixture = (role: Role = "manager") =>
   Effect.gen(function* () {
@@ -211,6 +213,181 @@ layer(TestLayer)("DataImportService", (it) => {
         statusName: null,
         title: null,
       });
+    })
+  );
+
+  it.effect("summarizes a report by outcome, warning and board", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeFixture();
+      const job = yield* stage(
+        fixture,
+        encoder.encode(
+          [
+            "title,content,status,board,tags,eta,author_name,author_email,created_at",
+            "Good post,Body,Pending,Another board,Bug;Feature,2026-Q1,Jane,jane@example.com,2026-01-02T03:04:05Z",
+            "Warned post,Body,Wontfix,,,not-a-quarter,,,",
+            ",No title,X,,,not-a-quarter,,,",
+          ].join("\n")
+        )
+      );
+      const service = yield* DataImportService;
+      const session = Effect.provideService(
+        CurrentSession,
+        makeSession(fixture, "manager")
+      );
+      const describe = (input: {
+        readonly board?: string;
+        readonly filter?: "failed" | "warned" | "pending" | "created";
+        readonly message?: string;
+        readonly sort?: "row_asc" | "row_desc";
+      }) =>
+        service
+          .describeImport({
+            id: job.id,
+            organizationId: fixture.organizationId,
+            ...input,
+          })
+          .pipe(session);
+
+      const detail = yield* describe({});
+
+      expect(detail.report.counts).toEqual({
+        created: 0,
+        failed: 1,
+        pending: 2,
+        total: 3,
+        warned: 1,
+      });
+      expect(detail.report.failureGroups).toEqual([
+        { count: 1, message: "The title is required." },
+      ]);
+      expect(detail.report.boardGroups).toEqual([
+        { count: 1, name: "Another board" },
+        { count: 1, name: "Test board" },
+      ]);
+      expect(detail.newBoards).toEqual(["Another board"]);
+      // A substituted row carries its warnings, a clean one carries none.
+      expect(detail.report.rows[0]?.warnings).toEqual([]);
+      expect(detail.report.rows[1]?.warnings).toHaveLength(3);
+      expect(detail.job.retentionExpiresAt).toBeInstanceOf(Date);
+
+      const failed = yield* describe({ filter: "failed" });
+      expect(failed.report.total).toBe(1);
+      expect(failed.report.rows[0]?.rowNumber).toBe(4);
+      // The counts stay whole-job while the page is filtered.
+      expect(failed.report.counts.total).toBe(3);
+
+      const warned = yield* describe({ filter: "warned" });
+      expect(warned.report.total).toBe(1);
+      expect(warned.report.rows[0]?.rowNumber).toBe(3);
+
+      const byMessage = yield* describe({
+        filter: "failed",
+        message: "The title is required.",
+      });
+      expect(byMessage.report.total).toBe(1);
+
+      const byBoard = yield* describe({ board: "Another board" });
+      expect(byBoard.report.total).toBe(1);
+      expect(byBoard.report.rows[0]?.rowNumber).toBe(2);
+
+      const newestFirst = yield* describe({ sort: "row_desc" });
+      expect(newestFirst.report.rows[0]?.rowNumber).toBe(4);
+    })
+  );
+
+  it.effect("bounds a substitution message before it leaves the report", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeFixture();
+      const job = yield* stage(
+        fixture,
+        encoder.encode(`title,eta\nLong,${"x".repeat(300)}\n`)
+      );
+      const service = yield* DataImportService;
+      const detail = yield* service
+        .describeImport({ id: job.id, organizationId: fixture.organizationId })
+        .pipe(
+          Effect.provideService(CurrentSession, makeSession(fixture, "manager"))
+        );
+
+      const long = detail.report.rows[0]?.warnings.find(
+        (warning) => warning.length > 240
+      );
+      expect(long).toHaveLength(241);
+      expect(long?.endsWith("…")).toBe(true);
+    })
+  );
+
+  it.effect("stops naming new boards once a job leaves staging", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeFixture();
+      const job = yield* stage(
+        fixture,
+        encoder.encode("title,board\nNew,Another board\n")
+      );
+      const service = yield* DataImportService;
+      const session = Effect.provideService(
+        CurrentSession,
+        makeSession(fixture, "manager")
+      );
+      const before = yield* service
+        .describeImport({ id: job.id, organizationId: fixture.organizationId })
+        .pipe(session);
+      expect(before.newBoards).toEqual(["Another board"]);
+
+      yield* service
+        .cancelImport({ id: job.id, organizationId: fixture.organizationId })
+        .pipe(session);
+      const after = yield* service
+        .describeImport({ id: job.id, organizationId: fixture.organizationId })
+        .pipe(session);
+      expect(after.newBoards).toEqual([]);
+    })
+  );
+
+  it.effect("streams the problem rows as a repair sheet", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeFixture();
+      const job = yield* stage(
+        fixture,
+        encoder.encode(
+          [
+            "title,content,status,board,tags,eta,author_name,author_email,created_at",
+            "Good post,Body,Pending,Another board,Bug;Feature,2026-Q1,Jane,jane@example.com,2026-01-02T03:04:05Z",
+            "Warned post,Body,Wontfix,,,not-a-quarter,,,",
+            ",No title,X,,,not-a-quarter,,,",
+          ].join("\n")
+        )
+      );
+      const session = Effect.provideService(
+        CurrentSession,
+        makeSession(fixture, "manager")
+      );
+      const report = yield* streamImportProblemsCsv({
+        id: job.id,
+        organizationId: fixture.organizationId,
+      }).pipe(session);
+      const chunks = yield* Stream.runCollect(report.stream);
+      const csv = chunks.map((chunk) => textDecoder.decode(chunk)).join("");
+
+      expect(report.fileName).toContain("posts-import-problems-");
+      // A UTF-8 decoder drops the leading byte-order mark it reports; the
+      // header itself is what the assertion can see.
+      expect(csv.startsWith("row_number,outcome,title,board")).toBe(true);
+      // The failed row and the substituted row are in the file; the clean one
+      // is not, because nothing needs repairing there.
+      expect(csv).toContain("4,failed,,,,The title is required.,");
+      expect(csv).toContain("3,pending,Warned post,Test board,Pending,,");
+      expect(csv).toContain("not-a-quarter");
+      expect(csv).not.toContain("Good post");
+
+      const error = yield* Effect.flip(
+        streamImportProblemsCsv({
+          id: "missing-job-id",
+          organizationId: fixture.organizationId,
+        }).pipe(session)
+      );
+      expect(error._tag).toBe("DataImportNotFoundError");
     })
   );
 

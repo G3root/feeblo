@@ -145,6 +145,9 @@
     "./data-transfer/errors": {
       "default": "./src/data-transfer/errors.ts"
     },
+    "./data-transfer/limits": {
+      "default": "./src/data-transfer/limits.ts"
+    },
     "./data-transfer/repository": {
       "default": "./src/data-transfer/repository.ts"
     },

@@ -21,6 +21,7 @@ import {
 import { DataImportUploadLimitsMiddlewareLive } from "./api-contract";
 import { DataImportFileTooLargeError } from "./errors";
 import { streamPostCsv } from "./export-service";
+import { streamImportProblemsCsv } from "./import-problems-csv";
 import { DataImportService } from "./import-service";
 import { DATA_IMPORT_MAX_BYTES } from "./limits";
 import { toDataImportJobSummary } from "./mappers";
@@ -173,6 +174,27 @@ export const DataTransferApiLive = HttpApiBuilder.group(
             contentType: "text/csv; charset=utf-8",
             headers: {
               "Content-Disposition": contentDisposition(exportFile.fileName),
+            },
+          });
+          // eslint-disable-next-line effecttsgo/strict-effect-provide -- HttpApiBuilder handlers resolve their own services (the same shape as the media upload)
+        }).pipe(Effect.provide(HandlerDependencies))
+      )
+      .handle("exportImportProblems", ({ params, query }) =>
+        Effect.gen(function* () {
+          const session = yield* CurrentSession;
+          // The same bucket as an export: both stream a workspace file out.
+          yield* consumeDashboardRateLimit({
+            key: `data-export:${session.user.id}`,
+            name: "data-export",
+          });
+          const report = yield* streamImportProblemsCsv({
+            id: params.id,
+            organizationId: query.organizationId,
+          });
+          return HttpServerResponse.stream(report.stream, {
+            contentType: "text/csv; charset=utf-8",
+            headers: {
+              "Content-Disposition": contentDisposition(report.fileName),
             },
           });
           // eslint-disable-next-line effecttsgo/strict-effect-provide -- HttpApiBuilder handlers resolve their own services (the same shape as the media upload)

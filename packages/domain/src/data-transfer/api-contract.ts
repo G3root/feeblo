@@ -1,3 +1,4 @@
+import { DataImportJobId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
@@ -13,6 +14,7 @@ import { DataTransferServiceErrors } from "./errors";
 import { DATA_IMPORT_MAX_BYTES } from "./limits";
 import {
   DataImportJobSummary,
+  DataImportProblemsQuery,
   DataImportUploadFields,
   PostExportQuery,
 } from "./schema";
@@ -45,14 +47,14 @@ export const DataImportUploadLimitsMiddlewareLive = Layer.succeed(
 );
 
 /**
- * The two file endpoints of the transfer feature.
+ * The two file endpoints of the transfer feature, plus the report download.
  *
- * The bytes never touch RPC: an upload arrives as multipart and an export
- * leaves as a streamed `text/csv` response, because both are files and the
- * dashboard HTTP API already owns exactly that shape. The success type of the
- * export is a stream so the OpenAPI document and the generated client describe
- * the body honestly; the handler returns a raw response anyway, to set the
- * download's filename.
+ * The bytes never touch RPC: an upload arrives as multipart, an export leaves
+ * as a streamed `text/csv` response, and the problems report is read the same
+ * way, because all three are files and the dashboard HTTP API already owns
+ * exactly that shape. The success type of the downloads is a stream so the
+ * OpenAPI document and the generated client describe the body honestly; the
+ * handlers return a raw response anyway, to set the download's filename.
  */
 export class DataTransferApiGroup extends HttpApiGroup.make(
   "DataTransferApiGroup"
@@ -69,6 +71,14 @@ export class DataTransferApiGroup extends HttpApiGroup.make(
     HttpApiEndpoint.get("exportPosts", "/data/export", {
       error: Schema.Union([DataTransferServiceErrors, RateLimitErrors]),
       query: PostExportQuery,
+      success: HttpApiSchema.StreamUint8Array({
+        contentType: "text/csv; charset=utf-8",
+      }),
+    }),
+    HttpApiEndpoint.get("exportImportProblems", "/data/import/:id/problems", {
+      error: Schema.Union([DataTransferServiceErrors, RateLimitErrors]),
+      params: Schema.Struct({ id: DataImportJobId.schema }),
+      query: DataImportProblemsQuery,
       success: HttpApiSchema.StreamUint8Array({
         contentType: "text/csv; charset=utf-8",
       }),

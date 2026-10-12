@@ -259,6 +259,14 @@ const formatCsvCell = (value: BoardPostCsvCell): string => {
   return escaped === value ? quoteField(value) : quoteCsvCell(escaped);
 };
 
+/**
+ * One free-text or numeric cell rendered with the writer's quoting and
+ * formula-injection rules. The import's problems report uses this so a
+ * downloadable error file reads exactly like an export.
+ */
+export const formatCsvTextCell = (value: string | number | null): string =>
+  formatCsvCell(value);
+
 const rowToCells = (row: BoardPostCsvRow): readonly BoardPostCsvCell[] => [
   row.title,
   row.content,

@@ -36,6 +36,7 @@ import {
   DataTransferRepositoryError,
 } from "./errors";
 import { DATA_IMPORT_RETENTION_MS } from "./limits";
+import type { TDataImportRowFilter, TDataImportRowSort } from "./schema";
 
 /** The active states; a job in one of these owns its workspace's transfer slot. */
 const ACTIVE_STATUSES = [
@@ -62,6 +63,7 @@ const JOB_FIELDS = {
   startedAt: schema.dataImportJobTable.startedAt,
   status: schema.dataImportJobTable.status,
   warningCount: schema.dataImportJobTable.warningCount,
+  retentionExpiresAt: schema.dataImportJobTable.retentionExpiresAt,
 } as const;
 
 /** One staged import as the application reads it; never a raw table row. */
@@ -83,6 +85,7 @@ export type DataImportJobRecord = {
   readonly startedAt: Date | null;
   readonly finishedAt: Date | null;
   readonly createdAt: Date;
+  readonly retentionExpiresAt: Date;
 };
 
 /** One row as the report reads it. The payload is deliberately absent. */
@@ -100,6 +103,47 @@ export type DataImportRowRecord = {
   readonly statusName: string | null;
   /** A bounded excerpt of the planned body; never the whole payload. */
   readonly contentPreview: string | null;
+  /**
+   * The created post's slugs, read through the post and its board. Null until
+   * the worker has created the post, or after that post is deleted.
+   */
+  readonly boardSlug: string | null;
+  readonly postSlug: string | null;
+  /**
+   * The row's planned substitutions, bounded. Empty for a row that needs no
+   * attention, and for every row that failed before it had a plan.
+   */
+  readonly warnings: readonly string[];
+};
+
+/** One row of the problems CSV: a failure or a row with substitutions. */
+export type DataImportProblemRow = {
+  readonly rowNumber: number;
+  readonly outcome: TDataImportRowOutcome;
+  readonly title: string | null;
+  readonly boardName: string | null;
+  readonly statusName: string | null;
+  readonly message: string | null;
+  readonly warnings: readonly string[];
+};
+
+/** Whole-job tallies and the two groupings the review page reads. */
+export type DataImportReportSummary = {
+  readonly counts: {
+    readonly total: number;
+    readonly pending: number;
+    readonly created: number;
+    readonly failed: number;
+    readonly warned: number;
+  };
+  readonly failureGroups: readonly {
+    readonly message: string;
+    readonly count: number;
+  }[];
+  readonly boardGroups: readonly {
+    readonly name: string;
+    readonly count: number;
+  }[];
 };
 
 /** One row as the worker applies it, payload included. */
@@ -190,8 +234,33 @@ export interface DataTransferRepositoryContract {
     readonly jobId: string;
     readonly limit: number;
     readonly offset: number;
+    readonly filter?: TDataImportRowFilter | undefined;
+    readonly board?: string | undefined;
+    readonly message?: string | undefined;
+    readonly sort?: TDataImportRowSort | undefined;
   }) => Effect.Effect<
     { readonly total: number; readonly rows: readonly DataImportRowRecord[] },
+    DataTransferRepositoryError
+  >;
+  /** Whole-job counts, failure groups, and destination board groups. */
+  readonly summarizeReport: (input: {
+    readonly jobId: string;
+  }) => Effect.Effect<DataImportReportSummary, DataTransferRepositoryError>;
+  /** Distinct board names the job's pending rows will create, sorted. */
+  readonly listNewBoardNames: (input: {
+    readonly jobId: string;
+  }) => Effect.Effect<readonly string[], DataTransferRepositoryError>;
+  /**
+   * One page of the problems report: failed rows plus rows with planned
+   * substitutions, in file order. This is what the downloadable error report
+   * carries, so it reads the stored message and the plan's warnings.
+   */
+  readonly listProblemRows: (input: {
+    readonly jobId: string;
+    readonly limit: number;
+    readonly offset: number;
+  }) => Effect.Effect<
+    readonly DataImportProblemRow[],
     DataTransferRepositoryError
   >;
 
@@ -323,6 +392,34 @@ const previewContent = (content: string): string =>
   content.length <= CONTENT_PREVIEW_LENGTH
     ? content
     : `${content.slice(0, CONTENT_PREVIEW_LENGTH)}…`;
+
+/** How much of one substitution message a report row carries. */
+const WARNING_REPORT_LENGTH = 240;
+
+/**
+ * Bounds each warning before it leaves the module. A warning interpolates the
+ * value the file gave (`eta`, a status name), so a long cell could otherwise
+ * become a long message on every row report.
+ */
+const reportWarnings = (warnings: readonly string[]): readonly string[] =>
+  warnings.map((warning) =>
+    warning.length <= WARNING_REPORT_LENGTH
+      ? warning
+      : `${warning.slice(0, WARNING_REPORT_LENGTH)}…`
+  );
+
+/** True for a row whose plan stores at least one substitution. */
+const rowHasWarnings = sql`jsonb_array_length(coalesce(${schema.dataImportRowTable.payload} -> 'warnings', '[]'::jsonb)) > 0`;
+
+/** The filter's SQL. `warned` is a plan property, not an outcome. */
+const rowFilterCondition = (filter: TDataImportRowFilter | undefined) => {
+  if (filter === undefined) {
+    return undefined;
+  }
+  return filter === "warned"
+    ? rowHasWarnings
+    : eq(schema.dataImportRowTable.outcome, filter);
+};
 
 const makeDataTransferRepository = Effect.gen(function* () {
   const db = yield* currentDb;
@@ -473,49 +570,223 @@ const makeDataTransferRepository = Effect.gen(function* () {
           .limit(limit)
       ),
 
-    listRows: ({ jobId, limit, offset }) =>
+    listRows: ({ jobId, limit, offset, filter, board, message, sort }) =>
       guard(
         "listRows",
         Effect.gen(function* () {
+          const where = and(
+            eq(schema.dataImportRowTable.jobId, jobId),
+            rowFilterCondition(filter),
+            message === undefined
+              ? undefined
+              : eq(schema.dataImportRowTable.message, message),
+            board === undefined
+              ? undefined
+              : sql`${schema.dataImportRowTable.payload} ->> 'boardName' = ${board}`
+          );
           const [totals] = yield* db
             .select({ total: sql<string | number>`count(*)` })
             .from(schema.dataImportRowTable)
-            .where(eq(schema.dataImportRowTable.jobId, jobId));
+            .where(where);
           const stored = yield* db
             .select({
+              boardSlug: schema.boardTable.slug,
               id: schema.dataImportRowTable.id,
               message: schema.dataImportRowTable.message,
               outcome: schema.dataImportRowTable.outcome,
               payload: schema.dataImportRowTable.payload,
               postId: schema.dataImportRowTable.postId,
+              postSlug: schema.postTable.slug,
               rowNumber: schema.dataImportRowTable.rowNumber,
             })
             .from(schema.dataImportRowTable)
-            .where(eq(schema.dataImportRowTable.jobId, jobId))
-            .orderBy(asc(schema.dataImportRowTable.rowNumber))
+            .leftJoin(
+              schema.postTable,
+              eq(schema.dataImportRowTable.postId, schema.postTable.id)
+            )
+            .leftJoin(
+              schema.boardTable,
+              eq(schema.postTable.boardId, schema.boardTable.id)
+            )
+            .where(where)
+            .orderBy(
+              sort === "row_desc"
+                ? desc(schema.dataImportRowTable.rowNumber)
+                : asc(schema.dataImportRowTable.rowNumber)
+            )
             .limit(limit)
             .offset(offset);
           // The payload holds the plan a preview renders; it is narrowed to
-          // four fields here and never leaves the module whole.
+          // the fields the report shows and never leaves the module whole.
           const rows = yield* Effect.forEach(stored, (row) =>
-            decodeStagedRow(row.payload)
-              .pipe(Effect.orElseSucceed((): null => null))
-              .pipe(
-                Effect.map((payload): DataImportRowRecord => ({
-                  boardName: payload?.boardName ?? null,
-                  contentPreview:
-                    payload === null ? null : previewContent(payload.content),
-                  id: row.id,
-                  message: row.message,
-                  outcome: row.outcome,
-                  postId: row.postId,
-                  rowNumber: row.rowNumber,
-                  statusName: payload?.statusName ?? null,
-                  title: payload?.title ?? null,
-                }))
-              )
+            decodeStagedRow(row.payload).pipe(
+              Effect.orElseSucceed((): null => null),
+              Effect.map((payload): DataImportRowRecord => ({
+                boardName: payload?.boardName ?? null,
+                boardSlug: row.boardSlug,
+                contentPreview:
+                  payload === null ? null : previewContent(payload.content),
+                id: row.id,
+                message: row.message,
+                outcome: row.outcome,
+                postId: row.postId,
+                postSlug: row.postSlug,
+                rowNumber: row.rowNumber,
+                statusName: payload?.statusName ?? null,
+                title: payload?.title ?? null,
+                warnings:
+                  payload === null ? [] : reportWarnings(payload.warnings),
+              }))
+            )
           );
           return { rows, total: Number(totals?.total ?? 0) };
+        })
+      ),
+
+    summarizeReport: ({ jobId }) =>
+      guard(
+        "summarizeReport",
+        Effect.gen(function* () {
+          const [counts] = yield* db
+            .select({
+              created: sql<
+                string | number
+              >`count(*) filter (where ${schema.dataImportRowTable.outcome} = 'created')`,
+              failed: sql<
+                string | number
+              >`count(*) filter (where ${schema.dataImportRowTable.outcome} = 'failed')`,
+              pending: sql<
+                string | number
+              >`count(*) filter (where ${schema.dataImportRowTable.outcome} = 'pending')`,
+              total: sql<string | number>`count(*)`,
+              warned: sql<
+                string | number
+              >`count(*) filter (where ${rowHasWarnings})`,
+            })
+            .from(schema.dataImportRowTable)
+            .where(eq(schema.dataImportRowTable.jobId, jobId));
+          const failureRows = yield* db
+            .select({
+              count: sql<string | number>`count(*)`,
+              message: schema.dataImportRowTable.message,
+            })
+            .from(schema.dataImportRowTable)
+            .where(
+              and(
+                eq(schema.dataImportRowTable.jobId, jobId),
+                eq(schema.dataImportRowTable.outcome, "failed"),
+                isNotNull(schema.dataImportRowTable.message)
+              )
+            )
+            .groupBy(schema.dataImportRowTable.message)
+            .orderBy(
+              desc(sql`count(*)`),
+              asc(schema.dataImportRowTable.message)
+            );
+          const boardRows = yield* db
+            .select({
+              count: sql<string | number>`count(*)`,
+              name: sql<
+                string | null
+              >`${schema.dataImportRowTable.payload} ->> 'boardName'`,
+            })
+            .from(schema.dataImportRowTable)
+            .where(
+              and(
+                eq(schema.dataImportRowTable.jobId, jobId),
+                sql`${schema.dataImportRowTable.payload} ->> 'boardName' is not null`
+              )
+            )
+            .groupBy(sql`${schema.dataImportRowTable.payload} ->> 'boardName'`)
+            .orderBy(
+              desc(sql`count(*)`),
+              asc(sql`${schema.dataImportRowTable.payload} ->> 'boardName'`)
+            );
+          return {
+            boardGroups: boardRows.flatMap((row) =>
+              row.name === null
+                ? []
+                : [{ count: Number(row.count), name: row.name }]
+            ),
+            counts: {
+              created: Number(counts?.created ?? 0),
+              failed: Number(counts?.failed ?? 0),
+              pending: Number(counts?.pending ?? 0),
+              total: Number(counts?.total ?? 0),
+              warned: Number(counts?.warned ?? 0),
+            },
+            failureGroups: failureRows.flatMap((row) =>
+              row.message === null
+                ? []
+                : [{ count: Number(row.count), message: row.message }]
+            ),
+          };
+        })
+      ),
+
+    listNewBoardNames: ({ jobId }) =>
+      guard(
+        "listNewBoardNames",
+        db
+          .selectDistinct({
+            name: sql<
+              string | null
+            >`${schema.dataImportRowTable.payload} ->> 'boardName'`,
+          })
+          .from(schema.dataImportRowTable)
+          .where(
+            and(
+              eq(schema.dataImportRowTable.jobId, jobId),
+              eq(schema.dataImportRowTable.outcome, "pending"),
+              sql`${schema.dataImportRowTable.payload} ->> 'boardId' is null`
+            )
+          )
+          .orderBy(
+            asc(sql`${schema.dataImportRowTable.payload} ->> 'boardName'`)
+          )
+          .pipe(
+            Effect.map((rows) =>
+              rows.flatMap((row) => (row.name === null ? [] : [row.name]))
+            )
+          )
+      ),
+
+    listProblemRows: ({ jobId, limit, offset }) =>
+      guard(
+        "listProblemRows",
+        Effect.gen(function* () {
+          const stored = yield* db
+            .select({
+              message: schema.dataImportRowTable.message,
+              outcome: schema.dataImportRowTable.outcome,
+              payload: schema.dataImportRowTable.payload,
+              rowNumber: schema.dataImportRowTable.rowNumber,
+            })
+            .from(schema.dataImportRowTable)
+            .where(
+              and(
+                eq(schema.dataImportRowTable.jobId, jobId),
+                sql`(${schema.dataImportRowTable.outcome} = 'failed' or ${rowHasWarnings})`
+              )
+            )
+            .orderBy(asc(schema.dataImportRowTable.rowNumber))
+            .limit(limit)
+            .offset(offset);
+          return yield* Effect.forEach(stored, (row) =>
+            decodeStagedRow(row.payload).pipe(
+              Effect.orElseSucceed((): null => null),
+              Effect.map((payload): DataImportProblemRow => ({
+                boardName: payload?.boardName ?? null,
+                message: row.message,
+                outcome: row.outcome,
+                rowNumber: row.rowNumber,
+                statusName: payload?.statusName ?? null,
+                title: payload?.title ?? null,
+                warnings:
+                  payload === null ? [] : reportWarnings(payload.warnings),
+              }))
+            )
+          );
         })
       ),
 

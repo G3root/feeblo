@@ -126,7 +126,9 @@ const settingsItems = [
       {
         label: "Imports & exports",
         icon: Database01Icon,
-        permission: "boards.exportData" as const,
+        // Either grant opens the page: it shows the import card and the
+        // export card independently, so a role with only one still belongs here.
+        permissions: ["boards.exportData", "boards.importPosts"] as const,
         to: "/$organizationId/settings/data" as const,
       },
       {
@@ -217,17 +219,28 @@ export function SettingsSidebar({
                 {group.subItems.map((item) => {
                   const permission =
                     "permission" in item ? item.permission : undefined;
+                  const permissions =
+                    "permissions" in item ? item.permissions : undefined;
                   const canAccess =
-                    permission === undefined ||
-                    (session != null &&
-                      hasPermission(organizationId, permission)(session));
+                    permission === undefined && permissions === undefined
+                      ? true
+                      : session != null &&
+                        (permission === undefined
+                          ? (permissions ?? []).some((candidate) =>
+                              hasPermission(organizationId, candidate)(session)
+                            )
+                          : hasPermission(organizationId, permission)(session));
+                  const itemPath = `/${organizationId}/settings/${item.to
+                    .split("/")
+                    .slice(3)
+                    .join("/")}`;
 
                   return (
                     <SidebarMenuItem key={item.to}>
                       <SidebarMenuButton
                         isActive={
-                          pathname ===
-                          `/${organizationId}/settings/${item.to.split("/").slice(3)}`
+                          pathname === itemPath ||
+                          pathname.startsWith(`${itemPath}/`)
                         }
                         render={(renderProps) =>
                           canAccess ? (

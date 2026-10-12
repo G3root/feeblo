@@ -1,3 +1,7 @@
+import type {
+  TDataImportRowFilter,
+  TDataImportRowSort,
+} from "@feeblo/domain/data-transfer/schema";
 import * as Effect from "effect/Effect";
 import * as Atom from "effect/reactivity/Atom";
 import * as Stream from "effect/Stream";
@@ -40,6 +44,11 @@ export type DataImportDetailArgs = {
   readonly limit: number;
   readonly offset: number;
   readonly organizationId: string;
+  /** Absent narrows nothing; the filter replaces the old whole-job view. */
+  readonly filter: TDataImportRowFilter | null;
+  readonly board: string | null;
+  readonly message: string | null;
+  readonly sort: TDataImportRowSort;
 };
 
 /**
@@ -47,23 +56,36 @@ export type DataImportDetailArgs = {
  *
  * The watch RPC ends once the job reaches a terminal status, so the atom
  * holds the final snapshot and the page stops re-rendering without any
- * client-side stop condition.
+ * client-side stop condition. Filters are part of the atom key, so changing
+ * one opens the stream for that view instead of re-sorting in the browser.
  */
-export const dataImportDetailAtom = Atom.family((args: DataImportDetailArgs) =>
-  DashboardClient.runtime.atom(
-    Stream.unwrap(
-      DashboardClient.use((client) =>
-        Effect.succeed(
-          client("DataImportWatch", {
-            id: args.id,
-            limit: args.limit,
-            offset: args.offset,
-            organizationId: args.organizationId,
-          })
+export const dataImportDetailAtom = Atom.family(
+  (args: DataImportDetailArgs) => {
+    const window = {
+      id: args.id,
+      limit: args.limit,
+      offset: args.offset,
+      organizationId: args.organizationId,
+      sort: args.sort,
+    };
+    // Optional keys are added one at a time: the RPC payload type refuses an
+    // explicit `undefined`, and a key that is present must carry a real value.
+    const withFilter =
+      args.filter === null ? window : { ...window, filter: args.filter };
+    const withBoard =
+      args.board === null ? withFilter : { ...withFilter, board: args.board };
+    const payload =
+      args.message === null
+        ? withBoard
+        : { ...withBoard, message: args.message };
+    return DashboardClient.runtime.atom(
+      Stream.unwrap(
+        DashboardClient.use((client) =>
+          Effect.succeed(client("DataImportWatch", payload))
         )
       )
-    )
-  )
+    );
+  }
 );
 
 export const confirmDataImportAtom =

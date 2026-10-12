@@ -21,6 +21,8 @@ export const DataImportJobSummary = S.Struct({
   confirmedAt: S.NullOr(S.DateFromString),
   startedAt: S.NullOr(S.DateFromString),
   finishedAt: S.NullOr(S.DateFromString),
+  /** When the retention sweep deletes the job and its row report. */
+  retentionExpiresAt: S.DateFromString,
 });
 
 export type TDataImportJobSummary = S.Schema.Type<typeof DataImportJobSummary>;
@@ -41,13 +43,82 @@ export const DataImportReportRow = S.Struct({
   statusName: S.NullOr(S.String),
   /** A bounded excerpt of the planned body; never the whole payload. */
   contentPreview: S.NullOr(S.String),
+  /**
+   * The post this row created, as the dashboard's route needs it: a board
+   * slug and a post slug. Both are null until the worker creates the post.
+   */
+  boardSlug: S.NullOr(S.String),
+  postSlug: S.NullOr(S.String),
+  /**
+   * The substitutions this row imports with: a defaulted status, an unreadable
+   * eta, a dropped author email. Bounded at the repository so a long cell
+   * cannot ride out of the payload; empty for a row that needs no attention.
+   */
+  warnings: S.Array(S.String),
 });
 
 export type TDataImportReportRow = S.Schema.Type<typeof DataImportReportRow>;
 
+/**
+ * The report filters the review page offers. Absent means every row. `warned`
+ * is the one that is not an outcome: it selects rows whose plan carries a
+ * substitution, whatever their lifecycle state.
+ */
+export const DataImportRowFilter = S.Literals([
+  "failed",
+  "warned",
+  "pending",
+  "created",
+]);
+
+export type TDataImportRowFilter = S.Schema.Type<typeof DataImportRowFilter>;
+
+/** The one sortable column: the file's row order, either way. */
+export const DataImportRowSort = S.Literals(["row_asc", "row_desc"]);
+
+export type TDataImportRowSort = S.Schema.Type<typeof DataImportRowSort>;
+
+/** Whole-job counts, independent of the filter the page is showing. */
+export const DataImportReportCounts = S.Struct({
+  total: S.Finite,
+  pending: S.Finite,
+  created: S.Finite,
+  failed: S.Finite,
+  /** Rows whose plan stores at least one substitution, any outcome. */
+  warned: S.Finite,
+});
+
+export type TDataImportReportCounts = S.Schema.Type<
+  typeof DataImportReportCounts
+>;
+
+/** One distinct failed-row message and how many rows carry it. */
+export const DataImportFailureGroup = S.Struct({
+  message: S.String,
+  count: S.Finite,
+});
+
+export type TDataImportFailureGroup = S.Schema.Type<
+  typeof DataImportFailureGroup
+>;
+
+/** One planned destination board and how many rows name it. */
+export const DataImportBoardGroup = S.Struct({
+  name: S.String,
+  count: S.Finite,
+});
+
+export type TDataImportBoardGroup = S.Schema.Type<typeof DataImportBoardGroup>;
+
 export const DataImportReportPage = S.Struct({
   rows: S.Array(DataImportReportRow),
+  /** Rows matching the current filter, so pagination is honest. */
   total: S.Finite,
+  counts: DataImportReportCounts,
+  /** Failed rows grouped by their static message, most rows first. */
+  failureGroups: S.Array(DataImportFailureGroup),
+  /** Rows grouped by planned destination board, most rows first. */
+  boardGroups: S.Array(DataImportBoardGroup),
 });
 
 export type TDataImportReportPage = S.Schema.Type<typeof DataImportReportPage>;
@@ -55,6 +126,12 @@ export type TDataImportReportPage = S.Schema.Type<typeof DataImportReportPage>;
 export const DataImportJobDetail = S.Struct({
   job: DataImportJobSummary,
   report: DataImportReportPage,
+  /**
+   * The boards a staged file will create, named once each. Empty once the job
+   * leaves `awaiting_confirmation`, because by then the worker has created
+   * them or is creating them.
+   */
+  newBoards: S.Array(S.String),
 });
 
 export type TDataImportJobDetail = S.Schema.Type<typeof DataImportJobDetail>;
@@ -77,10 +154,23 @@ const ReportWindow = {
   offset: S.optionalKey(WindowBound),
 };
 
+/**
+ * The report's narrowing. `message` matches a failed row's static message, so
+ * a failure group links to the rows it counts; `board` matches the planned
+ * destination board.
+ */
+const ReportFilter = {
+  filter: S.optionalKey(DataImportRowFilter),
+  board: S.optionalKey(S.String),
+  message: S.optionalKey(S.String),
+  sort: S.optionalKey(DataImportRowSort),
+};
+
 export const DataImportGet = S.Struct({
   id: DataImportJobId.schema,
   organizationId: S.String,
   ...ReportWindow,
+  ...ReportFilter,
 });
 
 export type TDataImportGet = S.Schema.Type<typeof DataImportGet>;
@@ -98,6 +188,15 @@ export const DataImportCancel = S.Struct({
 });
 
 export type TDataImportCancel = S.Schema.Type<typeof DataImportCancel>;
+
+/** The row report download's query: the job is the path segment. */
+export const DataImportProblemsQuery = S.Struct({
+  organizationId: S.String,
+});
+
+export type TDataImportProblemsQuery = S.Schema.Type<
+  typeof DataImportProblemsQuery
+>;
 
 /**
  * The export endpoint's query, as the wire carries it: query parameters are

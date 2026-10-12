@@ -11,6 +11,22 @@ import type {
   TDataImportList,
 } from "./schema";
 
+/**
+ * The report window and its narrowing cross the RPC as optional keys; this
+ * drops the absent ones so the service sees one shape whether the caller sent
+ * a filter or not.
+ */
+const toDescribeInput = (args: TDataImportGet) => ({
+  board: args.board,
+  filter: args.filter,
+  id: args.id,
+  limit: args.limit,
+  message: args.message,
+  offset: args.offset,
+  organizationId: args.organizationId,
+  sort: args.sort,
+});
+
 export const DataTransferRpcHandlersEffect = Effect.gen(function* () {
   const service = yield* DataImportService;
 
@@ -27,12 +43,7 @@ export const DataTransferRpcHandlersEffect = Effect.gen(function* () {
       }),
     DataImportGet: (args: TDataImportGet) =>
       service
-        .describeImport({
-          id: args.id,
-          organizationId: args.organizationId,
-          ...(args.limit !== undefined && { limit: args.limit }),
-          ...(args.offset !== undefined && { offset: args.offset }),
-        })
+        .describeImport(toDescribeInput(args))
         .pipe(Effect.map(toDataImportJobDetail)),
     DataImportList: (args: TDataImportList) =>
       service
@@ -42,12 +53,7 @@ export const DataTransferRpcHandlersEffect = Effect.gen(function* () {
       service.watchImportList({ organizationId: args.organizationId }),
     DataImportWatch: (args: TDataImportGet) =>
       service
-        .watchImport({
-          id: args.id,
-          organizationId: args.organizationId,
-          ...(args.limit !== undefined && { limit: args.limit }),
-          ...(args.offset !== undefined && { offset: args.offset }),
-        })
+        .watchImport(toDescribeInput(args))
         .pipe(Stream.map(toDataImportJobDetail)),
   };
 });

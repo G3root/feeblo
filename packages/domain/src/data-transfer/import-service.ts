@@ -30,6 +30,7 @@ import { planImportRows } from "./plan";
 import { canImportPosts } from "./policies";
 import {
   type DataImportJobRecord,
+  type DataImportReportSummary,
   type DataImportRowRecord,
   DataTransferRepository,
   type NewStagedImportRow,
@@ -37,6 +38,8 @@ import {
 import {
   BOARD_IMPORT_DEFAULT_REPORT_LIMIT,
   BOARD_IMPORT_MAX_REPORT_LIMIT,
+  type TDataImportRowFilter,
+  type TDataImportRowSort,
 } from "./schema";
 
 export type StageBoardImportInput = {
@@ -49,10 +52,12 @@ export type StageBoardImportInput = {
 
 export type DataImportJobDetail = {
   readonly job: DataImportJobRecord;
-  readonly report: {
+  readonly report: DataImportReportSummary & {
     readonly rows: readonly DataImportRowRecord[];
     readonly total: number;
   };
+  /** The boards a staged file will create; empty once the job has left staging. */
+  readonly newBoards: readonly string[];
 };
 
 export type DescribeImportInput = {
@@ -60,6 +65,10 @@ export type DescribeImportInput = {
   readonly id: string;
   readonly limit?: number | undefined;
   readonly offset?: number | undefined;
+  readonly filter?: TDataImportRowFilter | undefined;
+  readonly board?: string | undefined;
+  readonly message?: string | undefined;
+  readonly sort?: TDataImportRowSort | undefined;
 };
 
 export type DataImportServiceContract = {
@@ -212,8 +221,15 @@ const reportChangeKey = (detail: DataImportJobDetail): string =>
   [
     jobChangeKey(detail.job),
     detail.report.total,
+    detail.report.counts.total,
+    detail.report.counts.pending,
+    detail.report.counts.created,
+    detail.report.counts.failed,
+    detail.report.counts.warned,
+    detail.newBoards.length,
     ...detail.report.rows.map(
-      (row) => `${row.id}\u0000${row.outcome}\u0000${row.postId ?? ""}`
+      (row) =>
+        `${row.id}\u0000${row.outcome}\u0000${row.postId ?? ""}\u0000${row.warnings.length}`
     ),
   ].join("\u0001");
 
@@ -450,12 +466,40 @@ const makeDataImportService = Effect.gen(function* () {
       const report = yield* fromStore(
         "listRows",
         repository.listRows({
+          board: input.board,
+          filter: input.filter,
           jobId: input.id,
           limit: window.limit,
+          message: input.message,
           offset: window.offset,
+          sort: input.sort,
         })
       );
-      return { job: job.value, report };
+      const summary = yield* fromStore(
+        "summarizeReport",
+        repository.summarizeReport({ jobId: input.id })
+      );
+      // A staged file may name boards that do not exist yet, and the
+      // confirmation names them. Once the job runs, the worker creates them,
+      // so an unchanged list would only be stale.
+      const newBoards =
+        job.value.status === "awaiting_confirmation"
+          ? yield* fromStore(
+              "listNewBoardNames",
+              repository.listNewBoardNames({ jobId: input.id })
+            )
+          : [];
+      return {
+        job: job.value,
+        newBoards: [...newBoards],
+        report: {
+          boardGroups: summary.boardGroups,
+          counts: summary.counts,
+          failureGroups: summary.failureGroups,
+          rows: report.rows,
+          total: report.total,
+        },
+      };
     }).pipe(Policy.withPolicy(canImportPosts(input.organizationId)));
 
   const listImports: DataImportServiceContract["listImports"] = (input) =>
