@@ -546,7 +546,7 @@ const makePostWriteService = Effect.gen(function* () {
             // keeps the acting member, exactly as before.
             ...(subject
               ? {
-                  creatorMemberId: subject.memberId ?? null,
+                  creatorMemberId: subject.memberId,
                   ...(subject.contactId !== null && {
                     contactId: subject.contactId,
                   }),
@@ -902,7 +902,7 @@ const makePostWriteService = Effect.gen(function* () {
               // A staff subject keeps its member row; a customer subject has
               // none (see the create path).
               creatorId: subject.userId,
-              creatorMemberId: subject.memberId ?? null,
+              creatorMemberId: subject.memberId,
               id: args.id,
               organizationId: args.organizationId,
             });

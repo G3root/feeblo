@@ -174,7 +174,7 @@ const makeCommentService = Effect.gen(function* () {
       return {
         // A staff subject keeps its member row so the comment carries the
         // member tick; a customer subject has none.
-        memberId: subject.memberId ?? null,
+        memberId: subject.memberId,
         metadata: toOnBehalfMetadata(subject),
         userId: subject.userId,
       };

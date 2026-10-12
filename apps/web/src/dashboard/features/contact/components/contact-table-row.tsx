@@ -1,3 +1,4 @@
+import type { TContact } from "@feeblo/domain/contact/schema";
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { TableCell, TableRow } from "@feeblo/ui/table";
@@ -29,9 +30,7 @@ function formatDate(date: Date) {
   return mediumDateFormatter.format(date);
 }
 
-function formatSource(
-  source: "DASHBOARD" | "WIDGET" | "API" | "IMPORT" | "ON_BEHALF"
-) {
+function formatSource(source: TContact["source"]) {
   return {
     DASHBOARD: "Dashboard",
     WIDGET: "Widget",
@@ -60,7 +59,7 @@ export function ContactTableRow({
     id: string;
     name: string | null;
     phone: string | null;
-    source: "DASHBOARD" | "WIDGET" | "API" | "IMPORT" | "ON_BEHALF";
+    source: TContact["source"];
     updatedAt: Date;
   };
   definitions: readonly CustomAttributeDefinition[];

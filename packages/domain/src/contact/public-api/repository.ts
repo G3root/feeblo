@@ -417,6 +417,7 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
               yield* renameSyntheticAccount({
                 db: tx,
                 name,
+                now,
                 userId: updated.userId,
               });
             }

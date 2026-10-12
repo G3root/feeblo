@@ -244,6 +244,8 @@ describe("ResolvePrincipalService", () => {
           // The row was created by attribution, not the contact dialog.
           expect(contact?.source).toBe("ON_BEHALF");
           expect(resolved.userId).toBeNull();
+          // A customer resolution says so explicitly: no member row.
+          expect(resolved.memberId).toBeNull();
         })
     );
 

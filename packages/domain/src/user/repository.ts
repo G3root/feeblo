@@ -1,6 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import { UserId } from "@feeblo/id";
-import { and, eq, getTableName, sql } from "drizzle-orm";
+import { and, eq, sql, type SQLWrapper } from "drizzle-orm";
+import type { PgTable } from "drizzle-orm/pg-core";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -399,22 +400,57 @@ const makeUserRepository = Effect.gen(function* () {
         // `contact` and `email_contact` are set-null too; they are listed
         // because their pointers are the attribution link a later write
         // adopts again.
+        // One `EXISTS` over a table's foreign-key index, asking whether any
+        // row names this account. `column` is the account reference on that
+        // table, e.g. `asset.userId`.
+        const namesAccount = (table: PgTable, column: SQLWrapper) =>
+          sql<boolean>`EXISTS (SELECT 1 FROM ${table} WHERE ${column} = ${userId})`;
         const [references = null] = yield* db
           .select({
-            asset: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.assetTable))} WHERE ${schema.assetTable.userId} = ${userId})`,
-            changelogSubscription: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.changelogSubscriptionTable))} WHERE ${schema.changelogSubscriptionTable.userId} = ${userId})`,
-            comment: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.commentTable))} WHERE ${schema.commentTable.userId} = ${userId})`,
-            commentReaction: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.commentReactionTable))} WHERE ${schema.commentReactionTable.userId} = ${userId})`,
-            contact: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.contactTable))} WHERE ${schema.contactTable.userId} = ${userId})`,
-            emailContact: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.emailContactTable))} WHERE ${schema.emailContactTable.userId} = ${userId})`,
-            invitation: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.invitationTable))} WHERE ${schema.invitationTable.inviterId} = ${userId})`,
-            member: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.memberTable))} WHERE ${schema.memberTable.userId} = ${userId})`,
-            notification: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.notificationTable))} WHERE ${schema.notificationTable.recipientUserId} = ${userId})`,
-            notificationPreference: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.notificationPreferenceTable))} WHERE ${schema.notificationPreferenceTable.userId} = ${userId})`,
-            post: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.postTable))} WHERE ${schema.postTable.creatorId} = ${userId})`,
-            postReaction: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.postReactionTable))} WHERE ${schema.postReactionTable.userId} = ${userId})`,
-            postSubscription: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.postSubscriptionTable))} WHERE ${schema.postSubscriptionTable.userId} = ${userId})`,
-            upvote: sql<boolean>`EXISTS (SELECT 1 FROM ${sql.identifier(getTableName(schema.upvoteTable))} WHERE ${schema.upvoteTable.userId} = ${userId})`,
+            asset: namesAccount(schema.assetTable, schema.assetTable.userId),
+            changelogSubscription: namesAccount(
+              schema.changelogSubscriptionTable,
+              schema.changelogSubscriptionTable.userId
+            ),
+            comment: namesAccount(
+              schema.commentTable,
+              schema.commentTable.userId
+            ),
+            commentReaction: namesAccount(
+              schema.commentReactionTable,
+              schema.commentReactionTable.userId
+            ),
+            contact: namesAccount(
+              schema.contactTable,
+              schema.contactTable.userId
+            ),
+            emailContact: namesAccount(
+              schema.emailContactTable,
+              schema.emailContactTable.userId
+            ),
+            invitation: namesAccount(
+              schema.invitationTable,
+              schema.invitationTable.inviterId
+            ),
+            member: namesAccount(schema.memberTable, schema.memberTable.userId),
+            notification: namesAccount(
+              schema.notificationTable,
+              schema.notificationTable.recipientUserId
+            ),
+            notificationPreference: namesAccount(
+              schema.notificationPreferenceTable,
+              schema.notificationPreferenceTable.userId
+            ),
+            post: namesAccount(schema.postTable, schema.postTable.creatorId),
+            postReaction: namesAccount(
+              schema.postReactionTable,
+              schema.postReactionTable.userId
+            ),
+            postSubscription: namesAccount(
+              schema.postSubscriptionTable,
+              schema.postSubscriptionTable.userId
+            ),
+            upvote: namesAccount(schema.upvoteTable, schema.upvoteTable.userId),
           })
           .from(schema.userTable)
           .where(eq(schema.userTable.id, userId))

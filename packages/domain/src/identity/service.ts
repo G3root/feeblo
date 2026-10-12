@@ -59,10 +59,11 @@ export interface ResolvedPrincipal {
   /** The linked account: a real user, a provisioned shadow user, or null. */
   userId: string | null;
   /**
-   * The workspace member row when the subject is staff. Null for customers,
-   * and absent when a caller constructs a customer principal by hand.
+   * The workspace member row when the subject is staff; null for a customer.
+   * Always present: every resolution says which of the two the subject is, so
+   * no consumer reads `undefined` as "customer".
    */
-  memberId?: string | null;
+  memberId: string | null;
 }
 
 type Contact = typeof schema.contactTable.$inferSelect;
@@ -319,6 +320,16 @@ const makeResolvePrincipalService = Effect.gen(function* () {
     );
   }
 
+  /**
+   * A customer resolution: the contact anchors the attribution and there is
+   * no member row. A staff resolution is built where the member is found,
+   * because it carries a null contact with a member id.
+   */
+  const customerPrincipal = (
+    contactId: string,
+    userId: string | null
+  ): ResolvedPrincipal => ({ contactId, memberId: null, userId });
+
   return {
     resolve: ({ organizationId, needsUser, subject }: ResolvePrincipalInput) =>
       Effect.gen(function* () {
@@ -408,10 +419,10 @@ const makeResolvePrincipalService = Effect.gen(function* () {
           }
 
           const enriched = yield* enrichContact(contact, subject);
-          return {
-            contactId: enriched.id,
-            userId: enriched.userId ?? user.value.id,
-          };
+          return customerPrincipal(
+            enriched.id,
+            enriched.userId ?? user.value.id
+          );
         }
 
         // -- Priority 2: explicit contact id -------------------------------
@@ -426,14 +437,15 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             needsUser,
             email,
           });
-          return { contactId: contact.id, userId };
+          return customerPrincipal(contact.id, userId);
         }
 
         // -- Priority 3: external id from the customer's system ------------
-        if (subject.externalId) {
+        const externalId = subject.externalId;
+        if (externalId) {
           const byExternalId = yield* findContactByExternalId(
             organizationId,
-            subject.externalId
+            externalId
           );
           if (Option.isSome(byExternalId)) {
             const contact = yield* enrichContact(byExternalId.value, subject);
@@ -442,7 +454,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
               needsUser,
               email,
             });
-            return { contactId: contact.id, userId };
+            return customerPrincipal(contact.id, userId);
           }
 
           // No external-id match: fall through to an email match before
@@ -459,7 +471,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             // overwritten by resolution input.
             const [claimed = null] = yield* db
               .update(schema.contactTable)
-              .set({ externalId: subject.externalId, updatedAt: now })
+              .set({ externalId, updatedAt: now })
               .where(
                 and(
                   eq(schema.contactTable.id, byEmail.id),
@@ -478,20 +490,20 @@ const makeResolvePrincipalService = Effect.gen(function* () {
               needsUser,
               email,
             });
-            return { contactId: contact.id, userId };
+            return customerPrincipal(contact.id, userId);
           }
 
           const created = yield* ensureContactInRoom(
             {
               organizationId,
-              externalId: subject.externalId,
+              externalId,
               email: email ?? null,
               name: subject.name ?? null,
               avatar: subject.avatarUrl ?? null,
             },
             () =>
               firstMatch([
-                findContactByExternalId(organizationId, subject.externalId!),
+                findContactByExternalId(organizationId, externalId),
                 ...(email ? [findContactByEmail(organizationId, email)] : []),
               ])
           );
@@ -500,7 +512,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             needsUser,
             email,
           });
-          return { contactId: created.id, userId };
+          return customerPrincipal(created.id, userId);
         }
 
         // -- Priority 4: email as the find-or-create key -------------------
@@ -513,7 +525,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
               needsUser,
               email,
             });
-            return { contactId: contact.id, userId };
+            return customerPrincipal(contact.id, userId);
           }
 
           // The email may belong to a real account that simply has no contact
@@ -538,10 +550,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             }
             if (linked) {
               const contact = yield* enrichContact(linked, subject);
-              return {
-                contactId: contact.id,
-                userId: contact.userId ?? user.id,
-              };
+              return customerPrincipal(contact.id, contact.userId ?? user.id);
             }
             const created = yield* ensureContactInRoom(
               {
@@ -553,7 +562,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
               },
               () => findContactByUser(organizationId, user.id)
             );
-            return { contactId: created.id, userId: user.id };
+            return customerPrincipal(created.id, user.id);
           }
 
           // Nothing anywhere: create the customer, plus a shadow user when
@@ -572,7 +581,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             needsUser,
             email,
           });
-          return { contactId: created.id, userId };
+          return customerPrincipal(created.id, userId);
         }
 
         return yield* new InvalidSubjectError({

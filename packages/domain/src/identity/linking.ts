@@ -257,7 +257,9 @@ const isOrganizationMember = (userId: string, organizationId: string) =>
  * (`email-outbox/access.ts`): the account proved the address, and it is a
  * member, SSO-bound to the organization, or an unrestricted global user whose
  * post sits on a PUBLIC board. Claims the `email_contact` row for the account
- * when eligibility holds; leaves it untouched otherwise.
+ * when eligibility holds; leaves it untouched otherwise. Returns the number
+ * of `deferred_no_access` rows moved to `active` (zero when the address is
+ * unproved or ineligible).
  *
  * Shared by shadow healing and the verification trigger, so the two triggers
  * cannot disagree about who may be emailed. Runs on the caller's transaction
@@ -276,15 +278,22 @@ const activateDeferredSubscriptionsForContact = (args: {
   readonly realUser: typeof schema.userTable.$inferSelect;
 }) =>
   Effect.gen(function* () {
+    // No proof, no activation: every eligibility branch below requires it.
+    // Returning first keeps an unproved contact from paying for a membership
+    // read and an address lookup whose answer nothing can use.
+    if (!args.addressProved) {
+      return 0;
+    }
+
     const db = yield* currentDb;
-    const { addressProved, contactEmail, now, organizationId, realUser } = args;
+    const { contactEmail, now, organizationId, realUser } = args;
 
     const isMember = yield* isOrganizationMember(realUser.id, organizationId);
     const isSsoBound = realUser.restrictedToOrganizationId === organizationId;
     const isUnrestrictedGlobal = realUser.restrictedToOrganizationId === null;
-    const eligibleDirect = addressProved && (isMember || isSsoBound);
+    const eligibleDirect = isMember || isSsoBound;
     const eligibleGlobalDeferred =
-      addressProved && !isMember && !isSsoBound && isUnrestrictedGlobal;
+      !isMember && !isSsoBound && isUnrestrictedGlobal;
 
     const emailContacts = yield* db
       .select({ id: schema.emailContactTable.id })
@@ -504,9 +513,12 @@ export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
  *
  * Guards:
  *
- * - Runs only for a verified, non-synthetic account. A synthetic inbox
- *   (`behalf-*`, `sso-*`) never proves an address.
- * - Contacts are found by equality with the account email, so a different
+ * - Runs only for a verified account. An email match is trusted only when the
+ *   account's own address is real: a `behalf-*` or `sso-*` synthetic inbox
+ *   proves nothing by string match. An SSO-bound account is proved instead by
+ *   the workspace's identity provider, through the contact link its token
+ *   created.
+ * - Contacts are found by the account's email or its own link, so a different
  *   address can never claim another person's subscriptions.
  * - Eligibility is re-evaluated per contact by the shared activation helper;
  *   a contact whose organization the account cannot reach is left deferred.
@@ -556,13 +568,17 @@ export const activateDeferredSubscriptionsForVerifiedUser = ({
     const organizationIds: Array<string> = [];
     let subscriptionsActivated = 0;
     const now = yield* DateTime.nowAsDate;
+    // An address match is evidence only when it is the account's own real
+    // address; a synthetic inbox proves nothing by string comparison.
+    const accountEmail = isSyntheticEmail(user.email)
+      ? null
+      : user.email.toLowerCase();
     for (const contact of contacts) {
       if (!contact.email || isSyntheticEmail(contact.email)) {
         continue;
       }
       const provedByEmail =
-        !isSyntheticEmail(user.email) &&
-        user.email.toLowerCase() === contact.email.toLowerCase();
+        accountEmail !== null && accountEmail === contact.email.toLowerCase();
       // The portal identity was created from the workspace's signed token and
       // the contact link came from the same token, so the address is proved by
       // the identity provider rather than by an email match.

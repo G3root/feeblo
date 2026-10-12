@@ -38,6 +38,8 @@ export type Contact = typeof schema.contactTable.$inferSelect;
 export const renameSyntheticAccount = (args: {
   db: PgDrizzle.EffectPgDatabase;
   name: string;
+  /** The transaction's timestamp, shared with the contact write. */
+  now: Date;
   userId: string;
 }) =>
   Effect.gen(function* () {
@@ -52,7 +54,7 @@ export const renameSyntheticAccount = (args: {
 
     yield* args.db
       .update(schema.userTable)
-      .set({ name: args.name, updatedAt: yield* DateTime.nowAsDate })
+      .set({ name: args.name, updatedAt: args.now })
       .where(eq(schema.userTable.id, args.userId));
     return true;
   });
@@ -146,6 +148,7 @@ const makeContactRepository = Effect.gen(function* () {
             yield* renameSyntheticAccount({
               db: tx,
               name: contact.value.name,
+              now,
               userId: contact.value.userId,
             });
           }

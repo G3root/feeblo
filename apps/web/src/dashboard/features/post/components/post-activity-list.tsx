@@ -80,6 +80,15 @@ function getOnBehalfMetadata(activity: TPostActivity): OnBehalfMetadata | null {
 }
 
 /**
+ * The label rendered after "on behalf of": the subject's display name and
+ * whether it came from the member list rather than the customer list.
+ */
+type OnBehalfSubjectLabel = {
+  readonly isMember: boolean;
+  readonly name: string;
+};
+
+/**
  * The subject of an on-behalf activity, resolved from the provenance
  * metadata: a customer contact, or a workspace member when the subject is
  * staff (staff attribution records no contact id).
@@ -89,7 +98,7 @@ function resolveOnBehalfSubject(
   contactsById: ReadonlyMap<string, TContact>,
   contactsByUserId: ReadonlyMap<string, TContact>,
   membersByUserId: ReadonlyMap<string, TOrganizationMember>
-): { name: string; isMember: boolean } | null {
+): OnBehalfSubjectLabel {
   const contactId = metadata.onBehalfOf?.contactId;
   const userId = metadata.onBehalfOf?.userId;
   const contact =
