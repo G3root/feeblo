@@ -163,7 +163,10 @@ const makeContactRepository = Effect.gen(function* () {
               eq(schema.contactTable.organizationId, args.organizationId)
             )
           )
-          .returning({ id: schema.contactTable.id });
+          .returning({
+            id: schema.contactTable.id,
+            userId: schema.contactTable.userId,
+          });
 
         return Option.fromNullishOr(deleted);
       }),

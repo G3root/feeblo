@@ -1,3 +1,4 @@
+import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -10,6 +11,7 @@ import * as Policy from "../policy";
 import { consumeDashboardRateLimit } from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
+import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { ContactNotFoundError, FailedToCreateContactError } from "./errors";
 import { ContactPolicy } from "./policies";
@@ -27,6 +29,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* ContactRepository;
   const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
   const contactPolicy = yield* ContactPolicy;
+  const userRepository = yield* UserRepository;
 
   return {
     ContactList: (args: TContactList) =>
@@ -143,8 +146,23 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
 
     ContactDelete: (args: TContactDelete) =>
       Effect.gen(function* () {
-        const contact = yield* repository.delete(args);
-        if (Option.isNone(contact)) {
+        const deleted = yield* transaction(
+          Effect.gen(function* () {
+            const contact = yield* repository.delete(args);
+            if (Option.isNone(contact)) {
+              return contact;
+            }
+            // The linked synthetic account goes with the contact when nothing
+            // refers to it any more; attributed content keeps it alive.
+            if (contact.value.userId !== null) {
+              yield* userRepository.deleteShadowUserIfUnreferenced(
+                contact.value.userId
+              );
+            }
+            return contact;
+          })
+        );
+        if (Option.isNone(deleted)) {
           return yield* new ContactNotFoundError({
             message: "Contact not found",
           });
@@ -163,5 +181,6 @@ export const ContactRpcHandlers = ContactRpcs.toLayer(
   Layer.provide(EntitlementPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(ContactRepository.layer),
-  Layer.provide(AttributeDefinitionRepository.layer)
+  Layer.provide(AttributeDefinitionRepository.layer),
+  Layer.provide(UserRepository.layer)
 );

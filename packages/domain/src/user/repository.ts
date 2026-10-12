@@ -352,6 +352,88 @@ const makeUserRepository = Effect.gen(function* () {
         }
         return winnerUpdated;
       }),
+
+    /**
+     * Deletes a `behalf-*` shadow account that nothing refers to any more.
+     *
+     * Deleting a contact leaves its shadow behind, because the votes and
+     * comments rendered under it must survive and a later attribution of the
+     * same email adopts it again. When no contact, post, vote, comment,
+     * subscription, email link, or notification refers to the account, the
+     * row is unreachable: nothing renders it and no later write needs it, so
+     * it goes with the contact.
+     *
+     * Locks the account for update before counting. A concurrent write that
+     * references the account either lands before the count (the shadow stays)
+     * or waits on the lock and fails its own foreign key if the shadow is
+     * deleted, which is louder than a cascade silently removing the write.
+     *
+     * Runs on the caller's transaction through the fiber-local connection.
+     * Returns whether the account was deleted.
+     */
+    deleteShadowUserIfUnreferenced: (userId: string) =>
+      Effect.gen(function* () {
+        const [user] = yield* db
+          .select({ email: schema.userTable.email })
+          .from(schema.userTable)
+          .where(eq(schema.userTable.id, userId))
+          .limit(1)
+          .for("update");
+        if (!user || !isShadowUserEmail(user.email)) {
+          return false;
+        }
+
+        // Every table that can name a customer, plus the notification row a
+        // shadow can never read but must not silently lose.
+        const referenceChecks = [
+          db
+            .select({ id: schema.contactTable.id })
+            .from(schema.contactTable)
+            .where(eq(schema.contactTable.userId, userId))
+            .limit(1),
+          db
+            .select({ id: schema.postTable.id })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.creatorId, userId))
+            .limit(1),
+          db
+            .select({ id: schema.upvoteTable.id })
+            .from(schema.upvoteTable)
+            .where(eq(schema.upvoteTable.userId, userId))
+            .limit(1),
+          db
+            .select({ id: schema.commentTable.id })
+            .from(schema.commentTable)
+            .where(eq(schema.commentTable.userId, userId))
+            .limit(1),
+          db
+            .select({ id: schema.postSubscriptionTable.id })
+            .from(schema.postSubscriptionTable)
+            .where(eq(schema.postSubscriptionTable.userId, userId))
+            .limit(1),
+          db
+            .select({ id: schema.emailContactTable.id })
+            .from(schema.emailContactTable)
+            .where(eq(schema.emailContactTable.userId, userId))
+            .limit(1),
+          db
+            .select({ id: schema.notificationTable.id })
+            .from(schema.notificationTable)
+            .where(eq(schema.notificationTable.recipientUserId, userId))
+            .limit(1),
+        ];
+        for (const check of referenceChecks) {
+          const rows = yield* check;
+          if (rows.length > 0) {
+            return false;
+          }
+        }
+
+        yield* db
+          .delete(schema.userTable)
+          .where(eq(schema.userTable.id, userId));
+        return true;
+      }),
   };
 });
 

@@ -5,6 +5,7 @@ import {
   ContactId,
   WorkspaceId,
 } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -13,6 +14,7 @@ import { AttributeDefinitionRepository } from "../attribute-definition/repositor
 import { CompanyRepository } from "../company/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { CurrentSession, type Session } from "../session-middleware";
+import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { ContactRpcHandlersEffect } from "./handlers";
 import { ContactPolicy } from "./policies";
@@ -80,7 +82,8 @@ describe("ContactRpcHandlers", () => {
     ContactRepository.layer,
     CompanyRepository.layer,
     WorkspaceRepository.layer,
-    AttributeDefinitionRepository.layer
+    AttributeDefinitionRepository.layer,
+    UserRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(WorkspaceRepository.layer),
@@ -185,7 +188,7 @@ describe("ContactRpcHandlers", () => {
           {
             id: "user_shadow_contact",
             name: "Old Name",
-            email: "behalf-0123abcd@feeblo.com",
+            email: "behalf-a1b2c3d4@feeblo.com",
             emailVerified: false,
             restrictedToOrganizationId: fixture.organizationId,
             createdAt: now,
@@ -245,6 +248,106 @@ describe("ContactRpcHandlers", () => {
         expect(
           users.find((user) => user.id === "user_real_contact")?.name
         ).toBe("Account Owner");
+      })
+    );
+
+    it.effect(
+      "deletes the linked shadow account with its contact when nothing refers to it",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* ContactRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const session = makeSession(fixture);
+          const now = yield* DateTime.nowAsDate;
+          const shadowId = `shadow_${fixture.organizationId}`;
+          yield* db.insert(schema.userTable).values({
+            id: shadowId,
+            name: "Jane Customer",
+            email: "behalf-0f0f0f0f@feeblo.com",
+            emailVerified: false,
+            restrictedToOrganizationId: fixture.organizationId,
+            createdAt: now,
+            updatedAt: now,
+          });
+          const contactId = yield* ContactId.generate;
+          yield* db.insert(schema.contactTable).values({
+            id: contactId,
+            organizationId: fixture.organizationId,
+            email: "shadow-customer@example.com",
+            name: "Jane Customer",
+            userId: shadowId,
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          yield* handlers
+            .ContactDelete({
+              id: contactId,
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const [shadow] = yield* db
+            .select({ id: schema.userTable.id })
+            .from(schema.userTable)
+            .where(eq(schema.userTable.id, shadowId));
+          expect(shadow).toBeUndefined();
+        })
+    );
+
+    it.effect("keeps the shadow account while a reference remains", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ContactRpcHandlersEffect;
+        const db = yield* currentDb;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+        const now = yield* DateTime.nowAsDate;
+        const shadowId = `shadow_kept_${fixture.organizationId}`;
+        yield* db.insert(schema.userTable).values({
+          id: shadowId,
+          name: "Ken Customer",
+          email: "behalf-e5f6a7b8@feeblo.com",
+          emailVerified: false,
+          restrictedToOrganizationId: fixture.organizationId,
+          createdAt: now,
+          updatedAt: now,
+        });
+        const contactId = yield* ContactId.generate;
+        yield* db.insert(schema.contactTable).values({
+          id: contactId,
+          organizationId: fixture.organizationId,
+          email: "shadow-kept@example.com",
+          name: "Ken Customer",
+          userId: shadowId,
+          createdAt: now,
+          updatedAt: now,
+        });
+        // An email link is one of the references that keep the account
+        // alive: the deferred subscription behind it activates when the
+        // human signs up.
+        yield* db.insert(schema.emailContactTable).values({
+          id: `email_contact_kept_${fixture.organizationId}`,
+          organizationId: fixture.organizationId,
+          email: "shadow-kept@example.com",
+          userId: shadowId,
+          verificationState: "pending",
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        yield* handlers
+          .ContactDelete({
+            id: contactId,
+            organizationId: fixture.organizationId,
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        const [shadow] = yield* db
+          .select({ id: schema.userTable.id })
+          .from(schema.userTable)
+          .where(eq(schema.userTable.id, shadowId));
+        expect(shadow?.id).toBe(shadowId);
       })
     );
 
