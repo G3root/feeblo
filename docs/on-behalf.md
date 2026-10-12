@@ -79,6 +79,7 @@ When the human behind a shadow user shows up with a real account, attributed dat
 - Signup/email-verification linking runs one transaction that reassigns contacts, posts, votes, comments, and subscriptions off the shadow user to the real account; collisions with the real user's existing votes/subscriptions drop the shadow's duplicate; the shadow user is deleted last.
 - SSO session creation instead promotes the shadow row in place (`upsertSsoUser`): when a `behalf-*` shadow matches by (email hash, organization), the same row becomes the portal identity — fresh synthetic `sso-*` address, `emailVerified = true` — rather than being reassigned and deleted.
 - Deferred subscriptions activate when the surviving account satisfies the eligibility rule.
+- Contacts with no shadow to heal are covered too: signup and email verification activate the deferred rows of every contact whose address the account proved (`activateDeferredSubscriptionsForVerifiedUser`), and an SSO sign-in activates the rows of the contacts linked to that portal account. Without this, a customer attributed by post author alone would keep a `deferred_no_access` row the outbox never materialises.
 
 Split identities therefore cannot persist: the first time the customer signs up with the email an admin typed, all their attributed history moves to the real account.
 
