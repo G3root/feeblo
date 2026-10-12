@@ -873,11 +873,64 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     }) => tokenService.deriveToken(input)
   );
 
+  /**
+   * Unsubscribes every email subscription an address holds in the workspace,
+   * whatever its topic or source. A workspace uses this when it removes a
+   * customer and must stop mailing them. Rows stay in place with state
+   * `unsubscribed`, so the audit trail survives and a later explicit opt-in
+   * can flip a row back. No-op when the address has no subscription.
+   */
+  const unsubscribeAllForEmail = Effect.fn(
+    "EmailSubscriptionRepository.unsubscribeAllForEmail"
+  )(function* ({
+    email,
+    now,
+    organizationId,
+  }: {
+    /** Matched case-insensitively, like every other address lookup. */
+    readonly email: string;
+    readonly now: Date;
+    readonly organizationId: string;
+  }) {
+    const contacts = yield* db
+      .select({ id: schema.emailContactTable.id })
+      .from(schema.emailContactTable)
+      .where(
+        and(
+          eq(schema.emailContactTable.organizationId, organizationId),
+          sql`lower(${schema.emailContactTable.email}) = lower(${email})`
+        )
+      );
+    if (contacts.length === 0) {
+      return { unsubscribed: 0 };
+    }
+    const updated = yield* db
+      .update(schema.emailSubscriptionTable)
+      .set({
+        state: "unsubscribed",
+        unsubscribedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(schema.emailSubscriptionTable.organizationId, organizationId),
+          inArray(
+            schema.emailSubscriptionTable.contactId,
+            contacts.map((contact) => contact.id)
+          ),
+          ne(schema.emailSubscriptionTable.state, "unsubscribed")
+        )
+      )
+      .returning({ id: schema.emailSubscriptionTable.id });
+    return { unsubscribed: updated.length };
+  });
+
   return {
     deriveLinkToken,
     findSubscription,
     requestSubscription,
     unsubscribe,
+    unsubscribeAllForEmail,
     unsubscribeAuthenticatedSubscription,
     unsubscribePreviousAuthorTopic,
     reconcileSubscriptionPlanStates,

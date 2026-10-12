@@ -12,7 +12,10 @@ import * as Layer from "effect/Layer";
 
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import { CompanyRepository } from "../company/repository";
+import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { PolicyDeniedError } from "../policy";
 import { CurrentSession, type Session } from "../session-middleware";
 import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -83,7 +86,14 @@ describe("ContactRpcHandlers", () => {
     CompanyRepository.layer,
     WorkspaceRepository.layer,
     AttributeDefinitionRepository.layer,
-    UserRepository.layer
+    UserRepository.layer,
+    EmailSubscriptionRepository.layerWithoutDependencies.pipe(
+      Layer.provide(
+        EmailSubscriptionTokenService.layerTest(
+          "contact-handlers-test-signing-secret"
+        )
+      )
+    )
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(WorkspaceRepository.layer),
@@ -348,6 +358,100 @@ describe("ContactRpcHandlers", () => {
           .from(schema.userTable)
           .where(eq(schema.userTable.id, shadowId));
         expect(shadow?.id).toBe(shadowId);
+      })
+    );
+
+    it.effect(
+      "unsubscribes every subscription the contact's address holds",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* ContactRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const session = makeSession(fixture);
+          const now = yield* DateTime.nowAsDate;
+          const contactId = yield* ContactId.generate;
+          yield* db.insert(schema.contactTable).values({
+            id: contactId,
+            organizationId: fixture.organizationId,
+            email: "leaving@example.com",
+            name: "Leaving Customer",
+            createdAt: now,
+            updatedAt: now,
+          });
+          const emailContactId = `email_contact_${fixture.organizationId}`;
+          yield* db.insert(schema.emailContactTable).values({
+            id: emailContactId,
+            organizationId: fixture.organizationId,
+            email: "leaving@example.com",
+            verificationState: "pending",
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* db.insert(schema.emailSubscriptionTable).values({
+            id: `email_sub_${fixture.organizationId}`,
+            organizationId: fixture.organizationId,
+            contactId: emailContactId,
+            topicType: "post",
+            topicId: null,
+            source: "admin_added_voter",
+            state: "deferred_no_access",
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          yield* handlers
+            .ContactUnsubscribe({
+              id: contactId,
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const [subscription] = yield* db
+            .select()
+            .from(schema.emailSubscriptionTable)
+            .where(
+              eq(
+                schema.emailSubscriptionTable.id,
+                `email_sub_${fixture.organizationId}`
+              )
+            );
+          expect(subscription?.state).toBe("unsubscribed");
+          expect(subscription?.unsubscribedAt).not.toBeNull();
+
+          // The contact itself is untouched: unsubscribing is not deleting.
+          const [contact] = yield* db
+            .select({ id: schema.contactTable.id })
+            .from(schema.contactTable)
+            .where(eq(schema.contactTable.id, contactId));
+          expect(contact?.id).toBe(contactId);
+        })
+    );
+
+    it.effect("reports a missing contact on unsubscribe", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ContactRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const contactId = yield* ContactId.generate;
+
+        const error = yield* Effect.flip(
+          handlers
+            .ContactUnsubscribe({
+              id: contactId,
+              organizationId: fixture.organizationId,
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "owner")
+              )
+            )
+        );
+
+        // `canUpdate` includes the organization check, so a missing contact
+        // is denied before the handler can name `ContactNotFoundError`; the
+        // handler path is the belt beside that suspender.
+        expect(error).toBeInstanceOf(PolicyDeniedError);
       })
     );
 

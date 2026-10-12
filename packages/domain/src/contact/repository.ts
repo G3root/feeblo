@@ -186,6 +186,20 @@ const makeContactRepository = Effect.gen(function* () {
         return contact !== undefined;
       }),
 
+    /** The full row, for callers that need more than the id. */
+    findById: ({ id, organizationId }: TContactDelete) =>
+      db
+        .select()
+        .from(schema.contactTable)
+        .where(
+          and(
+            eq(schema.contactTable.id, id),
+            eq(schema.contactTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => Option.fromNullishOr(rows[0]))),
+
     memberExistsByUserId: ({
       organizationId,
       userId,

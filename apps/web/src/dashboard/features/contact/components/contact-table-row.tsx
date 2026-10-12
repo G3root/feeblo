@@ -8,6 +8,7 @@ import {
 } from "@feeblo/web-shared/use-policy";
 import {
   ArrowUpRight01Icon,
+  BellOffIcon,
   Delete02Icon,
   Edit,
   Ellipsis,
@@ -46,6 +47,7 @@ export function ContactTableRow({
   onCompanyClick,
   onDelete,
   onEdit,
+  onUnsubscribe,
   updatePolicy,
 }: {
   company?: { id: string; name: string };
@@ -64,6 +66,7 @@ export function ContactTableRow({
   onCompanyClick: (companyId: string) => void;
   onDelete: () => void;
   onEdit: () => void;
+  onUnsubscribe: () => void;
   updatePolicy: ClientPolicy;
 }) {
   const { contactAttributeValueCollection } = useDashboardCollections();
@@ -134,6 +137,19 @@ export function ContactTableRow({
                           icon={Edit}
                         />
                         <span>Edit</span>
+                      </MenuItem>
+                    )}
+                  </PolicyGuard>
+                  <PolicyGuard policy={updatePolicy}>
+                    {({ allowed }) => (
+                      <MenuItem
+                        // A contact without an address holds no email
+                        // subscription, so there is nothing to withdraw.
+                        disabled={!allowed || contact.email === null}
+                        onClick={onUnsubscribe}
+                      >
+                        <HugeiconsIcon icon={BellOffIcon} />
+                        <span>Stop email updates</span>
                       </MenuItem>
                     )}
                   </PolicyGuard>

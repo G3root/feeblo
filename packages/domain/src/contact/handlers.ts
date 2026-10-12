@@ -1,4 +1,5 @@
 import { transaction } from "@feeblo/db";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -6,6 +7,7 @@ import * as Option from "effect/Option";
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import { validateAttributeValueEffect } from "../attribute-definition/validation";
 import { createCrmEntry } from "../crm-entry/intake";
+import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { consumeDashboardRateLimit } from "../rate-limit";
@@ -22,6 +24,7 @@ import type {
   TContactDelete,
   TContactList,
   TContactSearch,
+  TContactUnsubscribe,
   TContactUpdate,
 } from "./schema";
 
@@ -29,6 +32,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* ContactRepository;
   const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
   const contactPolicy = yield* ContactPolicy;
+  const emailSubscriptions = yield* EmailSubscriptionRepository;
   const userRepository = yield* UserRepository;
 
   return {
@@ -144,6 +148,27 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Contact", "update")
       ),
 
+    ContactUnsubscribe: (args: TContactUnsubscribe) =>
+      Effect.gen(function* () {
+        const contact = yield* repository.findById(args);
+        if (Option.isNone(contact)) {
+          return yield* new ContactNotFoundError({
+            message: "Contact not found",
+          });
+        }
+        const email = contact.value.email;
+        if (email !== null) {
+          yield* emailSubscriptions.unsubscribeAllForEmail({
+            email,
+            now: yield* DateTime.nowAsDate,
+            organizationId: args.organizationId,
+          });
+        }
+      }).pipe(
+        Policy.withPolicy(contactPolicy.canUpdate(args)),
+        withRemapDbErrors("Contact", "update")
+      ),
+
     ContactDelete: (args: TContactDelete) =>
       Effect.gen(function* () {
         const deleted = yield* transaction(
@@ -182,5 +207,6 @@ export const ContactRpcHandlers = ContactRpcs.toLayer(
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(ContactRepository.layer),
   Layer.provide(AttributeDefinitionRepository.layer),
+  Layer.provide(EmailSubscriptionRepository.layer),
   Layer.provide(UserRepository.layer)
 );

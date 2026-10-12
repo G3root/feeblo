@@ -12,6 +12,7 @@ import {
   ContactList,
   ContactSearch,
   ContactSearchResult,
+  ContactUnsubscribe,
   ContactUpdate,
 } from "./schema";
 
@@ -44,6 +45,12 @@ export class ContactRpcs extends RpcGroup.make(
   Rpc.make("ContactDelete", {
     success: Schema.Void,
     payload: ContactDelete,
+    error: ContactServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("ContactUnsubscribe", {
+    success: Schema.Void,
+    payload: ContactUnsubscribe,
     error: ContactServiceErrors,
   }).middleware(AuthMiddleware)
 ) {}

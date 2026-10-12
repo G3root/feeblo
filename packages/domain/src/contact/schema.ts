@@ -71,6 +71,18 @@ export const ContactDelete = S.Struct({
   organizationId: WorkspaceId.schema,
 });
 
+/**
+ * Stops every email subscription the customer's address holds in the
+ * workspace. Separate from delete on purpose: removing a customer from the
+ * CRM and withdrawing their email consent are different decisions.
+ */
+export const ContactUnsubscribe = S.Struct({
+  id: ContactId.schema,
+  organizationId: WorkspaceId.schema,
+});
+
+export type TContactUnsubscribe = S.Schema.Type<typeof ContactUnsubscribe>;
+
 export const ContactSearch = S.Struct({
   organizationId: WorkspaceId.schema,
   query: S.String,
