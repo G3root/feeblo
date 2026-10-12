@@ -16,7 +16,7 @@ async function uploadCsv(page: Page, name: string, contents: string) {
     mimeType: "text/csv",
     name,
   });
-  await page.getByRole("button", { name: "Upload and preview" }).click();
+  await page.getByRole("button", { name: "Upload file" }).click();
 }
 
 test.describe("data import", () => {
@@ -57,10 +57,10 @@ test.describe("data import", () => {
     await expect(page.getByText("Rows 1-1 of 1")).toBeVisible();
 
     // Confirming names what is about to happen.
-    await page.getByRole("button", { name: "Import 1 posts" }).click();
+    await page.getByRole("button", { name: "Import posts" }).first().click();
     const dialog = page.getByRole("alertdialog");
-    await expect(dialog.getByText("1 posts will be created.")).toBeVisible();
-    await dialog.getByRole("button", { name: "Import 1 posts" }).click();
+    await expect(dialog.getByText("Posts to create")).toBeVisible();
+    await dialog.getByRole("button", { name: "Import posts" }).click();
 
     // The watch stream reports the run and its end without a reload.
     await expect(
@@ -93,7 +93,7 @@ test.describe("data import", () => {
 
     await expect(page.getByText("Choose a CSV file.")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Upload and preview" })
+      page.getByRole("button", { name: "Upload file" })
     ).toBeDisabled();
   });
 

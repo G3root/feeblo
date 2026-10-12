@@ -153,6 +153,22 @@ function BackToImportsButton({
   );
 }
 
+/** One figure in the sticky confirm bar, label first and number last. */
+function BarFigure({
+  label,
+  value,
+}: {
+  readonly label: string;
+  readonly value: number;
+}) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium tabular-nums">{value}</span>
+    </span>
+  );
+}
+
 /** The report when the job is gone: retention removes both, so nothing is left to show. */
 function UnavailableCard({
   organizationId,
@@ -401,6 +417,64 @@ export function ImportReviewPage({
       </SettingsLayout.Header>
 
       <SettingsLayout.Content>
+        <div className="bg-background/95 sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-2 shadow-xs/5 backdrop-blur">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+            {awaiting ? (
+              <>
+                <BarFigure
+                  label={m.plain_bold_auk()}
+                  value={plannedRowCount(job)}
+                />
+                {counts.warned > 0 ? (
+                  <BarFigure label={m.kind_calm_moth()} value={counts.warned} />
+                ) : null}
+                {detail.newBoards.length > 0 ? (
+                  <BarFigure
+                    label={m.soft_brave_yak()}
+                    value={detail.newBoards.length}
+                  />
+                ) : null}
+              </>
+            ) : (
+              <span className="text-muted-foreground">
+                {m.sunny_bold_wren({
+                  created: job.createdCount,
+                  total: job.rowCount,
+                })}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {problemCount > 0 ? (
+              <Button
+                loading={downloading}
+                onClick={() => {
+                  void handleDownloadProblems();
+                }}
+                size="sm"
+                variant="outline"
+              >
+                <HugeiconsIcon icon={FileDownloadIcon} />
+                {m.lucky_plain_dove()}
+              </Button>
+            ) : null}
+            {awaiting ? (
+              <Button onClick={() => setConfirmOpen(true)} size="sm">
+                {m.zesty_fresh_mole()}
+              </Button>
+            ) : null}
+            {active ? (
+              <Button
+                onClick={() => setCancelOpen(true)}
+                size="sm"
+                variant="outline"
+              >
+                {m.crisp_honest_wren()}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+
         {job.status === "running" || job.status === "queued" ? (
           <Card>
             <div className="p-5">
@@ -501,33 +575,6 @@ export function ImportReviewPage({
                 {m.tidy_plain_bass()}
               </Button>
             )}
-            {problemCount > 0 ? (
-              <Button
-                loading={downloading}
-                onClick={() => {
-                  void handleDownloadProblems();
-                }}
-                size="sm"
-                variant="outline"
-              >
-                <HugeiconsIcon icon={FileDownloadIcon} />
-                {m.lucky_plain_dove()}
-              </Button>
-            ) : null}
-            {awaiting ? (
-              <Button onClick={() => setConfirmOpen(true)} size="sm">
-                {m.zesty_fresh_mole({ count: plannedRowCount(job) })}
-              </Button>
-            ) : null}
-            {active ? (
-              <Button
-                onClick={() => setCancelOpen(true)}
-                size="sm"
-                variant="outline"
-              >
-                {m.crisp_honest_wren()}
-              </Button>
-            ) : null}
           </div>
         </div>
 
@@ -758,6 +805,9 @@ export function ImportReviewPage({
                 <p className="text-muted-foreground text-sm">
                   {m.warm_lucky_toad({ from, to, total })}
                 </p>
+                <p className="text-muted-foreground text-sm">
+                  {m.plain_bold_moth()}
+                </p>
                 <Select
                   items={PAGE_SIZE_OPTIONS.map((option) => ({
                     label: String(option),
@@ -783,9 +833,6 @@ export function ImportReviewPage({
                     ))}
                   </SelectPopup>
                 </Select>
-                <p className="text-muted-foreground text-sm">
-                  {m.plain_bold_moth()}
-                </p>
               </div>
               <Pagination className="w-fit justify-end">
                 <PaginationContent>
