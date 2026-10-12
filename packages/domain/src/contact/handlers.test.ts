@@ -169,6 +169,85 @@ describe("ContactRpcHandlers", () => {
       })
     );
 
+    it.effect("renames the linked synthetic account but never a real one", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ContactRpcHandlersEffect;
+        const db = yield* currentDb;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+        const now = yield* DateTime.nowAsDate;
+        const shadowContactId = yield* ContactId.generate;
+        const realContactId = yield* ContactId.generate;
+
+        // A shadow account carries the customer's attributed content, so a
+        // CRM rename must reach it. A real account owns its own name.
+        yield* db.insert(schema.userTable).values([
+          {
+            id: "user_shadow_contact",
+            name: "Old Name",
+            email: "behalf-0123abcd@feeblo.com",
+            emailVerified: false,
+            restrictedToOrganizationId: fixture.organizationId,
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: "user_real_contact",
+            name: "Account Owner",
+            email: "real-contact@example.com",
+            emailVerified: true,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ]);
+        yield* db.insert(schema.contactTable).values([
+          {
+            id: shadowContactId,
+            organizationId: fixture.organizationId,
+            email: "shadow-contact@example.com",
+            name: "Old Name",
+            userId: "user_shadow_contact",
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: realContactId,
+            organizationId: fixture.organizationId,
+            email: "real-contact@example.com",
+            name: "Old Account Name",
+            userId: "user_real_contact",
+            createdAt: now,
+            updatedAt: now,
+          },
+        ]);
+
+        yield* handlers
+          .ContactUpdate({
+            id: shadowContactId,
+            organizationId: fixture.organizationId,
+            name: "New Name",
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+        yield* handlers
+          .ContactUpdate({
+            id: realContactId,
+            organizationId: fixture.organizationId,
+            name: "CRM Label",
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        const users = yield* db
+          .select({ id: schema.userTable.id, name: schema.userTable.name })
+          .from(schema.userTable);
+        expect(
+          users.find((user) => user.id === "user_shadow_contact")?.name
+        ).toBe("New Name");
+        expect(
+          users.find((user) => user.id === "user_real_contact")?.name
+        ).toBe("Account Owner");
+      })
+    );
+
     it.effect("rejects contributors (contacts.create is manager+)", () =>
       Effect.gen(function* () {
         const handlers = yield* ContactRpcHandlersEffect;

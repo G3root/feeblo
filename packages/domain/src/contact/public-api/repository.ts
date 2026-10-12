@@ -18,6 +18,7 @@ import {
   planRequiresUpgradeError,
 } from "../../public-api/errors";
 import { withRemapDbErrors } from "../../rpc-errors";
+import { renameSyntheticAccount } from "../repository";
 import type { PublicApiEndUserSource } from "./mappers";
 
 export type PublicApiEndUserPage = {
@@ -382,25 +383,46 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
         }
 
         const now = yield* DateTime.nowAsDate;
-        const [updated = null] = yield* db
-          .update(schema.contactTable)
-          .set({
-            ...(externalId !== undefined && { externalId: wantedExternalId }),
-            ...(email !== undefined && { email: wantedEmail ?? null }),
-            ...(name !== undefined && { name }),
-            ...(avatarUrl !== undefined && { avatar: avatarUrl }),
-            ...(companyId !== undefined && { companyId }),
-            updatedAt: now,
-          })
-          .where(eq(schema.contactTable.id, existing.value.id))
-          .returning();
+        return yield* db.transaction((tx) =>
+          Effect.gen(function* () {
+            const [updated = null] = yield* tx
+              .update(schema.contactTable)
+              .set({
+                ...(externalId !== undefined && {
+                  externalId: wantedExternalId,
+                }),
+                ...(email !== undefined && { email: wantedEmail ?? null }),
+                ...(name !== undefined && { name }),
+                ...(avatarUrl !== undefined && { avatar: avatarUrl }),
+                ...(companyId !== undefined && { companyId }),
+                updatedAt: now,
+              })
+              .where(eq(schema.contactTable.id, existing.value.id))
+              .returning();
 
-        if (updated === null) {
-          return yield* internalError(
-            "The end user could not be read after it was updated."
-          );
-        }
-        return toEndUserSource(updated);
+            if (updated === null) {
+              return yield* internalError(
+                "The end user could not be read after it was updated."
+              );
+            }
+
+            // A rename must reach the synthetic account that renders the
+            // customer's attributed content (shadow and SSO portal accounts),
+            // exactly as the dashboard's contact update does.
+            if (
+              name !== undefined &&
+              name !== null &&
+              updated.userId !== null
+            ) {
+              yield* renameSyntheticAccount({
+                db: tx,
+                name,
+                userId: updated.userId,
+              });
+            }
+            return toEndUserSource(updated);
+          })
+        );
       }).pipe(
         withRemapDbErrors({
           action: "update",
