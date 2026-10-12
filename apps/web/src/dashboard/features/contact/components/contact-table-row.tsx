@@ -30,12 +30,15 @@ function formatDate(date: Date) {
   return mediumDateFormatter.format(date);
 }
 
-function formatSource(source: "DASHBOARD" | "WIDGET" | "API" | "IMPORT") {
+function formatSource(
+  source: "DASHBOARD" | "WIDGET" | "API" | "IMPORT" | "ON_BEHALF"
+) {
   return {
     DASHBOARD: "Dashboard",
     WIDGET: "Widget",
     API: "API",
     IMPORT: "Import",
+    ON_BEHALF: "On behalf",
   }[source];
 }
 
@@ -58,7 +61,7 @@ export function ContactTableRow({
     id: string;
     name: string | null;
     phone: string | null;
-    source: "DASHBOARD" | "WIDGET" | "API" | "IMPORT";
+    source: "DASHBOARD" | "WIDGET" | "API" | "IMPORT" | "ON_BEHALF";
     updatedAt: Date;
   };
   definitions: readonly CustomAttributeDefinition[];

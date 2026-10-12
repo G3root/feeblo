@@ -241,6 +241,8 @@ describe("ResolvePrincipalService", () => {
           expect(contact?.email).toBe("jane@example.com");
           expect(contact?.name).toBe("Jane Doe");
           expect(contact?.userId).toBeNull();
+          // The row was created by attribution, not the contact dialog.
+          expect(contact?.source).toBe("ON_BEHALF");
           expect(resolved.userId).toBeNull();
         })
     );
