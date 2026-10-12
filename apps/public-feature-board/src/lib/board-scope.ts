@@ -82,10 +82,15 @@ export function createBoardScope(options: {
 /**
  * Publishes the resolved site's organization id onto the client's scope.
  *
- * Called by the board layout before any collection materializes: on the
- * server from the route's `beforeLoad`, and in the browser from the layout's
- * render (hydration does not re-run `beforeLoad`, and a parent renders before
- * its children).
+ * Called before any collection materializes, because the organization id is
+ * part of every collection's query key. The layout publishes it on the server
+ * from the route's `beforeLoad`, and in the browser from its render — but a
+ * child route's `beforeLoad` runs *before* that render on a fresh document
+ * (hydration does not re-run the parent's `beforeLoad`), so the board's
+ * preload helpers publish it themselves before materializing a collection.
+ * A collection that materializes first would key its on-demand subsets
+ * without the organization, and the later unload of that preload would
+ * decrement the component's key instead — deleting rows the page renders.
  */
 export function setBoardOrganizationId(
   client: DbClient,
