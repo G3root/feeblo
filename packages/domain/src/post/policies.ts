@@ -5,10 +5,9 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
 import * as Policy from "../policy";
+import type { Surface } from "../surface";
 import { PostRepository } from "./repository";
 import { PostIds } from "./schema";
-
-type TSource = "dashboard" | "public";
 
 type TIsCreator = {
   organizationId: string;
@@ -26,21 +25,21 @@ type TCanCreate = {
   organizationId: string;
   /** True when the payload attributes the post to a resolved customer. */
   onBehalf?: boolean;
-  source: TSource;
+  source: Surface;
 };
 
 type TCanDelete = {
   organizationId: string;
   postId: string | readonly string[];
   boardId: string;
-  source: TSource;
+  source: Surface;
 };
 
 type TCanUpdate = {
   organizationId: string;
   postId: string;
   boardId: string;
-  source: TSource;
+  source: Surface;
 };
 
 type TCanUpdateProperties = TCanUpdate & {

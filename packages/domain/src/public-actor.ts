@@ -62,3 +62,9 @@ export const redactCreatorIdentity = <T extends CreatorRow>(
   }
   return { ...row, creatorId: null, creatorMemberId: null };
 };
+
+/** `redactCreatorIdentity` over a list; post reads return arrays. */
+export const redactCreatorIdentities = <T extends CreatorRow>(
+  rows: readonly T[],
+  sessionUserId: string | undefined
+): T[] => rows.map((row) => redactCreatorIdentity(row, sessionUserId));
