@@ -26,7 +26,7 @@ export const makeObservabilityLayer = (config: ServerConfigValue) =>
     Effect.gen(function* () {
       const telemetry = yield* telemetryConfig({
         service: "feeblo-server",
-        environment: config.sentryEnvironment,
+        environment: config.environment,
       }).pipe(Effect.orDie);
 
       const otlpEnabled =

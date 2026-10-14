@@ -218,7 +218,7 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
           )
         );
       }
-      const sentryEnvironment = yield* Config.String("SENTRY_ENVIRONMENT").pipe(
+      const environment = yield* Config.String("APP_ENV").pipe(
         Config.withDefault(nodeEnv)
       );
       const sentryDsn = yield* Config.String("SENTRY_DSN").pipe(
@@ -291,7 +291,7 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         nodeEnv,
         redisUrl,
         sentryDsn,
-        sentryEnvironment,
+        environment,
         sentryTracesSampleRate,
         discordBotToken,
         discordClientId,

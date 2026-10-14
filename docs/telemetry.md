@@ -29,7 +29,7 @@ Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the 
 | `OTEL_RESOURCE_ATTRIBUTES` | Extra resource attributes for every signal, `key=value,key2=value2`. Grafana Cloud's Application Observability matches a service by `service.name` **and** `service.namespace`, so set `service.namespace=<namespace>` there. |
 | `APP_RELEASE` | Reported as `service.version`. |
 
-The resource on every signal carries both `deployment.environment` and its stable-semconv rename `deployment.environment.name`, both set from `SENTRY_ENVIRONMENT` (defaults to `NODE_ENV`). Grafana's Application Observability still filters on the pre-1.27 `deployment.environment` name by default, so dropping either spelling breaks its service discovery.
+The resource on every signal carries both `deployment.environment` and its stable-semconv rename `deployment.environment.name`, both set from `APP_ENV` (defaults to `NODE_ENV`). Grafana's Application Observability still filters on the pre-1.27 `deployment.environment` name by default, so dropping either spelling breaks its service discovery.
 
 ## Span shaping
 

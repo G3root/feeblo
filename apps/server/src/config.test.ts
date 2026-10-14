@@ -326,3 +326,24 @@ describe("ServerConfig E2E switches", () => {
     })
   );
 });
+
+describe("ServerConfig environment label", () => {
+  it.effect("defaults to NODE_ENV", () =>
+    Effect.gen(function* () {
+      const config = yield* loadServerConfig({ NODE_ENV: "staging" });
+
+      expect(config.environment).toBe("staging");
+    })
+  );
+
+  it.effect("prefers APP_ENV over NODE_ENV", () =>
+    Effect.gen(function* () {
+      const config = yield* loadServerConfig({
+        APP_ENV: "preview",
+        NODE_ENV: "staging",
+      });
+
+      expect(config.environment).toBe("preview");
+    })
+  );
+});

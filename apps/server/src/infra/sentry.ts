@@ -28,7 +28,7 @@ export const makeSentryLayer = (
     Sentry.effectLayer({
       dsn: config.sentryDsn,
       enableLogs: true,
-      environment: config.sentryEnvironment,
+      environment: config.environment,
       tracesSampleRate: config.sentryTracesSampleRate,
     }),
     tracer
