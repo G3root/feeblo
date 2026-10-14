@@ -6,6 +6,7 @@ import { DataImportService } from "./import-service";
 import { toDataImportJobDetail, toDataImportJobSummary } from "./mappers";
 import { DataTransferRpcs } from "./rpcs";
 import type {
+  TDataImportCancel,
   TDataImportConfirm,
   TDataImportGet,
   TDataImportList,
@@ -31,7 +32,7 @@ export const DataTransferRpcHandlersEffect = Effect.gen(function* () {
   const service = yield* DataImportService;
 
   return {
-    DataImportCancel: (args: TDataImportConfirm) =>
+    DataImportCancel: (args: TDataImportCancel) =>
       service.cancelImport({
         id: args.id,
         organizationId: args.organizationId,
@@ -50,7 +51,9 @@ export const DataTransferRpcHandlersEffect = Effect.gen(function* () {
         .listImports({ organizationId: args.organizationId })
         .pipe(Effect.map((jobs) => jobs.map(toDataImportJobSummary))),
     DataImportListWatch: (args: TDataImportList) =>
-      service.watchImportList({ organizationId: args.organizationId }),
+      service
+        .watchImportList({ organizationId: args.organizationId })
+        .pipe(Stream.map((jobs) => jobs.map(toDataImportJobSummary))),
     DataImportWatch: (args: TDataImportGet) =>
       service
         .watchImport(toDescribeInput(args))
