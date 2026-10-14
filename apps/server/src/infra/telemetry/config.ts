@@ -55,6 +55,7 @@ export const TelemetryConfig = Schema.Struct({
   metricsProtocol: Schema.optional(
     Schema.Literals(["http/json", "http/protobuf"])
   ),
+  metricsTemporality: Schema.Literals(["cumulative", "delta"]),
   tracesSampleRate: Schema.Finite,
   /** Whether parentless `sql.*` spans are kept; false is a debugging escape hatch. */
   dropRootSpans: Schema.Boolean,
@@ -132,6 +133,9 @@ export const telemetryConfig = (options: {
     const metricsProtocol = yield* Config.String(
       "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL"
     ).pipe(Config.withDefault("http/protobuf"));
+    const metricsTemporality = yield* Config.String(
+      "OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE"
+    ).pipe(Config.withDefault("cumulative"));
     const sampleRate = yield* Config.Number(
       "FEEBLO_TELEMETRY_TRACES_SAMPLE_RATE"
     ).pipe(Config.withDefault(1));
@@ -168,6 +172,7 @@ export const telemetryConfig = (options: {
       version,
       environment: options.environment,
       metricsProtocol,
+      metricsTemporality,
       // A mistyped ratio must not take down a deployment; clamp to the
       // documented 0–1 range instead.
       tracesSampleRate: Math.min(1, Math.max(0, sampleRate)),

@@ -23,6 +23,7 @@ Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the 
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` / `_LOGS_` / `_METRICS_` | Per-signal override, used verbatim. |
 | `OTEL_EXPORTER_OTLP_HEADERS` | Backend credentials, `key=value,key2=value2` (URI-encoded). A per-signal `_HEADERS` override wins. |
 | `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` | `http/protobuf` (default) or `http/json`. |
+| `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` | `cumulative` (default) or `delta`. Prometheus-based backends (Grafana Cloud, Mimir, self-hosted Prometheus) store cumulative series; use `delta` only for backends that require it, such as Datadog. |
 | `FEEBLO_TELEMETRY_TRACES_SAMPLE_RATE` | Root-span ratio, `0.0`–`1.0`, default `1`. Children always follow their root's decision. |
 | `FEEBLO_TELEMETRY_DROP_ROOT_SPANS` | Drop parentless `sql.execute` / `sql.transaction` spans, default `true`. Set `false` to keep them while debugging a poller. |
 | `OTEL_SERVICE_NAME` | Defaults to `feeblo-server`. |

@@ -73,6 +73,21 @@ describe("telemetry OTLP headers", () => {
 });
 
 describe("telemetry OTLP endpoints", () => {
+  it.effect("defaults metrics temporality to cumulative", () =>
+    Effect.gen(function* () {
+      const config = yield* loadTelemetryConfig({
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+      });
+      const delta = yield* loadTelemetryConfig({
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+        OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: "delta",
+      });
+
+      expect(config.metricsTemporality).toBe("cumulative");
+      expect(delta.metricsTemporality).toBe("delta");
+    })
+  );
+
   it.effect("appends the signal path to a base endpoint", () =>
     Effect.gen(function* () {
       const config = yield* loadTelemetryConfig({

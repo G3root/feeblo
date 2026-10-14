@@ -113,7 +113,11 @@ export const telemetryLayer = (
       : OtlpMetrics.layer({
           ...signal(config.metrics),
           exportInterval: "30 seconds",
-          temporality: "delta",
+          // Cumulative is what Prometheus-based backends (Grafana Cloud,
+          // Mimir, self-hosted Prometheus) store and query; delta is for
+          // backends that require it, such as Datadog. Mimir's delta OTLP
+          // ingest is still incomplete, so cumulative is the default.
+          temporality: config.metricsTemporality,
         }).pipe(
           Layer.provide(
             config.metricsProtocol === "http/json"

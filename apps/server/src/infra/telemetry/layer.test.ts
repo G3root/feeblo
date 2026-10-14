@@ -5,6 +5,7 @@ import { isString } from "@feeblo/utils/runtime-kind";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Metric from "effect/Metric";
 import * as Schema from "effect/Schema";
 import * as Tracer from "effect/Tracer";
 
@@ -82,6 +83,7 @@ it.live("exports a span to the configured OTLP endpoint", () =>
       const layer = telemetryLayer({
         dropRootSpans: true,
         environment: "test",
+        metricsTemporality: "cumulative",
         service: "feeblo-test",
         traces: { url: `${url}/v1/traces` },
         tracesSampleRate: 1,
@@ -129,6 +131,42 @@ it.live("exports a span to the configured OTLP endpoint", () =>
           },
         ])
       );
+    })
+  )
+);
+
+it.live("exports metrics recorded outside the exporter's context", () =>
+  withCollector((url, requests) =>
+    Effect.gen(function* () {
+      const layer = telemetryLayer({
+        dropRootSpans: true,
+        environment: "test",
+        metrics: { url: `${url}/v1/metrics` },
+        metricsProtocol: "http/json",
+        metricsTemporality: "cumulative",
+        service: "feeblo-test",
+        tracesSampleRate: 1,
+        version: "test",
+      });
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          yield* Layer.build(layer);
+          // Recorded in the test's context, not the exporter's: the metric
+          // registry must still be the one the exporter snapshots.
+          yield* Metric.update(
+            Metric.withAttributes(Metric.counter("feeblo_test_counter_total"), {
+              outcome: "ok",
+            }),
+            1
+          );
+          yield* Effect.sleep("100 millis");
+        })
+      );
+      yield* Effect.sleep("250 millis");
+
+      const payload = requests.join("");
+      expect(payload).toContain("feeblo_test_counter_total");
+      expect(payload).toContain("outcome");
     })
   )
 );
