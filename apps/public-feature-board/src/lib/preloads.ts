@@ -2,7 +2,10 @@ import { and, eq } from "@tanstack/react-db";
 import type { DbClient } from "@tanstack/react-db";
 import { createIsomorphicFn } from "@tanstack/react-start";
 
-import { markBoardPreloadDegraded } from "./board-scope";
+import {
+  markBoardPreloadDegraded,
+  setBoardOrganizationId,
+} from "./board-scope";
 import {
   publicBoardDescriptor,
   publicChangelogCategoryDescriptor,
@@ -157,6 +160,12 @@ export function preloadChangelogDetail(
 ) {
   const { organizationId, slug } = options;
 
+  // Publish before the preloads below materialize their collections: the
+  // board scope's organization id is part of every query key, and a child
+  // route's `beforeLoad` runs before the layout's render on a fresh document
+  // (see `setBoardOrganizationId`).
+  setBoardOrganizationId(client, organizationId);
+
   return preloadsFor(client, [
     client.collection(publicChangelogCategoryDescriptor).preload(),
     client.collection(publicChangelogCategoryLinkDescriptor).preload(),
@@ -192,6 +201,10 @@ export function preloadPostUserState(
 ) {
   const { organizationId } = options;
 
+  // Same reason as `preloadChangelogDetail`: the scope must be filled before
+  // the preloads materialize their collections.
+  setBoardOrganizationId(client, organizationId);
+
   return preloadsFor(client, [
     client.collection(publicDeleteEligibilityDescriptor).preload(),
     client.preloadLiveQuery({
@@ -219,6 +232,12 @@ export function preloadPostDetail(
   options: { organizationId: string; slug: string }
 ) {
   const { organizationId, slug } = options;
+
+  // Publish before the preloads below materialize their collections: the
+  // board scope's organization id is part of every query key, and a child
+  // route's `beforeLoad` runs before the layout's render on a fresh document
+  // (see `setBoardOrganizationId`).
+  setBoardOrganizationId(client, organizationId);
 
   return preloadsFor(client, [
     client.collection(publicBoardDescriptor).preload(),

@@ -4,7 +4,7 @@ import { expect, type Page, test } from "../fixtures";
 import { createAuthenticatedWorkspace } from "../helpers/auth";
 import { waitForHydration } from "../helpers/hydration";
 import { assertNoPageErrors, trackPageErrors } from "../helpers/page-errors";
-import { createPost, fillEditor } from "../helpers/posts";
+import { createPost, fillEditor, openPost } from "../helpers/posts";
 import {
   verificationCodeFromEmail,
   waitForVerificationEmail,
@@ -57,6 +57,19 @@ async function signOutFromPublicBoard(page: Page) {
   await page.getByRole("menuitem", { name: "Log out" }).click();
   await expect(
     page.getByRole("button", { name: authButtonName })
+  ).toBeVisible();
+}
+
+/**
+ * Adds a public comment on the dashboard post page. The composer's submit
+ * button reads "Comment Public" while the visibility toggle is on PUBLIC.
+ */
+async function addPublicComment(page: Page, content: string) {
+  const composer = page.locator('[data-slot="comment-composer"]');
+  await fillEditor(page, content, { scope: composer });
+  await page.getByRole("button", { name: "Comment Public" }).click();
+  await expect(
+    page.locator('[data-slot="comment"]').filter({ hasText: content }).first()
   ).toBeVisible();
 }
 
@@ -445,6 +458,53 @@ test(
       await expect(
         visitorPage.getByRole("heading", { name: "Features 💡" })
       ).toBeVisible();
+
+      await assertNoPageErrors(visitorPage);
+    } finally {
+      await visitorContext.close();
+    }
+  }
+);
+
+test(
+  "a guest's comments stay visible after the page settles",
+  { tag: "@critical" },
+  async ({ browser, page }) => {
+    // The post route's `beforeLoad` preloads the comment subset through an
+    // on-demand collection. That preload's demand is released a few seconds
+    // after the page loads; if the preload keyed its subset differently from
+    // the list component (e.g. before the board scope carried the organization
+    // id), the release deletes the rows the guest is reading and the comments
+    // vanish without a refetch. This holds the window open past the release.
+    const user = createTestUser();
+    await createAuthenticatedWorkspace(page, user);
+
+    const title = `Guest comments ${randomUUID().slice(0, 8)}`;
+    const comment = `Public comment ${randomUUID().slice(0, 8)}`;
+    await createPost(page, title, "Comments must survive for guests.");
+    await openPost(page, title);
+    await addPublicComment(page, comment);
+
+    const slug = new URL(page.url()).pathname
+      .split("/")
+      .findLast((segment) => segment.length > 0);
+
+    const visitorContext = await browser.newContext();
+    const visitorPage = await visitorContext.newPage();
+    trackPageErrors(visitorPage);
+
+    try {
+      await visitorPage.goto(`${publicBoardUrl(user.workspaceName)}/p/${slug}`);
+
+      const commentCard = visitorPage
+        .locator('[data-slot="comment"]')
+        .filter({ hasText: comment });
+      await expect(commentCard).toBeVisible();
+
+      // The preload's subset is unloaded well after the first paint; the
+      // comment must still be there when it is.
+      await visitorPage.waitForTimeout(5000);
+      await expect(commentCard).toBeVisible();
 
       await assertNoPageErrors(visitorPage);
     } finally {

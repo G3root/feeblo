@@ -8,7 +8,18 @@ import {
   createBoardScope,
   isBoardPreloadDegraded,
 } from "../src/lib/board-scope";
-import { preloadBoardShell } from "../src/lib/preloads";
+import {
+  preloadBoardShell,
+  preloadChangelogDetail,
+  preloadPostDetail,
+} from "../src/lib/preloads";
+
+function createClient(scope: ReturnType<typeof createBoardScope>) {
+  return new DbClient({
+    [BOARD_QUERY_CLIENT_DEPENDENCY]: new QueryClient(),
+    [BOARD_SCOPE_DEPENDENCY]: scope,
+  });
+}
 
 /**
  * A route's preloads report their outcome on the request's scope, because the
@@ -20,13 +31,6 @@ import { preloadBoardShell } from "../src/lib/preloads";
  * under test.
  */
 describe("preload outcomes", () => {
-  function createClient(scope: ReturnType<typeof createBoardScope>) {
-    return new DbClient({
-      [BOARD_QUERY_CLIENT_DEPENDENCY]: new QueryClient(),
-      [BOARD_SCOPE_DEPENDENCY]: scope,
-    });
-  }
-
   it("marks the request when a preload cannot complete", async () => {
     const scope = createBoardScope({
       organizationId: "org_1",
@@ -55,5 +59,42 @@ describe("preload outcomes", () => {
     await preloadBoardShell(createClient(failing));
 
     expect(isBoardPreloadDegraded(createClient(other))).toBe(false);
+  });
+});
+
+/**
+ * A child route's `beforeLoad` runs before the layout's render on a fresh
+ * document, and every collection query key embeds the scope's organization id.
+ * A preload that materializes a collection before that id is published keys
+ * its on-demand subsets without it; the later unload then recomputes the
+ * component's key and can delete rows the page is rendering.
+ */
+describe("preload scope", () => {
+  it("publishes the organization before the post preloads materialize", () => {
+    const scope = createBoardScope({ pathname: () => "/p/some-slug" });
+    const client = createClient(scope);
+
+    expect(scope.getOrganizationId()).toBeUndefined();
+
+    void preloadPostDetail(client, {
+      organizationId: "org_1",
+      slug: "some-slug",
+    }).catch(() => undefined);
+
+    expect(scope.getOrganizationId()).toBe("org_1");
+  });
+
+  it("publishes the organization before the changelog preloads materialize", () => {
+    const scope = createBoardScope({ pathname: () => "/changelog/some-slug" });
+    const client = createClient(scope);
+
+    expect(scope.getOrganizationId()).toBeUndefined();
+
+    void preloadChangelogDetail(client, {
+      organizationId: "org_1",
+      slug: "some-slug",
+    }).catch(() => undefined);
+
+    expect(scope.getOrganizationId()).toBe("org_1");
   });
 });
