@@ -10,6 +10,7 @@
  */
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
+import type * as LogLevel from "effect/LogLevel";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
@@ -56,6 +57,21 @@ export const TelemetryConfig = Schema.Struct({
     Schema.Literals(["http/json", "http/protobuf"])
   ),
   metricsTemporality: Schema.Literals(["cumulative", "delta"]),
+  logLevel: Schema.Literals([
+    "All",
+    "Fatal",
+    "Error",
+    "Warn",
+    "Info",
+    "Debug",
+    "Trace",
+    "None",
+  ]),
+  /**
+   * `service.instance.id`, from `OTEL_RESOURCE_ATTRIBUTES` when the operator
+   * sets it, otherwise the container hostname.
+   */
+  instanceId: Schema.optional(Schema.NonEmptyString),
   tracesSampleRate: Schema.Finite,
   /** Whether parentless `sql.*` spans are kept; false is a debugging escape hatch. */
   dropRootSpans: Schema.Boolean,
@@ -109,6 +125,21 @@ const OtlpHeaders = Schema.Union([
 const otlpHeaders = (path: string) => Config.schema(OtlpHeaders, path);
 
 /**
+ * `FEEBLO_TELEMETRY_LOG_LEVEL` is case-insensitive; an unknown value keeps the
+ * `Info` default rather than failing startup over a telemetry knob.
+ */
+const logLevels = new Map<string, LogLevel.LogLevel>([
+  ["all", "All"],
+  ["fatal", "Fatal"],
+  ["error", "Error"],
+  ["warn", "Warn"],
+  ["info", "Info"],
+  ["debug", "Debug"],
+  ["trace", "Trace"],
+  ["none", "None"],
+]);
+
+/**
  * Reads the standard OTLP environment.
  *
  * A base `OTEL_EXPORTER_OTLP_ENDPOINT` gains the `/v1/<signal>` path the
@@ -142,6 +173,18 @@ export const telemetryConfig = (options: {
     const dropRootSpans = yield* Config.Boolean(
       "FEEBLO_TELEMETRY_DROP_ROOT_SPANS"
     ).pipe(Config.withDefault(true));
+    const logLevel = yield* Config.String("FEEBLO_TELEMETRY_LOG_LEVEL").pipe(
+      Config.withDefault("Info")
+    );
+    const resourceAttributes: Record<string, string> = yield* Config.Record(
+      Schema.String,
+      Schema.StringFromUriComponent,
+      "OTEL_RESOURCE_ATTRIBUTES"
+    ).pipe(Config.withDefault({}));
+    const hostname = yield* Config.String("HOSTNAME").pipe(Config.option);
+    const instanceId =
+      resourceAttributes["service.instance.id"] ??
+      Option.getOrUndefined(hostname);
     const target = (signal: "TRACES" | "LOGS" | "METRICS") =>
       Effect.gen(function* () {
         const endpoint = yield* Config.URL(
@@ -173,6 +216,8 @@ export const telemetryConfig = (options: {
       environment: options.environment,
       metricsProtocol,
       metricsTemporality,
+      logLevel: logLevels.get(logLevel.toLowerCase()) ?? "Info",
+      instanceId,
       // A mistyped ratio must not take down a deployment; clamp to the
       // documented 0–1 range instead.
       tracesSampleRate: Math.min(1, Math.max(0, sampleRate)),

@@ -83,6 +83,8 @@ it.live("exports a span to the configured OTLP endpoint", () =>
       const layer = telemetryLayer({
         dropRootSpans: true,
         environment: "test",
+        instanceId: "test-instance",
+        logLevel: "Info",
         metricsTemporality: "cumulative",
         service: "feeblo-test",
         traces: { url: `${url}/v1/traces` },
@@ -129,6 +131,10 @@ it.live("exports a span to the configured OTLP endpoint", () =>
             key: "deployment.environment.name",
             value: { stringValue: "test" },
           },
+          {
+            key: "service.instance.id",
+            value: { stringValue: "test-instance" },
+          },
         ])
       );
     })
@@ -141,6 +147,7 @@ it.live("exports metrics recorded outside the exporter's context", () =>
       const layer = telemetryLayer({
         dropRootSpans: true,
         environment: "test",
+        logLevel: "Info",
         metrics: { url: `${url}/v1/metrics` },
         metricsProtocol: "http/json",
         metricsTemporality: "cumulative",

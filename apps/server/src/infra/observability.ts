@@ -24,17 +24,34 @@ import { defaultTelemetryLogger } from "./telemetry/layer";
 export const makeObservabilityLayer = (config: ServerConfigValue) =>
   Layer.unwrap(
     Effect.gen(function* () {
+      // Sentry-only is also the fallback when OTLP configuration is broken: a
+      // typo in a telemetry env var logs loudly but must not take down a
+      // deployment.
+      const sentryOnly = Layer.merge(
+        makeSentryLayer(config),
+        OtlpExporter.layerFlusher
+      );
       const telemetry = yield* telemetryConfig({
         service: "feeblo-server",
         environment: config.environment,
-      }).pipe(Effect.orDie);
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.logError(
+            "OTLP configuration is invalid; continuing with Sentry only",
+            { error }
+          ).pipe(Effect.as(undefined))
+        )
+      );
 
+      if (telemetry === undefined) {
+        return sentryOnly;
+      }
       const otlpEnabled =
         telemetry.traces !== undefined ||
         telemetry.logs !== undefined ||
         telemetry.metrics !== undefined;
       if (!otlpEnabled) {
-        return Layer.merge(makeSentryLayer(config), OtlpExporter.layerFlusher);
+        return sentryOnly;
       }
 
       const loggers: Array<Logger.Logger<unknown, void>> = [
@@ -54,6 +71,15 @@ export const makeObservabilityLayer = (config: ServerConfigValue) =>
           baseLoggers: Logger.layer(loggers, { mergeWithExisting: false }),
           rpcSpanPrefix,
         })
+      ).pipe(
+        Layer.catchCause((cause) =>
+          Layer.unwrap(
+            Effect.logError(
+              "OTLP exporters failed to start; continuing with Sentry only",
+              { cause }
+            ).pipe(Effect.as(sentryOnly))
+          )
+        )
       );
     })
   );

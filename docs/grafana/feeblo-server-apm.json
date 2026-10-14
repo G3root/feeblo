@@ -412,7 +412,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Route labels are redacted request paths; unmatched paths collapse to `unmatched`.",
+      "description": "Route labels are the router's matched route templates; only unmatched paths collapse to `unmatched`.",
       "fieldConfig": {
         "defaults": {
           "color": {

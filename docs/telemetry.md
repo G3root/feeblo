@@ -26,11 +26,16 @@ Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the 
 | `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` | `cumulative` (default) or `delta`. Prometheus-based backends (Grafana Cloud, Mimir, self-hosted Prometheus) store cumulative series; use `delta` only for backends that require it, such as Datadog. |
 | `FEEBLO_TELEMETRY_TRACES_SAMPLE_RATE` | Root-span ratio, `0.0`–`1.0`, default `1`. Children always follow their root's decision. |
 | `FEEBLO_TELEMETRY_DROP_ROOT_SPANS` | Drop parentless `sql.execute` / `sql.transaction` spans, default `true`. Set `false` to keep them while debugging a poller. |
+| `FEEBLO_TELEMETRY_LOG_LEVEL` | Minimum exported log level: `All`, `Fatal`, `Error`, `Warn`, `Info` (default), `Debug`, `Trace`, or `None`; case-insensitive. An unknown value keeps `Info`. |
 | `OTEL_SERVICE_NAME` | Defaults to `feeblo-server`. |
 | `OTEL_RESOURCE_ATTRIBUTES` | Extra resource attributes for every signal, `key=value,key2=value2`. Grafana Cloud's Application Observability matches a service by `service.name` **and** `service.namespace`, so set `service.namespace=<namespace>` there. |
 | `APP_RELEASE` | Reported as `service.version`. |
 
 The resource on every signal carries both `deployment.environment` and its stable-semconv rename `deployment.environment.name`, both set from `APP_ENV` (defaults to `NODE_ENV`). Grafana's Application Observability still filters on the pre-1.27 `deployment.environment` name by default, so dropping either spelling breaks its service discovery.
+
+Every signal also carries `service.instance.id`: `OTEL_RESOURCE_ATTRIBUTES=service.instance.id=...` when set, otherwise the container hostname. Grafana maps it to the `instance` label, which keeps replicas distinguishable.
+
+Traces export every 5 seconds, logs every second, and metrics every 30 seconds. When `OTEL_EXPORTER_OTLP_ENDPOINT` or a header is malformed, the server logs the configuration error and continues with Sentry-only observability instead of failing startup.
 
 ## Span shaping
 

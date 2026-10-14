@@ -18,6 +18,7 @@ import {
   OtlpTracer,
 } from "effect/observability";
 import * as Redacted from "effect/Redacted";
+import * as References from "effect/References";
 import * as Tracer from "effect/Tracer";
 
 import type { TelemetryConfig, TelemetryTarget } from "./config";
@@ -48,23 +49,35 @@ export const telemetryLayer = (
   const baseLoggers =
     options?.baseLoggers ??
     Logger.layer([defaultTelemetryLogger], { mergeWithExisting: false });
+  const environmentAttributes = {
+    // `deployment.environment` is the pre-1.27 semantic-convention name;
+    // Grafana's Application Observability still filters on it by default.
+    // Send both it and the stable rename so either reader matches.
+    "deployment.environment": config.environment,
+    "deployment.environment.name": config.environment,
+  };
   const resource = {
     serviceName: config.service,
     serviceVersion: config.version,
-    attributes: {
-      // `deployment.environment` is the pre-1.27 semantic-convention name;
-      // Grafana's Application Observability still filters on it by default.
-      // Send both it and the stable rename so either reader matches.
-      "deployment.environment": config.environment,
-      "deployment.environment.name": config.environment,
-    },
+    // `service.instance.id` is per-process identity: Grafana maps it to the
+    // `instance` label on metrics and logs, so replicas stay distinguishable.
+    attributes:
+      config.instanceId === undefined
+        ? environmentAttributes
+        : {
+            ...environmentAttributes,
+            "service.instance.id": config.instanceId,
+          },
   };
-  const signal = (target: TelemetryTarget) => {
+  const signal = (
+    target: TelemetryTarget,
+    processExportInterval: "1 second" | "5 seconds" | "30 seconds"
+  ) => {
     const common = {
       url: target.url,
       resource,
       exportInterval:
-        lifetime === "event" ? ("1 hour" as const) : ("1 second" as const),
+        lifetime === "event" ? ("1 hour" as const) : processExportInterval,
       shutdownTimeout: "3 seconds" as const,
     };
     return target.headers === undefined
@@ -74,7 +87,12 @@ export const telemetryLayer = (
   return Layer.mergeAll(
     config.traces === undefined
       ? Layer.empty
-      : OtlpTracer.layer(signal(config.traces)).pipe(
+      : OtlpTracer.layer(
+          // Effect's own default; the one-second interval this was ported
+          // with is for short-lived processes, and a server gains nothing
+          // from it.
+          signal(config.traces, "5 seconds")
+        ).pipe(
           Layer.provide(OtlpSerialization.layerJson),
           Layer.provide(FetchHttpClient.layer),
           // Wrap the exporter's tracer with RPC labelling, the attribute
@@ -102,7 +120,7 @@ export const telemetryLayer = (
     config.logs === undefined
       ? baseLoggers
       : OtlpLogger.layer({
-          ...signal(config.logs),
+          ...signal(config.logs, "1 second"),
           mergeWithExisting: true,
         }).pipe(
           Layer.provide(OtlpSerialization.layerJson),
@@ -111,8 +129,7 @@ export const telemetryLayer = (
     config.metrics === undefined
       ? Layer.empty
       : OtlpMetrics.layer({
-          ...signal(config.metrics),
-          exportInterval: "30 seconds",
+          ...signal(config.metrics, "30 seconds"),
           // Cumulative is what Prometheus-based backends (Grafana Cloud,
           // Mimir, self-hosted Prometheus) store and query; delta is for
           // backends that require it, such as Datadog. Mimir's delta OTLP
@@ -124,7 +141,10 @@ export const telemetryLayer = (
               ? OtlpSerialization.layerJson
               : OtlpSerialization.layerProtobuf
           )
-        )
+        ),
+    // Bound log volume without a redeploy: Effect's default is `Info`, and
+    // raising it to `Warn` is the escalation lever during an incident.
+    Layer.succeed(References.MinimumLogLevel, config.logLevel)
   ).pipe(
     Layer.provide(FetchHttpClient.layer),
     // Exporter fibers capture services during construction; their failure

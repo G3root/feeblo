@@ -36,7 +36,7 @@ Both variables are editable in the dashboard toolbar, so no JSON editing is need
 | `feeblo_http_server_requests_total` | `method`, `route`, `status` |
 | `feeblo_http_server_request_duration_milliseconds` (classic histogram) | `method`, `route` |
 
-They are recorded for every response the server sends — successful, failed, or unmatched — so the values are exact and do not depend on trace sampling. The `route` label is the request path with UUID, legid, and known token segments redacted to `:id`; unmatched paths (404s) collapse to `unmatched` so scanner traffic cannot mint a label per path.
+They are recorded for every response the server sends — successful, failed, or unmatched — so the values are exact and do not depend on trace sampling. The `route` label is the router's matched route template (for example `/api/v1/posts/:postId`), so a matched handler that answers 404 keeps its route; only genuinely unmatched paths collapse to `unmatched`, which stops scanner traffic from minting a label per path.
 
 RPC methods are not visible here: every call shares `POST /rpc`, and the method only exists on the span. Use Application Observability or Traces Drilldown for the per-method breakdown.
 
