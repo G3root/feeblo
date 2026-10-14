@@ -21,6 +21,15 @@ export const [ContactDeleteDialogProvider, useContactDeleteDialogContext] =
     providerName: "ContactDeleteDialogProvider",
   });
 
+export const [
+  ContactUnsubscribeDialogProvider,
+  useContactUnsubscribeDialogContext,
+] = createModalStoreContext<{ contactId: string }>({
+  name: "ContactUnsubscribeDialogContext",
+  hookName: "useContactUnsubscribeDialogContext",
+  providerName: "ContactUnsubscribeDialogProvider",
+});
+
 export const [CompanyCreateDialogProvider, useCompanyCreateDialogContext] =
   createModalStoreContext({
     name: "CompanyCreateDialogContext",

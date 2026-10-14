@@ -172,8 +172,9 @@ const makeCommentService = Effect.gen(function* () {
       }
 
       return {
-        // On-behalf comments keep staff attribution out of the author fields.
-        memberId: null,
+        // A staff subject keeps its member row so the comment carries the
+        // member tick; a customer subject has none.
+        memberId: subject.memberId,
         metadata: toOnBehalfMetadata(subject),
         userId: subject.userId,
       };

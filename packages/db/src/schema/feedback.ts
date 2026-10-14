@@ -34,7 +34,10 @@ import type {
   TEmailSubscriptionTopicType,
   TEmailSuppressionReason,
 } from "../validation-schema/email";
-import type { TEntitySource } from "../validation-schema/entity-source";
+import type {
+  TContactSource,
+  TEntitySource,
+} from "../validation-schema/entity-source";
 import type { TNotificationEventType } from "../validation-schema/notification-kind";
 import type {
   TNotificationPreferenceChannel,
@@ -493,7 +496,7 @@ export const contactTable = pgTable(
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
     source: text("source")
-      .$type<TEntitySource>()
+      .$type<TContactSource>()
       .default("DASHBOARD")
       .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })

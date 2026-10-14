@@ -49,6 +49,7 @@ export interface AnalyticsEvents {
   company_updated: { success: boolean };
   contact_created: { success: boolean };
   contact_deleted: { success: boolean };
+  contact_unsubscribed: { success: boolean };
   contact_updated: { success: boolean };
   custom_attribute_created: {
     entity_type: "company" | "contact";

@@ -11,7 +11,11 @@ import * as Layer from "effect/Layer";
 
 import { linkAnonymousAccount } from "../widget/sso";
 import { SubjectNotFoundError } from "./errors";
-import { healShadowsForVerifiedUser, linkShadowUser } from "./linking";
+import {
+  activateDeferredSubscriptionsForVerifiedUser,
+  healShadowsForVerifiedUser,
+  linkShadowUser,
+} from "./linking";
 
 const hashEmail = (email: string): string =>
   createHash("sha256").update(email.toLowerCase().trim()).digest("hex");
@@ -785,6 +789,242 @@ describe("identity linking", () => {
           // The better-auth plugin performs the cleanup itself afterwards.
           expect(yield* getUserById(anonymous)).toBeDefined();
         })
+    );
+  });
+
+  layer(TestLayer)("activateDeferredSubscriptionsForVerifiedUser", (it) => {
+    it.effect(
+      "activates a contact-only customer's deferred row when they join",
+      () =>
+        Effect.gen(function* () {
+          const n = nextTestRun();
+          const organizationId = yield* makeOrganization();
+          const email = `member.${n}@example.com`;
+          const real = `real_member_${n}`;
+          const { boardId, statusId } =
+            yield* makeBoardAndStatus(organizationId);
+          yield* insertPost({
+            id: `post_${n}`,
+            organizationId,
+            boardId,
+            statusId,
+            creatorId: null,
+          });
+          // The customer was attributed before they ever signed up: a contact
+          // with no linked account and a deferred subscription.
+          yield* insertContact({
+            id: `contact_${n}`,
+            organizationId,
+            email,
+            userId: null,
+          });
+          yield* insertDeferredEmailSubscription({
+            id: `${n}`,
+            organizationId,
+            email,
+            postId: `post_${n}`,
+          });
+          yield* insertRealUser({ id: real, email });
+          yield* insertMembership({
+            id: `member_${n}`,
+            organizationId,
+            userId: real,
+          });
+
+          const summary = yield* activateDeferredSubscriptionsForVerifiedUser({
+            userId: real,
+          });
+
+          expect(summary).toEqual({
+            organizationIds: [organizationId],
+            subscriptionsActivated: 1,
+          });
+          expect((yield* getEmailSubscriptionById(`${n}`))?.state).toBe(
+            "active"
+          );
+          expect((yield* getEmailContactById(`${n}`))?.userId).toBe(real);
+          expect((yield* getEmailContactById(`${n}`))?.verificationState).toBe(
+            "verified"
+          );
+        })
+    );
+
+    it.effect(
+      "leaves a deferred row alone when the account cannot reach the organization",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const n = nextTestRun();
+          const organizationId = yield* makeOrganization();
+          const email = `global.${n}@example.com`;
+          const real = `real_global_${n}`;
+          const { boardId, statusId } =
+            yield* makeBoardAndStatus(organizationId);
+          // A private board fails the unrestricted-global branch of the
+          // eligibility rule, so nothing may activate.
+          yield* db
+            .update(schema.boardTable)
+            .set({ visibility: "PRIVATE" })
+            .where(eq(schema.boardTable.id, boardId));
+          yield* insertPost({
+            id: `post_${n}`,
+            organizationId,
+            boardId,
+            statusId,
+            creatorId: null,
+          });
+          yield* insertContact({
+            id: `contact_${n}`,
+            organizationId,
+            email,
+            userId: null,
+          });
+          yield* insertDeferredEmailSubscription({
+            id: `${n}`,
+            organizationId,
+            email,
+            postId: `post_${n}`,
+          });
+          yield* insertRealUser({ id: real, email });
+
+          const summary = yield* activateDeferredSubscriptionsForVerifiedUser({
+            userId: real,
+          });
+
+          expect(summary.subscriptionsActivated).toBe(0);
+          expect((yield* getEmailSubscriptionById(`${n}`))?.state).toBe(
+            "deferred_no_access"
+          );
+        })
+    );
+
+    it.effect(
+      "activates a public-board row for an unrestricted global account",
+      () =>
+        Effect.gen(function* () {
+          const n = nextTestRun();
+          const organizationId = yield* makeOrganization();
+          const email = `global.public.${n}@example.com`;
+          const real = `real_global_public_${n}`;
+          const { boardId, statusId } =
+            yield* makeBoardAndStatus(organizationId);
+          yield* insertPost({
+            id: `post_${n}`,
+            organizationId,
+            boardId,
+            statusId,
+            creatorId: null,
+          });
+          yield* insertContact({
+            id: `contact_${n}`,
+            organizationId,
+            email,
+            userId: null,
+          });
+          yield* insertDeferredEmailSubscription({
+            id: `${n}`,
+            organizationId,
+            email,
+            postId: `post_${n}`,
+          });
+          yield* insertRealUser({ id: real, email });
+
+          const summary = yield* activateDeferredSubscriptionsForVerifiedUser({
+            userId: real,
+          });
+
+          expect(summary.subscriptionsActivated).toBe(1);
+          expect((yield* getEmailSubscriptionById(`${n}`))?.state).toBe(
+            "active"
+          );
+        })
+    );
+
+    it.effect(
+      "activates a portal user's linked contact deferred row on SSO",
+      () =>
+        Effect.gen(function* () {
+          const n = nextTestRun();
+          const organizationId = yield* makeOrganization();
+          const email = `portal.${n}@example.com`;
+          const portal = `sso_portal_${n}`;
+          const { boardId, statusId } =
+            yield* makeBoardAndStatus(organizationId);
+          yield* insertPost({
+            id: `post_${n}`,
+            organizationId,
+            boardId,
+            statusId,
+            creatorId: null,
+          });
+          yield* insertSsoPortalUser({
+            id: portal,
+            email,
+            organizationId,
+          });
+          // The widget SSO upsert links the workspace's contact to the portal
+          // account; the stored account address stays synthetic.
+          yield* insertContact({
+            id: `contact_${n}`,
+            organizationId,
+            email,
+            userId: portal,
+          });
+          yield* insertDeferredEmailSubscription({
+            id: `${n}`,
+            organizationId,
+            email,
+            postId: `post_${n}`,
+          });
+
+          const summary = yield* activateDeferredSubscriptionsForVerifiedUser({
+            userId: portal,
+          });
+
+          expect(summary.subscriptionsActivated).toBe(1);
+          expect((yield* getEmailSubscriptionById(`${n}`))?.state).toBe(
+            "active"
+          );
+        })
+    );
+
+    it.effect("does nothing for an unverified account", () =>
+      Effect.gen(function* () {
+        const n = nextTestRun();
+        const organizationId = yield* makeOrganization();
+        const email = `unverified.${n}@example.com`;
+        const real = `real_unverified_${n}`;
+        const { boardId, statusId } = yield* makeBoardAndStatus(organizationId);
+        yield* insertPost({
+          id: `post_${n}`,
+          organizationId,
+          boardId,
+          statusId,
+          creatorId: null,
+        });
+        yield* insertContact({
+          id: `contact_${n}`,
+          organizationId,
+          email,
+          userId: null,
+        });
+        yield* insertDeferredEmailSubscription({
+          id: `${n}`,
+          organizationId,
+          email,
+          postId: `post_${n}`,
+        });
+        yield* insertRealUser({ id: real, email, emailVerified: false });
+
+        const summary = yield* activateDeferredSubscriptionsForVerifiedUser({
+          userId: real,
+        });
+
+        expect(summary.subscriptionsActivated).toBe(0);
+        expect((yield* getEmailSubscriptionById(`${n}`))?.state).toBe(
+          "deferred_no_access"
+        );
+      })
     );
   });
 

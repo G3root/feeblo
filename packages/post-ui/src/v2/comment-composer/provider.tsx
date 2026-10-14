@@ -43,6 +43,8 @@ export type CommentComposerProviderProps = {
     email: string;
     name: string;
   }) => void | Promise<void>;
+  /** Returns authorship to the session user (dismiss the author chip). */
+  onAuthorClear?: () => void;
   /** Controlled visibility; when omitted the composer keeps its own copy. */
   isPrivate?: boolean;
   /**
@@ -203,6 +205,7 @@ function CommentComposerController(props: CommentComposerProviderProps) {
   const hasSubmit = props.onSubmit !== undefined;
   const hasCancel = props.onCancel !== undefined;
   const hasAuthorCreate = props.onAuthorCreate !== undefined;
+  const hasAuthorClear = props.onAuthorClear !== undefined;
 
   const actions = useMemo<CommentComposerActions>(() => {
     const composed: CommentComposerActions = {
@@ -213,6 +216,11 @@ function CommentComposerController(props: CommentComposerProviderProps) {
             onAuthorCreate: (values: { email: string; name: string }) =>
               latest.current.onAuthorCreate?.(values),
           }
+        : undefined),
+      // Same opt-in rule: the author chip renders its dismiss control only
+      // when the host can return authorship to the session user.
+      ...(hasAuthorClear
+        ? { onAuthorClear: () => latest.current.onAuthorClear?.() }
         : undefined),
       onContentChange: (doc: string) => {
         // The store owns the text only when the host doesn't pass `content`.
@@ -247,7 +255,14 @@ function CommentComposerController(props: CommentComposerProviderProps) {
     }
 
     return composed;
-  }, [handleSubmit, hasAuthorCreate, hasCancel, hasSubmit, store]);
+  }, [
+    handleSubmit,
+    hasAuthorClear,
+    hasAuthorCreate,
+    hasCancel,
+    hasSubmit,
+    store,
+  ]);
 
   const contextValue = useMemo<CommentComposerContextValue>(
     () => ({

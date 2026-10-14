@@ -304,6 +304,9 @@ export const CommentComposerField = withForm({
                                 authorDisplay={describeContactSelection(
                                   author.state.value ?? null
                                 )}
+                                onAuthorClear={() =>
+                                  author.handleChange(emptyOnBehalfAuthor)
+                                }
                                 onAuthorCreate={({ email, name }) =>
                                   author.handleChange({ email, name })
                                 }
@@ -352,6 +355,10 @@ export const CommentComposerField = withForm({
                                   className={commentComposerBoxClassName}
                                   data-slot="comment-composer"
                                 >
+                                  {/* The staged author stays visible: it is
+                                      the only signal that the next comment
+                                      is written as the customer. */}
+                                  <CommentComposer.AuthorChip />
                                   <CommentComposer.Editor />
                                   <CommentComposer.Submit />
                                 </div>

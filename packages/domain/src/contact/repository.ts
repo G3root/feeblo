@@ -1,12 +1,14 @@
 import { currentDb, schema } from "@feeblo/db";
 import { ContactId } from "@feeblo/id";
 import { and, count, eq, getTableName, sql } from "drizzle-orm";
+import type * as PgDrizzle from "drizzle-orm/effect-postgres";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { isSyntheticEmail } from "../identity/emails";
 import {
   ContactAlreadyExistsError,
   FailedToUpdateContactError,
@@ -19,6 +21,43 @@ import type {
 } from "./schema";
 
 export type Contact = typeof schema.contactTable.$inferSelect;
+
+/**
+ * Keeps a synthetic account's display name in step with the customer record
+ * that owns it.
+ *
+ * A shadow (`behalf-*`) or portal (`sso-*`) account exists to carry the
+ * workspace's view of a customer, and comments, votes, and the voter list
+ * render the account's name rather than the contact's. A rename in the CRM
+ * must reach the account, or the customer keeps their old name on everything
+ * they were attributed. A real account owns its own name and is left alone.
+ *
+ * Takes the transaction handle so the rename commits with the contact write;
+ * callers outside a transaction pass the database they captured.
+ */
+export const renameSyntheticAccount = (args: {
+  db: PgDrizzle.EffectPgDatabase;
+  name: string;
+  /** The transaction's timestamp, shared with the contact write. */
+  now: Date;
+  userId: string;
+}) =>
+  Effect.gen(function* () {
+    const [user] = yield* args.db
+      .select({ email: schema.userTable.email })
+      .from(schema.userTable)
+      .where(eq(schema.userTable.id, args.userId))
+      .limit(1);
+    if (!user || !isSyntheticEmail(user.email)) {
+      return false;
+    }
+
+    yield* args.db
+      .update(schema.userTable)
+      .set({ name: args.name, updatedAt: args.now })
+      .where(eq(schema.userTable.id, args.userId));
+    return true;
+  });
 
 /** Arguments for the org-scoped people-picker query backing on-behalf flows. */
 export interface ContactSearchArgs {
@@ -70,32 +109,52 @@ const makeContactRepository = Effect.gen(function* () {
       }),
 
     update: (args: TContactUpdate) =>
-      Effect.gen(function* () {
-        const now = yield* DateTime.nowAsDate;
-        const [updated] = yield* db
-          .update(schema.contactTable)
-          .set({
-            ...(args.externalId !== undefined && {
-              externalId: args.externalId,
-            }),
-            ...(args.email !== undefined && { email: args.email }),
-            ...(args.name !== undefined && { name: args.name }),
-            ...(args.phone !== undefined && { phone: args.phone }),
-            ...(args.avatar !== undefined && { avatar: args.avatar }),
-            ...(args.companyId !== undefined && { companyId: args.companyId }),
-            ...(args.userId !== undefined && { userId: args.userId }),
-            updatedAt: now,
-          })
-          .where(
-            and(
-              eq(schema.contactTable.id, args.id),
-              eq(schema.contactTable.organizationId, args.organizationId)
+      db.transaction((tx) =>
+        Effect.gen(function* () {
+          const now = yield* DateTime.nowAsDate;
+          const [updated] = yield* tx
+            .update(schema.contactTable)
+            .set({
+              ...(args.externalId !== undefined && {
+                externalId: args.externalId,
+              }),
+              ...(args.email !== undefined && { email: args.email }),
+              ...(args.name !== undefined && { name: args.name }),
+              ...(args.phone !== undefined && { phone: args.phone }),
+              ...(args.avatar !== undefined && { avatar: args.avatar }),
+              ...(args.companyId !== undefined && {
+                companyId: args.companyId,
+              }),
+              ...(args.userId !== undefined && { userId: args.userId }),
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(schema.contactTable.id, args.id),
+                eq(schema.contactTable.organizationId, args.organizationId)
+              )
             )
-          )
-          .returning();
+            .returning();
 
-        return Option.fromNullishOr(updated);
-      }),
+          const contact = Option.fromNullishOr(updated);
+          // A rename must reach the account that renders the customer's
+          // attributed content, or comments and votes keep the old name.
+          if (
+            Option.isSome(contact) &&
+            args.name !== undefined &&
+            contact.value.name !== null &&
+            contact.value.userId !== null
+          ) {
+            yield* renameSyntheticAccount({
+              db: tx,
+              name: contact.value.name,
+              now,
+              userId: contact.value.userId,
+            });
+          }
+          return contact;
+        })
+      ),
 
     delete: (args: TContactDelete) =>
       Effect.gen(function* () {
@@ -107,7 +166,10 @@ const makeContactRepository = Effect.gen(function* () {
               eq(schema.contactTable.organizationId, args.organizationId)
             )
           )
-          .returning({ id: schema.contactTable.id });
+          .returning({
+            id: schema.contactTable.id,
+            userId: schema.contactTable.userId,
+          });
 
         return Option.fromNullishOr(deleted);
       }),
@@ -126,6 +188,20 @@ const makeContactRepository = Effect.gen(function* () {
           .limit(1);
         return contact !== undefined;
       }),
+
+    /** The full row, for callers that need more than the id. */
+    findById: ({ id, organizationId }: TContactDelete) =>
+      db
+        .select()
+        .from(schema.contactTable)
+        .where(
+          and(
+            eq(schema.contactTable.id, id),
+            eq(schema.contactTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => Option.fromNullishOr(rows[0]))),
 
     memberExistsByUserId: ({
       organizationId,

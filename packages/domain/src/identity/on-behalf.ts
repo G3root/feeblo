@@ -76,7 +76,9 @@ export const toOnBehalfMetadata = (
 ): PostActivityMetadata | undefined =>
   subject && {
     onBehalfOf: {
-      contactId: subject.contactId,
+      // A staff subject carries no contact: the account id is the whole
+      // provenance, and the timeline resolves the member from it.
+      ...(subject.contactId !== null && { contactId: subject.contactId }),
       ...(subject.userId !== null && { userId: subject.userId }),
     },
   };
@@ -140,10 +142,18 @@ export const subscribeOnBehalfSubject = (args: {
         );
     }
 
+    // A staff subject has no contact to defer against: the trusted branch
+    // above is the only subscription a member can hold, and a member whose
+    // address is unverified is refused at the delivery gate anyway.
+    const contactId = args.subject.contactId;
+    if (contactId === null) {
+      return;
+    }
+
     const [contact] = yield* db
       .select({ email: schema.contactTable.email })
       .from(schema.contactTable)
-      .where(eq(schema.contactTable.id, args.subject.contactId))
+      .where(eq(schema.contactTable.id, contactId))
       .limit(1);
     const contactEmail = contact?.email;
     if (

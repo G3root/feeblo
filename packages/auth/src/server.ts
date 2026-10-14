@@ -5,7 +5,10 @@ import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { revokePendingSubscriptionRevocations } from "@feeblo/domain/billing/revocation";
 import { PolarService } from "@feeblo/domain/billing/service";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
-import { healShadowsForVerifiedUser } from "@feeblo/domain/identity/linking";
+import {
+  healShadowsForVerifiedUser,
+  activateDeferredSubscriptionsForVerifiedUser,
+} from "@feeblo/domain/identity/linking";
 import { MembershipPolicy } from "@feeblo/domain/membership/policies";
 import { MembershipRepository } from "@feeblo/domain/membership/repository";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
@@ -199,18 +202,24 @@ export const initAuthHandler = (
 
     /**
      * Heals `behalf-*` shadow identities into a freshly verified real
-     * account. Runs after email verification and after any signup that
-     * already carries a verified email (e.g. OAuth). The program itself
-     * guards on verification, exact email match, and shadow-only links, so a
-     * failure or a non-match can never corrupt another identity — and a
+     * account and activates the deferred subscriptions of attributed
+     * subjects that have no shadow to heal. Runs after email verification and
+     * after any signup that already carries a verified email (e.g. OAuth).
+     * The programs themselves guard on verification and on exact email match,
+     * so a failure or a non-match can never corrupt another identity — and a
      * healing error must never block the authentication flow.
      */
-    const healShadowIdentities = (user: { readonly id: string }) =>
+    const healVerifiedIdentities = (user: { readonly id: string }) =>
       callbackRuntime.runPromise(
-        healShadowsForVerifiedUser({ userId: user.id }).pipe(
+        Effect.gen(function* () {
+          yield* healShadowsForVerifiedUser({ userId: user.id });
+          yield* activateDeferredSubscriptionsForVerifiedUser({
+            userId: user.id,
+          });
+        }).pipe(
           Effect.catchCause((cause) =>
             Effect.logWarning(
-              "Failed to heal shadow identities for verified user",
+              "Failed to heal verified user identities",
               cause
             ).pipe(Effect.annotateLogs({ userId: user.id }))
           )
@@ -244,9 +253,30 @@ export const initAuthHandler = (
     const ssoOptions: JwtAutoLoginOptions = {
       createSsoUser: async ({ clientIp, organizationId, token }) => {
         try {
-          return await callbackRuntime.runPromise(
+          const session = await callbackRuntime.runPromise(
             createSsoSession({ clientIp, organizationId, token })
           );
+          // A portal sign-in proves the workspace's own view of the person.
+          // Deferred subscriptions that were waiting for this access activate
+          // here; the call is best-effort and must never fail the sign-in.
+          await callbackRuntime.runPromise(
+            activateDeferredSubscriptionsForVerifiedUser({
+              userId: session.userId,
+            }).pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning(
+                  "Failed to activate deferred subscriptions for SSO user",
+                  cause
+                ).pipe(
+                  Effect.annotateLogs({
+                    organizationId,
+                    userId: session.userId,
+                  })
+                )
+              )
+            )
+          );
+          return session;
         } catch (error) {
           // The plugin may hand back an error that crossed a request
           // boundary, so match on the tag rather than the prototype.
@@ -708,7 +738,7 @@ export const initAuthHandler = (
       emailVerification: {
         autoSignInAfterVerification: true,
         afterEmailVerification: async (user) => {
-          await healShadowIdentities(user);
+          await healVerifiedIdentities(user);
           await scheduleWelcome(user);
         },
       },
@@ -1021,7 +1051,7 @@ export const initAuthHandler = (
           // program no-ops for unverified users.
           create: {
             async after(user) {
-              await healShadowIdentities(user);
+              await healVerifiedIdentities(user);
             },
           },
         },

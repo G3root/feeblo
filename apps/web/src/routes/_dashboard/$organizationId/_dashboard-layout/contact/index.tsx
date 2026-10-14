@@ -27,16 +27,19 @@ import { ContactCreateDialog } from "~/features/contact/components/contact-creat
 import { ContactDeleteDialog } from "~/features/contact/components/contact-delete-dialog";
 import { ContactEditDialog } from "~/features/contact/components/contact-edit-dialog";
 import { ContactTableRow } from "~/features/contact/components/contact-table-row";
+import { ContactUnsubscribeDialog } from "~/features/contact/components/contact-unsubscribe-dialog";
 import { CrmEntriesUsage } from "~/features/contact/components/crm-entries-usage";
 import {
   CompanyEditDialogProvider,
   ContactCreateDialogProvider,
   ContactDeleteDialogProvider,
   ContactEditDialogProvider,
+  ContactUnsubscribeDialogProvider,
   useCompanyEditDialogContext,
   useContactCreateDialogContext,
   useContactDeleteDialogContext,
   useContactEditDialogContext,
+  useContactUnsubscribeDialogContext,
 } from "~/features/contact/dialog-stores";
 import { useContactAttributeDefinitions } from "~/hooks/use-attribute-definitions";
 import { useEntitlements } from "~/hooks/use-entitlements";
@@ -65,11 +68,14 @@ function RouteComponent() {
       <ContactCreateDialogProvider>
         <ContactEditDialogProvider>
           <ContactDeleteDialogProvider>
-            <ContactPage />
-            <CompanyEditDialog />
-            <ContactCreateDialog />
-            <ContactEditDialog />
-            <ContactDeleteDialog />
+            <ContactUnsubscribeDialogProvider>
+              <ContactPage />
+              <CompanyEditDialog />
+              <ContactCreateDialog />
+              <ContactEditDialog />
+              <ContactDeleteDialog />
+              <ContactUnsubscribeDialog />
+            </ContactUnsubscribeDialogProvider>
           </ContactDeleteDialogProvider>
         </ContactEditDialogProvider>
       </ContactCreateDialogProvider>
@@ -82,6 +88,7 @@ function ContactPage() {
   const createDialogStore = useContactCreateDialogContext();
   const editDialogStore = useContactEditDialogContext();
   const deleteDialogStore = useContactDeleteDialogContext();
+  const unsubscribeDialogStore = useContactUnsubscribeDialogContext();
   const companyEditDialogStore = useCompanyEditDialogContext();
   const contactsQuery = useOrgContacts(organizationId);
   // The shared org-contacts query is unordered; this table keeps its
@@ -250,6 +257,12 @@ function ContactPage() {
               }
               onEdit={() =>
                 editDialogStore.send({
+                  type: "toggle",
+                  data: { contactId: contact.id },
+                })
+              }
+              onUnsubscribe={() =>
+                unsubscribeDialogStore.send({
                   type: "toggle",
                   data: { contactId: contact.id },
                 })
