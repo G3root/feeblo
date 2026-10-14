@@ -27,6 +27,14 @@ Both variables are editable in the dashboard toolbar, so no JSON editing is need
 | Integrations | Due and claimed backlog, retry/exhausted outcomes, oldest recovered lease, delivery rate by outcome, p95 latency, lease recoveries and pauses |
 | Email outbox | Oldest queued age, delivery retries, throttles, estimated cost, intent/delivery transitions, retries by error tag, access skips, provider submissions, reconciliation recoveries |
 
+## Gauge names carry a `_ratio` suffix
+
+Grafana Cloud's OTLP-to-Prometheus conversion appends suffixes following the OpenTelemetry spec. The server's gauges do not set an explicit OTel unit, so they export as unit `1` and land as `<name>_ratio` — for example `feeblo_integration_delivery_backlog_ratio`. Counters already end in `_total` and keep their name; the latency histogram is unaffected. To list exactly what your stack stores:
+
+```promql
+{__name__=~"feeblo_.*"}
+```
+
 ## Empty panels
 
 Metrics are exported every 30 seconds, and only by features that ran. An empty panel usually means the feature has seen no traffic, not that the dashboard is broken. If every panel is empty:
