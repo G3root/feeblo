@@ -63,7 +63,7 @@ Set the same variables in the Dokploy environment (or `.env` for `docker-compose
 - **Grafana LGTM** (Tempo + Loki + Grafana) — the standard OTLP stack.
 - **Grafana Cloud / Axiom / Better Stack** — hosted OTLP, free tiers, no collector to run.
 
-A ready-to-import Grafana Cloud dashboard for the queue and email metrics lives in `docs/grafana/`.
+Ready-to-import Grafana Cloud dashboards for the HTTP APM and the queue and email metrics live in `docs/grafana/`.
 
 Sampling is the cost control: the server emits every span when the rate is `1`, and a busy workspace can produce millions of SQL spans per day. Set `FEEBLO_TELEMETRY_TRACES_SAMPLE_RATE` to `0.05`–`0.2` in production and let the backend's retention policy bound storage. Effect's `Tracer.MinimumTraceLevel` is also available for dropping low-level spans wholesale.
 

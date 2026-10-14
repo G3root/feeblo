@@ -23,6 +23,8 @@ const httpNamespaces = ["http.", "url.", "server.", "client.", "user_agent."];
 export const httpSpanAttributeAllowlist: ReadonlySet<string> = new Set([
   "http.request.method",
   "http.response.status_code",
+  // The router's matched route template, e.g. `/api/v1/posts/:postId`.
+  "http.route",
   "server.address",
   "url.scheme",
   // Path only. `url.full` and `url.query` carry the query string.

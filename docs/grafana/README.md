@@ -1,17 +1,24 @@
-# Grafana Cloud dashboard
+# Grafana Cloud dashboards
 
-`feeblo-server-dashboard.json` is an importable Grafana dashboard for the queue and email metrics the server exports over OTLP. Traces, trace-derived RED metrics, and logs are covered by Application Observability, Traces Drilldown, and Logs Drilldown; this dashboard is the Prometheus side.
+Two importable Grafana dashboards for the telemetry the server exports over OTLP:
+
+| File | Covers |
+| --- | --- |
+| `feeblo-server-apm.json` | Exact HTTP request rate, error rate, and latency, from the server's own metrics |
+| `feeblo-server-dashboard.json` | Integration delivery and email outbox queues, from the server's own metrics |
+
+Traces, trace-derived RED metrics, and logs are covered by Application Observability, Traces Drilldown, and Logs Drilldown instead.
 
 ## Import
 
 1. Grafana → **Dashboards** → **New** → **Import**.
-2. Upload or paste `feeblo-server-dashboard.json`.
+2. Upload or paste a dashboard file.
 3. When prompted, select your stack's Prometheus data source (`grafanacloud-<org>-prom`).
 4. **Import**.
 
 ## The service filter
 
-The dashboard filters on `job=~"feeblo/feeblo-server"` by default, because Grafana Cloud builds the `job` label for OTLP metrics from `service.namespace/service.name`. If every panel is empty, open **Explore → Prometheus** and check which service label the series actually carry:
+Both dashboards filter on `job=~"feeblo/feeblo-server"` by default, because Grafana Cloud builds the `job` label for OTLP metrics from `service.namespace/service.name`. If every panel is empty, open **Explore → Prometheus** and check which service label the series actually carry:
 
 | What the series show | Service label variable | Service variable |
 | --- | --- | --- |
@@ -20,7 +27,22 @@ The dashboard filters on `job=~"feeblo/feeblo-server"` by default, because Grafa
 
 Both variables are editable in the dashboard toolbar, so no JSON editing is needed.
 
-## What it shows
+## HTTP APM
+
+`feeblo-server-apm.json` is built from two metrics recorded by the HTTP metrics middleware:
+
+| Metric | Labels |
+| --- | --- |
+| `feeblo_http_server_requests_total` | `method`, `route`, `status` |
+| `feeblo_http_server_request_duration_milliseconds` (classic histogram) | `method`, `route` |
+
+They are recorded for every response the server sends — successful, failed, or unmatched — so the values are exact and do not depend on trace sampling. The `route` label is the request path with UUID, legid, and known token segments redacted to `:id`; unmatched paths (404s) collapse to `unmatched` so scanner traffic cannot mint a label per path.
+
+RPC methods are not visible here: every call shares `POST /rpc`, and the method only exists on the span. Use Application Observability or Traces Drilldown for the per-method breakdown.
+
+## Queue and email dashboards
+
+`feeblo-server-dashboard.json` shows:
 
 | Row | Panels |
 | --- | --- |
@@ -29,7 +51,7 @@ Both variables are editable in the dashboard toolbar, so no JSON editing is need
 
 ## Gauge names carry a `_ratio` suffix
 
-Grafana Cloud's OTLP-to-Prometheus conversion appends suffixes following the OpenTelemetry spec. The server's gauges do not set an explicit OTel unit, so they export as unit `1` and land as `<name>_ratio` — for example `feeblo_integration_delivery_backlog_ratio`. Counters already end in `_total` and keep their name; the latency histogram is unaffected. To list exactly what your stack stores:
+Grafana Cloud's OTLP-to-Prometheus conversion appends suffixes following the OpenTelemetry spec. The queue dashboard's gauges do not set an explicit OTel unit, so they export as unit `1` and land as `<name>_ratio` — for example `feeblo_integration_delivery_backlog_ratio`. Counters already end in `_total` and keep their name; the latency histogram is unaffected. To list exactly what your stack stores:
 
 ```promql
 {__name__=~"feeblo_.*"}

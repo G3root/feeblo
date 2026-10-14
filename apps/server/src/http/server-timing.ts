@@ -2,32 +2,9 @@ import { Clock } from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as HttpEffect from "effect/http/HttpEffect";
 import * as HttpMiddleware from "effect/http/HttpMiddleware";
-import type * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 
-/**
- * Human-readable request label used to identify each timing entry. Dynamic
- * segments are redacted to keep the label set bounded: the SES feedback
- * webhook embeds its signing token in the URL path, and other routes carry
- * unbounded identifiers (UUIDs, prefixed legids) that would otherwise leak
- * into `Server-Timing` headers.
- */
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const legidPattern = /^[a-z]{2,}_[a-z0-9]{6,}$/i;
-
-const redactIdentifierSegment = (segment: string): string =>
-  uuidPattern.test(segment) || legidPattern.test(segment) ? ":id" : segment;
-
-const requestLabel = (request: HttpServerRequest.HttpServerRequest): string => {
-  const path = request.url.split("?")[0] ?? "";
-  const redacted = path
-    .replace(/^(\/email-provider\/ses\/).+$/, "$1:token")
-    .split("/")
-    .map(redactIdentifierSegment)
-    .join("/");
-  return `${request.method} ${redacted}`;
-};
+import { requestLabel } from "./request-label";
 
 /**
  * Adds timing headers to every response:

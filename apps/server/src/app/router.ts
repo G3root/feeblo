@@ -27,6 +27,7 @@ import {
   e2eSetPlanRouter,
   testMailboxRouter,
 } from "../http/e2e";
+import { httpMetricsMiddleware } from "../http/http-metrics";
 import { makeOriginCheckMiddleware } from "../http/origin-check";
 import {
   BetterAuthRouterLive,
@@ -194,6 +195,10 @@ export const withGlobalMiddleware = <A, E, R>(
     ),
     Layer.provide(
       HttpRouter.middleware(serverTimingMiddleware, { global: true })
+    ),
+    // Exact HTTP request rate and latency, independent of trace sampling.
+    Layer.provide(
+      HttpRouter.middleware(httpMetricsMiddleware, { global: true })
     ),
     // Provides the peer-anchored client IP (socket remoteAddress) to every
     // route, including RPC middleware, so public rate limits are keyed on an
