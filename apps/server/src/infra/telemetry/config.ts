@@ -12,6 +12,7 @@ import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import * as SchemaGetter from "effect/SchemaGetter";
 
 /** Bound each collector request, including its acknowledgement. */
 export const telemetryRequestTimeout = "5 seconds" as const;
@@ -61,6 +62,52 @@ export const TelemetryConfig = Schema.Struct({
 export type TelemetryConfig = typeof TelemetryConfig.Type;
 
 /**
+ * Header values may contain `=` — Grafana Cloud's `Authorization=Basic
+ * <base64>` does whenever the base64 carries padding — and the separated-string
+ * parser behind `Config.Record` splits each pair on every `=`, silently
+ * truncating the value. Split on the first `=` instead, as the OTLP spec and
+ * the official SDKs do, and let `StringFromUriComponent` own the URL decoding
+ * so a malformed escape still fails loudly.
+ */
+const headerRecord = Schema.Record(
+  Schema.String,
+  Schema.StringFromUriComponent
+);
+
+const splitHeaders = SchemaGetter.transform((input: string) => {
+  const headers = new Map<string, string>();
+  for (const pair of input.split(",")) {
+    const separator = pair.indexOf("=");
+    if (separator <= 0) {
+      continue;
+    }
+    headers.set(pair.slice(0, separator), pair.slice(separator + 1));
+  }
+  return Object.fromEntries(headers);
+});
+
+const OtlpHeaders = Schema.Union([
+  headerRecord,
+  Schema.String.pipe(
+    Schema.decodeTo(Schema.toCodecStringTree(headerRecord), {
+      decode: splitHeaders,
+      encode: SchemaGetter.compose(
+        SchemaGetter.passthrough<Record<string, string>, Schema.StringTree>({
+          strict: false,
+        }),
+        SchemaGetter.transform((headers: Record<string, string>) =>
+          Object.entries(headers)
+            .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+            .join(",")
+        )
+      ),
+    })
+  ),
+]);
+
+const otlpHeaders = (path: string) => Config.schema(OtlpHeaders, path);
+
+/**
  * Reads the standard OTLP environment.
  *
  * A base `OTEL_EXPORTER_OTLP_ENDPOINT` gains the `/v1/<signal>` path the
@@ -105,18 +152,10 @@ export const telemetryConfig = (options: {
         if (url === undefined) {
           return undefined;
         }
-        const headers = yield* Config.Record(
-          Schema.String,
-          Schema.StringFromUriComponent,
+        const headers = yield* otlpHeaders(
           `OTEL_EXPORTER_OTLP_${signal}_HEADERS`
         ).pipe(
-          Config.orElse(() =>
-            Config.Record(
-              Schema.String,
-              Schema.StringFromUriComponent,
-              "OTEL_EXPORTER_OTLP_HEADERS"
-            )
-          ),
+          Config.orElse(() => otlpHeaders("OTEL_EXPORTER_OTLP_HEADERS")),
           Config.option
         );
         if (Option.isNone(headers)) {

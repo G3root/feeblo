@@ -26,6 +26,7 @@ Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the 
 | `FEEBLO_TELEMETRY_TRACES_SAMPLE_RATE` | Root-span ratio, `0.0`–`1.0`, default `1`. Children always follow their root's decision. |
 | `FEEBLO_TELEMETRY_DROP_ROOT_SPANS` | Drop parentless `sql.execute` / `sql.transaction` spans, default `true`. Set `false` to keep them while debugging a poller. |
 | `OTEL_SERVICE_NAME` | Defaults to `feeblo-server`. |
+| `OTEL_RESOURCE_ATTRIBUTES` | Extra resource attributes for every signal, `key=value,key2=value2`. Grafana Cloud's Application Observability matches a service by `service.name` **and** `service.namespace`, so set `service.namespace=<namespace>` there. |
 | `APP_RELEASE` | Reported as `service.version`. |
 
 ## Span shaping
