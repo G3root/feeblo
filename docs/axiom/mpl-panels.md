@@ -25,7 +25,8 @@ Requests per second:
   | where `status` == #/5../
   | map rate
   | align to 5m using avg
-  | group using sum,
+  | group using sum
+  | map fill::const(0),
   `<metrics-dataset>`:`feeblo_http_server_requests_total`
   | where `service.name` == "feeblo-server"
   | map rate
@@ -35,6 +36,8 @@ Requests per second:
 | compute error_ratio using /
 | map * 100
 ```
+
+The numerator fills unset buckets with zero: `compute` only emits timestamps present on both sides, so without it a window with no 5xx requests would show no data instead of 0%.
 
 4xx ratio: the same query with `#/4../`.
 
@@ -108,8 +111,8 @@ Retries and exhausting deliveries in the last 15 minutes:
 `<metrics-dataset>`:`feeblo_integration_delivery_transitions_total`
 | where `service.name` == "feeblo-server"
 | where `outcome` in ["retry", "exhausted"]
-| map rate
-| align to 15m using avg
+| map increase
+| align to 15m using sum
 | group using sum
 ```
 
@@ -167,7 +170,7 @@ Error spans:
 ['<traces-dataset>']
 | where ['service.name'] == "feeblo-server"
 | where ['status.code'] == "error"
-| project _time, trace_id, span_id, name, duration, ['rpc.method'], ['http.response.status_code']
+| project _time, trace_id, span_id, name, duration, ['attributes.rpc.method'], ['attributes.http.response.status_code']
 | sort by _time desc
 | limit 50
 ```
@@ -178,7 +181,7 @@ Slowest root spans per route (`isnull(parent_span_id)` selects roots so duration
 ['<traces-dataset>']
 | where ['service.name'] == "feeblo-server"
 | where isnull(parent_span_id)
-| summarize p95 = percentile(duration, 95) by name, ['http.route']
+| summarize p95 = percentile(duration, 95) by name, ['attributes.http.route']
 | sort by p95 desc
 | limit 20
 ```

@@ -13,7 +13,7 @@ const redactIdentifierSegment = (segment: string): string =>
   uuidPattern.test(segment) || legidPattern.test(segment) ? ":id" : segment;
 
 /** Request path with identifier and token segments redacted. */
-export const redactedRequestPath = (
+const redactedRequestPath = (
   request: HttpServerRequest.HttpServerRequest
 ): string => {
   const path = request.url.split("?")[0] ?? "";

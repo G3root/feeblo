@@ -10,7 +10,6 @@
  */
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
-import type * as LogLevel from "effect/LogLevel";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
@@ -45,6 +44,29 @@ export const TelemetryTarget = Schema.Struct({
 });
 export type TelemetryTarget = typeof TelemetryTarget.Type;
 
+/** The log levels `FEEBLO_TELEMETRY_LOG_LEVEL` accepts, in effect's spelling. */
+const logLevelSchema = Schema.Literals([
+  "All",
+  "Fatal",
+  "Error",
+  "Warn",
+  "Info",
+  "Debug",
+  "Trace",
+  "None",
+]);
+
+type LogLevelName = typeof logLevelSchema.Type;
+
+/**
+ * `FEEBLO_TELEMETRY_LOG_LEVEL` is case-insensitive; an unknown value keeps the
+ * `Info` default rather than failing startup over a telemetry knob. The lookup
+ * is derived from the schema so the accepted names live in exactly one place.
+ */
+const logLevels: ReadonlyMap<string, LogLevelName> = new Map(
+  logLevelSchema.literals.map((level) => [level.toLowerCase(), level])
+);
+
 /** Shared identity and independently selectable OTLP signals. */
 export const TelemetryConfig = Schema.Struct({
   service: Schema.NonEmptyString,
@@ -57,16 +79,7 @@ export const TelemetryConfig = Schema.Struct({
     Schema.Literals(["http/json", "http/protobuf"])
   ),
   metricsTemporality: Schema.Literals(["cumulative", "delta"]),
-  logLevel: Schema.Literals([
-    "All",
-    "Fatal",
-    "Error",
-    "Warn",
-    "Info",
-    "Debug",
-    "Trace",
-    "None",
-  ]),
+  logLevel: logLevelSchema,
   /**
    * `service.instance.id`, from `OTEL_RESOURCE_ATTRIBUTES` when the operator
    * sets it, otherwise the container hostname.
@@ -124,20 +137,9 @@ const OtlpHeaders = Schema.Union([
 
 const otlpHeaders = (path: string) => Config.schema(OtlpHeaders, path);
 
-/**
- * `FEEBLO_TELEMETRY_LOG_LEVEL` is case-insensitive; an unknown value keeps the
- * `Info` default rather than failing startup over a telemetry knob.
- */
-const logLevels = new Map<string, LogLevel.LogLevel>([
-  ["all", "All"],
-  ["fatal", "Fatal"],
-  ["error", "Error"],
-  ["warn", "Warn"],
-  ["info", "Info"],
-  ["debug", "Debug"],
-  ["trace", "Trace"],
-  ["none", "None"],
-]);
+/** An env value that is set but empty means "not set", not an empty identity. */
+const nonEmpty = (value: string | undefined): string | undefined =>
+  value === undefined || value === "" ? undefined : value;
 
 /**
  * Reads the standard OTLP environment.
@@ -181,9 +183,11 @@ export const telemetryConfig = (options: {
       Schema.StringFromUriComponent,
       "OTEL_RESOURCE_ATTRIBUTES"
     ).pipe(Config.withDefault({}));
-    const hostname = yield* Config.String("HOSTNAME").pipe(Config.option);
+    const hostname = yield* Config.NonEmptyString("HOSTNAME").pipe(
+      Config.option
+    );
     const instanceId =
-      resourceAttributes["service.instance.id"] ??
+      nonEmpty(resourceAttributes["service.instance.id"]) ??
       Option.getOrUndefined(hostname);
     const target = (signal: "TRACES" | "LOGS" | "METRICS") =>
       Effect.gen(function* () {

@@ -114,6 +114,24 @@ describe("telemetry resource identity and log level", () => {
       expect(none.instanceId).toBeUndefined();
     })
   );
+  it.effect("treats an empty instance id or hostname as unset", () =>
+    Effect.gen(function* () {
+      const emptyHostname = yield* loadTelemetryConfig({
+        HOSTNAME: "",
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+      });
+      const emptyAttribute = yield* loadTelemetryConfig({
+        HOSTNAME: "container-7",
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+        OTEL_RESOURCE_ATTRIBUTES: "service.instance.id=",
+      });
+
+      expect(emptyHostname.instanceId).toBeUndefined();
+      // An empty resource attribute yields to the hostname rather than
+      // disabling OTLP over a meaningless value.
+      expect(emptyAttribute.instanceId).toBe("container-7");
+    })
+  );
 });
 
 describe("telemetry OTLP endpoints", () => {

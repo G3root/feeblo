@@ -8,6 +8,7 @@
  * `UsefulSoftwareCo/executor`'s `packages/telemetry/src/layer.ts`.
  */
 import * as Context from "effect/Context";
+import type * as Duration from "effect/Duration";
 import { FetchHttpClient } from "effect/http";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
@@ -71,13 +72,16 @@ export const telemetryLayer = (
   };
   const signal = (
     target: TelemetryTarget,
-    processExportInterval: "1 second" | "5 seconds" | "30 seconds"
+    processExportInterval: Duration.Input
   ) => {
+    // An `event` lifetime batches until shutdown, so a one-shot process
+    // exports once instead of per interval.
+    const exportInterval: Duration.Input =
+      lifetime === "event" ? "1 hour" : processExportInterval;
     const common = {
       url: target.url,
       resource,
-      exportInterval:
-        lifetime === "event" ? ("1 hour" as const) : processExportInterval,
+      exportInterval,
       shutdownTimeout: "3 seconds" as const,
     };
     return target.headers === undefined

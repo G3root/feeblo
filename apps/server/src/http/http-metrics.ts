@@ -1,10 +1,10 @@
-import { Clock } from "effect/Clock";
-import * as Context from "effect/Context";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as HttpEffect from "effect/http/HttpEffect";
 import * as HttpMiddleware from "effect/http/HttpMiddleware";
 import * as HttpRouter from "effect/http/HttpRouter";
 import * as Metric from "effect/Metric";
+import * as Option from "effect/Option";
 
 /** Requests served, by method, matched route, and response status. */
 export const httpServerRequests = Metric.counter(
@@ -38,34 +38,37 @@ export const httpServerRequestDuration = Metric.histogram(
  * remains the place to see RPC methods, since every call shares `POST /rpc`.
  */
 export const httpMetricsMiddleware = HttpMiddleware.make((httpApp) =>
-  Effect.withFiber((fiber) => {
-    const startedAt = fiber.getRef(Clock).monotonicTimeNanosUnsafe();
-    return HttpEffect.withPreResponseHandler(httpApp, (request, response) => {
-      const durationMs =
-        Number(fiber.getRef(Clock).monotonicTimeNanosUnsafe() - startedAt) /
-        1_000_000;
-      // The router sets `RouteContext` on the request fiber before invoking
-      // the matched handler, so it is still visible when the response is sent.
-      const matched = Context.getOption(fiber.context, HttpRouter.RouteContext);
-      const route =
-        matched._tag === "Some" ? matched.value.route.path : "unmatched";
-      return Effect.andThen(
-        Metric.update(
+  Effect.gen(function* () {
+    const startedAt = yield* Clock.monotonicTimeNanos;
+    return yield* HttpEffect.withPreResponseHandler(
+      httpApp,
+      // The router sets `RouteContext` on the request fiber before invoking the
+      // matched handler, and the pre-response handler runs before that fiber
+      // ends, so a matched handler that answers 404 still reads its template.
+      Effect.fnUntraced(function* (request, response) {
+        const finishedAt = yield* Clock.monotonicTimeNanos;
+        const durationMs = Number(finishedAt - startedAt) / 1_000_000;
+        const route = Option.match(
+          yield* Effect.serviceOption(HttpRouter.RouteContext),
+          { onNone: () => "unmatched", onSome: (matched) => matched.route.path }
+        );
+        yield* Metric.update(
           Metric.withAttributes(httpServerRequests, {
             method: request.method,
             route,
             status: String(response.status),
           }),
           1
-        ),
-        Metric.update(
+        );
+        yield* Metric.update(
           Metric.withAttributes(httpServerRequestDuration, {
             method: request.method,
             route,
           }),
           durationMs
-        )
-      ).pipe(Effect.as(response));
-    });
+        );
+        return response;
+      })
+    );
   })
 );
