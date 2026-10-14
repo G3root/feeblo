@@ -51,7 +51,13 @@ export const telemetryLayer = (
   const resource = {
     serviceName: config.service,
     serviceVersion: config.version,
-    attributes: { "deployment.environment.name": config.environment },
+    attributes: {
+      // `deployment.environment` is the pre-1.27 semantic-convention name;
+      // Grafana's Application Observability still filters on it by default.
+      // Send both it and the stable rename so either reader matches.
+      "deployment.environment": config.environment,
+      "deployment.environment.name": config.environment,
+    },
   };
   const signal = (target: TelemetryTarget) => {
     const common = {

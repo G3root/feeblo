@@ -5,6 +5,7 @@ import { isString } from "@feeblo/utils/runtime-kind";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as Tracer from "effect/Tracer";
 
 import { telemetryLayer } from "./layer";
@@ -53,6 +54,28 @@ const withCollector = <A, E, R>(
     ({ close }) => close
   );
 
+/** Just enough of an OTLP export body to read the resource attributes. */
+const OtlpResourceSpan = Schema.Struct({
+  resourceSpans: Schema.Array(
+    Schema.Struct({
+      resource: Schema.Struct({
+        attributes: Schema.Array(
+          Schema.Struct({
+            key: Schema.String,
+            value: Schema.Struct({
+              stringValue: Schema.optional(Schema.String),
+            }),
+          })
+        ),
+      }),
+    })
+  ),
+});
+
+const decodeResourceSpans = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(OtlpResourceSpan)
+);
+
 it.live("exports a span to the configured OTLP endpoint", () =>
   withCollector((url, requests) =>
     Effect.gen(function* () {
@@ -91,6 +114,21 @@ it.live("exports a span to the configured OTLP endpoint", () =>
       expect(payload).toContain("feeblo.test.span");
       expect(payload).toContain("/posts");
       expect(payload).not.toContain("secret");
+
+      // Application Observability still reads the pre-1.27 attribute name,
+      // so both spellings must reach the backend.
+      const attributes =
+        (yield* decodeResourceSpans(payload)).resourceSpans[0]?.resource
+          .attributes ?? [];
+      expect(attributes).toEqual(
+        expect.arrayContaining([
+          { key: "deployment.environment", value: { stringValue: "test" } },
+          {
+            key: "deployment.environment.name",
+            value: { stringValue: "test" },
+          },
+        ])
+      );
     })
   )
 );
