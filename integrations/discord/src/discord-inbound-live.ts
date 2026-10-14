@@ -1,7 +1,8 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
 import { BoardRepository } from "@feeblo/domain/board/repository";
 import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
-import { DiscordInboundFailure } from "@feeblo/domain/integration/discord/errors";
+import { ChatInboundFailure } from "@feeblo/domain/integration/chat/errors";
+import { ChatFeedbackService } from "@feeblo/domain/integration/chat/feedback-service";
 import {
   type DiscordInboundHttpResponse,
   DiscordInboundService,
@@ -22,7 +23,6 @@ import * as EffectArray from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { DiscordFeedbackService } from "./discord-feedback-service";
 import {
   buildDeferredUpdate,
   buildEphemeralMessage,
@@ -99,7 +99,7 @@ export const DiscordInboundServiceLive: Layer.Layer<
   | BoardRepository
   | EmailOutboxConfig
   | DiscordUserService
-  | DiscordFeedbackService
+  | ChatFeedbackService
 > = Layer.effect(
   DiscordInboundService,
   Effect.gen(function* () {
@@ -107,7 +107,7 @@ export const DiscordInboundServiceLive: Layer.Layer<
     const boardRepository = yield* BoardRepository;
     const emailOutboxConfig = yield* EmailOutboxConfig;
     const discordUserService = yield* DiscordUserService;
-    const discordFeedbackService = yield* DiscordFeedbackService;
+    const chatFeedbackService = yield* ChatFeedbackService;
 
     const findActiveConnection = (guildId: string) =>
       db
@@ -206,7 +206,7 @@ export const DiscordInboundServiceLive: Layer.Layer<
         }
         const invokingUserId = payload.member?.user.id ?? payload.user?.id;
         if (invokingUserId === undefined) {
-          return yield* new DiscordInboundFailure({
+          return yield* new ChatInboundFailure({
             message: "Discord interaction user is missing",
           });
         }
@@ -215,10 +215,11 @@ export const DiscordInboundServiceLive: Layer.Layer<
           guildId: metadata.guildId,
           userId: invokingUserId,
         });
-        const created = yield* discordFeedbackService.createPost({
+        const created = yield* chatFeedbackService.createPost({
           boardId,
           content: details,
           organizationId: metadata.organizationId,
+          source: "DISCORD",
           title,
           userId,
         });

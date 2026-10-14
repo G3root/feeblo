@@ -23,11 +23,11 @@ import { toastManager } from "@feeblo/ui/toast";
 import { slugify } from "@feeblo/utils/url";
 import { SparklesIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import { useEntitlements } from "~/hooks/use-entitlements";
+import { useOrgBoards } from "~/hooks/use-org-boards";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -62,12 +62,7 @@ function CreateBoardForm() {
   const upgradePlanStore = useUpgradePlanDialogContext();
   const { entitlements } = useEntitlements();
 
-  const { data: boards } = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ board: boardCollection })
-        .where(({ board }) => eq(board.organizationId, organizationId)),
-  });
+  const { data: boards } = useOrgBoards(organizationId);
 
   const boardCount = boards?.length ?? 0;
   const boardLimit = entitlements.limits.feedbackBoards;

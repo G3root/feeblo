@@ -15,15 +15,8 @@ import {
 } from "@tanstack/react-db";
 import { useDeferredValue, useMemo } from "react";
 
-import {
-  boardCollection,
-  deleteEligibilityCollection,
-  postCollection,
-  postStatusCollection,
-  postTagCollection,
-  tagCollection,
-  upvoteCollection,
-} from "~/lib/collections";
+import { useOrgPostStatuses } from "~/hooks/use-org-post-statuses";
+import { dashboardCollections } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import type {
@@ -47,13 +40,13 @@ import type { BoardPostRow } from "./types";
  */
 export async function preloadBoardPostsDataCollections(): Promise<void> {
   await Promise.all([
-    boardCollection.preload(),
-    deleteEligibilityCollection.preload(),
-    postCollection.preload(),
-    postStatusCollection.preload(),
-    tagCollection.preload(),
-    postTagCollection.preload(),
-    upvoteCollection.preload(),
+    dashboardCollections.boardCollection.preload(),
+    dashboardCollections.deleteEligibilityCollection.preload(),
+    dashboardCollections.postCollection.preload(),
+    dashboardCollections.postStatusCollection.preload(),
+    dashboardCollections.tagCollection.preload(),
+    dashboardCollections.postTagCollection.preload(),
+    dashboardCollections.upvoteCollection.preload(),
   ]);
 }
 
@@ -88,28 +81,6 @@ type UseBoardPostsDataOptions = {
   tagOperator: BoardTagOperator;
 };
 
-function useBoardPostStatuses(organizationId: string) {
-  const { postStatusCollection } = useDashboardCollections();
-  return useLiveQuery({
-    query: (q) => {
-      if (!organizationId) {
-        return undefined;
-      }
-
-      return q
-        .from({ postStatus: postStatusCollection })
-        .where(({ postStatus }) =>
-          eq(postStatus.organizationId, organizationId)
-        )
-        .select(({ postStatus }) => ({
-          id: postStatus.id,
-          type: postStatus.type,
-          label: postStatus.label,
-        }));
-    },
-  });
-}
-
 export function useBoardPostsData({
   boardId,
   organizationId,
@@ -133,7 +104,7 @@ export function useBoardPostsData({
   // re-runs over the overfetched collection at lower priority.
   const deferredSearch = useDeferredValue(normalizedSearch);
 
-  const postStatusesQuery = useBoardPostStatuses(organizationId);
+  const postStatusesQuery = useOrgPostStatuses(organizationId);
 
   // One live query for everything the lanes render. The previous shape ran
   // five separate queries and stitched them in JS (board Map, upvote-count
@@ -148,6 +119,25 @@ export function useBoardPostsData({
   // - tag matching is a grouped subquery joined in place, so there is no
   //   JS id-list bridge and no giant dep key.
   const postsQuery = useLiveQuery({
+    // The board surface's main query: the largest IR in the dashboard and the
+    // board re-renders on every keystroke/filter change. Every value the
+    // callback reads is listed, plus each collection it queries.
+    queryKey: [
+      "board-posts",
+      postCollection.id,
+      postStatusCollection.id,
+      boardCollection.id,
+      upvoteCollection.id,
+      postTagCollection.id,
+      organizationId,
+      boardId ?? null,
+      postStatusFilter,
+      deferredSearch,
+      statusOperator,
+      statuses,
+      tagOperator,
+      tagIds,
+    ],
     query: (q) => {
       if (!organizationId) {
         return undefined;

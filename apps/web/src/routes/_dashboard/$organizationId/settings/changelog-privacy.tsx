@@ -14,14 +14,14 @@ import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useSite } from "~/hooks/use-site";
-import { siteCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/settings/changelog-privacy"
 )({
   component: ChangelogPrivacySettingsPage,
   beforeLoad: async () => {
-    await siteCollection.preload();
+    await dashboardCollections.siteCollection.preload();
     return null;
   },
 });
@@ -41,9 +41,12 @@ function ChangelogPrivacySettingsPage() {
 
     startTransition(async () => {
       try {
-        const tx = siteCollection.update(site.id, (draft) => {
-          draft.changelogVisibility = checked ? "PUBLIC" : "HIDDEN";
-        });
+        const tx = dashboardCollections.siteCollection.update(
+          site.id,
+          (draft) => {
+            draft.changelogVisibility = checked ? "PUBLIC" : "HIDDEN";
+          }
+        );
 
         await tx.isPersisted.promise;
 

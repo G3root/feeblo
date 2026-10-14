@@ -1,3 +1,4 @@
+import type { TContact } from "@feeblo/domain/contact/schema";
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { TableCell, TableRow } from "@feeblo/ui/table";
@@ -8,18 +9,18 @@ import {
 } from "@feeblo/web-shared/use-policy";
 import {
   ArrowUpRight01Icon,
+  BellOffIcon,
   Delete02Icon,
   Edit,
   Ellipsis,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 
 import {
   type CustomAttributeDefinition,
   formatCustomAttributeValue,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+import { useContactAttributeValues } from "~/hooks/use-attribute-values";
 
 const mediumDateFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
@@ -29,12 +30,13 @@ function formatDate(date: Date) {
   return mediumDateFormatter.format(date);
 }
 
-function formatSource(source: "DASHBOARD" | "WIDGET" | "API" | "IMPORT") {
+function formatSource(source: TContact["source"]) {
   return {
     DASHBOARD: "Dashboard",
     WIDGET: "Widget",
     API: "API",
     IMPORT: "Import",
+    ON_BEHALF: "On behalf",
   }[source];
 }
 
@@ -46,6 +48,7 @@ export function ContactTableRow({
   onCompanyClick,
   onDelete,
   onEdit,
+  onUnsubscribe,
   updatePolicy,
 }: {
   company?: { id: string; name: string };
@@ -56,7 +59,7 @@ export function ContactTableRow({
     id: string;
     name: string | null;
     phone: string | null;
-    source: "DASHBOARD" | "WIDGET" | "API" | "IMPORT";
+    source: TContact["source"];
     updatedAt: Date;
   };
   definitions: readonly CustomAttributeDefinition[];
@@ -64,15 +67,10 @@ export function ContactTableRow({
   onCompanyClick: (companyId: string) => void;
   onDelete: () => void;
   onEdit: () => void;
+  onUnsubscribe: () => void;
   updatePolicy: ClientPolicy;
 }) {
-  const { contactAttributeValueCollection } = useDashboardCollections();
-  const { data: values = [] } = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ value: contactAttributeValueCollection })
-        .where(({ value }) => eq(value.contactId, contact.id)),
-  });
+  const { data: values = [] } = useContactAttributeValues(contact.id);
   const valuesByAttributeId = new Map(
     values.map((value) => [value.attributeId, value])
   );
@@ -134,6 +132,19 @@ export function ContactTableRow({
                           icon={Edit}
                         />
                         <span>Edit</span>
+                      </MenuItem>
+                    )}
+                  </PolicyGuard>
+                  <PolicyGuard policy={updatePolicy}>
+                    {({ allowed }) => (
+                      <MenuItem
+                        // A contact without an address holds no email
+                        // subscription, so there is nothing to withdraw.
+                        disabled={!allowed || contact.email === null}
+                        onClick={onUnsubscribe}
+                      >
+                        <HugeiconsIcon icon={BellOffIcon} />
+                        <span>Stop email updates</span>
                       </MenuItem>
                     )}
                   </PolicyGuard>

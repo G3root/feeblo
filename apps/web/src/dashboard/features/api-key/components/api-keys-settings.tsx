@@ -150,7 +150,12 @@ function OneTimeKeyPanel({
         The key for {created.name} will not be shown again. Store it wherever
         the integration reads its configuration.
       </p>
-      <code className="bg-background mt-3 block rounded-md border p-3 text-sm break-all">
+      {/* `data-ph-block` keeps the one-time key out of session replays even
+          if the blanket text mask is ever relaxed. */}
+      <code
+        className="bg-background mt-3 block rounded-md border p-3 text-sm break-all"
+        data-ph-block
+      >
         {created.key}
       </code>
       <div className="mt-3 flex gap-2">

@@ -1,3 +1,4 @@
+import { CommentComposerAuthorChip } from "./author-chip";
 import { CommentComposerEditor } from "./editor";
 import {
   CommentComposerProvider,
@@ -31,6 +32,7 @@ function CommentComposerComponent(props: CommentComposerProviderProps) {
       `data-slot="comment"`): the post page mounts two ProseMirror
       editors, so tests scope to the composer instead of indexing. */}
       <div className={commentComposerBoxClassName} data-slot="comment-composer">
+        <CommentComposerAuthorChip />
         <CommentComposerEditor />
         <CommentComposerSubmit />
       </div>
@@ -39,6 +41,7 @@ function CommentComposerComponent(props: CommentComposerProviderProps) {
 }
 
 export const CommentComposer = Object.assign(CommentComposerComponent, {
+  AuthorChip: CommentComposerAuthorChip,
   Editor: CommentComposerEditor,
   Provider: CommentComposerProvider,
   Submit: CommentComposerSubmit,

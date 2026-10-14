@@ -1,4 +1,4 @@
-import { EntitySource } from "@feeblo/db/validation-schema/entity-source";
+import { ContactSource } from "@feeblo/db/validation-schema/entity-source";
 import {
   ContactAttributeDefinitionId,
   ContactAttributeValueId,
@@ -71,6 +71,31 @@ export const ContactDelete = S.Struct({
   organizationId: WorkspaceId.schema,
 });
 
+/**
+ * Whether the workspace's plan has room for one more CRM entry. The picker
+ * asks before it offers the create-new-customer row; the write path still
+ * enforces the cap inside its transaction, so this answers the UI alone.
+ */
+export const ContactCreateEligibility = S.Struct({
+  organizationId: WorkspaceId.schema,
+});
+
+export type TContactCreateEligibility = S.Schema.Type<
+  typeof ContactCreateEligibility
+>;
+
+/**
+ * Stops every email subscription the customer's address holds in the
+ * workspace. Separate from delete on purpose: removing a customer from the
+ * CRM and withdrawing their email consent are different decisions.
+ */
+export const ContactUnsubscribe = S.Struct({
+  id: ContactId.schema,
+  organizationId: WorkspaceId.schema,
+});
+
+export type TContactUnsubscribe = S.Schema.Type<typeof ContactUnsubscribe>;
+
 export const ContactSearch = S.Struct({
   organizationId: WorkspaceId.schema,
   query: S.String,
@@ -116,7 +141,7 @@ export const Contact = S.Struct({
   companyId: S.NullOr(S.String),
   /** Linked feeblo account, when the customer has (or was provisioned) one. */
   userId: S.optional(S.NullOr(S.String)),
-  source: EntitySource,
+  source: ContactSource,
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
 });

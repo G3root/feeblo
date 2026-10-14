@@ -45,6 +45,7 @@ function TagRenameForm() {
   const tagId = useSelector(store, (state) => state.context.data.tagId);
 
   const { data } = useLiveQuery({
+    queryKey: ["tag-by-id", tagCollection.id, tagId, organizationId],
     query: (q) =>
       q
         .from({ tag: tagCollection })

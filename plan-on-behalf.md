@@ -263,6 +263,7 @@ Decisions above held; implementation diverged in these places, all recorded in c
 6. **`identity/emails.ts`** holds the synthetic-email predicates as a dependency-free module to avoid a user-repository import cycle.
 7. **Glossary location.** `CONTEXT.md` is scoped to the integration platform domain, so the feature vocabulary (actor/subject, shadow user, deferred subscription) lives in `docs/on-behalf.md` instead.
 8. **Picker `hasAccess` without post context.** With no `postId`, board visibility cannot participate in the eligibility rule, so an unrestricted verified global user is reported as eligible only provisionally — the verdict is not final until the post's board is known. ContactSearch integrations should pass `postId` whenever post context exists; callers without one must treat `hasAccess` as "not yet determined" rather than a definitive "will be notified" for unrestricted global users.
+9. **A staff subject resolves to a member, not a contact.** "Every on-behalf action resolves its subject to a contact" held only for customers. A subject who is a member of the acting workspace resolves to their account and member row, mints no contact, and spends no CRM-entry allowance (ADR 0017). `ResolvedPrincipal.contactId` is nullable and the activity metadata carries whichever identifier the subject has.
 
 ## Completion Criteria
 

@@ -54,6 +54,7 @@ import {
 } from "react";
 import { z } from "zod";
 
+import { useChangelogCategories } from "~/hooks/use-changelog-categories";
 import { usePublicSiteUrl } from "~/hooks/use-site";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -698,19 +699,18 @@ export function ChangelogEditorDetails() {
 
 export function ChangelogEditorCategoryField() {
   const { changelog, isOwner, organizationId } = useChangelogEditor();
-  const { changelogCategoryCollection, changelogCategoryLinkCollection } =
-    useDashboardCollections();
+  const { changelogCategoryLinkCollection } = useDashboardCollections();
 
-  const categoriesQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ category: changelogCategoryCollection })
-        .where(({ category }) => eq(category.organizationId, organizationId))
-        .orderBy(({ category }) => category.createdAt, "asc"),
-  });
+  const categoriesQuery = useChangelogCategories(organizationId);
   const categories = categoriesQuery.data ?? [];
 
   const linksQuery = useLiveQuery({
+    queryKey: [
+      "changelog-category-links",
+      changelogCategoryLinkCollection.id,
+      changelog.id,
+      organizationId,
+    ],
     query: (q) =>
       q
         .from({ link: changelogCategoryLinkCollection })

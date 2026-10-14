@@ -29,6 +29,7 @@ function renderSlugFooter(
   slug: string,
   slugStatus: "idle" | "checking" | "available" | "taken" | "error",
   suggestion: string | null,
+  reason: string | null,
   form: SlugCheckForm
 ) {
   if (slug.length < 4) {
@@ -51,7 +52,7 @@ function renderSlugFooter(
   if (slugStatus === "taken") {
     return (
       <div className="flex flex-col gap-2">
-        <FieldError>This name is already taken.</FieldError>
+        <FieldError>{reason ?? "This name is already taken."}</FieldError>
         {suggestion ? (
           <div className="flex items-center gap-2">
             <Button
@@ -89,10 +90,11 @@ export const RegisterWorkspaceStep = withForm({
     );
 
     const slug = toWorkspaceSlug(workspaceName);
-    const { status: slugStatus, suggestion } = useWorkspaceSlugAvailability(
-      slug,
-      slug.length >= 4
-    );
+    const {
+      status: slugStatus,
+      suggestion,
+      reason,
+    } = useWorkspaceSlugAvailability(slug, slug.length >= 4);
 
     return (
       <div className="flex flex-col gap-4">
@@ -134,7 +136,7 @@ export const RegisterWorkspaceStep = withForm({
               <InputGroupText>.{appRootDomain}</InputGroupText>
             </InputGroupAddon>
           </InputGroup>
-          {renderSlugFooter(slug, slugStatus, suggestion, form)}
+          {renderSlugFooter(slug, slugStatus, suggestion, reason, form)}
         </Field>
       </div>
     );

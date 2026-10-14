@@ -3,7 +3,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type React from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
-import { cn } from "./utils";
 
 const WHITESPACE_REGEX = /\s+/;
 
@@ -22,29 +21,22 @@ export function getInitials(name: string | null | undefined): string {
  * The blue member tick, drawn on the avatar's bottom-right corner. It is
  * `aria-hidden` on its own: `memberLabel` is what a screen reader announces,
  * because a decorative tick on an image says nothing by itself.
+ *
+ * Every dimension is a percentage of the avatar rather than a per-`size` map,
+ * so the tick keeps its proportion for the named sizes and for a caller's
+ * `className` override (`size-5`, say) alike. The icon is a percentage of the
+ * tick, which is what makes the check itself shrink and grow with the face.
  */
-function MemberTick({
-  label,
-  size,
-}: {
-  label?: string | undefined;
-  size: "sm" | "default" | "lg";
-}) {
+function MemberTick({ label }: { label?: string | undefined }) {
   return (
     <span
-      className={cn(
-        "bg-info ring-background absolute -right-0.5 -bottom-0.5 flex items-center justify-center rounded-full ring-2",
-        size === "sm" && "size-3",
-        size === "default" && "size-3.5",
-        size === "lg" && "size-4"
-      )}
+      className="bg-info ring-background absolute -right-[6%] -bottom-[6%] flex size-[44%] items-center justify-center rounded-full ring-2"
       data-slot="member-tick"
     >
       <HugeiconsIcon
         aria-hidden="true"
-        className="text-white"
+        className="size-[64%] text-white"
         icon={Tick02Icon}
-        size={9}
         strokeWidth={3}
       />
       {label ? <span className="sr-only">{label}</span> : null}
@@ -58,7 +50,9 @@ export interface UserAvatarProps extends React.ComponentProps<typeof Avatar> {
   /**
    * Draws the blue member tick on the avatar. Set for people who belong to the
    * workspace (its members) so a reader can tell them apart from customers and
-   * public-board accounts at a glance.
+   * public-board accounts at a glance. Only comments and post lists draw it;
+   * other surfaces (the inbox, voter lists, author pickers, post profiles)
+   * show the plain face.
    */
   isMember?: boolean;
   /** Accessible label for the tick; omitted, the tick is purely decorative. */
@@ -96,7 +90,7 @@ export function UserAvatar({
   return (
     <span className="relative inline-flex shrink-0">
       {avatar}
-      <MemberTick label={memberLabel} size={size} />
+      <MemberTick label={memberLabel} />
     </span>
   );
 }

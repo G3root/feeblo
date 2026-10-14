@@ -1,4 +1,5 @@
 import type { TContact } from "@feeblo/domain/contact/schema";
+import type { TOrganizationMember } from "@feeblo/domain/membership/schema";
 import type { TPostActivityKind } from "@feeblo/domain/post-activity/schema";
 import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
 import {
@@ -45,14 +46,12 @@ import {
 } from "@tanstack/react-db";
 import { useMemo } from "react";
 
-import {
-  boardCollection,
-  contactCollection,
-  postActivityCollection,
-  postCollection,
-  postStatusCollection,
-  tagCollection,
-} from "~/lib/collections";
+import { useOrgBoards } from "~/hooks/use-org-boards";
+import { useOrgContacts } from "~/hooks/use-org-contacts";
+import { useOrgMembers } from "~/hooks/use-org-members";
+import { useOrgPostStatuses } from "~/hooks/use-org-post-statuses";
+import { useOrgTags } from "~/hooks/use-org-tags";
+import { dashboardCollections } from "~/lib/collections";
 
 type NameLookup = ReadonlyMap<string, string>;
 
@@ -80,19 +79,44 @@ function getOnBehalfMetadata(activity: TPostActivity): OnBehalfMetadata | null {
   return { onBehalfOf };
 }
 
-/** "{actor} on behalf of {subject}" — subject resolved from contacts. */
+/**
+ * The label rendered after "on behalf of": the subject's display name and
+ * whether it came from the member list rather than the customer list.
+ */
+type OnBehalfSubjectLabel = {
+  readonly isMember: boolean;
+  readonly name: string;
+};
+
+/**
+ * The subject of an on-behalf activity, resolved from the provenance
+ * metadata: a customer contact, or a workspace member when the subject is
+ * staff (staff attribution records no contact id).
+ */
 function resolveOnBehalfSubject(
   metadata: OnBehalfMetadata,
   contactsById: ReadonlyMap<string, TContact>,
-  contactsByUserId: ReadonlyMap<string, TContact>
-): string {
+  contactsByUserId: ReadonlyMap<string, TContact>,
+  membersByUserId: ReadonlyMap<string, TOrganizationMember>
+): OnBehalfSubjectLabel {
   const contactId = metadata.onBehalfOf?.contactId;
   const userId = metadata.onBehalfOf?.userId;
   const contact =
     (contactId ? contactsById.get(contactId) : undefined) ??
     (userId ? contactsByUserId.get(userId) : undefined);
+  if (contact) {
+    return {
+      name: contact.name ?? contact.email ?? "a customer",
+      isMember: false,
+    };
+  }
 
-  return contact?.name ?? contact?.email ?? "a customer";
+  const member = userId ? membersByUserId.get(userId) : undefined;
+  if (member) {
+    return { name: member.user.name, isMember: true };
+  }
+
+  return { name: "a customer", isMember: false };
 }
 
 const activityIconMap = {
@@ -214,7 +238,7 @@ export function createPostActivityQuery({
 }) {
   return createLiveQueryCollection((query) =>
     query
-      .from({ activity: postActivityCollection })
+      .from({ activity: dashboardCollections.postActivityCollection })
       .where(({ activity }) =>
         and(
           eq(activity.organizationId, organizationId),
@@ -233,34 +257,22 @@ export function PostActivityList({
   organizationId: string;
 }) {
   const { data: activities, isLoading } = useLiveQuery(activityQuery);
-  const { data: statuses } = useLiveQuery({
-    query: (query) =>
-      query
-        .from({ status: postStatusCollection })
-        .where(({ status }) => eq(status.organizationId, organizationId)),
-  });
-  const { data: boards } = useLiveQuery({
-    query: (query) =>
-      query
-        .from({ board: boardCollection })
-        .where(({ board }) => eq(board.organizationId, organizationId)),
-  });
-  const { data: tags } = useLiveQuery({
-    query: (query) =>
-      query
-        .from({ tag: tagCollection })
-        .where(({ tag }) => eq(tag.organizationId, organizationId)),
-  });
-  const { data: contacts } = useLiveQuery({
-    query: (query) =>
-      query
-        .from({ contact: contactCollection })
-        .where(({ contact }) => eq(contact.organizationId, organizationId)),
-  });
+  const { data: statuses } = useOrgPostStatuses(organizationId);
+  const { data: boards } = useOrgBoards(organizationId);
+  const { data: tags } = useOrgTags(organizationId);
+  const { data: contacts } = useOrgContacts(organizationId);
+  // Staff subjects record no contact id, so their name comes from the member
+  // row the attribution preserved.
+  const { data: members } = useOrgMembers(organizationId);
   const { data: posts } = useLiveQuery({
+    queryKey: [
+      "post-activity-posts",
+      dashboardCollections.postCollection.id,
+      organizationId,
+    ],
     query: (query) =>
       query
-        .from({ post: postCollection })
+        .from({ post: dashboardCollections.postCollection })
         .where(({ post }) => eq(post.organizationId, organizationId)),
   });
 
@@ -303,6 +315,10 @@ export function PostActivityList({
     }
     return map;
   }, [contacts]);
+  const membersByUserId = useMemo(
+    () => new Map(members.map((member) => [member.userId, member])),
+    [members]
+  );
 
   if (isLoading) {
     return null;
@@ -326,7 +342,8 @@ export function PostActivityList({
           ? resolveOnBehalfSubject(
               onBehalfMetadata,
               contactsById,
-              contactsByUserId
+              contactsByUserId,
+              membersByUserId
             )
           : null;
         return (
@@ -352,7 +369,12 @@ export function PostActivityList({
             {onBehalfSubject ? (
               <>
                 {" on behalf of "}
-                <span className="font-medium">{onBehalfSubject}</span>
+                <span className="font-medium">{onBehalfSubject.name}</span>
+                {onBehalfSubject.isMember ? (
+                  <span className="text-muted-foreground">
+                    {" (workspace member)"}
+                  </span>
+                ) : null}
               </>
             ) : null}{" "}
             {dayjs.default(activity.createdAt).fromNow()}

@@ -38,6 +38,12 @@ export function ChangelogSubscribeButton() {
 
   const { data: hasUserSubscribed, isLoading: isSubscriptionLoading } =
     useLiveQuery({
+      queryKey: [
+        "portal-changelog-subscription",
+        publicChangelogSubscriptionCollection.id,
+        organizationId,
+        session?.user.id ?? null,
+      ],
       query: (q) => {
         if (!(organizationId && session)) {
           return undefined;

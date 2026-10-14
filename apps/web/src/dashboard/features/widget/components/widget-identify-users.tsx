@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { useEntitlements } from "~/hooks/use-entitlements";
-import { jwtSecretCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 import {
   buildIdentitySnippet,
@@ -51,7 +51,7 @@ export function WidgetIdentifyUsers({
   const { data: secrets, isLoading } = useLiveQuery({
     query: (q) =>
       q
-        .from({ secret: jwtSecretCollection })
+        .from({ secret: dashboardCollections.jwtSecretCollection })
         .where(({ secret }) => eq(secret.organizationId, organizationId)),
   });
 

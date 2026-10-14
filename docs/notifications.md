@@ -48,7 +48,7 @@ This applies to `NotificationList`, `NotificationUnreadCount`, `NotificationMark
 
 ## Dashboard behavior
 
-`NotificationsMenu` polls the unread count every 30 seconds and polls the list only while the menu is open. Selecting a notification immediately navigates through TanStack Router, passes an optional URL hash separately for comment deep links, and marks the item read in the background. A mark-read failure never blocks navigation. Each row renders the actor's avatar with a blue member tick when the actor is a workspace member, and marks unread rows with a brand dot; a read row carries no mark. An event with no actor, such as a public submission, falls back to the event kind's icon. The tick comes from the list query's membership join, not from the stored row, so an actor who leaves the workspace loses it on the next poll.
+`NotificationsMenu` polls the unread count every 30 seconds and polls the list only while the menu is open. Selecting a notification immediately navigates through TanStack Router, passes an optional URL hash separately for comment deep links, and marks the item read in the background. A mark-read failure never blocks navigation. Each row renders the actor's avatar and marks unread rows with a brand dot; a read row carries no mark. An event with no actor, such as a public submission, falls back to the event kind's icon. The inbox deliberately does not draw the blue member tick — that marker is scoped to comments and post lists.
 
 ## Email updates for on-behalf customers
 

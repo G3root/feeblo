@@ -7,7 +7,7 @@ import {
   MembersSection,
 } from "~/features/settings/components/member-sections";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
-import { invitationsCollection, membersCollection } from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/settings/members"
@@ -16,13 +16,13 @@ export const Route = createFileRoute(
   beforeLoad: async ({ params }) => {
     const session = getCachedAuthSession();
 
-    const promises = [membersCollection.preload()];
+    const promises = [dashboardCollections.membersCollection.preload()];
     const canListInvitations =
       session !== null &&
       hasPermission(params.organizationId, "members.invite")(session);
 
     if (canListInvitations) {
-      promises.push(invitationsCollection.preload());
+      promises.push(dashboardCollections.invitationsCollection.preload());
     }
 
     await Promise.all(promises);

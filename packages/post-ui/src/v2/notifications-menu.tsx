@@ -39,7 +39,6 @@ type NotificationRow = {
   href: string;
   actorName: string | null;
   actorImage: string | null;
-  actorIsMember: boolean;
   readAt: Date | string | null;
   createdAt: Date | string;
 };
@@ -66,17 +65,14 @@ const NOTIFICATION_KIND_ICONS = {
  * submission has none, and deleting an account nulls `actor_user_id` while the
  * row stays. A nameless `UserAvatar` would render `??`, so the fallback is an
  * icon on a muted circle of the same size, which keeps every row's text column
- * aligned. A member's face carries the blue member tick so a team reply reads
- * differently from a customer's or a public-board commenter's.
+ * aligned.
  */
 function NotificationAvatar({
   actorImage,
-  actorIsMember,
   actorName,
   kind,
 }: {
   actorImage: string | null;
-  actorIsMember: boolean;
   actorName: string | null;
   kind: TNotificationEventType;
 }) {
@@ -92,15 +88,7 @@ function NotificationAvatar({
     );
   }
 
-  return (
-    <UserAvatar
-      image={actorImage}
-      isMember={actorIsMember}
-      memberLabel={m.sad_soft_tadpole()}
-      name={actorName}
-      size="default"
-    />
-  );
+  return <UserAvatar image={actorImage} name={actorName} size="default" />;
 }
 
 /**
@@ -282,7 +270,6 @@ export function NotificationsMenu({
                 >
                   <NotificationAvatar
                     actorImage={notification.actorImage}
-                    actorIsMember={notification.actorIsMember}
                     actorName={notification.actorName}
                     kind={notification.kind}
                   />

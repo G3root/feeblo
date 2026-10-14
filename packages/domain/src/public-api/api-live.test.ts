@@ -4547,6 +4547,73 @@ layer(makeTestApp())("public api v1", (it) => {
       })
   );
 
+  it.effect("carries an end-user rename to the synthetic account", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      registerKey(
+        "fbk_end_users_rename",
+        workspace.organizationId,
+        END_USER_MANAGEMENT_KEY_SCOPES
+      );
+
+      // A customer attributed before they ever signed up: the shadow account
+      // carries the name that comments, votes, and the voter list render.
+      yield* db.insert(schema.userTable).values({
+        id: "user_shadow_rename",
+        name: "Old Name",
+        email: "behalf-0123abcd@feeblo.com",
+        emailVerified: false,
+        restrictedToOrganizationId: workspace.organizationId,
+      });
+      yield* db.insert(schema.contactTable).values({
+        id: "cnt_rename_target",
+        organizationId: workspace.organizationId,
+        email: "rename@example.com",
+        name: "Old Name",
+        userId: "user_shadow_rename",
+      });
+      // A real account owns its own name; the CRM record must not rename it.
+      yield* db.insert(schema.userTable).values({
+        id: "user_real_rename",
+        name: "Account Owner",
+        email: "rename-real@example.com",
+        emailVerified: true,
+      });
+      yield* db.insert(schema.contactTable).values({
+        id: "cnt_rename_real",
+        organizationId: workspace.organizationId,
+        email: "rename-real@example.com",
+        name: "Old Account Name",
+        userId: "user_real_rename",
+      });
+
+      const renamed = yield* executeWrite("POST", "/api/v1/end-users", {
+        apiKey: "fbk_end_users_rename",
+        body: { email: "rename@example.com", name: "New Name" },
+      });
+      expect(renamed.status).toBe(200);
+
+      const [shadow] = yield* db
+        .select({ name: schema.userTable.name })
+        .from(schema.userTable)
+        .where(eq(schema.userTable.id, "user_shadow_rename"));
+      expect(shadow?.name).toBe("New Name");
+
+      const renamedReal = yield* executeWrite("POST", "/api/v1/end-users", {
+        apiKey: "fbk_end_users_rename",
+        body: { email: "rename-real@example.com", name: "CRM Label" },
+      });
+      expect(renamedReal.status).toBe(200);
+
+      const [real] = yield* db
+        .select({ name: schema.userTable.name })
+        .from(schema.userTable)
+        .where(eq(schema.userTable.id, "user_real_rename"));
+      expect(real?.name).toBe("Account Owner");
+    })
+  );
+
   it.effect("refuses end-user reads to a key without the capability", () =>
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace();

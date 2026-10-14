@@ -23,7 +23,6 @@ import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { SparklesIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 
@@ -34,9 +33,11 @@ import {
   getCompanyCustomAttributeValueChanges,
   hasMissingRequiredCustomAttributeValues,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
+import { useCompanyAttributeDefinitions } from "~/hooks/use-attribute-definitions";
 import { useEntitlements } from "~/hooks/use-entitlements";
+import { useOrgCompanies } from "~/hooks/use-org-companies";
+import { useOrgContacts } from "~/hooks/use-org-contacts";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { useCompanyCreateDialogContext } from "../dialog-stores";
 import { CrmLimitInfoPopover } from "./crm-entries-usage";
@@ -60,38 +61,15 @@ export function CompanyCreateDialog() {
 
 function CompanyCreateForm() {
   const organizationId = useOrganizationId();
-  const {
-    companyAttributeDefinitionCollection,
-    companyCollection,
-    contactCollection,
-  } = useDashboardCollections();
   const store = useCompanyCreateDialogContext();
   const upgradePlanStore = useUpgradePlanDialogContext();
   const { entitlements } = useEntitlements();
-  const { data: companies = [] } = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ company: companyCollection })
-        .where(({ company }) => eq(company.organizationId, organizationId)),
-  });
-  const { data: contacts = [] } = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ contact: contactCollection })
-        .where(({ contact }) => eq(contact.organizationId, organizationId)),
-  });
+  const { data: companies = [] } = useOrgCompanies(organizationId);
+  const { data: contacts = [] } = useOrgContacts(organizationId);
   const crmLimit = entitlements.limits.crmEntries;
   const totalCrmEntries = companies.length + contacts.length;
   const atLimit = crmLimit !== null && totalCrmEntries >= crmLimit;
-  const definitionsQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ definition: companyAttributeDefinitionCollection })
-        .where(({ definition }) =>
-          eq(definition.organizationId, organizationId)
-        )
-        .orderBy(({ definition }) => definition.createdAt, "asc"),
-  });
+  const definitionsQuery = useCompanyAttributeDefinitions(organizationId);
   const definitions = definitionsQuery.data ?? [];
   const form = useAppForm({
     defaultValues: { attributes: {}, externalId: "", name: "" },

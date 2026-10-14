@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./url": "./src/url.ts",
+    "./http-url": "./src/http-url.ts",
     "./crypto": "./src/crypto.ts",
     "./dayjs": "./src/dayjs.ts",
     "./html": "./src/html.ts",

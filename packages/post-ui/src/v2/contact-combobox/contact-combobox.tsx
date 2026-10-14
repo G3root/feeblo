@@ -99,6 +99,20 @@ export const searchContacts: ContactSearchFn = ({
   );
 
 /**
+ * The plan-room probe that decides whether the create-new-customer row is
+ * offered. Separate from `ContactSearch` so the picker does not pay for two
+ * counts on every keystroke; it runs once, when the entry point appears.
+ */
+export type ContactCreateEligibilityFn = (input: {
+  organizationId: string;
+}) => Promise<{ canCreate: boolean }>;
+
+/** Live eligibility transport; injectable so stories/tests stay hermetic. */
+export const fetchContactCreateEligibility: ContactCreateEligibilityFn = ({
+  organizationId,
+}) => fetchRpc((rpc) => rpc.ContactCreateEligibility({ organizationId }));
+
+/**
  * Projects a selection onto the wire shape shared by `PostCreate.author`,
  * `CommentCreate.author` and `UpvoteAddOnBehalf.author`, dropping the
  * display-only hints.
@@ -171,6 +185,8 @@ export interface ContactComboboxProps {
    * attribution, and the badge is hidden there as noise.
    */
   disableAlreadyVoted?: boolean;
+  /** Replace the plan-room probe (stories/tests). */
+  createEligibility?: ContactCreateEligibilityFn;
   /** Accessible name for the search input. */
   label?: string;
   organizationId: string;
@@ -187,6 +203,7 @@ export interface ContactComboboxProps {
 }
 
 export function ContactCombobox({
+  createEligibility = fetchContactCreateEligibility,
   disabled = false,
   disableAlreadyVoted = true,
   label = m.best_mealy_lynx(),
@@ -284,10 +301,56 @@ export function ContactCombobox({
       contact.email !== null &&
       contact.email.toLowerCase() === trimmedQuery.toLowerCase()
   );
-  const createOption: ContactOption[] =
-    queryLooksLikeEmail && !searchFailed && !exactEmailHit
-      ? [{ kind: "create", email: trimmedQuery }]
-      : [];
+  const offersCreate = queryLooksLikeEmail && !searchFailed && !exactEmailHit;
+  const createOption: ContactOption[] = offersCreate
+    ? [{ kind: "create", email: trimmedQuery }]
+    : [];
+
+  // Plan room is asked when the create entry appears. The answer is stored
+  // with the workspace it describes, so a switch to another workspace reads
+  // as "not asked yet" and probes again even when the previous answer was
+  // `false`. The picker's open handler drops the answer each time it opens,
+  // so a plan that changed while the picker was closed is measured against
+  // the current cap. `null` leaves the row selectable: the write path
+  // re-checks the cap inside its transaction, so a stale hint can never
+  // over-grant.
+  const [createEligibilityResult, setCreateEligibilityResult] = useState<{
+    canCreate: boolean;
+    organizationId: string;
+  } | null>(null);
+  const canCreateContact =
+    createEligibilityResult?.organizationId === organizationId
+      ? createEligibilityResult.canCreate
+      : null;
+  const createEligibilityRef = useRef(createEligibility);
+  useEffect(() => {
+    createEligibilityRef.current = createEligibility;
+  });
+  useEffect(() => {
+    if (!offersCreate || canCreateContact !== null) {
+      return;
+    }
+    let isCurrent = true;
+    const probedOrganizationId = organizationId;
+    createEligibilityRef.current({ organizationId: probedOrganizationId }).then(
+      ({ canCreate }) => {
+        if (isCurrent) {
+          setCreateEligibilityResult({
+            canCreate,
+            organizationId: probedOrganizationId,
+          });
+        }
+      },
+      () => {
+        // Leave the row selectable: a failed probe proves nothing, and the
+        // write path answers the cap with copy of its own.
+      }
+    );
+    return () => {
+      isCurrent = false;
+    };
+  }, [canCreateContact, offersCreate, organizationId]);
+
   const options: ContactOption[] = [
     ...results.map((contact): ContactOption => ({ kind: "contact", contact })),
     ...createOption,
@@ -326,6 +389,15 @@ export function ContactCombobox({
 
     setQuery("");
     setOpen(false);
+  };
+
+  // Opening the picker invalidates the cached plan-room answer so the effect
+  // below probes again when the create entry appears.
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (nextOpen) {
+      setCreateEligibilityResult(null);
+    }
   };
 
   // A picked subject replaces the input with a readable summary row so the
@@ -391,7 +463,7 @@ export function ContactCombobox({
         }
         setQuery(nextQuery);
       }}
-      onOpenChange={setOpen}
+      onOpenChange={handleOpenChange}
       onValueChange={handleSelect}
       open={open}
     >
@@ -452,17 +524,31 @@ export function ContactCombobox({
           <ComboboxList>
             {(option) =>
               option.kind === "create" ? (
-                <ComboboxItem key={`create:${option.email}`} value={option}>
-                  <span className="flex items-center gap-2">
+                <ComboboxItem
+                  disabled={canCreateContact === false}
+                  key={`create:${option.email}`}
+                  value={option}
+                >
+                  <span className="flex min-w-0 items-start gap-2">
                     <HugeiconsIcon
-                      className="text-muted-foreground"
+                      className="text-muted-foreground mt-0.5"
                       icon={UserAdd01Icon}
                       strokeWidth={2}
                     />
-                    <span>
-                      {results.length === 0
-                        ? m.misty_red_vole({ email: option.email })
-                        : m.agent_gross_anteater({ email: option.email })}
+                    <span className="min-w-0">
+                      <span className="block truncate">
+                        {results.length === 0
+                          ? m.misty_red_vole({ email: option.email })
+                          : m.agent_gross_anteater({ email: option.email })}
+                      </span>
+                      {/* A brand-new address has no account here, so the
+                          action grants attribution before (or instead of)
+                          notification. Say so before the admin submits. */}
+                      <span className="text-muted-foreground block text-xs">
+                        {canCreateContact === false
+                          ? m.brave_tidy_quokka()
+                          : m.hour_smart_wombat()}
+                      </span>
                     </span>
                   </span>
                 </ComboboxItem>

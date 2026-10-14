@@ -1,6 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import { UserId } from "@feeblo/id";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, sql, type SQLWrapper } from "drizzle-orm";
+import type { PgTable } from "drizzle-orm/pg-core";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -351,6 +352,118 @@ const makeUserRepository = Effect.gen(function* () {
           });
         }
         return winnerUpdated;
+      }),
+
+    /**
+     * Deletes a `behalf-*` shadow account that nothing refers to any more.
+     *
+     * Deleting a contact leaves its shadow behind, because the votes and
+     * comments rendered under it must survive and a later attribution of the
+     * same email adopts it again. When no contact, post, vote, comment,
+     * subscription, email link, or notification refers to the account, the
+     * row is unreachable: nothing renders it and no later write needs it, so
+     * it goes with the contact.
+     *
+     * Locks the account for update before counting. A concurrent write that
+     * references the account either lands before the count (the shadow stays)
+     * or waits on the lock and fails its own foreign key if the shadow is
+     * deleted, which is louder than a cascade silently removing the write.
+     *
+     * Runs on the caller's transaction through the fiber-local connection.
+     * Returns whether the account was deleted.
+     */
+    deleteShadowUserIfUnreferenced: (userId: string) =>
+      Effect.gen(function* () {
+        const [user] = yield* db
+          .select({ email: schema.userTable.email })
+          .from(schema.userTable)
+          .where(eq(schema.userTable.id, userId))
+          .limit(1)
+          .for("update");
+        if (!user || !isShadowUserEmail(user.email)) {
+          return false;
+        }
+
+        // Every durable row that can name this account, each probed with an
+        // EXISTS over its foreign-key index so the whole check is one round
+        // trip. Two groups are deliberately absent:
+        //
+        // - Credential rows (`session`, `account`, `two_factor`) cascade by
+        //   design. A shadow can never hold one, and removing a broken
+        //   credential is the cleanup's job rather than data loss.
+        // - References that are `ON DELETE SET NULL` (`api_key`, `board`,
+        //   `tag`, `changelog`, `post_activity.actor_id`,
+        //   `notification.actor_user_id`) keep their row and only lose a
+        //   pointer. A shadow is ever only a subject, never a creator or an
+        //   actor, so those pointers cannot name it.
+        //
+        // `contact` and `email_contact` are set-null too; they are listed
+        // because their pointers are the attribution link a later write
+        // adopts again.
+        // One `EXISTS` over a table's foreign-key index, asking whether any
+        // row names this account. `column` is the account reference on that
+        // table, e.g. `asset.userId`.
+        const namesAccount = (table: PgTable, column: SQLWrapper) =>
+          sql<boolean>`EXISTS (SELECT 1 FROM ${table} WHERE ${column} = ${userId})`;
+        const [references = null] = yield* db
+          .select({
+            asset: namesAccount(schema.assetTable, schema.assetTable.userId),
+            changelogSubscription: namesAccount(
+              schema.changelogSubscriptionTable,
+              schema.changelogSubscriptionTable.userId
+            ),
+            comment: namesAccount(
+              schema.commentTable,
+              schema.commentTable.userId
+            ),
+            commentReaction: namesAccount(
+              schema.commentReactionTable,
+              schema.commentReactionTable.userId
+            ),
+            contact: namesAccount(
+              schema.contactTable,
+              schema.contactTable.userId
+            ),
+            emailContact: namesAccount(
+              schema.emailContactTable,
+              schema.emailContactTable.userId
+            ),
+            invitation: namesAccount(
+              schema.invitationTable,
+              schema.invitationTable.inviterId
+            ),
+            member: namesAccount(schema.memberTable, schema.memberTable.userId),
+            notification: namesAccount(
+              schema.notificationTable,
+              schema.notificationTable.recipientUserId
+            ),
+            notificationPreference: namesAccount(
+              schema.notificationPreferenceTable,
+              schema.notificationPreferenceTable.userId
+            ),
+            post: namesAccount(schema.postTable, schema.postTable.creatorId),
+            postReaction: namesAccount(
+              schema.postReactionTable,
+              schema.postReactionTable.userId
+            ),
+            postSubscription: namesAccount(
+              schema.postSubscriptionTable,
+              schema.postSubscriptionTable.userId
+            ),
+            upvote: namesAccount(schema.upvoteTable, schema.upvoteTable.userId),
+          })
+          .from(schema.userTable)
+          .where(eq(schema.userTable.id, userId))
+          .limit(1);
+
+        if (references === null || Object.values(references).some(Boolean)) {
+          return false;
+        }
+
+        yield* db
+          .delete(schema.userTable)
+          .where(eq(schema.userTable.id, userId));
+        return true;
       }),
   };
 });

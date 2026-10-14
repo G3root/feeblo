@@ -41,19 +41,7 @@ import {
   ToggleRoadmapVisibilityDialogProvider,
 } from "~/features/roadmap/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import {
-  boardCollection,
-  commentCollection,
-  commentReactionCollection,
-  deleteEligibilityCollection,
-  membersCollection,
-  postCollection,
-  postDetailCollection,
-  postReactionCollection,
-  postStatusCollection,
-  postSubscriptionCollection,
-  upvoteCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const organizationId = useOrganizationId();
@@ -61,7 +49,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     NonNullable<PostCollectionsValue["getPostHref"]>
   >(
     (post) => {
-      const board = boardCollection.get(post.boardId);
+      const board = dashboardCollections.boardCollection.get(post.boardId);
       return board
         ? `/${organizationId}/post/${board.slug}/${post.slug}`
         : `/${organizationId}`;
@@ -91,17 +79,20 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     <UpgradePlanDialogProvider>
       <PostCollectionsProvider
         collections={{
-          boardCollection,
-          commentCollection,
-          deleteEligibilityCollection,
-          membersCollection,
-          postCollection,
-          postDetailCollection,
-          postStatusCollection,
-          postSubscriptionCollection,
-          upvoteCollection,
-          postReactionCollection,
-          commentReactionCollection,
+          boardCollection: dashboardCollections.boardCollection,
+          commentCollection: dashboardCollections.commentCollection,
+          deleteEligibilityCollection:
+            dashboardCollections.deleteEligibilityCollection,
+          membersCollection: dashboardCollections.membersCollection,
+          postCollection: dashboardCollections.postCollection,
+          postDetailCollection: dashboardCollections.postDetailCollection,
+          postStatusCollection: dashboardCollections.postStatusCollection,
+          postSubscriptionCollection:
+            dashboardCollections.postSubscriptionCollection,
+          upvoteCollection: dashboardCollections.upvoteCollection,
+          postReactionCollection: dashboardCollections.postReactionCollection,
+          commentReactionCollection:
+            dashboardCollections.commentReactionCollection,
         }}
         getPostHref={getPostHref}
         organizationId={organizationId}

@@ -1,5 +1,5 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 
@@ -19,6 +19,14 @@ export interface HealedIdentityCounts {
   postSubscriptionsDropped: number;
   /** Deferred email subscriptions activated by the surviving account's access. */
   subscriptionsActivated: number;
+}
+
+/** Organizations whose deferred subscriptions a verification trigger touched. */
+export interface DeferredActivationSummary {
+  /** Organizations that had at least one subscription activated. */
+  readonly organizationIds: ReadonlyArray<string>;
+  /** `deferred_no_access` rows moved to `active`. */
+  readonly subscriptionsActivated: number;
 }
 
 export interface ShadowHealSummary {
@@ -192,153 +200,19 @@ export const linkShadowUser = ({
           if (!contact.email || isSyntheticEmail(contact.email)) {
             continue;
           }
-
-          const isMember = yield* isOrganizationMember(
-            realUserId,
-            contact.organizationId
-          );
-          // The activation must only ever verify an address the surviving
-          // account actually proved; callers may link identities whose emails
-          // differ in case, never in substance.
-          const addressProved =
-            contact.email !== null &&
-            realUser.emailVerified &&
-            realUser.email.toLowerCase() === contact.email.toLowerCase();
-          const isSsoBound =
-            realUser.restrictedToOrganizationId === contact.organizationId;
-          const isUnrestrictedGlobal =
-            realUser.restrictedToOrganizationId === null;
-          const eligibleDirect = addressProved && (isMember || isSsoBound);
-          const eligibleGlobalDeferred =
-            addressProved && !isMember && !isSsoBound && isUnrestrictedGlobal;
-
-          const emailContacts = yield* db
-            .select({ id: schema.emailContactTable.id })
-            .from(schema.emailContactTable)
-            .where(
-              and(
-                eq(
-                  schema.emailContactTable.organizationId,
-                  contact.organizationId
-                ),
-                sql`lower(${schema.emailContactTable.email}) = ${contact.email.toLowerCase()}`
-              )
-            )
-            .limit(1);
-          const emailContact = emailContacts[0];
-          if (!emailContact) {
-            continue;
-          }
-
-          if (eligibleDirect) {
-            const activated = yield* db
-              .update(schema.emailSubscriptionTable)
-              .set({ state: "active", updatedAt: now, verifiedAt: now })
-              .where(
-                and(
-                  eq(schema.emailSubscriptionTable.contactId, emailContact.id),
-                  eq(
-                    schema.emailSubscriptionTable.organizationId,
-                    contact.organizationId
-                  ),
-                  eq(schema.emailSubscriptionTable.state, "deferred_no_access")
-                )
-              )
-              .returning({ id: schema.emailSubscriptionTable.id });
-            subscriptionsActivated += activated.length;
-
-            // Mirror `requestSubscription`'s verified path: an eligible
-            // surviving account owns the address and proves it verified.
-            // Ineligible accounts leave the row untouched.
-            yield* db
-              .update(schema.emailContactTable)
-              .set({
-                userId: realUserId,
-                verificationState: "verified",
-                verifiedAt: now,
-                updatedAt: now,
-              })
-              .where(eq(schema.emailContactTable.id, emailContact.id));
-          } else if (eligibleGlobalDeferred) {
-            // Unrestricted globals pass the delivery gate only on PUBLIC
-            // boards: activate deferred post subscriptions per-post instead
-            // of bulk-activating private-board rows that could never deliver.
-            const deferred = yield* db
-              .select({
-                id: schema.emailSubscriptionTable.id,
-                topicId: schema.emailSubscriptionTable.topicId,
-                topicType: schema.emailSubscriptionTable.topicType,
-              })
-              .from(schema.emailSubscriptionTable)
-              .where(
-                and(
-                  eq(schema.emailSubscriptionTable.contactId, emailContact.id),
-                  eq(
-                    schema.emailSubscriptionTable.organizationId,
-                    contact.organizationId
-                  ),
-                  eq(schema.emailSubscriptionTable.state, "deferred_no_access")
-                )
-              );
-            const postIds = deferred.flatMap((row) =>
-              row.topicType === "post" && row.topicId !== null
-                ? [row.topicId]
-                : []
-            );
-            if (postIds.length === 0) {
-              continue;
-            }
-            const publicPosts = yield* db
-              .select({ id: schema.postTable.id })
-              .from(schema.postTable)
-              .innerJoin(
-                schema.boardTable,
-                eq(schema.boardTable.id, schema.postTable.boardId)
-              )
-              .where(
-                and(
-                  eq(schema.postTable.organizationId, contact.organizationId),
-                  inArray(schema.postTable.id, postIds),
-                  eq(schema.boardTable.visibility, "PUBLIC")
-                )
-              );
-            const publicIds = new Set(publicPosts.map((row) => row.id));
-            const activatable = deferred
-              .filter(
-                (row) => row.topicId !== null && publicIds.has(row.topicId)
-              )
-              .map((row) => row.id);
-            if (activatable.length === 0) {
-              continue;
-            }
-            const activated = yield* db
-              .update(schema.emailSubscriptionTable)
-              .set({ state: "active", updatedAt: now, verifiedAt: now })
-              .where(
-                and(
-                  eq(schema.emailSubscriptionTable.contactId, emailContact.id),
-                  eq(
-                    schema.emailSubscriptionTable.organizationId,
-                    contact.organizationId
-                  ),
-                  eq(schema.emailSubscriptionTable.state, "deferred_no_access"),
-                  inArray(schema.emailSubscriptionTable.id, activatable)
-                )
-              )
-              .returning({ id: schema.emailSubscriptionTable.id });
-            subscriptionsActivated += activated.length;
-            if (activated.length > 0) {
-              yield* db
-                .update(schema.emailContactTable)
-                .set({
-                  userId: realUserId,
-                  verificationState: "verified",
-                  verifiedAt: now,
-                  updatedAt: now,
-                })
-                .where(eq(schema.emailContactTable.id, emailContact.id));
-            }
-          }
+          // Activation must only ever verify an address the surviving
+          // account proved; callers may link identities whose emails differ
+          // in case, never in substance.
+          subscriptionsActivated +=
+            yield* activateDeferredSubscriptionsForContact({
+              addressProved:
+                realUser.emailVerified &&
+                realUser.email.toLowerCase() === contact.email.toLowerCase(),
+              contactEmail: contact.email,
+              now,
+              organizationId: contact.organizationId,
+              realUser,
+            });
         }
 
         if (deleteShadowUser) {
@@ -375,6 +249,167 @@ const isOrganizationMember = (userId: string, organizationId: string) =>
       )
       .limit(1);
     return rows.length > 0;
+  });
+
+/**
+ * Activates the deferred email subscriptions one customer contact holds, once
+ * the surviving account satisfies the notification-eligibility rule
+ * (`email-outbox/access.ts`): the account proved the address, and it is a
+ * member, SSO-bound to the organization, or an unrestricted global user whose
+ * post sits on a PUBLIC board. Claims the `email_contact` row for the account
+ * when eligibility holds; leaves it untouched otherwise. Returns the number
+ * of `deferred_no_access` rows moved to `active` (zero when the address is
+ * unproved or ineligible).
+ *
+ * Shared by shadow healing and the verification trigger, so the two triggers
+ * cannot disagree about who may be emailed. Runs on the caller's transaction
+ * through the fiber-local connection.
+ */
+const activateDeferredSubscriptionsForContact = (args: {
+  /**
+   * Whether the surviving account proved it owns this address. The caller
+   * decides what counts as proof: an exact verified email match, or an
+   * SSO-bound portal identity whose contact link carries the address.
+   */
+  readonly addressProved: boolean;
+  readonly contactEmail: string;
+  readonly now: Date;
+  readonly organizationId: string;
+  readonly realUser: typeof schema.userTable.$inferSelect;
+}) =>
+  Effect.gen(function* () {
+    // No proof, no activation: every eligibility branch below requires it.
+    // Returning first keeps an unproved contact from paying for a membership
+    // read and an address lookup whose answer nothing can use.
+    if (!args.addressProved) {
+      return 0;
+    }
+
+    const db = yield* currentDb;
+    const { contactEmail, now, organizationId, realUser } = args;
+
+    const isMember = yield* isOrganizationMember(realUser.id, organizationId);
+    const isSsoBound = realUser.restrictedToOrganizationId === organizationId;
+    const isUnrestrictedGlobal = realUser.restrictedToOrganizationId === null;
+    const eligibleDirect = isMember || isSsoBound;
+    const eligibleGlobalDeferred =
+      !isMember && !isSsoBound && isUnrestrictedGlobal;
+
+    const emailContacts = yield* db
+      .select({ id: schema.emailContactTable.id })
+      .from(schema.emailContactTable)
+      .where(
+        and(
+          eq(schema.emailContactTable.organizationId, organizationId),
+          sql`lower(${schema.emailContactTable.email}) = ${contactEmail.toLowerCase()}`
+        )
+      )
+      .limit(1);
+    const emailContact = emailContacts[0];
+    if (!emailContact) {
+      return 0;
+    }
+
+    if (eligibleDirect) {
+      const activated = yield* db
+        .update(schema.emailSubscriptionTable)
+        .set({ state: "active", updatedAt: now, verifiedAt: now })
+        .where(
+          and(
+            eq(schema.emailSubscriptionTable.contactId, emailContact.id),
+            eq(schema.emailSubscriptionTable.organizationId, organizationId),
+            eq(schema.emailSubscriptionTable.state, "deferred_no_access")
+          )
+        )
+        .returning({ id: schema.emailSubscriptionTable.id });
+
+      // Mirror `requestSubscription`'s verified path: an eligible surviving
+      // account owns the address and proves it verified. Ineligible accounts
+      // leave the row untouched.
+      yield* db
+        .update(schema.emailContactTable)
+        .set({
+          userId: realUser.id,
+          verificationState: "verified",
+          verifiedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(schema.emailContactTable.id, emailContact.id));
+      return activated.length;
+    }
+
+    if (!eligibleGlobalDeferred) {
+      return 0;
+    }
+
+    // Unrestricted globals pass the delivery gate only on PUBLIC boards:
+    // activate deferred post subscriptions per post instead of
+    // bulk-activating private-board rows that could never deliver.
+    const deferred = yield* db
+      .select({
+        id: schema.emailSubscriptionTable.id,
+        topicId: schema.emailSubscriptionTable.topicId,
+        topicType: schema.emailSubscriptionTable.topicType,
+      })
+      .from(schema.emailSubscriptionTable)
+      .where(
+        and(
+          eq(schema.emailSubscriptionTable.contactId, emailContact.id),
+          eq(schema.emailSubscriptionTable.organizationId, organizationId),
+          eq(schema.emailSubscriptionTable.state, "deferred_no_access")
+        )
+      );
+    const postIds = deferred.flatMap((row) =>
+      row.topicType === "post" && row.topicId !== null ? [row.topicId] : []
+    );
+    if (postIds.length === 0) {
+      return 0;
+    }
+    const publicPosts = yield* db
+      .select({ id: schema.postTable.id })
+      .from(schema.postTable)
+      .innerJoin(
+        schema.boardTable,
+        eq(schema.boardTable.id, schema.postTable.boardId)
+      )
+      .where(
+        and(
+          eq(schema.postTable.organizationId, organizationId),
+          inArray(schema.postTable.id, postIds),
+          eq(schema.boardTable.visibility, "PUBLIC")
+        )
+      );
+    const publicIds = new Set(publicPosts.map((row) => row.id));
+    const activatable = deferred
+      .filter((row) => row.topicId !== null && publicIds.has(row.topicId))
+      .map((row) => row.id);
+    if (activatable.length === 0) {
+      return 0;
+    }
+    const activated = yield* db
+      .update(schema.emailSubscriptionTable)
+      .set({ state: "active", updatedAt: now, verifiedAt: now })
+      .where(
+        and(
+          eq(schema.emailSubscriptionTable.contactId, emailContact.id),
+          eq(schema.emailSubscriptionTable.organizationId, organizationId),
+          eq(schema.emailSubscriptionTable.state, "deferred_no_access"),
+          inArray(schema.emailSubscriptionTable.id, activatable)
+        )
+      )
+      .returning({ id: schema.emailSubscriptionTable.id });
+    if (activated.length > 0) {
+      yield* db
+        .update(schema.emailContactTable)
+        .set({
+          userId: realUser.id,
+          verificationState: "verified",
+          verifiedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(schema.emailContactTable.id, emailContact.id));
+    }
+    return activated.length;
   });
 
 /**
@@ -462,4 +497,106 @@ export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
     }
 
     return { organizationIds, totals } satisfies ShadowHealSummary;
+  });
+
+/**
+ * Signup / email-verification trigger for attributed subjects that have no
+ * shadow identity to heal.
+ *
+ * A customer who was attributed by a bare email or an external id has a
+ * contact but no shadow user, so {@link healShadowsForVerifiedUser} finds
+ * nothing to link. Their subscription still sits at `deferred_no_access`,
+ * and the outbox skips it: the fan-out reads `active` rows only. The
+ * documented rule is that gaining access later resumes delivery, so this
+ * trigger activates the deferred rows of every contact whose email the
+ * account just proved, exactly as a shadow heal would.
+ *
+ * Guards:
+ *
+ * - Runs only for a verified account. An email match is trusted only when the
+ *   account's own address is real: a `behalf-*` or `sso-*` synthetic inbox
+ *   proves nothing by string match. An SSO-bound account is proved instead by
+ *   the workspace's identity provider, through the contact link its token
+ *   created.
+ * - Contacts are found by the account's email or its own link, so a different
+ *   address can never claim another person's subscriptions.
+ * - Eligibility is re-evaluated per contact by the shared activation helper;
+ *   a contact whose organization the account cannot reach is left deferred.
+ */
+export const activateDeferredSubscriptionsForVerifiedUser = ({
+  userId,
+}: {
+  userId: string;
+}) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+
+    const users = yield* db
+      .select()
+      .from(schema.userTable)
+      .where(eq(schema.userTable.id, userId))
+      .limit(1);
+    const user = users[0];
+    // A synthetic inbox (`behalf-*`, `sso-*`) never proves an address by
+    // itself, but an SSO-bound account is proved by the workspace's own
+    // identity provider and its contact link carries the address.
+    if (!user || !user.emailVerified) {
+      const nothingActivated: DeferredActivationSummary = {
+        organizationIds: [],
+        subscriptionsActivated: 0,
+      };
+      return nothingActivated;
+    }
+
+    const contacts = yield* db
+      .select({
+        email: schema.contactTable.email,
+        organizationId: schema.contactTable.organizationId,
+        userId: schema.contactTable.userId,
+      })
+      .from(schema.contactTable)
+      .where(
+        and(
+          isNotNull(schema.contactTable.email),
+          or(
+            sql`lower(${schema.contactTable.email}) = ${user.email.toLowerCase()}`,
+            eq(schema.contactTable.userId, userId)
+          )
+        )
+      );
+
+    const organizationIds: Array<string> = [];
+    let subscriptionsActivated = 0;
+    const now = yield* DateTime.nowAsDate;
+    // An address match is evidence only when it is the account's own real
+    // address; a synthetic inbox proves nothing by string comparison.
+    const accountEmail = isSyntheticEmail(user.email)
+      ? null
+      : user.email.toLowerCase();
+    for (const contact of contacts) {
+      if (!contact.email || isSyntheticEmail(contact.email)) {
+        continue;
+      }
+      const provedByEmail =
+        accountEmail !== null && accountEmail === contact.email.toLowerCase();
+      // The portal identity was created from the workspace's signed token and
+      // the contact link came from the same token, so the address is proved by
+      // the identity provider rather than by an email match.
+      const provedBySso =
+        contact.userId === userId &&
+        user.restrictedToOrganizationId === contact.organizationId;
+      const activated = yield* activateDeferredSubscriptionsForContact({
+        addressProved: provedByEmail || provedBySso,
+        contactEmail: contact.email,
+        now,
+        organizationId: contact.organizationId,
+        realUser: user,
+      });
+      if (activated > 0) {
+        subscriptionsActivated += activated;
+        organizationIds.push(contact.organizationId);
+      }
+    }
+
+    return { organizationIds, subscriptionsActivated };
   });

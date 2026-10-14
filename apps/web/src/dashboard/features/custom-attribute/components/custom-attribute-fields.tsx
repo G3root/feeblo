@@ -12,12 +12,7 @@ import { Input } from "@feeblo/ui/input";
 import { Label } from "@feeblo/ui/label";
 import { isString } from "@feeblo/utils/runtime-kind";
 
-import {
-  companyAttributeValueCollection,
-  companyCollection,
-  contactAttributeValueCollection,
-  contactCollection,
-} from "~/lib/collections";
+import { dashboardCollections } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
 
 export type CustomAttributeDefinition = {
@@ -433,8 +428,8 @@ export async function createContactAction(
     ]);
   }
   await Promise.all([
-    contactCollection.utils.refetch(),
-    contactAttributeValueCollection.utils.refetch(),
+    dashboardCollections.contactCollection.utils.refetch(),
+    dashboardCollections.contactAttributeValueCollection.utils.refetch(),
   ]);
 }
 
@@ -482,7 +477,7 @@ export async function createCompanyAction(
     ]);
   }
   await Promise.all([
-    companyCollection.utils.refetch(),
-    companyAttributeValueCollection.utils.refetch(),
+    dashboardCollections.companyCollection.utils.refetch(),
+    dashboardCollections.companyAttributeValueCollection.utils.refetch(),
   ]);
 }

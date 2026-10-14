@@ -583,6 +583,121 @@ describe("PostRpcHandlers on-behalf", () => {
       );
     });
 
+    describe("staff attribution", () => {
+      /** A second workspace member the actor can attribute to on behalf. */
+      const insertTeammate = (fixture: Fixture) =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const now = yield* DateTime.nowAsDate;
+          yield* db.insert(schema.userTable).values({
+            id: `user_teammate_${fixture.organizationId}`,
+            email: `teammate_${fixture.organizationId}@example.com`,
+            name: "Teammate",
+            emailVerified: true,
+          });
+          yield* db.insert(schema.memberTable).values({
+            id: `member_teammate_${fixture.organizationId}`,
+            organizationId: fixture.organizationId,
+            userId: `user_teammate_${fixture.organizationId}`,
+            role: "contributor",
+            createdAt: now,
+          });
+          return {
+            userId: `user_teammate_${fixture.organizationId}`,
+            memberId: `member_teammate_${fixture.organizationId}`,
+          };
+        });
+
+      const countContacts = (organizationId: string) =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const rows = yield* db
+            .select({ id: schema.contactTable.id })
+            .from(schema.contactTable)
+            .where(eq(schema.contactTable.organizationId, organizationId));
+          return rows.length;
+        });
+
+      it.effect(
+        "pegs a staff-authored post to the member row, not a customer",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const db = yield* currentDb;
+            const fixture = yield* makeFixture("manager");
+            const teammate = yield* insertTeammate(fixture);
+            const postId = yield* PostId.generate;
+
+            yield* handlers
+              .PostCreate({
+                ...postCreateInput(fixture, postId, "Staff authored"),
+                author: { userId: teammate.userId },
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "manager")
+                )
+              );
+
+            const post = yield* getPost(postId);
+            expect(post).toMatchObject({
+              contactId: null,
+              creatorId: teammate.userId,
+              creatorMemberId: teammate.memberId,
+            });
+            // Staff attribution spends no CRM entry: no contact exists.
+            expect(yield* countContacts(fixture.organizationId)).toBe(0);
+
+            const [activity] = yield* db
+              .select({ metadata: schema.postActivityTable.metadata })
+              .from(schema.postActivityTable)
+              .where(
+                and(
+                  eq(schema.postActivityTable.postId, postId),
+                  eq(schema.postActivityTable.kind, "POST_CREATED")
+                )
+              )
+              .limit(1);
+            expect(activity?.metadata).toEqual({
+              onBehalfOf: { userId: teammate.userId },
+            });
+          })
+      );
+
+      it.effect("reattributes a customer post to a staff member", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("manager");
+          const teammate = yield* insertTeammate(fixture);
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, "manager");
+
+          yield* handlers
+            .PostCreate({
+              ...postCreateInput(fixture, postId, "Customer authored"),
+              author: { email: "customer@example.com", name: "Customer" },
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          yield* handlers
+            .PostUpdateAuthor({
+              id: postId,
+              organizationId: fixture.organizationId,
+              author: { userId: teammate.userId },
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const post = yield* getPost(postId);
+          expect(post).toMatchObject({
+            contactId: null,
+            creatorId: teammate.userId,
+            creatorMemberId: teammate.memberId,
+          });
+        })
+      );
+    });
+
     describe("PostUpdateAuthor", () => {
       it.effect("reattributes a self-authored post to a new customer", () =>
         Effect.gen(function* () {
@@ -714,66 +829,121 @@ describe("PostRpcHandlers on-behalf", () => {
         })
       );
 
-      it.effect("unsubscribes the previous author on reassignment", () =>
+      it.effect(
+        "retires the previous creator subscription on reassignment",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const emailSubscriptions = yield* EmailSubscriptionRepository;
+            const postSubscriptions = yield* PostSubscriptionRepository;
+            const fixture = yield* makeFixture("manager");
+            const postId = yield* PostId.generate;
+            const session = makeSession(fixture, "manager");
+
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, postId, "Self post"))
+              .pipe(Effect.provideService(CurrentSession, session));
+
+            // Sanity: the self-service creator starts subscribed everywhere.
+            expect(
+              yield* postSubscriptions.isSubscribed({
+                organizationId: fixture.organizationId,
+                postId,
+                userId: fixture.userId,
+              })
+            ).toBe(true);
+
+            yield* handlers
+              .PostUpdateAuthor({
+                id: postId,
+                organizationId: fixture.organizationId,
+                author: {
+                  email: "author-jane@example.com",
+                  name: "Jane Doe",
+                },
+              })
+              .pipe(Effect.provideService(CurrentSession, session));
+
+            // The creator-derived email subscription is retired: otherwise the
+            // previous author keeps receiving status mail for a post no longer
+            // attributed to them.
+            const retired = yield* emailSubscriptions.findSubscription({
+              email: fixture.userEmail,
+              organizationId: fixture.organizationId,
+              topic: { topicId: postId, topicType: "post" },
+            });
+            expect(Option.getOrUndefined(retired)).toMatchObject({
+              state: "unsubscribed",
+            });
+
+            // The in-app follower row carries no source, so it cannot be told
+            // apart from a follow the previous author chose. It stays, and they
+            // toggle it off themselves if they no longer care.
+            expect(
+              yield* postSubscriptions.isSubscribed({
+                organizationId: fixture.organizationId,
+                postId,
+                userId: fixture.userId,
+              })
+            ).toBe(true);
+
+            // The new author still inherits the creator subscription.
+            const incoming = yield* emailSubscriptions.findSubscription({
+              email: "author-jane@example.com",
+              organizationId: fixture.organizationId,
+              topic: { topicId: postId, topicType: "post" },
+            });
+            expect(Option.getOrUndefined(incoming)).toMatchObject({
+              source: "post_creator",
+              state: "deferred_no_access",
+            });
+          })
+      );
+
+      it.effect("keeps an explicit subscription when the author changes", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
           const emailSubscriptions = yield* EmailSubscriptionRepository;
-          const postSubscriptions = yield* PostSubscriptionRepository;
           const fixture = yield* makeFixture("manager");
           const postId = yield* PostId.generate;
           const session = makeSession(fixture, "manager");
+          const now = yield* DateTime.nowAsDate;
 
           yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Self post"))
+            .PostCreate({
+              ...postCreateInput(fixture, postId, "Customer post"),
+              author: { email: "author-kim@example.com", name: "Kim" },
+            })
             .pipe(Effect.provideService(CurrentSession, session));
 
-          // Sanity: the self-service creator starts subscribed everywhere.
-          expect(
-            yield* postSubscriptions.isSubscribed({
-              organizationId: fixture.organizationId,
-              postId,
-              userId: fixture.userId,
-            })
-          ).toBe(true);
+          // The customer opts in for real (double opt-in or the portal
+          // toggle), which rewrites their row's source to `explicit`.
+          yield* emailSubscriptions.requestSubscription({
+            deferredNoAccess: true,
+            email: "author-kim@example.com",
+            now,
+            organizationId: fixture.organizationId,
+            source: "explicit",
+            topic: { topicId: postId, topicType: "post" },
+            verificationExpiresAt: now,
+          });
 
           yield* handlers
             .PostUpdateAuthor({
               id: postId,
               organizationId: fixture.organizationId,
-              author: {
-                email: "author-jane@example.com",
-                name: "Jane Doe",
-              },
+              author: { email: "author-bob@example.com", name: "Bob" },
             })
             .pipe(Effect.provideService(CurrentSession, session));
 
-          // The previous author keeps no subscription: otherwise they
-          // would keep receiving status mail for a post that is no longer
-          // attributed to them.
-          expect(
-            yield* postSubscriptions.isSubscribed({
-              organizationId: fixture.organizationId,
-              postId,
-              userId: fixture.userId,
-            })
-          ).toBe(false);
-          const retired = yield* emailSubscriptions.findSubscription({
-            email: fixture.userEmail,
+          // Losing authorship is not consent withdrawal: the opt-in stands.
+          const kept = yield* emailSubscriptions.findSubscription({
+            email: "author-kim@example.com",
             organizationId: fixture.organizationId,
             topic: { topicId: postId, topicType: "post" },
           });
-          expect(Option.getOrUndefined(retired)).toMatchObject({
-            state: "unsubscribed",
-          });
-
-          // The new author still inherits the creator subscription.
-          const incoming = yield* emailSubscriptions.findSubscription({
-            email: "author-jane@example.com",
-            organizationId: fixture.organizationId,
-            topic: { topicId: postId, topicType: "post" },
-          });
-          expect(Option.getOrUndefined(incoming)).toMatchObject({
-            source: "post_creator",
+          expect(Option.getOrUndefined(kept)).toMatchObject({
+            source: "explicit",
             state: "deferred_no_access",
           });
         })

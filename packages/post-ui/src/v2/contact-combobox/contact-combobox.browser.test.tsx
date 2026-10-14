@@ -204,6 +204,11 @@ describe("ContactCombobox", () => {
     await typeQuery(screen, "nobody@example.com");
     const createRow = screen.getByText(/as new customer/);
     await expect.element(createRow).toBeVisible();
+    // The create-new path grants attribution before (or instead of)
+    // notification, and the picker says so before the admin submits.
+    await expect
+      .element(screen.getByText(/Won't be notified until they have access/))
+      .toBeVisible();
 
     await createRow.click();
     expect(onSelect).toHaveBeenCalledWith({ email: "nobody@example.com" });
@@ -224,6 +229,128 @@ describe("ContactCombobox", () => {
     await expect.element(createRow).toBeVisible();
     await createRow.click();
     expect(onSelect).toHaveBeenCalledWith({ email: "sarah@feeblo.co" });
+  });
+
+  it("disables the create entry when the plan has no room", async () => {
+    const onSelect = vi.fn();
+    const screen = await render(
+      <ContactCombobox
+        createEligibility={() => Promise.resolve({ canCreate: false })}
+        label="Search customers"
+        onSelect={onSelect}
+        organizationId="organization-id"
+        search={() => Promise.resolve([])}
+        value={null}
+      />
+    );
+
+    await typeQuery(screen, "full@example.com");
+    const createRow = screen.getByText(/as new customer/);
+    await expect.element(createRow).toBeVisible();
+    await expect
+      .element(screen.getByText(/Your plan has no room for another customer/))
+      .toBeVisible();
+
+    await createRow.click();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("re-probes plan room when the workspace changes", async () => {
+    const createEligibility = vi.fn(
+      ({ organizationId }: { organizationId: string }) =>
+        Promise.resolve({ canCreate: organizationId === "org-b" })
+    );
+    const onSelect = vi.fn();
+    const renderCombobox = (organizationId: string) => (
+      <ContactCombobox
+        createEligibility={createEligibility}
+        label="Search customers"
+        onSelect={onSelect}
+        organizationId={organizationId}
+        search={() => Promise.resolve([])}
+        value={null}
+      />
+    );
+
+    const screen = await render(renderCombobox("org-a"));
+    await typeQuery(screen, "switch@example.com");
+    await expect
+      .element(screen.getByText(/Your plan has no room for another customer/))
+      .toBeVisible();
+
+    // The cached answer belongs to the workspace that produced it, so the
+    // new workspace is probed even though the previous answer was `false`.
+    await screen.rerender(renderCombobox("org-b"));
+    await vi.waitFor(() => {
+      expect(createEligibility).toHaveBeenCalledWith({
+        organizationId: "org-b",
+      });
+    });
+    await expect
+      .element(screen.getByText(/Won't be notified until they have access/))
+      .toBeVisible();
+  });
+
+  it("re-probes plan room when the picker reopens", async () => {
+    const createEligibility = vi
+      .fn(({ organizationId }: { organizationId: string }) =>
+        Promise.resolve({ canCreate: organizationId === "organization-id" })
+      )
+      .mockResolvedValueOnce({ canCreate: true })
+      .mockResolvedValueOnce({ canCreate: false });
+    const onSelect = vi.fn();
+    const screen = await render(
+      <ContactCombobox
+        createEligibility={createEligibility}
+        label="Search customers"
+        onSelect={onSelect}
+        organizationId="organization-id"
+        search={() => Promise.resolve([])}
+        value={null}
+      />
+    );
+
+    await typeQuery(screen, "filled@example.com");
+    await expect
+      .element(screen.getByText(/Won't be notified until they have access/))
+      .toBeVisible();
+
+    // Reopening drops the cached answer, so the second probe observes the
+    // plan now being full and disables the create row again.
+    const input = screen.getByRole("combobox");
+    await input.fill("");
+    input.element().blur();
+    await input.click();
+    await input.fill("filled@example.com");
+
+    await expect
+      .element(screen.getByText(/Your plan has no room for another customer/))
+      .toBeVisible();
+    expect(createEligibility).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the create entry selectable while the plan has room", async () => {
+    const onSelect = vi.fn();
+    const screen = await render(
+      <ContactCombobox
+        createEligibility={() => Promise.resolve({ canCreate: true })}
+        label="Search customers"
+        onSelect={onSelect}
+        organizationId="organization-id"
+        search={() => Promise.resolve([])}
+        value={null}
+      />
+    );
+
+    await typeQuery(screen, "room@example.com");
+    const createRow = screen.getByText(/as new customer/);
+    await expect.element(createRow).toBeVisible();
+    await expect
+      .element(screen.getByText(/Won't be notified until they have access/))
+      .toBeVisible();
+
+    await createRow.click();
+    expect(onSelect).toHaveBeenCalledWith({ email: "room@example.com" });
   });
 
   it("hides the create entry on an exact email hit", async () => {

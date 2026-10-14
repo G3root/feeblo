@@ -20,7 +20,6 @@
     "./routers": "./src/discord-routers.ts",
     "./signature": "./src/discord-signature.ts",
     "./discord-channel-service": "./src/discord-channel-service.ts",
-    "./discord-feedback-service": "./src/discord-feedback-service.ts",
     "./discord-user-service": "./src/discord-user-service.ts"
   },
   "scripts": {

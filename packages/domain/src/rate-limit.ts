@@ -141,11 +141,19 @@ export const withPublicRpcRateLimit =
  *   write that stores bytes with no plan quota. One save uploads every
  *   pending image at once, so the cap has to clear a paste-burst; it bounds
  *   sustained abuse, not the pace of editing.
+ * - `data-export`: a board download is a member-initiated read of their own
+ *   workspace. The cap is here to keep one browser from hammering a large
+ *   board, not to meter use.
+ * - `data-import-upload`: one upload stages up to 20,000 rows and holds the
+ *   workspace's single import slot until confirmed or canceled, so the cap
+ *   is per hour rather than per minute.
  */
 const dashboardRateLimits = {
   "contact-search": { limit: 300, window: "1 minute" },
   "on-behalf-create": { limit: 60, window: "1 minute" },
   "media-upload": { limit: 60, window: "1 minute" },
+  "data-export": { limit: 10, window: "1 minute" },
+  "data-import-upload": { limit: 5, window: "1 hour" },
 } as const satisfies Record<
   string,
   { readonly limit: number; readonly window: Duration.Input }

@@ -30,8 +30,8 @@ import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { SparklesIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
+import { useMemo } from "react";
 import { z } from "zod";
 
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
@@ -41,9 +41,11 @@ import {
   getContactCustomAttributeValueChanges,
   hasMissingRequiredCustomAttributeValues,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
+import { useContactAttributeDefinitions } from "~/hooks/use-attribute-definitions";
 import { useEntitlements } from "~/hooks/use-entitlements";
+import { useOrgCompanies } from "~/hooks/use-org-companies";
+import { useOrgContacts } from "~/hooks/use-org-contacts";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { useContactCreateDialogContext } from "../dialog-stores";
 import { CrmLimitInfoPopover } from "./crm-entries-usage";
@@ -67,36 +69,21 @@ export function ContactCreateDialog() {
 
 function ContactCreateForm() {
   const organizationId = useOrganizationId();
-  const {
-    companyCollection,
-    contactAttributeDefinitionCollection,
-    contactCollection,
-  } = useDashboardCollections();
   const store = useContactCreateDialogContext();
   const upgradePlanStore = useUpgradePlanDialogContext();
   const { entitlements } = useEntitlements();
-  const { data: definitions = [] } = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ definition: contactAttributeDefinitionCollection })
-        .where(({ definition }) =>
-          eq(definition.organizationId, organizationId)
-        )
-        .orderBy(({ definition }) => definition.createdAt, "asc"),
-  });
-  const { data: companies = [] } = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ company: companyCollection })
-        .where(({ company }) => eq(company.organizationId, organizationId))
-        .orderBy(({ company }) => company.name, "asc"),
-  });
-  const { data: contacts = [] } = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ contact: contactCollection })
-        .where(({ contact }) => eq(contact.organizationId, organizationId)),
-  });
+  const { data: definitions = [] } =
+    useContactAttributeDefinitions(organizationId);
+  const { data: companiesData = [] } = useOrgCompanies(organizationId);
+  // The shared org-companies query is unordered; this picker orders by name.
+  const companies = useMemo(
+    () =>
+      companiesData.toSorted((left, right) =>
+        left.name.localeCompare(right.name)
+      ),
+    [companiesData]
+  );
+  const { data: contacts = [] } = useOrgContacts(organizationId);
   const crmLimit = entitlements.limits.crmEntries;
   const totalCrmEntries = contacts.length + companies.length;
   const atLimit = crmLimit !== null && totalCrmEntries >= crmLimit;

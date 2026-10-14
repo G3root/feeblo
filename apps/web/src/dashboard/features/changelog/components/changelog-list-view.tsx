@@ -48,6 +48,13 @@ export function ChangelogListView({
   const { changelogCategoryCollection, changelogCategoryLinkCollection } =
     useDashboardCollections();
   const categoriesQuery = useLiveQuery({
+    // The changelog list re-renders on every search/filter change; the
+    // explicit keys keep the two list lookups off the identity path.
+    queryKey: [
+      "changelog-list-categories",
+      changelogCategoryCollection.id,
+      organizationId,
+    ],
     query: (q) =>
       q
         .from({ category: changelogCategoryCollection })
@@ -59,6 +66,11 @@ export function ChangelogListView({
   );
 
   const linksQuery = useLiveQuery({
+    queryKey: [
+      "changelog-list-category-links",
+      changelogCategoryLinkCollection.id,
+      organizationId,
+    ],
     query: (q) =>
       q
         .from({ link: changelogCategoryLinkCollection })

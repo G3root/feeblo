@@ -647,55 +647,5 @@ describe("ChangelogRpcHandlers", () => {
           ]);
         })
     );
-
-    it.effect(
-      "records distinct explicit changelog update requests idempotently",
-      () =>
-        Effect.gen(function* () {
-          const handlers = yield* ChangelogRpcHandlersEffect;
-          const outbox = yield* EmailOutboxRepository;
-          const fixture = yield* makeFixture();
-          const id = yield* ChangelogId.generate;
-          const session = makeSession(fixture);
-
-          yield* handlers
-            .ChangelogCreate({
-              assetIds: [],
-              coverImage: null,
-              id,
-              organizationId: fixture.organizationId,
-              title: "Published release",
-              slug: "published-release",
-              content: "Published",
-              status: "published",
-              scheduledAt: null,
-              publishedAt: yield* DateTime.nowAsDate,
-            })
-            .pipe(Effect.provideService(CurrentSession, session));
-
-          const sendUpdate = (requestId: string) =>
-            handlers
-              .ChangelogSendUpdate({
-                id,
-                organizationId: fixture.organizationId,
-                requestId,
-              })
-              .pipe(Effect.provideService(CurrentSession, session));
-
-          yield* sendUpdate("request-one");
-          yield* sendUpdate("request-one");
-          yield* sendUpdate("request-two");
-
-          const intents = yield* outbox.findPending({
-            before: dateAt((yield* Clock.currentTimeMillis) + 60_000),
-            organizationId: fixture.organizationId,
-          });
-          expect(intents.map(({ kind }) => kind)).toEqual([
-            "changelog.published",
-            "changelog.update_requested",
-            "changelog.update_requested",
-          ]);
-        })
-    );
   });
 });

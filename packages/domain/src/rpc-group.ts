@@ -10,6 +10,7 @@ import { CommentReactionRpcs } from "./comment-reaction/rpcs";
 import { CommentRpcs } from "./comments/rpcs";
 import { CompanyRpcs } from "./company/rpcs";
 import { ContactRpcs } from "./contact/rpcs";
+import { DataTransferRpcs } from "./data-transfer/rpcs";
 import { EmailSubscriptionRpcs } from "./email-subscription/rpcs";
 import { DiscordManagementRpcs } from "./integration/discord/rpcs";
 import { ExternalResourceRpcs } from "./integration/external-resource/rpcs";
@@ -18,6 +19,7 @@ import { WebhookManagementRpcs } from "./integration/rpcs";
 import { SlackManagementRpcs } from "./integration/slack/rpcs";
 import { JwtSecretRpcs } from "./jwt-secret/rpcs";
 import { MembershipRpcs } from "./membership/rpcs";
+import { NotificationPreferenceRpcs } from "./notification-preference/rpcs";
 import { NotificationRpcs } from "./notification/rpcs";
 import { OrganizationRpcs } from "./organization/rpcs";
 import { PostActivityRpcs } from "./post-activity/rpcs";
@@ -65,10 +67,12 @@ export const RpcGroups = [
   ["ApiKey", ApiKeyRpcs],
   ["Membership", MembershipRpcs],
   ["Notification", NotificationRpcs],
+  ["NotificationPreference", NotificationPreferenceRpcs],
   ["Organization", OrganizationRpcs],
   ["CommentReaction", CommentReactionRpcs],
   ["Comment", CommentRpcs],
   ["Company", CompanyRpcs],
+  ["DataTransfer", DataTransferRpcs],
   ["Site", SiteRpcs],
   ["Tag", TagRpcs],
   ["Upvote", UpvoteRpcs],

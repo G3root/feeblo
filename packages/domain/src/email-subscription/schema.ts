@@ -65,10 +65,6 @@ export const parseEmailAddress = (
 export const EmailSubscriptionTopic = Schema.Union([
   Schema.Struct({
     topicId: Schema.Null,
-    topicType: Schema.tag("submission"),
-  }),
-  Schema.Struct({
-    topicId: Schema.Null,
     topicType: Schema.tag("changelog"),
   }),
   Schema.Struct({
@@ -102,7 +98,7 @@ export const EmailSubscriptionRecord = Schema.Struct({
   source: EmailSubscriptionSource,
   state: EmailSubscriptionState,
   topicId: Schema.NullOr(PostId.schema),
-  topicType: Schema.Literals(["submission", "changelog", "post"]),
+  topicType: Schema.Literals(["changelog", "post"]),
   unsubscribedAt: Schema.NullOr(PersistedDate),
   updatedAt: PersistedDate,
   verificationExpiresAt: Schema.NullOr(PersistedDate),
@@ -158,35 +154,3 @@ export const EmailSubscriptionVerificationAccepted = Schema.Struct({
 export const EmailSubscriptionUnsubscribeAccepted = Schema.Struct({
   unsubscribed: Schema.Boolean,
 });
-
-/** Authenticated administrator preference for submission notification email. */
-export const SubmissionNotificationPreferenceRequest = Schema.Struct({
-  enabled: Schema.Boolean,
-  organizationId: WorkspaceId.schema,
-});
-
-export type SubmissionNotificationPreferenceRequest = Schema.Schema.Type<
-  typeof SubmissionNotificationPreferenceRequest
->;
-
-/** The workspace whose preference is read; the acting user comes from the session. */
-export const SubmissionNotificationPreferenceQuery = Schema.Struct({
-  organizationId: WorkspaceId.schema,
-});
-
-export type SubmissionNotificationPreferenceQuery = Schema.Schema.Type<
-  typeof SubmissionNotificationPreferenceQuery
->;
-
-/**
- * Whether the acting user currently receives submission notification email.
- * The answer to both the read and the write, so a caller can reconcile a
- * toggle from the mutation response alone.
- */
-export const SubmissionNotificationPreferenceState = Schema.Struct({
-  enabled: Schema.Boolean,
-});
-
-export type SubmissionNotificationPreferenceState = Schema.Schema.Type<
-  typeof SubmissionNotificationPreferenceState
->;

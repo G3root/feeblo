@@ -16,6 +16,16 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAMESPACE: g3root
+  # Per-architecture staging tag prefix, scoped by event so a release build and
+  # the main-branch (edge) build of the same commit cannot overwrite each
+  # other's per-arch images. `github.sha` on a release event is the tagged
+  # commit, which is exactly the `head_sha` the CI-triggered edge run carries,
+  # so both used to push `sha-<commit>-<arch>`. `merge-manifests` assembles the
+  # release tags by referencing those mutable staging tags, so an edge build
+  # finishing in between made `X.Y.Z`, `latest` and friends point at the edge
+  # image: the v1.1.3 server image reported APP_RELEASE=<sha> at `/health`
+  # instead of `v1.1.3`. One prefix per event source removes the collision.
+  STAGING_TAG: ${{ github.event_name == 'release' && format('rel-{0}', github.event.release.tag_name) || format('sha-{0}', github.event.workflow_run.head_sha) }}
 
 jobs:
   build-and-push:
@@ -84,7 +94,7 @@ jobs:
           push: true
           provenance: false
           build-args: APP_RELEASE=${{ github.event.release.tag_name || github.event.workflow_run.head_sha }}
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}:sha-${{ github.event.workflow_run.head_sha || github.sha }}-${{ matrix.platform.arch }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}:${{ env.STAGING_TAG }}-${{ matrix.platform.arch }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha || github.sha }}
@@ -176,7 +186,7 @@ jobs:
         shell: bash
         env:
           IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
-          SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          STAGING_TAG: ${{ env.STAGING_TAG }}
           TAGS: |
             ${{ steps.staging-meta.outputs.tags }}
             ${{ steps.release-meta.outputs.tags }}
@@ -191,8 +201,8 @@ jobs:
 
           docker buildx imagetools create \
             "${tag_args[@]}" \
-            "${IMAGE}:sha-${SOURCE_SHA}-amd64" \
-            "${IMAGE}:sha-${SOURCE_SHA}-arm64"
+            "${IMAGE}:${STAGING_TAG}-amd64" \
+            "${IMAGE}:${STAGING_TAG}-arm64"
 
           digest="$(docker buildx imagetools inspect "${first_tag}" --format '{{ .Manifest.Digest }}')"
           echo "digest=${digest}" >> "${GITHUB_OUTPUT}"

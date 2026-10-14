@@ -27,7 +27,7 @@ import {
 } from "./tokens";
 
 export type EmailSubscriptionTopicInput =
-  | { readonly topicId: null; readonly topicType: "submission" | "changelog" }
+  | { readonly topicId: null; readonly topicType: "changelog" }
   | { readonly topicId: string; readonly topicType: "post" };
 
 export type RequestEmailSubscriptionInput = {
@@ -511,43 +511,6 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     };
   });
 
-  const configureSubmissionNotificationRecipient = Effect.fn(
-    "EmailSubscriptionRepository.configureSubmissionNotificationRecipient"
-  )(function* (
-    input: RequestEmailSubscriptionInput & {
-      readonly replaceOtherRecipients: boolean;
-    }
-  ) {
-    const configured = yield* requestSubscription(input);
-    if (input.replaceOtherRecipients) {
-      yield* db
-        .update(schema.emailSubscriptionTable)
-        .set({
-          state: "unsubscribed",
-          unsubscribedAt: input.now,
-          updatedAt: input.now,
-        })
-        .where(
-          and(
-            eq(
-              schema.emailSubscriptionTable.organizationId,
-              input.organizationId
-            ),
-            eq(schema.emailSubscriptionTable.topicType, "submission"),
-            isNull(schema.emailSubscriptionTable.topicId),
-            ne(schema.emailSubscriptionTable.id, configured.subscription.id),
-            inArray(schema.emailSubscriptionTable.state, [
-              "active",
-              "pending_verification",
-              "paused_by_plan",
-              "deferred_no_access",
-            ])
-          )
-        );
-    }
-    return configured;
-  });
-
   const findSubscription = Effect.fn(
     "EmailSubscriptionRepository.findSubscription"
   )(function* (input: FindEmailSubscriptionInput) {
@@ -653,63 +616,6 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     }
   );
 
-  /** Authenticated topic lookup used for toggle-button subscription state. */
-  const findAuthenticatedSubscription = Effect.fn(
-    "EmailSubscriptionRepository.findAuthenticatedSubscription"
-  )(function* ({
-    organizationId,
-    topic,
-    userId,
-  }: {
-    readonly organizationId: string;
-    readonly topic: EmailSubscriptionTopicInput;
-    readonly userId: string;
-  }) {
-    const rows = yield* db
-      .select({ state: schema.emailSubscriptionTable.state })
-      .from(schema.emailSubscriptionTable)
-      .innerJoin(
-        schema.emailContactTable,
-        eq(schema.emailContactTable.id, schema.emailSubscriptionTable.contactId)
-      )
-      .where(
-        and(
-          eq(schema.emailSubscriptionTable.organizationId, organizationId),
-          topicCondition(schema.emailSubscriptionTable, topic),
-          eq(schema.emailContactTable.organizationId, organizationId),
-          eq(schema.emailContactTable.userId, userId)
-        )
-      );
-    if (rows.length === 0) {
-      return null;
-    }
-    // One user can own several email contacts (several addresses) with
-    // diverging states for the same topic; an unordered `limit(1)` would
-    // return an arbitrary row. Aggregate to a deterministic user-level
-    // result so the toggle reflects the most-subscribed state.
-    const rank = (state: string): number => {
-      switch (state) {
-        case "active":
-          return 0;
-        case "pending_verification":
-          return 1;
-        case "paused_by_plan":
-          return 2;
-        case "deferred_no_access":
-          return 3;
-        default:
-          return 4;
-      }
-    };
-    let best = rows[0]!;
-    for (const candidate of rows) {
-      if (rank(candidate.state) < rank(best.state)) {
-        best = candidate;
-      }
-    }
-    return best;
-  });
-
   /** Authenticated topic unsubscribe; it never accepts a bearer token. */
   const unsubscribeAuthenticatedSubscription = Effect.fn(
     "EmailSubscriptionRepository.unsubscribeAuthenticatedSubscription"
@@ -775,15 +681,19 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
   });
 
   /**
-   * Author-reassignment cleanup: retires every email subscription the
-   * previous author holds for one topic. Unlike
+   * Author-reassignment cleanup: retires the previous author's
+   * creator-derived email subscription for one topic. Unlike
    * `unsubscribeAuthenticatedSubscription` this includes
    * `deferred_no_access` rows — a deferred row for a removed contact-only
    * author must not activate on later identity linking and start notifying
-   * them about a post they no longer author. No-op when neither identifier
-   * is provided or nothing matches. Callers pass only identifiers that
-   * differ from the new subject's, so a shared address is never retired
-   * before the fresh subscribe below re-establishes it.
+   * them about a post they no longer author.
+   *
+   * Only rows whose `source` matches are retired. An `explicit` opt-in or an
+   * `admin_added_voter` row is the recipient's own standing follow and
+   * survives the reattribution. No-op when neither identifier is provided or
+   * nothing matches. Callers pass only identifiers that differ from the new
+   * subject's, so a shared address is never retired before the fresh
+   * subscribe below re-establishes it.
    */
   const unsubscribePreviousAuthorTopic = Effect.fn(
     "EmailSubscriptionRepository.unsubscribePreviousAuthorTopic"
@@ -791,6 +701,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     contactEmail,
     now,
     organizationId,
+    source,
     topic,
     userId,
   }: {
@@ -798,6 +709,8 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     readonly contactEmail: string | null;
     readonly now: Date;
     readonly organizationId: string;
+    /** Only subscriptions created by this source are retired. */
+    readonly source: Subscription["source"];
     readonly topic: EmailSubscriptionTopicInput;
     /** Previous author's user row; null for contact-only authors. */
     readonly userId: string | null;
@@ -840,6 +753,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
             schema.emailSubscriptionTable.contactId,
             contacts.map((contact) => contact.id)
           ),
+          eq(schema.emailSubscriptionTable.source, source),
           ne(schema.emailSubscriptionTable.state, "unsubscribed")
         )
       )
@@ -959,13 +873,64 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     }) => tokenService.deriveToken(input)
   );
 
+  /**
+   * Unsubscribes every email subscription an address holds in the workspace,
+   * whatever its topic or source. A workspace uses this when it removes a
+   * customer and must stop mailing them. Rows stay in place with state
+   * `unsubscribed`, so the audit trail survives and a later explicit opt-in
+   * can flip a row back. No-op when the address has no subscription.
+   */
+  const unsubscribeAllForEmail = Effect.fn(
+    "EmailSubscriptionRepository.unsubscribeAllForEmail"
+  )(function* ({
+    email,
+    now,
+    organizationId,
+  }: {
+    /** Matched case-insensitively, like every other address lookup. */
+    readonly email: string;
+    readonly now: Date;
+    readonly organizationId: string;
+  }) {
+    const contacts = yield* db
+      .select({ id: schema.emailContactTable.id })
+      .from(schema.emailContactTable)
+      .where(
+        and(
+          eq(schema.emailContactTable.organizationId, organizationId),
+          sql`lower(${schema.emailContactTable.email}) = lower(${email})`
+        )
+      );
+    if (contacts.length === 0) {
+      return { unsubscribed: 0 };
+    }
+    const updated = yield* db
+      .update(schema.emailSubscriptionTable)
+      .set({
+        state: "unsubscribed",
+        unsubscribedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(schema.emailSubscriptionTable.organizationId, organizationId),
+          inArray(
+            schema.emailSubscriptionTable.contactId,
+            contacts.map((contact) => contact.id)
+          ),
+          ne(schema.emailSubscriptionTable.state, "unsubscribed")
+        )
+      )
+      .returning({ id: schema.emailSubscriptionTable.id });
+    return { unsubscribed: updated.length };
+  });
+
   return {
     deriveLinkToken,
-    configureSubmissionNotificationRecipient,
-    findAuthenticatedSubscription,
     findSubscription,
     requestSubscription,
     unsubscribe,
+    unsubscribeAllForEmail,
     unsubscribeAuthenticatedSubscription,
     unsubscribePreviousAuthorTopic,
     reconcileSubscriptionPlanStates,

@@ -47,6 +47,7 @@ const ALLOWED_USER_FACING_TAGS = new Set<string>([
   "OgImageRequestValidationError",
   "OgImageSiteNotFoundError",
   "OgImagePostNotFoundError",
+  "InvalidSubdomainError",
   "ProfanityError",
   "ReservedSubdomainError",
   "UploadLimitError",
@@ -55,6 +56,15 @@ const ALLOWED_USER_FACING_TAGS = new Set<string>([
   // Merge/unmerge failures carry actionable copy (already merged, archived,
   // chained merge) that the moderator needs to understand the rejection.
   "FailedToMergePostError",
+  // On-behalf attribution resolves a subject and can refuse the write three
+  // ways: the subject does not resolve (`SubjectNotFoundError`), it cannot be
+  // attributed to as asked (`InvalidSubjectError`), or creating its contact
+  // would pass the plan's CRM-entry cap (`CrmEntryLimitReachedError`,
+  // packages/domain/src/identity/errors.ts). Each carries copy the admin must
+  // read to fix the request or the plan, so none may fall back to generic copy.
+  "SubjectNotFoundError",
+  "InvalidSubjectError",
+  "CrmEntryLimitReachedError",
 ]);
 
 function extractUserMessage(cause: unknown): string | undefined {

@@ -1,4 +1,5 @@
 import { usePostCollections } from "@feeblo/post-ui/post-collections-provider";
+import { usePostUpvotes } from "@feeblo/post-ui/use-post-upvotes";
 import { AvatarGroup, AvatarGroupCount } from "@feeblo/ui/avatar";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -11,7 +12,6 @@ import {
   DialogTrigger,
 } from "@feeblo/ui/dialog";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useMemo } from "react";
 
 import { m } from "../../paraglide/messages.js";
@@ -19,7 +19,6 @@ import { useSite } from "../../providers/site-provider";
 
 type PostVoter = {
   id: string;
-  voterIsMember: boolean;
   user: {
     image: string | null;
     name: string;
@@ -61,17 +60,10 @@ function PostVoterDialogRoot({
   const {
     collections: { upvoteCollection },
   } = usePostCollections();
-  const { data: upvotes } = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ upvote: upvoteCollection })
-        .where(({ upvote }) =>
-          and(
-            eq(upvote.postId, postId),
-            eq(upvote.organizationId, organizationId)
-          )
-        )
-        .orderBy(({ upvote }) => upvote.createdAt, "asc"),
+  const { data: upvotes } = usePostUpvotes({
+    organizationId,
+    postId,
+    upvoteCollection,
   });
 
   const voterData = useMemo(() => {
@@ -122,9 +114,7 @@ function PostVoterList() {
       {visibleVoters.map((voter) => (
         <UserAvatar
           image={voter.user.image}
-          isMember={voter.voterIsMember}
           key={voter.id}
-          memberLabel={m.sad_soft_tadpole()}
           name={voter.user.name}
         />
       ))}
@@ -153,12 +143,7 @@ function PostVoterDialogPopup() {
           {voters.map((voter) => (
             <li key={voter.id}>
               <div className="flex items-center gap-3 rounded-xl px-2 py-2">
-                <UserAvatar
-                  image={voter.user.image}
-                  isMember={voter.voterIsMember}
-                  memberLabel={m.sad_soft_tadpole()}
-                  name={voter.user.name}
-                />
+                <UserAvatar image={voter.user.image} name={voter.user.name} />
                 <span className="text-foreground text-sm font-medium">
                   {voter.user.name}
                 </span>

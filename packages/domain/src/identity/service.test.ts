@@ -70,8 +70,37 @@ describe("ResolvePrincipalService", () => {
       return rows[0];
     });
 
-  const getContactById = (id: string) =>
+  const insertMember = (args: {
+    id: string;
+    organizationId: string;
+    userId: string;
+  }) =>
     Effect.gen(function* () {
+      const db = yield* currentDb;
+      yield* db.insert(schema.memberTable).values({
+        id: args.id,
+        organizationId: args.organizationId,
+        userId: args.userId,
+        role: "contributor",
+        createdAt: yield* DateTime.nowAsDate,
+      });
+    });
+
+  const getContactCount = (organizationId: string) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const rows = yield* db
+        .select({ id: schema.contactTable.id })
+        .from(schema.contactTable)
+        .where(eq(schema.contactTable.organizationId, organizationId));
+      return rows.length;
+    });
+
+  const getContactById = (id: string | null) =>
+    Effect.gen(function* () {
+      if (id === null) {
+        return undefined;
+      }
       const db = yield* currentDb;
       const rows = yield* db
         .select()
@@ -162,6 +191,36 @@ describe("ResolvePrincipalService", () => {
         expect(resolved.contactId).not.toBe("");
       })
     );
+
+    it.effect("resolves a staff subject at the CRM cap", () =>
+      Effect.gen(function* () {
+        const service = yield* ResolvePrincipalService;
+        const organizationId = yield* makeOrganization();
+        yield* fillCrm(organizationId, FREE_PLAN_CRM_LIMIT);
+        yield* insertGlobalUser({
+          id: "user_staff_capped",
+          email: "staff-capped@example.com",
+        });
+        yield* insertMember({
+          id: "member_staff_capped",
+          organizationId,
+          userId: "user_staff_capped",
+        });
+
+        // Attributing to staff spends no CRM room, so the cap must not refuse
+        // the write the way it refuses an unseen customer.
+        const resolved = yield* service.resolve({
+          organizationId,
+          needsUser: true,
+          subject: { userId: "user_staff_capped" },
+        });
+
+        expect(resolved.memberId).toBe("member_staff_capped");
+        expect(yield* getContactCount(organizationId)).toBe(
+          FREE_PLAN_CRM_LIMIT
+        );
+      })
+    );
   });
 
   layer(TestLayer)("resolve", (it) => {
@@ -182,7 +241,11 @@ describe("ResolvePrincipalService", () => {
           expect(contact?.email).toBe("jane@example.com");
           expect(contact?.name).toBe("Jane Doe");
           expect(contact?.userId).toBeNull();
+          // The row was created by attribution, not the contact dialog.
+          expect(contact?.source).toBe("ON_BEHALF");
           expect(resolved.userId).toBeNull();
+          // A customer resolution says so explicitly: no member row.
+          expect(resolved.memberId).toBeNull();
         })
     );
 
@@ -349,6 +412,104 @@ describe("ResolvePrincipalService", () => {
         const contact = yield* getContactById(resolved.contactId);
         expect(contact?.userId).toBe("user_alice");
         expect(resolved.userId).toBe("user_alice");
+      })
+    );
+
+    it.effect(
+      "attributes a staff subject to their account without creating a contact",
+      () =>
+        Effect.gen(function* () {
+          const service = yield* ResolvePrincipalService;
+          const organizationId = yield* makeOrganization();
+          yield* insertGlobalUser({
+            id: "user_staff",
+            email: "staff@example.com",
+            name: "Staff Member",
+          });
+          yield* insertMember({
+            id: "member_staff",
+            organizationId,
+            userId: "user_staff",
+          });
+
+          const resolved = yield* service.resolve({
+            organizationId,
+            needsUser: true,
+            subject: { userId: "user_staff" },
+          });
+
+          // Staff are not customers: the member row carries the attribution
+          // and the CRM stays untouched, so a full CRM must not even be
+          // consulted.
+          expect(resolved).toEqual({
+            contactId: null,
+            memberId: "member_staff",
+            userId: "user_staff",
+          });
+          expect(yield* getContactCount(organizationId)).toBe(0);
+        })
+    );
+
+    it.effect("resolves a staff subject by email without a contact", () =>
+      Effect.gen(function* () {
+        const service = yield* ResolvePrincipalService;
+        const organizationId = yield* makeOrganization();
+        yield* insertGlobalUser({
+          id: "user_staff_email",
+          email: "staff-email@example.com",
+          name: "Staff By Email",
+        });
+        yield* insertMember({
+          id: "member_staff_email",
+          organizationId,
+          userId: "user_staff_email",
+        });
+
+        const resolved = yield* service.resolve({
+          organizationId,
+          needsUser: false,
+          subject: { email: "staff-email@example.com", name: "Typed" },
+        });
+
+        expect(resolved.memberId).toBe("member_staff_email");
+        expect(resolved.userId).toBe("user_staff_email");
+        expect(yield* getContactCount(organizationId)).toBe(0);
+      })
+    );
+
+    it.effect("keeps a pre-existing customer contact for a staff subject", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const service = yield* ResolvePrincipalService;
+        const organizationId = yield* makeOrganization();
+        yield* insertGlobalUser({
+          id: "user_staff_contacted",
+          email: "staff-contact@example.com",
+        });
+        yield* insertMember({
+          id: "member_staff_contacted",
+          organizationId,
+          userId: "user_staff_contacted",
+        });
+
+        // The human was a customer before joining the workspace, so the
+        // existing contact is their attribution anchor and must survive.
+        const contactId = yield* ContactId.generate;
+        yield* db.insert(schema.contactTable).values({
+          id: contactId,
+          organizationId,
+          email: "staff-contact@example.com",
+          userId: "user_staff_contacted",
+        });
+
+        const resolved = yield* service.resolve({
+          organizationId,
+          needsUser: false,
+          subject: { userId: "user_staff_contacted" },
+        });
+
+        expect(resolved.contactId).toBe(contactId);
+        expect(yield* getContactCount(organizationId)).toBe(1);
       })
     );
 

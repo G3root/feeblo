@@ -5,6 +5,5 @@ export * from "./slack-credentials";
 export * from "./slack-errors";
 export * from "./slack-inbound-schema";
 export * from "./slack-manifest";
-export * from "./slack-oauth-callback";
 export * from "./slack-provider-registration";
 export * from "./slack-signature";

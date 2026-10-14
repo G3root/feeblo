@@ -1,12 +1,17 @@
 import { isPrivilegedRole } from "@feeblo/permissions";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
-
-import { invitationsCollection, membersCollection } from "~/lib/collections";
 
 import { useEntitlements } from "./use-entitlements";
+import { useOrgInvitations } from "./use-org-invitations";
+import { useOrgMembers } from "./use-org-members";
 import { useOrganizationId } from "./use-organization-id";
 
+/**
+ * Privileged-member seat usage for the current organization.
+ *
+ * Both queries come from the shared org hooks, so the members page and the
+ * invite form read the same live queries (and the same explicit keys).
+ */
 export const usePrivilegedMemberLimit = () => {
   const organizationId = useOrganizationId();
 
@@ -15,27 +20,10 @@ export const usePrivilegedMemberLimit = () => {
   );
   const { entitlements } = useEntitlements();
 
-  const membersQuery = useLiveQuery({
-    query: (q) =>
-      q
-        .from({ member: membersCollection })
-        .where(({ member }) => eq(member.organizationId, organizationId)),
-  });
-
-  const invitationsQuery = useLiveQuery({
-    query: (q) => {
-      if (isPolicyPending || !canListInvitations) {
-        return undefined;
-      }
-      return q
-        .from({ invitation: invitationsCollection })
-        .where(({ invitation }) =>
-          and(
-            eq(invitation.organizationId, organizationId),
-            eq(invitation.status, "pending")
-          )
-        );
-    },
+  const membersQuery = useOrgMembers(organizationId);
+  const invitationsQuery = useOrgInvitations({
+    organizationId,
+    enabled: !isPolicyPending && canListInvitations,
   });
 
   const privilegedMemberCount = (membersQuery.data ?? []).filter((member) =>
