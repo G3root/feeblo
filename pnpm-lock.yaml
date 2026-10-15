@@ -15,6 +15,9 @@ catalogs:
     '@better-auth/utils':
       specifier: ^0.4.0
       version: 0.4.3
+    '@bufbuild/protobuf':
+      specifier: 2.16.0
+      version: 2.16.0
     '@cloudflare/workers-types':
       specifier: ^4.20260702.1
       version: 4.20260702.1
@@ -310,6 +313,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@bufbuild/protobuf':
+        specifier: 'catalog:'
+        version: 2.16.0
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.0(effect@4.0.0)(redis@6.2.1)
@@ -1973,6 +1979,9 @@ packages:
 
   '@blazediff/core@1.10.0':
     resolution: {integrity: sha512-AOQff0zgR7cGsZL+4E7hVkmujoPUpm0J9xzWGWZj5wCjd3gmxESXAPfKyuzs93VdpQNFhHlBhfOjrcZ+XTERtQ==}
+
+  '@bufbuild/protobuf@2.16.0':
+    resolution: {integrity: sha512-FWa0sPlqYGJgpTs6OxBRcL/AW4JT0OIO+W1ajerluoTVh8CV0B7XM1qsNCRgnkSCkRCgOICKHRQlY17jrsm0+Q==}
 
   '@cloudflare/kv-asset-handler@0.5.0':
     resolution: {integrity: sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==}
@@ -9932,6 +9941,8 @@ snapshots:
   '@better-fetch/fetch@1.3.1': {}
 
   '@blazediff/core@1.10.0': {}
+
+  '@bufbuild/protobuf@2.16.0': {}
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
 

@@ -1,6 +1,6 @@
 # Telemetry
 
-Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the server. The exporters are Effect's own (`effect/observability`), so the only dependency is `effect` itself — this is a port of `UsefulSoftwareCo/executor`'s `packages/telemetry`, trimmed to what a first-party server needs.
+Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the server. The exporters are Effect's own (`effect/observability`); the transport adds `@bufbuild/protobuf` to read the OTLP acknowledgement. This is a port of `UsefulSoftwareCo/executor`'s `packages/telemetry`, trimmed to what a first-party server needs.
 
 ## Wiring
 
@@ -9,8 +9,12 @@ Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the 
 | `apps/server/src/infra/observability.ts` | Chooses the OTLP exporters or the runtime defaults, and owns the final logger set |
 | `apps/server/src/infra/telemetry/config.ts` | Parses the standard `OTEL_EXPORTER_OTLP_*` environment |
 | `apps/server/src/infra/telemetry/layer.ts` | Builds the OTLP tracer, logger, and metrics layers |
-| `apps/server/src/infra/telemetry/span-attributes.ts` | HTTP attribute allowlist, root-span filter, and ratio sampling |
+| `apps/server/src/infra/telemetry/span-attributes.ts` | HTTP attribute allowlist, route-template substitution, root-span filter, and ratio sampling |
 | `apps/server/src/infra/telemetry/rpc-spans.ts` | Adds `rpc.*` attributes and labels the parent HTTP span per RPC method |
+| `apps/server/src/infra/telemetry/transport.ts` | Bounds each export, reads the OTLP acknowledgement, and accounts for failures |
+| `apps/server/src/infra/telemetry/measurements.ts` | Export-failure and rejected-record counters |
+| `apps/server/src/infra/telemetry/process.ts` | Process CPU, memory, and event-loop gauges |
+| `apps/server/src/http/request-rejection.ts` | Records HTTP API schema rejections on the request span |
 
 `program.ts` provides `makeObservabilityLayer` around the whole program, so layer construction, the forked workers, and the HTTP server all share one tracer and one logger set.
 
@@ -36,12 +40,19 @@ Every signal also carries `service.instance.id`: `OTEL_RESOURCE_ATTRIBUTES=servi
 
 Traces export every 5 seconds, logs every second, and metrics every 30 seconds. When `OTEL_EXPORTER_OTLP_ENDPOINT` or a header is malformed, the server logs the configuration error and continues with the runtime's default tracer and logger instead of failing startup.
 
+## Export health and runtime metrics
+
+Each export is bounded by a five-second acknowledgement timeout. A transport failure, timeout, or interrupted export increments `feeblo_telemetry_export_failures_total`; a collector's partial-success acknowledgement increments `feeblo_telemetry_rejected_records_total` by the rejected count. Both carry `signal` and `reason` attributes, and every failure also logs `Telemetry export failed` at warn.
+
+When OTLP is enabled, a sampler records `feeblo.process.cpu.cores`, `process.memory.usage`, `nodejs.memory.heap.*`, `nodejs.eventloop.utilization`, and `nodejs.eventloop.delay.*` every 30 seconds, and logs `process.runtime` with the same values. The sampler stops with the layer's scope.
+
 ## Span shaping
 
 Two policies run in the tracer wrappers the OTLP layer installs (`span-attributes.ts` and `rpc-spans.ts`):
 
 - **RPC methods.** `effect/rpc` names each server span `RpcServer.<Tag>`, but every call shares the same `POST /rpc` HTTP route. `rpc-spans.ts` adds `rpc.system.name=effect` and `rpc.method=<Tag>` to the RPC span, and records `rpc.method` on the parent HTTP span (or on the HTTP link when the client owns the trace context), so a backend can filter and group by method instead of the anonymous route. When one HTTP span serves more than one method, the shared span keeps every distinct method as an array instead of the last write winning; each RPC span still carries the scalar method it serves. The prefix is pinned by `rpcSpanPrefix` in `@feeblo/domain/rpc-router`, which also passes it to `RpcServer.layerHttp`.
 - **Root library spans.** Queue pollers and delivery workers run without a parent request, so Effect SQL's `sql.execute` and `sql.transaction` arrive as roots and every 1 Hz poll becomes a standalone trace. Those root names are dropped; a SQL span under a request keeps its parent and is exported.
+- **Path templates.** The router records `http.route` on a matched server span, and the allowlist replaces the concrete `url.path` with that template, so a path parameter such as the SES webhook's signing token never leaves the process. `recordRoute` and `routeTemplates` name a fixed endpoint served under a wildcard mount.
 
 ## Local development
 

@@ -157,14 +157,19 @@ it.live("exports metrics recorded outside the exporter's context", () =>
       });
       yield* Effect.scoped(
         Effect.gen(function* () {
-          yield* Layer.build(layer);
-          // Recorded in the test's context, not the exporter's: the metric
-          // registry must still be the one the exporter snapshots.
+          const context = yield* Layer.build(layer);
+          // The layer owns a fresh registry, so the measurement must run with
+          // the registry the exporter snapshots.
           yield* Metric.update(
             Metric.withAttributes(Metric.counter("feeblo_test_counter_total"), {
               outcome: "ok",
             }),
             1
+          ).pipe(
+            Effect.provideService(
+              Metric.MetricRegistry,
+              Context.get(context, Metric.MetricRegistry)
+            )
           );
           yield* Effect.sleep("100 millis");
         })

@@ -9,9 +9,9 @@
  */
 import * as Context from "effect/Context";
 import type * as Duration from "effect/Duration";
-import { FetchHttpClient } from "effect/http";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
+import * as Metric from "effect/Metric";
 import {
   OtlpLogger,
   OtlpMetrics,
@@ -25,6 +25,7 @@ import * as Tracer from "effect/Tracer";
 import type { TelemetryConfig, TelemetryTarget } from "./config";
 import { rpcSpans } from "./rpc-spans";
 import { allowedSpans, rootSpanNoise } from "./span-attributes";
+import { telemetryHttpClient } from "./transport";
 
 /** Nothing is skipped when the root-span filter is turned off for debugging. */
 const noRootSpans: ReadonlySet<string> = new Set();
@@ -43,10 +44,18 @@ export const telemetryLayer = (
     readonly baseLoggers?: Layer.Layer<never, never, never> | undefined;
     /** Prefix `@feeblo/domain/rpc-router` gives every RPC server span. */
     readonly rpcSpanPrefix?: string | undefined;
+    /**
+     * Per-signal bound on the final flush. A signal's default is three
+     * seconds; only the host that owns a destination knows it answers faster.
+     */
+    readonly shutdownTimeouts?:
+      | Partial<Record<"traces" | "logs" | "metrics", Duration.Input>>
+      | undefined;
   }
 ) => {
   const lifetime = options?.lifetime ?? "process";
   const rpcSpanPrefix = options?.rpcSpanPrefix ?? "RpcServer";
+  const shutdownTimeouts = options?.shutdownTimeouts ?? {};
   const baseLoggers =
     options?.baseLoggers ??
     Logger.layer([defaultTelemetryLogger], { mergeWithExisting: false });
@@ -72,6 +81,7 @@ export const telemetryLayer = (
   };
   const signal = (
     target: TelemetryTarget,
+    name: keyof typeof shutdownTimeouts,
     processExportInterval: Duration.Input
   ) => {
     // An `event` lifetime batches until shutdown, so a one-shot process
@@ -82,7 +92,7 @@ export const telemetryLayer = (
       url: target.url,
       resource,
       exportInterval,
-      shutdownTimeout: "3 seconds" as const,
+      shutdownTimeout: shutdownTimeouts[name] ?? ("3 seconds" as const),
     };
     return target.headers === undefined
       ? common
@@ -95,10 +105,9 @@ export const telemetryLayer = (
           // Effect's own default; the one-second interval this was ported
           // with is for short-lived processes, and a server gains nothing
           // from it.
-          signal(config.traces, "5 seconds")
+          signal(config.traces, "traces", "5 seconds")
         ).pipe(
           Layer.provide(OtlpSerialization.layerJson),
-          Layer.provide(FetchHttpClient.layer),
           // Wrap the exporter's tracer with RPC labelling, the attribute
           // filter, and ratio sampling. `flatMap` replaces the layer output
           // with a value, so the `Tracer.Tracer` reference is provided without
@@ -124,7 +133,7 @@ export const telemetryLayer = (
     config.logs === undefined
       ? baseLoggers
       : OtlpLogger.layer({
-          ...signal(config.logs, "1 second"),
+          ...signal(config.logs, "logs", "1 second"),
           mergeWithExisting: true,
         }).pipe(
           Layer.provide(OtlpSerialization.layerJson),
@@ -133,7 +142,7 @@ export const telemetryLayer = (
     config.metrics === undefined
       ? Layer.empty
       : OtlpMetrics.layer({
-          ...signal(config.metrics, "30 seconds"),
+          ...signal(config.metrics, "metrics", "30 seconds"),
           // Cumulative is what Prometheus-based backends (Grafana Cloud,
           // Mimir, self-hosted Prometheus) store and query; delta is for
           // backends that require it, such as Datadog. Mimir's delta OTLP
@@ -150,9 +159,14 @@ export const telemetryLayer = (
     // raising it to `Warn` is the escalation lever during an incident.
     Layer.succeed(References.MinimumLogLevel, config.logLevel)
   ).pipe(
-    Layer.provide(FetchHttpClient.layer),
+    // One export client, with the acknowledgement bound, for every signal.
+    Layer.provide(telemetryHttpClient),
     // Exporter fibers capture services during construction; their failure
     // evidence must reach the base logger even after a remote logger closes.
-    Layer.provide(baseLoggers)
+    Layer.provide(baseLoggers),
+    // A fresh registry per layer build keeps tests isolated; the process host
+    // builds the layer once, so its measurements share one registry. Effect's
+    // default registry is a cached `Map` shared by every context.
+    Layer.provideMerge(Layer.sync(Metric.MetricRegistry, () => new Map()))
   );
 };

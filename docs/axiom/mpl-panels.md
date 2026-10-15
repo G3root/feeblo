@@ -162,6 +162,60 @@ Estimated cost per hour (micros to currency units, `3600 / 1000000 = 0.0036`):
 | map * 0.0036
 ```
 
+## Telemetry health
+
+Export failures by signal and reason:
+
+```
+`<metrics-dataset>`:`feeblo_telemetry_export_failures_total`
+| where `service.name` == "feeblo-server"
+| map rate
+| align to 5m using avg
+| group by `signal`, `reason` using sum
+```
+
+Records a collector rejected in a partial-success acknowledgement (cumulative temporality; omit `map increase` for delta):
+
+```
+`<metrics-dataset>`:`feeblo_telemetry_rejected_records_total`
+| where `service.name` == "feeblo-server"
+| map increase
+| align to 15m using sum
+| group by `signal`, `reason` using sum
+```
+
+## Process runtime
+
+CPU cores used (one means one busy core):
+
+```
+`<metrics-dataset>`:`feeblo.process.cpu.cores`
+| where `service.name` == "feeblo-server"
+| align to 5m using avg
+```
+
+Resident memory:
+
+```
+`<metrics-dataset>`:`process.memory.usage`
+| where `service.name` == "feeblo-server"
+| align to 5m using avg
+```
+
+Event-loop utilization and p99 delay:
+
+```
+`<metrics-dataset>`:`nodejs.eventloop.utilization`
+| where `service.name` == "feeblo-server"
+| align to 5m using avg
+```
+
+```
+`<metrics-dataset>`:`nodejs.eventloop.delay.p99`
+| where `service.name` == "feeblo-server"
+| align to 5m using avg
+```
+
 ## Traces (APL)
 
 Same datasets as the logs if you send both to one Events dataset, or your traces dataset.

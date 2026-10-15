@@ -18,7 +18,11 @@ import * as Option from "effect/Option";
 import * as References from "effect/References";
 
 import type { ServerConfigValue } from "../config";
-import { telemetryConfig, telemetryLayer } from "./telemetry";
+import {
+  startProcessMetrics,
+  telemetryConfig,
+  telemetryLayer,
+} from "./telemetry";
 
 /** Longest failure summary written to the startup log. */
 const failureSummaryLimit = 500;
@@ -91,7 +95,11 @@ export const makeObservabilityLayer = (config: ServerConfigValue) =>
         return Layer.succeed(References.MinimumLogLevel, logLevel);
       }
 
-      return telemetryLayer(telemetry.value, { rpcSpanPrefix }).pipe(
+      // `provideMerge` gives the sampler the telemetry layer's fresh metric
+      // registry, so its gauges reach the same exporter, and keeps the
+      // telemetry output in the result.
+      return Layer.effectDiscard(startProcessMetrics("feeblo-server")).pipe(
+        Layer.provideMerge(telemetryLayer(telemetry.value, { rpcSpanPrefix })),
         Layer.catchCause((cause) =>
           Layer.unwrap(
             Effect.logError(

@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "catalog:",
     "@effect/platform-node": "catalog:",
     "@feeblo/auth": "workspace:*",
     "@feeblo/db": "workspace:*",
