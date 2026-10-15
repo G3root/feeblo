@@ -1,11 +1,12 @@
 # Grafana Cloud dashboards
 
-Two importable Grafana dashboards for the telemetry the server exports over OTLP:
+Three importable Grafana dashboards for the telemetry the server exports over OTLP:
 
 | File | Covers |
 | --- | --- |
 | `feeblo-server-apm.json` | Exact HTTP request rate, error rate, and latency, from the server's own metrics |
 | `feeblo-server-dashboard.json` | Integration delivery and email outbox queues, from the server's own metrics |
+| `feeblo-server-runtime.json` | Telemetry export health and process CPU, memory, and event-loop metrics |
 
 Traces, trace-derived RED metrics, and logs are covered by Application Observability, Traces Drilldown, and Logs Drilldown instead.
 
@@ -18,7 +19,7 @@ Traces, trace-derived RED metrics, and logs are covered by Application Observabi
 
 ## The service filter
 
-Both dashboards filter on `job=~"feeblo/feeblo-server"` by default, because Grafana Cloud builds the `job` label for OTLP metrics from `service.namespace/service.name`. If every panel is empty, open **Explore → Prometheus** and check which service label the series actually carry:
+All three dashboards filter on `job=~"feeblo/feeblo-server"` by default, because Grafana Cloud builds the `job` label for OTLP metrics from `service.namespace/service.name`. If every panel is empty, open **Explore → Prometheus** and check which service label the series actually carry:
 
 | What the series show | Service label variable | Service variable |
 | --- | --- | --- |
@@ -49,9 +50,20 @@ RPC methods are not visible here: every call shares `POST /rpc`, and the method 
 | Integrations | Due and claimed backlog, retry/exhausted outcomes, oldest recovered lease, delivery rate by outcome, p95 latency, lease recoveries and pauses |
 | Email outbox | Oldest queued age, delivery retries, throttles, estimated cost, intent/delivery transitions, retries by error tag, access skips, provider submissions, reconciliation recoveries |
 
-## Gauge names carry a `_ratio` suffix
+## Runtime and telemetry health
 
-Grafana Cloud's OTLP-to-Prometheus conversion appends suffixes following the OpenTelemetry spec. The queue dashboard's gauges do not set an explicit OTel unit, so they export as unit `1` and land as `<name>_ratio` — for example `feeblo_integration_delivery_backlog_ratio`. Counters already end in `_total` and keep their name; the latency histogram is unaffected. To list exactly what your stack stores:
+`feeblo-server-runtime.json` shows:
+
+| Row | Panels |
+| --- | --- |
+| Telemetry export | Export failures and rejected records, as totals and by signal and reason |
+| Process runtime | CPU cores, resident memory, heap used/total, event-loop utilization, and event-loop delay (mean/p99/max) |
+
+`feeblo_telemetry_export_failures_total` counts a collector that refused, dropped, or timed out an export. `feeblo_telemetry_rejected_records_total` counts records a collector rejected in an OTLP partial-success acknowledgement, which OTLP forbids retrying. Both carry `signal` and `reason` labels. The process gauges are sampled every 30 seconds while OTLP is enabled.
+
+## Metric name suffixes
+
+Grafana Cloud's OTLP-to-Prometheus conversion rewrites names following the OpenTelemetry spec. A gauge with no unit, or unit `1`, lands as `<name>_ratio` — `feeblo_integration_delivery_backlog_ratio`, `feeblo_process_cpu_cores_ratio`, and `nodejs_eventloop_utilization_ratio`. A gauge with an explicit unit takes that unit's Prometheus suffix: bytes land as `_bytes` (`process_memory_usage_bytes`, `nodejs_memory_heap_used_bytes`) and seconds as `_seconds` (`nodejs_eventloop_delay_p99_seconds`). Counters already end in `_total` and keep their name; the latency histogram is unaffected. To list exactly what your stack stores:
 
 ```promql
 {__name__=~"feeblo_.*"}

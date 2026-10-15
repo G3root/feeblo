@@ -202,10 +202,16 @@ Resident memory:
 | align to 5m using avg
 ```
 
-Event-loop utilization and p99 delay:
+Event-loop utilization and delay:
 
 ```
 `<metrics-dataset>`:`nodejs.eventloop.utilization`
+| where `service.name` == "feeblo-server"
+| align to 5m using avg
+```
+
+```
+`<metrics-dataset>`:`nodejs.eventloop.delay.mean`
 | where `service.name` == "feeblo-server"
 | align to 5m using avg
 ```
@@ -215,6 +221,28 @@ Event-loop utilization and p99 delay:
 | where `service.name` == "feeblo-server"
 | align to 5m using avg
 ```
+
+```
+`<metrics-dataset>`:`nodejs.eventloop.delay.max`
+| where `service.name` == "feeblo-server"
+| align to 5m using avg
+```
+
+Heap used and total:
+
+```
+`<metrics-dataset>`:`nodejs.memory.heap.used`
+| where `service.name` == "feeblo-server"
+| align to 5m using avg
+```
+
+```
+`<metrics-dataset>`:`nodejs.memory.heap.total`
+| where `service.name` == "feeblo-server"
+| align to 5m using avg
+```
+
+Append `| group by` and the `service.instance.id` tag to any process query when replicas need to be distinguished.
 
 ## Traces (APL)
 
