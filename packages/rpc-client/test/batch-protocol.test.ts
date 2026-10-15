@@ -20,6 +20,7 @@ import type {
 } from "effect/rpc/RpcMessage";
 import * as RpcSerialization from "effect/rpc/RpcSerialization";
 import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
 
 import { layerProtocolHttpBatch } from "../src/batch-protocol";
 
@@ -31,7 +32,12 @@ const Echo = Rpc.make("Echo", {
   payload: Schema.Struct({ text: Schema.String }),
   success: Schema.String,
 });
-const TestRpcs = RpcGroup.make(Add, Echo);
+const Watch = Rpc.make("Watch", {
+  payload: Schema.Struct({}),
+  stream: true,
+  success: Schema.String,
+});
+const TestRpcs = RpcGroup.make(Add, Echo, Watch);
 
 /**
  * The window the tests give a batch. Long enough that the calls `Effect.all`
@@ -168,6 +174,35 @@ const silentClient = (): Layer.Layer<HttpClient.HttpClient> =>
   );
 
 /**
+ * A transport whose response body never yields and never closes, the shape a
+ * watch RPC keeps. `cancels.count` proves whether the client aborted it.
+ */
+const openEndedClient = (cancels: {
+  count: number;
+}): Layer.Layer<HttpClient.HttpClient> =>
+  Layer.succeed(
+    HttpClient.HttpClient,
+    HttpClient.make((request) =>
+      Effect.sync(() =>
+        HttpClientResponse.fromWeb(
+          request,
+          new Response(
+            new ReadableStream({
+              start() {
+                // Never enqueue and never close.
+              },
+              cancel() {
+                cancels.count += 1;
+              },
+            }),
+            { status: 200, headers: { "content-type": "application/ndjson" } }
+          )
+        )
+      )
+    )
+  );
+
+/**
  * A transport that answers with the connection-level `Defect` the server writes
  * when it cannot read a body, then ends the response.
  */
@@ -220,6 +255,7 @@ const testLayer = (
     RpcSerialization.RpcSerialization
   >,
   options?: {
+    readonly batchWindow?: Duration.Duration;
     readonly maxBatchBytes?: number;
     readonly sharesBatch?: (tag: string) => boolean;
   }
@@ -326,6 +362,58 @@ describe("batched RPC protocol", () => {
 
       const bodies = yield* Ref.get(posts);
       expect(bodies.map((body) => framesIn(body).length)).toEqual([1, 1]);
+    })
+  );
+
+  it.live(
+    "posts a frame that cannot share without waiting out the window",
+    () =>
+      Effect.gen(function* () {
+        const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+        const context = yield* Layer.build(
+          testLayer(answeringClient(posts), {
+            batchWindow: Duration.seconds(30),
+            sharesBatch: () => false,
+          })
+        );
+
+        // A frame that went through the reads resolver would sit out the 30s
+        // window; a direct send answers inside the timeout.
+        const total = yield* Effect.gen(function* () {
+          const client = yield* RpcClient.make(TestRpcs);
+          return yield* client.Add({ a: 40, b: 2 });
+        }).pipe(
+          Effect.timeout(Duration.seconds(1)),
+          Effect.provideContext(context)
+        );
+
+        expect(total).toBe(42);
+
+        const bodies = yield* Ref.get(posts);
+        expect(bodies).toHaveLength(1);
+      })
+  );
+
+  it.live("cancels a response whose caller is interrupted", () =>
+    Effect.gen(function* () {
+      const cancels = { count: 0 };
+      const context = yield* Layer.build(
+        testLayer(openEndedClient(cancels), { sharesBatch: () => false })
+      );
+
+      yield* Effect.gen(function* () {
+        const client = yield* RpcClient.make(TestRpcs);
+        // A stream that never yields: only the caller's interruption ends it.
+        yield* Stream.runDrain(client.Watch({})).pipe(
+          Effect.timeout(Duration.millis(50)),
+          Effect.ignore
+        );
+      }).pipe(Effect.provideContext(context));
+
+      // The frame is posted from the stream's own fiber, so closing the scope
+      // must abort the HTTP request rather than leave it pumping forever.
+      yield* Effect.sleep(Duration.millis(200));
+      expect(cancels.count).toBe(1);
     })
   );
 

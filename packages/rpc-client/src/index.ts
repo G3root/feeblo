@@ -8,6 +8,7 @@ import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as RpcClient from "effect/rpc/RpcClient";
 import type * as RpcClientError from "effect/rpc/RpcClientError";
+import * as RpcSchema from "effect/rpc/RpcSchema";
 import * as RpcSerialization from "effect/rpc/RpcSerialization";
 
 import { layerProtocolHttpBatch } from "./batch-protocol";
@@ -25,6 +26,23 @@ export const FetchWithCredentials = FetchHttpClient.layer.pipe(
 function normalizeApiUrl(apiUrl: string) {
   return apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl;
 }
+
+/**
+ * Whether a tag's frames may share one HTTP request: a read may, unless it
+ * streams.
+ *
+ * A stream is sent alone on purpose. Its response stays open for as long as the
+ * stream, and a batch's response is pumped by the resolver's fiber, which
+ * Effect does not interrupt once the run has started — so closing the stream's
+ * scope (disposing an atom, leaving a route) would leave the HTTP request open.
+ * `batch-protocol.ts` posts everything this rules out from the caller's own
+ * fiber, where interruption aborts the request.
+ */
+export const sharesRpcBatch = (tag: string): boolean => {
+  if (!isReadRpc(tag)) return false;
+  const rpc = AllRpcs.requests.get(tag);
+  return rpc !== undefined && !RpcSchema.isStreamSchema(rpc.successSchema);
+};
 
 /**
  * One memo map for every RPC protocol layer this module builds.
@@ -66,7 +84,7 @@ export const createRpcProtocolLive = (apiUrl: string) => {
   // shared by every concurrent request; batching there would let one request's
   // cookie authenticate another's frames.
   const protocol = hasWindow()
-    ? layerProtocolHttpBatch({ url, sharesBatch: isReadRpc })
+    ? layerProtocolHttpBatch({ url, sharesBatch: sharesRpcBatch })
     : RpcClient.layerProtocolHttp({ url });
 
   return protocol.pipe(
