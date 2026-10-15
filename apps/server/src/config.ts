@@ -221,13 +221,6 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       const environment = yield* Config.String("APP_ENV").pipe(
         Config.withDefault(nodeEnv)
       );
-      const sentryDsn = yield* Config.String("SENTRY_DSN").pipe(
-        Config.option,
-        Effect.map(Option.getOrUndefined)
-      );
-      const sentryTracesSampleRate = yield* Config.Number(
-        "SENTRY_TRACES_SAMPLE_RATE"
-      ).pipe(Config.withDefault(0.1));
       const trustAllProxyHeaders = yield* Config.Boolean(
         "TRUST_PROXY_HEADERS"
       ).pipe(Config.withDefault(false));
@@ -290,9 +283,7 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         e2eTestMailer,
         nodeEnv,
         redisUrl,
-        sentryDsn,
         environment,
-        sentryTracesSampleRate,
         discordBotToken,
         discordClientId,
         discordClientSecret,
