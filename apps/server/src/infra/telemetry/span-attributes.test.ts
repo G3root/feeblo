@@ -184,6 +184,17 @@ describe("allowedSpans", () => {
     expect(templates.match("/api/auth/unknown")).toBeUndefined();
   });
 
+  it("prefers a fixed segment over a parameter from left to right", () => {
+    const templates = routeTemplates([
+      "/api/auth/:provider/callback",
+      "/api/auth/callback/:provider",
+    ]);
+
+    expect(templates.match("/api/auth/callback/callback")).toBe(
+      "/api/auth/callback/:provider"
+    );
+  });
+
   it.effect("drops only the configured root names", () =>
     Effect.gen(function* () {
       const { spans, tracer } = recordingTracer();

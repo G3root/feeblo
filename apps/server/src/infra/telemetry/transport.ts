@@ -21,7 +21,6 @@ import {
   type HttpClientResponse,
 } from "effect/http";
 import * as Layer from "effect/Layer";
-import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 
 import { telemetryRequestTimeout } from "./config";
@@ -86,6 +85,28 @@ const decodeError = (
     }),
   });
 
+/** The sentinel the acknowledgement timeout fails with, classified apart from transport errors. */
+const acknowledgementTimeout = "Telemetry collector acknowledgement timed out";
+
+/** Classify an export failure for the `reason` label on the failure counter. */
+const exportFailureReason = (
+  cause: unknown
+): "acknowledgement" | "timeout" | "transport" => {
+  if (!HttpClientError.isHttpClientError(cause)) {
+    return "transport";
+  }
+  if (cause.reason._tag === "DecodeError") {
+    return "acknowledgement";
+  }
+  if (
+    cause.reason._tag === "TransportError" &&
+    cause.reason.description === acknowledgementTimeout
+  ) {
+    return "timeout";
+  }
+  return "transport";
+};
+
 const decodeAcknowledgement = (
   response: HttpClientResponse.HttpClientResponse
 ) =>
@@ -145,8 +166,7 @@ export const telemetryHttpClient: Layer.Layer<HttpClient.HttpClient> =
                     new HttpClientError.HttpClientError({
                       reason: new HttpClientError.TransportError({
                         request,
-                        description:
-                          "Telemetry collector acknowledgement timed out",
+                        description: acknowledgementTimeout,
                       }),
                     })
                   ),
@@ -154,10 +174,7 @@ export const telemetryHttpClient: Layer.Layer<HttpClient.HttpClient> =
               Effect.tapError((error) =>
                 recordExportFailure(
                   new URL(request.url).pathname,
-                  HttpClientError.isHttpClientError(error) &&
-                    Predicate.isTagged(error.reason, "DecodeError")
-                    ? "acknowledgement"
-                    : "transport"
+                  exportFailureReason(error)
                 )
               ),
               Effect.onInterrupt(() =>

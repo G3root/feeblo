@@ -33,23 +33,62 @@ const maxIssues = 10;
 const segment = (key: PropertyKey) =>
   isNumber(key) ? `[${key}]` : `.${String(key).slice(0, 64)}`;
 
-/** Issue locations and categories only. Values, messages and annotations can echo request content. */
-const issueSummary = (issue: Issue, path: string): ReadonlyArray<string> => {
+/**
+ * Issue locations and categories only, yielded lazily. Values, messages and
+ * annotations can echo request content, and a large request can carry a large
+ * issue tree; the caller stops once it has enough findings.
+ */
+function* issueSummaries(issue: Issue, path: string): Generator<string> {
   switch (issue._tag) {
     case "Pointer":
-      return issueSummary(issue.issue, path + issue.path.map(segment).join(""));
+      yield* issueSummaries(
+        issue.issue,
+        path + issue.path.map(segment).join("")
+      );
+      return;
     case "Encoding":
-      return issueSummary(issue.issue, path);
+      yield* issueSummaries(issue.issue, path);
+      return;
     case "Composite":
-      return issue.issues.flatMap((inner) => issueSummary(inner, path));
+      for (const inner of issue.issues) {
+        yield* issueSummaries(inner, path);
+      }
+      return;
     // A union lists why each member rejected the value.
     case "AnyOf":
-      return issue.issues.length === 0
-        ? [`${path}: AnyOf`]
-        : issue.issues.flatMap((inner) => issueSummary(inner, path));
+      if (issue.issues.length === 0) {
+        yield `${path}: AnyOf`;
+        return;
+      }
+      for (const inner of issue.issues) {
+        yield* issueSummaries(inner, path);
+      }
+      return;
     default:
-      return [`${path}: ${issue._tag}`];
+      yield `${path}: ${issue._tag}`;
   }
+}
+
+/** The first `maxIssues` unique summaries, and whether the tree held more. */
+interface CollectedIssues {
+  readonly issues: ReadonlyArray<string>;
+  readonly truncated: boolean;
+}
+
+const collectIssues = (issue: Issue): CollectedIssues => {
+  const issues: string[] = [];
+  const seen = new Set<string>();
+  for (const summary of issueSummaries(issue, "$")) {
+    if (seen.has(summary)) {
+      continue;
+    }
+    seen.add(summary);
+    if (issues.length === maxIssues) {
+      return { issues, truncated: true };
+    }
+    issues.push(summary);
+  }
+  return { issues, truncated: false };
 };
 
 /** Record the rejection on the span that owns the rejected request. */
@@ -70,18 +109,12 @@ const reporter: ErrorReporter.ErrorReporter = {
       if (Option.isNone(span) || span.value._tag !== "Span") {
         return;
       }
-      // Union members can repeat the same finding.
-      const issues = [...new Set(issueSummary(error.cause.issue, "$"))];
+      const { issues, truncated } = collectIssues(error.cause.issue);
       span.value.attribute("error.type", "HttpApiSchemaError");
       span.value.attribute("feeblo.request.rejection.kind", error.kind);
       span.value.attribute(
         "feeblo.request.rejection.issues",
-        [
-          ...issues.slice(0, maxIssues),
-          ...(issues.length > maxIssues
-            ? [`+${issues.length - maxIssues} more`]
-            : []),
-        ].join(", ")
+        [...issues, ...(truncated ? ["+more"] : [])].join(", ")
       );
       return;
     }

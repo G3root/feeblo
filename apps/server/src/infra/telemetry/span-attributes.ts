@@ -65,6 +65,27 @@ export const recordRoute = (template: `/${string}`) =>
   Effect.annotateCurrentSpan("http.route", template);
 
 /**
+ * Compare two templates from left to right: at the first segment where they
+ * differ, a fixed segment is more specific than a parameter. Templates that
+ * differ nowhere in their shared prefix keep their input order, so a match is
+ * deterministic.
+ */
+const compareSpecificity = (
+  a: ReadonlyArray<string>,
+  b: ReadonlyArray<string>
+): number => {
+  const length = Math.min(a.length, b.length);
+  for (let index = 0; index < length; index += 1) {
+    const left = a[index]?.startsWith(":") ?? false;
+    const right = b[index]?.startsWith(":") ?? false;
+    if (left !== right) {
+      return left ? 1 : -1;
+    }
+  }
+  return a.length - b.length;
+};
+
+/**
  * A fixed set of endpoint templates served under one wildcard route, such as
  * Better Auth's endpoints under `/api/auth/*`. `:name` stands for one segment.
  * `record` names the request's endpoint by its template and leaves the
@@ -76,11 +97,7 @@ export const routeTemplates = (templates: Iterable<`/${string}`>) => {
   // these serve.
   const known = [...new Set(templates)]
     .map((template) => ({ template, segments: template.split("/") }))
-    .sort(
-      (a, b) =>
-        a.segments.filter((segment) => segment.startsWith(":")).length -
-        b.segments.filter((segment) => segment.startsWith(":")).length
-    );
+    .sort((a, b) => compareSpecificity(a.segments, b.segments));
   const match = (path: string) => {
     const segments = path.split("/");
     return known.find(
