@@ -15,7 +15,6 @@ type PostWithTransientAuthor = {
   author?: TPostCreateAuthor;
 };
 import {
-  createRpcCollectionHelpers,
   eqFilterValue,
   postSlugFromPath,
   refetchInBackground,
@@ -45,7 +44,10 @@ import { getContext } from "~/integrations/tanstack-query/root-provider";
 import {
   type DashboardCollectionScope,
   organizationScopedCollectionId,
+  organizationScopedQueryKey,
+  scopePostSlug,
   slugScopedCollectionId,
+  slugScopedQueryKey,
 } from "./collection-scope";
 import { fetchRpc } from "./runtime";
 
@@ -87,8 +89,9 @@ function getBrowserDbClient(): DbClient {
 /**
  * The dashboard's organization, taken from the first path segment.
  *
- * Isomorphic through `currentPathname`, so the `queryKey`/`queryFn` helpers
- * below resolve the same scope during SSR as they do in the browser.
+ * Read when a descriptor is materialized (`currentScope`), which is what pins
+ * the descriptor and its query key to one scope. The dashboard is client-only,
+ * so `currentPathname` resolves from `window`.
  */
 function getCurrentOrganizationId() {
   const organizationId = currentPathname()
@@ -100,19 +103,13 @@ function getCurrentOrganizationId() {
 
 /**
  * Post detail pages live at `/:organizationId/.../post/:boardSlug/:postSlug`;
- * parse the post slug from the current URL so the comment/reaction collections
- * can be keyed and fetched when the query is created without an explicit
- * filter (e.g. from a route loader).
+ * parse the post slug from the current URL so a collection created without an
+ * explicit filter (e.g. from a route loader) captures the post it belongs to
+ * and keys itself to that post, not to whichever post is on screen later.
  */
 function getCurrentPostSlug() {
   return postSlugFromPath(currentPathname(), "post", 2);
 }
-
-const { organizationScopedQueryKey, resolvePostSlug, slugScopedQueryKey } =
-  createRpcCollectionHelpers({
-    getOrganizationId: getCurrentOrganizationId,
-    getPostSlug: getCurrentPostSlug,
-  });
 
 export function postCollection(scope: DashboardCollectionScope) {
   const id = organizationScopedCollectionId("postCollection", scope);
@@ -121,7 +118,7 @@ export function postCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("post"),
+      queryKey: () => organizationScopedQueryKey(scope, "post"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -241,8 +238,9 @@ export function postDetailCollection(scope: DashboardCollectionScope) {
       // entry per post regardless of where they subscribe from.
       queryKey: (opts) => {
         const filters = parseLoadSubsetOptions(opts).filters;
-        const slug = eqFilterValue(filters, "slug") ?? resolvePostSlug(filters);
-        return organizationScopedQueryKey("post-detail", slug);
+        const slug =
+          eqFilterValue(filters, "slug") ?? scopePostSlug(scope, filters);
+        return organizationScopedQueryKey(scope, "post-detail", slug);
       },
       syncMode: "on-demand",
       queryFn: async (ctx) => {
@@ -250,7 +248,8 @@ export function postDetailCollection(scope: DashboardCollectionScope) {
         const filters = parseLoadSubsetOptions(
           ctx.meta?.loadSubsetOptions
         ).filters;
-        const slug = eqFilterValue(filters, "slug") ?? resolvePostSlug(filters);
+        const slug =
+          eqFilterValue(filters, "slug") ?? scopePostSlug(scope, filters);
 
         if (!(organizationId && slug)) {
           return [];
@@ -274,7 +273,7 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("post-status"),
+      queryKey: () => organizationScopedQueryKey(scope, "post-status"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -353,7 +352,7 @@ export function changelogCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("changelog"),
+      queryKey: () => organizationScopedQueryKey(scope, "changelog"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -436,7 +435,8 @@ export function changelogCategoryLinkCollection(
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("changelog-category-link"),
+      queryKey: () =>
+        organizationScopedQueryKey(scope, "changelog-category-link"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -468,7 +468,7 @@ export function changelogCategoryCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("changelog-category"),
+      queryKey: () => organizationScopedQueryKey(scope, "changelog-category"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -558,7 +558,7 @@ export function changelogPostCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("changelog-post"),
+      queryKey: () => organizationScopedQueryKey(scope, "changelog-post"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
         if (!organizationId) {
@@ -603,7 +603,7 @@ export function boardCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("board"),
+      queryKey: () => organizationScopedQueryKey(scope, "board"),
       refetchInterval: Duration.toMillis(Duration.minutes(5)),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
@@ -676,7 +676,7 @@ export function tagCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("tag"),
+      queryKey: () => organizationScopedQueryKey(scope, "tag"),
 
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
@@ -738,7 +738,7 @@ export function postTagCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("post-tag"),
+      queryKey: () => organizationScopedQueryKey(scope, "post-tag"),
 
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
@@ -819,7 +819,7 @@ export function membersCollection(scope: DashboardCollectionScope) {
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
       staleTime: Duration.toMillis(Duration.minutes(20)),
-      queryKey: () => organizationScopedQueryKey("members"),
+      queryKey: () => organizationScopedQueryKey(scope, "members"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -868,7 +868,7 @@ export function invitationsCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("invitations"),
+      queryKey: () => organizationScopedQueryKey(scope, "invitations"),
 
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
@@ -906,12 +906,17 @@ export function commentCollection(scope: DashboardCollectionScope) {
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
       queryKey: (opts) =>
-        slugScopedQueryKey("comment", parseLoadSubsetOptions(opts).filters),
+        slugScopedQueryKey(
+          scope,
+          "comment",
+          parseLoadSubsetOptions(opts).filters
+        ),
       syncMode: "on-demand",
 
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
-        const slug = resolvePostSlug(
+        const slug = scopePostSlug(
+          scope,
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
         );
 
@@ -1023,8 +1028,8 @@ export function postActivityCollection(scope: DashboardCollectionScope) {
         );
 
         return postId
-          ? organizationScopedQueryKey("post-activity", "postId", postId)
-          : organizationScopedQueryKey("post-activity");
+          ? organizationScopedQueryKey(scope, "post-activity", "postId", postId)
+          : organizationScopedQueryKey(scope, "post-activity");
       },
       syncMode: "on-demand",
       queryFn: async (ctx) => {
@@ -1087,6 +1092,7 @@ export function commentReactionCollection(scope: DashboardCollectionScope) {
       queryClient: client.requireDependency<QueryClient>("queryClient"),
       queryKey: (opts) =>
         slugScopedQueryKey(
+          scope,
           "comment-reaction",
           parseLoadSubsetOptions(opts).filters
         ),
@@ -1094,7 +1100,8 @@ export function commentReactionCollection(scope: DashboardCollectionScope) {
 
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
-        const slug = resolvePostSlug(
+        const slug = scopePostSlug(
+          scope,
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
         );
 
@@ -1153,7 +1160,7 @@ export function upvoteCollection(scope: DashboardCollectionScope) {
       queryClient: client.requireDependency<QueryClient>("queryClient"),
       // Lazy key: resolved at query time so navigation between organizations
       // never reuses another organization's cache entry (matches queryFn).
-      queryKey: () => organizationScopedQueryKey("upvote"),
+      queryKey: () => organizationScopedQueryKey(scope, "upvote"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -1228,7 +1235,7 @@ export function deleteEligibilityCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("delete-eligibility"),
+      queryKey: () => organizationScopedQueryKey(scope, "delete-eligibility"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -1259,6 +1266,7 @@ export function postReactionCollection(scope: DashboardCollectionScope) {
       queryClient: client.requireDependency<QueryClient>("queryClient"),
       queryKey: (opts) =>
         slugScopedQueryKey(
+          scope,
           "post-reaction",
           parseLoadSubsetOptions(opts).filters
         ),
@@ -1266,7 +1274,8 @@ export function postReactionCollection(scope: DashboardCollectionScope) {
 
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
-        const slug = resolvePostSlug(
+        const slug = scopePostSlug(
+          scope,
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
         );
 
@@ -1321,7 +1330,7 @@ export function siteCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("site"),
+      queryKey: () => organizationScopedQueryKey(scope, "site"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -1365,7 +1374,7 @@ export function workspacePlanCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("workspace-plan"),
+      queryKey: () => organizationScopedQueryKey(scope, "workspace-plan"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -1396,13 +1405,15 @@ export function postSubscriptionCollection(scope: DashboardCollectionScope) {
       queryClient: client.requireDependency<QueryClient>("queryClient"),
       queryKey: (opts) =>
         slugScopedQueryKey(
+          scope,
           "post-subscription",
           parseLoadSubsetOptions(opts).filters
         ),
       syncMode: "on-demand",
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
-        const slug = resolvePostSlug(
+        const slug = scopePostSlug(
+          scope,
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
         );
 
@@ -1458,7 +1469,7 @@ export function jwtSecretCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("jwt-secret"),
+      queryKey: () => organizationScopedQueryKey(scope, "jwt-secret"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -1484,7 +1495,7 @@ export function contactCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("contact"),
+      queryKey: () => organizationScopedQueryKey(scope, "contact"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -1556,7 +1567,7 @@ export function companyCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("company"),
+      queryKey: () => organizationScopedQueryKey(scope, "company"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -1631,7 +1642,7 @@ export function contactAttributeDefinitionCollection(
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
       queryKey: () =>
-        organizationScopedQueryKey("contact-attribute-definition"),
+        organizationScopedQueryKey(scope, "contact-attribute-definition"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -1707,7 +1718,7 @@ export function companyAttributeDefinitionCollection(
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
       queryKey: () =>
-        organizationScopedQueryKey("company-attribute-definition"),
+        organizationScopedQueryKey(scope, "company-attribute-definition"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -1781,7 +1792,8 @@ export function contactAttributeValueCollection(
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("contact-attribute-value"),
+      queryKey: () =>
+        organizationScopedQueryKey(scope, "contact-attribute-value"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -1813,7 +1825,8 @@ export function companyAttributeValueCollection(
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("company-attribute-value"),
+      queryKey: () =>
+        organizationScopedQueryKey(scope, "company-attribute-value"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -1840,7 +1853,7 @@ export function roadmapCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("roadmap"),
+      queryKey: () => organizationScopedQueryKey(scope, "roadmap"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
         if (!organizationId) {
@@ -1920,7 +1933,7 @@ export function roadmapColumnCollection(scope: DashboardCollectionScope) {
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey("roadmap-column"),
+      queryKey: () => organizationScopedQueryKey(scope, "roadmap-column"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 

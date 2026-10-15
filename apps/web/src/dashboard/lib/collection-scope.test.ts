@@ -4,7 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   organizationScopedCollectionId,
+  organizationScopedQueryKey,
+  scopePostSlug,
   slugScopedCollectionId,
+  slugScopedQueryKey,
 } from "./collection-scope";
 
 const orgA = { organizationId: "org-a", postSlug: "post-1" };
@@ -74,6 +77,50 @@ describe("slugScopedCollectionId", () => {
   });
 });
 
+describe("scope-derived query keys", () => {
+  const postSlugFilter = (value: string) => [
+    { field: ["postSlug"], operator: "eq", value },
+  ];
+
+  it("keys an organization-scoped collection by its scope", () => {
+    expect(organizationScopedQueryKey(orgA, "post")).toEqual(["post", "org-a"]);
+    expect(organizationScopedQueryKey(orgB, "post")).toEqual(["post", "org-b"]);
+  });
+
+  it("prefers an explicit postSlug filter over the scope's slug", () => {
+    expect(
+      slugScopedQueryKey(orgA, "comment", postSlugFilter("post-2"))
+    ).toEqual(["comment", "org-a", "postSlug", "post-2"]);
+  });
+
+  it("falls back to the slug captured in the scope", () => {
+    expect(slugScopedQueryKey(orgA, "comment")).toEqual([
+      "comment",
+      "org-a",
+      "postSlug",
+      "post-1",
+    ]);
+    expect(
+      scopePostSlug({ organizationId: "org-a", postSlug: undefined })
+    ).toBeUndefined();
+  });
+
+  it("carries extra key parts after the slug", () => {
+    expect(
+      slugScopedQueryKey(orgA, "post-subscription", undefined, "user-1")
+    ).toEqual(["post-subscription", "org-a", "postSlug", "post-1", "user-1"]);
+  });
+
+  it("falls back to the bare name without an organization", () => {
+    expect(
+      organizationScopedQueryKey(
+        { organizationId: undefined, postSlug: undefined },
+        "post"
+      )
+    ).toEqual(["post"]);
+  });
+});
+
 /**
  * Source-level guard for the invariant the unit tests above encode: a collection
  * whose `queryKey` resolves a slug from the route must key its descriptor by
@@ -118,9 +165,7 @@ describe("collections module invariants", () => {
 
   it("keys every route-slug-scoped collection by slug", () => {
     const slugScoped = blocks.filter((b) =>
-      /getCurrentPostSlug\(\)|resolvePostSlug\(|slugScopedQueryKey\(/.test(
-        b.body
-      )
+      /getCurrentPostSlug\(\)|scopePostSlug\(|slugScopedQueryKey\(/.test(b.body)
     );
 
     expect(slugScoped.length).toBeGreaterThan(0);
