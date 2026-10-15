@@ -87,7 +87,11 @@ export type RemapDbErrorsConfig<UniqueViolationError = never> = {
   readonly uniqueViolationMessage?: string;
 };
 
-type RemappedDbError =
+/**
+ * The error types `withRemapDbErrors` replaces; exported so a wrapper can
+ * state the channel it leaves behind.
+ */
+export type RemappedDbError =
   | EffectDrizzleQueryError
   | { _tag: "SqlError" | "SchemaError" | "LegidError" };
 
