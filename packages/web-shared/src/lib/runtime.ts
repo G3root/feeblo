@@ -67,11 +67,17 @@ export async function runEffect<A, E, R>(
 }
 
 /**
- * Fetches via RPC: runs the given RPC effect with the default runtime.
+ * Fetches via RPC: runs the given RPC effect with the environment's runtime.
  *
- * Handle declared domain failures inside `cb` with `Effect.catchTag` or
- * `Effect.catchTags`; JavaScript promises cannot retain a typed rejection
- * channel. Any failure left unhandled is thrown as `RpcError` for fallback UI.
+ * The promise boundary cannot carry Effect's typed error channel, so every
+ * failure — declared or not — rejects with `RpcError`, whose cause carries the
+ * tag. Callers render it with `parseRpcError`, which reads that tag into
+ * user-facing copy.
+ *
+ * Catch inside `cb` only when the tag changes control flow: a not-found that
+ * means "empty", a retry policy, a rate limit that wants its own UI. A
+ * mutation handler that catches without rethrowing commits its optimistic
+ * write as if the RPC had succeeded.
  */
 export function fetchRpc<A, E, R>(
   cb: (rpc: RpcClientType) => Effect.Effect<A, E, R>,
