@@ -138,7 +138,7 @@ function IntegrationsSettingsRoute() {
     } else {
       return;
     }
-    router.navigate({
+    void router.navigate({
       to: "/$organizationId/settings/integrations",
       params: { organizationId },
       search: {},

@@ -97,9 +97,9 @@ function PublicRoadmapProvider({
   const switchRoadmap = useCallback(
     (nextSlug: string) => {
       if (nextSlug === primarySlug) {
-        navigate({ to: boardPaths.roadmap, replace: true });
+        void navigate({ to: boardPaths.roadmap, replace: true });
       } else {
-        navigate({
+        void navigate({
           params: { slug: nextSlug },
           replace: true,
           to: "/s/roadmap/$slug",

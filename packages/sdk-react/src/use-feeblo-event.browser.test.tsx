@@ -78,7 +78,7 @@ describe("useFeebloEvent", () => {
     }
 
     const screen = await render(<RecordingProbe />);
-    screen.unmount();
+    await screen.unmount();
 
     emitWidgetEvent("feedbackSubmitted", {
       boardId: "b_1",

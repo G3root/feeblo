@@ -732,7 +732,7 @@ function InviteMemberForm() {
       onSubmit={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        form.handleSubmit();
+        void form.handleSubmit();
       }}
     >
       <form.AppField name="email">

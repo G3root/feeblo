@@ -106,7 +106,7 @@ function TagCreateForm({
       onSubmit={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        form.handleSubmit();
+        void form.handleSubmit();
       }}
     >
       <DialogPanel className="grid gap-4">

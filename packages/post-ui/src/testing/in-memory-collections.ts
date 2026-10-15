@@ -36,7 +36,7 @@ export function createMockCollection<T extends object>({
       for (const item of initialData) {
         w({ type: "insert", value: item });
       }
-      c();
+      void c();
       markReady();
     },
   };

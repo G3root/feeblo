@@ -277,7 +277,7 @@ export function ChangelogEditorProvider({
         type: "success",
       });
 
-      navigate({
+      void navigate({
         to: "/$organizationId/changelog",
         params: { organizationId },
       });
@@ -291,7 +291,7 @@ export function ChangelogEditorProvider({
   }, [changelog.id, changelogCollection, navigate, organizationId]);
 
   const submitDefault = useCallback(() => {
-    form.handleSubmit({ successTitle: "Changes saved" });
+    void form.handleSubmit({ successTitle: "Changes saved" });
   }, [form]);
   const value = useMemo<ChangelogEditorContextValue>(
     () => ({

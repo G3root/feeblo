@@ -99,7 +99,7 @@ function RenameBoardFormFields({ board }: { board: BoardFormValues }) {
         });
         store.send({ type: "toggle" });
 
-        navigate({
+        void navigate({
           to: "/$organizationId/board/$boardSlug",
           params: {
             organizationId,
@@ -121,7 +121,7 @@ function RenameBoardFormFields({ board }: { board: BoardFormValues }) {
       onSubmit={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        form.handleSubmit();
+        void form.handleSubmit();
       }}
     >
       <SheetPanel className="grid gap-4">
