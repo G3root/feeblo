@@ -10,11 +10,7 @@ import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
-import {
-  type Surface,
-  type SurfacePair,
-  withSurfacePolicyAndRateLimit,
-} from "../surface";
+import { defineSurfacePair } from "../surface";
 import { CommentReactionRepository } from "./repository";
 import { CommentReactionRpcs } from "./rpcs";
 import type { TCommentReactionList, TCommentReactionToggle } from "./schema";
@@ -34,8 +30,12 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
   // `isUnlockedPublic` and lets the repository's `togglePublic` join the
   // board visibility.
 
-  const toggleWrite = {
+  const toggleWrite = defineSurfacePair<
+    TCommentReactionToggle,
+    CommentReactionRpcTag
+  >()({
     operation: "CommentReactionToggle",
+    remap: { action: "update", entity: "CommentReaction" },
     dashboard: {
       rateLimit: undefined,
       policy: (args: TCommentReactionToggle) =>
@@ -58,36 +58,24 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
           })
         ),
     },
-  } satisfies SurfacePair<TCommentReactionToggle, CommentReactionRpcTag>;
+  });
 
-  const toggleReaction = <
-    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
-  >(
-    surface: Surface,
-    level: Level,
-    args: TCommentReactionToggle
-  ) =>
-    withSurfacePolicyAndRateLimit({
-      level,
-      operation: toggleWrite.operation,
-      surface,
-      policy: toggleWrite[surface].policy(args),
-    })(
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        const request = {
-          commentId: args.commentId,
-          emoji: args.emoji,
-          organizationId: args.organizationId,
-          postId: args.postId,
-          userId: session.session.userId,
-        };
+  const toggleReaction = toggleWrite.handlers((surface, args) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const request = {
+        commentId: args.commentId,
+        emoji: args.emoji,
+        organizationId: args.organizationId,
+        postId: args.postId,
+        userId: session.session.userId,
+      };
 
-        return yield* surface === "public"
-          ? repository.togglePublic(request)
-          : repository.toggle(request);
-      })
-    ).pipe(withRemapDbErrors("CommentReaction", "update"));
+      return yield* surface === "public"
+        ? repository.togglePublic(request)
+        : repository.toggle(request);
+    })
+  );
 
   return {
     CommentReactionList: (args: TCommentReactionList) =>
@@ -100,8 +88,7 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("CommentReaction", "select")
         ),
-    CommentReactionToggle: (args: TCommentReactionToggle) =>
-      toggleReaction("dashboard", toggleWrite.dashboard.rateLimit, args),
+    CommentReactionToggle: toggleReaction.dashboard,
     CommentReactionListPublic: (args: TCommentReactionList) =>
       withPublicViewer({
         read: () =>
@@ -117,8 +104,7 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
         }),
         withRemapDbErrors("CommentReaction", "select")
       ),
-    CommentReactionTogglePublic: (args: TCommentReactionToggle) =>
-      toggleReaction("public", toggleWrite.public.rateLimit, args),
+    CommentReactionTogglePublic: toggleReaction.public,
   };
 });
 
