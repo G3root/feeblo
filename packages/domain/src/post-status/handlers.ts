@@ -2,14 +2,9 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import * as Policy from "../policy";
-import * as RateLimit from "../rate-limit";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
-import {
-  type Surface,
-  type SurfacePair,
-  withSurfacePolicyAndRateLimit,
-} from "../surface";
+import { defineSurfacePair } from "../surface";
 import { PostStatusRepository } from "./repository";
 import { PostStatusRpcs } from "./rpcs";
 import type {
@@ -41,8 +36,9 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
   // The public read is per-IP rate limited and returns no PII (id/name/color/
   // kind only).
 
-  const listRead = {
+  const listRead = defineSurfacePair<TPostStatusList, PostStatusRpcTag>()({
     operation: "PostStatusList",
+    remap: { action: "select", entity: "PostStatus" },
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostStatusList) => read(args.organizationId),
@@ -51,41 +47,15 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
       rateLimit: "read",
       policy: (_args: TPostStatusList) => Policy.allow,
     },
-  } satisfies SurfacePair<TPostStatusList, PostStatusRpcTag>;
+  });
 
-  const listStatuses = <
-    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
-    P extends Policy.Policy<unknown, unknown>,
-  >(
-    surface: Surface,
-    level: Level,
-    policy: P,
-    args: TPostStatusList
-  ) =>
-    withSurfacePolicyAndRateLimit({
-      level,
-      operation: listRead.operation,
-      surface,
-      policy,
-    })(repository.findMany({ organizationId: args.organizationId })).pipe(
-      withRemapDbErrors("PostStatus", "select")
-    );
+  const listStatuses = listRead.handlers((_surface, args) =>
+    repository.findMany({ organizationId: args.organizationId })
+  );
 
   return {
-    PostStatusList: (args: TPostStatusList) =>
-      listStatuses(
-        "dashboard",
-        listRead.dashboard.rateLimit,
-        listRead.dashboard.policy(args),
-        args
-      ),
-    PostStatusListPublic: (args: TPostStatusList) =>
-      listStatuses(
-        "public",
-        listRead.public.rateLimit,
-        listRead.public.policy(args),
-        args
-      ),
+    PostStatusList: listStatuses.dashboard,
+    PostStatusListPublic: listStatuses.public,
     PostStatusCreate: (args: TPostStatusCreate) =>
       repository.create(args).pipe(
         Policy.withPolicy(manage(args.organizationId)),
