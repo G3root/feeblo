@@ -12,11 +12,7 @@ import * as RateLimit from "../rate-limit";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
-import {
-  type Surface,
-  type SurfacePair,
-  withSurfacePolicyAndRateLimit,
-} from "../surface";
+import { defineSurfacePair } from "../surface";
 import { PostSubscriptionRepository } from "./repository";
 import { PostSubscriptionRpcs } from "./rpcs";
 import type {
@@ -124,13 +120,17 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
 
   // -- Surface-parameterized writes --
   //
-  // Both bodies above are surface-neutral; the record holds what differs:
+  // Both bodies above are surface-neutral; the pair holds what differs:
   // the dashboard admits members to unlocked posts, the public portal admits
   // restricted sessions to public boards, and only the public portal spends a
   // rate limit.
 
-  const createWrite = {
+  const createWrite = defineSurfacePair<
+    TPostSubscriptionCreate,
+    PostSubscriptionRpcTag
+  >()({
     operation: "PostSubscriptionCreate",
+    remap: { action: "create", entity: "PostSubscription" },
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostSubscriptionCreate) =>
@@ -153,10 +153,14 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
           })
         ),
     },
-  } satisfies SurfacePair<TPostSubscriptionCreate, PostSubscriptionRpcTag>;
+  });
 
-  const deleteWrite = {
+  const deleteWrite = defineSurfacePair<
+    TPostSubscriptionDelete,
+    PostSubscriptionRpcTag
+  >()({
     operation: "PostSubscriptionDelete",
+    remap: { action: "delete", entity: "PostSubscription" },
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostSubscriptionDelete) =>
@@ -179,39 +183,15 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
           })
         ),
     },
-  } satisfies SurfacePair<TPostSubscriptionDelete, PostSubscriptionRpcTag>;
+  });
 
-  const subscribeFor = <
-    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
-  >(
-    surface: Surface,
-    level: Level,
-    args: TPostSubscriptionCreate
-  ) =>
-    withSurfacePolicyAndRateLimit({
-      level,
-      operation: createWrite.operation,
-      surface,
-      policy: createWrite[surface].policy(args),
-    })(subscribeEffect(args)).pipe(
-      withRemapDbErrors("PostSubscription", "create")
-    );
+  const subscribe = createWrite.handlers((_surface, args) =>
+    subscribeEffect(args)
+  );
 
-  const unsubscribeFor = <
-    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
-  >(
-    surface: Surface,
-    level: Level,
-    args: TPostSubscriptionDelete
-  ) =>
-    withSurfacePolicyAndRateLimit({
-      level,
-      operation: deleteWrite.operation,
-      surface,
-      policy: deleteWrite[surface].policy(args),
-    })(unsubscribeEffect(args)).pipe(
-      withRemapDbErrors("PostSubscription", "delete")
-    );
+  const unsubscribe = deleteWrite.handlers((_surface, args) =>
+    unsubscribeEffect(args)
+  );
 
   // -- RPC handlers --
 
@@ -246,17 +226,13 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("PostSubscription", "select")
       ),
 
-    PostSubscriptionCreate: (args: TPostSubscriptionCreate) =>
-      subscribeFor("dashboard", createWrite.dashboard.rateLimit, args),
+    PostSubscriptionCreate: subscribe.dashboard,
 
-    PostSubscriptionCreatePublic: (args: TPostSubscriptionCreate) =>
-      subscribeFor("public", createWrite.public.rateLimit, args),
+    PostSubscriptionCreatePublic: subscribe.public,
 
-    PostSubscriptionDelete: (args: TPostSubscriptionDelete) =>
-      unsubscribeFor("dashboard", deleteWrite.dashboard.rateLimit, args),
+    PostSubscriptionDelete: unsubscribe.dashboard,
 
-    PostSubscriptionDeletePublic: (args: TPostSubscriptionDelete) =>
-      unsubscribeFor("public", deleteWrite.public.rateLimit, args),
+    PostSubscriptionDeletePublic: unsubscribe.public,
   };
 });
 
