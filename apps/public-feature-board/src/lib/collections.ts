@@ -504,20 +504,19 @@ export const publicCommentDescriptor = collectionOptions(
           return [];
         }
 
-        try {
-          const data = await fetchRpc(
-            (rpc) =>
-              rpc.CommentListPublic({
-                organizationId,
-                slug,
-              }),
-            { signal: ctx.signal }
-          );
+        // No catch: a rate limit or transport failure is the query's error
+        // state, not an empty thread. A hidden post's comments are filtered in
+        // the repository and arrive as a successful empty list.
+        const data = await fetchRpc(
+          (rpc) =>
+            rpc.CommentListPublic({
+              organizationId,
+              slug,
+            }),
+          { signal: ctx.signal }
+        );
 
-          return [...data];
-        } catch {
-          return [];
-        }
+        return [...data];
       },
       queryClient: deps.queryClient,
       getKey: (item) => item.id,
@@ -603,16 +602,14 @@ export const publicCommentReactionDescriptor = collectionOptions(
           return [];
         }
 
-        try {
-          const data = await fetchRpc(
-            (rpc) => rpc.CommentReactionListPublic({ organizationId, slug }),
-            { signal: ctx.signal }
-          );
+        // No catch here either: the public reaction list has no "hidden"
+        // answer, so any failure is the query's error state, not an empty list.
+        const data = await fetchRpc(
+          (rpc) => rpc.CommentReactionListPublic({ organizationId, slug }),
+          { signal: ctx.signal }
+        );
 
-          return [...data];
-        } catch {
-          return [];
-        }
+        return [...data];
       },
       // SAFETY: The endpoint/API contract guarantees this response shape.
       queryClient: deps.queryClient,

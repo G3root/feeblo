@@ -81,7 +81,8 @@ services:
       # custom domain, never the S3 endpoint. Unset, uploads still succeed and
       # return URLs that 403 for every browser.
       MEDIA_PUBLIC_BASE_URL: "${MEDIA_PUBLIC_BASE_URL:?MEDIA_PUBLIC_BASE_URL is required - e.g. https://media.example.com}"
-      # Optional OTLP exporters; unset keeps Sentry as the only tracing backend.
+      # Optional OTLP exporters; unset disables telemetry export and keeps the
+      # runtime's default tracer and logger.
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-}

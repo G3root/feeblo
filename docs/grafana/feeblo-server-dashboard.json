@@ -412,7 +412,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "End-to-end provider request latency. Grafana Cloud stores the OTLP exponential histogram as a Prometheus native histogram.",
+      "description": "End-to-end provider request latency, from the classic bucket series Effect exports for explicit-boundary histograms.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -490,7 +490,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(feeblo_integration_delivery_latency_milliseconds{${service_label}=~\"$service\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(feeblo_integration_delivery_latency_milliseconds_bucket{${service_label}=~\"$service\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "refId": "A"

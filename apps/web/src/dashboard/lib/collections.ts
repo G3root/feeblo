@@ -924,15 +924,14 @@ export function commentCollection(scope: DashboardCollectionScope) {
           return [];
         }
 
-        try {
-          const data = await fetchRpc(
-            (rpc) => rpc.CommentList({ organizationId, slug }),
-            { signal: ctx.signal }
-          );
-          return [...data];
-        } catch {
-          return [];
-        }
+        // No catch: a policy denial, a lost session or a dropped connection is
+        // the query's error state, not an empty thread. An empty list is a
+        // successful RPC that found no comments.
+        const data = await fetchRpc(
+          (rpc) => rpc.CommentList({ organizationId, slug }),
+          { signal: ctx.signal }
+        );
+        return [...data];
       },
       getKey: (item) => item.id,
       onInsert: async ({ transaction }) => {
