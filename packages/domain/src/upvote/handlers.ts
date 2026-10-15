@@ -13,7 +13,7 @@ import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
-import { defineSurfacePair } from "../surface";
+import { type Surface, definePublicEntry, defineSurfacePair } from "../surface";
 import { UserRepository } from "../user/repository";
 import { addVoteOnBehalf, removeVoteOnBehalf } from "./on-behalf";
 import { UpvotePolicy } from "./policies";
@@ -36,29 +36,22 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
   // -- Surface-parameterized writes --
   //
   // The policy's `source` selects the visibility rule: the dashboard checks
-  // `isUnlocked`, the public portal `isUnlockedPublic`.
+  // `isUnlocked`, the public portal `isUnlockedPublic`. The pair passes its
+  // own surface to the factory, so the halves cannot disagree about which
+  // rule is which.
+
+  const canToggleFor = (args: TUpvoteToggle, surface: Surface) =>
+    upvotePolicy.canToggle({
+      organizationId: args.organizationId,
+      postId: args.postId,
+      source: surface,
+    });
 
   const toggleWrite = defineSurfacePair<TUpvoteToggle, UpvoteRpcTag>()({
     operation: "UpvoteToggle",
     remap: { action: "update", entity: "Upvote" },
-    dashboard: {
-      rateLimit: undefined,
-      policy: (args: TUpvoteToggle) =>
-        upvotePolicy.canToggle({
-          organizationId: args.organizationId,
-          postId: args.postId,
-          source: "dashboard",
-        }),
-    },
-    public: {
-      rateLimit: "write",
-      policy: (args: TUpvoteToggle) =>
-        upvotePolicy.canToggle({
-          organizationId: args.organizationId,
-          postId: args.postId,
-          source: "public",
-        }),
-    },
+    dashboard: { rateLimit: undefined, policy: canToggleFor },
+    public: { rateLimit: "write", policy: canToggleFor },
   });
 
   const toggleVote = toggleWrite.handlers((_surface, args) =>
@@ -74,6 +67,15 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
       );
     })
   );
+
+  // The dashboard list is the voter roster; the public list is filtered to
+  // public-only rows with no roster, so the pair does not apply and the
+  // dashboard half stays hand-written.
+  const listPublicEntry = definePublicEntry<TUpvoteList, UpvoteRpcTag>()({
+    operation: "UpvoteList",
+    remap: { action: "select", entity: "Upvote" },
+    config: { rateLimit: "read", policy: () => Policy.allow },
+  });
 
   return {
     UpvoteList: (args: TUpvoteList) =>
@@ -153,7 +155,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         ),
         withRemapDbErrors("Upvote", "update")
       ),
-    UpvoteListPublic: (args: TUpvoteList) =>
+    UpvoteListPublic: listPublicEntry.entry((args) =>
       withPublicViewer({
         read: () =>
           repository.list({
@@ -163,13 +165,8 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
             ...(args.slug && { slug: args.slug }),
           }),
         redact: redactActorIdentities,
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "UpvoteListPublic",
-          level: "read",
-        }),
-        withRemapDbErrors("Upvote", "select")
-      ),
+      })
+    ),
     UpvoteTogglePublic: toggleVote.public,
   };
 });

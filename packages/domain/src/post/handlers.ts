@@ -19,7 +19,7 @@ import * as RateLimit from "../rate-limit";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession, type Session } from "../session-middleware";
-import { defineSurfacePair } from "../surface";
+import { type Surface, definePublicEntry, defineSurfacePair } from "../surface";
 import { WorkspaceRepository } from "../workspace/repository";
 import { PostEmbeddingService } from "./embedding-service";
 import {
@@ -148,29 +148,22 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   // rate-limit level that differ. Public updates are rename semantics only,
   // which is why `PostUpdate`'s public policy adds `hasUnchangedLocation`.
 
+  // One factory per admission rule the surfaces share: each entry passes its
+  // own surface to it, so the policy's `source` is the surface the entry
+  // actually answers and the halves cannot disagree.
+  const canDeleteAs = (args: TPostDelete, surface: Surface) =>
+    postPolicy.canDelete({
+      boardId: args.boardId,
+      organizationId: args.organizationId,
+      postId: args.id,
+      source: surface,
+    });
+
   const deleteWrite = defineSurfacePair<TPostDelete, PostRpcTag>()({
     operation: "PostDelete",
     remap: { action: "delete", entity: "Post" },
-    dashboard: {
-      rateLimit: undefined,
-      policy: (args: TPostDelete) =>
-        postPolicy.canDelete({
-          boardId: args.boardId,
-          organizationId: args.organizationId,
-          postId: args.id,
-          source: "dashboard",
-        }),
-    },
-    public: {
-      rateLimit: "write",
-      policy: (args: TPostDelete) =>
-        postPolicy.canDelete({
-          boardId: args.boardId,
-          organizationId: args.organizationId,
-          postId: args.id,
-          source: "public",
-        }),
-    },
+    dashboard: { rateLimit: undefined, policy: canDeleteAs },
+    public: { rateLimit: "write", policy: canDeleteAs },
   });
 
   const updateWrite = defineSurfacePair<TPostUpdate, PostRpcTag>()({
@@ -209,57 +202,32 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     },
   });
 
+  const canUpdateAs = (
+    args: TPostUpdateContent | TPostUpdateTitle,
+    surface: Surface
+  ) =>
+    postPolicy.canUpdate({
+      boardId: args.boardId,
+      organizationId: args.organizationId,
+      postId: args.id,
+      source: surface,
+    });
+
   const updateContentWrite = defineSurfacePair<
     TPostUpdateContent,
     PostRpcTag
   >()({
     operation: "PostUpdateContent",
     remap: { action: "update", entity: "Post" },
-    dashboard: {
-      rateLimit: undefined,
-      policy: (args: TPostUpdateContent) =>
-        postPolicy.canUpdate({
-          boardId: args.boardId,
-          organizationId: args.organizationId,
-          postId: args.id,
-          source: "dashboard",
-        }),
-    },
-    public: {
-      rateLimit: "expensive",
-      policy: (args: TPostUpdateContent) =>
-        postPolicy.canUpdate({
-          boardId: args.boardId,
-          organizationId: args.organizationId,
-          postId: args.id,
-          source: "public",
-        }),
-    },
+    dashboard: { rateLimit: undefined, policy: canUpdateAs },
+    public: { rateLimit: "expensive", policy: canUpdateAs },
   });
 
   const updateTitleWrite = defineSurfacePair<TPostUpdateTitle, PostRpcTag>()({
     operation: "PostUpdateTitle",
     remap: { action: "update", entity: "Post" },
-    dashboard: {
-      rateLimit: undefined,
-      policy: (args: TPostUpdateTitle) =>
-        postPolicy.canUpdate({
-          boardId: args.boardId,
-          organizationId: args.organizationId,
-          postId: args.id,
-          source: "dashboard",
-        }),
-    },
-    public: {
-      rateLimit: "expensive",
-      policy: (args: TPostUpdateTitle) =>
-        postPolicy.canUpdate({
-          boardId: args.boardId,
-          organizationId: args.organizationId,
-          postId: args.id,
-          source: "public",
-        }),
-    },
+    dashboard: { rateLimit: undefined, policy: canUpdateAs },
+    public: { rateLimit: "expensive", policy: canUpdateAs },
   });
 
   const removePost = deleteWrite.handlers((_surface, args) =>
@@ -319,6 +287,16 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     )
   );
 
+  // On-behalf attribution is a dashboard capability: the public `canCreate`
+  // branch never consults `onBehalf`, and the body below refuses an author
+  // outright on the portal, so one factory serves both halves.
+  const canCreateAs = (args: TPostCreate, surface: Surface) =>
+    postPolicy.canCreate({
+      onBehalf: args.author !== undefined,
+      organizationId: args.organizationId,
+      source: surface,
+    });
+
   const createWrite = defineSurfacePair<TPostCreate, PostRpcTag>()({
     operation: "PostCreate",
     remap: {
@@ -329,23 +307,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           message: "A post with this slug already exists",
         }),
     },
-    dashboard: {
-      rateLimit: undefined,
-      policy: (args: TPostCreate) =>
-        postPolicy.canCreate({
-          onBehalf: args.author !== undefined,
-          organizationId: args.organizationId,
-          source: "dashboard",
-        }),
-    },
-    public: {
-      rateLimit: "expensive",
-      policy: (args: TPostCreate) =>
-        postPolicy.canCreate({
-          organizationId: args.organizationId,
-          source: "public",
-        }),
-    },
+    dashboard: { rateLimit: undefined, policy: canCreateAs },
+    public: { rateLimit: "expensive", policy: canCreateAs },
   });
 
   const createPost = createWrite.handlers((surface, args) =>
@@ -369,6 +332,38 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     })
   );
 
+  // -- One-sided public reads (the dashboard bodies differ) --
+
+  const listPublicEntry = definePublicEntry<TPostList, PostRpcTag>()({
+    operation: "PostList",
+    remap: { action: "select", entity: "Post" },
+    config: { rateLimit: "read", policy: () => Policy.allow },
+  });
+
+  const getPublicEntry = definePublicEntry<TPostGet, PostRpcTag>()({
+    operation: "PostGet",
+    remap: { action: "select", entity: "Post" },
+    config: { rateLimit: "read", policy: () => Policy.allow },
+  });
+
+  const suggestionsPublicEntry = definePublicEntry<
+    TPostSuggestions,
+    PostRpcTag
+  >()({
+    operation: "PostSuggestions",
+    remap: { action: "select", entity: "Post" },
+    config: { rateLimit: "expensive", limit: 30, policy: () => Policy.allow },
+  });
+
+  const deleteEligibilityPublicEntry = definePublicEntry<
+    TPostDeleteEligibilityListPublic,
+    PostRpcTag
+  >()({
+    operation: "PostDeleteEligibilityList",
+    remap: { action: "select", entity: "Post" },
+    config: { rateLimit: "read", policy: () => Policy.allow },
+  });
+
   // -- RPC handlers --
 
   return {
@@ -387,25 +382,16 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         );
     },
 
-    PostListPublic: (args: TPostList) => {
-      // Public post listing is intentionally unauthenticated; board
-      // visibility is enforced inside `findManyPublic` (unlocked boards
-      // only). No site-policy gate needed here.
-      return withPublicViewer({
+    PostListPublic: listPublicEntry.entry((args) =>
+      withPublicViewer({
         read: () =>
           repository.findManyPublic({
             organizationId: args.organizationId,
             boardId: args.boardId,
           }),
         redact: redactCreatorIdentities,
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "PostListPublic",
-          level: "read",
-        }),
-        withRemapDbErrors("Post", "select")
-      );
-    },
+      })
+    ),
 
     PostGet: (args: TPostGet) => {
       return Effect.gen(function* () {
@@ -425,11 +411,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       );
     },
 
-    PostGetPublic: (args: TPostGet) => {
+    PostGetPublic: getPublicEntry.entry((args) =>
       // Same visibility rule as PostListPublic: board visibility is enforced
-      // inside `findPublicBySlug` (public boards only). No site-policy gate
-      // needed here.
-      return withPublicViewer({
+      // inside `findPublicBySlug` (public boards only).
+      withPublicViewer({
         read: () =>
           Effect.gen(function* () {
             const post = yield* repository.findPublicBySlug({
@@ -444,14 +429,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             return post;
           }),
         redact: redactCreatorIdentity,
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "PostGetPublic",
-          level: "read",
-        }),
-        withRemapDbErrors("Post", "select")
-      );
-    },
+      })
+    ),
 
     PostSuggestions: (args: TPostSuggestions) =>
       suggestions({ ...args, publicOnly: false }).pipe(
@@ -474,22 +453,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "select")
       ),
 
-    PostSuggestionsPublic: (args: TPostSuggestions) =>
+    PostSuggestionsPublic: suggestionsPublicEntry.entry((args) =>
       withPublicViewer({
         read: () => suggestions({ ...args, publicOnly: true }),
         redact: redactCreatorIdentities,
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "PostSuggestionsPublic",
-          // Embedding + vector search per request — priced like the widget
-          // suggest endpoint. The cap is raised above the `expensive`
-          // default because the create dialog fires this per debounced
-          // keystroke while composing a title.
-          level: "expensive",
-          limit: 30,
-        }),
-        withRemapDbErrors("Post", "select")
-      ),
+      })
+    ),
 
     PostDelete: removePost.dashboard,
 
@@ -508,36 +477,20 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "select")
       ),
 
-    PostDeleteEligibilityListPublic: (args: TPostDeleteEligibilityListPublic) =>
-      Effect.gen(function* () {
-        const viewer = yield* currentPublicViewer;
-        if (viewer.userId === undefined) {
-          return { eligibleIds: [] };
-        }
-        const rows = yield* repository.findDeletableIds({
-          organizationId: args.organizationId,
-          userId: viewer.userId,
-        });
-        return { eligibleIds: rows.map((row) => row.id) };
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "PostDeleteEligibilityListPublic",
-          level: "read",
-        }),
-        // No organization-scope policy here, because none can fire on this
-        // route: `OptionalAuthMiddlewareLive` reduces a restricted widget-SSO
-        // session to `Option.none()`, so the branch above already answers
-        // `eligibleIds: []` for one. A scope policy would read that same
-        // `None`, treat it as a guest, and allow.
-        //
-        // What bounds the response is that `creatorId` predicate: a caller only
-        // ever sees ids of posts they created, in whatever organization they
-        // name. A restricted session confined to its own workspace is therefore
-        // the middleware's job, and it is already doing it — if that ever
-        // changes to admit restricted sessions, this handler needs a
-        // `hasRestrictedOrganizationScope` check alongside the branch above.
-        withRemapDbErrors("Post", "select")
-      ),
+    PostDeleteEligibilityListPublic: deleteEligibilityPublicEntry.entry(
+      (args) =>
+        Effect.gen(function* () {
+          const viewer = yield* currentPublicViewer;
+          if (viewer.userId === undefined) {
+            return { eligibleIds: [] };
+          }
+          const rows = yield* repository.findDeletableIds({
+            organizationId: args.organizationId,
+            userId: viewer.userId,
+          });
+          return { eligibleIds: rows.map((row) => row.id) };
+        })
+    ),
 
     PostUpdate: updatePost.dashboard,
 
@@ -678,7 +631,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         // intent are the shared write path (`post/write.ts`), so a merge
         // performed from the dashboard and one performed with an API key
         // cannot drift; only the actor differs.
-        yield* writes.merge(args, memberActor(session, args.organizationId));
+        return yield* writes.merge(
+          args,
+          memberActor(session, args.organizationId)
+        );
       }).pipe(
         Policy.withPolicy(postPolicy.canMerge(args.organizationId)),
         withRemapDbErrors("Post", "update")

@@ -12,7 +12,7 @@ import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
-import { defineSurfacePair } from "../surface";
+import { definePublicEntry, defineSurfacePair } from "../surface";
 import { ChangelogSubscriptionRepository } from "./repository";
 import { ChangelogSubscriptionRpcs } from "./rpcs";
 import type {
@@ -175,6 +175,25 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     unsubscribeEffect(args)
   );
 
+  // The dashboard list is the subscriber roster; the public list is the
+  // viewer's own subscription, so the pair does not apply and the dashboard
+  // half stays hand-written.
+  const listPublicEntry = definePublicEntry<
+    TChangelogSubscriptionList,
+    ChangelogSubscriptionRpcTag
+  >()({
+    operation: "ChangelogSubscriptionList",
+    remap: { action: "select", entity: "ChangelogSubscription" },
+    config: {
+      rateLimit: "read",
+      policy: (args, _surface) =>
+        Policy.all(
+          Policy.hasRestrictedOrganizationScope(args.organizationId),
+          sitePolicy.canViewChangelog(args.organizationId)
+        ),
+    },
+  });
+
   // -- RPC handlers --
 
   return {
@@ -188,30 +207,17 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("ChangelogSubscription", "select")
       ),
 
-    /**
-     * Public boards only ever need the current visitor's own subscription to
-     * render the toggle; unlike post subscriptions there is no subscriber
-     * showcase, so other users' rows are never exposed.
-     */
-    ChangelogSubscriptionListPublic: (args: TChangelogSubscriptionList) =>
+    // Public boards only ever need the current visitor's own subscription to
+    // render the toggle; unlike post subscriptions there is no subscriber
+    // showcase, so other users' rows are never exposed.
+    ChangelogSubscriptionListPublic: listPublicEntry.entry((args) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         return yield* listSubscribersEffect(args, {
           userId: session.session.userId,
         });
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "ChangelogSubscriptionListPublic",
-          level: "read",
-        }),
-        Policy.withPolicy(
-          Policy.all(
-            Policy.hasRestrictedOrganizationScope(args.organizationId),
-            sitePolicy.canViewChangelog(args.organizationId)
-          )
-        ),
-        withRemapDbErrors("ChangelogSubscription", "select")
-      ),
+      })
+    ),
 
     ChangelogSubscriptionCreate: subscribe.dashboard,
 

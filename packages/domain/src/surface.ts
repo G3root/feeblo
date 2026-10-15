@@ -1,6 +1,7 @@
+import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 
-import type { Policy } from "./policy";
+import { type Policy, PolicyDeniedError } from "./policy";
 import {
   type PublicRpcRateLimitLevel,
   type RateLimitError,
@@ -27,10 +28,14 @@ export type Surface = "dashboard" | "public";
 /**
  * One surface's half of a pair where the limiter applies. The level is
  * present, so `SurfaceEntry` widens the error channel with `RateLimitError`.
+ * `limit`/`window` override the level's preset in `publicRpcLimits` (e.g. the
+ * suggestions endpoint's raised cap).
  */
 export type LimitedSurfaceConfig<TArgs> = {
   readonly rateLimit: PublicRpcRateLimitLevel;
-  readonly policy: (args: TArgs) => Policy<unknown, unknown>;
+  readonly limit?: number;
+  readonly window?: Duration.Input;
+  readonly policy: (args: TArgs, surface: Surface) => Policy<unknown, unknown>;
 };
 
 /**
@@ -40,10 +45,15 @@ export type LimitedSurfaceConfig<TArgs> = {
  */
 export type UnlimitedSurfaceConfig<TArgs> = {
   readonly rateLimit: undefined;
-  readonly policy: (args: TArgs) => Policy<unknown, unknown>;
+  readonly policy: (args: TArgs, surface: Surface) => Policy<unknown, unknown>;
 };
 
-/** One surface's half of a pair: the limiter it spends and its policy. */
+/**
+ * One surface's half of a pair: the limiter it spends and its policy factory,
+ * which the entry's surface is passed to. Halves whose admissions differ only
+ * by `source` share one closure, so the policy can never describe a surface
+ * other than the one its entry answers.
+ */
 export type SurfaceConfig<TArgs> =
   | LimitedSurfaceConfig<TArgs>
   | UnlimitedSurfaceConfig<TArgs>;
@@ -72,6 +82,26 @@ type RateLimitErrorOf<Config> = Config extends {
   ? RateLimitError
   : never;
 
+/** The typed failures the literal config's policy factory can raise. */
+type PolicyErrorOf<Config> = Config extends {
+  readonly policy: (...args: never[]) => infer P;
+}
+  ? Effect.Error<P>
+  : never;
+
+/**
+ * The entry's error channel before the remap's replacement: the body's own
+ * failures, the policy factory's own (`PolicyDeniedError` admission
+ * inclusive), and the limiter's conditional. A half without a level carries
+ * no `RateLimitError`, and the remap excludes every db-family error and
+ * replaces it with the operation's vocabulary.
+ */
+type UnremappedEntryError<Config, E> =
+  | E
+  | PolicyDeniedError
+  | PolicyErrorOf<Config>
+  | RateLimitErrorOf<Config>;
+
 /** The channel `withRemapDbErrors` leaves behind for `UniqueViolationError`. */
 type RemappedError<E, UniqueViolationError> =
   | Exclude<E, RemappedDbError>
@@ -86,8 +116,8 @@ type PolicyRequirementOf<Config> = Config extends {
 
 /**
  * One surface's RPC entry, with the channels its surface config implies: the
- * limiter's `RateLimitError` only where a level exists, the policy's
- * `PolicyDeniedError` and services, and the db-error remap applied.
+ * limiter's `RateLimitError` only where a level exists, the policy factory's
+ * own typed failures and services, and the db-error remap applied.
  */
 export type SurfaceEntry<
   TArgs,
@@ -100,7 +130,7 @@ export type SurfaceEntry<
   args: TArgs
 ) => Effect.Effect<
   A,
-  RemappedError<E | RateLimitErrorOf<Config>, UniqueViolationError>,
+  RemappedError<UnremappedEntryError<Config, E>, UniqueViolationError>,
   R | PolicyRequirementOf<Config>
 >;
 
@@ -118,14 +148,14 @@ export type SurfaceHandlers<
     args: TArgs
   ) => Effect.Effect<
     A,
-    RemappedError<E | RateLimitErrorOf<Dashboard>, UniqueViolationError>,
+    RemappedError<UnremappedEntryError<Dashboard, E>, UniqueViolationError>,
     R | PolicyRequirementOf<Dashboard>
   >;
   readonly public: (
     args: TArgs
   ) => Effect.Effect<
     A,
-    RemappedError<E | RateLimitErrorOf<Public>, UniqueViolationError>,
+    RemappedError<UnremappedEntryError<Public, E>, UniqueViolationError>,
     R | PolicyRequirementOf<Public>
   >;
 };
@@ -135,6 +165,11 @@ export type SurfaceHandlers<
  * operation's db-error remap. The policy runs first so a denied caller never
  * spends budget; the remap is outermost so the policy's own repository probes
  * stay inside it, exactly as the hand-written pair did.
+ *
+ * A policy's typed failures reach `UnremappedEntryError` (its
+ * `PolicyDeniedError` admission inclusive), and the remap excludes and
+ * replaces the db-family members. Passing `surface` to the factory keeps the
+ * policy's `source` welded to the entry that answers it.
  */
 const makeEntry = <
   TArgs,
@@ -152,26 +187,60 @@ const makeEntry = <
 ): SurfaceEntry<TArgs, Config, UniqueViolationError, A, E, R> => {
   const name = surfaceRpcName(operation, surface);
   return (args: TArgs) => {
-    // SAFETY: `config.policy` is the widened `Policy<unknown, unknown>` that
-    // a generic `Config` exposes; the literal config at the
-    // `defineSurfacePair` call site supplies the channels named here, exactly
-    // as `Effect.andThen` and `withPublicRpcRateLimit` compute them.
-    const admitted = (
+    // SAFETY: once `Config` crosses makeEntry's generic boundary, TS reads
+    // its members through the widened `SurfaceConfig` constraint, so every
+    // channel on the composition below is unknowable to TS even though the
+    // literal config at the call site decides them. The convergence — the
+    // assertion onto the declared `UnremappedEntryError` — is what lets
+    // callers see the declared channels instead; the runtime contract it
+    // rests on (a policy only fails with PolicyDeniedError or db errors the
+    // remap catches) is what surface.test.ts pins per surface.
+    /* oxlint-disable effecttsgo/any-unknown-in-error-context -- the widened-constraint channels converge here; see the SAFETY comment */
+    const composed =
       config.rateLimit === undefined
-        ? Effect.andThen(config.policy(args), body(surface, args))
+        ? Effect.andThen(config.policy(args, surface), body(surface, args))
         : Effect.andThen(
-            config.policy(args),
-            withPublicRpcRateLimit({ level: config.rateLimit, name })(
-              body(surface, args)
-            )
-          )
-    ) as Effect.Effect<
+            config.policy(args, surface),
+            withPublicRpcRateLimit({
+              level: config.rateLimit,
+              name,
+              ...(config.limit === undefined
+                ? undefined
+                : { limit: config.limit }),
+              ...(config.window === undefined
+                ? undefined
+                : { window: config.window }),
+            })(body(surface, args))
+          );
+
+    // SAFETY: the composition above is unknowable to TS once `Config`
+    // crosses makeEntry's generic boundary — TS reads `config.policy` through
+    // the widened `SurfaceConfig` constraint, while the literal config at the
+    // call site decides the real channels. This assertion converges what the
+    // constraint widened onto the declared `UnremappedEntryError`; the
+    // runtime contract it rests on — a policy only fails with
+    // PolicyDeniedError or db errors the remap catches — is what
+    // surface.test.ts pins per surface.
+    // oxlint-disable-next-line effecttsgo/unsafe-effect-type-assertion -- the SAFETY comment above states the invariant the assertion converges to.
+    const admitted = composed as Effect.Effect<
       A,
-      E | RateLimitErrorOf<Config>,
+      UnremappedEntryError<Config, E>,
       R | PolicyRequirementOf<Config>
     >;
+    /* oxlint-enable effecttsgo/any-unknown-in-error-context */
 
-    return admitted.pipe(withRemapDbErrors(remap));
+    // Explicit type arguments on direct application, not `pipe`: an
+    // overloaded helper's curried form cannot carry the generic channels
+    // through its first call, and `pipe`'s overload resolution loses the
+    // conditional member of the error channel at the boundary. The one
+    // `RemappedDbErrorsConfig` overload is `<R, E, A, UV>` over a plain
+    // `Effect<R, E, A>` — success, error, requirements, in that order.
+    return withRemapDbErrors<
+      A,
+      UnremappedEntryError<Config, E>,
+      R | PolicyRequirementOf<Config>,
+      UniqueViolationError
+    >(remap)(admitted);
   };
 };
 
@@ -242,4 +311,60 @@ export const defineSurfacePair =
         body
       ),
     }),
+  });
+
+/**
+ * One operation's public-only entry as a value: the declaration, its config,
+ * and `entry`, which builds the portal half from its own body. The
+ * dashboard side is deliberately absent — the pair machinery exists for
+ * operations whose two bodies match, and this exists for the rest, whose
+ * portal half still declares against the registry (`Tags` rejects an
+ * operation whose public twin the group does not declare, exactly as a pair
+ * does).
+ *
+ * The composition is exactly a pair's: policy (or `Policy.allow` where no
+ * admission is needed), then limiter, then body, db-error remap outermost;
+ * the bucket name is derived from the operation, so it cannot drift from the
+ * RPC a handler answers.
+ */
+export type PublicEntryRecord<
+  TArgs,
+  Tags extends string,
+  Config extends SurfaceConfig<TArgs>,
+  UniqueViolationError = never,
+> = {
+  readonly _tag: "PublicEntry";
+  readonly operation: PairedRpcTag<Tags>;
+  readonly config: Config;
+  readonly entry: <A, E, R>(
+    body: (args: TArgs) => Effect.Effect<A, E, R>
+  ) => SurfaceEntry<TArgs, Config, UniqueViolationError, A, E, R>;
+};
+
+/**
+ * Builds a public-only entry as a value. `Tags` rejects an operation whose
+ * public twin the group does not declare, exactly as `defineSurfacePair`
+ * does; an operation with no dashboard twin at all stays hand-written.
+ */
+export const definePublicEntry =
+  <TArgs, Tags extends string = string>() =>
+  <
+    const Config extends SurfaceConfig<TArgs>,
+    const UniqueViolationError = never,
+  >(entry: {
+    readonly operation: PairedRpcTag<Tags>;
+    readonly remap: RemapDbErrorsConfig<UniqueViolationError>;
+    readonly config: Config;
+  }): PublicEntryRecord<TArgs, Tags, Config, UniqueViolationError> => ({
+    _tag: "PublicEntry",
+    operation: entry.operation,
+    config: entry.config,
+    entry: (body) =>
+      makeEntry(
+        entry.remap,
+        entry.operation,
+        entry.config,
+        "public",
+        (_surface, args) => body(args)
+      ),
   });

@@ -14,7 +14,7 @@ import * as RateLimit from "../rate-limit";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
-import { defineSurfacePair } from "../surface";
+import { type Surface, definePublicEntry, defineSurfacePair } from "../surface";
 import { CommentPolicy } from "./policies";
 import { CommentRepository } from "./repository";
 import { CommentRpcs } from "./rpcs";
@@ -59,54 +59,51 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
   // bucket name is derived from the operation. The RPC names, their auth
   // middleware, and their error schemas stay separate in `./rpcs.ts`.
 
+  // One factory per admission rule the surfaces share: each entry passes its
+  // own surface to it, so the policy's `source` is the surface the entry
+  // actually answers and the halves cannot disagree.
+  const canDeleteFor = (args: TCommentDelete, surface: Surface) =>
+    commentPolicy.canDelete({
+      commentId: args.id,
+      organizationId: args.organizationId,
+      postId: args.postId,
+      source: surface,
+    });
+
+  const canUpdateFor = (args: TCommentUpdate, surface: Surface) =>
+    commentPolicy.canUpdate({
+      commentId: args.id,
+      organizationId: args.organizationId,
+      postId: args.postId,
+      source: surface,
+    });
+
+  // On-behalf attribution is a dashboard capability; the public `canCreate`
+  // branch never consults `onBehalf`, and the body below refuses an author
+  // outright on the portal, so one factory serves both halves.
+  const canCreateFor = (args: TCommentCreate, surface: Surface) =>
+    commentPolicy.canCreate({
+      organizationId: args.organizationId,
+      visibility: args.visibility,
+      postId: args.postId,
+      parentCommentId: args.parentCommentId,
+      statusUpdateId: args.statusUpdateId,
+      source: surface,
+      onBehalf: args.author !== undefined,
+    });
+
   const deleteWrite = defineSurfacePair<TCommentDelete, CommentRpcTag>()({
     operation: "CommentDelete",
     remap: { action: "delete", entity: "Comment" },
-    dashboard: {
-      rateLimit: undefined,
-      policy: (args: TCommentDelete) =>
-        commentPolicy.canDelete({
-          commentId: args.id,
-          organizationId: args.organizationId,
-          postId: args.postId,
-          source: "dashboard",
-        }),
-    },
-    public: {
-      rateLimit: "write",
-      policy: (args: TCommentDelete) =>
-        commentPolicy.canDelete({
-          commentId: args.id,
-          organizationId: args.organizationId,
-          postId: args.postId,
-          source: "public",
-        }),
-    },
+    dashboard: { rateLimit: undefined, policy: canDeleteFor },
+    public: { rateLimit: "write", policy: canDeleteFor },
   });
 
   const updateWrite = defineSurfacePair<TCommentUpdate, CommentRpcTag>()({
     operation: "CommentUpdate",
     remap: { action: "update", entity: "Comment" },
-    dashboard: {
-      rateLimit: undefined,
-      policy: (args: TCommentUpdate) =>
-        commentPolicy.canUpdate({
-          commentId: args.id,
-          organizationId: args.organizationId,
-          postId: args.postId,
-          source: "dashboard",
-        }),
-    },
-    public: {
-      rateLimit: "expensive",
-      policy: (args: TCommentUpdate) =>
-        commentPolicy.canUpdate({
-          commentId: args.id,
-          organizationId: args.organizationId,
-          postId: args.postId,
-          source: "public",
-        }),
-    },
+    dashboard: { rateLimit: undefined, policy: canUpdateFor },
+    public: { rateLimit: "expensive", policy: canUpdateFor },
   });
 
   const removeComment = deleteWrite.handlers((_surface, args) =>
@@ -155,31 +152,17 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
   const createWrite = defineSurfacePair<TCommentCreate, CommentRpcTag>()({
     operation: "CommentCreate",
     remap: { action: "create", entity: "Comment" },
-    dashboard: {
-      rateLimit: undefined,
-      policy: (args: TCommentCreate) =>
-        commentPolicy.canCreate({
-          organizationId: args.organizationId,
-          visibility: args.visibility,
-          postId: args.postId,
-          parentCommentId: args.parentCommentId,
-          statusUpdateId: args.statusUpdateId,
-          source: "dashboard",
-          onBehalf: args.author !== undefined,
-        }),
-    },
-    public: {
-      rateLimit: "expensive",
-      policy: (args: TCommentCreate) =>
-        commentPolicy.canCreate({
-          organizationId: args.organizationId,
-          visibility: args.visibility,
-          postId: args.postId,
-          parentCommentId: args.parentCommentId,
-          statusUpdateId: args.statusUpdateId,
-          source: "public",
-        }),
-    },
+    dashboard: { rateLimit: undefined, policy: canCreateFor },
+    public: { rateLimit: "expensive", policy: canCreateFor },
+  });
+
+  // The dashboard list projects with `isMember` visibility shared with the
+  // viewer's own rows; the public list projects its own predicate, so the
+  // pair does not apply and the dashboard half stays hand-written.
+  const listPublicEntry = definePublicEntry<TCommentList, CommentRpcTag>()({
+    operation: "CommentList",
+    remap: { action: "select", entity: "Comment" },
+    config: { rateLimit: "read", policy: () => Policy.allow },
   });
 
   const addComment = createWrite.handlers((surface, args) =>
@@ -251,7 +234,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Comment", "select")
         ),
 
-    CommentListPublic: (args: TCommentList) =>
+    CommentListPublic: listPublicEntry.entry((args) =>
       withPublicViewer({
         read: (viewer) =>
           repository.findManyPublic({
@@ -260,13 +243,8 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             slug: args.slug,
           }),
         redact: redactActorIdentities,
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "CommentListPublic",
-          level: "read",
-        }),
-        withRemapDbErrors("Comment", "select")
-      ),
+      })
+    ),
 
     CommentCreate: addComment.dashboard,
 

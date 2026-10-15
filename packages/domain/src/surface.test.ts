@@ -9,6 +9,7 @@ import {
   type RateLimitError,
 } from "./rate-limit";
 import {
+  definePublicEntry,
   defineSurfacePair,
   type PairedRpcTag,
   surfaceRpcName,
@@ -62,6 +63,16 @@ describe("defineSurfacePair", () => {
     expectTypeOf<
       Extract<PublicError, RateLimitError>
     >().toEqualTypeOf<RateLimitError>();
+
+    // A policy's only typed failure reaches the declared channel on both
+    // halves, even though the body below fails with nothing.
+    expectTypeOf<
+      Extract<DashboardError, PolicyDeniedError>
+    >().toEqualTypeOf<PolicyDeniedError>();
+    expectTypeOf<
+      Extract<PublicError, PolicyDeniedError>
+    >().toEqualTypeOf<PolicyDeniedError>();
+
     expectTypeOf<
       Parameters<typeof entries.public>[0]
     >().toEqualTypeOf<TestArgs>();
@@ -84,14 +95,8 @@ describe("defineSurfacePair", () => {
   it.effect("spends the budget before the body runs", () =>
     Effect.gen(function* () {
       const order: Array<string> = [];
-      const ordered = defineSurfacePair<TestArgs, TestTags>()({
-        operation: "ThingCreate",
-        remap: { action: "create", entity: "Thing" },
-        dashboard: { rateLimit: undefined, policy: () => Effect.void },
-        public: { rateLimit: "write", policy: () => Effect.void },
-      });
 
-      const result = yield* ordered
+      const result = yield* pair
         .handlers((_surface, _args) =>
           Effect.sync(() => {
             order.push("body");
@@ -153,6 +158,60 @@ describe("defineSurfacePair", () => {
       expect(consumed).toEqual([]);
       expect(bodyRan).toEqual([]);
     })
+  );
+
+  it.effect("passes a preset override through to the limiter", () =>
+    Effect.gen(function* () {
+      const consumed: Array<PublicRpcRateLimitOptions> = [];
+      const capped = defineSurfacePair<TestArgs, TestTags>()({
+        operation: "ThingCreate",
+        remap: { action: "create", entity: "Thing" },
+        dashboard: { rateLimit: undefined, policy: () => Effect.void },
+        public: {
+          rateLimit: "expensive",
+          limit: 30,
+          policy: () => Effect.void,
+        },
+      });
+
+      const result = yield* capped
+        .handlers((_surface, _args) => Effect.succeed("kept"))
+        .public({ id: "thing-1" })
+        .pipe(limiter(consumed));
+
+      expect(result).toBe("kept");
+      expect(consumed).toEqual([
+        {
+          level: "expensive",
+          limit: 30,
+          name: "ThingCreatePublic",
+        },
+      ]);
+    })
+  );
+
+  it.effect(
+    "one-sided entry keeps the pair composition on the public name",
+    () =>
+      Effect.gen(function* () {
+        const consumed: Array<PublicRpcRateLimitOptions> = [];
+        const readEntry = definePublicEntry<TestArgs, TestTags>()({
+          operation: "ThingCreate",
+          remap: { action: "select", entity: "Thing" },
+          config: { rateLimit: "read", policy: () => Effect.void },
+        });
+
+        // An entry is `(args) => Effect`: built from the body, then called
+        // with the operation's args like the pair halves are.
+        const result = yield* readEntry
+          .entry((args) => Effect.succeed(args.id))({ id: "thing-1" })
+          .pipe(limiter(consumed));
+
+        expect(result).toBe("thing-1");
+        expect(consumed).toEqual([
+          { level: "read", name: "ThingCreatePublic" },
+        ]);
+      })
   );
 
   it.effect("passes the surface each entry is bound to into the body", () =>

@@ -6,11 +6,10 @@ import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
 import { withPublicViewer } from "../public-read";
-import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
-import { defineSurfacePair } from "../surface";
+import { definePublicEntry, defineSurfacePair } from "../surface";
 import { CommentReactionRepository } from "./repository";
 import { CommentReactionRpcs } from "./rpcs";
 import type { TCommentReactionList, TCommentReactionToggle } from "./schema";
@@ -60,6 +59,18 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
     },
   });
 
+  // The dashboard list projects from the repository's internal predicate; the
+  // public list projects its own, so the pair does not apply and the
+  // dashboard half stays hand-written.
+  const listPublicEntry = definePublicEntry<
+    TCommentReactionList,
+    CommentReactionRpcTag
+  >()({
+    operation: "CommentReactionList",
+    remap: { action: "select", entity: "CommentReaction" },
+    config: { rateLimit: "read", policy: () => Policy.allow },
+  });
+
   const toggleReaction = toggleWrite.handlers((surface, args) =>
     Effect.gen(function* () {
       const session = yield* CurrentSession;
@@ -89,7 +100,7 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("CommentReaction", "select")
         ),
     CommentReactionToggle: toggleReaction.dashboard,
-    CommentReactionListPublic: (args: TCommentReactionList) =>
+    CommentReactionListPublic: listPublicEntry.entry((args) =>
       withPublicViewer({
         read: () =>
           repository.listPublic({
@@ -97,13 +108,8 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
             slug: args.slug,
           }),
         redact: redactActorIdentities,
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "CommentReactionListPublic",
-          level: "read",
-        }),
-        withRemapDbErrors("CommentReaction", "select")
-      ),
+      })
+    ),
     CommentReactionTogglePublic: toggleReaction.public,
   };
 });

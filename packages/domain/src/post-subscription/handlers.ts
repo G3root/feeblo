@@ -8,11 +8,10 @@ import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
-import * as RateLimit from "../rate-limit";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
-import { defineSurfacePair } from "../surface";
+import { definePublicEntry, defineSurfacePair } from "../surface";
 import { PostSubscriptionRepository } from "./repository";
 import { PostSubscriptionRpcs } from "./rpcs";
 import type {
@@ -193,6 +192,28 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     unsubscribeEffect(args)
   );
 
+  // The public list is the viewer's own subscription; the dashboard list is
+  // the subscriber roster, so the pair does not apply and the dashboard half
+  // stays hand-written.
+  const listPublicEntry = definePublicEntry<
+    TPostSubscriptionList,
+    PostSubscriptionRpcTag
+  >()({
+    operation: "PostSubscriptionList",
+    remap: { action: "select", entity: "PostSubscription" },
+    config: {
+      rateLimit: "read",
+      // This route runs on `PublicAuthMiddleware`, which admits the restricted
+      // sessions that widget SSO mints — so it needs the same organization
+      // confinement as `PostSubscriptionCreatePublic` and
+      // `PostSubscriptionDeletePublic`. The repository's `userId` predicate is
+      // what kept the response to the caller's own rows; this is the control
+      // that says the caller may ask about this organization at all.
+      policy: (args, _surface) =>
+        Policy.hasRestrictedOrganizationScope(args.organizationId),
+    },
+  });
+
   // -- RPC handlers --
 
   return {
@@ -202,29 +223,15 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("PostSubscription", "select")
       ),
 
-    PostSubscriptionListPublic: (args: TPostSubscriptionList) =>
+    PostSubscriptionListPublic: listPublicEntry.entry((args) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         return yield* listSubscribersEffect(args, {
           publicOnly: true,
           userId: session.session.userId,
         });
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "PostSubscriptionListPublic",
-          level: "read",
-        }),
-        // This route runs on `PublicAuthMiddleware`, which admits the restricted
-        // sessions that widget SSO mints — so it needs the same organization
-        // confinement as `PostSubscriptionCreatePublic` and
-        // `PostSubscriptionDeletePublic`. The repository's `userId` predicate is
-        // what kept the response to the caller's own rows; this is the control
-        // that says the caller may ask about this organization at all.
-        Policy.withPolicy(
-          Policy.hasRestrictedOrganizationScope(args.organizationId)
-        ),
-        withRemapDbErrors("PostSubscription", "select")
-      ),
+      })
+    ),
 
     PostSubscriptionCreate: subscribe.dashboard,
 
