@@ -10,11 +10,7 @@ import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
-import {
-  type Surface,
-  type SurfacePair,
-  withSurfacePolicyAndRateLimit,
-} from "../surface";
+import { defineSurfacePair } from "../surface";
 import { PostReactionRepository } from "./repository";
 import { PostReactionRpcs } from "./rpcs";
 import type { TPostReactionList, TPostReactionToggle } from "./schema";
@@ -34,8 +30,12 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
   // `isUnlockedPublic` and lets the repository's `togglePublic` join the
   // board visibility.
 
-  const toggleWrite = {
+  const toggleWrite = defineSurfacePair<
+    TPostReactionToggle,
+    PostReactionRpcTag
+  >()({
     operation: "PostReactionToggle",
+    remap: { action: "update", entity: "PostReaction" },
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostReactionToggle) =>
@@ -58,35 +58,23 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
           })
         ),
     },
-  } satisfies SurfacePair<TPostReactionToggle, PostReactionRpcTag>;
+  });
 
-  const toggleReaction = <
-    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
-  >(
-    surface: Surface,
-    level: Level,
-    args: TPostReactionToggle
-  ) =>
-    withSurfacePolicyAndRateLimit({
-      level,
-      operation: toggleWrite.operation,
-      surface,
-      policy: toggleWrite[surface].policy(args),
-    })(
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        const request = {
-          emoji: args.emoji,
-          organizationId: args.organizationId,
-          postId: args.postId,
-          userId: session.session.userId,
-        };
+  const toggleReaction = toggleWrite.handlers((surface, args) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const request = {
+        emoji: args.emoji,
+        organizationId: args.organizationId,
+        postId: args.postId,
+        userId: session.session.userId,
+      };
 
-        return yield* surface === "public"
-          ? repository.togglePublic(request)
-          : repository.toggle(request);
-      })
-    ).pipe(withRemapDbErrors("PostReaction", "update"));
+      return yield* surface === "public"
+        ? repository.togglePublic(request)
+        : repository.toggle(request);
+    })
+  );
 
   return {
     PostReactionList: (args: TPostReactionList) =>
@@ -99,8 +87,7 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("PostReaction", "select")
         ),
-    PostReactionToggle: (args: TPostReactionToggle) =>
-      toggleReaction("dashboard", toggleWrite.dashboard.rateLimit, args),
+    PostReactionToggle: toggleReaction.dashboard,
     PostReactionListPublic: (args: TPostReactionList) =>
       withPublicViewer({
         read: () =>
@@ -116,8 +103,7 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
         }),
         withRemapDbErrors("PostReaction", "select")
       ),
-    PostReactionTogglePublic: (args: TPostReactionToggle) =>
-      toggleReaction("public", toggleWrite.public.rateLimit, args),
+    PostReactionTogglePublic: toggleReaction.public,
   };
 });
 
