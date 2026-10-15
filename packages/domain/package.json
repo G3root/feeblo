@@ -493,6 +493,9 @@
     "./rpc-group": {
       "default": "./src/rpc-group.ts"
     },
+    "./rpc-kind": {
+      "default": "./src/rpc-kind.ts"
+    },
     "./rpc-router": {
       "default": "./src/rpc-router.ts"
     },

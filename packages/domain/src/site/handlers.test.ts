@@ -253,14 +253,14 @@ describe("SiteRpcHandlers", () => {
       );
     });
 
-    describe("SiteListBySubdomain", () => {
+    describe("SiteSubdomainList", () => {
       it.effect("returns site by subdomain without auth", () =>
         Effect.gen(function* () {
           const handlers = yield* SiteRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const subdomain = `test-${fixture.organizationId}`;
 
-          const results = yield* handlers.SiteListBySubdomain({
+          const results = yield* handlers.SiteSubdomainList({
             subdomain,
           });
 
@@ -278,7 +278,7 @@ describe("SiteRpcHandlers", () => {
       it.effect("returns empty array for unknown subdomain", () =>
         Effect.gen(function* () {
           const handlers = yield* SiteRpcHandlersEffect;
-          const results = yield* handlers.SiteListBySubdomain({
+          const results = yield* handlers.SiteSubdomainList({
             subdomain: "nonexistent-subdomain-xyz",
           });
 
@@ -294,7 +294,7 @@ describe("SiteRpcHandlers", () => {
             const fixture = yield* makeFixture();
             yield* setHidePoweredBy(fixture, true);
 
-            const results = yield* handlers.SiteListBySubdomain({
+            const results = yield* handlers.SiteSubdomainList({
               subdomain: `test-${fixture.organizationId}`,
             });
 
@@ -311,7 +311,7 @@ describe("SiteRpcHandlers", () => {
             yield* setHidePoweredBy(fixture, true);
             yield* addPaidPlan(fixture);
 
-            const results = yield* handlers.SiteListBySubdomain({
+            const results = yield* handlers.SiteSubdomainList({
               subdomain: `test-${fixture.organizationId}`,
             });
 

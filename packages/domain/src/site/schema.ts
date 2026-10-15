@@ -48,8 +48,8 @@ export type TSiteHidePoweredByBranding = S.Schema.Type<
   typeof SiteHidePoweredByBranding
 >;
 
-export const SiteListBySubdomain = S.Struct({
+export const SiteSubdomainList = S.Struct({
   subdomain: S.String,
 });
 
-export type TSiteListBySubdomain = S.Schema.Type<typeof SiteListBySubdomain>;
+export type TSiteSubdomainList = S.Schema.Type<typeof SiteSubdomainList>;
