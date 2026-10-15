@@ -39,7 +39,9 @@ Both variables are editable in the dashboard toolbar, so no JSON editing is need
 
 They are recorded for every response the server sends — successful, failed, or unmatched — so the values are exact and do not depend on trace sampling. The `route` label is the router's matched route template (for example `/api/v1/posts/:postId`), so a matched handler that answers 404 keeps its route; only genuinely unmatched paths collapse to `unmatched`, which stops scanner traffic from minting a label per path.
 
-RPC methods are not visible here: every call shares `POST /rpc`, and the method only exists on the span. Use Application Observability or Traces Drilldown for the per-method breakdown.
+The SLO row turns those exact metrics into objectives: a 1% 5xx error objective with fast (1h) and slow (6h) error-budget burn rates, and a 500 ms p95 latency objective. The objectives are starting points; edit the panel queries to change them.
+
+RPC methods are not visible here: every call shares `POST /rpc`, and the method only exists on the span as `rpc.method`. In Application Observability, filter to `service.name = feeblo-server` and group or filter by the `rpc.method` span attribute; the server names each RPC server span `RpcServer.<Tag>` and also records the method on the parent HTTP span. Traces Drilldown's span-metrics view charts request rate, error rate, and latency per method.
 
 ## Queue and email dashboards
 
@@ -60,6 +62,20 @@ RPC methods are not visible here: every call shares `POST /rpc`, and the method 
 | Process runtime | CPU cores, resident memory, heap used/total, event-loop utilization, and event-loop delay (mean/p99/max) |
 
 `feeblo_telemetry_export_failures_total` counts a collector that refused, dropped, or timed out an export. `feeblo_telemetry_rejected_records_total` counts records a collector rejected in an OTLP partial-success acknowledgement, which OTLP forbids retrying. Both carry `signal` and `reason` labels. The process gauges are sampled every 30 seconds while OTLP is enabled.
+
+## Alerts
+
+The runtime and SLO signals are worth alerting on. Create Grafana-managed alert rules (Alerting → Alert rules → New alert rule); the dashboard's 6h range is not the alert window. Dashboard template variables are not available in an alert rule, so write the service matcher into the query — `job="feeblo/feeblo-server"` below, or `service_name="feeblo-server"` if that is the label your stack promotes.
+
+| Signal | PromQL | Condition |
+| --- | --- | --- |
+| Telemetry export failing | `sum(increase(feeblo_telemetry_export_failures_total{job="feeblo/feeblo-server"}[5m]))` | `> 0` for 5m |
+| Records rejected by the collector | `sum(increase(feeblo_telemetry_rejected_records_total{job="feeblo/feeblo-server"}[15m]))` | `> 0` for 5m |
+| Event loop blocked | `max(nodejs_eventloop_delay_p99_seconds{job="feeblo/feeblo-server"})` | `> 0.1` for 5m |
+| CPU saturated | `max(feeblo_process_cpu_cores_ratio{job="feeblo/feeblo-server"})` | `> 0.8` for 10m |
+| Fast 5xx burn | `100 * sum(increase(feeblo_http_server_requests_total{job="feeblo/feeblo-server",status=~"5.."}[1h])) / clamp_min(sum(increase(feeblo_http_server_requests_total{job="feeblo/feeblo-server"}[1h])), 1)` | `> 14.4` for 5m |
+| Slow 5xx burn | the fast query with `[6h]` in both places | `> 6` for 30m |
+| p95 latency over objective | `histogram_quantile(0.95, sum by (le) (rate(feeblo_http_server_request_duration_milliseconds_bucket{job="feeblo/feeblo-server"}[5m])))` | `> 500` for 10m |
 
 ## Metric name suffixes
 

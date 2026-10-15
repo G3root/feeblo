@@ -71,6 +71,31 @@ Requests by route:
 
 5xx by route: the by-route query with `| where \`status\` == #/5../` added.
 
+## SLO
+
+5xx burn rate over 1 hour against a 1% objective; 1 spends the budget at exactly the allowed rate. Use `align to 6h` for the slow-burn panel:
+
+```
+(
+  `<metrics-dataset>`:`feeblo_http_server_requests_total`
+  | where `service.name` == "feeblo-server"
+  | where `status` == #/5../
+  | map increase
+  | align to 1h using sum
+  | group using sum
+  | map fill::const(0),
+  `<metrics-dataset>`:`feeblo_http_server_requests_total`
+  | where `service.name` == "feeblo-server"
+  | map increase
+  | align to 1h using sum
+  | group using sum
+)
+| compute burn_rate using /
+| map * 100
+```
+
+p95 latency against a 500 ms objective: the percentile query with the objective drawn at 500.
+
 ## Integrations
 
 Delivery rate by outcome:
@@ -270,4 +295,32 @@ Slowest root spans per route (`isnull(parent_span_id)` selects roots so duration
 | limit 20
 ```
 
-RPC methods only exist on the span, so this is where the per-method breakdown lives — the HTTP metrics see every call as `POST /rpc`.
+RPC methods only exist on the span, so this is where the per-method breakdown lives — the HTTP metrics see every call as `POST /rpc`. Each RPC server span is named `RpcServer.<Tag>` and carries `rpc.method`.
+
+RPC request rate by method:
+
+```
+['<traces-dataset>']
+| where ['service.name'] == "feeblo-server"
+| where name startswith_cs "RpcServer."
+| summarize requests = count() by bin(_time, 5m), ['attributes.rpc.method']
+```
+
+RPC errors by method:
+
+```
+['<traces-dataset>']
+| where ['service.name'] == "feeblo-server"
+| where name startswith_cs "RpcServer."
+| where ['status.code'] == "error"
+| summarize errors = count() by bin(_time, 5m), ['attributes.rpc.method']
+```
+
+RPC p95 latency by method:
+
+```
+['<traces-dataset>']
+| where ['service.name'] == "feeblo-server"
+| where name startswith_cs "RpcServer."
+| summarize p95 = percentile(duration, 95) by bin(_time, 5m), ['attributes.rpc.method']
+```

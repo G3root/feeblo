@@ -45,4 +45,8 @@ For monitors, start from the same queries:
 - due integration delivery backlog above zero for 10 minutes;
 - oldest queued email age above five minutes;
 - any `exhausted` integration delivery;
-- HTTP 5xx ratio above a few percent.
+- HTTP 5xx burn rate above 14.4 for one hour, or above 6 for six hours, against a 1% objective;
+- any `feeblo_telemetry_export_failures_total` increase over 5 minutes, because telemetry is being lost;
+- any `feeblo_telemetry_rejected_records_total` increase over 15 minutes;
+- event-loop p99 delay above 100 ms for 5 minutes;
+- CPU above 0.8 cores per replica for 10 minutes.
