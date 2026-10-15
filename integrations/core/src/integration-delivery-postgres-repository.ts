@@ -110,9 +110,22 @@ export const makeIntegrationDeliveryWorkerRepository = (
     const db = yield* currentDb;
     const planGatedProviders = options.planGatedProviders ?? [];
 
-    const loadClaimedDelivery = (deliveryId: string, leaseOwner: string) =>
+    /**
+     * Reads the claimed deliveries in one query, in the order the claim
+     * selected them. A claimed row that is missing here lost its lease between
+     * the claim and this read; the worker has already counted the attempt, so
+     * that is a persistence failure rather than an empty answer.
+     */
+    const loadClaimedDeliveries = (
+      deliveryIds: readonly string[],
+      leaseOwner: string
+    ) =>
       Effect.gen(function* () {
-        const [row] = yield* db
+        const claimed: ClaimedIntegrationDelivery[] = [];
+        if (deliveryIds.length === 0) {
+          return claimed;
+        }
+        const rows = yield* db
           .select({
             connection: schema.integrationConnectionTable,
             delivery: schema.integrationDeliveryTable,
@@ -143,71 +156,81 @@ export const makeIntegrationDeliveryWorkerRepository = (
           )
           .where(
             and(
-              eq(schema.integrationDeliveryTable.id, deliveryId),
+              inArray(schema.integrationDeliveryTable.id, deliveryIds),
               eq(schema.integrationDeliveryTable.state, "leased"),
               eq(schema.integrationDeliveryTable.leaseOwner, leaseOwner)
             )
-          )
-          .limit(1);
-        if (row === undefined) {
-          return yield* persistenceError("load_claimed_delivery");
-        }
-        const input = yield* Schema.decodeUnknownEffect(ClaimedProviderInput)({
-          connection: {
-            credentialGeneration: row.connection.credentialGeneration,
-            id: asLegid(IntegrationConnectionId)(row.connection.id),
-            lifecycleStatus: row.connection.lifecycle,
-            name: row.connection.name,
-            organizationId: asLegid(WorkspaceId)(row.connection.organizationId),
-            provider: row.connection.provider,
-            safeMetadata: row.connection.safeDisplayMetadata ?? {},
-          },
-          delivery: {
-            actionKey: row.delivery.actionKey,
-            attemptCount: row.delivery.attemptCount,
-            eventId: asLegid(IntegrationEventId)(row.delivery.eventId),
-            id: asLegid(IntegrationDeliveryId)(row.delivery.id),
-            leaseExpiresAt:
-              row.delivery.leaseExpiresAt === null
-                ? null
-                : row.delivery.leaseExpiresAt.toISOString(),
-            leaseOwner: row.delivery.leaseOwner,
-            nextAttemptAt: row.delivery.nextAttemptAt.toISOString(),
-            orderingKey: row.delivery.orderingKey,
-            routeId: asLegid(IntegrationRouteId)(row.delivery.routeId),
-            state: row.delivery.state,
-          },
-          event: {
-            causalHopCount: row.event.causalHopCount,
-            ...(row.event.causationId !== null && {
-              causationId: row.event.causationId,
-            }),
-            correlationId: row.event.correlationId,
-            data: row.event.payload,
-            id: asLegid(IntegrationEventId)(row.event.id),
-            occurredAt: row.event.occurredAt.toISOString(),
-            organizationId: asLegid(WorkspaceId)(row.event.organizationId),
-            origin: row.event.origin,
-            type: row.event.type,
-            version: row.event.version,
-          },
-          route: {
-            capabilityKey: row.route.capabilityKey,
-            configVersion: row.route.configVersion,
-            connectionId: asLegid(IntegrationConnectionId)(
-              row.route.connectionId
-            ),
-            enabled: row.route.enabled,
-            eventTypes: row.route.eventTypes,
-            id: asLegid(IntegrationRouteId)(row.route.id),
-            provider: row.connection.provider,
-            providerConfig: row.route.providerConfig,
-            safeMetadata: row.route.safeDisplayMetadata ?? {},
-          },
-        }).pipe(
-          Effect.mapError(() => persistenceError("decode_claimed_delivery"))
+          );
+        const byId = new Map(
+          rows.map((row) => [row.delivery.id, row] as const)
         );
-        return { input, leaseOwner } satisfies ClaimedIntegrationDelivery;
+        for (const deliveryId of deliveryIds) {
+          const row = byId.get(deliveryId);
+          if (row === undefined) {
+            return yield* persistenceError("load_claimed_delivery");
+          }
+          const input = yield* Schema.decodeUnknownEffect(ClaimedProviderInput)(
+            {
+              connection: {
+                credentialGeneration: row.connection.credentialGeneration,
+                id: asLegid(IntegrationConnectionId)(row.connection.id),
+                lifecycleStatus: row.connection.lifecycle,
+                name: row.connection.name,
+                organizationId: asLegid(WorkspaceId)(
+                  row.connection.organizationId
+                ),
+                provider: row.connection.provider,
+                safeMetadata: row.connection.safeDisplayMetadata ?? {},
+              },
+              delivery: {
+                actionKey: row.delivery.actionKey,
+                attemptCount: row.delivery.attemptCount,
+                eventId: asLegid(IntegrationEventId)(row.delivery.eventId),
+                id: asLegid(IntegrationDeliveryId)(row.delivery.id),
+                leaseExpiresAt:
+                  row.delivery.leaseExpiresAt === null
+                    ? null
+                    : row.delivery.leaseExpiresAt.toISOString(),
+                leaseOwner: row.delivery.leaseOwner,
+                nextAttemptAt: row.delivery.nextAttemptAt.toISOString(),
+                orderingKey: row.delivery.orderingKey,
+                routeId: asLegid(IntegrationRouteId)(row.delivery.routeId),
+                state: row.delivery.state,
+              },
+              event: {
+                causalHopCount: row.event.causalHopCount,
+                ...(row.event.causationId !== null && {
+                  causationId: row.event.causationId,
+                }),
+                correlationId: row.event.correlationId,
+                data: row.event.payload,
+                id: asLegid(IntegrationEventId)(row.event.id),
+                occurredAt: row.event.occurredAt.toISOString(),
+                organizationId: asLegid(WorkspaceId)(row.event.organizationId),
+                origin: row.event.origin,
+                type: row.event.type,
+                version: row.event.version,
+              },
+              route: {
+                capabilityKey: row.route.capabilityKey,
+                configVersion: row.route.configVersion,
+                connectionId: asLegid(IntegrationConnectionId)(
+                  row.route.connectionId
+                ),
+                enabled: row.route.enabled,
+                eventTypes: row.route.eventTypes,
+                id: asLegid(IntegrationRouteId)(row.route.id),
+                provider: row.connection.provider,
+                providerConfig: row.route.providerConfig,
+                safeMetadata: row.route.safeDisplayMetadata ?? {},
+              },
+            }
+          ).pipe(
+            Effect.mapError(() => persistenceError("decode_claimed_delivery"))
+          );
+          claimed.push({ input, leaseOwner });
+        }
+        return claimed;
       });
 
     const claimDueDeliveries: IntegrationDeliveryWorkerRepository["claimDueDeliveries"] =
@@ -330,61 +353,72 @@ export const makeIntegrationDeliveryWorkerRepository = (
                   DateTime.addDuration(Duration.millis(leaseDurationMs)),
                   DateTime.toDate
                 );
-                return yield* Effect.forEach(claimableRows, ({ id }) =>
-                  Effect.gen(function* () {
-                    const [delivery] = yield* db
-                      .update(schema.integrationDeliveryTable)
-                      .set({
-                        attemptCount: sql`${schema.integrationDeliveryTable.attemptCount} + 1`,
-                        leaseExpiresAt,
-                        leaseOwner,
-                        state: "leased",
-                        updatedAt: now,
-                      })
-                      .where(
-                        and(
-                          eq(schema.integrationDeliveryTable.id, id),
-                          eq(schema.integrationDeliveryTable.state, "pending")
-                        )
-                      )
-                      .returning({
-                        attemptCount:
-                          schema.integrationDeliveryTable.attemptCount,
-                        id: schema.integrationDeliveryTable.id,
-                      });
-                    if (delivery === undefined) {
-                      return undefined;
-                    }
-                    const attemptId =
-                      yield* IntegrationDeliveryAttemptId.generate;
-                    yield* db
-                      .insert(schema.integrationDeliveryAttemptTable)
-                      .values({
-                        attemptNumber: delivery.attemptCount,
-                        deliveryId: delivery.id,
-                        id: attemptId,
-                        retentionExpiresAt: DateTime.fromDateUnsafe(now).pipe(
-                          DateTime.addDuration(
-                            Duration.millis(
-                              integrationDeliveryWorkerDefaults.retentionMs
-                            )
-                          ),
-                          DateTime.toDate
-                        ),
-                        startedAt: now,
-                      });
-                    return delivery.id;
+                const claimableIds = claimableRows.map(({ id }) => id);
+                if (claimableIds.length === 0) {
+                  return [];
+                }
+                // One statement claims the whole batch. Its rows are already
+                // locked by the `FOR UPDATE SKIP LOCKED` select above, so the
+                // `pending` guard cannot lose a race here: a concurrent
+                // claimer waits on this transaction rather than interleaving
+                // with it.
+                const claimed = yield* db
+                  .update(schema.integrationDeliveryTable)
+                  .set({
+                    attemptCount: sql`${schema.integrationDeliveryTable.attemptCount} + 1`,
+                    leaseExpiresAt,
+                    leaseOwner,
+                    state: "leased",
+                    updatedAt: now,
                   })
-                ).pipe(
-                  Effect.map((ids) =>
-                    ids.filter((id): id is string => id !== undefined)
+                  .where(
+                    and(
+                      inArray(schema.integrationDeliveryTable.id, claimableIds),
+                      eq(schema.integrationDeliveryTable.state, "pending")
+                    )
                   )
+                  .returning({
+                    attemptCount: schema.integrationDeliveryTable.attemptCount,
+                    id: schema.integrationDeliveryTable.id,
+                  });
+                if (claimed.length === 0) {
+                  return [];
+                }
+                // The attempt row is the audit trail of the claim, so one
+                // insert carries the whole batch. `UPDATE ... RETURNING`
+                // answers in no particular order; the ids are put back in the
+                // order the due select chose before their rows are read back.
+                const attemptRetentionExpiresAt = DateTime.fromDateUnsafe(
+                  now
+                ).pipe(
+                  DateTime.addDuration(
+                    Duration.millis(
+                      integrationDeliveryWorkerDefaults.retentionMs
+                    )
+                  ),
+                  DateTime.toDate
                 );
+                const attempts = yield* Effect.forEach(
+                  claimed,
+                  ({ attemptCount, id }) =>
+                    IntegrationDeliveryAttemptId.generate.pipe(
+                      Effect.map((attemptId) => ({
+                        attemptNumber: attemptCount,
+                        deliveryId: id,
+                        id: attemptId,
+                        retentionExpiresAt: attemptRetentionExpiresAt,
+                        startedAt: now,
+                      }))
+                    )
+                );
+                yield* db
+                  .insert(schema.integrationDeliveryAttemptTable)
+                  .values(attempts);
+                const claimedIdSet = new Set(claimed.map(({ id }) => id));
+                return claimableIds.filter((id) => claimedIdSet.has(id));
               })
             );
-            return yield* Effect.forEach(claimedIds, (id) =>
-              loadClaimedDelivery(id, leaseOwner)
-            );
+            return yield* loadClaimedDeliveries(claimedIds, leaseOwner);
           })
         );
 
