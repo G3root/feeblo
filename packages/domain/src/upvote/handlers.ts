@@ -13,11 +13,7 @@ import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
-import {
-  type Surface,
-  type SurfacePair,
-  withSurfacePolicyAndRateLimit,
-} from "../surface";
+import { defineSurfacePair } from "../surface";
 import { UserRepository } from "../user/repository";
 import { addVoteOnBehalf, removeVoteOnBehalf } from "./on-behalf";
 import { UpvotePolicy } from "./policies";
@@ -42,8 +38,9 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
   // The policy's `source` selects the visibility rule: the dashboard checks
   // `isUnlocked`, the public portal `isUnlockedPublic`.
 
-  const toggleWrite = {
+  const toggleWrite = defineSurfacePair<TUpvoteToggle, UpvoteRpcTag>()({
     operation: "UpvoteToggle",
+    remap: { action: "update", entity: "Upvote" },
     dashboard: {
       rateLimit: undefined,
       policy: (args: TUpvoteToggle) =>
@@ -62,33 +59,21 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
           source: "public",
         }),
     },
-  } satisfies SurfacePair<TUpvoteToggle, UpvoteRpcTag>;
+  });
 
-  const toggleVote = <
-    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
-  >(
-    surface: Surface,
-    level: Level,
-    args: TUpvoteToggle
-  ) =>
-    withSurfacePolicyAndRateLimit({
-      level,
-      operation: toggleWrite.operation,
-      surface,
-      policy: toggleWrite[surface].policy(args),
-    })(
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
+  const toggleVote = toggleWrite.handlers((_surface, args) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
 
-        return yield* transaction(
-          repository.toggle({
-            organizationId: args.organizationId,
-            postId: args.postId,
-            userId: session.session.userId,
-          })
-        );
-      })
-    ).pipe(withRemapDbErrors("Upvote", "update"));
+      return yield* transaction(
+        repository.toggle({
+          organizationId: args.organizationId,
+          postId: args.postId,
+          userId: session.session.userId,
+        })
+      );
+    })
+  );
 
   return {
     UpvoteList: (args: TUpvoteList) =>
@@ -105,8 +90,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
           ),
           withRemapDbErrors("Upvote", "select")
         ),
-    UpvoteToggle: (args: TUpvoteToggle) =>
-      toggleVote("dashboard", toggleWrite.dashboard.rateLimit, args),
+    UpvoteToggle: toggleVote.dashboard,
     UpvoteAddOnBehalf: (args: TUpvoteAddOnBehalf) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
@@ -186,8 +170,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         }),
         withRemapDbErrors("Upvote", "select")
       ),
-    UpvoteTogglePublic: (args: TUpvoteToggle) =>
-      toggleVote("public", toggleWrite.public.rateLimit, args),
+    UpvoteTogglePublic: toggleVote.public,
   };
 });
 
