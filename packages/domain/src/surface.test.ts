@@ -81,6 +81,38 @@ describe("defineSurfacePair", () => {
     })
   );
 
+  it.effect("spends the budget before the body runs", () =>
+    Effect.gen(function* () {
+      const order: Array<string> = [];
+      const ordered = defineSurfacePair<TestArgs, TestTags>()({
+        operation: "ThingCreate",
+        remap: { action: "create", entity: "Thing" },
+        dashboard: { rateLimit: undefined, policy: () => Effect.void },
+        public: { rateLimit: "write", policy: () => Effect.void },
+      });
+
+      const result = yield* ordered
+        .handlers((_surface, _args) =>
+          Effect.sync(() => {
+            order.push("body");
+            return "kept";
+          })
+        )
+        .public({ id: "thing-1" })
+        .pipe(
+          Effect.provideService(PublicRpcRateLimiter, {
+            consume: ({ name }) =>
+              Effect.sync(() => {
+                order.push(`limit:${name}`);
+              }),
+          })
+        );
+
+      expect(result).toBe("kept");
+      expect(order).toEqual(["limit:ThingCreatePublic", "body"]);
+    })
+  );
+
   it.effect("leaves the dashboard surface unthrottled", () =>
     Effect.gen(function* () {
       const consumed: Array<PublicRpcRateLimitOptions> = [];
@@ -97,6 +129,7 @@ describe("defineSurfacePair", () => {
   it.effect("decides admission before spending budget", () =>
     Effect.gen(function* () {
       const consumed: Array<PublicRpcRateLimitOptions> = [];
+      const bodyRan: Array<string> = [];
       const denied = defineSurfacePair<TestArgs, TestTags>()({
         operation: "ThingCreate",
         remap: { action: "create", entity: "Thing" },
@@ -108,12 +141,17 @@ describe("defineSurfacePair", () => {
       });
 
       const exit = yield* denied
-        .handlers((_surface, _args) => Effect.void)
+        .handlers((_surface, _args) =>
+          Effect.sync(() => {
+            bodyRan.push("body");
+          })
+        )
         .public({ id: "thing-1" })
         .pipe(limiter(consumed), Effect.exit);
 
       expect(Exit.isFailure(exit)).toBe(true);
       expect(consumed).toEqual([]);
+      expect(bodyRan).toEqual([]);
     })
   );
 
