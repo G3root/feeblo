@@ -1,5 +1,5 @@
 import { createRuntime, type RpcClientType, withRpc } from "@feeblo/rpc-client";
-import * as Cause from "effect/Cause";
+import { RpcError } from "@feeblo/web-shared/rpc-error";
 import type * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 
@@ -30,9 +30,9 @@ async function runEffect<A, E, R>(
     { signal: options?.signal }
   );
   if (Exit.isFailure(result)) {
-    const cause = result.cause;
-
-    throw new Error(Cause.pretty(cause));
+    // The same error shape the browser runtime throws: `parseRpcError` reads
+    // the tag off the cause, which a `Cause.pretty` string would lose.
+    throw new RpcError(result.cause);
   }
   return result.value;
 }

@@ -169,6 +169,29 @@ export default defineConfig({
     // warning.
     "effecttsgo/strict-effect-provide": "error",
 
+    // The rest of ADR 0005's ratchet that is already clear. Each rule below is
+    // `warn` in the two extended presets and reports zero findings in this
+    // tree, so `error` costs nothing today and makes the first violation fail
+    // the gate instead of joining a list nobody reads. All but the last two
+    // are the `-in-effect` half of the boundary pattern above: global fetch,
+    // timers, `Math.random`, `crypto.randomUUID`, `process.env`, sync Schema
+    // decoding and a hand-built `AbortController` are ordinary at the edges
+    // and a defect inside a fiber tree, where they bypass the service the
+    // runtime substitutes in tests. `instance-of-schema` is the decoded-error
+    // rule AGENTS.md names — `instanceof` answers `false` for a decoded value
+    // that carries `_tag` with no prototype, so the branch silently takes its
+    // fallback and `Schema.is` is the only correct match. `leaking-requirements`
+    // keeps a service's implementation type out of its method signatures.
+    "effecttsgo/leaking-requirements": "error",
+    "effecttsgo/abort-controller-in-effect": "error",
+    "effecttsgo/crypto-random-uuid-in-effect": "error",
+    "effecttsgo/global-fetch-in-effect": "error",
+    "effecttsgo/global-random-in-effect": "error",
+    "effecttsgo/global-timers-in-effect": "error",
+    "effecttsgo/instance-of-schema": "error",
+    "effecttsgo/process-env-in-effect": "error",
+    "effecttsgo/schema-sync-in-effect": "error",
+
     // anti-slop
     "anti-slop/no-chained-type-assertions": "error",
     "anti-slop/no-conditional-empty-object-spread": "error",

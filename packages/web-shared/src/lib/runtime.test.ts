@@ -1,7 +1,22 @@
+import { rpcProtocolFor } from "@feeblo/rpc-client";
 import * as Cause from "effect/Cause";
 import { describe, expect, it } from "vitest";
 
 import { parseRpcError, RpcError } from "./rpc-error";
+
+describe("rpcProtocolFor", () => {
+  it("memoizes one protocol layer per normalized API URL", () => {
+    expect(rpcProtocolFor("http://api.test")).toBe(
+      rpcProtocolFor("http://api.test/")
+    );
+  });
+
+  it("keeps different API origins on different layers", () => {
+    expect(rpcProtocolFor("http://api.test")).not.toBe(
+      rpcProtocolFor("http://other.test")
+    );
+  });
+});
 
 describe("parseRpcError", () => {
   it("extracts user-facing message from domain errors", () => {
