@@ -94,7 +94,7 @@ Requests by route:
 | map * 100
 ```
 
-p95 latency against a 500 ms objective: the percentile query with the objective drawn at 500.
+p95 latency against a 500 ms objective, and p99 against 1000 ms: the percentile query with the objective drawn at the target. The objectives are the chosen defaults; see `docs/grafana/README.md` before changing them.
 
 ## Integrations
 

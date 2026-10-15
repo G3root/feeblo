@@ -39,7 +39,7 @@ Both variables are editable in the dashboard toolbar, so no JSON editing is need
 
 They are recorded for every response the server sends — successful, failed, or unmatched — so the values are exact and do not depend on trace sampling. The `route` label is the router's matched route template (for example `/api/v1/posts/:postId`), so a matched handler that answers 404 keeps its route; only genuinely unmatched paths collapse to `unmatched`, which stops scanner traffic from minting a label per path.
 
-The SLO row turns those exact metrics into objectives: a 1% 5xx error objective with fast (1h) and slow (6h) error-budget burn rates, and a 500 ms p95 latency objective. The objectives are starting points; edit the panel queries to change them.
+The SLO row turns those exact metrics into objectives. It assumes **1% of requests may be 5xx** and **p95 latency must stay under 500 ms** (p99 under 1000 ms), and derives fast (1h) and slow (6h) error-budget burn rates from the first. Those are the chosen defaults, not a measurement; if the product targets differ, change them in the panel queries, the panel thresholds, and the alert rules below. The dashboard description repeats the objectives so they are visible without opening this file.
 
 RPC methods are not visible here: every call shares `POST /rpc`, and the method only exists on the span as `rpc.method`. In Application Observability, filter to `service.name = feeblo-server` and group or filter by the `rpc.method` span attribute; the server names each RPC server span `RpcServer.<Tag>` and also records the method on the parent HTTP span. Traces Drilldown's span-metrics view charts request rate, error rate, and latency per method.
 

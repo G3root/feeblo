@@ -25,7 +25,7 @@
       }
     ]
   },
-  "description": "Exact HTTP request rate, error rate, and latency from the server's own metrics \u2014 unsampled, unlike trace-derived RED. RPC method breakdowns and database spans live in Application Observability. Service label defaults to job=~\"feeblo/feeblo-server\"; switch to service_name if your stack promotes that label instead.",
+  "description": "Exact HTTP request rate, error rate, and latency from the server's own metrics \u2014 unsampled, unlike trace-derived RED. The SLO row targets 1% 5xx and 500 ms p95 (1000 ms p99); edit the panel queries to change them. RPC method breakdowns and database spans live in Application Observability. Service label defaults to job=~\"feeblo/feeblo-server\"; switch to service_name if your stack promotes that label instead.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
