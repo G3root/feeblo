@@ -10,20 +10,20 @@ import { sharesRpcBatch } from "../src/index";
  */
 describe("sharesRpcBatch", () => {
   it("lets unary reads share a batch", () => {
-    expect(sharesRpcBatch("PostList")).toBe(true);
-    expect(sharesRpcBatch("PostGetPublic")).toBe(true);
-    expect(sharesRpcBatch("NotificationUnreadCount")).toBe(true);
-    expect(sharesRpcBatch("PostDeleteEligibilityList")).toBe(true);
+    expect(sharesRpcBatch("ListPosts")).toBe(true);
+    expect(sharesRpcBatch("GetPostPublic")).toBe(true);
+    expect(sharesRpcBatch("CountUnreadNotifications")).toBe(true);
+    expect(sharesRpcBatch("ListPostDeleteEligibility")).toBe(true);
   });
 
   it("sends writes alone", () => {
-    expect(sharesRpcBatch("PostUpdate")).toBe(false);
-    expect(sharesRpcBatch("OrganizationUpdateMemberRole")).toBe(false);
+    expect(sharesRpcBatch("UpdatePost")).toBe(false);
+    expect(sharesRpcBatch("UpdateOrganizationMemberRole")).toBe(false);
   });
 
   it("sends streaming reads alone", () => {
-    expect(sharesRpcBatch("DataImportListWatch")).toBe(false);
-    expect(sharesRpcBatch("DataImportWatch")).toBe(false);
+    expect(sharesRpcBatch("WatchDataImports")).toBe(false);
+    expect(sharesRpcBatch("WatchDataImport")).toBe(false);
   });
 
   it("sends a tag this build does not know alone", () => {
