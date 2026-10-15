@@ -1,28 +1,24 @@
 /**
  * The composition root's observability layer.
  *
- * Sentry stays the error channel. When an OTLP endpoint is configured, the
- * Effect-native OTLP exporters take over traces, and optionally logs and
- * metrics, because Effect carries a single `Tracer.Tracer` and one tracer must
- * win. Without an endpoint this is exactly the Sentry layer as before, so
- * local development and self-hosting keep working with no collector.
+ * Observability is OTLP-only. When an endpoint is configured, the
+ * Effect-native OTLP exporters own traces, logs, and metrics; without one the
+ * runtime's default tracer and logger are used. A broken telemetry env var or
+ * an exporter that fails to start logs loudly and continues without OTLP
+ * rather than taking down a deployment.
  *
  * See `docs/telemetry.md` for the env and the local motel setup.
  */
 import { rpcSpanPrefix } from "@feeblo/domain/rpc-router";
 import { truncate } from "@feeblo/utils/text";
-import * as Sentry from "@sentry/effect/server";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Logger from "effect/Logger";
-import { OtlpExporter } from "effect/observability";
 import * as Option from "effect/Option";
+import * as References from "effect/References";
 
 import type { ServerConfigValue } from "../config";
-import { makeSentryLayer } from "./sentry";
 import { telemetryConfig, telemetryLayer } from "./telemetry";
-import { defaultTelemetryLogger } from "./telemetry/layer";
 
 /** Longest failure summary written to the startup log. */
 const failureSummaryLimit = 500;
@@ -69,60 +65,41 @@ export const failureSummary = (cause: Cause.Cause<unknown>): string =>
 export const makeObservabilityLayer = (config: ServerConfigValue) =>
   Layer.unwrap(
     Effect.gen(function* () {
-      // Sentry-only is also the fallback when OTLP configuration is broken: a
-      // typo in a telemetry env var logs loudly but must not take down a
-      // deployment.
-      const sentryOnly = Layer.merge(
-        makeSentryLayer(config),
-        OtlpExporter.layerFlusher
-      );
       const telemetry = yield* telemetryConfig({
         service: "feeblo-server",
         environment: config.environment,
       }).pipe(
         Effect.tapError((error) =>
           Effect.logError(
-            "OTLP configuration is invalid; continuing with Sentry only",
+            "OTLP configuration is invalid; continuing without OTLP exporters",
             { error: failureSummary(Cause.fail(error)) }
           )
         ),
         Effect.option
       );
 
+      // The invalid-configuration path has no decoded log level; the fallbacks
+      // below do, so keep `FEEBLO_TELEMETRY_LOG_LEVEL` in effect even when no
+      // exporter starts.
       if (Option.isNone(telemetry)) {
-        return sentryOnly;
+        return Layer.empty;
       }
-      const { logs, metrics, traces } = telemetry.value;
+      const { logLevel, logs, metrics, traces } = telemetry.value;
       const otlpEnabled =
         traces !== undefined || logs !== undefined || metrics !== undefined;
       if (!otlpEnabled) {
-        return sentryOnly;
+        return Layer.succeed(References.MinimumLogLevel, logLevel);
       }
 
-      const loggers: Array<Logger.Logger<unknown, void>> = [
-        defaultTelemetryLogger,
-      ];
-      if (config.sentryDsn && logs === undefined) {
-        loggers.push(Sentry.SentryEffectLogger);
-      }
-
-      return Layer.mergeAll(
-        makeSentryLayer(config, {
-          logger: false,
-          metrics: metrics === undefined,
-          tracer: traces === undefined,
-        }),
-        telemetryLayer(telemetry.value, {
-          baseLoggers: Logger.layer(loggers, { mergeWithExisting: false }),
-          rpcSpanPrefix,
-        })
-      ).pipe(
+      return telemetryLayer(telemetry.value, { rpcSpanPrefix }).pipe(
         Layer.catchCause((cause) =>
           Layer.unwrap(
             Effect.logError(
-              "OTLP exporters failed to start; continuing with Sentry only",
+              "OTLP exporters failed to start; continuing without OTLP exporters",
               { cause: failureSummary(cause) }
-            ).pipe(Effect.as(sentryOnly))
+            ).pipe(
+              Effect.as(Layer.succeed(References.MinimumLogLevel, logLevel))
+            )
           )
         )
       );

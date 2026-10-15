@@ -1,17 +1,16 @@
 # Telemetry
 
-Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the server, and keeps Sentry as the error channel. The exporters are Effect's own (`effect/observability`), so the only dependency is `effect` itself — this is a port of `UsefulSoftwareCo/executor`'s `packages/telemetry`, trimmed to what a first-party server needs.
+Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the server. The exporters are Effect's own (`effect/observability`), so the only dependency is `effect` itself — this is a port of `UsefulSoftwareCo/executor`'s `packages/telemetry`, trimmed to what a first-party server needs.
 
 ## Wiring
 
 | File | Role |
 | --- | --- |
-| `apps/server/src/infra/observability.ts` | Chooses Sentry-only or Sentry + OTLP, and owns the final logger set |
+| `apps/server/src/infra/observability.ts` | Chooses the OTLP exporters or the runtime defaults, and owns the final logger set |
 | `apps/server/src/infra/telemetry/config.ts` | Parses the standard `OTEL_EXPORTER_OTLP_*` environment |
 | `apps/server/src/infra/telemetry/layer.ts` | Builds the OTLP tracer, logger, and metrics layers |
 | `apps/server/src/infra/telemetry/span-attributes.ts` | HTTP attribute allowlist, root-span filter, and ratio sampling |
 | `apps/server/src/infra/telemetry/rpc-spans.ts` | Adds `rpc.*` attributes and labels the parent HTTP span per RPC method |
-| `apps/server/src/infra/sentry.ts` | Sentry SDK, logger, metrics, and tracer, each optional |
 
 `program.ts` provides `makeObservabilityLayer` around the whole program, so layer construction, the forked workers, and the HTTP server all share one tracer and one logger set.
 
@@ -26,7 +25,7 @@ Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the 
 | `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` | `cumulative` (default) or `delta`. Prometheus-based backends (Grafana Cloud, Mimir, self-hosted Prometheus) store cumulative series; use `delta` only for backends that require it, such as Datadog. |
 | `FEEBLO_TELEMETRY_TRACES_SAMPLE_RATE` | Root-span ratio, `0.0`–`1.0`, default `1`. Children always follow their root's decision. |
 | `FEEBLO_TELEMETRY_DROP_ROOT_SPANS` | Drop parentless `sql.execute` / `sql.transaction` spans, default `true`. Set `false` to keep them while debugging a poller. |
-| `FEEBLO_TELEMETRY_LOG_LEVEL` | Minimum exported log level: `All`, `Fatal`, `Error`, `Warn`, `Info` (default), `Debug`, `Trace`, or `None`; case-insensitive. An unknown value keeps `Info`. |
+| `FEEBLO_TELEMETRY_LOG_LEVEL` | Minimum log level: `All`, `Fatal`, `Error`, `Warn`, `Info` (default), `Debug`, `Trace`, or `None`; case-insensitive. An unknown value keeps `Info`. |
 | `OTEL_SERVICE_NAME` | Defaults to `feeblo-server`. |
 | `OTEL_RESOURCE_ATTRIBUTES` | Extra resource attributes for every signal, `key=value,key2=value2`. Grafana Cloud's Application Observability matches a service by `service.name` **and** `service.namespace`, so set `service.namespace=<namespace>` there. |
 | `APP_RELEASE` | Reported as `service.version`. |
@@ -35,7 +34,7 @@ The resource on every signal carries both `deployment.environment` and its stabl
 
 Every signal also carries `service.instance.id`: `OTEL_RESOURCE_ATTRIBUTES=service.instance.id=...` when set, otherwise the container hostname. Grafana maps it to the `instance` label, which keeps replicas distinguishable.
 
-Traces export every 5 seconds, logs every second, and metrics every 30 seconds. When `OTEL_EXPORTER_OTLP_ENDPOINT` or a header is malformed, the server logs the configuration error and continues with Sentry-only observability instead of failing startup.
+Traces export every 5 seconds, logs every second, and metrics every 30 seconds. When `OTEL_EXPORTER_OTLP_ENDPOINT` or a header is malformed, the server logs the configuration error and continues with the runtime's default tracer and logger instead of failing startup.
 
 ## Span shaping
 
@@ -72,12 +71,6 @@ Set the same variables in the Dokploy environment (or `.env` for `docker-compose
 Ready-to-import Grafana Cloud dashboards for the HTTP APM and the queue and email metrics live in `docs/grafana/`; `docs/axiom/` carries the same panels as MPL queries.
 
 Sampling is the cost control: the server emits every span when the rate is `1`, and a busy workspace can produce millions of SQL spans per day. Set `FEEBLO_TELEMETRY_TRACES_SAMPLE_RATE` to `0.05`–`0.2` in production and let the backend's retention policy bound storage. Effect's `Tracer.MinimumTraceLevel` is also available for dropping low-level spans wholesale.
-
-## Sentry
-
-Sentry keeps capturing errors. Its tracer is only installed when no OTLP traces endpoint is configured, because Effect carries a single `Tracer.Tracer`. When OTLP logs or metrics are configured, Sentry's logger and metrics layer are left off to avoid shipping the same signal twice; with only an OTLP traces endpoint, Sentry logs and metrics stay as before.
-
-`makeSentryLayer` accepts `{ tracer, logger, metrics }` for that decision. The `SENTRY_TRACES_SAMPLE_RATE` value still applies whenever Sentry is the tracer.
 
 ## What is deliberately not ported
 

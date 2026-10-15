@@ -105,7 +105,7 @@ Due and claimed backlog (monitors should use `max`):
 | align to 5m using avg
 ```
 
-Retries and exhausting deliveries in the last 15 minutes:
+Retries and exhausting deliveries in the last 15 minutes (cumulative temporality):
 
 ```
 `<metrics-dataset>`:`feeblo_integration_delivery_transitions_total`
@@ -115,6 +115,8 @@ Retries and exhausting deliveries in the last 15 minutes:
 | align to 15m using sum
 | group using sum
 ```
+
+With delta temporality (`OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta`) the exporter already sends per-interval increments: omit `map increase` and keep `align to 15m using sum`, which totals the points directly.
 
 Lease recoveries and pauses: group `feeblo_integration_lease_recoveries_total`, `feeblo_integration_automatic_pauses_total`, and `feeblo_integration_plan_pauses_total` the same way.
 

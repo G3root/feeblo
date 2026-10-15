@@ -2,8 +2,13 @@ import { expect, it } from "@effect/vitest";
 import * as Cause from "effect/Cause";
 import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as References from "effect/References";
 
-import { failureSummary } from "./observability";
+import { ServerConfig } from "../config";
+import { failureSummary, makeObservabilityLayer } from "./observability";
 
 const summaryOf = (message: string): string =>
   failureSummary(Cause.fail(new Error(message)));
@@ -89,3 +94,28 @@ it("keeps every failure message in the summary", () => {
   expect(summary).toContain("first failure");
   expect(summary).toContain("second failure");
 });
+
+it.effect(
+  "keeps the configured log level when no OTLP exporter is enabled",
+  () =>
+    Effect.gen(function* () {
+      const provider = ConfigProvider.fromUnknown({
+        API_URL: "https://api.example.test",
+        APP_ROOT_DOMAIN: "example.test",
+        APP_URL: "https://example.test",
+        AUTH_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef",
+        FEEBLO_TELEMETRY_LOG_LEVEL: "warn",
+      });
+      const config = yield* ServerConfig.make.pipe(
+        Effect.provideService(ConfigProvider.ConfigProvider, provider)
+      );
+
+      const context = yield* Layer.build(
+        makeObservabilityLayer(config).pipe(
+          Layer.provide(ConfigProvider.layer(provider))
+        )
+      );
+
+      expect(Context.get(context, References.MinimumLogLevel)).toBe("Warn");
+    })
+);
