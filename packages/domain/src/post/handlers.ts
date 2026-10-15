@@ -19,11 +19,7 @@ import * as RateLimit from "../rate-limit";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession, type Session } from "../session-middleware";
-import {
-  type Surface,
-  type SurfacePair,
-  withSurfacePolicyAndRateLimit,
-} from "../surface";
+import { defineSurfacePair } from "../surface";
 import { WorkspaceRepository } from "../workspace/repository";
 import { PostEmbeddingService } from "./embedding-service";
 import {
@@ -148,12 +144,13 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   // -- Surface-parameterized writes --
   //
   // The dashboard RPC and the public portal RPC are two names for one write;
-  // the shared body takes the surface, and the record holds the policy and
+  // the shared body takes the surface, and the pair holds the policy and
   // rate-limit level that differ. Public updates are rename semantics only,
   // which is why `PostUpdate`'s public policy adds `hasUnchangedLocation`.
 
-  const deleteWrite = {
+  const deleteWrite = defineSurfacePair<TPostDelete, PostRpcTag>()({
     operation: "PostDelete",
+    remap: { action: "delete", entity: "Post" },
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostDelete) =>
@@ -174,10 +171,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           source: "public",
         }),
     },
-  } satisfies SurfacePair<TPostDelete, PostRpcTag>;
+  });
 
-  const updateWrite = {
+  const updateWrite = defineSurfacePair<TPostUpdate, PostRpcTag>()({
     operation: "PostUpdate",
+    remap: { action: "update", entity: "Post" },
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostUpdate) =>
@@ -209,10 +207,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           })
         ),
     },
-  } satisfies SurfacePair<TPostUpdate, PostRpcTag>;
+  });
 
-  const updateContentWrite = {
+  const updateContentWrite = defineSurfacePair<
+    TPostUpdateContent,
+    PostRpcTag
+  >()({
     operation: "PostUpdateContent",
+    remap: { action: "update", entity: "Post" },
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostUpdateContent) =>
@@ -233,10 +235,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           source: "public",
         }),
     },
-  } satisfies SurfacePair<TPostUpdateContent, PostRpcTag>;
+  });
 
-  const updateTitleWrite = {
+  const updateTitleWrite = defineSurfacePair<TPostUpdateTitle, PostRpcTag>()({
     operation: "PostUpdateTitle",
+    remap: { action: "update", entity: "Post" },
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostUpdateTitle) =>
@@ -257,115 +260,75 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           source: "public",
         }),
     },
-  } satisfies SurfacePair<TPostUpdateTitle, PostRpcTag>;
+  });
 
-  const removePost = <
-    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
-  >(
-    surface: Surface,
-    level: Level,
-    args: TPostDelete
-  ) =>
-    withSurfacePolicyAndRateLimit({
-      level,
-      operation: deleteWrite.operation,
-      surface,
-      policy: deleteWrite[surface].policy(args),
-    })(
-      Effect.flatMap(CurrentSession, (session) =>
-        writes.remove(
-          {
-            ...args,
-            mayDeleteEngaged: Permissions.can(
-              session,
-              args.organizationId,
-              "posts.*"
-            ),
-          },
-          memberActor(session, args.organizationId)
-        )
+  const removePost = deleteWrite.handlers((_surface, args) =>
+    Effect.flatMap(CurrentSession, (session) =>
+      writes.remove(
+        {
+          ...args,
+          mayDeleteEngaged: Permissions.can(
+            session,
+            args.organizationId,
+            "posts.*"
+          ),
+        },
+        memberActor(session, args.organizationId)
       )
-    ).pipe(withRemapDbErrors("Post", "delete"));
+    )
+  );
 
-  const updatePost = <
-    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
-  >(
-    surface: Surface,
-    level: Level,
-    args: TPostUpdate
-  ) =>
-    withSurfacePolicyAndRateLimit({
-      level,
-      operation: updateWrite.operation,
-      surface,
-      policy: updateWrite[surface].policy(args),
-    })(
-      Effect.flatMap(CurrentSession, (session) =>
-        writes.update(
-          {
-            boardId: args.boardId,
-            id: args.id,
-            organizationId: args.organizationId,
-            statusId: args.statusId,
-          },
-          memberActor(session, args.organizationId)
-        )
+  const updatePost = updateWrite.handlers((_surface, args) =>
+    Effect.flatMap(CurrentSession, (session) =>
+      writes.update(
+        {
+          boardId: args.boardId,
+          id: args.id,
+          organizationId: args.organizationId,
+          statusId: args.statusId,
+        },
+        memberActor(session, args.organizationId)
       )
-    ).pipe(withRemapDbErrors("Post", "update"));
+    )
+  );
 
-  const updatePostContent = <
-    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
-  >(
-    surface: Surface,
-    level: Level,
-    args: TPostUpdateContent
-  ) =>
-    withSurfacePolicyAndRateLimit({
-      level,
-      operation: updateContentWrite.operation,
-      surface,
-      policy: updateContentWrite[surface].policy(args),
-    })(
-      Effect.flatMap(CurrentSession, (session) =>
-        writes.update(
-          {
-            assetIds: args.assetIds,
-            content: args.content,
-            id: args.id,
-            organizationId: args.organizationId,
-          },
-          memberActor(session, args.organizationId)
-        )
+  const updatePostContent = updateContentWrite.handlers((_surface, args) =>
+    Effect.flatMap(CurrentSession, (session) =>
+      writes.update(
+        {
+          assetIds: args.assetIds,
+          content: args.content,
+          id: args.id,
+          organizationId: args.organizationId,
+        },
+        memberActor(session, args.organizationId)
       )
-    ).pipe(withRemapDbErrors("Post", "update"));
+    )
+  );
 
-  const updatePostTitle = <
-    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
-  >(
-    surface: Surface,
-    level: Level,
-    args: TPostUpdateTitle
-  ) =>
-    withSurfacePolicyAndRateLimit({
-      level,
-      operation: updateTitleWrite.operation,
-      surface,
-      policy: updateTitleWrite[surface].policy(args),
-    })(
-      Effect.flatMap(CurrentSession, (session) =>
-        writes.update(
-          {
-            id: args.id,
-            organizationId: args.organizationId,
-            title: args.title,
-          },
-          memberActor(session, args.organizationId)
-        )
+  const updatePostTitle = updateTitleWrite.handlers((_surface, args) =>
+    Effect.flatMap(CurrentSession, (session) =>
+      writes.update(
+        {
+          id: args.id,
+          organizationId: args.organizationId,
+          title: args.title,
+        },
+        memberActor(session, args.organizationId)
       )
-    ).pipe(withRemapDbErrors("Post", "update"));
+    )
+  );
 
-  const createWrite = {
+  const createWrite = defineSurfacePair<TPostCreate, PostRpcTag>()({
     operation: "PostCreate",
+    remap: {
+      action: "create",
+      entity: "Post",
+      onUniqueViolation: () =>
+        new PostAlreadyExistsError({
+          message: "A post with this slug already exists",
+        }),
+    },
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostCreate) =>
@@ -383,49 +346,28 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           source: "public",
         }),
     },
-  } satisfies SurfacePair<TPostCreate, PostRpcTag>;
+  });
 
-  const createPost = <
-    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
-  >(
-    surface: Surface,
-    level: Level,
-    args: TPostCreate
-  ) =>
-    withSurfacePolicyAndRateLimit({
-      level,
-      operation: createWrite.operation,
-      surface,
-      policy: createWrite[surface].policy(args),
-    })(
-      Effect.gen(function* () {
-        // On-behalf attribution is dashboard-only; the public portal cannot
-        // name a customer and the board's create form does not offer one.
-        if (surface === "public" && args.author !== undefined) {
-          return yield* new BadRequestError({
-            message:
-              "Posts cannot be created on behalf of another author from public boards",
-          });
-        }
+  const createPost = createWrite.handlers((surface, args) =>
+    Effect.gen(function* () {
+      // On-behalf attribution is dashboard-only; the public portal cannot
+      // name a customer and the board's create form does not offer one.
+      if (surface === "public" && args.author !== undefined) {
+        return yield* new BadRequestError({
+          message:
+            "Posts cannot be created on behalf of another author from public boards",
+        });
+      }
 
-        const session = yield* CurrentSession;
+      const session = yield* CurrentSession;
 
-        return yield* writes.create(
-          args,
-          memberActor(session, args.organizationId),
-          surface === "public" ? { source: "PUBLIC_BOARD" } : undefined
-        );
-      })
-    ).pipe(
-      withRemapDbErrors({
-        action: "create",
-        entity: "Post",
-        onUniqueViolation: () =>
-          new PostAlreadyExistsError({
-            message: "A post with this slug already exists",
-          }),
-      })
-    );
+      return yield* writes.create(
+        args,
+        memberActor(session, args.organizationId),
+        surface === "public" ? { source: "PUBLIC_BOARD" } : undefined
+      );
+    })
+  );
 
   // -- RPC handlers --
 
@@ -549,11 +491,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "select")
       ),
 
-    PostDelete: (args: TPostDelete) =>
-      removePost("dashboard", deleteWrite.dashboard.rateLimit, args),
+    PostDelete: removePost.dashboard,
 
-    PostDeletePublic: (args: TPostDelete) =>
-      removePost("public", deleteWrite.public.rateLimit, args),
+    PostDeletePublic: removePost.public,
 
     PostDeleteEligibilityList: (args: TPostDeleteEligibilityList) =>
       Effect.gen(function* () {
@@ -599,33 +539,21 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "select")
       ),
 
-    PostUpdate: (args: TPostUpdate) =>
-      updatePost("dashboard", updateWrite.dashboard.rateLimit, args),
+    PostUpdate: updatePost.dashboard,
 
-    PostUpdatePublic: (args: TPostUpdate) =>
-      updatePost("public", updateWrite.public.rateLimit, args),
+    PostUpdatePublic: updatePost.public,
 
-    PostUpdateContent: (args: TPostUpdateContent) =>
-      updatePostContent(
-        "dashboard",
-        updateContentWrite.dashboard.rateLimit,
-        args
-      ),
+    PostUpdateContent: updatePostContent.dashboard,
 
-    PostUpdateTitle: (args: TPostUpdateTitle) =>
-      updatePostTitle("dashboard", updateTitleWrite.dashboard.rateLimit, args),
+    PostUpdateTitle: updatePostTitle.dashboard,
 
-    PostUpdateContentPublic: (args: TPostUpdateContent) =>
-      updatePostContent("public", updateContentWrite.public.rateLimit, args),
+    PostUpdateContentPublic: updatePostContent.public,
 
-    PostUpdateTitlePublic: (args: TPostUpdateTitle) =>
-      updatePostTitle("public", updateTitleWrite.public.rateLimit, args),
+    PostUpdateTitlePublic: updatePostTitle.public,
 
-    PostCreate: (args: TPostCreate) =>
-      createPost("dashboard", createWrite.dashboard.rateLimit, args),
+    PostCreate: createPost.dashboard,
 
-    PostCreatePublic: (args: TPostCreate) =>
-      createPost("public", createWrite.public.rateLimit, args),
+    PostCreatePublic: createPost.public,
 
     PostUpdateEta: (args: TPostUpdateEta) =>
       Effect.flatMap(CurrentSession, (session) =>

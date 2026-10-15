@@ -59,21 +59,6 @@ export type PairedRpcTag<Tags extends string> = {
 }[Tags];
 
 /**
- * One operation's two surfaces, with the RPC tag the rate-limit bucket name
- * derives from. The tag is tied to the feature's group (`RpcTagsOf`), so a
- * rename in `rpcs.ts` cannot leave a handler naming a bucket after an RPC
- * that no longer exists.
- *
- * `defineSurfacePair` builds the value form of this declaration; the type is
- * what the not-yet-migrated handlers name in `satisfies`.
- */
-export type SurfacePair<TArgs, Tags extends string = string> = {
-  readonly operation: PairedRpcTag<Tags>;
-  readonly dashboard: SurfaceConfig<TArgs>;
-  readonly public: SurfaceConfig<TArgs>;
-};
-
-/**
  * The RPC name of `operation` on `surface`. The public portal names every RPC
  * `<operation>Public`, so deriving the rate-limit bucket from the operation
  * keeps it from drifting from the RPC a handler answers.
@@ -87,8 +72,11 @@ type RateLimitErrorOf<Config> = Config extends {
   ? RateLimitError
   : never;
 
-/** The channel `withRemapDbErrors` leaves behind. */
-type RemappedError<E> = Exclude<E, RemappedDbError> | InternalServerError;
+/** The channel `withRemapDbErrors` leaves behind for `UniqueViolationError`. */
+type RemappedError<E, UniqueViolationError> =
+  | Exclude<E, RemappedDbError>
+  | InternalServerError
+  | UniqueViolationError;
 
 type PolicyRequirementOf<Config> = Config extends {
   readonly policy: (...args: never[]) => infer P;
@@ -104,6 +92,7 @@ type PolicyRequirementOf<Config> = Config extends {
 export type SurfaceEntry<
   TArgs,
   Config extends SurfaceConfig<TArgs>,
+  UniqueViolationError,
   A,
   E,
   R,
@@ -111,24 +100,32 @@ export type SurfaceEntry<
   args: TArgs
 ) => Effect.Effect<
   A,
-  RemappedError<E | RateLimitErrorOf<Config>>,
+  RemappedError<E | RateLimitErrorOf<Config>, UniqueViolationError>,
   R | PolicyRequirementOf<Config>
 >;
 
 /** The two RPC entries one pair's `handlers` builds from a single body. */
-export type SurfaceHandlers<TArgs, Dashboard, Public, A, E, R> = {
+export type SurfaceHandlers<
+  TArgs,
+  Dashboard,
+  Public,
+  UniqueViolationError,
+  A,
+  E,
+  R,
+> = {
   readonly dashboard: (
     args: TArgs
   ) => Effect.Effect<
     A,
-    RemappedError<E | RateLimitErrorOf<Dashboard>>,
+    RemappedError<E | RateLimitErrorOf<Dashboard>, UniqueViolationError>,
     R | PolicyRequirementOf<Dashboard>
   >;
   readonly public: (
     args: TArgs
   ) => Effect.Effect<
     A,
-    RemappedError<E | RateLimitErrorOf<Public>>,
+    RemappedError<E | RateLimitErrorOf<Public>, UniqueViolationError>,
     R | PolicyRequirementOf<Public>
   >;
 };
@@ -139,13 +136,20 @@ export type SurfaceHandlers<TArgs, Dashboard, Public, A, E, R> = {
  * spends budget; the remap is outermost so the policy's own repository probes
  * stay inside it, exactly as the hand-written pair did.
  */
-const makeEntry = <TArgs, Config extends SurfaceConfig<TArgs>, A, E, R>(
-  remap: RemapDbErrorsConfig,
+const makeEntry = <
+  TArgs,
+  Config extends SurfaceConfig<TArgs>,
+  UniqueViolationError,
+  A,
+  E,
+  R,
+>(
+  remap: RemapDbErrorsConfig<UniqueViolationError>,
   operation: string,
   config: Config,
   surface: Surface,
   body: (surface: Surface, args: TArgs) => Effect.Effect<A, E, R>
-): SurfaceEntry<TArgs, Config, A, E, R> => {
+): SurfaceEntry<TArgs, Config, UniqueViolationError, A, E, R> => {
   const name = surfaceRpcName(operation, surface);
   return (args: TArgs) => {
     // SAFETY: `config.policy` is the widened `Policy<unknown, unknown>` that
@@ -183,6 +187,7 @@ export type SurfacePairRecord<
   Tags extends string,
   Dashboard extends SurfaceConfig<TArgs>,
   Public extends SurfaceConfig<TArgs>,
+  UniqueViolationError = never,
 > = {
   readonly _tag: "SurfacePair";
   readonly operation: PairedRpcTag<Tags>;
@@ -190,26 +195,33 @@ export type SurfacePairRecord<
   readonly public: Public;
   readonly handlers: <A, E, R>(
     body: (surface: Surface, args: TArgs) => Effect.Effect<A, E, R>
-  ) => SurfaceHandlers<TArgs, Dashboard, Public, A, E, R>;
+  ) => SurfaceHandlers<TArgs, Dashboard, Public, UniqueViolationError, A, E, R>;
 };
 
 /**
- * Builds the value form of a `SurfacePair`: the operation, the one db-error
- * remap both surfaces share, and each surface's literal config. Passing the
- * args type explicitly fixes the body's parameter, and `Tags` rejects an
- * operation whose public twin the group does not declare.
+ * Builds a surface pair as a value: the operation, the one db-error remap
+ * both surfaces share, and each surface's literal config. Passing the args
+ * type explicitly fixes the body's parameter, and `Tags` rejects an operation
+ * whose public twin the group does not declare.
  */
 export const defineSurfacePair =
   <TArgs, Tags extends string = string>() =>
   <
     const Dashboard extends SurfaceConfig<TArgs>,
     const Public extends SurfaceConfig<TArgs>,
+    const UniqueViolationError = never,
   >(pair: {
     readonly operation: PairedRpcTag<Tags>;
-    readonly remap: RemapDbErrorsConfig;
+    readonly remap: RemapDbErrorsConfig<UniqueViolationError>;
     readonly dashboard: Dashboard;
     readonly public: Public;
-  }): SurfacePairRecord<TArgs, Tags, Dashboard, Public> => ({
+  }): SurfacePairRecord<
+    TArgs,
+    Tags,
+    Dashboard,
+    Public,
+    UniqueViolationError
+  > => ({
     _tag: "SurfacePair",
     operation: pair.operation,
     dashboard: pair.dashboard,
@@ -231,59 +243,3 @@ export const defineSurfacePair =
       ),
     }),
   });
-
-/**
- * Applies `surface`'s policy, then its rate limit, to a handler body.
- *
- * Inside this helper the policy runs before the limiter, so admission is
- * decided first: a denied caller never spends budget, and only an admitted
- * caller can be limited. Pair handlers wrap it in the feature's
- * `withRemapDbErrors` so the policy's own repository probes stay inside the
- * db-error remapping, and they call it directly — not as a `pipe` step,
- * where the deferred level conditional degrades and rates both branches
- * into every surface. `surface.test.ts` pins that composition shape.
- *
- * The conditional is load-bearing but deliberately lives as a member of the
- * error channel, not as the channel's whole shape: a handler whose level is
- * `undefined` must not be typed as if it could fail with `RateLimitError`,
- * or `RpcGroup.toLayer` rejects it — while the least-conditional shape
- * survives direct instantiation, which the whole-type conditional did
- * not.
- *
- * Superseded by `defineSurfacePair().handlers`, which closes over the
- * surface instead of accepting its pieces as arguments; this export remains
- * for the handlers that have not migrated yet.
- */
-export const withSurfacePolicyAndRateLimit =
-  <
-    Level extends PublicRpcRateLimitLevel | undefined,
-    P extends Policy<unknown, unknown>,
-  >(options: {
-    readonly level: Level;
-    readonly operation: string;
-    readonly surface: Surface;
-    readonly policy: P;
-  }) =>
-  <A, E, R>(
-    self: Effect.Effect<A, E, R>
-  ): Effect.Effect<
-    A,
-    E | Effect.Error<P> | (Level extends undefined ? never : RateLimitError),
-    R | Effect.Services<P>
-  > =>
-    // SAFETY: the union-member conditional above restates the two runtime
-    // branches `level` selects; the assertion restates what `Effect.andThen`
-    // and `withPublicRpcRateLimit` compute against the widened constraint.
-    (options.level === undefined
-      ? Effect.andThen(options.policy, self)
-      : Effect.andThen(
-          options.policy,
-          withPublicRpcRateLimit({
-            level: options.level,
-            name: surfaceRpcName(options.operation, options.surface),
-          })(self)
-        )) as Effect.Effect<
-      A,
-      E | Effect.Error<P> | (Level extends undefined ? never : RateLimitError),
-      R | Effect.Services<P>
-    >;

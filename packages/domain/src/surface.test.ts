@@ -12,7 +12,6 @@ import {
   defineSurfacePair,
   type PairedRpcTag,
   surfaceRpcName,
-  withSurfacePolicyAndRateLimit,
 } from "./surface";
 
 const limiter = (consumed: Array<PublicRpcRateLimitOptions>) =>
@@ -33,79 +32,6 @@ describe("surfaceRpcName", () => {
       "CommentDeletePublic"
     );
   });
-});
-
-describe("withSurfacePolicyAndRateLimit", () => {
-  // Handler shape: the gate wraps the body by direct call, the package's
-  // `withRemapDbErrors` pipes outside it. `surface.ts` documents why the
-  // gate cannot be a `pipe` step. `defineSurfacePair().handlers` builds this
-  // same shape for the migrated handlers; the tests below pin its behavior.
-
-  it.effect("derives the public bucket name from the operation", () =>
-    Effect.gen(function* () {
-      const consumed: Array<PublicRpcRateLimitOptions> = [];
-
-      yield* withSurfacePolicyAndRateLimit({
-        level: "write",
-        operation: "CommentDelete",
-        surface: "public",
-        policy: Effect.void,
-      })(Effect.void).pipe(limiter(consumed));
-
-      expect(consumed).toEqual([
-        { level: "write", name: "CommentDeletePublic" },
-      ]);
-    })
-  );
-
-  it.effect("leaves a surface with no level untouched", () =>
-    Effect.gen(function* () {
-      const consumed: Array<PublicRpcRateLimitOptions> = [];
-
-      const result = yield* withSurfacePolicyAndRateLimit({
-        level: undefined,
-        operation: "CommentDelete",
-        surface: "dashboard",
-        policy: Effect.void,
-      })(Effect.succeed("kept")).pipe(limiter(consumed));
-
-      expect(result).toBe("kept");
-      expect(consumed).toEqual([]);
-    })
-  );
-
-  it.effect("decides admission before spending budget", () =>
-    Effect.gen(function* () {
-      const consumed: Array<PublicRpcRateLimitOptions> = [];
-
-      const exit = yield* withSurfacePolicyAndRateLimit({
-        level: "write",
-        operation: "CommentCreate",
-        surface: "public",
-        policy: Effect.fail(new PolicyDeniedError()),
-      })(Effect.void).pipe(limiter(consumed), Effect.exit);
-
-      expect(Exit.isFailure(exit)).toBe(true);
-      expect(consumed).toEqual([]);
-    })
-  );
-
-  it.effect("spends the budget once the policy passes", () =>
-    Effect.gen(function* () {
-      const consumed: Array<PublicRpcRateLimitOptions> = [];
-
-      yield* withSurfacePolicyAndRateLimit({
-        level: "write",
-        operation: "CommentCreate",
-        surface: "public",
-        policy: Effect.void,
-      })(Effect.void).pipe(limiter(consumed));
-
-      expect(consumed).toEqual([
-        { level: "write", name: "CommentCreatePublic" },
-      ]);
-    })
-  );
 });
 
 /** The pair's args shape for the tests below. */
