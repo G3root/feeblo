@@ -27,7 +27,9 @@ import {
   e2eSetPlanRouter,
   testMailboxRouter,
 } from "../http/e2e";
+import { httpMetricsMiddleware } from "../http/http-metrics";
 import { makeOriginCheckMiddleware } from "../http/origin-check";
+import { requestRejectionMiddleware } from "../http/request-rejection";
 import {
   BetterAuthRouterLive,
   HealthRouter,
@@ -194,6 +196,15 @@ export const withGlobalMiddleware = <A, E, R>(
     ),
     Layer.provide(
       HttpRouter.middleware(serverTimingMiddleware, { global: true })
+    ),
+    // Exact HTTP request rate and latency, independent of trace sampling.
+    Layer.provide(
+      HttpRouter.middleware(httpMetricsMiddleware, { global: true })
+    ),
+    // Records why the HTTP API rejected a request body, query, or parameter on
+    // the request span: the 400 is answered before any handler runs.
+    Layer.provide(
+      HttpRouter.middleware(requestRejectionMiddleware, { global: true })
     ),
     // Provides the peer-anchored client IP (socket remoteAddress) to every
     // route, including RPC middleware, so public rate limits are keyed on an

@@ -72,6 +72,68 @@ describe("telemetry OTLP headers", () => {
   );
 });
 
+describe("telemetry resource identity and log level", () => {
+  it.effect("defaults the log level to Info and accepts any case", () =>
+    Effect.gen(function* () {
+      const config = yield* loadTelemetryConfig({
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+      });
+      const warn = yield* loadTelemetryConfig({
+        FEEBLO_TELEMETRY_LOG_LEVEL: "warn",
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+      });
+      // A telemetry knob typo must not fail startup.
+      const typo = yield* loadTelemetryConfig({
+        FEEBLO_TELEMETRY_LOG_LEVEL: "verbose",
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+      });
+
+      expect(config.logLevel).toBe("Info");
+      expect(warn.logLevel).toBe("Warn");
+      expect(typo.logLevel).toBe("Info");
+    })
+  );
+
+  it.effect("prefers service.instance.id over the container hostname", () =>
+    Effect.gen(function* () {
+      const hostname = yield* loadTelemetryConfig({
+        HOSTNAME: "container-7",
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+      });
+      const override = yield* loadTelemetryConfig({
+        HOSTNAME: "container-7",
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+        OTEL_RESOURCE_ATTRIBUTES: "service.instance.id=pod-9",
+      });
+      const none = yield* loadTelemetryConfig({
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+      });
+
+      expect(hostname.instanceId).toBe("container-7");
+      expect(override.instanceId).toBe("pod-9");
+      expect(none.instanceId).toBeUndefined();
+    })
+  );
+  it.effect("treats an empty instance id or hostname as unset", () =>
+    Effect.gen(function* () {
+      const emptyHostname = yield* loadTelemetryConfig({
+        HOSTNAME: "",
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+      });
+      const emptyAttribute = yield* loadTelemetryConfig({
+        HOSTNAME: "container-7",
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+        OTEL_RESOURCE_ATTRIBUTES: "service.instance.id=",
+      });
+
+      expect(emptyHostname.instanceId).toBeUndefined();
+      // An empty resource attribute yields to the hostname rather than
+      // disabling OTLP over a meaningless value.
+      expect(emptyAttribute.instanceId).toBe("container-7");
+    })
+  );
+});
+
 describe("telemetry OTLP endpoints", () => {
   it.effect("defaults metrics temporality to cumulative", () =>
     Effect.gen(function* () {

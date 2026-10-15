@@ -8,15 +8,10 @@ import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
-import * as RateLimit from "../rate-limit";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
-import {
-  type Surface,
-  type SurfacePair,
-  withSurfacePolicyAndRateLimit,
-} from "../surface";
+import { definePublicEntry, defineSurfacePair } from "../surface";
 import { PostSubscriptionRepository } from "./repository";
 import { PostSubscriptionRpcs } from "./rpcs";
 import type {
@@ -124,13 +119,17 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
 
   // -- Surface-parameterized writes --
   //
-  // Both bodies above are surface-neutral; the record holds what differs:
+  // Both bodies above are surface-neutral; the pair holds what differs:
   // the dashboard admits members to unlocked posts, the public portal admits
   // restricted sessions to public boards, and only the public portal spends a
   // rate limit.
 
-  const createWrite = {
+  const createWrite = defineSurfacePair<
+    TPostSubscriptionCreate,
+    PostSubscriptionRpcTag
+  >()({
     operation: "PostSubscriptionCreate",
+    remap: { action: "create", entity: "PostSubscription" },
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostSubscriptionCreate) =>
@@ -153,10 +152,14 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
           })
         ),
     },
-  } satisfies SurfacePair<TPostSubscriptionCreate, PostSubscriptionRpcTag>;
+  });
 
-  const deleteWrite = {
+  const deleteWrite = defineSurfacePair<
+    TPostSubscriptionDelete,
+    PostSubscriptionRpcTag
+  >()({
     operation: "PostSubscriptionDelete",
+    remap: { action: "delete", entity: "PostSubscription" },
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostSubscriptionDelete) =>
@@ -179,39 +182,37 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
           })
         ),
     },
-  } satisfies SurfacePair<TPostSubscriptionDelete, PostSubscriptionRpcTag>;
+  });
 
-  const subscribeFor = <
-    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
-  >(
-    surface: Surface,
-    level: Level,
-    args: TPostSubscriptionCreate
-  ) =>
-    withSurfacePolicyAndRateLimit({
-      level,
-      operation: createWrite.operation,
-      surface,
-      policy: createWrite[surface].policy(args),
-    })(subscribeEffect(args)).pipe(
-      withRemapDbErrors("PostSubscription", "create")
-    );
+  const subscribe = createWrite.handlers((_surface, args) =>
+    subscribeEffect(args)
+  );
 
-  const unsubscribeFor = <
-    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
-  >(
-    surface: Surface,
-    level: Level,
-    args: TPostSubscriptionDelete
-  ) =>
-    withSurfacePolicyAndRateLimit({
-      level,
-      operation: deleteWrite.operation,
-      surface,
-      policy: deleteWrite[surface].policy(args),
-    })(unsubscribeEffect(args)).pipe(
-      withRemapDbErrors("PostSubscription", "delete")
-    );
+  const unsubscribe = deleteWrite.handlers((_surface, args) =>
+    unsubscribeEffect(args)
+  );
+
+  // The public list is the viewer's own subscription; the dashboard list is
+  // the subscriber roster, so the pair does not apply and the dashboard half
+  // stays hand-written.
+  const listPublicEntry = definePublicEntry<
+    TPostSubscriptionList,
+    PostSubscriptionRpcTag
+  >()({
+    operation: "PostSubscriptionList",
+    remap: { action: "select", entity: "PostSubscription" },
+    config: {
+      rateLimit: "read",
+      // This route runs on `PublicAuthMiddleware`, which admits the restricted
+      // sessions that widget SSO mints — so it needs the same organization
+      // confinement as `PostSubscriptionCreatePublic` and
+      // `PostSubscriptionDeletePublic`. The repository's `userId` predicate is
+      // what kept the response to the caller's own rows; this is the control
+      // that says the caller may ask about this organization at all.
+      policy: (args, _surface) =>
+        Policy.hasRestrictedOrganizationScope(args.organizationId),
+    },
+  });
 
   // -- RPC handlers --
 
@@ -222,41 +223,23 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("PostSubscription", "select")
       ),
 
-    PostSubscriptionListPublic: (args: TPostSubscriptionList) =>
+    PostSubscriptionListPublic: listPublicEntry.entry((args) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         return yield* listSubscribersEffect(args, {
           publicOnly: true,
           userId: session.session.userId,
         });
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "PostSubscriptionListPublic",
-          level: "read",
-        }),
-        // This route runs on `PublicAuthMiddleware`, which admits the restricted
-        // sessions that widget SSO mints — so it needs the same organization
-        // confinement as `PostSubscriptionCreatePublic` and
-        // `PostSubscriptionDeletePublic`. The repository's `userId` predicate is
-        // what kept the response to the caller's own rows; this is the control
-        // that says the caller may ask about this organization at all.
-        Policy.withPolicy(
-          Policy.hasRestrictedOrganizationScope(args.organizationId)
-        ),
-        withRemapDbErrors("PostSubscription", "select")
-      ),
+      })
+    ),
 
-    PostSubscriptionCreate: (args: TPostSubscriptionCreate) =>
-      subscribeFor("dashboard", createWrite.dashboard.rateLimit, args),
+    PostSubscriptionCreate: subscribe.dashboard,
 
-    PostSubscriptionCreatePublic: (args: TPostSubscriptionCreate) =>
-      subscribeFor("public", createWrite.public.rateLimit, args),
+    PostSubscriptionCreatePublic: subscribe.public,
 
-    PostSubscriptionDelete: (args: TPostSubscriptionDelete) =>
-      unsubscribeFor("dashboard", deleteWrite.dashboard.rateLimit, args),
+    PostSubscriptionDelete: unsubscribe.dashboard,
 
-    PostSubscriptionDeletePublic: (args: TPostSubscriptionDelete) =>
-      unsubscribeFor("public", deleteWrite.public.rateLimit, args),
+    PostSubscriptionDeletePublic: unsubscribe.public,
   };
 });
 

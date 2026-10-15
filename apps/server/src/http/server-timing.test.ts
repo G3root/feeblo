@@ -1,6 +1,10 @@
 import { expect, it } from "@effect/vitest";
+import * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as HttpEffect from "effect/http/HttpEffect";
 import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Layer from "effect/Layer";
 
@@ -75,4 +79,35 @@ it.live("adds Server-Timing to unmatched routes", () =>
       expect(getResponseTime(response)).toMatch(/^\d+(\.\d+)?ms$/);
     })
   )
+);
+
+it.effect("adds the request span's trace descriptors", () =>
+  Effect.gen(function* () {
+    const handled =
+      yield* Deferred.make<HttpServerResponse.HttpServerResponse>();
+    // A route that cannot fail keeps the middleware's error marker out of the
+    // effect's requirements, so `toHandled` can consume it.
+    const traced = Layer.mergeAll(
+      HttpRouter.add("GET", "/ok", HttpServerResponse.text("ok")),
+      HttpRouter.middleware(serverTimingMiddleware, { global: true })
+    ).pipe(Layer.provideMerge(HttpRouter.layer));
+    const context = yield* Layer.build(traced);
+    const router = Context.get(context, HttpRouter.HttpRouter);
+
+    yield* HttpEffect.toHandled(router.asHttpEffect(), (_request, response) =>
+      Deferred.succeed(handled, response)
+    ).pipe(
+      Effect.provideService(
+        HttpServerRequest.HttpServerRequest,
+        HttpServerRequest.fromWeb(new Request("http://localhost/ok"))
+      ),
+      Effect.withSpan("test.request")
+    );
+
+    const timing =
+      (yield* Deferred.await(handled)).headers["server-timing"] ?? "";
+    expect(timing).toContain('feeblo-trace;desc="');
+    expect(timing).toContain('feeblo-span;desc="');
+    expect(timing).toMatch(/feeblo-sampled;desc="[01]"/);
+  })
 );

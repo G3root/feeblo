@@ -7,7 +7,6 @@
  * Architecture:
  *   config.ts              → typed env (ServerConfig)
  *   infra/redis.ts         → redisOptions
- *   infra/sentry.ts        → makeSentryLayer
  *   http/body-limit.ts     → bodySizeLimitMiddleware + BetterAuth body guard
  *   http/cors.ts           → makeIsAllowedOrigin
  *   http/server-timing.ts  → serverTimingMiddleware

@@ -6,15 +6,10 @@ import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
 import { withPublicViewer } from "../public-read";
-import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
-import {
-  type Surface,
-  type SurfacePair,
-  withSurfacePolicyAndRateLimit,
-} from "../surface";
+import { definePublicEntry, defineSurfacePair } from "../surface";
 import { PostReactionRepository } from "./repository";
 import { PostReactionRpcs } from "./rpcs";
 import type { TPostReactionList, TPostReactionToggle } from "./schema";
@@ -34,8 +29,12 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
   // `isUnlockedPublic` and lets the repository's `togglePublic` join the
   // board visibility.
 
-  const toggleWrite = {
+  const toggleWrite = defineSurfacePair<
+    TPostReactionToggle,
+    PostReactionRpcTag
+  >()({
     operation: "PostReactionToggle",
+    remap: { action: "update", entity: "PostReaction" },
     dashboard: {
       rateLimit: undefined,
       policy: (args: TPostReactionToggle) =>
@@ -58,35 +57,35 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
           })
         ),
     },
-  } satisfies SurfacePair<TPostReactionToggle, PostReactionRpcTag>;
+  });
 
-  const toggleReaction = <
-    Level extends RateLimit.PublicRpcRateLimitLevel | undefined,
-  >(
-    surface: Surface,
-    level: Level,
-    args: TPostReactionToggle
-  ) =>
-    withSurfacePolicyAndRateLimit({
-      level,
-      operation: toggleWrite.operation,
-      surface,
-      policy: toggleWrite[surface].policy(args),
-    })(
-      Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        const request = {
-          emoji: args.emoji,
-          organizationId: args.organizationId,
-          postId: args.postId,
-          userId: session.session.userId,
-        };
+  // The dashboard list projects from the repository's internal predicate; the
+  // public list projects its own, so the pair does not apply and the
+  // dashboard half stays hand-written.
+  const listPublicEntry = definePublicEntry<
+    TPostReactionList,
+    PostReactionRpcTag
+  >()({
+    operation: "PostReactionList",
+    remap: { action: "select", entity: "PostReaction" },
+    config: { rateLimit: "read", policy: () => Policy.allow },
+  });
 
-        return yield* surface === "public"
-          ? repository.togglePublic(request)
-          : repository.toggle(request);
-      })
-    ).pipe(withRemapDbErrors("PostReaction", "update"));
+  const toggleReaction = toggleWrite.handlers((surface, args) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const request = {
+        emoji: args.emoji,
+        organizationId: args.organizationId,
+        postId: args.postId,
+        userId: session.session.userId,
+      };
+
+      return yield* surface === "public"
+        ? repository.togglePublic(request)
+        : repository.toggle(request);
+    })
+  );
 
   return {
     PostReactionList: (args: TPostReactionList) =>
@@ -99,9 +98,8 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("PostReaction", "select")
         ),
-    PostReactionToggle: (args: TPostReactionToggle) =>
-      toggleReaction("dashboard", toggleWrite.dashboard.rateLimit, args),
-    PostReactionListPublic: (args: TPostReactionList) =>
+    PostReactionToggle: toggleReaction.dashboard,
+    PostReactionListPublic: listPublicEntry.entry((args) =>
       withPublicViewer({
         read: () =>
           repository.listPublic({
@@ -109,15 +107,9 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
             organizationId: args.organizationId,
           }),
         redact: redactActorIdentities,
-      }).pipe(
-        RateLimit.withPublicRpcRateLimit({
-          name: "PostReactionListPublic",
-          level: "read",
-        }),
-        withRemapDbErrors("PostReaction", "select")
-      ),
-    PostReactionTogglePublic: (args: TPostReactionToggle) =>
-      toggleReaction("public", toggleWrite.public.rateLimit, args),
+      })
+    ),
+    PostReactionTogglePublic: toggleReaction.public,
   };
 });
 
