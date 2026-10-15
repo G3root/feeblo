@@ -12,11 +12,14 @@
  * `requestId`. Only the client sends one frame per POST.
  *
  * A frame is eligible to share a batch only when `sharesBatch` says so, which
- * `index.ts` answers from the RPC's kind: reads wait out a short window
- * together, a write travels on its own and leaves at once. Batching a write
- * would put a mutation in one request with the page's reads, where it would pay
- * the window, share a byte budget and a transport failure with them, and gain
- * nothing — writes are not started in parallel the way a render's reads are.
+ * `index.ts` answers from the RPC's kind: unary reads wait out a short window
+ * together, and everything else — a write, a stream — is posted on its own
+ * from the caller's fiber. Batching a write would put a mutation in one request
+ * with the page's reads, where it would pay the window, share a byte budget and
+ * a transport failure with them, and gain nothing — writes are not started in
+ * parallel the way a render's reads are. Batching a stream would hold the
+ * response open for as long as the stream, in a fiber the resolver owns, and
+ * Effect's `RequestResolver` does not interrupt a batch once its run starts.
  *
  * A batch is posted as an NDJSON body of the frames that arrived inside the
  * window (at most `maxBatchFrames`, at most `maxBatchBytes`), and each answer
@@ -32,6 +35,7 @@
  */
 import { isString } from "@feeblo/utils/runtime-kind";
 import * as Cause from "effect/Cause";
+import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -124,6 +128,29 @@ class BatchedFrame extends Request.Class<
   RpcClientError
 > {}
 
+/**
+ * One frame a group owes an answer to, and the way to release it whatever
+ * happens to the group. A batched read wraps a resolver entry; a frame sent on
+ * its own wraps the `Deferred` its sender waits on.
+ */
+interface PendingFrame {
+  readonly clientId: number;
+  readonly requestId: string | number;
+  /** The frame as the group's body carries it, encoded once at the call site. */
+  readonly encoded: string;
+  /** The encoded frame's UTF-8 length, the byte budget's unit. */
+  readonly byteLength: number;
+  /** Releases the caller's wait; called at most once per frame. */
+  readonly complete: (
+    exit: Exit.Exit<void, RpcClientError>
+  ) => Effect.Effect<void>;
+}
+
+const fromEntry = (entry: Request.Entry<BatchedFrame>): PendingFrame => ({
+  ...entry.request,
+  complete: (exit) => Effect.sync(() => entry.completeUnsafe(exit)),
+});
+
 export const makeProtocolHttpBatch = (options: {
   readonly url: string;
   /** Frames one POST may carry; a burst past it is split across POSTs. */
@@ -134,8 +161,10 @@ export const makeProtocolHttpBatch = (options: {
   readonly batchWindow?: Duration.Duration | undefined;
   /**
    * Whether the frame's RPC may share a request with the frames beside it.
-   * A frame this answers false for is sent on its own, immediately. Defaults
-   * to every frame; `index.ts` passes the RPC kind, so only reads share.
+   * A frame this answers false for is posted on its own from the sender's
+   * fiber, so interrupting the caller aborts its HTTP request. Defaults to
+   * every frame; `index.ts` passes the RPC kind and the stream check, so
+   * only unary reads share.
    */
   readonly sharesBatch?: ((tag: string) => boolean) | undefined;
 }): Effect.Effect<
@@ -186,15 +215,15 @@ export const makeProtocolHttpBatch = (options: {
        * into a failure for each request the group still owes an answer to,
        * so one broken batch never strands a caller.
        */
-      const sendGroup = (entries: ReadonlyArray<Request.Entry<BatchedFrame>>) =>
+      const sendGroup = (frames: ReadonlyArray<PendingFrame>) =>
         Effect.gen(function* () {
           const waiting = new Map(
-            entries.map((entry) => [entry.request.requestId, entry] as const)
+            frames.map((frame) => [frame.requestId, frame] as const)
           );
           const failWaiting = (error: RpcClientError) =>
-            Effect.sync(() => {
-              for (const entry of waiting.values()) {
-                entry.completeUnsafe(Exit.fail(error));
+            Effect.gen(function* () {
+              for (const frame of waiting.values()) {
+                yield* frame.complete(Exit.fail(error));
               }
               waiting.clear();
             });
@@ -202,8 +231,8 @@ export const makeProtocolHttpBatch = (options: {
           yield* Effect.gen(function* () {
             const parser = serialization.makeUnsafe();
             let body = "";
-            for (const { request } of entries) {
-              body += request.encoded;
+            for (const { encoded } of frames) {
+              body += encoded;
             }
 
             const response = yield* client.post("", {
@@ -215,32 +244,34 @@ export const makeProtocolHttpBatch = (options: {
                 Effect.gen(function* () {
                   // SAFETY: the serialization decodes only the protocol
                   // frames it encoded; every element is a server message.
-                  const frames = chunk.flatMap(
+                  const serverFrames = chunk.flatMap(
                     parser.decode
                   ) as ReadonlyArray<FromServerEncoded>;
-                  for (const frame of frames) {
-                    switch (frame._tag) {
+                  for (const serverFrame of serverFrames) {
+                    switch (serverFrame._tag) {
                       case "Chunk":
                       case "Exit": {
-                        const entry = waiting.get(frame.requestId);
-                        if (entry === undefined) break;
-                        yield* writeResponse(entry.request.clientId, frame);
+                        const frame = waiting.get(serverFrame.requestId);
+                        if (frame === undefined) break;
+                        yield* writeResponse(frame.clientId, serverFrame);
                         // A chunk answers a stream, not the request; only
                         // the terminal frame releases its caller.
-                        if (isTerminalResponse(frame)) {
-                          waiting.delete(frame.requestId);
-                          entry.completeUnsafe(Exit.succeed(undefined));
+                        if (isTerminalResponse(serverFrame)) {
+                          waiting.delete(serverFrame.requestId);
+                          yield* frame.complete(Exit.succeed(undefined));
                         }
                         break;
                       }
                       case "Defect": {
                         // Connection-level: the server could not read the
                         // body, so no request in it has an answer coming.
-                        yield* failWaiting(yield* serverDefect(frame.defect));
+                        yield* failWaiting(
+                          yield* serverDefect(serverFrame.defect)
+                        );
                         break;
                       }
                       case "ClientProtocolError": {
-                        yield* failWaiting(frame.error);
+                        yield* failWaiting(serverFrame.error);
                         break;
                       }
                       default: {
@@ -279,8 +310,8 @@ export const makeProtocolHttpBatch = (options: {
         entries: ReadonlyArray<Request.Entry<BatchedFrame>>
       ) =>
         Effect.gen(function* () {
-          const groups: Array<Array<Request.Entry<BatchedFrame>>> = [];
-          let group: Array<Request.Entry<BatchedFrame>> = [];
+          const groups: Array<Array<PendingFrame>> = [];
+          let group: Array<PendingFrame> = [];
           let bytes = 0;
 
           for (const entry of entries) {
@@ -292,7 +323,7 @@ export const makeProtocolHttpBatch = (options: {
               group = [];
               bytes = 0;
             }
-            group.push(entry);
+            group.push(fromEntry(entry));
             bytes += entry.request.byteLength;
           }
 
@@ -306,15 +337,14 @@ export const makeProtocolHttpBatch = (options: {
           });
         });
 
-      // One resolver per kind, both posting through the same pipe: reads
-      // wait out the window and travel together; writes are each their own
-      // batch and leave at once.
+      // Only unary reads share a batch: they wait out the window and travel
+      // together. Everything `sharesBatch` rules out is posted by `send` from
+      // the caller's own fiber, because a batch run belongs to the resolver,
+      // which Effect does not interrupt once the run has started — a stream
+      // could then never be cancelled, and a write would outlive its caller.
       const reads = RequestResolver.make<BatchedFrame>(sendResolved).pipe(
         RequestResolver.setDelay(batchWindow),
         RequestResolver.batchN(maxBatchFrames)
-      );
-      const writes = RequestResolver.make<BatchedFrame>(sendResolved).pipe(
-        RequestResolver.batchN(1)
       );
 
       return Effect.succeed({
@@ -324,16 +354,33 @@ export const makeProtocolHttpBatch = (options: {
           return Effect.gen(function* () {
             const parser = serialization.makeUnsafe();
             const encoded = yield* encodeFrame(parser, request);
-            const frame = new BatchedFrame({
-              clientId,
-              requestId: request.id,
-              encoded,
-              byteLength: encodeText.encode(encoded).length,
-            });
-            yield* Effect.request(
-              frame,
-              sharesBatch(request.tag) ? reads : writes
-            );
+            const byteLength = encodeText.encode(encoded).length;
+
+            if (sharesBatch(request.tag)) {
+              yield* Effect.request(
+                new BatchedFrame({
+                  clientId,
+                  requestId: request.id,
+                  encoded,
+                  byteLength,
+                }),
+                reads
+              );
+              return;
+            }
+
+            const answered = yield* Deferred.make<void, RpcClientError>();
+            yield* sendGroup([
+              {
+                clientId,
+                requestId: request.id,
+                encoded,
+                byteLength,
+                complete: (exit) =>
+                  Deferred.done(answered, exit).pipe(Effect.asVoid),
+              },
+            ]);
+            yield* Deferred.await(answered);
           });
         },
         supportsAck: false,
@@ -351,7 +398,11 @@ export const layerProtocolHttpBatch = (options: {
   readonly maxBatchBytes?: number | undefined;
   /** How long a flush waits for the frames that start behind the first one. */
   readonly batchWindow?: Duration.Duration | undefined;
-  /** Whether the frame's RPC may share a request with the frames beside it. */
+  /**
+   * Whether the frame's RPC may share a request with the frames beside it.
+   * A frame this answers false for is posted on its own from the sender's
+   * fiber, so interrupting the caller aborts its HTTP request.
+   */
   readonly sharesBatch?: ((tag: string) => boolean) | undefined;
 }): Layer.Layer<
   RpcClient.Protocol,
