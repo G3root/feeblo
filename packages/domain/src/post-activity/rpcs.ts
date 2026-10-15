@@ -7,7 +7,7 @@ import { PostActivityServiceErrors } from "./errors";
 import { PostActivity, PostActivityList } from "./schema";
 
 export class PostActivityRpcs extends RpcGroup.make(
-  Rpc.make("PostActivityList", {
+  Rpc.make("ListPostActivities", {
     success: Schema.Array(PostActivity),
     error: PostActivityServiceErrors,
     payload: PostActivityList,

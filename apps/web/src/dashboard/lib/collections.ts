@@ -132,7 +132,7 @@ export function postCollection(scope: DashboardCollectionScope) {
         const boardId: string | null = null;
 
         const data = await fetchRpc(
-          (rpc) => rpc.PostList({ boardId, organizationId }),
+          (rpc) => rpc.ListPosts({ boardId, organizationId }),
           {
             signal: ctx.signal,
           }
@@ -150,7 +150,7 @@ export function postCollection(scope: DashboardCollectionScope) {
         const { modified: updatedPost } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.PostUpdate({
+          rpc.UpdatePost({
             id: updatedPost.id,
             statusId: updatedPost.statusId,
             boardId: updatedPost.boardId,
@@ -192,7 +192,7 @@ export function postCollection(scope: DashboardCollectionScope) {
         const results = await Promise.allSettled(
           [...postIdsByBoardId.entries()].map(([boardId, postIds]) =>
             fetchRpc((rpc) =>
-              rpc.PostDelete({
+              rpc.DeletePost({
                 id: postIds,
                 boardId,
                 organizationId,
@@ -223,7 +223,7 @@ export function postCollection(scope: DashboardCollectionScope) {
 /**
  * Full-post detail collection backing post detail routes. The org-scoped
  * `postCollection` carries slim `PostListItem` rows (no `content`); this
- * slug-scoped, on-demand collection resolves the body through `PostGet`.
+ * slug-scoped, on-demand collection resolves the body through `GetPost`.
  * Detail routes preload + subscribe it and merge `content` over the list
  * row. Content edits apply here through `createOptimisticAction` (ambient
  * transaction, so no sync handlers by design); all other mutations stay on
@@ -257,7 +257,7 @@ export function postDetailCollection(scope: DashboardCollectionScope) {
         }
 
         const post = await fetchRpc(
-          (rpc) => rpc.PostGet({ organizationId, slug }),
+          (rpc) => rpc.GetPost({ organizationId, slug }),
           { signal: ctx.signal }
         );
         return [post];
@@ -283,7 +283,7 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.PostStatusList({ organizationId }),
+          (rpc) => rpc.ListPostStatuses({ organizationId }),
           {
             signal: ctx.signal,
           }
@@ -302,7 +302,7 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
         }
 
         await fetchRpc((rpc) =>
-          rpc.PostStatusCreate({
+          rpc.CreatePostStatus({
             id: newStatus.id,
             organizationId,
             type: newStatus.type,
@@ -322,7 +322,7 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
         }
 
         await fetchRpc((rpc) =>
-          rpc.PostStatusUpdate({
+          rpc.UpdatePostStatus({
             id: updatedStatus.id,
             organizationId,
             type: updatedStatus.type,
@@ -362,7 +362,7 @@ export function changelogCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.ChangelogList({ organizationId }),
+          (rpc) => rpc.ListChangelogs({ organizationId }),
           {
             signal: ctx.signal,
           }
@@ -376,7 +376,7 @@ export function changelogCollection(scope: DashboardCollectionScope) {
         const { modified: updatedChangelog } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.ChangelogUpdate({
+          rpc.UpdateChangelog({
             id: updatedChangelog.id,
             title: updatedChangelog.title,
             slug: updatedChangelog.slug,
@@ -395,7 +395,7 @@ export function changelogCollection(scope: DashboardCollectionScope) {
         const { original: deletedChangelog } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.ChangelogDelete({
+          rpc.DeleteChangelog({
             id: deletedChangelog.id,
             organizationId: deletedChangelog.organizationId,
           })
@@ -406,7 +406,7 @@ export function changelogCollection(scope: DashboardCollectionScope) {
         const { modified: newChangelog } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.ChangelogCreate({
+          rpc.CreateChangelog({
             id: newChangelog.id,
             title: newChangelog.title,
             slug: newChangelog.slug,
@@ -445,7 +445,7 @@ export function changelogCategoryLinkCollection(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.ChangelogCategoryListLinks({ organizationId }),
+          (rpc) => rpc.ListChangelogCategoryLinks({ organizationId }),
           {
             signal: ctx.signal,
           }
@@ -477,7 +477,7 @@ export function changelogCategoryCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.ChangelogCategoryList({ organizationId }),
+          (rpc) => rpc.ListChangelogCategories({ organizationId }),
           {
             signal: ctx.signal,
           }
@@ -498,7 +498,7 @@ export function changelogCategoryCollection(scope: DashboardCollectionScope) {
         }
 
         await fetchRpc((rpc) =>
-          rpc.ChangelogCategoryCreate({
+          rpc.CreateChangelogCategory({
             id: newCategory.id,
             name: newCategory.name,
             iconType,
@@ -519,7 +519,7 @@ export function changelogCategoryCollection(scope: DashboardCollectionScope) {
         }
 
         await fetchRpc((rpc) =>
-          rpc.ChangelogCategoryUpdate({
+          rpc.UpdateChangelogCategory({
             id: updatedCategory.id,
             name: updatedCategory.name,
             iconType,
@@ -533,7 +533,7 @@ export function changelogCategoryCollection(scope: DashboardCollectionScope) {
         const { original: deletedCategory } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.ChangelogCategoryDelete({
+          rpc.DeleteChangelogCategory({
             id: deletedCategory.id,
             organizationId: deletedCategory.organizationId,
           })
@@ -566,7 +566,7 @@ export function changelogPostCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.ChangelogPostList({ organizationId }),
+          (rpc) => rpc.ListChangelogPosts({ organizationId }),
           { signal: ctx.signal }
         );
         return [...data];
@@ -575,7 +575,7 @@ export function changelogPostCollection(scope: DashboardCollectionScope) {
       onInsert: async ({ transaction }) => {
         const { modified } = transaction.mutations[0];
         await fetchRpc((rpc) =>
-          rpc.ChangelogPostCreate({
+          rpc.CreateChangelogPost({
             changelogId: modified.changelogId,
             postId: modified.postId,
             organizationId: modified.organizationId,
@@ -585,7 +585,7 @@ export function changelogPostCollection(scope: DashboardCollectionScope) {
       onDelete: async ({ transaction }) => {
         const { original } = transaction.mutations[0];
         await fetchRpc((rpc) =>
-          rpc.ChangelogPostDelete({
+          rpc.DeleteChangelogPost({
             changelogId: original.changelogId,
             postId: original.postId,
             organizationId: original.organizationId,
@@ -613,7 +613,7 @@ export function boardCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.BoardList({ organizationId }),
+          (rpc) => rpc.ListBoards({ organizationId }),
           {
             signal: ctx.signal,
           }
@@ -627,7 +627,7 @@ export function boardCollection(scope: DashboardCollectionScope) {
 
         await fetchRpc(
           (rpc) =>
-            rpc.BoardCreate({
+            rpc.CreateBoard({
               id: newBoard.id,
               name: newBoard.name,
               visibility: newBoard.visibility,
@@ -643,7 +643,7 @@ export function boardCollection(scope: DashboardCollectionScope) {
 
         await fetchRpc(
           (rpc) =>
-            rpc.BoardDelete({
+            rpc.DeleteBoard({
               id: deletedBoard.id,
               organizationId: deletedBoard.organizationId,
             }),
@@ -656,7 +656,7 @@ export function boardCollection(scope: DashboardCollectionScope) {
 
         await fetchRpc(
           (rpc) =>
-            rpc.BoardUpdate({
+            rpc.UpdateBoard({
               id: updatedBoard.id,
               name: updatedBoard.name,
               visibility: updatedBoard.visibility,
@@ -685,7 +685,7 @@ export function tagCollection(scope: DashboardCollectionScope) {
           return [];
         }
 
-        const data = await fetchRpc((rpc) => rpc.TagList({ organizationId }), {
+        const data = await fetchRpc((rpc) => rpc.ListTags({ organizationId }), {
           signal: ctx.signal,
         });
 
@@ -697,7 +697,7 @@ export function tagCollection(scope: DashboardCollectionScope) {
         const { modified: newTag } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.TagCreate({
+          rpc.CreateTag({
             id: newTag.id,
             name: newTag.name,
             organizationId: newTag.organizationId,
@@ -709,7 +709,7 @@ export function tagCollection(scope: DashboardCollectionScope) {
         const { modified: updatedTag } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.TagUpdate({
+          rpc.UpdateTag({
             id: updatedTag.id,
             name: updatedTag.name,
             organizationId: updatedTag.organizationId,
@@ -721,7 +721,7 @@ export function tagCollection(scope: DashboardCollectionScope) {
         const { original: deletedTag } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.TagDelete({
+          rpc.DeleteTag({
             id: deletedTag.id,
             organizationId: deletedTag.organizationId,
           })
@@ -748,7 +748,7 @@ export function postTagCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.PostTagList({ organizationId }),
+          (rpc) => rpc.ListPostTags({ organizationId }),
           {
             signal: ctx.signal,
           }
@@ -771,7 +771,7 @@ export function membershipCollection(_scope: DashboardCollectionScope) {
       queryKey: ["membership"],
       staleTime: Duration.toMillis(Duration.minutes(10)),
       queryFn: async (ctx) =>
-        fetchRpc((rpc) => rpc.MembershipList(), { signal: ctx.signal }).then(
+        fetchRpc((rpc) => rpc.ListMemberships(), { signal: ctx.signal }).then(
           (data) => [...data]
         ),
       getKey: (item) => item.id,
@@ -788,7 +788,7 @@ export function organizationCollection(_scope: DashboardCollectionScope) {
       queryClient: client.requireDependency<QueryClient>("queryClient"),
       queryKey: ["organizations"],
       queryFn: async (ctx) => {
-        const data = await fetchRpc((rpc) => rpc.OrganizationList(), {
+        const data = await fetchRpc((rpc) => rpc.ListOrganizations(), {
           signal: ctx.signal,
         });
 
@@ -800,7 +800,7 @@ export function organizationCollection(_scope: DashboardCollectionScope) {
         const { modified: updatedOrganization } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.OrganizationUpdate({
+          rpc.UpdateOrganization({
             organizationId: updatedOrganization.id,
             name: updatedOrganization.name,
             logo: updatedOrganization.logo,
@@ -828,7 +828,7 @@ export function membersCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.OrganizationMembersList({ organizationId }),
+          (rpc) => rpc.ListOrganizationMembers({ organizationId }),
           { signal: ctx.signal }
         );
         return [...data];
@@ -839,7 +839,7 @@ export function membersCollection(scope: DashboardCollectionScope) {
         const { original: deletedMember } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.OrganizationRemoveMember({
+          rpc.RemoveOrganizationMember({
             memberId: deletedMember.id,
             organizationId: deletedMember.organizationId,
           })
@@ -850,7 +850,7 @@ export function membersCollection(scope: DashboardCollectionScope) {
         const { modified: updatedMember } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.OrganizationUpdateMemberRole({
+          rpc.UpdateOrganizationMemberRole({
             memberId: updatedMember.id,
             organizationId: updatedMember.organizationId,
             role: updatedMember.role,
@@ -878,7 +878,7 @@ export function invitationsCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.OrganizationInvitationsList({ organizationId }),
+          (rpc) => rpc.ListOrganizationInvitations({ organizationId }),
           { signal: ctx.signal }
         );
         return [...data];
@@ -888,7 +888,7 @@ export function invitationsCollection(scope: DashboardCollectionScope) {
         const mutation = transaction.mutations[0];
         const { original: deletedInvitation } = mutation;
         await fetchRpc((rpc) =>
-          rpc.OrganizationCancelInvitation({
+          rpc.CancelOrganizationInvitation({
             invitationId: deletedInvitation.id,
             organizationId: deletedInvitation.organizationId,
           })
@@ -923,7 +923,7 @@ export function commentCollection(scope: DashboardCollectionScope) {
         // the query's error state, not an empty thread. An empty list is a
         // successful RPC that found no comments.
         const data = await fetchRpc(
-          (rpc) => rpc.CommentList({ organizationId, slug }),
+          (rpc) => rpc.ListComments({ organizationId, slug }),
           { signal: ctx.signal }
         );
         return [...data];
@@ -939,7 +939,7 @@ export function commentCollection(scope: DashboardCollectionScope) {
 
         await fetchRpc(
           (rpc) =>
-            rpc.CommentCreate({
+            rpc.CreateComment({
               organizationId: newComment.organizationId,
               visibility: newComment.visibility,
               content: newComment.content,
@@ -968,7 +968,7 @@ export function commentCollection(scope: DashboardCollectionScope) {
 
         await fetchRpc(
           (rpc) =>
-            rpc.CommentDelete({
+            rpc.DeleteComment({
               id: deletedComment.id,
               organizationId: deletedComment.organizationId,
               postId: deletedComment.postId,
@@ -990,7 +990,7 @@ export function commentCollection(scope: DashboardCollectionScope) {
 
         await fetchRpc(
           (rpc) =>
-            rpc.CommentUpdate({
+            rpc.UpdateComment({
               id: updatedComment.id,
               organizationId: updatedComment.organizationId,
               postId: updatedComment.postId,
@@ -1051,7 +1051,7 @@ export function postActivityCollection(scope: DashboardCollectionScope) {
         );
         const changes = await fetchRpc(
           (rpc) =>
-            rpc.PostActivityList({
+            rpc.ListPostActivities({
               organizationId,
               postId,
               ...(since === undefined ? undefined : { since }),
@@ -1103,7 +1103,7 @@ export function commentReactionCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.CommentReactionList({ organizationId, slug }),
+          (rpc) => rpc.ListCommentReactions({ organizationId, slug }),
           {
             signal: ctx.signal,
           }
@@ -1119,7 +1119,7 @@ export function commentReactionCollection(scope: DashboardCollectionScope) {
         const { modified: newCommentReaction } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.CommentReactionToggle({
+          rpc.ToggleCommentReaction({
             organizationId: newCommentReaction.organizationId,
             postId: newCommentReaction.postId,
             commentId: newCommentReaction.commentId,
@@ -1132,7 +1132,7 @@ export function commentReactionCollection(scope: DashboardCollectionScope) {
         const { original: deletedCommentReaction } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.CommentReactionToggle({
+          rpc.ToggleCommentReaction({
             organizationId: deletedCommentReaction.organizationId,
             postId: deletedCommentReaction.postId,
             commentId: deletedCommentReaction.commentId,
@@ -1162,7 +1162,7 @@ export function upvoteCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.UpvoteList({ organizationId }),
+          (rpc) => rpc.ListUpvotes({ organizationId }),
           {
             signal: ctx.signal,
           }
@@ -1177,7 +1177,7 @@ export function upvoteCollection(scope: DashboardCollectionScope) {
         const { modified: newUpvote } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.UpvoteToggle({
+          rpc.ToggleUpvote({
             organizationId: newUpvote.organizationId,
             postId: newUpvote.postId,
           })
@@ -1196,7 +1196,7 @@ export function upvoteCollection(scope: DashboardCollectionScope) {
         const { original: deletedUpvote } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.UpvoteToggle({
+          rpc.ToggleUpvote({
             organizationId: deletedUpvote.organizationId,
             postId: deletedUpvote.postId,
           })
@@ -1237,7 +1237,7 @@ export function deleteEligibilityCollection(scope: DashboardCollectionScope) {
         }
 
         const result = await fetchRpc(
-          (rpc) => rpc.PostDeleteEligibilityList({ organizationId }),
+          (rpc) => rpc.ListPostDeleteEligibility({ organizationId }),
           { signal: ctx.signal }
         );
         return result.eligibleIds.map((postId) => ({
@@ -1275,7 +1275,7 @@ export function postReactionCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.PostReactionList({ organizationId, slug }),
+          (rpc) => rpc.ListPostReactions({ organizationId, slug }),
           {
             signal: ctx.signal,
           }
@@ -1291,7 +1291,7 @@ export function postReactionCollection(scope: DashboardCollectionScope) {
         const { modified: newPostReaction } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.PostReactionToggle({
+          rpc.TogglePostReaction({
             organizationId: newPostReaction.organizationId,
             postId: newPostReaction.postId,
             emoji: newPostReaction.emoji,
@@ -1303,7 +1303,7 @@ export function postReactionCollection(scope: DashboardCollectionScope) {
         const { original: deletedPostReaction } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.PostReactionToggle({
+          rpc.TogglePostReaction({
             organizationId: deletedPostReaction.organizationId,
             postId: deletedPostReaction.postId,
             emoji: deletedPostReaction.emoji,
@@ -1329,9 +1329,12 @@ export function siteCollection(scope: DashboardCollectionScope) {
           return [];
         }
 
-        const data = await fetchRpc((rpc) => rpc.SiteList({ organizationId }), {
-          signal: ctx.signal,
-        });
+        const data = await fetchRpc(
+          (rpc) => rpc.ListSites({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
         return [...data];
       },
       getKey: (item) => item.id,
@@ -1341,7 +1344,7 @@ export function siteCollection(scope: DashboardCollectionScope) {
         const { modified: updatedSite } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.SiteUpdate({
+          rpc.UpdateSite({
             id: updatedSite.id,
             organizationId: updatedSite.organizationId,
             changelogVisibility: updatedSite.changelogVisibility,
@@ -1371,7 +1374,7 @@ export function workspacePlanCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.WorkspacePlanGet({ organizationId }),
+          (rpc) => rpc.GetWorkspacePlan({ organizationId }),
           {
             signal: ctx.signal,
           }
@@ -1408,7 +1411,7 @@ export function postSubscriptionCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.PostSubscriptionList({ organizationId, slug }),
+          (rpc) => rpc.ListPostSubscriptions({ organizationId, slug }),
           {
             signal: ctx.signal,
           }
@@ -1427,7 +1430,7 @@ export function postSubscriptionCollection(scope: DashboardCollectionScope) {
         const { modified: newSubscription } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.PostSubscriptionCreate({
+          rpc.CreatePostSubscription({
             organizationId: newSubscription.organizationId,
             postId: newSubscription.postId,
           })
@@ -1438,7 +1441,7 @@ export function postSubscriptionCollection(scope: DashboardCollectionScope) {
         const { original: deletedSubscription } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.PostSubscriptionDelete({
+          rpc.DeletePostSubscription({
             organizationId: deletedSubscription.organizationId,
             postId: deletedSubscription.postId,
           })
@@ -1464,7 +1467,7 @@ export function jwtSecretCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.JwtSecretList({ organizationId }),
+          (rpc) => rpc.ListJwtSecrets({ organizationId }),
           { signal: ctx.signal }
         );
         return [...data];
@@ -1490,7 +1493,7 @@ export function contactCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.ContactList({ organizationId }),
+          (rpc) => rpc.ListContacts({ organizationId }),
           { signal: ctx.signal }
         );
 
@@ -1502,7 +1505,7 @@ export function contactCollection(scope: DashboardCollectionScope) {
         const { modified: updatedContact } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.ContactUpdate({
+          rpc.UpdateContact({
             id: updatedContact.id,
             organizationId: updatedContact.organizationId,
             externalId: updatedContact.externalId,
@@ -1519,7 +1522,7 @@ export function contactCollection(scope: DashboardCollectionScope) {
         const { modified: newContact } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.ContactCreate({
+          rpc.CreateContact({
             id: newContact.id,
             organizationId: newContact.organizationId,
             externalId: newContact.externalId,
@@ -1536,7 +1539,7 @@ export function contactCollection(scope: DashboardCollectionScope) {
         const { original: deletedContact } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.ContactDelete({
+          rpc.DeleteContact({
             id: deletedContact.id,
             organizationId: deletedContact.organizationId,
           })
@@ -1562,7 +1565,7 @@ export function companyCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.CompanyList({ organizationId }),
+          (rpc) => rpc.ListCompanies({ organizationId }),
           { signal: ctx.signal }
         );
 
@@ -1574,7 +1577,7 @@ export function companyCollection(scope: DashboardCollectionScope) {
         const { modified: updatedCompany } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.CompanyUpdate({
+          rpc.UpdateCompany({
             id: updatedCompany.id,
             organizationId: updatedCompany.organizationId,
             externalId: updatedCompany.externalId,
@@ -1589,7 +1592,7 @@ export function companyCollection(scope: DashboardCollectionScope) {
         const { modified: newCompany } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.CompanyCreate({
+          rpc.CreateCompany({
             id: newCompany.id,
             organizationId: newCompany.organizationId,
             externalId: newCompany.externalId,
@@ -1604,7 +1607,7 @@ export function companyCollection(scope: DashboardCollectionScope) {
         const { original: deletedCompany } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.CompanyDelete({
+          rpc.DeleteCompany({
             id: deletedCompany.id,
             organizationId: deletedCompany.organizationId,
           })
@@ -1637,7 +1640,7 @@ export function contactAttributeDefinitionCollection(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.ContactAttributeDefinitionList({ organizationId }),
+          (rpc) => rpc.ListContactAttributeDefinitions({ organizationId }),
           { signal: ctx.signal }
         );
 
@@ -1649,7 +1652,7 @@ export function contactAttributeDefinitionCollection(
         const { modified: definition } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.ContactAttributeDefinitionUpdate({
+          rpc.UpdateContactAttributeDefinition({
             id: definition.id,
             name: definition.name,
             key: definition.key,
@@ -1664,7 +1667,7 @@ export function contactAttributeDefinitionCollection(
         const { modified: definition } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.ContactAttributeDefinitionCreate({
+          rpc.CreateContactAttributeDefinition({
             id: definition.id,
             name: definition.name,
             key: definition.key,
@@ -1680,7 +1683,7 @@ export function contactAttributeDefinitionCollection(
         const { original: definition } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.ContactAttributeDefinitionDelete({
+          rpc.DeleteContactAttributeDefinition({
             id: definition.id,
             organizationId: definition.organizationId,
           })
@@ -1713,7 +1716,7 @@ export function companyAttributeDefinitionCollection(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.CompanyAttributeDefinitionList({ organizationId }),
+          (rpc) => rpc.ListCompanyAttributeDefinitions({ organizationId }),
           { signal: ctx.signal }
         );
 
@@ -1725,7 +1728,7 @@ export function companyAttributeDefinitionCollection(
         const { modified: definition } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.CompanyAttributeDefinitionUpdate({
+          rpc.UpdateCompanyAttributeDefinition({
             id: definition.id,
             name: definition.name,
             key: definition.key,
@@ -1740,7 +1743,7 @@ export function companyAttributeDefinitionCollection(
         const { modified: definition } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.CompanyAttributeDefinitionCreate({
+          rpc.CreateCompanyAttributeDefinition({
             id: definition.id,
             name: definition.name,
             key: definition.key,
@@ -1756,7 +1759,7 @@ export function companyAttributeDefinitionCollection(
         const { original: definition } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.CompanyAttributeDefinitionDelete({
+          rpc.DeleteCompanyAttributeDefinition({
             id: definition.id,
             organizationId: definition.organizationId,
           })
@@ -1787,7 +1790,7 @@ export function contactAttributeValueCollection(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.ContactAttributeValueList({ organizationId }),
+          (rpc) => rpc.ListContactAttributeValues({ organizationId }),
           { signal: ctx.signal }
         );
 
@@ -1819,7 +1822,7 @@ export function companyAttributeValueCollection(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.CompanyAttributeValueList({ organizationId }),
+          (rpc) => rpc.ListCompanyAttributeValues({ organizationId }),
           { signal: ctx.signal }
         );
 
@@ -1845,7 +1848,7 @@ export function roadmapCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.RoadmapList({ organizationId }),
+          (rpc) => rpc.ListRoadmaps({ organizationId }),
           {
             signal: ctx.signal,
           }
@@ -1858,7 +1861,7 @@ export function roadmapCollection(scope: DashboardCollectionScope) {
         const { modified: newRoadmap } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.RoadmapCreate({
+          rpc.CreateRoadmap({
             id: newRoadmap.id,
             organizationId: newRoadmap.organizationId,
             name: newRoadmap.name,
@@ -1876,7 +1879,7 @@ export function roadmapCollection(scope: DashboardCollectionScope) {
         const { modified: updatedRoadmap } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.RoadmapUpdate({
+          rpc.UpdateRoadmap({
             id: updatedRoadmap.id,
             organizationId: updatedRoadmap.organizationId,
             name: updatedRoadmap.name,
@@ -1894,7 +1897,7 @@ export function roadmapCollection(scope: DashboardCollectionScope) {
         const { original: deletedRoadmap } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.RoadmapDelete({
+          rpc.DeleteRoadmap({
             id: deletedRoadmap.id,
             organizationId: deletedRoadmap.organizationId,
           })
@@ -1926,7 +1929,7 @@ export function roadmapColumnCollection(scope: DashboardCollectionScope) {
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.RoadmapColumnList({ organizationId }),
+          (rpc) => rpc.ListRoadmapColumns({ organizationId }),
           { signal: ctx.signal }
         );
 
@@ -1943,7 +1946,7 @@ export function roadmapColumnCollection(scope: DashboardCollectionScope) {
         }
 
         await fetchRpc((rpc) =>
-          rpc.RoadmapColumnCreate({
+          rpc.CreateRoadmapColumn({
             id: newColumn.id,
             roadmapId: newColumn.roadmapId,
             organizationId,
@@ -1963,7 +1966,7 @@ export function roadmapColumnCollection(scope: DashboardCollectionScope) {
         }
 
         await fetchRpc((rpc) =>
-          rpc.RoadmapColumnUpdate({
+          rpc.UpdateRoadmapColumn({
             id: updatedColumn.id,
             roadmapId: updatedColumn.roadmapId,
             organizationId,
@@ -1983,7 +1986,7 @@ export function roadmapColumnCollection(scope: DashboardCollectionScope) {
         }
 
         await fetchRpc((rpc) =>
-          rpc.RoadmapColumnDelete({
+          rpc.DeleteRoadmapColumn({
             id: deletedColumn.id,
             roadmapId: deletedColumn.roadmapId,
             organizationId,

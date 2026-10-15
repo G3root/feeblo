@@ -83,7 +83,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
           const provideSession = Effect.provideService(CurrentSession, session);
 
           yield* handlers
-            .ContactAttributeDefinitionCreate({
+            .CreateContactAttributeDefinition({
               id: contactId,
               organizationId,
               name: "Job title",
@@ -94,7 +94,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
             })
             .pipe(provideSession);
           yield* handlers
-            .CompanyAttributeDefinitionCreate({
+            .CreateCompanyAttributeDefinition({
               id: companyId,
               organizationId,
               name: "Industry vertical",
@@ -106,7 +106,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
             .pipe(provideSession);
 
           yield* handlers
-            .ContactAttributeDefinitionUpdate({
+            .UpdateContactAttributeDefinition({
               id: contactId,
               organizationId,
               name: "Account role",
@@ -116,7 +116,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
             })
             .pipe(provideSession);
           yield* handlers
-            .CompanyAttributeDefinitionUpdate({
+            .UpdateCompanyAttributeDefinition({
               id: companyId,
               organizationId,
               name: "Market sector",
@@ -127,10 +127,10 @@ describe("AttributeDefinitionRpcHandlers", () => {
             .pipe(provideSession);
 
           const contactDefinitions = yield* handlers
-            .ContactAttributeDefinitionList({ organizationId })
+            .ListContactAttributeDefinitions({ organizationId })
             .pipe(provideSession);
           const companyDefinitions = yield* handlers
-            .CompanyAttributeDefinitionList({ organizationId })
+            .ListCompanyAttributeDefinitions({ organizationId })
             .pipe(provideSession);
 
           expect(contactDefinitions).toHaveLength(1);
@@ -145,20 +145,20 @@ describe("AttributeDefinitionRpcHandlers", () => {
           });
 
           yield* handlers
-            .ContactAttributeDefinitionDelete({ id: contactId, organizationId })
+            .DeleteContactAttributeDefinition({ id: contactId, organizationId })
             .pipe(provideSession);
           yield* handlers
-            .CompanyAttributeDefinitionDelete({ id: companyId, organizationId })
+            .DeleteCompanyAttributeDefinition({ id: companyId, organizationId })
             .pipe(provideSession);
 
           expect(
             yield* handlers
-              .ContactAttributeDefinitionList({ organizationId })
+              .ListContactAttributeDefinitions({ organizationId })
               .pipe(provideSession)
           ).toHaveLength(0);
           expect(
             yield* handlers
-              .CompanyAttributeDefinitionList({ organizationId })
+              .ListCompanyAttributeDefinitions({ organizationId })
               .pipe(provideSession)
           ).toHaveLength(0);
         })
@@ -182,7 +182,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
 
         const createError = yield* Effect.flip(
           handlers
-            .ContactAttributeDefinitionCreate({
+            .CreateContactAttributeDefinition({
               id: contactId,
               organizationId,
               name: "Job title",
@@ -197,7 +197,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
 
         const deleteError = yield* Effect.flip(
           handlers
-            .ContactAttributeDefinitionDelete({
+            .DeleteContactAttributeDefinition({
               id: contactId,
               organizationId,
             })
@@ -234,7 +234,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
             [numberId, "Report count", "reportCount"],
           ] as const) {
             yield* handlers
-              .ContactAttributeDefinitionCreate({
+              .CreateContactAttributeDefinition({
                 id: definitionId,
                 organizationId,
                 name,
@@ -263,7 +263,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
           // land on another attribute's row - it is refused outright.
           const error = yield* Effect.flip(
             handlers
-              .ContactAttributeValueUpdate({
+              .UpdateContactAttributeValue({
                 id: valueRowId,
                 organizationId,
                 contactId: contactRowId,
@@ -321,7 +321,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
             [numberId, "Report count", "reportCount"],
           ] as const) {
             yield* handlers
-              .ContactAttributeDefinitionCreate({
+              .CreateContactAttributeDefinition({
                 id: definitionId,
                 organizationId,
                 name,

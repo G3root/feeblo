@@ -2,13 +2,13 @@
 
 ## Decision
 
-Workspace creation (`WorkspaceRpcHandlersEffect.WorkspaceCreate`) enforces a per-user cap: a user may own at most `PLAN_ENTITLEMENTS.free.limits.workspaces` (3) workspaces whose plan resolves to `free`. Ownership means the user's member role list contains `owner`; paid workspaces are not counted and do not raise the cap, so upgrading one of the free workspaces frees a slot.
+Workspace creation (`WorkspaceRpcHandlersEffect.CreateWorkspace`) enforces a per-user cap: a user may own at most `PLAN_ENTITLEMENTS.free.limits.workspaces` (3) workspaces whose plan resolves to `free`. Ownership means the user's member role list contains `owner`; paid workspaces are not counted and do not raise the cap, so upgrading one of the free workspaces frees a slot.
 
 The cap lives in the plan catalog as a `LimitFeatureKey`, next to feedback boards, admin roles, changelog categories, CRM entries, and submission recipients, rather than as a private constant in the workspace module. The check runs inside the create transaction, after `WorkspaceRepository.lockUser` takes a `FOR NO KEY UPDATE` lock on the user row.
 
 ## Why
 
-The free plan is per workspace: each free workspace carries its own boards, CRM entries, and other allowances, so without a cap one account multiplies the free tier without limit. `WorkspaceCreate` is the only user-reachable creation path — better-auth's `/organization/create` is disabled with `allowUserToCreateOrganization: false` — so the rule has exactly one place to hold.
+The free plan is per workspace: each free workspace carries its own boards, CRM entries, and other allowances, so without a cap one account multiplies the free tier without limit. `CreateWorkspace` is the only user-reachable creation path — better-auth's `/organization/create` is disabled with `allowUserToCreateOrganization: false` — so the rule has exactly one place to hold.
 
 The rejected alternatives are the argument. "Any paid workspace lifts the cap" lets one subscription unlock unlimited _free_ workspaces, which is the farming hole the cap exists to close. A hard cap on total workspaces regardless of plan blocks a paying customer from a fourth workspace on a plan they upgraded for. Excluding paid workspaces from the count, and applying the cap only to free ones, keeps both properties: paying never buys less than free, and free capacity never exceeds the free plan's allowance.
 

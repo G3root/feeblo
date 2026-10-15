@@ -53,7 +53,7 @@ export const ApiKeyRpcHandlersEffect = Effect.gen(function* () {
   const auth = yield* Auth;
 
   return {
-    ApiKeyCreate: ({
+    CreateApiKey: ({
       name,
       organizationId,
       expiration,
@@ -118,12 +118,12 @@ export const ApiKeyRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("ApiKey", "create")
       ),
 
-    ApiKeyList: ({ organizationId }: TApiKeyList) =>
+    ListApiKeys: ({ organizationId }: TApiKeyList) =>
       repository
         .listForOrganization({ organizationId })
         .pipe(Policy.withPolicy(apiKeyPolicy.canManage(organizationId))),
 
-    ApiKeyRevoke: ({ organizationId, keyId }: TApiKeyRevoke) =>
+    RevokeApiKey: ({ organizationId, keyId }: TApiKeyRevoke) =>
       repository
         .revoke({ organizationId, keyId })
         .pipe(Policy.withPolicy(apiKeyPolicy.canManage(organizationId))),

@@ -13,7 +13,7 @@ export type PostExternalResourceLinkArgs = {
 
 export const postExternalResourceLinksAtom = Atom.family(
   (args: PostExternalResourceLinkArgs) =>
-    DashboardClient.query("PostExternalResourceLinkList", args, {
+    DashboardClient.query("ListPostExternalResourceLinks", args, {
       reactivityKeys: { postExternalResources: [args.postId] },
     }).pipe(dashboardSWR("15 seconds"), Atom.setIdleTTL("5 minutes"))
 );

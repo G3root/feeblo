@@ -23,7 +23,7 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
   const membershipPolicy = yield* MembershipPolicy;
 
   return {
-    MembershipList: () => {
+    ListMemberships: () => {
       return Effect.gen(function* () {
         const session = yield* CurrentSession;
 
@@ -32,14 +32,14 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
         });
       }).pipe(withRemapDbErrors("Membership", "select"));
     },
-    OrganizationMembersList: ({ organizationId }: TOrganizationId) =>
+    ListOrganizationMembers: ({ organizationId }: TOrganizationId) =>
       repository
         .findOrganizationMembers({ organizationId })
         .pipe(
           Policy.withPolicy(Policy.hasMembership(organizationId)),
           withRemapDbErrors("Membership", "select")
         ),
-    OrganizationInvitationsList: ({ organizationId }: TOrganizationId) =>
+    ListOrganizationInvitations: ({ organizationId }: TOrganizationId) =>
       repository
         .findOrganizationInvitations({
           organizationId,
@@ -55,7 +55,7 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
           ),
           withRemapDbErrors("Invitation", "select")
         ),
-    OrganizationUpdateMemberRole: ({
+    UpdateOrganizationMemberRole: ({
       organizationId,
       memberId,
       role,
@@ -96,7 +96,7 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
         ),
         withRemapDbErrors("Membership", "update")
       ),
-    OrganizationRemoveMember: ({ organizationId, memberId }: TRemoveMember) =>
+    RemoveOrganizationMember: ({ organizationId, memberId }: TRemoveMember) =>
       transaction(
         Effect.gen(function* () {
           yield* membershipPolicy.canManageTarget({
@@ -115,7 +115,7 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
         ),
         withRemapDbErrors("Membership", "delete")
       ),
-    OrganizationCancelInvitation: ({
+    CancelOrganizationInvitation: ({
       organizationId,
       invitationId,
     }: TCancelInvitation) =>

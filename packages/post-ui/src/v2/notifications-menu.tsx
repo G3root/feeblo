@@ -145,9 +145,12 @@ export function NotificationsMenu({
   const { data: unread } = useQuery({
     enabled: Boolean(session),
     queryFn: ({ signal }) =>
-      fetchRpc((rpc) => rpc.NotificationUnreadCountPublic({ organizationId }), {
-        signal,
-      }),
+      fetchRpc(
+        (rpc) => rpc.CountUnreadNotificationsPublic({ organizationId }),
+        {
+          signal,
+        }
+      ),
     queryKey: [...listKey, "unread"],
     refetchInterval: REFRESH_MS,
     staleTime: REFRESH_MS,
@@ -158,7 +161,7 @@ export function NotificationsMenu({
     queryFn: ({ signal }) =>
       fetchRpc(
         (rpc) =>
-          rpc.NotificationListPublic({ organizationId, limit: LIST_LIMIT }),
+          rpc.ListNotificationsPublic({ organizationId, limit: LIST_LIMIT }),
         { signal }
       ),
     queryKey: listKey,
@@ -179,7 +182,7 @@ export function NotificationsMenu({
   const markRead = useMutation<unknown, RpcError, string>({
     mutationFn: (notificationId: string) =>
       fetchRpc((rpc) =>
-        rpc.NotificationMarkReadPublic({
+        rpc.MarkNotificationReadPublic({
           organizationId,
           notificationId,
         })
@@ -190,7 +193,7 @@ export function NotificationsMenu({
 
   const markAllRead = useMutation<unknown, RpcError, void>({
     mutationFn: () =>
-      fetchRpc((rpc) => rpc.NotificationMarkAllReadPublic({ organizationId })),
+      fetchRpc((rpc) => rpc.MarkAllNotificationsReadPublic({ organizationId })),
     onError,
     onSettled: invalidate,
   });

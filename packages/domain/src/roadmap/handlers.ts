@@ -24,19 +24,19 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
   const roadmapPolicy = yield* RoadmapPolicy;
 
   return {
-    RoadmapList: (args: TRoadmapList) =>
+    ListRoadmaps: (args: TRoadmapList) =>
       repository
         .findMany(args)
         .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Roadmap", "select")
         ),
-    RoadmapListPublic: (args: TRoadmapList) =>
+    ListRoadmapsPublic: (args: TRoadmapList) =>
       repository
         .findMany({ organizationId: args.organizationId, visibility: "public" })
         .pipe(
           RateLimit.withPublicRpcRateLimit({
-            name: "RoadmapListPublic",
+            name: "ListRoadmapsPublic",
             level: "read",
           }),
           Policy.withPublicPolicy(
@@ -44,7 +44,7 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
           ),
           withRemapDbErrors("Roadmap", "select")
         ),
-    RoadmapCreate: (args: TRoadmapCreate) =>
+    CreateRoadmap: (args: TRoadmapCreate) =>
       // The first roadmap in an organization becomes the primary one; the
       // repository claims primary status atomically (backed by the partial
       // unique index roadmap_primary_organizationId_uidx) and falls back to a
@@ -64,7 +64,7 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
           ),
           withRemapDbErrors("Roadmap", "create")
         ),
-    RoadmapUpdate: (args: TRoadmapUpdate) =>
+    UpdateRoadmap: (args: TRoadmapUpdate) =>
       repository.update(args).pipe(
         Policy.withPolicy(
           roadmapPolicy.canUpdate({
@@ -75,7 +75,7 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
         ),
         withRemapDbErrors("Roadmap", "update")
       ),
-    RoadmapDelete: (args: TRoadmapDelete) =>
+    DeleteRoadmap: (args: TRoadmapDelete) =>
       // Deletion and primary handoff run in one organization-scoped
       // transaction (see RoadmapRepository.deleteWithPrimaryHandoff), so a
       // concurrent create/delete cannot leave the organization with zero or

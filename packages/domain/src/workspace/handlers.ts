@@ -23,7 +23,7 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
   const { validate: validateSubdomain } = yield* SubdomainValidationService;
 
   return {
-    WorkspaceCreate: (args: TCreateWorkspaceInput) => {
+    CreateWorkspace: (args: TCreateWorkspaceInput) => {
       return Effect.gen(function* () {
         const session = yield* CurrentSession;
         const workspaceName = args.workspaceName.trim();
@@ -69,16 +69,16 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
         return { organizationId };
       }).pipe(withRemapDbErrors("Workspace", "create"));
     },
-    WorkspaceCreationStateGet: () =>
+    GetWorkspaceCreationState: () =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         return yield* workspacePolicy.getCreationState({
           userId: session.session.userId,
         });
       }).pipe(withRemapDbErrors("Workspace", "select")),
-    WorkspaceProductList: () =>
+    ListWorkspaceProducts: () =>
       repository.findProducts().pipe(withRemapDbErrors("Workspace", "select")),
-    WorkspacePlanGet: (args: TWorkspaceInput) =>
+    GetWorkspacePlan: (args: TWorkspaceInput) =>
       repository
         .findPlanByOrganizationId({
           organizationId: args.organizationId,
@@ -87,7 +87,7 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Workspace", "select")
         ),
-    WorkspaceSlugCheck: (args: TWorkspaceSlugCheckInput) =>
+    CheckWorkspaceSlug: (args: TWorkspaceSlugCheckInput) =>
       validateSubdomain(args.slug).pipe(
         Effect.matchEffect({
           onFailure: (error) =>

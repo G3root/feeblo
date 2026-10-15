@@ -30,12 +30,12 @@ const withTracer = (tracer: Tracer.Tracer, spanPrefix = rpcSpanPrefix) =>
 describe("rpcMethodFromSpanName", () => {
   it("reads the method from a prefixed span name", () => {
     expect(
-      rpcMethodFromSpanName(`${rpcSpanPrefix}.PostCreate`, rpcSpanPrefix)
-    ).toBe("PostCreate");
+      rpcMethodFromSpanName(`${rpcSpanPrefix}.CreatePost`, rpcSpanPrefix)
+    ).toBe("CreatePost");
   });
 
   it("ignores every other span", () => {
-    expect(rpcMethodFromSpanName("rpc.PostCreate", rpcSpanPrefix)).toBe(
+    expect(rpcMethodFromSpanName("rpc.CreatePost", rpcSpanPrefix)).toBe(
       undefined
     );
     expect(rpcMethodFromSpanName("http.server POST", rpcSpanPrefix)).toBe(
@@ -50,21 +50,21 @@ describe("rpcSpans", () => {
     Effect.gen(function* () {
       const { spans, tracer } = recordingTracer();
       yield* Effect.void.pipe(
-        Effect.withSpan(`${rpcSpanPrefix}.WorkspaceCreationStateGet`),
+        Effect.withSpan(`${rpcSpanPrefix}.GetWorkspaceCreationState`),
         Effect.withSpan("http.server POST"),
         withTracer(tracer)
       );
 
       const httpSpan = spans[0];
       const rpcSpan = spans[1];
-      expect(rpcSpan?.name).toBe(`${rpcSpanPrefix}.WorkspaceCreationStateGet`);
+      expect(rpcSpan?.name).toBe(`${rpcSpanPrefix}.GetWorkspaceCreationState`);
       expect(rpcSpan?.attributes.get("rpc.system.name")).toBe("effect");
       expect(rpcSpan?.attributes.get("rpc.method")).toBe(
-        "WorkspaceCreationStateGet"
+        "GetWorkspaceCreationState"
       );
       // The parent is the operation a backend lists, so it carries the method.
       expect(httpSpan?.attributes.get("rpc.method")).toBe(
-        "WorkspaceCreationStateGet"
+        "GetWorkspaceCreationState"
       );
     })
   );
@@ -74,7 +74,7 @@ describe("rpcSpans", () => {
       const { spans, tracer } = recordingTracer();
       yield* Effect.gen(function* () {
         yield* Effect.void.pipe(Effect.withSpan(`${rpcSpanPrefix}.Ping`));
-        yield* Effect.void.pipe(Effect.withSpan(`${rpcSpanPrefix}.PostCreate`));
+        yield* Effect.void.pipe(Effect.withSpan(`${rpcSpanPrefix}.CreatePost`));
         // A repeated method must not be recorded twice on the shared span.
         yield* Effect.void.pipe(Effect.withSpan(`${rpcSpanPrefix}.Ping`));
       }).pipe(Effect.withSpan("http.server POST"), withTracer(tracer));
@@ -83,11 +83,11 @@ describe("rpcSpans", () => {
       const rpcSpans = spans.slice(1);
       // Each RPC span still names exactly the one method it serves.
       expect(rpcSpans.map((span) => span.attributes.get("rpc.method"))).toEqual(
-        ["Ping", "PostCreate", "Ping"]
+        ["Ping", "CreatePost", "Ping"]
       );
       expect(httpSpan?.attributes.get("rpc.method")).toEqual([
         "Ping",
-        "PostCreate",
+        "CreatePost",
       ]);
     })
   );
@@ -164,7 +164,7 @@ describe("rpcSpans", () => {
         sampled: true,
         startTime: 0n,
       });
-      for (const method of ["PostCreate", "PostGet"]) {
+      for (const method of ["CreatePost", "GetPost"]) {
         yield* Effect.void.pipe(
           Effect.withSpan(`${rpcSpanPrefix}.${method}`, {
             parent: Tracer.externalSpan({
@@ -179,8 +179,8 @@ describe("rpcSpans", () => {
       }
 
       expect(httpSpan.attributes.get("rpc.method")).toEqual([
-        "PostCreate",
-        "PostGet",
+        "CreatePost",
+        "GetPost",
       ]);
     })
   );

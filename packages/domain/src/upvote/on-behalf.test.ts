@@ -197,7 +197,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
   );
 
   layer(TestLayer)("handlers", (it) => {
-    describe("UpvoteAddOnBehalf", () => {
+    describe("AddUpvoteOnBehalf", () => {
       it.effect(
         "provisions a shadow user for an email-only subject and links the contact",
         () =>
@@ -209,7 +209,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
             yield* createPost(fixture, postId);
 
             const result = yield* handlers
-              .UpvoteAddOnBehalf({
+              .AddUpvoteOnBehalf({
                 organizationId: fixture.organizationId,
                 postId,
                 author: { email: "sam@example.com", name: "Sam Shadow" },
@@ -285,7 +285,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
             });
 
             const result = yield* handlers
-              .UpvoteAddOnBehalf({
+              .AddUpvoteOnBehalf({
                 organizationId: fixture.organizationId,
                 postId,
                 author: { userId: memberUserId },
@@ -331,10 +331,10 @@ describe("UpvoteRpcHandlers on-behalf", () => {
           } as const;
           const session = makeSession(fixture, "manager");
           const first = yield* handlers
-            .UpvoteAddOnBehalf(args)
+            .AddUpvoteOnBehalf(args)
             .pipe(Effect.provideService(CurrentSession, session));
           const second = yield* handlers
-            .UpvoteAddOnBehalf(args)
+            .AddUpvoteOnBehalf(args)
             .pipe(Effect.provideService(CurrentSession, session));
 
           expect(first.added).toBe(true);
@@ -364,7 +364,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
             yield* createPost(fixture, postId);
 
             const result = yield* handlers
-              .UpvoteAddOnBehalf({
+              .AddUpvoteOnBehalf({
                 organizationId: fixture.organizationId,
                 postId,
                 author: { email: "jane@example.com" },
@@ -404,7 +404,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
           yield* createPost(fixture, postId);
 
           yield* handlers
-            .UpvoteAddOnBehalf({
+            .AddUpvoteOnBehalf({
               organizationId: fixture.organizationId,
               postId,
               author: { email: "sam@example.com" },
@@ -463,7 +463,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
           });
 
           yield* handlers
-            .UpvoteAddOnBehalf({
+            .AddUpvoteOnBehalf({
               organizationId: fixture.organizationId,
               postId,
               author: { email: "portal@example.com" },
@@ -495,7 +495,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
           yield* createPost(fixture, postId);
 
           yield* handlers
-            .UpvoteAddOnBehalf({
+            .AddUpvoteOnBehalf({
               organizationId: fixture.organizationId,
               postId,
               author: { email: "sam@example.com", name: "Sam Shadow" },
@@ -534,7 +534,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
 
             // The staff actor votes as themselves via their own subject.
             yield* handlers
-              .UpvoteAddOnBehalf({
+              .AddUpvoteOnBehalf({
                 organizationId: fixture.organizationId,
                 postId,
                 author: { userId: fixture.userId },
@@ -563,7 +563,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
           yield* createPost(fixture, postId);
 
           const result = yield* handlers
-            .UpvoteAddOnBehalf({
+            .AddUpvoteOnBehalf({
               organizationId: fixture.organizationId,
               postId,
               author: { email: "sam@example.com" },
@@ -589,7 +589,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
           // an organization membership never gets past the policy.
           const error = yield* Effect.flip(
             handlers
-              .UpvoteAddOnBehalf({
+              .AddUpvoteOnBehalf({
                 organizationId: fixture.organizationId,
                 postId,
                 author: { email: "sam@example.com" },
@@ -617,7 +617,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .UpvoteAddOnBehalf({
+              .AddUpvoteOnBehalf({
                 organizationId: fixture.organizationId,
                 postId,
                 author: { contactId: "cnt_does_not_exist" },
@@ -637,7 +637,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
       );
     });
 
-    describe("UpvoteRemoveOnBehalf", () => {
+    describe("RemoveUpvoteOnBehalf", () => {
       it.effect("removes exactly the subject's vote with provenance", () =>
         Effect.gen(function* () {
           const handlers = yield* UpvoteRpcHandlersEffect;
@@ -646,7 +646,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
           yield* createPost(fixture, postId);
 
           yield* handlers
-            .UpvoteAddOnBehalf({
+            .AddUpvoteOnBehalf({
               organizationId: fixture.organizationId,
               postId,
               author: { email: "sam@example.com" },
@@ -661,7 +661,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
           const shadowUserId = upvotes[0]!.userId;
 
           const result = yield* handlers
-            .UpvoteRemoveOnBehalf({
+            .RemoveUpvoteOnBehalf({
               organizationId: fixture.organizationId,
               postId,
               userId: shadowUserId,
@@ -712,7 +712,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
           yield* createPost(fixture, postId);
 
           const result = yield* handlers
-            .UpvoteRemoveOnBehalf({
+            .RemoveUpvoteOnBehalf({
               organizationId: fixture.organizationId,
               postId,
               userId: "user_never_voted",
@@ -748,7 +748,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
             });
 
             const result = yield* handlers
-              .UpvoteRemoveOnBehalf({
+              .RemoveUpvoteOnBehalf({
                 organizationId: fixture.organizationId,
                 postId,
                 userId: fixture.userId,
@@ -782,7 +782,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
           yield* createPost(fixture, postId);
 
           yield* handlers
-            .UpvoteAddOnBehalf({
+            .AddUpvoteOnBehalf({
               organizationId: fixture.organizationId,
               postId,
               author: { email: "jane-remove@example.com" },
@@ -794,7 +794,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
               )
             );
           yield* handlers
-            .UpvoteRemoveOnBehalf({
+            .RemoveUpvoteOnBehalf({
               organizationId: fixture.organizationId,
               postId,
               userId: "user_jane_remove",
@@ -829,7 +829,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .UpvoteRemoveOnBehalf({
+              .RemoveUpvoteOnBehalf({
                 organizationId: fixture.organizationId,
                 postId,
                 userId: "user_someone",

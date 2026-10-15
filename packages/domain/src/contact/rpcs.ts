@@ -18,44 +18,44 @@ import {
 } from "./schema";
 
 export class ContactRpcs extends RpcGroup.make(
-  Rpc.make("ContactList", {
+  Rpc.make("ListContacts", {
     success: Schema.Array(Contact),
     payload: ContactList,
     error: ContactServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("ContactSearch", {
+  Rpc.make("SearchContacts", {
     success: Schema.Array(ContactSearchResult),
     payload: ContactSearch,
     // The picker consumes the per-member dashboard read rate limit.
     error: Schema.Union([ContactServiceErrors, RateLimitErrors]),
   }).middleware(AuthMiddleware),
 
-  Rpc.make("ContactCreate", {
+  Rpc.make("CreateContact", {
     success: Contact,
     payload: ContactCreate,
     error: ContactServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("ContactUpdate", {
+  Rpc.make("UpdateContact", {
     success: Contact,
     payload: ContactUpdate,
     error: ContactServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("ContactDelete", {
+  Rpc.make("DeleteContact", {
     success: Schema.Void,
     payload: ContactDelete,
     error: ContactServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("ContactCreateEligibility", {
+  Rpc.make("CheckContactCreateEligibility", {
     success: Schema.Struct({ canCreate: Schema.Boolean }),
     payload: ContactCreateEligibility,
     error: Schema.Union([ContactServiceErrors, RateLimitErrors]),
   }).middleware(AuthMiddleware),
 
-  Rpc.make("ContactUnsubscribe", {
+  Rpc.make("UnsubscribeContact", {
     success: Schema.Void,
     payload: ContactUnsubscribe,
     error: ContactServiceErrors,

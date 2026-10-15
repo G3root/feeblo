@@ -33,7 +33,7 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
     TPostReactionToggle,
     PostReactionRpcTag
   >()({
-    operation: "PostReactionToggle",
+    operation: "TogglePostReaction",
     remap: { action: "update", entity: "PostReaction" },
     dashboard: {
       rateLimit: undefined,
@@ -66,7 +66,7 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
     TPostReactionList,
     PostReactionRpcTag
   >()({
-    operation: "PostReactionList",
+    operation: "ListPostReactions",
     remap: { action: "select", entity: "PostReaction" },
     config: { rateLimit: "read", policy: () => Policy.allow },
   });
@@ -88,7 +88,7 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
   );
 
   return {
-    PostReactionList: (args: TPostReactionList) =>
+    ListPostReactions: (args: TPostReactionList) =>
       repository
         .list({
           slug: args.slug,
@@ -98,8 +98,8 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("PostReaction", "select")
         ),
-    PostReactionToggle: toggleReaction.dashboard,
-    PostReactionListPublic: listPublicEntry.entry((args) =>
+    TogglePostReaction: toggleReaction.dashboard,
+    ListPostReactionsPublic: listPublicEntry.entry((args) =>
       withPublicViewer({
         read: () =>
           repository.listPublic({
@@ -109,7 +109,7 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
         redact: redactActorIdentities,
       })
     ),
-    PostReactionTogglePublic: toggleReaction.public,
+    TogglePostReactionPublic: toggleReaction.public,
   };
 });
 

@@ -430,7 +430,7 @@ export type NewOrganization = typeof organizationTable.$inferInsert;
  * writes them; the plugin's own limiter is disabled, so they hold defaults
  * and per-key limiting runs through the Redis `RateLimitService` instead.
  *
- * `creatorId` is the one column the plugin does not know: the `ApiKeyCreate`
+ * `creatorId` is the one column the plugin does not know: the `CreateApiKey`
  * handler writes it right after the plugin inserts the row. It is the acting
  * user, not a membership id, so the key keeps an owner to point at after that
  * member leaves, and `set null` keeps the credential itself alive.

@@ -28,7 +28,7 @@ export type VoteWriteActor = {
 /**
  * Adds one voter on behalf of a resolved customer, as one transaction.
  *
- * This is the dashboard's `UpvoteAddOnBehalf` body and the Public API's
+ * This is the dashboard's `AddUpvoteOnBehalf` body and the Public API's
  * `createVote` body, extracted so the two cannot drift on what adding a voter
  * means: the customer is resolved inside the same transaction as the mutation
  * (see plan-on-behalf.md), an existing vote is an idempotent success no-op, and
@@ -153,7 +153,7 @@ export const recordVoteRemoved = (args: {
  * transaction.
  *
  * Removing a non-voter is a success no-op that records nothing — the same
- * semantics as the dashboard's `UpvoteRemoveOnBehalf`. A removal records the
+ * semantics as the dashboard's `RemoveUpvoteOnBehalf`. A removal records the
  * provenance `recordVoteRemoved` describes. Unsubscribing stays explicit:
  * removing a voter never touches their email subscription.
  */

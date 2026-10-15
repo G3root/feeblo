@@ -145,7 +145,7 @@ test(
     await createAuthenticatedWorkspace(page, user);
 
     // Submitting through the public dialog exercises the public create
-    // path end to end (shared optimistic form → `PostCreatePublic`), as
+    // path end to end (shared optimistic form → `CreatePostPublic`), as
     // opposed to the dashboard dialog covered by the feedback specs.
     const title = `Visitor feedback ${randomUUID().slice(0, 8)}`;
     const content = "Submitted from the public board dialog.";

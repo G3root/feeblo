@@ -12,17 +12,17 @@ import {
 } from "./schema";
 
 export class JwtSecretRpcs extends RpcGroup.make(
-  Rpc.make("JwtSecretRevoke", {
+  Rpc.make("RevokeJwtSecret", {
     success: Schema.Void,
     payload: JwtSecretRevoke,
     error: JwtSecretServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("JwtSecretRotate", {
+  Rpc.make("RotateJwtSecret", {
     success: Schema.Void,
     payload: JwtSecretRotate,
     error: JwtSecretServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("JwtSecretList", {
+  Rpc.make("ListJwtSecrets", {
     success: Schema.Array(JwtSecretWithSecret),
     payload: JwtSecretList,
     error: JwtSecretServiceErrors,

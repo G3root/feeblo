@@ -81,14 +81,14 @@ describe("OrganizationRpcHandlers", () => {
   const TestLayer = Layer.merge(RepositoryTest, Database.PgliteDatabaseLive);
 
   layer(TestLayer)("handlers", (it) => {
-    describe("OrganizationList", () => {
+    describe("ListOrganizations", () => {
       it.effect("returns organizations the user belongs to", () =>
         Effect.gen(function* () {
           const handlers = yield* OrganizationRpcHandlersEffect;
           const fixture = yield* makeFixture();
 
           const organizations = yield* handlers
-            .OrganizationList()
+            .ListOrganizations()
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(organizations).toHaveLength(1);
@@ -127,7 +127,7 @@ describe("OrganizationRpcHandlers", () => {
             };
 
             const organizations = yield* handlers
-              .OrganizationList()
+              .ListOrganizations()
               .pipe(
                 Effect.provideService(CurrentSession, sessionWithoutMemberships)
               );
@@ -189,7 +189,7 @@ describe("OrganizationRpcHandlers", () => {
             };
 
             const organizations = yield* handlers
-              .OrganizationList()
+              .ListOrganizations()
               .pipe(Effect.provideService(CurrentSession, sessionWithTwo));
 
             expect(organizations).toHaveLength(2);
@@ -200,7 +200,7 @@ describe("OrganizationRpcHandlers", () => {
       );
     });
 
-    describe("OrganizationUpdate", () => {
+    describe("UpdateOrganization", () => {
       const updateInput = (
         fixture: Fixture,
         name: string,
@@ -218,7 +218,7 @@ describe("OrganizationRpcHandlers", () => {
           const fixture = yield* makeFixture();
 
           yield* handlers
-            .OrganizationUpdate(
+            .UpdateOrganization(
               updateInput(
                 fixture,
                 "Updated Name",
@@ -244,7 +244,7 @@ describe("OrganizationRpcHandlers", () => {
           const fixture = yield* makeFixture();
 
           yield* handlers
-            .OrganizationUpdate(updateInput(fixture, "Admin Updated"))
+            .UpdateOrganization(updateInput(fixture, "Admin Updated"))
             .pipe(
               Effect.provideService(
                 CurrentSession,
@@ -268,7 +268,7 @@ describe("OrganizationRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .OrganizationUpdate(updateInput(fixture, "Member Update"))
+              .UpdateOrganization(updateInput(fixture, "Member Update"))
               .pipe(
                 Effect.provideService(
                   CurrentSession,
@@ -288,7 +288,7 @@ describe("OrganizationRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .OrganizationUpdate(updateInput(fixture, "Outsider Update"))
+              .UpdateOrganization(updateInput(fixture, "Outsider Update"))
               .pipe(
                 Effect.provideService(
                   CurrentSession,
@@ -331,7 +331,7 @@ describe("OrganizationRpcHandlers", () => {
 
             const error = yield* Effect.flip(
               handlers
-                .OrganizationUpdate({
+                .UpdateOrganization({
                   organizationId: nonExistentOrgId,
                   name: "Ghost Org",
                   logo: null,
@@ -358,7 +358,7 @@ describe("OrganizationRpcHandlers", () => {
 
           // Now remove it
           yield* handlers
-            .OrganizationUpdate(updateInput(fixture, "Test Organization", null))
+            .UpdateOrganization(updateInput(fixture, "Test Organization", null))
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const [org] = yield* db

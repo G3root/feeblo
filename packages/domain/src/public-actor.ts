@@ -1,7 +1,7 @@
 /**
  * Redaction helpers for public list endpoints.
  *
- * Public endpoints (e.g. UpvoteListPublic, PostReactionListPublic) return
+ * Public endpoints (e.g. ListUpvotesPublic, ListPostReactionsPublic) return
  * rows that include internal actor identifiers (userId, memberId). Those
  * identifiers are PII that must never be exposed to unauthenticated callers:
  * they are not needed for any public UI and can be used to enumerate or

@@ -338,14 +338,14 @@ describe("PostRpcHandlers", () => {
   );
 
   layer(TestLayer)("handlers", (it) => {
-    describe("PostList", () => {
+    describe("ListPosts", () => {
       it.effect("rejects users without a membership", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const error = yield* Effect.flip(
             handlers
-              .PostList({
+              .ListPosts({
                 organizationId: fixture.organizationId,
                 boardId: fixture.boardId,
               })
@@ -362,7 +362,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostCreatePublic", () => {
+    describe("CreatePostPublic", () => {
       it.effect(
         "allows non-members to create on public boards and exposes the post publicly",
         () =>
@@ -372,7 +372,7 @@ describe("PostRpcHandlers", () => {
             const postId = yield* PostId.generate;
 
             yield* handlers
-              .PostCreatePublic(
+              .CreatePostPublic(
                 postCreateInput(
                   fixture,
                   postId,
@@ -388,7 +388,7 @@ describe("PostRpcHandlers", () => {
               );
 
             const posts = yield* handlers
-              .PostListPublic({
+              .ListPostsPublic({
                 organizationId: fixture.organizationId,
                 boardId: fixture.boardId,
               })
@@ -409,7 +409,7 @@ describe("PostRpcHandlers", () => {
             // resolves through the detail RPC.
             expect(posts[0]?.excerpt).not.toHaveLength(0);
             const detail = yield* handlers
-              .PostGetPublic({
+              .GetPostPublic({
                 organizationId: fixture.organizationId,
                 // SAFETY: The length check above guarantees the row.
                 slug: posts[0]!.slug,
@@ -428,7 +428,7 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
           const error = yield* Effect.flip(
             handlers
-              .PostCreatePublic(
+              .CreatePostPublic(
                 postCreateInput(
                   fixture,
                   postId,
@@ -449,7 +449,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostCreate", () => {
+    describe("CreatePost", () => {
       it.effect(
         "records equivalent safe creation envelopes for dashboard and public-board posts",
         () =>
@@ -461,14 +461,14 @@ describe("PostRpcHandlers", () => {
             const publicPostId = yield* PostId.generate;
 
             yield* handlers
-              .PostCreate(
+              .CreatePost(
                 postCreateInput(fixture, dashboardPostId, "Dashboard event")
               )
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
             yield* handlers
-              .PostCreatePublic(
+              .CreatePostPublic(
                 postCreateInput(fixture, publicPostId, "Public event")
               )
               .pipe(
@@ -509,7 +509,7 @@ describe("PostRpcHandlers", () => {
             const fixture = yield* makeFixture();
             const postId = yield* PostId.generate;
             yield* handlers
-              .PostCreate(
+              .CreatePost(
                 postCreateInput(fixture, postId, "Creator subscription")
               )
               .pipe(
@@ -553,7 +553,7 @@ describe("PostRpcHandlers", () => {
 
           yield* Effect.flip(
             handlers
-              .PostCreate(postCreateInput(fixture, postId, "Atomic outbox"))
+              .CreatePost(postCreateInput(fixture, postId, "Atomic outbox"))
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           ).pipe(
             Effect.ensuring(
@@ -592,7 +592,7 @@ describe("PostRpcHandlers", () => {
             const db = yield* currentDb;
 
             yield* handlers
-              .PostCreate(postCreateInput(fixture, postId, "Email intent"))
+              .CreatePost(postCreateInput(fixture, postId, "Email intent"))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
@@ -622,7 +622,7 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(
+            .CreatePost(
               postCreateInput(fixture, postId, "Contributor feedback")
             )
             .pipe(
@@ -641,7 +641,7 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
           const error = yield* Effect.flip(
             handlers
-              .PostCreate(
+              .CreatePost(
                 postCreateInput(fixture, postId, "Member-only feedback")
               )
               .pipe(
@@ -664,12 +664,12 @@ describe("PostRpcHandlers", () => {
           const secondPostId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(
+            .CreatePost(
               postCreateInput(fixture, firstPostId, "Duplicate title")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           yield* handlers
-            .PostCreate(
+            .CreatePost(
               postCreateInput(fixture, secondPostId, "Duplicate title")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -704,14 +704,14 @@ describe("PostRpcHandlers", () => {
             const secondPostId = yield* PostId.generate;
 
             yield* handlers
-              .PostCreate(
+              .CreatePost(
                 postCreateInput(firstFixture, firstPostId, "Shared title")
               )
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(firstFixture))
               );
             yield* handlers
-              .PostCreate(
+              .CreatePost(
                 postCreateInput(secondFixture, secondPostId, "Shared title")
               )
               .pipe(
@@ -741,7 +741,7 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate({
+            .CreatePost({
               ...postCreateInput(fixture, postId, "Eta post"),
               etaQuarter: "2026-Q3",
             })
@@ -757,7 +757,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostDelete", () => {
+    describe("DeletePost", () => {
       it.effect(
         "reports NotFound when a privileged delete matches no post",
         () =>
@@ -768,7 +768,7 @@ describe("PostRpcHandlers", () => {
 
             const error = yield* Effect.flip(
               handlers
-                .PostDelete({
+                .DeletePost({
                   id: missingPostId,
                   organizationId: fixture.organizationId,
                   boardId: fixture.boardId,
@@ -796,14 +796,14 @@ describe("PostRpcHandlers", () => {
             [targetPostId, "Target feedback"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
           }
 
           yield* handlers
-            .PostMerge({
+            .MergePost({
               organizationId: fixture.organizationId,
               sourcePostId,
               targetPostId,
@@ -832,7 +832,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostDeleteEligibilityList", () => {
+    describe("ListPostDeleteEligibility", () => {
       it.effect("returns only the caller's untouched posts", () =>
         Effect.gen(function* () {
           const db = yield* currentDb;
@@ -846,7 +846,7 @@ describe("PostRpcHandlers", () => {
             [engagedPostId, "Engaged feedback"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
@@ -862,7 +862,7 @@ describe("PostRpcHandlers", () => {
           });
 
           const result = yield* handlers
-            .PostDeleteEligibilityList({
+            .ListPostDeleteEligibility({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -872,14 +872,14 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostDeleteEligibilityListPublic", () => {
+    describe("ListPostDeleteEligibilityPublic", () => {
       it.effect("returns an empty set for anonymous callers", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
           const fixture = yield* makeFixture("PUBLIC");
 
           const result = yield* handlers
-            .PostDeleteEligibilityListPublic({
+            .ListPostDeleteEligibilityPublic({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
@@ -896,13 +896,13 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Own feedback"))
+            .CreatePost(postCreateInput(fixture, postId, "Own feedback"))
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const session = Option.some(makeSession(fixture));
           const check = () =>
             handlers
-              .PostDeleteEligibilityListPublic({
+              .ListPostDeleteEligibilityPublic({
                 organizationId: fixture.organizationId,
               })
               .pipe(Effect.provideService(OptionalCurrentSession, session));
@@ -923,7 +923,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostGetPublic", () => {
+    describe("GetPostPublic", () => {
       it.effect("returns a public post by slug", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -931,11 +931,11 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Slugged feedback"))
+            .CreatePost(postCreateInput(fixture, postId, "Slugged feedback"))
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const created = yield* handlers
-            .PostList({
+            .ListPosts({
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
             })
@@ -945,7 +945,7 @@ describe("PostRpcHandlers", () => {
           expect(createdPost).toBeDefined();
 
           const post = yield* handlers
-            .PostGetPublic({
+            .GetPostPublic({
               organizationId: fixture.organizationId,
               // SAFETY: The existence check above guarantees the slug.
               slug: createdPost!.slug,
@@ -965,14 +965,14 @@ describe("PostRpcHandlers", () => {
           const privatePostId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate({
+            .CreatePost({
               ...postCreateInput(fixture, privatePostId, "Private feedback"),
               boardId: privateBoardId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const created = yield* handlers
-            .PostList({
+            .ListPosts({
               organizationId: fixture.organizationId,
               boardId: privateBoardId,
             })
@@ -983,7 +983,7 @@ describe("PostRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .PostGetPublic({
+              .GetPostPublic({
                 organizationId: fixture.organizationId,
                 // SAFETY: The existence check above guarantees the slug.
                 slug: privatePost!.slug,
@@ -1004,7 +1004,7 @@ describe("PostRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .PostGetPublic({
+              .GetPostPublic({
                 organizationId: fixture.organizationId,
                 slug: "no-such-post-slug",
               })
@@ -1018,7 +1018,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostResolveMergedPublic", () => {
+    describe("ResolveMergedPostPublic", () => {
       it.effect("resolves a merged public source to the target slug", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -1031,14 +1031,14 @@ describe("PostRpcHandlers", () => {
             [targetPostId, "Canonical feedback"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
           }
 
           const posts = yield* handlers
-            .PostList({
+            .ListPosts({
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
             })
@@ -1047,7 +1047,7 @@ describe("PostRpcHandlers", () => {
           const target = posts.find((post) => post.id === targetPostId);
 
           yield* handlers
-            .PostMerge({
+            .MergePost({
               organizationId: fixture.organizationId,
               sourcePostId,
               targetPostId,
@@ -1055,7 +1055,7 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const resolved = yield* handlers
-            .PostResolveMergedPublic({
+            .ResolveMergedPostPublic({
               organizationId: fixture.organizationId,
               // SAFETY: The list lookup above guarantees the slug.
               slug: source!.slug,
@@ -1073,11 +1073,11 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Live feedback"))
+            .CreatePost(postCreateInput(fixture, postId, "Live feedback"))
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const posts = yield* handlers
-            .PostList({
+            .ListPosts({
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
             })
@@ -1085,7 +1085,7 @@ describe("PostRpcHandlers", () => {
           const post = posts.find((row) => row.id === postId);
 
           const resolved = yield* handlers
-            .PostResolveMergedPublic({
+            .ResolveMergedPostPublic({
               organizationId: fixture.organizationId,
               // SAFETY: The list lookup above guarantees the slug.
               slug: post!.slug,
@@ -1097,7 +1097,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostGet", () => {
+    describe("GetPost", () => {
       it.effect("returns the full post including content for members", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -1105,13 +1105,13 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(
+            .CreatePost(
               postCreateInput(fixture, postId, "Detailed feedback", "Full body")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const created = yield* handlers
-            .PostList({
+            .ListPosts({
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
             })
@@ -1123,7 +1123,7 @@ describe("PostRpcHandlers", () => {
           expect("content" in (createdPost ?? {})).toBe(false);
 
           const post = yield* handlers
-            .PostGet({
+            .GetPost({
               organizationId: fixture.organizationId,
               // SAFETY: The existence check above guarantees the slug.
               slug: createdPost!.slug,
@@ -1142,7 +1142,7 @@ describe("PostRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .PostGet({
+              .GetPost({
                 organizationId: fixture.organizationId,
                 slug: "no-such-post-slug",
               })
@@ -1154,7 +1154,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostListPublic", () => {
+    describe("ListPostsPublic", () => {
       it.effect("does not expose posts from private boards", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -1164,19 +1164,19 @@ describe("PostRpcHandlers", () => {
           const privatePostId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(
+            .CreatePost(
               postCreateInput(fixture, publicPostId, "Public feedback")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           yield* handlers
-            .PostCreate({
+            .CreatePost({
               ...postCreateInput(fixture, privatePostId, "Private feedback"),
               boardId: privateBoardId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const posts = yield* handlers
-            .PostListPublic({
+            .ListPostsPublic({
               organizationId: fixture.organizationId,
               boardId: null,
             })
@@ -1196,14 +1196,14 @@ describe("PostRpcHandlers", () => {
             const session = makeSession(fixture);
 
             yield* handlers
-              .PostCreate(
+              .CreatePost(
                 postCreateInput(fixture, postId, "Identifiable feedback")
               )
               .pipe(Effect.provideService(CurrentSession, session));
 
             // Anonymous callers get no creator identifiers.
             const [anonymousView] = yield* handlers
-              .PostListPublic({
+              .ListPostsPublic({
                 organizationId: fixture.organizationId,
                 boardId: null,
               })
@@ -1217,7 +1217,7 @@ describe("PostRpcHandlers", () => {
             // The creator's own view keeps their identifiers so the client
             // can compute "did I create this post".
             const [ownView] = yield* handlers
-              .PostListPublic({
+              .ListPostsPublic({
                 organizationId: fixture.organizationId,
                 boardId: null,
               })
@@ -1247,14 +1247,14 @@ describe("PostRpcHandlers", () => {
             [mergedSourcePostId, "Merged feedback"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
           }
 
           yield* handlers
-            .PostAdminUpdate({
+            .AdminUpdatePost({
               id: archivedPostId,
               organizationId: fixture.organizationId,
               archived: true,
@@ -1262,7 +1262,7 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           yield* handlers
-            .PostMerge({
+            .MergePost({
               organizationId: fixture.organizationId,
               sourcePostId: mergedSourcePostId,
               targetPostId: activePostId,
@@ -1270,7 +1270,7 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const posts = yield* handlers
-            .PostListPublic({
+            .ListPostsPublic({
               organizationId: fixture.organizationId,
               boardId: null,
             })
@@ -1281,7 +1281,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostUpdate", () => {
+    describe("UpdatePost", () => {
       it.effect(
         "records one event for a real status transition and none for a no-op",
         () =>
@@ -1299,14 +1299,14 @@ describe("PostRpcHandlers", () => {
               type: "PLANNED",
             });
             yield* handlers
-              .PostCreate(postCreateInput(fixture, postId, "Transition event"))
+              .CreatePost(postCreateInput(fixture, postId, "Transition event"))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
             recordedIntegrationEvents.length = 0;
 
             yield* handlers
-              .PostUpdate({
+              .UpdatePost({
                 boardId: fixture.boardId,
                 id: postId,
                 organizationId: fixture.organizationId,
@@ -1318,7 +1318,7 @@ describe("PostRpcHandlers", () => {
             expect(recordedIntegrationEvents).toHaveLength(0);
 
             yield* handlers
-              .PostUpdate({
+              .UpdatePost({
                 boardId: fixture.boardId,
                 id: postId,
                 organizationId: fixture.organizationId,
@@ -1369,14 +1369,14 @@ describe("PostRpcHandlers", () => {
               },
             ]);
             yield* handlers
-              .PostCreate(postCreateInput(fixture, postId, "Coalesced status"))
+              .CreatePost(postCreateInput(fixture, postId, "Coalesced status"))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
 
             for (const statusId of [reviewStatusId, plannedStatusId]) {
               yield* handlers
-                .PostUpdate({
+                .UpdatePost({
                   id: postId,
                   organizationId: fixture.organizationId,
                   boardId: fixture.boardId,
@@ -1426,12 +1426,12 @@ describe("PostRpcHandlers", () => {
               organizationId: fixture.organizationId,
             });
             yield* handlers
-              .PostCreate(postCreateInput(fixture, postId, "Closing"))
+              .CreatePost(postCreateInput(fixture, postId, "Closing"))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
             yield* handlers
-              .PostUpdate({
+              .UpdatePost({
                 id: postId,
                 organizationId: fixture.organizationId,
                 boardId: fixture.boardId,
@@ -1475,13 +1475,13 @@ describe("PostRpcHandlers", () => {
               organizationId: fixture.organizationId,
             });
             yield* handlers
-              .PostCreate(postCreateInput(fixture, postId, "Movable feedback"))
+              .CreatePost(postCreateInput(fixture, postId, "Movable feedback"))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
 
             yield* handlers
-              .PostUpdate({
+              .UpdatePost({
                 id: postId,
                 organizationId: fixture.organizationId,
                 boardId: destinationBoardId,
@@ -1496,7 +1496,7 @@ describe("PostRpcHandlers", () => {
 
             const error = yield* Effect.flip(
               handlers
-                .PostUpdate({
+                .UpdatePost({
                   id: postId,
                   organizationId: fixture.organizationId,
                   boardId: destinationBoardId,
@@ -1521,7 +1521,7 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(
+            .CreatePost(
               postCreateInput(
                 fixture,
                 postId,
@@ -1531,7 +1531,7 @@ describe("PostRpcHandlers", () => {
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           yield* handlers
-            .PostUpdateContent({
+            .UpdatePostContent({
               assetIds: [],
               id: postId,
               organizationId: fixture.organizationId,
@@ -1545,7 +1545,7 @@ describe("PostRpcHandlers", () => {
               )
             );
           yield* handlers
-            .PostUpdateTitle({
+            .UpdatePostTitle({
               id: postId,
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
@@ -1559,7 +1559,7 @@ describe("PostRpcHandlers", () => {
             );
 
           const [post] = yield* handlers
-            .PostListPublic({
+            .ListPostsPublic({
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
             })
@@ -1571,7 +1571,7 @@ describe("PostRpcHandlers", () => {
           // Content updates are visible through the detail RPC; list rows
           // only carry the excerpt.
           const detail = yield* handlers
-            .PostGetPublic({
+            .GetPostPublic({
               organizationId: fixture.organizationId,
               // SAFETY: The update above guarantees the row exists.
               slug: post!.slug,
@@ -1582,7 +1582,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostUpdateEta", () => {
+    describe("UpdatePostEta", () => {
       it.effect("lets a manager set the ETA", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -1591,11 +1591,11 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Eta feedback"))
+            .CreatePost(postCreateInput(fixture, postId, "Eta feedback"))
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           yield* handlers
-            .PostUpdateEta({
+            .UpdatePostEta({
               id: postId,
               organizationId: fixture.organizationId,
               etaQuarter: "2026-Q3",
@@ -1644,14 +1644,14 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate({
+            .CreatePost({
               ...postCreateInput(fixture, postId, "Eta feedback"),
               etaQuarter: "2026-Q3",
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           yield* handlers
-            .PostUpdateEta({
+            .UpdatePostEta({
               id: postId,
               organizationId: fixture.organizationId,
               etaQuarter: null,
@@ -1699,12 +1699,12 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Eta feedback"))
+            .CreatePost(postCreateInput(fixture, postId, "Eta feedback"))
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const error = yield* Effect.flip(
             handlers
-              .PostUpdateEta({
+              .UpdatePostEta({
                 id: postId,
                 organizationId: fixture.organizationId,
                 etaQuarter: "2026-Q3",
@@ -1728,12 +1728,12 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Eta feedback"))
+            .CreatePost(postCreateInput(fixture, postId, "Eta feedback"))
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const error = yield* Effect.flip(
             handlers
-              .PostUpdateEta({
+              .UpdatePostEta({
                 id: postId,
                 organizationId: fixture.organizationId,
                 etaQuarter: "2026-Q3",
@@ -1751,7 +1751,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostUpdatePublic", () => {
+    describe("UpdatePostPublic", () => {
       it.effect("lets non-members update their own unlocked public posts", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -1760,14 +1760,14 @@ describe("PostRpcHandlers", () => {
           const session = makeSession(fixture, null);
 
           yield* handlers
-            .PostCreatePublic(
+            .CreatePostPublic(
               postCreateInput(fixture, postId, "Original feedback")
             )
             .pipe(Effect.provideService(CurrentSession, session));
 
           const memberOnlyError = yield* Effect.flip(
             handlers
-              .PostUpdate({
+              .UpdatePost({
                 id: postId,
                 organizationId: fixture.organizationId,
                 boardId: fixture.boardId,
@@ -1778,7 +1778,7 @@ describe("PostRpcHandlers", () => {
           expect(memberOnlyError._tag).toBe("PolicyDenied");
 
           yield* handlers
-            .PostUpdatePublic({
+            .UpdatePostPublic({
               id: postId,
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
@@ -1787,7 +1787,7 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, session));
 
           const [post] = yield* handlers
-            .PostListPublic({
+            .ListPostsPublic({
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
             })
@@ -1809,7 +1809,7 @@ describe("PostRpcHandlers", () => {
           const completedStatusId = yield* addStatus(fixture, "COMPLETED");
 
           yield* handlers
-            .PostCreatePublic(
+            .CreatePostPublic(
               postCreateInput(fixture, postId, "Original feedback")
             )
             .pipe(Effect.provideService(CurrentSession, session));
@@ -1818,7 +1818,7 @@ describe("PostRpcHandlers", () => {
           // status changes are reserved for `posts.status` holders.
           const error = yield* Effect.flip(
             handlers
-              .PostUpdatePublic({
+              .UpdatePostPublic({
                 id: postId,
                 organizationId: fixture.organizationId,
                 boardId: fixture.boardId,
@@ -1840,14 +1840,14 @@ describe("PostRpcHandlers", () => {
           const otherBoardId = yield* addBoard(fixture, "PUBLIC");
 
           yield* handlers
-            .PostCreatePublic(
+            .CreatePostPublic(
               postCreateInput(fixture, postId, "Original feedback")
             )
             .pipe(Effect.provideService(CurrentSession, session));
 
           const error = yield* Effect.flip(
             handlers
-              .PostUpdatePublic({
+              .UpdatePostPublic({
                 id: postId,
                 organizationId: fixture.organizationId,
                 boardId: otherBoardId,
@@ -1861,7 +1861,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostDeletePublic", () => {
+    describe("DeletePostPublic", () => {
       it.effect("lets non-members delete their own public posts", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -1870,14 +1870,14 @@ describe("PostRpcHandlers", () => {
           const session = makeSession(fixture, null);
 
           yield* handlers
-            .PostCreatePublic(
+            .CreatePostPublic(
               postCreateInput(fixture, postId, "Feedback to delete")
             )
             .pipe(Effect.provideService(CurrentSession, session));
 
           const memberOnlyError = yield* Effect.flip(
             handlers
-              .PostDelete({
+              .DeletePost({
                 id: postId,
                 organizationId: fixture.organizationId,
                 boardId: fixture.boardId,
@@ -1887,7 +1887,7 @@ describe("PostRpcHandlers", () => {
           expect(memberOnlyError._tag).toBe("PolicyDenied");
 
           yield* handlers
-            .PostDeletePublic({
+            .DeletePostPublic({
               id: postId,
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
@@ -1895,7 +1895,7 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, session));
 
           const posts = yield* handlers
-            .PostListPublic({
+            .ListPostsPublic({
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
             })
@@ -1915,7 +1915,7 @@ describe("PostRpcHandlers", () => {
           const db = yield* currentDb;
 
           yield* handlers
-            .PostCreatePublic(
+            .CreatePostPublic(
               postCreateInput(fixture, postId, "Feedback with another vote")
             )
             .pipe(Effect.provideService(CurrentSession, session));
@@ -1937,7 +1937,7 @@ describe("PostRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .PostDeletePublic({
+              .DeletePostPublic({
                 id: postId,
                 organizationId: fixture.organizationId,
                 boardId: fixture.boardId,
@@ -1958,7 +1958,7 @@ describe("PostRpcHandlers", () => {
           const db = yield* currentDb;
 
           yield* handlers
-            .PostCreatePublic(
+            .CreatePostPublic(
               postCreateInput(fixture, postId, "Feedback with a comment")
             )
             .pipe(Effect.provideService(CurrentSession, session));
@@ -1978,7 +1978,7 @@ describe("PostRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .PostDeletePublic({
+              .DeletePostPublic({
                 id: postId,
                 organizationId: fixture.organizationId,
                 boardId: fixture.boardId,
@@ -1991,7 +1991,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostAdminUpdate", () => {
+    describe("AdminUpdatePost", () => {
       it.effect("allows managers to moderate posts", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -1999,7 +1999,7 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(
+            .CreatePost(
               postCreateInput(
                 fixture,
                 postId,
@@ -2010,7 +2010,7 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           yield* handlers
-            .PostAdminUpdate({
+            .AdminUpdatePost({
               id: postId,
               organizationId: fixture.organizationId,
               locked: true,
@@ -2023,7 +2023,7 @@ describe("PostRpcHandlers", () => {
             );
 
           const [post] = yield* handlers
-            .PostListPublic({
+            .ListPostsPublic({
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
             })
@@ -2034,7 +2034,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostSuggestions", () => {
+    describe("GetPostSuggestions", () => {
       it.effect("does not await embedding generation in the handler", () =>
         Effect.gen(function* () {
           let embedCalls = 0;
@@ -2054,7 +2054,7 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Embedded feedback"))
+            .CreatePost(postCreateInput(fixture, postId, "Embedded feedback"))
             .pipe(
               Effect.provideService(CurrentSession, makeSession(fixture)),
               // The write path reads its optional embedding service from the
@@ -2093,7 +2093,7 @@ describe("PostRpcHandlers", () => {
           );
 
           yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Old title"))
+            .CreatePost(postCreateInput(fixture, postId, "Old title"))
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           yield* repository.update({
             ...postCreateInput(fixture, postId, "Current title"),
@@ -2137,7 +2137,7 @@ describe("PostRpcHandlers", () => {
             [farPostId, "Far vector"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
@@ -2171,7 +2171,7 @@ describe("PostRpcHandlers", () => {
             })
           );
           const suggestions = yield* semanticHandlers
-            .PostSuggestions({
+            .GetPostSuggestions({
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
               title: "Semantic query",
@@ -2208,7 +2208,7 @@ describe("PostRpcHandlers", () => {
             [unrelatedPostId, "Unrelated vector"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
@@ -2243,7 +2243,7 @@ describe("PostRpcHandlers", () => {
             })
           );
           const suggestions = yield* semanticHandlers
-            .PostSuggestions({
+            .GetPostSuggestions({
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
               title: "Semantic query",
@@ -2264,7 +2264,7 @@ describe("PostRpcHandlers", () => {
           const unrelatedPostId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(
+            .CreatePost(
               postCreateInput(
                 fixture,
                 billingPostId,
@@ -2274,7 +2274,7 @@ describe("PostRpcHandlers", () => {
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           yield* handlers
-            .PostCreate(
+            .CreatePost(
               postCreateInput(
                 fixture,
                 unrelatedPostId,
@@ -2285,7 +2285,7 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const suggestions = yield* handlers
-            .PostSuggestions({
+            .GetPostSuggestions({
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
               title: "Annual billing",
@@ -2308,7 +2308,7 @@ describe("PostRpcHandlers", () => {
             const privatePostId = yield* PostId.generate;
 
             yield* handlers
-              .PostCreate(
+              .CreatePost(
                 postCreateInput(
                   fixture,
                   publicPostId,
@@ -2320,7 +2320,7 @@ describe("PostRpcHandlers", () => {
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
             yield* handlers
-              .PostCreate({
+              .CreatePost({
                 ...postCreateInput(
                   fixture,
                   privatePostId,
@@ -2334,7 +2334,7 @@ describe("PostRpcHandlers", () => {
               );
 
             const suggestions = yield* handlers
-              .PostSuggestionsPublic({
+              .GetPostSuggestionsPublic({
                 organizationId: fixture.organizationId,
                 title: "Export reports",
                 content: "CSV reports",
@@ -2348,7 +2348,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostMerge", () => {
+    describe("MergePost", () => {
       it.effect("records the paid merge email intent atomically", () =>
         Effect.gen(function* () {
           const db = yield* currentDb;
@@ -2362,13 +2362,13 @@ describe("PostRpcHandlers", () => {
             [targetPostId, "Target"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
           }
           yield* handlers
-            .PostMerge({
+            .MergePost({
               organizationId: fixture.organizationId,
               sourcePostId,
               targetPostId,
@@ -2400,7 +2400,7 @@ describe("PostRpcHandlers", () => {
             const postId = yield* PostId.generate;
             const error = yield* Effect.flip(
               handlers
-                .PostMerge({
+                .MergePost({
                   organizationId: fixture.organizationId,
                   sourcePostId: postId,
                   targetPostId: postId,
@@ -2433,14 +2433,14 @@ describe("PostRpcHandlers", () => {
             [thirdPostId, "Third feedback"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
           }
 
           yield* handlers
-            .PostMerge({
+            .MergePost({
               organizationId: fixture.organizationId,
               sourcePostId: firstPostId,
               targetPostId: secondPostId,
@@ -2452,7 +2452,7 @@ describe("PostRpcHandlers", () => {
           // unmerging `secondPostId` could never restore `firstPostId`.
           const error = yield* Effect.flip(
             handlers
-              .PostMerge({
+              .MergePost({
                 organizationId: fixture.organizationId,
                 sourcePostId: secondPostId,
                 targetPostId: thirdPostId,
@@ -2469,7 +2469,7 @@ describe("PostRpcHandlers", () => {
           // is barred from having children, so another duplicate can still be
           // folded into `secondPostId`.
           yield* handlers
-            .PostMerge({
+            .MergePost({
               organizationId: fixture.organizationId,
               sourcePostId: thirdPostId,
               targetPostId: secondPostId,
@@ -2507,14 +2507,14 @@ describe("PostRpcHandlers", () => {
             [targetPostId, "Target feedback"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
           }
 
           yield* handlers
-            .PostMerge({
+            .MergePost({
               organizationId: fixture.organizationId,
               sourcePostId,
               targetPostId,
@@ -2524,7 +2524,7 @@ describe("PostRpcHandlers", () => {
           // Merge bookkeeping is internal state; the membership-gated list
           // still returns archived/merged rows (the public list filters them).
           const posts = yield* handlers
-            .PostList({
+            .ListPosts({
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
             })
@@ -2550,7 +2550,7 @@ describe("PostRpcHandlers", () => {
             [targetPostId, "Target feedback"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
@@ -2659,7 +2659,7 @@ describe("PostRpcHandlers", () => {
           ]);
 
           yield* handlers
-            .PostMerge({
+            .MergePost({
               organizationId: fixture.organizationId,
               sourcePostId,
               targetPostId,
@@ -2799,7 +2799,7 @@ describe("PostRpcHandlers", () => {
               [targetPostId, "Target feedback"],
             ] as const) {
               yield* handlers
-                .PostCreate(postCreateInput(fixture, id, title))
+                .CreatePost(postCreateInput(fixture, id, title))
                 .pipe(
                   Effect.provideService(CurrentSession, makeSession(fixture))
                 );
@@ -2828,7 +2828,7 @@ describe("PostRpcHandlers", () => {
             ]);
 
             yield* handlers
-              .PostMerge({
+              .MergePost({
                 organizationId: fixture.organizationId,
                 sourcePostId,
                 targetPostId,
@@ -2871,7 +2871,7 @@ describe("PostRpcHandlers", () => {
               [targetPostId, "Target feedback"],
             ] as const) {
               yield* handlers
-                .PostCreate(postCreateInput(fixture, id, title))
+                .CreatePost(postCreateInput(fixture, id, title))
                 .pipe(
                   Effect.provideService(CurrentSession, makeSession(fixture))
                 );
@@ -2900,7 +2900,7 @@ describe("PostRpcHandlers", () => {
             });
 
             yield* handlers
-              .PostMerge({
+              .MergePost({
                 organizationId: fixture.organizationId,
                 sourcePostId,
                 targetPostId,
@@ -2909,7 +2909,7 @@ describe("PostRpcHandlers", () => {
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
             yield* handlers
-              .PostUnmerge({
+              .UnmergePost({
                 organizationId: fixture.organizationId,
                 sourcePostId,
               })
@@ -2971,7 +2971,7 @@ describe("PostRpcHandlers", () => {
               [targetPostId, "Target feedback"],
             ] as const) {
               yield* handlers
-                .PostCreate(postCreateInput(fixture, id, title))
+                .CreatePost(postCreateInput(fixture, id, title))
                 .pipe(
                   Effect.provideService(CurrentSession, makeSession(fixture))
                 );
@@ -3059,7 +3059,7 @@ describe("PostRpcHandlers", () => {
             });
 
             yield* handlers
-              .PostMerge({
+              .MergePost({
                 organizationId: fixture.organizationId,
                 sourcePostId,
                 targetPostId,
@@ -3068,7 +3068,7 @@ describe("PostRpcHandlers", () => {
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
             yield* handlers
-              .PostUnmerge({
+              .UnmergePost({
                 organizationId: fixture.organizationId,
                 sourcePostId,
               })
@@ -3163,7 +3163,7 @@ describe("PostRpcHandlers", () => {
               [targetPostId, "Target feedback"],
             ] as const) {
               yield* handlers
-                .PostCreate(postCreateInput(fixture, id, title))
+                .CreatePost(postCreateInput(fixture, id, title))
                 .pipe(
                   Effect.provideService(CurrentSession, makeSession(fixture))
                 );
@@ -3193,7 +3193,7 @@ describe("PostRpcHandlers", () => {
             ]);
 
             yield* handlers
-              .PostMerge({
+              .MergePost({
                 organizationId: fixture.organizationId,
                 sourcePostId,
                 targetPostId,
@@ -3211,7 +3211,7 @@ describe("PostRpcHandlers", () => {
             expect(mergedSourceUpvotes).toEqual([{ id: sourceUpvoteId }]);
 
             yield* handlers
-              .PostUnmerge({
+              .UnmergePost({
                 organizationId: fixture.organizationId,
                 sourcePostId,
               })
@@ -3257,7 +3257,7 @@ describe("PostRpcHandlers", () => {
               [targetPostId, "Target feedback"],
             ] as const) {
               yield* handlers
-                .PostCreate(postCreateInput(fixture, id, title))
+                .CreatePost(postCreateInput(fixture, id, title))
                 .pipe(
                   Effect.provideService(CurrentSession, makeSession(fixture))
                 );
@@ -3305,7 +3305,7 @@ describe("PostRpcHandlers", () => {
             });
 
             yield* handlers
-              .PostMerge({
+              .MergePost({
                 organizationId: fixture.organizationId,
                 sourcePostId,
                 targetPostId,
@@ -3325,7 +3325,7 @@ describe("PostRpcHandlers", () => {
             // and does not orphan it: the child returns to its board with the
             // engagement that had been carried onto the survivor.
             yield* handlers
-              .PostDelete({
+              .DeletePost({
                 boardId: fixture.boardId,
                 id: targetPostId,
                 organizationId: fixture.organizationId,
@@ -3429,14 +3429,14 @@ describe("PostRpcHandlers", () => {
             [targetPostId, "Target feedback"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
           }
 
           yield* handlers
-            .PostMerge({
+            .MergePost({
               organizationId: fixture.organizationId,
               sourcePostId,
               targetPostId,
@@ -3445,7 +3445,7 @@ describe("PostRpcHandlers", () => {
 
           const titleError = yield* Effect.flip(
             handlers
-              .PostUpdateTitle({
+              .UpdatePostTitle({
                 boardId: fixture.boardId,
                 id: sourcePostId,
                 organizationId: fixture.organizationId,
@@ -3457,7 +3457,7 @@ describe("PostRpcHandlers", () => {
 
           const etaError = yield* Effect.flip(
             handlers
-              .PostUpdateEta({
+              .UpdatePostEta({
                 etaQuarter: "2026-Q1",
                 id: sourcePostId,
                 organizationId: fixture.organizationId,
@@ -3468,7 +3468,7 @@ describe("PostRpcHandlers", () => {
 
           const adminError = yield* Effect.flip(
             handlers
-              .PostAdminUpdate({
+              .AdminUpdatePost({
                 id: sourcePostId,
                 locked: true,
                 organizationId: fixture.organizationId,
@@ -3492,7 +3492,7 @@ describe("PostRpcHandlers", () => {
             [targetPostId, "Target feedback"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
@@ -3594,7 +3594,7 @@ describe("PostRpcHandlers", () => {
           ]);
 
           yield* handlers
-            .PostMerge({
+            .MergePost({
               organizationId: fixture.organizationId,
               sourcePostId,
               targetPostId,
@@ -3677,14 +3677,14 @@ describe("PostRpcHandlers", () => {
             [targetPostId, "Target feedback"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
           }
 
           yield* handlers
-            .PostMerge({
+            .MergePost({
               organizationId: fixture.organizationId,
               sourcePostId,
               targetPostId,
@@ -3728,14 +3728,14 @@ describe("PostRpcHandlers", () => {
             [targetPostId, "Target feedback"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
           }
 
           yield* handlers
-            .PostMerge({
+            .MergePost({
               organizationId: fixture.organizationId,
               sourcePostId,
               targetPostId,
@@ -3782,7 +3782,7 @@ describe("PostRpcHandlers", () => {
             [targetPostId, "Target feedback"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
@@ -3807,7 +3807,7 @@ describe("PostRpcHandlers", () => {
           });
 
           yield* handlers
-            .PostMerge({
+            .MergePost({
               organizationId: fixture.organizationId,
               sourcePostId,
               targetPostId,
@@ -3846,7 +3846,7 @@ describe("PostRpcHandlers", () => {
               [targetPostId, "Target feedback"],
             ] as const) {
               yield* handlers
-                .PostCreate(postCreateInput(fixture, id, title))
+                .CreatePost(postCreateInput(fixture, id, title))
                 .pipe(
                   Effect.provideService(CurrentSession, makeSession(fixture))
                 );
@@ -3878,7 +3878,7 @@ describe("PostRpcHandlers", () => {
             ]);
 
             yield* handlers
-              .PostMerge({
+              .MergePost({
                 organizationId: fixture.organizationId,
                 sourcePostId,
                 targetPostId,
@@ -3918,14 +3918,14 @@ describe("PostRpcHandlers", () => {
               [targetPostId, "Target feedback"],
             ] as const) {
               yield* handlers
-                .PostCreate(postCreateInput(fixture, id, title))
+                .CreatePost(postCreateInput(fixture, id, title))
                 .pipe(
                   Effect.provideService(CurrentSession, makeSession(fixture))
                 );
             }
 
             yield* handlers
-              .PostMerge({
+              .MergePost({
                 organizationId: fixture.organizationId,
                 sourcePostId,
                 targetPostId,
@@ -3935,7 +3935,7 @@ describe("PostRpcHandlers", () => {
               );
 
             yield* handlers
-              .PostUnmerge({
+              .UnmergePost({
                 organizationId: fixture.organizationId,
                 sourcePostId,
               })
@@ -3988,7 +3988,7 @@ describe("PostRpcHandlers", () => {
             const postId = yield* PostId.generate;
 
             yield* handlers
-              .PostCreate(
+              .CreatePost(
                 postCreateInput(fixture, postId, "Not merged feedback")
               )
               .pipe(
@@ -3997,7 +3997,7 @@ describe("PostRpcHandlers", () => {
 
             const error = yield* Effect.flip(
               handlers
-                .PostUnmerge({
+                .UnmergePost({
                   organizationId: fixture.organizationId,
                   sourcePostId: postId,
                 })
@@ -4013,7 +4013,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostMerge notifications", () => {
+    describe("MergePost notifications", () => {
       layer(
         Layer.merge(
           TestLayer,
@@ -4035,7 +4035,7 @@ describe("PostRpcHandlers", () => {
               [targetPostId, "Target feedback"],
             ] as const) {
               yield* handlers
-                .PostCreate(postCreateInput(fixture, id, title))
+                .CreatePost(postCreateInput(fixture, id, title))
                 .pipe(
                   Effect.provideService(CurrentSession, makeSession(fixture))
                 );
@@ -4076,7 +4076,7 @@ describe("PostRpcHandlers", () => {
             });
 
             yield* handlers
-              .PostMerge({
+              .MergePost({
                 organizationId: fixture.organizationId,
                 sourcePostId,
                 targetPostId,
@@ -4150,7 +4150,7 @@ describe("PostRpcHandlers", () => {
               [targetPostId, "Target feedback"],
             ] as const) {
               yield* handlers
-                .PostCreate(postCreateInput(fixture, id, title))
+                .CreatePost(postCreateInput(fixture, id, title))
                 .pipe(
                   Effect.provideService(CurrentSession, makeSession(fixture))
                 );
@@ -4190,7 +4190,7 @@ describe("PostRpcHandlers", () => {
             });
 
             yield* handlers
-              .PostMerge({
+              .MergePost({
                 organizationId: fixture.organizationId,
                 sourcePostId,
                 targetPostId,
@@ -4199,7 +4199,7 @@ describe("PostRpcHandlers", () => {
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
             yield* handlers
-              .PostUnmerge({
+              .UnmergePost({
                 organizationId: fixture.organizationId,
                 sourcePostId,
               })
@@ -4266,7 +4266,7 @@ describe("PostRpcHandlers", () => {
             [targetPostId, "Target feedback"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
@@ -4275,7 +4275,7 @@ describe("PostRpcHandlers", () => {
           // The real policy has evaluated `isNotMerged` against the unmerged
           // row and is paused before the update enters its transaction.
           const updateFiber = yield* handlers
-            .PostUpdateTitle({
+            .UpdatePostTitle({
               boardId: fixture.boardId,
               id: sourcePostId,
               organizationId: fixture.organizationId,
@@ -4290,7 +4290,7 @@ describe("PostRpcHandlers", () => {
           // A concurrent merge commits while the update waits, so the policy
           // result the update carries is stale.
           yield* handlers
-            .PostMerge({
+            .MergePost({
               organizationId: fixture.organizationId,
               sourcePostId,
               targetPostId,
@@ -4331,7 +4331,7 @@ describe("PostRpcHandlers", () => {
             [targetPostId, "Target feedback"],
           ] as const) {
             yield* handlers
-              .PostCreate(postCreateInput(fixture, id, title))
+              .CreatePost(postCreateInput(fixture, id, title))
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
@@ -4340,7 +4340,7 @@ describe("PostRpcHandlers", () => {
           // Same race as above, through the ETA handler's own locked
           // transaction (`canUpdateEta` policy path).
           const updateFiber = yield* handlers
-            .PostUpdateEta({
+            .UpdatePostEta({
               id: sourcePostId,
               organizationId: fixture.organizationId,
               etaQuarter: "2026-Q3",
@@ -4355,7 +4355,7 @@ describe("PostRpcHandlers", () => {
           yield* Deferred.await(gate.policyEvaluated);
 
           yield* handlers
-            .PostMerge({
+            .MergePost({
               organizationId: fixture.organizationId,
               sourcePostId,
               targetPostId,

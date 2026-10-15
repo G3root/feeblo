@@ -23,7 +23,7 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
   const boardPolicy = yield* BoardPolicy;
   // const sitePolicy = yield* SitePolicy;
   return {
-    BoardList: (args: TBoardList) =>
+    ListBoards: (args: TBoardList) =>
       repository
         .findMany({
           organizationId: args.organizationId,
@@ -32,7 +32,7 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Board", "select")
         ),
-    BoardListPublic: (args: TBoardList) =>
+    ListBoardsPublic: (args: TBoardList) =>
       repository
         .findMany({
           organizationId: args.organizationId,
@@ -40,12 +40,12 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
         })
         .pipe(
           RateLimit.withPublicRpcRateLimit({
-            name: "BoardListPublic",
+            name: "ListBoardsPublic",
             level: "read",
           }),
           withRemapDbErrors("Board", "select")
         ),
-    BoardDelete: (args: TBoardDelete) => {
+    DeleteBoard: (args: TBoardDelete) => {
       return repository
         .delete({
           id: args.id,
@@ -61,7 +61,7 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Board", "delete")
         );
     },
-    BoardCreate: (args: TBoardCreate) => {
+    CreateBoard: (args: TBoardCreate) => {
       return Effect.gen(function* () {
         const session = yield* CurrentSession;
         const isMember = session.memberships.find(
@@ -89,7 +89,7 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Board", "create")
       );
     },
-    BoardUpdate: (args: TBoardUpdate) =>
+    UpdateBoard: (args: TBoardUpdate) =>
       Effect.gen(function* () {
         const currentBoard = yield* repository.getById({
           id: args.id,

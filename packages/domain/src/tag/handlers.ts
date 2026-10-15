@@ -71,7 +71,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
   const postActivityRepository = yield* PostActivityRepository;
 
   return {
-    TagList: (args: TTagList) =>
+    ListTags: (args: TTagList) =>
       repository
         .findMany(args)
         .pipe(
@@ -79,7 +79,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Tag", "select")
         ),
 
-    TagListPublic: (args: TTagList) =>
+    ListTagsPublic: (args: TTagList) =>
       repository
         .findManyPublic({
           organizationId: args.organizationId,
@@ -87,13 +87,13 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         })
         .pipe(
           RateLimit.withPublicRpcRateLimit({
-            name: "TagListPublic",
+            name: "ListTagsPublic",
             level: "read",
           }),
           withRemapDbErrors("Tag", "select")
         ),
 
-    PostTagList: (args: TPostTagList) =>
+    ListPostTags: (args: TPostTagList) =>
       repository
         .findPostTags(args)
         .pipe(
@@ -101,16 +101,16 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Tag", "select")
         ),
 
-    PostTagListPublic: (args: TPostTagList) =>
+    ListPostTagsPublic: (args: TPostTagList) =>
       repository.findPostTags(args, { publicOnly: true }).pipe(
         RateLimit.withPublicRpcRateLimit({
-          name: "PostTagListPublic",
+          name: "ListPostTagsPublic",
           level: "read",
         }),
         withRemapDbErrors("Tag", "select")
       ),
 
-    TagCreate: (args: TTagCreate) =>
+    CreateTag: (args: TTagCreate) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = session.memberships.find(
@@ -127,7 +127,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Tag", "create")
       ),
 
-    TagUpdate: (args: TTagUpdate) =>
+    UpdateTag: (args: TTagUpdate) =>
       repository.update(args).pipe(
         Effect.asVoid,
         Policy.withPolicy(
@@ -139,7 +139,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Tag", "update")
       ),
 
-    TagDelete: (args: TTagDelete) =>
+    DeleteTag: (args: TTagDelete) =>
       repository.delete(args).pipe(
         Effect.asVoid,
         Policy.withPolicy(
@@ -151,7 +151,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Tag", "delete")
       ),
 
-    PostTagSet: (args: TPostTagSet) =>
+    SetPostTags: (args: TPostTagSet) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);

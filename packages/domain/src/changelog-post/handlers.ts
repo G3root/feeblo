@@ -24,7 +24,7 @@ export const ChangelogPostRpcHandlersEffect = Effect.gen(function* () {
   const sitePolicy = yield* SitePolicy;
 
   return {
-    ChangelogPostList: (args: TChangelogPostList) =>
+    ListChangelogPosts: (args: TChangelogPostList) =>
       repository
         .findMany(args)
         .pipe(
@@ -32,10 +32,10 @@ export const ChangelogPostRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("ChangelogPost", "select")
         ),
 
-    ChangelogPostListPublic: (args: TChangelogPostList) =>
+    ListChangelogPostsPublic: (args: TChangelogPostList) =>
       repository.findManyPublished(args).pipe(
         RateLimit.withPublicRpcRateLimit({
-          name: "ChangelogPostListPublic",
+          name: "ListChangelogPostsPublic",
           level: "read",
         }),
         Policy.withPublicPolicy(
@@ -44,7 +44,7 @@ export const ChangelogPostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("ChangelogPost", "select")
       ),
 
-    ChangelogPostCreate: (args: TChangelogPostCreate) =>
+    CreateChangelogPost: (args: TChangelogPostCreate) =>
       Effect.gen(function* () {
         const eligible = yield* repository.findEligible(args);
         if (eligible.length === 0) {
@@ -67,7 +67,7 @@ export const ChangelogPostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("ChangelogPost", "create")
       ),
 
-    ChangelogPostDelete: (args: TChangelogPostDelete) =>
+    DeleteChangelogPost: (args: TChangelogPostDelete) =>
       repository.delete(args).pipe(
         Policy.withPolicy(
           changelogPolicy.canUpdate({

@@ -37,7 +37,7 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
   // kind only).
 
   const listRead = defineSurfacePair<TPostStatusList, PostStatusRpcTag>()({
-    operation: "PostStatusList",
+    operation: "ListPostStatuses",
     remap: { action: "select", entity: "PostStatus" },
     dashboard: {
       rateLimit: undefined,
@@ -54,9 +54,9 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
   );
 
   return {
-    PostStatusList: listStatuses.dashboard,
-    PostStatusListPublic: listStatuses.public,
-    PostStatusCreate: (args: TPostStatusCreate) =>
+    ListPostStatuses: listStatuses.dashboard,
+    ListPostStatusesPublic: listStatuses.public,
+    CreatePostStatus: (args: TPostStatusCreate) =>
       repository.create(args).pipe(
         Policy.withPolicy(manage(args.organizationId)),
         withRemapDbErrors({
@@ -74,35 +74,35 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
             }),
         })
       ),
-    PostStatusUpdate: (args: TPostStatusUpdate) =>
+    UpdatePostStatus: (args: TPostStatusUpdate) =>
       repository
         .update(args)
         .pipe(
           Policy.withPolicy(manage(args.organizationId)),
           withRemapDbErrors("PostStatus", "update")
         ),
-    PostStatusMakeDefault: (args: TPostStatusMakeDefault) =>
+    SetPostStatusDefault: (args: TPostStatusMakeDefault) =>
       repository
         .makeDefault(args)
         .pipe(
           Policy.withPolicy(manage(args.organizationId)),
           withRemapDbErrors("PostStatus", "update")
         ),
-    PostStatusDelete: (args: TPostStatusDelete) =>
+    DeletePostStatus: (args: TPostStatusDelete) =>
       repository
         .delete(args)
         .pipe(
           Policy.withPolicy(manage(args.organizationId)),
           withRemapDbErrors("PostStatus", "delete")
         ),
-    PostStatusDeletePreview: (args: TPostStatusDeletePreview) =>
+    PreviewPostStatusDelete: (args: TPostStatusDeletePreview) =>
       repository
         .previewDelete(args)
         .pipe(
           Policy.withPolicy(manage(args.organizationId)),
           withRemapDbErrors("PostStatus", "select")
         ),
-    PostStatusReorder: (args: TPostStatusReorder) =>
+    ReorderPostStatuses: (args: TPostStatusReorder) =>
       repository
         .reorder(args)
         .pipe(

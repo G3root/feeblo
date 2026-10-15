@@ -11,7 +11,7 @@ export const PostActivityRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostActivityRepository;
 
   return {
-    PostActivityList: (args: TPostActivityList) =>
+    ListPostActivities: (args: TPostActivityList) =>
       repository
         .findMany({
           organizationId: args.organizationId,

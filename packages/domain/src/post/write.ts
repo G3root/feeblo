@@ -883,7 +883,7 @@ const makePostWriteService = Effect.gen(function* () {
         // Re-attribution is part of the same transaction as the field writes,
         // so a `PATCH` that names a title and an author is atomic: either the
         // post and its timeline both move or neither does. The dashboard's
-        // `PostUpdateAuthor` RPC is this branch with no other field named.
+        // `UpdatePostAuthor` RPC is this branch with no other field named.
         if (args.author !== undefined) {
           const subject = yield* resolveOnBehalfSubject({
             organizationId: args.organizationId,
@@ -1122,7 +1122,7 @@ const makePostWriteService = Effect.gen(function* () {
           });
           // Deleting a survivor reverts its merged children so the FK cannot
           // block the delete and no post is orphaned. Record the reversal on
-          // each child's timeline, mirroring `PostUnmerge`.
+          // each child's timeline, mirroring `UnmergePost`.
           if (outcome.restoredChildren.length > 0) {
             yield* activityRepository.createMany(
               outcome.restoredChildren.map((child) => ({

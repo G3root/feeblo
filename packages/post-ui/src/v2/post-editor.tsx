@@ -385,14 +385,14 @@ export function PostContentUpdateInput() {
     mutationFn: async ({ assetIds, content }) => {
       await fetchRpc((rpc) =>
         pageType === "Dashboard"
-          ? rpc.PostUpdateContent({
+          ? rpc.UpdatePostContent({
               id: post.id,
               boardId: post.boardId,
               organizationId,
               content,
               assetIds,
             })
-          : rpc.PostUpdateContentPublic({
+          : rpc.UpdatePostContentPublic({
               id: post.id,
               boardId: post.boardId,
               organizationId,

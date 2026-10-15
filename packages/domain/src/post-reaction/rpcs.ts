@@ -9,12 +9,12 @@ import { PostReactionServiceErrors } from "./errors";
 import { PostReaction, PostReactionList, PostReactionToggle } from "./schema";
 
 export class PostReactionRpcs extends RpcGroup.make(
-  Rpc.make("PostReactionList", {
+  Rpc.make("ListPostReactions", {
     payload: PostReactionList,
     success: Schema.Array(PostReaction),
     error: PostReactionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("PostReactionToggle", {
+  Rpc.make("TogglePostReaction", {
     payload: PostReactionToggle,
     success: Schema.Struct({
       reacted: Schema.Boolean,
@@ -23,14 +23,14 @@ export class PostReactionRpcs extends RpcGroup.make(
     error: PostReactionServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("PostReactionListPublic", {
+  Rpc.make("ListPostReactionsPublic", {
     payload: PostReactionList,
     success: Schema.Array(PostReaction),
     error: Schema.Union([PostReactionServiceErrors, RateLimitErrors]),
   })
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("PostReactionTogglePublic", {
+  Rpc.make("TogglePostReactionPublic", {
     payload: PostReactionToggle,
     success: Schema.Struct({
       reacted: Schema.Boolean,

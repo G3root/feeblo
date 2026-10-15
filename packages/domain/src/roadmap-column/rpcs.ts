@@ -13,27 +13,27 @@ import {
   StatusRoadmapColumn,
 } from "./schema";
 export class RoadmapColumnRpcs extends RpcGroup.make(
-  Rpc.make("RoadmapColumnList", {
+  Rpc.make("ListRoadmapColumns", {
     success: S.Array(StatusRoadmapColumn),
     payload: RoadmapColumnList,
     error: RoadmapColumnServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("RoadmapColumnListPublic", {
+  Rpc.make("ListRoadmapColumnsPublic", {
     success: S.Array(StatusRoadmapColumn),
     payload: RoadmapColumnList,
     error: S.Union([RoadmapColumnServiceErrors, RateLimitErrors]),
   }).middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("RoadmapColumnCreate", {
+  Rpc.make("CreateRoadmapColumn", {
     success: S.Void,
     payload: RoadmapColumnCreate,
     error: RoadmapColumnServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("RoadmapColumnUpdate", {
+  Rpc.make("UpdateRoadmapColumn", {
     success: S.Void,
     payload: RoadmapColumnUpdate,
     error: RoadmapColumnServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("RoadmapColumnDelete", {
+  Rpc.make("DeleteRoadmapColumn", {
     success: S.Void,
     payload: RoadmapColumnDelete,
     error: RoadmapColumnServiceErrors,

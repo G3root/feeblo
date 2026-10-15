@@ -46,13 +46,13 @@ async function pickReaction(page: Page, scope?: Locator) {
 
 /**
  * Merges the currently viewed post into `targetTitle` through the dashboard
- * merge menu and waits for the `PostMerge` RPC. Leaves the browser on the
+ * merge menu and waits for the `MergePost` RPC. Leaves the browser on the
  * surviving post.
  */
 async function mergeCurrentPostInto(page: Page, targetTitle: string) {
   await page.getByRole("button", { name: "Merge post" }).click();
   await page.getByRole("menuitem", { name: "Merge to existing" }).click();
-  const mergeRpc = waitForRpc(page, "PostMerge");
+  const mergeRpc = waitForRpc(page, "MergePost");
   await page.getByRole("option", { name: targetTitle }).click();
   await page.getByRole("button", { name: "Merge posts" }).click();
   await mergeRpc;
@@ -252,7 +252,7 @@ test.describe("feedback workflow", () => {
     await expect(page.getByText("Merge", { exact: true })).toBeVisible();
     await expect(page.getByText("Close", { exact: true })).toBeVisible();
 
-    const mergeRpc = waitForRpc(page, "PostMerge");
+    const mergeRpc = waitForRpc(page, "MergePost");
     await page.getByRole("option", { name: sourceTitle }).click();
     // Merging is destructive, so it asks for confirmation first.
     await page.getByRole("button", { name: "Merge posts" }).click();
@@ -278,7 +278,7 @@ test.describe("feedback workflow", () => {
     await page.getByRole("button", { name: "Merge post" }).click();
     await page.getByRole("menuitem", { name: "Merge to existing" }).click();
 
-    const mergeRpc = waitForRpc(page, "PostMerge");
+    const mergeRpc = waitForRpc(page, "MergePost");
     await page.getByRole("option", { name: targetTitle }).click();
     await page.getByRole("button", { name: "Merge posts" }).click();
     await mergeRpc;
@@ -308,7 +308,7 @@ test.describe("feedback workflow", () => {
     await page.getByRole("button", { name: "Merge post" }).click();
     await page.getByRole("menuitem", { name: "Merge to existing" }).click();
 
-    const mergeRpc = waitForRpc(page, "PostMerge");
+    const mergeRpc = waitForRpc(page, "MergePost");
     await page.getByRole("option", { name: targetTitle }).click();
     await page.getByRole("button", { name: "Merge posts" }).click();
     await mergeRpc;
@@ -339,7 +339,7 @@ test.describe("feedback workflow", () => {
     await page.getByRole("button", { name: "Merge post" }).click();
     await page.getByRole("menuitem", { name: "Merge to existing" }).click();
 
-    const mergeRpc = waitForRpc(page, "PostMerge");
+    const mergeRpc = waitForRpc(page, "MergePost");
     await page.getByRole("option", { name: targetTitle }).click();
     await page.getByRole("button", { name: "Merge posts" }).click();
     await mergeRpc;
@@ -369,7 +369,7 @@ test.describe("feedback workflow", () => {
 
     await page.getByRole("button", { name: "Merge post" }).click();
     await page.getByRole("menuitem", { name: "Merge to existing" }).click();
-    const mergeRpc = waitForRpc(page, "PostMerge");
+    const mergeRpc = waitForRpc(page, "MergePost");
     await page.getByRole("option", { name: targetTitle }).click();
     await page.getByRole("button", { name: "Merge posts" }).click();
     await mergeRpc;
@@ -388,7 +388,7 @@ test.describe("feedback workflow", () => {
     await openPost(page, targetTitle);
     await page.getByRole("button", { name: "Merge post" }).click();
     await page.getByRole("menuitem", { name: "Unmerge a post" }).click();
-    const unmergeRpc = waitForRpc(page, "PostUnmerge");
+    const unmergeRpc = waitForRpc(page, "UnmergePost");
     await page.getByRole("option", { name: sourceTitle }).click();
     await unmergeRpc;
     await expect(page.getByText(`Restored "${sourceTitle}"`)).toBeVisible();
@@ -460,7 +460,7 @@ test.describe("feedback workflow", () => {
 
     // Upvote the duplicate before it is merged away, waiting for the toggle
     // to persist so the merge cannot race it.
-    const upvoteResponse = waitForRpc(page, "UpvoteToggle");
+    const upvoteResponse = waitForRpc(page, "ToggleUpvote");
     await page.getByRole("button", { name: "Upvote" }).click();
     await upvoteResponse;
     await expect(page.getByRole("button", { name: "Upvote" })).toContainText(
@@ -470,7 +470,7 @@ test.describe("feedback workflow", () => {
     await page.getByRole("button", { name: "Merge post" }).click();
     await page.getByRole("menuitem", { name: "Merge to existing" }).click();
 
-    const mergeRpc = waitForRpc(page, "PostMerge");
+    const mergeRpc = waitForRpc(page, "MergePost");
     await page.getByRole("option", { name: targetTitle }).click();
     await page.getByRole("button", { name: "Merge posts" }).click();
     await mergeRpc;
@@ -506,7 +506,7 @@ test.describe("feedback workflow", () => {
 
     await page.getByRole("button", { name: "Merge post" }).click();
     await page.getByRole("menuitem", { name: "Merge to existing" }).click();
-    const mergeRpc = waitForRpc(page, "PostMerge");
+    const mergeRpc = waitForRpc(page, "MergePost");
     await page.getByRole("option", { name: targetTitle }).click();
     await page.getByRole("button", { name: "Merge posts" }).click();
     await mergeRpc;
@@ -546,7 +546,7 @@ test.describe("feedback workflow", () => {
 
     await page.getByRole("button", { name: "Merge post" }).click();
     await page.getByRole("menuitem", { name: "Merge to existing" }).click();
-    const mergeRpc = waitForRpc(page, "PostMerge");
+    const mergeRpc = waitForRpc(page, "MergePost");
     await page.getByRole("option", { name: targetTitle }).click();
     await page.getByRole("button", { name: "Merge posts" }).click();
     await mergeRpc;
@@ -563,7 +563,7 @@ test.describe("feedback workflow", () => {
       page.getByRole("menuitem", { name: "Merge others to this" })
     ).toHaveCount(0);
 
-    const unmergeRpc = waitForRpc(page, "PostUnmerge");
+    const unmergeRpc = waitForRpc(page, "UnmergePost");
     await page.getByRole("menuitem", { name: "Unmerge this post" }).click();
     await unmergeRpc;
     await expect(page.getByText("Post unmerged")).toBeVisible();
@@ -725,7 +725,7 @@ test.describe("feedback workflow", () => {
     // Unmerge is the one action left, and it revives the post with its
     // comments still in place.
     await page.getByRole("button", { name: "Merge post" }).click();
-    const unmergeRpc = waitForRpc(page, "PostUnmerge");
+    const unmergeRpc = waitForRpc(page, "UnmergePost");
     await page.getByRole("menuitem", { name: "Unmerge this post" }).click();
     await unmergeRpc;
     await expect(page.getByText("Post unmerged")).toBeVisible();
@@ -792,7 +792,7 @@ test.describe("feedback workflow", () => {
     await page.getByRole("button", { name: "Delete post" }).click();
     const dialog = page.getByRole("alertdialog", { name: "Delete Post" });
     await expect(dialog).toBeVisible();
-    const deleted = waitForRpc(page, "PostDelete");
+    const deleted = waitForRpc(page, "DeletePost");
     await dialog.getByRole("button", { name: "Continue" }).click();
     await deleted;
     await expect(page.getByText("Post deleted successfully")).toBeVisible();
@@ -863,7 +863,7 @@ test.describe("feedback workflow", () => {
     await expect(unsubscribeButton).toBeVisible();
 
     // Unsubscribe, then re-subscribe.
-    const deleteRpc = waitForRpc(page, "PostSubscriptionDelete");
+    const deleteRpc = waitForRpc(page, "DeletePostSubscription");
     await unsubscribeButton.click();
     const subscribeButton = page.getByRole("button", {
       name: "Subscribe",
@@ -877,7 +877,7 @@ test.describe("feedback workflow", () => {
     await page.reload();
     await expect(subscribeButton).toBeVisible();
 
-    const createRpc = waitForRpc(page, "PostSubscriptionCreate");
+    const createRpc = waitForRpc(page, "CreatePostSubscription");
     await subscribeButton.click();
     await expect(unsubscribeButton).toBeVisible();
     await createRpc;
@@ -907,7 +907,7 @@ test.describe("feedback workflow", () => {
     const dialog = page.getByRole("alertdialog", { name: "Delete Post" });
     await expect(dialog).toBeVisible();
 
-    const deleted = waitForRpc(page, "PostDelete");
+    const deleted = waitForRpc(page, "DeletePost");
     await dialog.getByRole("button", { name: "Continue" }).click();
     await deleted;
 
@@ -948,7 +948,7 @@ test.describe("feedback workflow", () => {
       const deleteDialog = contributorPage.getByRole("alertdialog", {
         name: "Delete Post",
       });
-      const deleted = waitForRpc(contributorPage, "PostDelete");
+      const deleted = waitForRpc(contributorPage, "DeletePost");
       await deleteDialog.getByRole("button", { name: "Continue" }).click();
       await deleted;
       await expect(

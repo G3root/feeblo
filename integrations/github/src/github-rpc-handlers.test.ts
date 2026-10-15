@@ -133,7 +133,7 @@ describe("GitHubManagementRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .GitHubConnectStart({ organizationId })
+              .StartGitHubConnect({ organizationId })
               .pipe(
                 Effect.provideService(
                   CurrentSession,
@@ -165,7 +165,7 @@ describe("GitHubManagementRpcHandlers", () => {
           const organizationId = yield* seedWorkspace({ paid: true });
 
           const started = yield* handlers
-            .GitHubConnectStart({ organizationId })
+            .StartGitHubConnect({ organizationId })
             .pipe(
               Effect.provideService(CurrentSession, makeSession(organizationId))
             );

@@ -15,7 +15,7 @@ Because the two copies were independent, they drifted:
 | --- | --- | --- | --- | --- |
 | 1 | `hasRole(role)` had **no org scope** | "user is admin anywhere → show admin UI" | roles are always org-scoped | An admin of org A saw admin UI inside org B |
 | 2 | Board menu gated by `hasOwnerOrAdminRole` | board creator (member) sees no menu | `BoardPolicy.canUpdate/canDelete` = manage **OR board creator** | UI hid actions the backend allows |
-| 3 | Post lock/archive/merge gated by `canManagePost` (manage **or** author) | post author sees lock/merge | `PostAdminUpdate`/`PostMerge` = `posts.*` (manager+) | UI showed actions the backend rejects (403) |
+| 3 | Post lock/archive/merge gated by `canManagePost` (manage **or** author) | post author sees lock/merge | `AdminUpdatePost`/`MergePost` = `posts.*` (manager+) | UI showed actions the backend rejects (403) |
 | 4 | Changelog editor gated by creator-only | owner/admin sees read-only editor for others' entries | `ChangelogPolicy.canUpdate` = manage **or** creator | UI blocked actions the backend allows |
 | 5 | Role literal duplicated | `"owner" \| "admin" \| "member"` typed by hand in ~6 places | same literal, hand-typed | Adding a role meant touching every site |
 
@@ -177,7 +177,7 @@ The DB `member.role` column is `text` (not an enum), so the rename is a data mig
 5. Roadmap pages use `roadmap.*` instead of the generic owner/admin gate.
 6. Managers can delete other users' comments through `comments.*`.
 
-**Manager-only operations are enforced on the backend, not just in the UI.** The board/changelog/tag/contact/company create/update policies check named permissions instead of bare `hasMembership`, so direct RPC calls from a contributor are rejected with `PolicyDenied`. Frontend mirrors gate the same actions (`CreateBoardButton`, changelog “New Entry”, tag/contact/company rows) so contributors never see actions that would 403. `TagList` now returns `creatorId` so the tag rename/delete menu keeps the creator fallback, matching `TagPolicy.canUpdate`/`canDelete`.
+**Manager-only operations are enforced on the backend, not just in the UI.** The board/changelog/tag/contact/company create/update policies check named permissions instead of bare `hasMembership`, so direct RPC calls from a contributor are rejected with `PolicyDenied`. Frontend mirrors gate the same actions (`CreateBoardButton`, changelog “New Entry”, tag/contact/company rows) so contributors never see actions that would 403. `ListTags` now returns `creatorId` so the tag rename/delete menu keeps the creator fallback, matching `TagPolicy.canUpdate`/`canDelete`.
 
 ## Rules of thumb for new code
 

@@ -58,7 +58,7 @@ type NameLookup = ReadonlyMap<string, string>;
 /**
  * Provenance payload recorded by on-behalf actions
  * (`packages/domain/src/post-activity/repository.ts#PostActivityMetadata`).
- * `PostActivityList` returns `metadata` (nullable; null for every
+ * `ListPostActivities` returns `metadata` (nullable; null for every
  * pre-on-behalf row), so on-behalf rows render "on behalf of {subject}"
  * once the subject's contact is in the local collection.
  */

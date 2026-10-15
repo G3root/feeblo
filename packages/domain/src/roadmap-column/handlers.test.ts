@@ -137,7 +137,7 @@ describe("RoadmapColumnRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* RoadmapColumnRpcHandlersEffect;
         const fixture = yield* makeFixture("PUBLIC");
-        const columns = yield* handlers.RoadmapColumnListPublic({
+        const columns = yield* handlers.ListRoadmapColumnsPublic({
           organizationId: fixture.organizationId,
         });
         expect(columns).toMatchObject([{ id: fixture.columnId }]);
@@ -148,7 +148,7 @@ describe("RoadmapColumnRpcHandlers", () => {
         const handlers = yield* RoadmapColumnRpcHandlersEffect;
         const fixture = yield* makeFixture("HIDDEN");
         const error = yield* Effect.flip(
-          handlers.RoadmapColumnListPublic({
+          handlers.ListRoadmapColumnsPublic({
             organizationId: fixture.organizationId,
           })
         );

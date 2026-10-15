@@ -55,11 +55,11 @@ export const Post = S.Struct({
 export type TPost = S.Schema.Type<typeof Post>;
 
 /**
- * Slim list projection of {@link Post} for `PostList`/`PostListPublic`.
+ * Slim list projection of {@link Post} for `ListPosts`/`ListPostsPublic`.
  *
  * `content` (full Markdown/HTML bodies) dominates list payloads but no list
  * UI renders it — cards, boards, and roadmaps show `excerpt`, and detail
- * pages resolve the body through `PostGet`/`PostGetPublic` instead. Keep in
+ * pages resolve the body through `GetPost`/`GetPostPublic` instead. Keep in
  * sync with {@link Post} minus `content`; the compiler enforces the shape
  * at each RPC boundary, not the field-by-field correspondence.
  */

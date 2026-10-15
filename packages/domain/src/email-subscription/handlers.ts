@@ -177,7 +177,7 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     );
 
   return {
-    EmailSubscriptionChangelogSubscribePublic: ({
+    SubscribeEmailSubscriptionPublic: ({
       email,
       organizationId,
     }: ChangelogSubscriptionRequest) =>
@@ -194,7 +194,7 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
         }),
         withRemapDbErrors("EmailSubscription", "create")
       ),
-    EmailSubscriptionUnsubscribePublic: ({
+    UnsubscribeEmailSubscriptionPublic: ({
       token,
     }: EmailSubscriptionTokenRequest) =>
       consent.unsubscribe({ unsubscribeToken: token }).pipe(
@@ -204,7 +204,7 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
         }),
         withRemapDbErrors("EmailSubscription", "update")
       ),
-    EmailSubscriptionVerifyPublic: ({ token }: EmailSubscriptionTokenRequest) =>
+    VerifyEmailSubscriptionPublic: ({ token }: EmailSubscriptionTokenRequest) =>
       consent.verifySubscription({ verificationToken: token }).pipe(
         Effect.catchTags({
           EmailSubscriptionDataError: internalConsentFailure,

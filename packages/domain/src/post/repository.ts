@@ -191,7 +191,7 @@ const selectPostFields = (opts?: { contactFallback?: boolean }) => ({
   organizationId: schema.postTable.organizationId,
   user: {
     // Dashboard rows attribute contact-only authors (bare/new emails with
-    // no user row, e.g. from on-behalf creation or PostUpdateAuthor) to
+    // no user row, e.g. from on-behalf creation or UpdatePostAuthor) to
     // their contact name instead of rendering "Unknown author". The
     // fallback is dashboard-only: public selects keep the user join alone
     // so customer names never leak onto public boards.
@@ -220,7 +220,7 @@ const selectPostFields = (opts?: { contactFallback?: boolean }) => ({
 
 const selectPostListFields = (opts?: { contactFallback?: boolean }) => {
   // Lists never render the full body (cards show `excerpt`; detail pages
-  // resolve `content` through `PostGet`/`PostGetPublic`), so drop the
+  // resolve `content` through `GetPost`/`GetPostPublic`), so drop the
   // heaviest column while keeping every other list field identical.
   // `canDeleteAsCreator` is dropped too: its two per-row NOT EXISTS probes
   // ran on every list fetch for every row, yet only the session user's own
@@ -315,7 +315,7 @@ const makePostRepository = Effect.gen(function* () {
 
   return {
     /**
-     * Authenticated single-post fetch backing the `PostGet` RPC. Scoped to
+     * Authenticated single-post fetch backing the `GetPost` RPC. Scoped to
      * the organization (membership is enforced by the handler's policy);
      * unlike `findPublicBySlug` it does not gate on board visibility, so
      * members can open posts on private boards and moderators can review

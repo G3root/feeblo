@@ -27,14 +27,14 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
   const companyPolicy = yield* CompanyPolicy;
 
   return {
-    CompanyList: (args: TCompanyList) =>
+    ListCompanies: (args: TCompanyList) =>
       repository
         .findManyCompanies(args.organizationId)
         .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Company", "select")
         ),
-    CompanyCreate: (args: TCompanyCreate) =>
+    CreateCompany: (args: TCompanyCreate) =>
       createCrmEntry({
         organizationId: args.organizationId,
         insert: Effect.gen(function* () {
@@ -99,7 +99,7 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
         Policy.withPolicy(companyPolicy.canCreate(args.organizationId)),
         withRemapDbErrors("Company", "create")
       ),
-    CompanyUpdate: (args: TCompanyUpdate) =>
+    UpdateCompany: (args: TCompanyUpdate) =>
       Effect.gen(function* () {
         const company = yield* repository.update(args);
         if (Option.isNone(company)) {
@@ -112,7 +112,7 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
         Policy.withPolicy(companyPolicy.canUpdate(args)),
         withRemapDbErrors("Company", "update")
       ),
-    CompanyDelete: (args: TCompanyDelete) =>
+    DeleteCompany: (args: TCompanyDelete) =>
       Effect.gen(function* () {
         const company = yield* repository.delete(args);
         if (Option.isNone(company)) {

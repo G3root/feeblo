@@ -169,7 +169,7 @@ describe("ChangelogPostRpcHandlers", () => {
         const fixture = yield* makeFixture();
 
         yield* handlers
-          .ChangelogPostCreate({
+          .CreateChangelogPost({
             changelogId: fixture.changelogId,
             postId: fixture.postId,
             organizationId: fixture.organizationId,
@@ -177,7 +177,7 @@ describe("ChangelogPostRpcHandlers", () => {
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
         const posts = yield* handlers
-          .ChangelogPostList({
+          .ListChangelogPosts({
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -223,7 +223,7 @@ describe("ChangelogPostRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .ChangelogPostCreate({
+              .CreateChangelogPost({
                 changelogId: foreignChangelogId,
                 postId: fixture.postId,
                 organizationId: fixture.organizationId,
@@ -233,7 +233,7 @@ describe("ChangelogPostRpcHandlers", () => {
           expect(error).toMatchObject({ _tag: "PolicyDenied" });
 
           const posts = yield* handlers
-            .ChangelogPostList({
+            .ListChangelogPosts({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));

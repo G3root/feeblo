@@ -134,7 +134,7 @@ describe("PostReactionRpcHandlers", () => {
           const f = yield* fixture();
           const error = yield* Effect.flip(
             handlers
-              .PostReactionList({
+              .ListPostReactions({
                 organizationId: f.organizationId,
                 slug: f.postSlug,
               })
@@ -154,11 +154,11 @@ describe("PostReactionRpcHandlers", () => {
           };
           expect(
             yield* handlers
-              .PostReactionToggle(input)
+              .TogglePostReaction(input)
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toEqual({ reacted: true, emoji: "thumbs_up" });
           const reactions = yield* handlers
-            .PostReactionList({
+            .ListPostReactions({
               organizationId: f.organizationId,
               slug: f.postSlug,
             })
@@ -172,7 +172,7 @@ describe("PostReactionRpcHandlers", () => {
           });
           expect(
             yield* handlers
-              .PostReactionToggle(input)
+              .TogglePostReaction(input)
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toEqual({ reacted: false, emoji: null });
         })
@@ -187,11 +187,11 @@ describe("PostReactionRpcHandlers", () => {
             emoji: "rocket" as const,
           };
           yield* handlers
-            .PostReactionToggle(input)
+            .TogglePostReaction(input)
             .pipe(Effect.provideService(CurrentSession, session(f)));
 
           const anonymous = yield* handlers
-            .PostReactionListPublic({
+            .ListPostReactionsPublic({
               organizationId: f.organizationId,
               slug: f.postSlug,
             })
@@ -205,7 +205,7 @@ describe("PostReactionRpcHandlers", () => {
           });
 
           const own = yield* handlers
-            .PostReactionListPublic({
+            .ListPostReactionsPublic({
               organizationId: f.organizationId,
               slug: f.postSlug,
             })
@@ -229,7 +229,7 @@ describe("PostReactionRpcHandlers", () => {
           const publicFixture = yield* fixture("PUBLIC");
           const privateFixture = yield* fixture("PRIVATE");
           const publicResult = yield* handlers
-            .PostReactionTogglePublic({
+            .TogglePostReactionPublic({
               organizationId: publicFixture.organizationId,
               postId: publicFixture.postId,
               emoji: "fire",
@@ -242,7 +242,7 @@ describe("PostReactionRpcHandlers", () => {
             );
           const privateError = yield* Effect.flip(
             handlers
-              .PostReactionTogglePublic({
+              .TogglePostReactionPublic({
                 organizationId: privateFixture.organizationId,
                 postId: privateFixture.postId,
                 emoji: "fire",

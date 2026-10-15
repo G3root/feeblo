@@ -25,7 +25,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
   const sitePolicy = yield* SitePolicy;
 
   return {
-    ChangelogCategoryList: (args: TChangelogCategoryList) =>
+    ListChangelogCategories: (args: TChangelogCategoryList) =>
       repository
         .findMany(args)
         .pipe(
@@ -33,10 +33,10 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("ChangelogCategory", "select")
         ),
 
-    ChangelogCategoryListPublic: (args: TChangelogCategoryList) =>
+    ListChangelogCategoriesPublic: (args: TChangelogCategoryList) =>
       repository.findManyPublished(args).pipe(
         RateLimit.withPublicRpcRateLimit({
-          name: "ChangelogCategoryListPublic",
+          name: "ListChangelogCategoriesPublic",
           level: "read",
         }),
         Policy.withPublicPolicy(
@@ -45,7 +45,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("ChangelogCategory", "select")
       ),
 
-    ChangelogCategoryListLinks: (args: TChangelogCategoryList) =>
+    ListChangelogCategoryLinks: (args: TChangelogCategoryList) =>
       repository
         .findLinks(args)
         .pipe(
@@ -53,10 +53,10 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("ChangelogCategory", "select")
         ),
 
-    ChangelogCategoryListLinksPublic: (args: TChangelogCategoryList) =>
+    ListChangelogCategoryLinksPublic: (args: TChangelogCategoryList) =>
       repository.findLinksPublished(args).pipe(
         RateLimit.withPublicRpcRateLimit({
-          name: "ChangelogCategoryListLinksPublic",
+          name: "ListChangelogCategoryLinksPublic",
           level: "read",
         }),
         Policy.withPublicPolicy(
@@ -65,7 +65,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("ChangelogCategory", "select")
       ),
 
-    ChangelogCategoryCreate: (args: TChangelogCategoryCreate) =>
+    CreateChangelogCategory: (args: TChangelogCategoryCreate) =>
       repository
         .create(args)
         .pipe(
@@ -73,7 +73,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("ChangelogCategory", "create")
         ),
 
-    ChangelogCategoryUpdate: (args: TChangelogCategoryUpdate) =>
+    UpdateChangelogCategory: (args: TChangelogCategoryUpdate) =>
       repository
         .update(args)
         .pipe(
@@ -81,7 +81,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("ChangelogCategory", "update")
         ),
 
-    ChangelogCategoryDelete: (args: TChangelogCategoryDelete) =>
+    DeleteChangelogCategory: (args: TChangelogCategoryDelete) =>
       repository
         .delete(args)
         .pipe(
@@ -89,7 +89,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("ChangelogCategory", "delete")
         ),
 
-    ChangelogCategorySet: (args: TChangelogCategorySet) =>
+    SetChangelogCategories: (args: TChangelogCategorySet) =>
       Effect.gen(function* () {
         const categoryIds = [...new Set(args.categoryIds)];
         yield* validateChangelog({

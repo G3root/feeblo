@@ -591,7 +591,7 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
      *
      * The behavior is the shared `upvote/on-behalf.ts` path — the same
      * resolution, idempotent insert, timeline entry, and voter subscription
-     * the dashboard's `UpvoteAddOnBehalf` performs — with a machine-key actor,
+     * the dashboard's `AddUpvoteOnBehalf` performs — with a machine-key actor,
      * because a key is not a member and has no person to record. The post's
      * state is checked under its row lock inside the same transaction, so a
      * concurrent lock or merge cannot slip between the check and the insert.

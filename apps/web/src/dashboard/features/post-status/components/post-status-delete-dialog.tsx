@@ -76,7 +76,7 @@ export function PostStatusDeleteDialog() {
     setPreviewError(false);
 
     fetchRpc((rpc) =>
-      rpc.PostStatusDeletePreview({ id: statusId, organizationId })
+      rpc.PreviewPostStatusDelete({ id: statusId, organizationId })
     )
       .then((result) => {
         if (!cancelled) {
@@ -111,7 +111,7 @@ export function PostStatusDeleteDialog() {
         // transaction that repoints every post in the status, and the counts
         // it returns are what the toast reports.
         const result = await fetchRpc((rpc) =>
-          rpc.PostStatusDelete({ id: status.id, organizationId })
+          rpc.DeletePostStatus({ id: status.id, organizationId })
         );
 
         await postStatusCollection.utils.refetch();

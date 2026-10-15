@@ -6,13 +6,13 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 ### Surfaces
 
-**Surface**: A transport the product answers on. The dashboard and the public portal are the two session-facing RPC surfaces; the Public API is the key-authenticated HTTP surface. An RPC write present on both RPC surfaces is implemented once and takes its surface, while each surface keeps its own RPC names, middleware, and error contract. The portal's RPC names carry a `Public` suffix (`UpvoteToggle` → `UpvoteTogglePublic`), which is what lets a shared body derive its rate-limit bucket from the operation and the surface. _Avoid_: channel, client, platform
+**Surface**: A transport the product answers on. The dashboard and the public portal are the two session-facing RPC surfaces; the Public API is the key-authenticated HTTP surface. An RPC write present on both RPC surfaces is implemented once and takes its surface, while each surface keeps its own RPC names, middleware, and error contract. The portal's RPC names carry a `Public` suffix (`ToggleUpvote` → `ToggleUpvotePublic`), which is what lets a shared body derive its rate-limit bucket from the operation and the surface. _Avoid_: channel, client, platform
 
 ### Feedback
 
 **Post**: A feature request, bug report, or other item of feedback on a board. _Avoid_: Feature, feature request, ticket, issue
 
-**Public portal**: The feedback-board and widget surface that is readable without a dashboard session. `*Public` in RPC names — `PostListPublic`, `PostGetPublic` — refers to this surface, not to anonymity and not to the Public API. _Avoid_: Public API, anonymous API
+**Public portal**: The feedback-board and widget surface that is readable without a dashboard session. `*Public` in RPC names — `ListPostsPublic`, `GetPostPublic` — refers to this surface, not to anonymity and not to the Public API. _Avoid_: Public API, anonymous API
 
 ### Data transfer
 

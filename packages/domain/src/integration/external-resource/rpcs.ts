@@ -8,7 +8,7 @@ import * as S from "./schema";
 
 /** Generic authenticated read surface for links from a Feeblo post to provider resources. */
 export class ExternalResourceRpcs extends RpcGroup.make(
-  Rpc.make("PostExternalResourceLinkList", {
+  Rpc.make("ListPostExternalResourceLinks", {
     success: Schema.Array(S.PostExternalResourceLink),
     payload: S.PostExternalResourceLinkList,
     error: WebhookManagementErrors,

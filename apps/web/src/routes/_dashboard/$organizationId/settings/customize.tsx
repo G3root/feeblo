@@ -28,7 +28,7 @@ export const Route = createFileRoute(
 
 function RouteComponent() {
   const organizationId = useOrganizationId();
-  // Same permission as the sidebar entry and the SiteUpdate mutation
+  // Same permission as the sidebar entry and the UpdateSite mutation
   // (`site.*`) — keep all three spellings aligned.
   const { allowed, isPending } = usePolicy(
     hasPermission(organizationId, "site.update")

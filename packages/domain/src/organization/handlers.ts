@@ -16,7 +16,7 @@ export const OrganizationRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* OrganizationRepository;
 
   return {
-    OrganizationList: () =>
+    ListOrganizations: () =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
 
@@ -24,7 +24,7 @@ export const OrganizationRpcHandlersEffect = Effect.gen(function* () {
           userId: session.session.userId,
         });
       }).pipe(withRemapDbErrors("Organization", "select")),
-    OrganizationUpdate: (args: TOrganizationUpdate) =>
+    UpdateOrganization: (args: TOrganizationUpdate) =>
       Effect.gen(function* () {
         const organization = yield* repository.update(args);
 

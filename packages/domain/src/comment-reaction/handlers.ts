@@ -33,7 +33,7 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
     TCommentReactionToggle,
     CommentReactionRpcTag
   >()({
-    operation: "CommentReactionToggle",
+    operation: "ToggleCommentReaction",
     remap: { action: "update", entity: "CommentReaction" },
     dashboard: {
       rateLimit: undefined,
@@ -66,7 +66,7 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
     TCommentReactionList,
     CommentReactionRpcTag
   >()({
-    operation: "CommentReactionList",
+    operation: "ListCommentReactions",
     remap: { action: "select", entity: "CommentReaction" },
     config: { rateLimit: "read", policy: () => Policy.allow },
   });
@@ -89,7 +89,7 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
   );
 
   return {
-    CommentReactionList: (args: TCommentReactionList) =>
+    ListCommentReactions: (args: TCommentReactionList) =>
       repository
         .list({
           organizationId: args.organizationId,
@@ -99,8 +99,8 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("CommentReaction", "select")
         ),
-    CommentReactionToggle: toggleReaction.dashboard,
-    CommentReactionListPublic: listPublicEntry.entry((args) =>
+    ToggleCommentReaction: toggleReaction.dashboard,
+    ListCommentReactionsPublic: listPublicEntry.entry((args) =>
       withPublicViewer({
         read: () =>
           repository.listPublic({
@@ -110,7 +110,7 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
         redact: redactActorIdentities,
       })
     ),
-    CommentReactionTogglePublic: toggleReaction.public,
+    ToggleCommentReactionPublic: toggleReaction.public,
   };
 });
 

@@ -80,7 +80,7 @@ export function PostTagField() {
 
     try {
       await fetchRpc((rpc) =>
-        rpc.PostTagSet({
+        rpc.SetPostTags({
           postId: post.id,
           organizationId,
           tagIds: newTagIds,

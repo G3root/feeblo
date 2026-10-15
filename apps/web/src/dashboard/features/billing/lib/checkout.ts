@@ -11,7 +11,7 @@ export async function startBillingCheckout({
 }) {
   try {
     const result = await fetchRpc((rpc) =>
-      rpc.BillingCheckout({
+      rpc.CreateBillingCheckout({
         organizationId,
         productId,
       })
@@ -36,7 +36,7 @@ export async function startBillingPortal({
 }) {
   try {
     const result = await fetchRpc((rpc) =>
-      rpc.BillingPortal({
+      rpc.CreateBillingPortal({
         organizationId,
       })
     );

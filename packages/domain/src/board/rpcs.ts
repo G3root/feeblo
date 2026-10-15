@@ -14,30 +14,30 @@ import {
 } from "./schema";
 
 export class BoardRpcs extends RpcGroup.make(
-  Rpc.make("BoardList", {
+  Rpc.make("ListBoards", {
     success: Schema.Array(Board),
     payload: BoardList,
     error: BoardServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("BoardListPublic", {
+  Rpc.make("ListBoardsPublic", {
     success: Schema.Array(Board),
     payload: BoardList,
     error: Schema.Union([BoardServiceErrors, RateLimitErrors]),
   }).middleware(PublicRpcRateLimitMiddleware),
 
-  Rpc.make("BoardDelete", {
+  Rpc.make("DeleteBoard", {
     success: Schema.Void,
     payload: BoardDelete,
     error: BoardServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("BoardCreate", {
+  Rpc.make("CreateBoard", {
     success: Schema.Void,
     payload: BoardCreate,
     error: BoardServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("BoardUpdate", {
+  Rpc.make("UpdateBoard", {
     success: Schema.Void,
     payload: BoardUpdate,
     error: BoardServiceErrors,

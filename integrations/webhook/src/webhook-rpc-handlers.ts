@@ -9,33 +9,34 @@ export const WebhookManagementRpcHandlersEffect = Effect.gen(function* () {
   const authorize = (organizationId: string) =>
     Policy.withPolicy(Policy.canPermission(organizationId, "webhooks.manage"));
   return {
-    WebhookEndpointList: (input: Parameters<typeof service.listEndpoints>[0]) =>
-      service.listEndpoints(input).pipe(authorize(input.organizationId)),
-    WebhookEndpointCreate: (
+    ListWebhookEndpoints: (
+      input: Parameters<typeof service.listEndpoints>[0]
+    ) => service.listEndpoints(input).pipe(authorize(input.organizationId)),
+    CreateWebhookEndpoint: (
       input: Parameters<typeof service.createEndpoint>[0]
     ) => service.createEndpoint(input).pipe(authorize(input.organizationId)),
-    WebhookEndpointUpdate: (
+    UpdateWebhookEndpoint: (
       input: Parameters<typeof service.updateEndpoint>[0]
     ) => service.updateEndpoint(input).pipe(authorize(input.organizationId)),
-    WebhookEndpointPause: (
+    PauseWebhookEndpoint: (
       input: Parameters<typeof service.pauseEndpoint>[0]
     ) => service.pauseEndpoint(input).pipe(authorize(input.organizationId)),
-    WebhookEndpointResume: (
+    ResumeWebhookEndpoint: (
       input: Parameters<typeof service.resumeEndpoint>[0]
     ) => service.resumeEndpoint(input).pipe(authorize(input.organizationId)),
-    WebhookEndpointRemove: (
+    RemoveWebhookEndpoint: (
       input: Parameters<typeof service.removeEndpoint>[0]
     ) => service.removeEndpoint(input).pipe(authorize(input.organizationId)),
-    WebhookSecretRotate: (input: Parameters<typeof service.rotateSecret>[0]) =>
+    RotateWebhookSecret: (input: Parameters<typeof service.rotateSecret>[0]) =>
       service.rotateSecret(input).pipe(authorize(input.organizationId)),
-    WebhookTestDelivery: (
+    TestWebhookDelivery: (
       input: Parameters<typeof service.sendTestDelivery>[0]
     ) => service.sendTestDelivery(input).pipe(authorize(input.organizationId)),
-    WebhookDeliveryHistory: (
+    GetWebhookDeliveryHistory: (
       input: Parameters<typeof service.getDeliveryHistory>[0]
     ) =>
       service.getDeliveryHistory(input).pipe(authorize(input.organizationId)),
-    WebhookDeliveryRetry: (
+    RetryWebhookDelivery: (
       input: Parameters<typeof service.retryDelivery>[0]
     ) => service.retryDelivery(input).pipe(authorize(input.organizationId)),
   };

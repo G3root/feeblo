@@ -400,7 +400,7 @@ export async function createContactAction(
 ): Promise<void> {
   if (args.operation === "create") {
     await fetchRpc((rpc) =>
-      rpc.ContactCreate({
+      rpc.CreateContact({
         ...args.contact,
         attributeValues: args.createAttribute?.map((attribute) => ({
           id: attribute.id,
@@ -411,12 +411,12 @@ export async function createContactAction(
     );
   } else {
     await Promise.all([
-      fetchRpc((rpc) => rpc.ContactUpdate(args.contact)),
+      fetchRpc((rpc) => rpc.UpdateContact(args.contact)),
       ...(args.createAttribute ?? [])
         .concat(args.upsertAttribute ?? [])
         .map((attribute) =>
           fetchRpc((rpc) =>
-            rpc.ContactAttributeValueUpdate({
+            rpc.UpdateContactAttributeValue({
               id: attribute.id,
               attributeId: attribute.attributeId,
               contactId: attribute.contactId,
@@ -449,7 +449,7 @@ export async function createCompanyAction(
 ): Promise<void> {
   if (args.operation === "create") {
     await fetchRpc((rpc) =>
-      rpc.CompanyCreate({
+      rpc.CreateCompany({
         ...args.company,
         attributeValues: args.createAttribute?.map((attribute) => ({
           id: attribute.id,
@@ -460,12 +460,12 @@ export async function createCompanyAction(
     );
   } else {
     await Promise.all([
-      fetchRpc((rpc) => rpc.CompanyUpdate(args.company)),
+      fetchRpc((rpc) => rpc.UpdateCompany(args.company)),
       ...(args.createAttribute ?? [])
         .concat(args.upsertAttribute ?? [])
         .map((attribute) =>
           fetchRpc((rpc) =>
-            rpc.CompanyAttributeValueUpdate({
+            rpc.UpdateCompanyAttributeValue({
               id: attribute.id,
               attributeId: attribute.attributeId,
               companyId: attribute.companyId,

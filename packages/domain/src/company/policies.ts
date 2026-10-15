@@ -14,7 +14,7 @@ const makeCompanyPolicy = Effect.gen(function* () {
 
   const canCreate = (organizationId: string) =>
     // The plan's CRM-entry cap is enforced inside the create's transaction
-    // (`CompanyCreate`), after the workspace row is locked: the count is only
+    // (`CreateCompany`), after the workspace row is locked: the count is only
     // meaningful under that lock, and a policy running outside it would let
     // two concurrent creates both see room past the cap.
     Policy.canPermission(organizationId, "companies.create");

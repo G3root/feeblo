@@ -16,25 +16,25 @@ import {
 } from "./schema";
 
 export class WorkspaceRpcs extends RpcGroup.make(
-  Rpc.make("WorkspaceCreate", {
+  Rpc.make("CreateWorkspace", {
     payload: CreateWorkspaceInput,
     success: CreateWorkspaceOutput,
     error: WorkspaceServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("WorkspaceCreationStateGet", {
+  Rpc.make("GetWorkspaceCreationState", {
     success: WorkspaceCreationState,
     error: WorkspaceServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("WorkspaceProductList", {
+  Rpc.make("ListWorkspaceProducts", {
     success: Schema.Array(WorkspaceProduct),
     error: WorkspaceServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("WorkspacePlanGet", {
+  Rpc.make("GetWorkspacePlan", {
     payload: WorkspaceInput,
     success: WorkspacePlan,
     error: WorkspaceServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("WorkspaceSlugCheck", {
+  Rpc.make("CheckWorkspaceSlug", {
     payload: WorkspaceSlugCheckInput,
     success: WorkspaceSlugCheckOutput,
     error: WorkspaceServiceErrors,

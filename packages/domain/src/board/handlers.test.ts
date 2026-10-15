@@ -137,14 +137,14 @@ describe("BoardRpcHandlers", () => {
   const TestLayer = Layer.merge(HandlerTest, Database.PgliteDatabaseLive);
 
   layer(TestLayer)("handlers", (it) => {
-    describe("BoardList", () => {
+    describe("ListBoards", () => {
       it.effect("rejects users without a membership", () =>
         Effect.gen(function* () {
           const handlers = yield* BoardRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const error = yield* Effect.flip(
             handlers
-              .BoardList({
+              .ListBoards({
                 organizationId: fixture.organizationId,
               })
               .pipe(
@@ -165,7 +165,7 @@ describe("BoardRpcHandlers", () => {
           const fixture = yield* makeFixture();
 
           const boards = yield* handlers
-            .BoardList({
+            .ListBoards({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -179,7 +179,7 @@ describe("BoardRpcHandlers", () => {
       );
     });
 
-    describe("BoardListPublic", () => {
+    describe("ListBoardsPublic", () => {
       it.effect("does not expose private boards", () =>
         Effect.gen(function* () {
           const handlers = yield* BoardRpcHandlersEffect;
@@ -200,7 +200,7 @@ describe("BoardRpcHandlers", () => {
             updatedAt: now,
           });
 
-          const boards = yield* handlers.BoardListPublic({
+          const boards = yield* handlers.ListBoardsPublic({
             organizationId: fixture.organizationId,
           });
 
@@ -210,7 +210,7 @@ describe("BoardRpcHandlers", () => {
       );
     });
 
-    describe("BoardCreate", () => {
+    describe("CreateBoard", () => {
       it.effect("rejects non-members", () =>
         Effect.gen(function* () {
           const handlers = yield* BoardRpcHandlersEffect;
@@ -218,7 +218,7 @@ describe("BoardRpcHandlers", () => {
           const boardId = yield* BoardId.generate;
           const error = yield* Effect.flip(
             handlers
-              .BoardCreate(boardCreateInput(fixture, boardId, "New board"))
+              .CreateBoard(boardCreateInput(fixture, boardId, "New board"))
               .pipe(
                 Effect.provideService(
                   CurrentSession,
@@ -256,7 +256,7 @@ describe("BoardRpcHandlers", () => {
           };
           const error = yield* Effect.flip(
             handlers
-              .BoardCreate(boardCreateInput(fixture, boardId, "New board"))
+              .CreateBoard(boardCreateInput(fixture, boardId, "New board"))
               .pipe(Effect.provideService(CurrentSession, memberSession))
           );
 
@@ -271,12 +271,12 @@ describe("BoardRpcHandlers", () => {
           const boardId = yield* BoardId.generate;
 
           yield* handlers
-            .BoardCreate(
+            .CreateBoard(
               boardCreateInput(fixture, boardId, "My public board", "PUBLIC")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
-          const boards = yield* handlers.BoardListPublic({
+          const boards = yield* handlers.ListBoardsPublic({
             organizationId: fixture.organizationId,
           });
 
@@ -295,7 +295,7 @@ describe("BoardRpcHandlers", () => {
           const boardId = yield* BoardId.generate;
           const error = yield* Effect.flip(
             handlers
-              .BoardCreate(
+              .CreateBoard(
                 boardCreateInput(fixture, boardId, "Private board", "PRIVATE")
               )
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
@@ -314,7 +314,7 @@ describe("BoardRpcHandlers", () => {
           // Create a second board (should succeed).
           const secondBoardId = yield* BoardId.generate;
           yield* handlers
-            .BoardCreate(
+            .CreateBoard(
               boardCreateInput(fixture, secondBoardId, "Second board")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -323,7 +323,7 @@ describe("BoardRpcHandlers", () => {
           const thirdBoardId = yield* BoardId.generate;
           const error = yield* Effect.flip(
             handlers
-              .BoardCreate(
+              .CreateBoard(
                 boardCreateInput(fixture, thirdBoardId, "Third board")
               )
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
@@ -334,14 +334,14 @@ describe("BoardRpcHandlers", () => {
       );
     });
 
-    describe("BoardUpdate", () => {
+    describe("UpdateBoard", () => {
       it.effect("rejects non-members", () =>
         Effect.gen(function* () {
           const handlers = yield* BoardRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const error = yield* Effect.flip(
             handlers
-              .BoardUpdate({
+              .UpdateBoard({
                 id: fixture.boardId,
                 organizationId: fixture.organizationId,
                 name: "Updated board",
@@ -383,7 +383,7 @@ describe("BoardRpcHandlers", () => {
           };
           const error = yield* Effect.flip(
             handlers
-              .BoardUpdate({
+              .UpdateBoard({
                 id: fixture.boardId,
                 organizationId: fixture.organizationId,
                 name: "Updated board",
@@ -402,7 +402,7 @@ describe("BoardRpcHandlers", () => {
           const fixture = yield* makeFixture();
 
           yield* handlers
-            .BoardUpdate({
+            .UpdateBoard({
               id: fixture.boardId,
               organizationId: fixture.organizationId,
               name: "Updated board",
@@ -410,7 +410,7 @@ describe("BoardRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
-          const boards = yield* handlers.BoardListPublic({
+          const boards = yield* handlers.ListBoardsPublic({
             organizationId: fixture.organizationId,
           });
 
@@ -422,14 +422,14 @@ describe("BoardRpcHandlers", () => {
       );
     });
 
-    describe("BoardDelete", () => {
+    describe("DeleteBoard", () => {
       it.effect("rejects non-members", () =>
         Effect.gen(function* () {
           const handlers = yield* BoardRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const error = yield* Effect.flip(
             handlers
-              .BoardDelete({
+              .DeleteBoard({
                 id: fixture.boardId,
                 organizationId: fixture.organizationId,
               })
@@ -469,7 +469,7 @@ describe("BoardRpcHandlers", () => {
           };
           const error = yield* Effect.flip(
             handlers
-              .BoardDelete({
+              .DeleteBoard({
                 id: fixture.boardId,
                 organizationId: fixture.organizationId,
               })
@@ -486,13 +486,13 @@ describe("BoardRpcHandlers", () => {
           const fixture = yield* makeFixture();
 
           yield* handlers
-            .BoardDelete({
+            .DeleteBoard({
               id: fixture.boardId,
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
-          const boards = yield* handlers.BoardListPublic({
+          const boards = yield* handlers.ListBoardsPublic({
             organizationId: fixture.organizationId,
           });
 

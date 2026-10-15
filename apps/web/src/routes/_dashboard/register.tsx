@@ -49,7 +49,7 @@ function RegisterRoute() {
     onSubmit: async ({ value }) => {
       try {
         const result = await fetchRpc((rpc) =>
-          rpc.WorkspaceCreate({
+          rpc.CreateWorkspace({
             workspaceName: value.workspaceName,
           })
         );

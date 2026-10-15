@@ -349,7 +349,7 @@ export function PostCreateForm() {
 
         // The list row carries no body; it travels as action input to the
         // surface's `persistPost` RPC instead. On-behalf attribution rides
-        // the same action input so `persistPost` can forward it to PostCreate.
+        // the same action input so `persistPost` can forward it to CreatePost.
         const tx = createPost({
           content,
           row: {

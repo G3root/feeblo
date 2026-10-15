@@ -7,11 +7,11 @@ import { OrganizationServiceErrors } from "./errors";
 import { Organization, OrganizationUpdate } from "./schema";
 
 export class OrganizationRpcs extends RpcGroup.make(
-  Rpc.make("OrganizationList", {
+  Rpc.make("ListOrganizations", {
     success: Schema.Array(Organization),
     error: OrganizationServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("OrganizationUpdate", {
+  Rpc.make("UpdateOrganization", {
     success: Schema.Void,
     payload: OrganizationUpdate,
     error: OrganizationServiceErrors,

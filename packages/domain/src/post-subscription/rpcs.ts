@@ -13,26 +13,26 @@ import {
 } from "./schema";
 
 export class PostSubscriptionRpcs extends RpcGroup.make(
-  Rpc.make("PostSubscriptionList", {
+  Rpc.make("ListPostSubscriptions", {
     payload: PostSubscriptionList,
     success: Schema.Array(PostSubscription),
     error: PostSubscriptionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("PostSubscriptionListPublic", {
+  Rpc.make("ListPostSubscriptionsPublic", {
     payload: PostSubscriptionList,
     success: Schema.Array(PostSubscription),
     error: Schema.Union([PostSubscriptionServiceErrors, RateLimitErrors]),
   })
     .middleware(PublicAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("PostSubscriptionCreate", {
+  Rpc.make("CreatePostSubscription", {
     payload: PostSubscriptionCreate,
     success: Schema.Struct({
       subscribed: Schema.Boolean,
     }),
     error: PostSubscriptionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("PostSubscriptionCreatePublic", {
+  Rpc.make("CreatePostSubscriptionPublic", {
     payload: PostSubscriptionCreate,
     success: Schema.Struct({
       subscribed: Schema.Boolean,
@@ -41,14 +41,14 @@ export class PostSubscriptionRpcs extends RpcGroup.make(
   })
     .middleware(PublicAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("PostSubscriptionDelete", {
+  Rpc.make("DeletePostSubscription", {
     payload: PostSubscriptionDelete,
     success: Schema.Struct({
       subscribed: Schema.Boolean,
     }),
     error: PostSubscriptionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("PostSubscriptionDeletePublic", {
+  Rpc.make("DeletePostSubscriptionPublic", {
     payload: PostSubscriptionDelete,
     success: Schema.Struct({
       subscribed: Schema.Boolean,

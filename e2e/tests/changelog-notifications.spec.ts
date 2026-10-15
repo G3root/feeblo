@@ -110,7 +110,7 @@ async function markAllNotificationsRead(page: Page) {
       /\/rpc\/?$/.test(candidate.url()) &&
       candidate.request().method() === "POST" &&
       (candidate.request().postData() ?? "").includes(
-        "NotificationMarkAllReadPublic"
+        "MarkAllNotificationsReadPublic"
       )
   );
   await page.getByRole("button", { name: "Mark all read" }).click();
@@ -490,7 +490,7 @@ test.describe("changelog notifications", () => {
                 headers: [],
                 id: 0,
                 payload: { organizationId },
-                tag: "ChangelogSubscriptionCreatePublic",
+                tag: "CreateChangelogSubscriptionPublic",
               })}\n`,
               credentials: "include",
               headers: { "content-type": "application/ndjson" },

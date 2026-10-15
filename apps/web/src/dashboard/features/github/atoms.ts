@@ -11,7 +11,7 @@ export const gitHubReactivityKeys = (organizationId: string) => ({
 /** GitHub App installations cached per organization. */
 export const gitHubConnectionsAtom = Atom.family((organizationId: string) =>
   DashboardClient.query(
-    "GitHubConnectionList",
+    "ListGitHubConnections",
     { organizationId },
     { reactivityKeys: gitHubReactivityKeys(organizationId) }
   ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
@@ -23,7 +23,7 @@ export type GitHubConnection = Atom.Success<
 
 /** Whether the GitHub App is configured for this deployment. */
 export const gitHubIntegrationStatusAtom = DashboardClient.query(
-  "GitHubIntegrationStatus",
+  "GetGitHubIntegrationStatus",
   void 0
 ).pipe(
   dashboardSWR("30 seconds"),
@@ -39,7 +39,7 @@ export type GitHubConnectionArgs = {
 /** Repositories available to one GitHub connection. */
 export const gitHubRepositoriesAtom = Atom.family(
   (args: GitHubConnectionArgs) =>
-    DashboardClient.query("GitHubRepositoryList", args, {
+    DashboardClient.query("ListGitHubRepositories", args, {
       reactivityKeys: gitHubReactivityKeys(args.organizationId),
     }).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
@@ -51,7 +51,7 @@ export type GitHubRepository = Atom.Success<
 /** Automatic publishing settings for one GitHub connection. */
 export const gitHubPublishSettingsAtom = Atom.family(
   (args: GitHubConnectionArgs) =>
-    DashboardClient.query("GitHubSettingsGet", args, {
+    DashboardClient.query("GetGitHubSettings", args, {
       reactivityKeys: gitHubReactivityKeys(args.organizationId),
     }).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
@@ -62,7 +62,7 @@ export type GitHubPublishSettings = Atom.Success<
 
 /** State synchronization rules for one GitHub connection. */
 export const gitHubSyncRulesAtom = Atom.family((args: GitHubConnectionArgs) =>
-  DashboardClient.query("GitHubRuleList", args, {
+  DashboardClient.query("ListGitHubRules", args, {
     reactivityKeys: gitHubReactivityKeys(args.organizationId),
   }).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
@@ -72,7 +72,7 @@ export type GitHubSyncRule = GitHubSyncRuleSchema;
 /** Boards available for scoping automatic publishing. */
 export const gitHubBoardsAtom = Atom.family((organizationId: string) =>
   DashboardClient.query(
-    "BoardList",
+    "ListBoards",
     { organizationId },
     {
       reactivityKeys: {
@@ -90,7 +90,7 @@ export type GitHubBoard = Atom.Success<
 /** Feeblo statuses available as synchronization-rule targets. */
 export const gitHubPostStatusesAtom = Atom.family((organizationId: string) =>
   DashboardClient.query(
-    "PostStatusList",
+    "ListPostStatuses",
     { organizationId },
     {
       reactivityKeys: {
@@ -106,22 +106,22 @@ export type GitHubPostStatus = Atom.Success<
 >[number];
 
 export const startGitHubConnectAtom =
-  DashboardClient.mutation("GitHubConnectStart");
+  DashboardClient.mutation("StartGitHubConnect");
 export const disconnectGitHubConnectionAtom = DashboardClient.mutation(
-  "GitHubConnectionDisconnect"
+  "DisconnectGitHubConnection"
 );
 export const updateGitHubPublishSettingsAtom = DashboardClient.mutation(
-  "GitHubSettingsUpdate"
+  "UpdateGitHubSettings"
 );
 export const createGitHubSyncRuleAtom =
-  DashboardClient.mutation("GitHubRuleCreate");
+  DashboardClient.mutation("CreateGitHubRule");
 export const updateGitHubSyncRuleAtom =
-  DashboardClient.mutation("GitHubRuleUpdate");
+  DashboardClient.mutation("UpdateGitHubRule");
 export const deleteGitHubSyncRuleAtom =
-  DashboardClient.mutation("GitHubRuleDelete");
+  DashboardClient.mutation("DeleteGitHubRule");
 export const createGitHubPostIssueAtom = DashboardClient.mutation(
-  "GitHubPostIssueCreate"
+  "CreateGitHubPostIssue"
 );
 export const linkGitHubPostIssueAtom = DashboardClient.mutation(
-  "GitHubPostIssueLink"
+  "LinkGitHubPostIssue"
 );
