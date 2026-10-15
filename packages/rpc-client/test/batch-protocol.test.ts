@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -7,9 +8,11 @@ import { HttpClientError, TransportError } from "effect/http/HttpClientError";
 import type * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Rpc from "effect/rpc/Rpc";
 import * as RpcClient from "effect/rpc/RpcClient";
+import type { RpcClientError } from "effect/rpc/RpcClientError";
 import * as RpcGroup from "effect/rpc/RpcGroup";
 import type {
   RequestEncoded,
@@ -164,16 +167,47 @@ const silentClient = (): Layer.Layer<HttpClient.HttpClient> =>
     )
   );
 
+/**
+ * A transport that answers with the connection-level `Defect` the server writes
+ * when it cannot read a body, then ends the response.
+ */
+const defectClient = (): Layer.Layer<HttpClient.HttpClient> =>
+  Layer.succeed(
+    HttpClient.HttpClient,
+    HttpClient.make((request) =>
+      Effect.succeed(
+        HttpClientResponse.fromWeb(
+          request,
+          new Response(
+            JSON.stringify({
+              _tag: "Defect",
+              defect: { message: "server exploded" },
+            }) + "\n",
+            {
+              status: 200,
+              headers: { "content-type": "application/ndjson" },
+            }
+          )
+        )
+      )
+    )
+  );
+
 const testLayer = (
   client: Layer.Layer<
     HttpClient.HttpClient,
     never,
     RpcSerialization.RpcSerialization
-  >
+  >,
+  options?: {
+    readonly maxBatchBytes?: number;
+    readonly sharesBatch?: (tag: string) => boolean;
+  }
 ): Layer.Layer<RpcClient.Protocol> =>
   layerProtocolHttpBatch({
     url: "http://rpc.test/rpc",
     batchWindow: testBatchWindow,
+    ...options,
   }).pipe(Layer.provide(client), Layer.provide(RpcSerialization.layerNdjson));
 
 describe("batched RPC protocol", () => {
@@ -224,6 +258,81 @@ describe("batched RPC protocol", () => {
     })
   );
 
+  it.live("sends a frame the classifier rules out alone and at once", () =>
+    Effect.gen(function* () {
+      const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+      const context = yield* Layer.build(
+        testLayer(answeringClient(posts), {
+          sharesBatch: (tag) => tag === "Echo",
+        })
+      );
+
+      const results = yield* Effect.gen(function* () {
+        const client = yield* RpcClient.make(TestRpcs);
+        return yield* Effect.all(
+          [client.Add({ a: 1, b: 2 }), client.Echo({ text: "hello" })],
+          { concurrency: "unbounded" }
+        );
+      }).pipe(Effect.provideContext(context));
+
+      expect(results).toEqual([3, "hello"]);
+
+      // The write leaves on its own resolver, without the read's window, so the
+      // page's reads never wait on it and a write failure never carries them.
+      const bodies = yield* Ref.get(posts);
+      expect(bodies.map((body) => framesIn(body).map((f) => f.tag))).toEqual([
+        ["Add"],
+        ["Echo"],
+      ]);
+    })
+  );
+
+  it.live("posts each write of a burst as its own request", () =>
+    Effect.gen(function* () {
+      const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+      const context = yield* Layer.build(
+        testLayer(answeringClient(posts), { sharesBatch: () => false })
+      );
+
+      const results = yield* Effect.gen(function* () {
+        const client = yield* RpcClient.make(TestRpcs);
+        return yield* Effect.all(
+          [client.Add({ a: 1, b: 2 }), client.Add({ a: 20, b: 22 })],
+          { concurrency: "unbounded" }
+        );
+      }).pipe(Effect.provideContext(context));
+
+      expect(results).toEqual([3, 42]);
+
+      const bodies = yield* Ref.get(posts);
+      expect(bodies.map((body) => framesIn(body).length)).toEqual([1, 1]);
+    })
+  );
+
+  it.live("splits a batch at its byte budget", () =>
+    Effect.gen(function* () {
+      const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+      const context = yield* Layer.build(
+        testLayer(answeringClient(posts), { maxBatchBytes: 1 })
+      );
+
+      const results = yield* Effect.gen(function* () {
+        const client = yield* RpcClient.make(TestRpcs);
+        return yield* Effect.all(
+          [client.Echo({ text: "one" }), client.Echo({ text: "two" })],
+          { concurrency: "unbounded" }
+        );
+      }).pipe(Effect.provideContext(context));
+
+      expect(results).toEqual(["one", "two"]);
+
+      // Every frame is over a one-byte budget, so each is a group of one and
+      // fails, if it fails, on its own.
+      const bodies = yield* Ref.get(posts);
+      expect(bodies.map((body) => framesIn(body).length)).toEqual([1, 1]);
+    })
+  );
+
   it.live("fails every caller in a batch when the transport drops", () =>
     Effect.gen(function* () {
       const context = yield* Layer.build(testLayer(failingClient()));
@@ -254,6 +363,40 @@ describe("batched RPC protocol", () => {
       }).pipe(Effect.provideContext(context));
 
       expect(Exit.isFailure(outcome)).toBe(true);
+    })
+  );
+
+  it.live("fails every caller with the defect the server reported", () =>
+    Effect.gen(function* () {
+      const context = yield* Layer.build(testLayer(defectClient()));
+
+      const outcomes: ReadonlyArray<
+        Exit.Exit<number | string, RpcClientError>
+      > = yield* Effect.gen(function* () {
+        const client = yield* RpcClient.make(TestRpcs);
+        return yield* Effect.all(
+          [
+            client.Add({ a: 1, b: 2 }).pipe(Effect.exit),
+            client.Echo({ text: "hello" }).pipe(Effect.exit),
+          ],
+          { concurrency: "unbounded" }
+        );
+      }).pipe(Effect.provideContext(context));
+
+      const failures = outcomes.map((outcome) =>
+        Exit.isFailure(outcome)
+          ? Cause.findErrorOption(outcome.cause)
+          : Option.none()
+      );
+
+      for (const failure of failures) {
+        expect(Option.isSome(failure)).toBe(true);
+        const error = Option.getOrThrow(failure);
+        expect(error.reason._tag).toBe("RpcClientDefect");
+        if (error.reason._tag === "RpcClientDefect") {
+          expect(String(error.reason.cause)).toContain("server exploded");
+        }
+      }
     })
   );
 });

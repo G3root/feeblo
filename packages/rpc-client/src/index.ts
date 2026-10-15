@@ -1,4 +1,5 @@
 import { AllRpcs } from "@feeblo/domain/rpc-group";
+import { isReadRpc } from "@feeblo/domain/rpc-kind";
 import { hasWindow } from "@feeblo/utils/runtime-kind";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -65,7 +66,7 @@ export const createRpcProtocolLive = (apiUrl: string) => {
   // shared by every concurrent request; batching there would let one request's
   // cookie authenticate another's frames.
   const protocol = hasWindow()
-    ? layerProtocolHttpBatch({ url })
+    ? layerProtocolHttpBatch({ url, sharesBatch: isReadRpc })
     : RpcClient.layerProtocolHttp({ url });
 
   return protocol.pipe(
