@@ -193,6 +193,26 @@ const defectClient = (): Layer.Layer<HttpClient.HttpClient> =>
     )
   );
 
+/**
+ * A transport that answers a non-2xx body the frame decoder cannot read, the
+ * way an auth middleware, a body limit or a proxy does.
+ */
+const unavailableClient = (): Layer.Layer<HttpClient.HttpClient> =>
+  Layer.succeed(
+    HttpClient.HttpClient,
+    HttpClient.make((request) =>
+      Effect.succeed(
+        HttpClientResponse.fromWeb(
+          request,
+          new Response("Service Unavailable", {
+            status: 503,
+            headers: { "content-type": "text/plain" },
+          })
+        )
+      )
+    )
+  );
+
 const testLayer = (
   client: Layer.Layer<
     HttpClient.HttpClient,
@@ -398,5 +418,44 @@ describe("batched RPC protocol", () => {
         }
       }
     })
+  );
+
+  it.live(
+    "fails every caller with the HTTP status when the API answers a non-2xx",
+    () =>
+      Effect.gen(function* () {
+        const context = yield* Layer.build(testLayer(unavailableClient()));
+
+        const outcomes: ReadonlyArray<
+          Exit.Exit<number | string, RpcClientError>
+        > = yield* Effect.gen(function* () {
+          const client = yield* RpcClient.make(TestRpcs);
+          return yield* Effect.all(
+            [
+              client.Add({ a: 1, b: 2 }).pipe(Effect.exit),
+              client.Echo({ text: "hello" }).pipe(Effect.exit),
+            ],
+            { concurrency: "unbounded" }
+          );
+        }).pipe(Effect.provideContext(context));
+
+        const failures = outcomes.map((outcome) =>
+          Exit.isFailure(outcome)
+            ? Cause.findErrorOption(outcome.cause)
+            : Option.none()
+        );
+
+        // The status survives: without the client's status filter the plain-text
+        // body would reach the frame decoder, and the callers would see a decode
+        // defect with no idea the API said 503.
+        for (const failure of failures) {
+          expect(Option.isSome(failure)).toBe(true);
+          const error = Option.getOrThrow(failure);
+          expect(error.reason._tag).toBe("HttpError");
+          if (error.reason._tag === "HttpError") {
+            expect(error.reason.kind).toBe("StatusCodeError");
+          }
+        }
+      })
   );
 });

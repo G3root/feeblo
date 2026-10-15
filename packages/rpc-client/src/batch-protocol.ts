@@ -149,7 +149,7 @@ export const makeProtocolHttpBatch = (options: {
     const client = HttpClient.mapRequest(
       http,
       HttpClientRequest.prependUrl(options.url)
-    );
+    ).pipe(HttpClient.filterStatusOk);
     const maxBatchFrames = Math.max(
       1,
       options.maxBatchFrames ?? defaultMaxBatchFrames
