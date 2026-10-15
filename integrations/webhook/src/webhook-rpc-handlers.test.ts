@@ -69,7 +69,7 @@ describe("WebhookManagementRpcHandlers", () => {
         );
 
         const allowed = yield* handlers
-          .WebhookEndpointList({ organizationId })
+          .ListWebhookEndpoints({ organizationId })
           .pipe(
             Effect.provideService(
               CurrentSession,
@@ -81,7 +81,7 @@ describe("WebhookManagementRpcHandlers", () => {
 
         const denied = yield* Effect.flip(
           handlers
-            .WebhookEndpointList({ organizationId })
+            .ListWebhookEndpoints({ organizationId })
             .pipe(
               Effect.provideService(
                 CurrentSession,
@@ -119,7 +119,7 @@ describe("WebhookManagementRpcHandlers", () => {
         );
         const error = yield* Effect.flip(
           handlers
-            .WebhookEndpointList({ organizationId: foreignOrganizationId })
+            .ListWebhookEndpoints({ organizationId: foreignOrganizationId })
             .pipe(
               Effect.provideService(
                 CurrentSession,

@@ -216,7 +216,7 @@ describe("PostRpcHandlers on-behalf", () => {
   );
 
   layer(TestLayer)("handlers", (it) => {
-    describe("PostCreate with author", () => {
+    describe("CreatePost with author", () => {
       it.effect(
         "attributes the post to the resolved contact with provenance",
         () =>
@@ -227,7 +227,7 @@ describe("PostRpcHandlers on-behalf", () => {
             const postId = yield* PostId.generate;
 
             yield* handlers
-              .PostCreate({
+              .CreatePost({
                 ...postCreateInput(fixture, postId, "On behalf feedback"),
                 author: { email: "jane@example.com", name: "Jane Doe" },
               })
@@ -312,7 +312,7 @@ describe("PostRpcHandlers on-behalf", () => {
             const postId = yield* PostId.generate;
 
             yield* handlers
-              .PostCreate({
+              .CreatePost({
                 ...postCreateInput(fixture, postId, "Verified author"),
                 author: { email: "jane@example.com" },
               })
@@ -392,7 +392,7 @@ describe("PostRpcHandlers on-behalf", () => {
 
             const postId = yield* PostId.generate;
             yield* handlers
-              .PostCreate({
+              .CreatePost({
                 ...postCreateInput(fixture, postId, "Shadow author"),
                 author: { email: "sam@example.com" },
               })
@@ -449,7 +449,7 @@ describe("PostRpcHandlers on-behalf", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate({
+            .CreatePost({
               ...postCreateInput(fixture, postId, "Bare email author"),
               author: { email: "chris@example.com" },
             })
@@ -493,7 +493,7 @@ describe("PostRpcHandlers on-behalf", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .PostCreate({
+              .CreatePost({
                 ...postCreateInput(fixture, postId, "Contributor on behalf"),
                 author: { email: "jane@example.com" },
               })
@@ -522,7 +522,7 @@ describe("PostRpcHandlers on-behalf", () => {
             const fixture = yield* makeFixture(role);
             const postId = yield* PostId.generate;
             yield* handlers
-              .PostCreate({
+              .CreatePost({
                 ...postCreateInput(fixture, postId, `${role} on behalf`),
                 author: { email: `${role}@example.com` },
               })
@@ -551,7 +551,7 @@ describe("PostRpcHandlers on-behalf", () => {
             const fixture = yield* makeFixture(role);
             const postId = yield* PostId.generate;
             yield* handlers
-              .PostCreate(postCreateInput(fixture, postId, `${role} self post`))
+              .CreatePost(postCreateInput(fixture, postId, `${role} self post`))
               .pipe(
                 Effect.provideService(
                   CurrentSession,
@@ -629,7 +629,7 @@ describe("PostRpcHandlers on-behalf", () => {
             const postId = yield* PostId.generate;
 
             yield* handlers
-              .PostCreate({
+              .CreatePost({
                 ...postCreateInput(fixture, postId, "Staff authored"),
                 author: { userId: teammate.userId },
               })
@@ -674,14 +674,14 @@ describe("PostRpcHandlers on-behalf", () => {
           const session = makeSession(fixture, "manager");
 
           yield* handlers
-            .PostCreate({
+            .CreatePost({
               ...postCreateInput(fixture, postId, "Customer authored"),
               author: { email: "customer@example.com", name: "Customer" },
             })
             .pipe(Effect.provideService(CurrentSession, session));
 
           yield* handlers
-            .PostUpdateAuthor({
+            .UpdatePostAuthor({
               id: postId,
               organizationId: fixture.organizationId,
               author: { userId: teammate.userId },
@@ -698,7 +698,7 @@ describe("PostRpcHandlers on-behalf", () => {
       );
     });
 
-    describe("PostUpdateAuthor", () => {
+    describe("UpdatePostAuthor", () => {
       it.effect("reattributes a self-authored post to a new customer", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -708,7 +708,7 @@ describe("PostRpcHandlers on-behalf", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Self post"))
+            .CreatePost(postCreateInput(fixture, postId, "Self post"))
             .pipe(
               Effect.provideService(
                 CurrentSession,
@@ -717,7 +717,7 @@ describe("PostRpcHandlers on-behalf", () => {
             );
 
           yield* handlers
-            .PostUpdateAuthor({
+            .UpdatePostAuthor({
               id: postId,
               organizationId: fixture.organizationId,
               author: {
@@ -791,7 +791,7 @@ describe("PostRpcHandlers on-behalf", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Self post"))
+            .CreatePost(postCreateInput(fixture, postId, "Self post"))
             .pipe(
               Effect.provideService(
                 CurrentSession,
@@ -800,7 +800,7 @@ describe("PostRpcHandlers on-behalf", () => {
             );
 
           yield* handlers
-            .PostUpdateAuthor({
+            .UpdatePostAuthor({
               id: postId,
               organizationId: fixture.organizationId,
               author: { email: "author-kate@example.com" },
@@ -841,7 +841,7 @@ describe("PostRpcHandlers on-behalf", () => {
             const session = makeSession(fixture, "manager");
 
             yield* handlers
-              .PostCreate(postCreateInput(fixture, postId, "Self post"))
+              .CreatePost(postCreateInput(fixture, postId, "Self post"))
               .pipe(Effect.provideService(CurrentSession, session));
 
             // Sanity: the self-service creator starts subscribed everywhere.
@@ -854,7 +854,7 @@ describe("PostRpcHandlers on-behalf", () => {
             ).toBe(true);
 
             yield* handlers
-              .PostUpdateAuthor({
+              .UpdatePostAuthor({
                 id: postId,
                 organizationId: fixture.organizationId,
                 author: {
@@ -910,7 +910,7 @@ describe("PostRpcHandlers on-behalf", () => {
           const now = yield* DateTime.nowAsDate;
 
           yield* handlers
-            .PostCreate({
+            .CreatePost({
               ...postCreateInput(fixture, postId, "Customer post"),
               author: { email: "author-kim@example.com", name: "Kim" },
             })
@@ -929,7 +929,7 @@ describe("PostRpcHandlers on-behalf", () => {
           });
 
           yield* handlers
-            .PostUpdateAuthor({
+            .UpdatePostAuthor({
               id: postId,
               organizationId: fixture.organizationId,
               author: { email: "author-bob@example.com", name: "Bob" },
@@ -960,7 +960,7 @@ describe("PostRpcHandlers on-behalf", () => {
             const session = makeSession(fixture, "manager");
 
             yield* handlers
-              .PostCreate({
+              .CreatePost({
                 ...postCreateInput(fixture, postId, "On behalf feedback"),
                 author: {
                   email: "author-jane@example.com",
@@ -970,7 +970,7 @@ describe("PostRpcHandlers on-behalf", () => {
               .pipe(Effect.provideService(CurrentSession, session));
 
             yield* handlers
-              .PostUpdateAuthor({
+              .UpdatePostAuthor({
                 id: postId,
                 organizationId: fixture.organizationId,
                 author: {
@@ -1011,7 +1011,7 @@ describe("PostRpcHandlers on-behalf", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Self post"))
+            .CreatePost(postCreateInput(fixture, postId, "Self post"))
             .pipe(
               Effect.provideService(
                 CurrentSession,
@@ -1026,7 +1026,7 @@ describe("PostRpcHandlers on-behalf", () => {
           };
           for (let index = 0; index < 2; index++) {
             yield* handlers
-              .PostUpdateAuthor({
+              .UpdatePostAuthor({
                 id: postId,
                 organizationId: fixture.organizationId,
                 author,
@@ -1054,7 +1054,7 @@ describe("PostRpcHandlers on-behalf", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Self post"))
+            .CreatePost(postCreateInput(fixture, postId, "Self post"))
             .pipe(
               Effect.provideService(
                 CurrentSession,
@@ -1065,7 +1065,7 @@ describe("PostRpcHandlers on-behalf", () => {
           for (const role of ["contributor", null] as const) {
             const error = yield* Effect.flip(
               handlers
-                .PostUpdateAuthor({
+                .UpdatePostAuthor({
                   id: postId,
                   organizationId: fixture.organizationId,
                   author: { email: "author-jane@example.com" },
@@ -1097,7 +1097,7 @@ describe("PostRpcHandlers on-behalf", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .PostUpdateAuthor({
+              .UpdatePostAuthor({
                 id: postId,
                 organizationId: fixture.organizationId,
                 author: { email: "author-jane@example.com" },
@@ -1123,7 +1123,7 @@ describe("PostRpcHandlers on-behalf", () => {
           const session = makeSession(fixture, "manager");
 
           const slug = yield* handlers
-            .PostCreate({
+            .CreatePost({
               ...postCreateInput(fixture, postId, "Bare email post"),
               author: {
                 email: "author-display@example.com",
@@ -1136,7 +1136,7 @@ describe("PostRpcHandlers on-behalf", () => {
           expect(post?.creatorId).toBeNull();
 
           const posts = yield* handlers
-            .PostList({
+            .ListPosts({
               boardId: fixture.boardId,
               organizationId: fixture.organizationId,
             })
@@ -1147,7 +1147,7 @@ describe("PostRpcHandlers on-behalf", () => {
           });
 
           const detail = yield* handlers
-            .PostGet({ organizationId: fixture.organizationId, slug })
+            .GetPost({ organizationId: fixture.organizationId, slug })
             .pipe(Effect.provideService(CurrentSession, session));
           expect(detail.user).toEqual({
             name: "Display Doe",
@@ -1164,11 +1164,11 @@ describe("PostRpcHandlers on-behalf", () => {
           const session = makeSession(fixture, "manager");
 
           yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Self post"))
+            .CreatePost(postCreateInput(fixture, postId, "Self post"))
             .pipe(Effect.provideService(CurrentSession, session));
 
           yield* handlers
-            .PostUpdateAuthor({
+            .UpdatePostAuthor({
               id: postId,
               organizationId: fixture.organizationId,
               author: {
@@ -1179,7 +1179,7 @@ describe("PostRpcHandlers on-behalf", () => {
             .pipe(Effect.provideService(CurrentSession, session));
 
           const posts = yield* handlers
-            .PostList({
+            .ListPosts({
               boardId: fixture.boardId,
               organizationId: fixture.organizationId,
             })
@@ -1203,7 +1203,7 @@ describe("PostRpcHandlers on-behalf", () => {
           const session = makeSession(fixture, "manager");
 
           yield* handlers
-            .PostCreate({
+            .CreatePost({
               ...postCreateInput(fixture, postId, "Linked post"),
               author: {
                 email: "author-linked@example.com",
@@ -1215,7 +1215,7 @@ describe("PostRpcHandlers on-behalf", () => {
           // The adopted account is "Jane Customer" (see
           // insertVerifiedUser); the contact enrichment name must not win.
           const posts = yield* handlers
-            .PostList({
+            .ListPosts({
               boardId: fixture.boardId,
               organizationId: fixture.organizationId,
             })
@@ -1234,7 +1234,7 @@ describe("PostRpcHandlers on-behalf", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate({
+            .CreatePost({
               ...postCreateInput(fixture, postId, "Public on behalf"),
               author: {
                 email: "author-public@example.com",
@@ -1249,7 +1249,7 @@ describe("PostRpcHandlers on-behalf", () => {
             );
 
           const posts = yield* handlers
-            .PostListPublic({
+            .ListPostsPublic({
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
             })
@@ -1262,7 +1262,7 @@ describe("PostRpcHandlers on-behalf", () => {
       );
     });
 
-    describe("PostCreatePublic", () => {
+    describe("CreatePostPublic", () => {
       it.effect("rejects an author with a bad request", () =>
         Effect.gen(function* () {
           recordedIntegrationEvents.length = 0;
@@ -1273,7 +1273,7 @@ describe("PostRpcHandlers on-behalf", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .PostCreatePublic({
+              .CreatePostPublic({
                 ...postCreateInput(fixture, postId, "Public on behalf"),
                 author: { email: "jane@example.com" },
               })

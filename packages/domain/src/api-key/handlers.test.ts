@@ -236,7 +236,7 @@ describe("ApiKeyRpcHandlers", () => {
           const fixture = yield* makeFixture("starter");
 
           const created = yield* handlers
-            .ApiKeyCreate({
+            .CreateApiKey({
               name: "Production",
               organizationId: fixture.organizationId,
               expiration: "30d",
@@ -282,7 +282,7 @@ describe("ApiKeyRpcHandlers", () => {
           // A create that names no scopes gets the read-only default set: the
           // write scopes are never implied by asking for a key.
           const byDefault = yield* handlers
-            .ApiKeyCreate({
+            .CreateApiKey({
               name: "Reader",
               organizationId: fixture.organizationId,
               expiration: "30d",
@@ -306,7 +306,7 @@ describe("ApiKeyRpcHandlers", () => {
           // plugin stores the list verbatim and would otherwise report the
           // same action twice.
           const withWrites = yield* handlers
-            .ApiKeyCreate({
+            .CreateApiKey({
               name: "Tag manager",
               organizationId: fixture.organizationId,
               expiration: "30d",
@@ -343,7 +343,7 @@ describe("ApiKeyRpcHandlers", () => {
           const fixture = yield* makeFixture("starter");
 
           const created = yield* handlers
-            .ApiKeyCreate({
+            .CreateApiKey({
               name: "Production",
               organizationId: fixture.organizationId,
               expiration: "never",
@@ -367,7 +367,7 @@ describe("ApiKeyRpcHandlers", () => {
         const fixture = yield* makeFixture("starter");
 
         const error = yield* handlers
-          .ApiKeyCreate({
+          .CreateApiKey({
             name: "Production",
             organizationId: fixture.organizationId,
             expiration: "never",
@@ -393,7 +393,7 @@ describe("ApiKeyRpcHandlers", () => {
         const fixture = yield* makeFixture("free");
 
         const error = yield* handlers
-          .ApiKeyCreate({
+          .CreateApiKey({
             name: "Production",
             organizationId: fixture.organizationId,
             expiration: "never",
@@ -425,7 +425,7 @@ describe("ApiKeyRpcHandlers", () => {
         yield* db.delete(schema.subscriptionTable);
 
         const keys = yield* handlers
-          .ApiKeyList({ organizationId: fixture.organizationId })
+          .ListApiKeys({ organizationId: fixture.organizationId })
           .pipe(
             Effect.provideService(CurrentSession, makeSession(fixture, "owner"))
           );
@@ -439,7 +439,7 @@ describe("ApiKeyRpcHandlers", () => {
         });
 
         yield* handlers
-          .ApiKeyRevoke({
+          .RevokeApiKey({
             organizationId: fixture.organizationId,
             keyId: "apikey_downgraded",
           })
@@ -469,7 +469,7 @@ describe("ApiKeyRpcHandlers", () => {
         });
 
         const keys = yield* handlers
-          .ApiKeyList({ organizationId: mine.organizationId })
+          .ListApiKeys({ organizationId: mine.organizationId })
           .pipe(
             Effect.provideService(CurrentSession, makeSession(mine, "owner"))
           );
@@ -491,7 +491,7 @@ describe("ApiKeyRpcHandlers", () => {
         });
 
         const error = yield* handlers
-          .ApiKeyRevoke({
+          .RevokeApiKey({
             organizationId: mine.organizationId,
             keyId: "apikey_theirs_revoke",
           })
@@ -520,7 +520,7 @@ describe("ApiKeyRpcHandlers", () => {
           const fixture = yield* makeFixture("starter");
 
           const error = yield* handlers
-            .ApiKeyList({ organizationId: fixture.organizationId })
+            .ListApiKeys({ organizationId: fixture.organizationId })
             .pipe(
               Effect.provideService(CurrentSession, {
                 ...makeSession(fixture, "owner"),

@@ -14,12 +14,12 @@ import {
 } from "./schema";
 
 export class UpvoteRpcs extends RpcGroup.make(
-  Rpc.make("UpvoteList", {
+  Rpc.make("ListUpvotes", {
     payload: UpvoteList,
     success: Schema.Array(Upvote),
     error: UpvoteServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("UpvoteToggle", {
+  Rpc.make("ToggleUpvote", {
     payload: UpvoteToggle,
     success: Schema.Struct({
       upvoted: Schema.Boolean,
@@ -30,7 +30,7 @@ export class UpvoteRpcs extends RpcGroup.make(
   // On-behalf voter management is dashboard-only (AuthMiddleware): there is
   // deliberately no public variant. Add and remove are separate RPCs so an
   // admin can never remove someone else's vote by accident.
-  Rpc.make("UpvoteAddOnBehalf", {
+  Rpc.make("AddUpvoteOnBehalf", {
     payload: UpvoteAddOnBehalf,
     success: Schema.Struct({
       added: Schema.Boolean,
@@ -38,7 +38,7 @@ export class UpvoteRpcs extends RpcGroup.make(
     // On-behalf voter management consumes the per-member dashboard rate limit.
     error: Schema.Union([UpvoteServiceErrors, RateLimitErrors]),
   }).middleware(AuthMiddleware),
-  Rpc.make("UpvoteRemoveOnBehalf", {
+  Rpc.make("RemoveUpvoteOnBehalf", {
     payload: UpvoteRemoveOnBehalf,
     success: Schema.Struct({
       removed: Schema.Boolean,
@@ -47,14 +47,14 @@ export class UpvoteRpcs extends RpcGroup.make(
     error: Schema.Union([UpvoteServiceErrors, RateLimitErrors]),
   }).middleware(AuthMiddleware),
 
-  Rpc.make("UpvoteListPublic", {
+  Rpc.make("ListUpvotesPublic", {
     payload: UpvoteList,
     success: Schema.Array(Upvote),
     error: Schema.Union([UpvoteServiceErrors, RateLimitErrors]),
   })
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("UpvoteTogglePublic", {
+  Rpc.make("ToggleUpvotePublic", {
     payload: UpvoteToggle,
     success: Schema.Struct({
       upvoted: Schema.Boolean,

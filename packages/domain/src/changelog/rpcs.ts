@@ -16,13 +16,13 @@ import {
 } from "./schema";
 
 export class ChangelogRpcs extends RpcGroup.make(
-  Rpc.make("ChangelogList", {
+  Rpc.make("ListChangelogs", {
     payload: ChangelogList,
     success: Schema.Array(Changelog),
     error: ChangelogServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("ChangelogListPublic", {
+  Rpc.make("ListChangelogsPublic", {
     payload: ChangelogList,
     success: Schema.Array(Changelog),
     error: Schema.Union([ChangelogServiceErrors, RateLimitErrors]),
@@ -35,7 +35,7 @@ export class ChangelogRpcs extends RpcGroup.make(
   // list wastes that entire payload per request. The response embeds the
   // entry's linked posts so the public detail page does not have to sync the
   // whole post/link collections for one section.
-  Rpc.make("ChangelogGetPublic", {
+  Rpc.make("GetChangelogPublic", {
     payload: ChangelogGet,
     success: ChangelogDetail,
     error: Schema.Union([ChangelogServiceErrors, RateLimitErrors]),
@@ -43,19 +43,19 @@ export class ChangelogRpcs extends RpcGroup.make(
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
 
-  Rpc.make("ChangelogCreate", {
+  Rpc.make("CreateChangelog", {
     success: Schema.Void,
     payload: ChangelogCreate,
     error: ChangelogServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("ChangelogDelete", {
+  Rpc.make("DeleteChangelog", {
     success: Schema.Void,
     payload: ChangelogDelete,
     error: ChangelogServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("ChangelogUpdate", {
+  Rpc.make("UpdateChangelog", {
     success: Schema.Void,
     payload: ChangelogUpdate,
     error: ChangelogServiceErrors,

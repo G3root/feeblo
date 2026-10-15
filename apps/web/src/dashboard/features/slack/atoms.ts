@@ -17,7 +17,7 @@ export const slackReactivityKeys = (organizationId: string) => ({
 /** Slack connections of one organization, cached per organization id. */
 export const connectionsAtom = Atom.family((organizationId: string) =>
   DashboardClient.query(
-    "SlackConnectionList",
+    "ListSlackConnections",
     { organizationId },
     { reactivityKeys: slackReactivityKeys(organizationId) }
   ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
@@ -31,7 +31,7 @@ export type ChannelListArgs = {
 /** Channels of one connection, cached per organization and connection id. */
 export const channelsAtom = Atom.family((args: ChannelListArgs) =>
   DashboardClient.query(
-    "SlackChannelList",
+    "ListSlackChannels",
     { connectionId: args.connectionId, organizationId: args.organizationId },
     { reactivityKeys: slackReactivityKeys(args.organizationId) }
   ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
@@ -39,7 +39,7 @@ export const channelsAtom = Atom.family((args: ChannelListArgs) =>
 
 /** Whether Slack is configured for this deployment. */
 export const slackStatusAtom = DashboardClient.query(
-  "SlackIntegrationStatus",
+  "GetSlackIntegrationStatus",
   void 0
 ).pipe(
   Atom.map((result) => Result.map(result, (value) => value.configured)),
@@ -48,10 +48,10 @@ export const slackStatusAtom = DashboardClient.query(
 );
 
 export const startSlackConnectAtom =
-  DashboardClient.mutation("SlackConnectStart");
+  DashboardClient.mutation("StartSlackConnect");
 export const updateSlackChannelNotificationsAtom = DashboardClient.mutation(
-  "SlackChannelNotificationsUpdate"
+  "UpdateSlackChannelNotifications"
 );
 export const disconnectSlackConnectionAtom = DashboardClient.mutation(
-  "SlackConnectionDisconnect"
+  "DisconnectSlackConnection"
 );

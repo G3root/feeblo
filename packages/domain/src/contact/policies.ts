@@ -55,7 +55,7 @@ const makeContactPolicy = Effect.gen(function* () {
       }),
       companyBelongsToOrganization(args)
       // The plan's CRM-entry cap is enforced inside the create's transaction
-      // (`ContactCreate`), after the workspace row is locked: the count is
+      // (`CreateContact`), after the workspace row is locked: the count is
       // only meaningful under that lock, and a policy running outside it
       // would let two concurrent creates both see room past the cap.
     );

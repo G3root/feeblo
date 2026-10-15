@@ -8,52 +8,52 @@ import * as S from "./schema";
 
 /** Authenticated RPC surface for organization-scoped webhook management. */
 export class WebhookManagementRpcs extends RpcGroup.make(
-  Rpc.make("WebhookEndpointList", {
+  Rpc.make("ListWebhookEndpoints", {
     success: Schema.Array(S.WebhookEndpoint),
     payload: S.WebhookEndpointList,
     error: WebhookManagementErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("WebhookEndpointCreate", {
+  Rpc.make("CreateWebhookEndpoint", {
     success: S.WebhookEndpointCreated,
     payload: S.WebhookEndpointCreate,
     error: WebhookManagementErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("WebhookEndpointUpdate", {
+  Rpc.make("UpdateWebhookEndpoint", {
     success: S.WebhookEndpoint,
     payload: S.WebhookEndpointUpdate,
     error: WebhookManagementErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("WebhookEndpointPause", {
+  Rpc.make("PauseWebhookEndpoint", {
     success: Schema.Void,
     payload: S.WebhookConnectionAction,
     error: WebhookManagementErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("WebhookEndpointResume", {
+  Rpc.make("ResumeWebhookEndpoint", {
     success: Schema.Void,
     payload: S.WebhookConnectionAction,
     error: WebhookManagementErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("WebhookEndpointRemove", {
+  Rpc.make("RemoveWebhookEndpoint", {
     success: Schema.Void,
     payload: S.WebhookConnectionAction,
     error: WebhookManagementErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("WebhookSecretRotate", {
+  Rpc.make("RotateWebhookSecret", {
     success: S.WebhookSecretRotated,
     payload: S.WebhookConnectionAction,
     error: WebhookManagementErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("WebhookTestDelivery", {
+  Rpc.make("TestWebhookDelivery", {
     success: S.WebhookTestDeliveryResult,
     payload: S.WebhookTestDelivery,
     error: WebhookManagementErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("WebhookDeliveryHistory", {
+  Rpc.make("GetWebhookDeliveryHistory", {
     success: S.WebhookDeliveryHistoryPage,
     payload: S.WebhookDeliveryHistory,
     error: WebhookManagementErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("WebhookDeliveryRetry", {
+  Rpc.make("RetryWebhookDelivery", {
     success: Schema.Void,
     payload: S.WebhookManualRetry,
     error: WebhookManagementErrors,

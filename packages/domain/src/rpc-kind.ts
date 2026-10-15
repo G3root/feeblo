@@ -7,79 +7,63 @@
  * frame, and only the tag travels in a frame, so the kind has to be a property
  * of the name.
  *
- * The rules below are the convention, and the type checker keeps it honest:
- * `RpcKindOf` computes a tag's kind from the same lists `rpcKindOf` reads, and
- * `EveryRpcTagIsClassified` fails to compile while any tag in `AllRpcs`
- * matches neither list. An RPC is a read when its name ends with the noun it
- * returns (`PostList`, `PostGet`), with its `Public` twin read against the same
- * name so `PostGetPublic` is a read like `PostGet`. An RPC is a write when its
- * name carries the verb it performs, which may sit anywhere in the tag because
- * several operations qualify it (`OrganizationUpdateMemberRole`,
- * `PostUpdateTitle`).
+ * The convention is a verb prefix: every tag starts with one of the verbs
+ * below, and the verb decides the kind. A read returns data and changes no
+ * state (`ListPosts`, `GetPost`, `CountUnreadNotifications`); a write changes
+ * state (`CreatePost`, `UpdatePostTitle`, `MarkNotificationRead`). The `Public`
+ * twin of a read is a read (`ListPostsPublic`), because the prefix is what
+ * carries the kind; no suffix is stripped before the prefix is matched.
  *
- * The read test runs first, and that order is part of the convention:
- * `PostDeleteEligibilityList` and `PostStatusDeletePreview` are reads even
- * though a write verb appears in their names, because the verb is part of the
- * noun they return. A tag matching neither list is a compile error, and the
- * runtime classifier answers "no kind" for it, so an unknown frame is sent on
- * its own rather than sharing a request with a write.
+ * The rules are the convention, and the type checker keeps it honest:
+ * `RpcKindOf` computes a tag's kind from the same lists `rpcKindOf` reads, and
+ * `EveryRpcTagIsClassified` fails to compile while any tag in `AllRpcs` starts
+ * with neither a read verb nor a write verb. A verb matches only at a word
+ * boundary, so `CheckoutBilling` is a write even though `Check` is a read
+ * verb, and `Listen` is not a `List` read.
+ *
+ * `RpcTagsResolved` keeps the check from passing vacuously: if `RpcTagsOf`
+ * ever stopped resolving, every tag would be `never` and nothing would be
+ * checked, so the alias pins one tag the union must contain.
  */
 import type { AllRpcs, RpcTagsOf } from "./rpc-group";
 
-/** The suffixes a read's name ends with, after its `Public` twin is dropped. */
-export const readRpcSuffixes = [
-  "List",
-  "Get",
-  "Watch",
-  "Search",
-  "Suggestions",
-  "Count",
-  "History",
-  "Status",
+/** The verbs a read's name starts with. A read returns data and changes nothing. */
+export const readRpcVerbs = [
   "Check",
+  "Count",
+  "Get",
+  "List",
   "Preview",
-  "Eligibility",
-  "ResolveMerged",
-  "Links",
+  "Resolve",
+  "Search",
+  "Watch",
 ] as const;
 
-/**
- * The verbs a write's name carries. The list names the write vocabulary, not
- * only the verbs in use today, so a new mutation that follows it needs no
- * change here.
- */
+/** The verbs a write's name starts with. A write changes state. */
 export const writeRpcVerbs = [
   "Add",
   "AdminUpdate",
-  "Archive",
   "Cancel",
-  "Checkout",
   "Confirm",
   "Connect",
   "Create",
   "Delete",
-  "Delivery",
   "Disconnect",
-  "HidePoweredByBranding",
+  "Hide",
   "Link",
-  "MakeDefault",
-  "MarkAllRead",
-  "MarkRead",
+  "Mark",
   "Merge",
-  "OnBehalf",
   "Pause",
   "Pin",
-  "Portal",
   "Publish",
   "Remove",
-  "Rename",
   "Reorder",
   "Resume",
   "Retry",
   "Revoke",
   "Rotate",
-  "Send",
   "Set",
+  "Start",
   "Subscribe",
   "Test",
   "Toggle",
@@ -96,60 +80,70 @@ export type RpcKind = "read" | "write";
 /** The tag of every RPC in `AllRpcs`, the union the compile-time check spans. */
 export type RpcTag = RpcTagsOf<typeof AllRpcs>;
 
-/** A read's or write's public twin classified by the name its `Public` suffix hides. */
-type WithoutPublic<Tag extends string> = Tag extends `${infer Base}Public`
-  ? Base
-  : Tag;
-
-type ReadSuffix = (typeof readRpcSuffixes)[number];
+type ReadVerb = (typeof readRpcVerbs)[number];
 type WriteVerb = (typeof writeRpcVerbs)[number];
 
 /**
- * The kind `tag` names. `never` when the name carries neither a read suffix
+ * `Verb` alone or followed by another capitalized word. The boundary is what
+ * keeps `Check` from matching `Checkout`, and a template type cannot express
+ * "end of input" inside `${Verb}${string}`, so the capitalized word is spelled
+ * out.
+ */
+type PrefixedBy<Verb extends string> =
+  | Verb
+  | `${Verb}${Uppercase<string>}${string}`;
+
+/**
+ * The kind `tag` names. `never` when the name starts with neither a read verb
  * nor a write verb, which `EveryRpcTagIsClassified` turns into a compile error.
  */
 export type RpcKindOf<Tag extends string> =
-  WithoutPublic<Tag> extends `${string}${ReadSuffix}`
+  Tag extends PrefixedBy<ReadVerb>
     ? "read"
-    : WithoutPublic<Tag> extends `${string}${WriteVerb}${string}`
+    : Tag extends PrefixedBy<WriteVerb>
       ? "write"
       : never;
 
 type AssertNever<Value extends never> = Value;
 type AssertTrue<Value extends true> = Value;
 
-/** The tags whose names carry neither a read suffix nor a write verb. */
+/** The tags whose names start with neither a read verb nor a write verb. */
 type UnclassifiedRpcTags = {
   [Tag in RpcTag]: RpcKindOf<Tag> extends never ? Tag : never;
 }[RpcTag];
 
-/**
- * The compile-time half of the convention, and the whole of its enforcement:
- * the aliases below do not typecheck while a tag in `AllRpcs` is unclassified.
- *
- * `RpcTagsResolved` is the guard that keeps this from passing vacuously: if
- * `RpcTagsOf<typeof AllRpcs>` ever stopped resolving, `RpcTag` would be `never`
- * and every mapped check over it would succeed without reading a single tag.
- */
+/** The alias that fails to compile while the tag union stops resolving. */
 export type RpcTagsResolved = AssertTrue<
-  "PostList" extends RpcTag ? true : false
+  "ListPosts" extends RpcTag ? true : false
 >;
 
+/** The compile-time half of the convention. */
 export type EveryRpcTagIsClassified = AssertNever<UnclassifiedRpcTags>;
 
 /**
+ * Whether `tag` starts with `verb` at a word boundary: the tag equals the verb
+ * or the verb is followed by a second capitalized word. The runtime twin of
+ * the `PrefixedBy` template type.
+ */
+const isPrefixedBy = (tag: string, verb: string): boolean => {
+  if (tag.length === verb.length) return tag === verb;
+  if (!tag.startsWith(verb)) return false;
+  const next = tag.charCodeAt(verb.length);
+  return next >= 0x41 && next <= 0x5a;
+};
+
+/**
  * The runtime half of `RpcKindOf`, over the same two lists. Answers
- * `undefined` for a tag that matches neither, including a tag this build does
- * not know, so the caller can send it on its own instead of guessing.
+ * `undefined` for a tag that starts with neither verb, including a tag this
+ * build does not know, so the caller can send it on its own instead of
+ * guessing.
  */
 export const rpcKindOf = (tag: string): RpcKind | undefined => {
-  const bare = tag.endsWith("Public") ? tag.slice(0, -"Public".length) : tag;
-
-  if (readRpcSuffixes.some((suffix) => bare.endsWith(suffix))) {
+  if (readRpcVerbs.some((verb) => isPrefixedBy(tag, verb))) {
     return "read";
   }
 
-  if (writeRpcVerbs.some((verb) => bare.includes(verb))) {
+  if (writeRpcVerbs.some((verb) => isPrefixedBy(tag, verb))) {
     return "write";
   }
 

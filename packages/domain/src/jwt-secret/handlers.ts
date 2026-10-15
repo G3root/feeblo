@@ -18,21 +18,21 @@ export const JwtSecretRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* JwtSecretRepository;
 
   return {
-    JwtSecretRevoke: (args: TJwtSecretRevoke) =>
+    RevokeJwtSecret: (args: TJwtSecretRevoke) =>
       repository
         .revoke(args)
         .pipe(
           Policy.withPolicy(canManageJwtSecret(args.organizationId)),
           withRemapDbErrors("JwtSecret", "update")
         ),
-    JwtSecretRotate: ({ organizationId }: TJwtSecretRotate) =>
+    RotateJwtSecret: ({ organizationId }: TJwtSecretRotate) =>
       repository
         .rotate({ organizationId })
         .pipe(
           Policy.withPolicy(canManageJwtSecret(organizationId)),
           withRemapDbErrors("JwtSecret", "update")
         ),
-    JwtSecretList: ({ organizationId }: TJwtSecretList) =>
+    ListJwtSecrets: ({ organizationId }: TJwtSecretList) =>
       repository
         .getSecretsForOrg({ organizationId })
         .pipe(

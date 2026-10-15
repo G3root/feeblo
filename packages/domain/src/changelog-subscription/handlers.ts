@@ -123,7 +123,7 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     TChangelogSubscriptionCreate,
     ChangelogSubscriptionRpcTag
   >()({
-    operation: "ChangelogSubscriptionCreate",
+    operation: "CreateChangelogSubscription",
     remap: { action: "create", entity: "ChangelogSubscription" },
     dashboard: {
       rateLimit: "write",
@@ -147,7 +147,7 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     TChangelogSubscriptionDelete,
     ChangelogSubscriptionRpcTag
   >()({
-    operation: "ChangelogSubscriptionDelete",
+    operation: "DeleteChangelogSubscription",
     remap: { action: "delete", entity: "ChangelogSubscription" },
     dashboard: {
       rateLimit: "write",
@@ -182,7 +182,7 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     TChangelogSubscriptionList,
     ChangelogSubscriptionRpcTag
   >()({
-    operation: "ChangelogSubscriptionList",
+    operation: "ListChangelogSubscriptions",
     remap: { action: "select", entity: "ChangelogSubscription" },
     config: {
       rateLimit: "read",
@@ -197,10 +197,10 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   // -- RPC handlers --
 
   return {
-    ChangelogSubscriptionList: (args: TChangelogSubscriptionList) =>
+    ListChangelogSubscriptions: (args: TChangelogSubscriptionList) =>
       listSubscribersEffect(args).pipe(
         RateLimit.withPublicRpcRateLimit({
-          name: "ChangelogSubscriptionList",
+          name: "ListChangelogSubscriptions",
           level: "read",
         }),
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
@@ -210,7 +210,7 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     // Public boards only ever need the current visitor's own subscription to
     // render the toggle; unlike post subscriptions there is no subscriber
     // showcase, so other users' rows are never exposed.
-    ChangelogSubscriptionListPublic: listPublicEntry.entry((args) =>
+    ListChangelogSubscriptionsPublic: listPublicEntry.entry((args) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         return yield* listSubscribersEffect(args, {
@@ -219,13 +219,13 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       })
     ),
 
-    ChangelogSubscriptionCreate: subscribe.dashboard,
+    CreateChangelogSubscription: subscribe.dashboard,
 
-    ChangelogSubscriptionCreatePublic: subscribe.public,
+    CreateChangelogSubscriptionPublic: subscribe.public,
 
-    ChangelogSubscriptionDelete: unsubscribe.dashboard,
+    DeleteChangelogSubscription: unsubscribe.dashboard,
 
-    ChangelogSubscriptionDeletePublic: unsubscribe.public,
+    DeleteChangelogSubscriptionPublic: unsubscribe.public,
   };
 });
 

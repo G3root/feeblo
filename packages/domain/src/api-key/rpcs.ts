@@ -19,17 +19,17 @@ import {
  * bypass these handlers.
  */
 export class ApiKeyRpcs extends RpcGroup.make(
-  Rpc.make("ApiKeyCreate", {
+  Rpc.make("CreateApiKey", {
     success: ApiKeyCreated,
     payload: ApiKeyCreate,
     error: ApiKeyServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("ApiKeyList", {
+  Rpc.make("ListApiKeys", {
     success: Schema.Array(ApiKeySummary),
     payload: ApiKeyList,
     error: ApiKeyServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("ApiKeyRevoke", {
+  Rpc.make("RevokeApiKey", {
     success: Schema.Void,
     payload: ApiKeyRevoke,
     error: ApiKeyServiceErrors,

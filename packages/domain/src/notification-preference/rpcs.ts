@@ -24,12 +24,12 @@ export const NotificationPreferenceErrors = Schema.Union([
  * is no route that writes another member's preferences.
  */
 export class NotificationPreferenceRpcs extends RpcGroup.make(
-  Rpc.make("NotificationPreferenceGet", {
+  Rpc.make("GetNotificationPreference", {
     payload: NotificationPreferenceQuery,
     success: NotificationPreferenceState,
     error: NotificationPreferenceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("NotificationPreferenceSet", {
+  Rpc.make("SetNotificationPreference", {
     payload: NotificationPreferenceSetRequest,
     success: NotificationPreferenceState,
     error: NotificationPreferenceErrors,

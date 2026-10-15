@@ -8,32 +8,32 @@ import * as S from "./schema";
 
 /** Authenticated RPC surface for organization-scoped Slack integration management. */
 export class SlackManagementRpcs extends RpcGroup.make(
-  Rpc.make("SlackConnectionList", {
+  Rpc.make("ListSlackConnections", {
     success: Schema.Array(S.SlackConnection),
     payload: S.SlackConnectionList,
     error: ChatIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("SlackConnectStart", {
+  Rpc.make("StartSlackConnect", {
     success: S.SlackConnectStarted,
     payload: S.SlackConnectStart,
     error: ChatIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("SlackChannelList", {
+  Rpc.make("ListSlackChannels", {
     success: Schema.Array(S.SlackChannel),
     payload: S.SlackChannelList,
     error: ChatIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("SlackChannelNotificationsUpdate", {
+  Rpc.make("UpdateSlackChannelNotifications", {
     success: Schema.Void,
     payload: S.SlackChannelNotificationsUpdate,
     error: ChatIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("SlackConnectionDisconnect", {
+  Rpc.make("DisconnectSlackConnection", {
     success: Schema.Void,
     payload: S.SlackConnectionDisconnect,
     error: ChatIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("SlackIntegrationStatus", {
+  Rpc.make("GetSlackIntegrationStatus", {
     success: S.SlackIntegrationStatus,
     error: ChatIntegrationErrors,
   }).middleware(AuthMiddleware)

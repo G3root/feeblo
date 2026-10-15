@@ -43,7 +43,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
   const publication = yield* makeChangelogPublication;
 
   return {
-    ChangelogList: (args: TChangelogList) =>
+    ListChangelogs: (args: TChangelogList) =>
       repository
         .findMany(args)
         .pipe(
@@ -51,10 +51,10 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Changelog", "select")
         ),
 
-    ChangelogListPublic: (args: TChangelogList) =>
+    ListChangelogsPublic: (args: TChangelogList) =>
       repository.findManyPublished(args).pipe(
         RateLimit.withPublicRpcRateLimit({
-          name: "ChangelogListPublic",
+          name: "ListChangelogsPublic",
           level: "read",
         }),
         Policy.withPublicPolicy(
@@ -63,7 +63,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Changelog", "select")
       ),
 
-    ChangelogGetPublic: (args: TChangelogGet) =>
+    GetChangelogPublic: (args: TChangelogGet) =>
       Effect.gen(function* () {
         const entry = yield* repository.findPublishedBySlug(args);
         if (entry === undefined) {
@@ -81,7 +81,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         return { ...entry, posts };
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
-          name: "ChangelogGetPublic",
+          name: "GetChangelogPublic",
           level: "read",
         }),
         Policy.withPublicPolicy(
@@ -90,7 +90,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Changelog", "select")
       ),
 
-    ChangelogCreate: (args: TChangelogCreate) => {
+    CreateChangelog: (args: TChangelogCreate) => {
       const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
         args.content
       );
@@ -156,7 +156,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
       );
     },
 
-    ChangelogDelete: (args: TChangelogDelete) =>
+    DeleteChangelog: (args: TChangelogDelete) =>
       repository.delete(args).pipe(
         Effect.asVoid,
         Effect.tap(() =>
@@ -182,7 +182,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Changelog", "delete")
       ),
 
-    ChangelogUpdate: (args: TChangelogUpdate) => {
+    UpdateChangelog: (args: TChangelogUpdate) => {
       const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
         args.content
       );

@@ -128,7 +128,7 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     TPostSubscriptionCreate,
     PostSubscriptionRpcTag
   >()({
-    operation: "PostSubscriptionCreate",
+    operation: "CreatePostSubscription",
     remap: { action: "create", entity: "PostSubscription" },
     dashboard: {
       rateLimit: undefined,
@@ -158,7 +158,7 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     TPostSubscriptionDelete,
     PostSubscriptionRpcTag
   >()({
-    operation: "PostSubscriptionDelete",
+    operation: "DeletePostSubscription",
     remap: { action: "delete", entity: "PostSubscription" },
     dashboard: {
       rateLimit: undefined,
@@ -199,14 +199,14 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     TPostSubscriptionList,
     PostSubscriptionRpcTag
   >()({
-    operation: "PostSubscriptionList",
+    operation: "ListPostSubscriptions",
     remap: { action: "select", entity: "PostSubscription" },
     config: {
       rateLimit: "read",
       // This route runs on `PublicAuthMiddleware`, which admits the restricted
       // sessions that widget SSO mints — so it needs the same organization
-      // confinement as `PostSubscriptionCreatePublic` and
-      // `PostSubscriptionDeletePublic`. The repository's `userId` predicate is
+      // confinement as `CreatePostSubscriptionPublic` and
+      // `DeletePostSubscriptionPublic`. The repository's `userId` predicate is
       // what kept the response to the caller's own rows; this is the control
       // that says the caller may ask about this organization at all.
       policy: (args, _surface) =>
@@ -217,13 +217,13 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   // -- RPC handlers --
 
   return {
-    PostSubscriptionList: (args: TPostSubscriptionList) =>
+    ListPostSubscriptions: (args: TPostSubscriptionList) =>
       listSubscribersEffect(args).pipe(
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
         withRemapDbErrors("PostSubscription", "select")
       ),
 
-    PostSubscriptionListPublic: listPublicEntry.entry((args) =>
+    ListPostSubscriptionsPublic: listPublicEntry.entry((args) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         return yield* listSubscribersEffect(args, {
@@ -233,13 +233,13 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       })
     ),
 
-    PostSubscriptionCreate: subscribe.dashboard,
+    CreatePostSubscription: subscribe.dashboard,
 
-    PostSubscriptionCreatePublic: subscribe.public,
+    CreatePostSubscriptionPublic: subscribe.public,
 
-    PostSubscriptionDelete: unsubscribe.dashboard,
+    DeletePostSubscription: unsubscribe.dashboard,
 
-    PostSubscriptionDeletePublic: unsubscribe.public,
+    DeletePostSubscriptionPublic: unsubscribe.public,
   };
 });
 

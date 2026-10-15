@@ -136,7 +136,7 @@ export function HidePoweredByBranding({
 
     try {
       await fetchRpc((rpc) =>
-        rpc.SiteHidePoweredByBranding({
+        rpc.HideSitePoweredByBranding({
           id: site.id,
           organizationId: site.organizationId,
           hidePoweredBy: value,

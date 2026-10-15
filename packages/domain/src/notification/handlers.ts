@@ -69,7 +69,7 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
     TNotificationMarkRead,
     NotificationRpcTag
   >()({
-    operation: "NotificationMarkRead",
+    operation: "MarkNotificationRead",
     remap: { action: "update", entity: "Notification" },
     dashboard: {
       rateLimit: "write",
@@ -87,7 +87,7 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
     { organizationId: string },
     NotificationRpcTag
   >()({
-    operation: "NotificationMarkAllRead",
+    operation: "MarkAllNotificationsRead",
     remap: { action: "update", entity: "Notification" },
     dashboard: {
       rateLimit: "write",
@@ -116,7 +116,7 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
   // dashboard, a restricted widget session on the portal.
 
   const listRead = defineSurfacePair<TNotificationList, NotificationRpcTag>()({
-    operation: "NotificationList",
+    operation: "ListNotifications",
     remap: { action: "select", entity: "Notification" },
     dashboard: {
       rateLimit: "read",
@@ -134,7 +134,7 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
     { organizationId: string },
     NotificationRpcTag
   >()({
-    operation: "NotificationUnreadCount",
+    operation: "CountUnreadNotifications",
     remap: { action: "select", entity: "Notification" },
     dashboard: {
       rateLimit: "read",
@@ -157,17 +157,17 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
   );
 
   return {
-    NotificationList: list.dashboard,
-    NotificationUnreadCount: unreadCount.dashboard,
-    NotificationMarkRead: markRead.dashboard,
-    NotificationMarkAllRead: markAllRead.dashboard,
+    ListNotifications: list.dashboard,
+    CountUnreadNotifications: unreadCount.dashboard,
+    MarkNotificationRead: markRead.dashboard,
+    MarkAllNotificationsRead: markAllRead.dashboard,
     // Public-board variants for signed-in end users, who may not be workspace
     // members. Every query is scoped to the session user id, so results can
     // never leak another user's inbox.
-    NotificationListPublic: list.public,
-    NotificationUnreadCountPublic: unreadCount.public,
-    NotificationMarkReadPublic: markRead.public,
-    NotificationMarkAllReadPublic: markAllRead.public,
+    ListNotificationsPublic: list.public,
+    CountUnreadNotificationsPublic: unreadCount.public,
+    MarkNotificationReadPublic: markRead.public,
+    MarkAllNotificationsReadPublic: markAllRead.public,
   };
 });
 

@@ -114,7 +114,7 @@ export function CommentDisplayItem({
     mutationFn: async () => {
       if (data.pinnedAt == null) {
         await fetchRpc((rpc) =>
-          rpc.CommentPin({
+          rpc.PinComment({
             id: data.id,
             organizationId: data.organizationId,
             postId: data.postId,
@@ -122,7 +122,7 @@ export function CommentDisplayItem({
         );
       } else {
         await fetchRpc((rpc) =>
-          rpc.CommentUnpin({
+          rpc.UnpinComment({
             id: data.id,
             organizationId: data.organizationId,
             postId: data.postId,

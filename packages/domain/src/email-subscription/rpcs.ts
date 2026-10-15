@@ -21,17 +21,17 @@ const EmailSubscriptionPublicErrors = Schema.Union([
 
 /** Public consent endpoints; their responses never include link tokens. */
 export class EmailSubscriptionRpcs extends RpcGroup.make(
-  Rpc.make("EmailSubscriptionChangelogSubscribePublic", {
+  Rpc.make("SubscribeEmailSubscriptionPublic", {
     payload: ChangelogSubscriptionRequest,
     success: EmailSubscriptionRequestAccepted,
     error: EmailSubscriptionPublicErrors,
   }).middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("EmailSubscriptionVerifyPublic", {
+  Rpc.make("VerifyEmailSubscriptionPublic", {
     payload: EmailSubscriptionTokenRequest,
     success: EmailSubscriptionVerificationAccepted,
     error: EmailSubscriptionPublicErrors,
   }).middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("EmailSubscriptionUnsubscribePublic", {
+  Rpc.make("UnsubscribeEmailSubscriptionPublic", {
     payload: EmailSubscriptionTokenRequest,
     success: EmailSubscriptionUnsubscribeAccepted,
     error: EmailSubscriptionPublicErrors,

@@ -124,9 +124,9 @@ function SecuritySettingsContent({
     }
     isGeneratingRef.current = true;
     try {
-      // JwtSecretRotate doubles as first-time generation: when no secret
+      // RotateJwtSecret doubles as first-time generation: when no secret
       // exists it revokes nothing and simply creates a new active one.
-      await fetchRpc((rpc) => rpc.JwtSecretRotate({ organizationId }));
+      await fetchRpc((rpc) => rpc.RotateJwtSecret({ organizationId }));
       trackEvent("sso_secret_generated", { success: true });
       toastManager.add({
         title: "Secret generated successfully",
@@ -144,7 +144,7 @@ function SecuritySettingsContent({
 
   const handleRotate = async () => {
     try {
-      await fetchRpc((rpc) => rpc.JwtSecretRotate({ organizationId }));
+      await fetchRpc((rpc) => rpc.RotateJwtSecret({ organizationId }));
       trackEvent("sso_secret_rotated", { success: true });
       toastManager.add({
         title: "Secret rotated successfully",
@@ -161,7 +161,7 @@ function SecuritySettingsContent({
   const handleRevoke = async () => {
     try {
       await fetchRpc((rpc) =>
-        rpc.JwtSecretRevoke({ organizationId, secretId: activeSecret.id })
+        rpc.RevokeJwtSecret({ organizationId, secretId: activeSecret.id })
       );
       trackEvent("sso_secret_revoked", { success: true });
       toastManager.add({
@@ -321,7 +321,7 @@ function SecuritySettingsContent({
                             onClick={async () => {
                               try {
                                 await fetchRpc((rpc) =>
-                                  rpc.JwtSecretRevoke({
+                                  rpc.RevokeJwtSecret({
                                     organizationId,
                                     secretId: s.id,
                                   })

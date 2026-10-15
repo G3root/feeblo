@@ -12,7 +12,7 @@ export const webhookReactivityKeys = (organizationId: string) => ({
 /** The endpoint list of one organization, cached per organization id. */
 export const endpointsAtom = Atom.family((organizationId: string) =>
   DashboardClient.query(
-    "WebhookEndpointList",
+    "ListWebhookEndpoints",
     { organizationId },
     { reactivityKeys: webhookReactivityKeys(organizationId) }
   ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
@@ -37,7 +37,7 @@ const loadWebhookDeliveryHistory = (input: {
 }) =>
   Effect.gen(function* () {
     const client = yield* DashboardClient;
-    return yield* client("WebhookDeliveryHistory", input);
+    return yield* client("GetWebhookDeliveryHistory", input);
   });
 
 export const deliveryHistoryRefreshAtom = Atom.family(
@@ -81,26 +81,26 @@ export const preloadDeliveryHistoryAtom = Atom.fnSync(
 );
 
 export const createWebhookEndpointAtom = DashboardClient.mutation(
-  "WebhookEndpointCreate"
+  "CreateWebhookEndpoint"
 );
 export const updateWebhookEndpointAtom = DashboardClient.mutation(
-  "WebhookEndpointUpdate"
+  "UpdateWebhookEndpoint"
 );
 export const testWebhookDeliveryAtom = DashboardClient.mutation(
-  "WebhookTestDelivery"
+  "TestWebhookDelivery"
 );
 export const rotateWebhookSecretAtom = DashboardClient.mutation(
-  "WebhookSecretRotate"
+  "RotateWebhookSecret"
 );
 export const resumeWebhookEndpointAtom = DashboardClient.mutation(
-  "WebhookEndpointResume"
+  "ResumeWebhookEndpoint"
 );
 export const pauseWebhookEndpointAtom = DashboardClient.mutation(
-  "WebhookEndpointPause"
+  "PauseWebhookEndpoint"
 );
 export const removeWebhookEndpointAtom = DashboardClient.mutation(
-  "WebhookEndpointRemove"
+  "RemoveWebhookEndpoint"
 );
 export const retryWebhookDeliveryAtom = DashboardClient.mutation(
-  "WebhookDeliveryRetry"
+  "RetryWebhookDelivery"
 );

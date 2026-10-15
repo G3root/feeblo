@@ -77,7 +77,7 @@ describe("JwtSecretRpcHandlers", () => {
         const handlers = yield* JwtSecretRpcHandlersEffect;
         const fixture = yield* makeFixture();
         const secrets = yield* handlers
-          .JwtSecretList({ organizationId: fixture.organizationId })
+          .ListJwtSecrets({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         expect(secrets).toHaveLength(0);
       })
@@ -90,11 +90,11 @@ describe("JwtSecretRpcHandlers", () => {
         const session = makeSession(fixture);
 
         yield* handlers
-          .JwtSecretRotate({ organizationId: fixture.organizationId })
+          .RotateJwtSecret({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
 
         const secrets = yield* handlers
-          .JwtSecretList({ organizationId: fixture.organizationId })
+          .ListJwtSecrets({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
         expect(secrets).toHaveLength(1);
         expect(secrets[0]).toMatchObject({
@@ -111,7 +111,7 @@ describe("JwtSecretRpcHandlers", () => {
         const fixture = yield* makeFixture();
         const error = yield* Effect.flip(
           handlers
-            .JwtSecretRotate({ organizationId: fixture.organizationId })
+            .RotateJwtSecret({ organizationId: fixture.organizationId })
             .pipe(
               Effect.provideService(
                 CurrentSession,
@@ -131,17 +131,17 @@ describe("JwtSecretRpcHandlers", () => {
 
         // Generate the initial secret first (creation is explicit now).
         yield* handlers
-          .JwtSecretRotate({ organizationId: fixture.organizationId })
+          .RotateJwtSecret({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
         const initial = yield* handlers
-          .JwtSecretList({ organizationId: fixture.organizationId })
+          .ListJwtSecrets({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
 
         yield* handlers
-          .JwtSecretRotate({ organizationId: fixture.organizationId })
+          .RotateJwtSecret({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
         const rotated = yield* handlers
-          .JwtSecretList({ organizationId: fixture.organizationId })
+          .ListJwtSecrets({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
         expect(rotated).toHaveLength(2);
         expect(

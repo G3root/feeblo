@@ -48,7 +48,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
     });
 
   const toggleWrite = defineSurfacePair<TUpvoteToggle, UpvoteRpcTag>()({
-    operation: "UpvoteToggle",
+    operation: "ToggleUpvote",
     remap: { action: "update", entity: "Upvote" },
     dashboard: { rateLimit: undefined, policy: canToggleFor },
     public: { rateLimit: "write", policy: canToggleFor },
@@ -72,13 +72,13 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
   // public-only rows with no roster, so the pair does not apply and the
   // dashboard half stays hand-written.
   const listPublicEntry = definePublicEntry<TUpvoteList, UpvoteRpcTag>()({
-    operation: "UpvoteList",
+    operation: "ListUpvotes",
     remap: { action: "select", entity: "Upvote" },
     config: { rateLimit: "read", policy: () => Policy.allow },
   });
 
   return {
-    UpvoteList: (args: TUpvoteList) =>
+    ListUpvotes: (args: TUpvoteList) =>
       repository
         .list({
           organizationId: args.organizationId,
@@ -92,8 +92,8 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
           ),
           withRemapDbErrors("Upvote", "select")
         ),
-    UpvoteToggle: toggleVote.dashboard,
-    UpvoteAddOnBehalf: (args: TUpvoteAddOnBehalf) =>
+    ToggleUpvote: toggleVote.dashboard,
+    AddUpvoteOnBehalf: (args: TUpvoteAddOnBehalf) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
@@ -127,7 +127,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         ),
         withRemapDbErrors("Upvote", "update")
       ),
-    UpvoteRemoveOnBehalf: (args: TUpvoteRemoveOnBehalf) =>
+    RemoveUpvoteOnBehalf: (args: TUpvoteRemoveOnBehalf) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
@@ -155,7 +155,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         ),
         withRemapDbErrors("Upvote", "update")
       ),
-    UpvoteListPublic: listPublicEntry.entry((args) =>
+    ListUpvotesPublic: listPublicEntry.entry((args) =>
       withPublicViewer({
         read: () =>
           repository.list({
@@ -167,7 +167,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         redact: redactActorIdentities,
       })
     ),
-    UpvoteTogglePublic: toggleVote.public,
+    ToggleUpvotePublic: toggleVote.public,
   };
 });
 

@@ -15,31 +15,31 @@ import {
 } from "./schema";
 
 export class MembershipRpcs extends RpcGroup.make(
-  Rpc.make("MembershipList", {
+  Rpc.make("ListMemberships", {
     success: Schema.Array(Membership),
     error: MembershipServiceErrors,
   }),
-  Rpc.make("OrganizationMembersList", {
+  Rpc.make("ListOrganizationMembers", {
     payload: OrganizationId,
     success: Schema.Array(OrganizationMember),
     error: MembershipServiceErrors,
   }),
-  Rpc.make("OrganizationInvitationsList", {
+  Rpc.make("ListOrganizationInvitations", {
     payload: OrganizationId,
     success: Schema.Array(OrganizationInvitation),
     error: MembershipServiceErrors,
   }),
-  Rpc.make("OrganizationUpdateMemberRole", {
+  Rpc.make("UpdateOrganizationMemberRole", {
     payload: UpdateMemberRole,
     success: Schema.Void,
     error: MembershipServiceErrors,
   }),
-  Rpc.make("OrganizationRemoveMember", {
+  Rpc.make("RemoveOrganizationMember", {
     payload: RemoveMember,
     success: Schema.Void,
     error: MembershipServiceErrors,
   }),
-  Rpc.make("OrganizationCancelInvitation", {
+  Rpc.make("CancelOrganizationInvitation", {
     payload: CancelInvitation,
     success: Schema.Void,
     error: MembershipServiceErrors,

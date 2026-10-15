@@ -81,7 +81,7 @@ function PostAdminActionButtons() {
     },
     mutationFn: async ({ locked }) => {
       await fetchRpc((rpc) =>
-        rpc.PostAdminUpdate({
+        rpc.AdminUpdatePost({
           id: post.id,
           organizationId,
           locked,

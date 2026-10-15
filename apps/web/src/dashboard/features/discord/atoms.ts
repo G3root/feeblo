@@ -17,7 +17,7 @@ export const discordReactivityKeys = (organizationId: string) => ({
 /** Discord connections of one organization, cached per organization id. */
 export const connectionsAtom = Atom.family((organizationId: string) =>
   DashboardClient.query(
-    "DiscordConnectionList",
+    "ListDiscordConnections",
     { organizationId },
     { reactivityKeys: discordReactivityKeys(organizationId) }
   ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
@@ -31,7 +31,7 @@ export type ChannelListArgs = {
 /** Channels of one connection, cached per organization and connection id. */
 export const channelsAtom = Atom.family((args: ChannelListArgs) =>
   DashboardClient.query(
-    "DiscordChannelList",
+    "ListDiscordChannels",
     { connectionId: args.connectionId, organizationId: args.organizationId },
     { reactivityKeys: discordReactivityKeys(args.organizationId) }
   ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
@@ -39,7 +39,7 @@ export const channelsAtom = Atom.family((args: ChannelListArgs) =>
 
 /** Whether Discord is configured for this deployment. */
 export const discordStatusAtom = DashboardClient.query(
-  "DiscordIntegrationStatus",
+  "GetDiscordIntegrationStatus",
   void 0
 ).pipe(
   Atom.map((result) => Result.map(result, (value) => value.configured)),
@@ -48,11 +48,11 @@ export const discordStatusAtom = DashboardClient.query(
 );
 
 export const startDiscordConnectAtom = DashboardClient.mutation(
-  "DiscordConnectStart"
+  "StartDiscordConnect"
 );
 export const updateDiscordChannelNotificationsAtom = DashboardClient.mutation(
-  "DiscordChannelNotificationsUpdate"
+  "UpdateDiscordChannelNotifications"
 );
 export const disconnectDiscordConnectionAtom = DashboardClient.mutation(
-  "DiscordConnectionDisconnect"
+  "DisconnectDiscordConnection"
 );

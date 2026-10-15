@@ -146,27 +146,27 @@ describe("NotificationRpcHandlers", () => {
 
           expect(
             yield* scoped(
-              handlers.NotificationUnreadCount({
+              handlers.CountUnreadNotifications({
                 organizationId: fixture.organizationId,
               })
             )
           ).toEqual({ count: 1 });
           expect(
             yield* scoped(
-              handlers.NotificationList({
+              handlers.ListNotifications({
                 organizationId: fixture.organizationId,
               })
             )
           ).toMatchObject([{ id, readAt: null }]);
           yield* scoped(
-            handlers.NotificationMarkRead({
+            handlers.MarkNotificationRead({
               organizationId: fixture.organizationId,
               notificationId: id,
             })
           );
           expect(
             yield* scoped(
-              handlers.NotificationUnreadCount({
+              handlers.CountUnreadNotifications({
                 organizationId: fixture.organizationId,
               })
             )
@@ -185,7 +185,7 @@ describe("NotificationRpcHandlers", () => {
 
           expect(
             yield* handlers
-              .NotificationList({
+              .ListNotifications({
                 organizationId: fixture.organizationId,
               })
               .pipe(Effect.provideService(CurrentSession, session(fixture)))
@@ -218,7 +218,7 @@ describe("NotificationRpcHandlers", () => {
 
           expect(
             yield* handlers
-              .NotificationList({
+              .ListNotifications({
                 organizationId: fixture.organizationId,
               })
               .pipe(Effect.provideService(CurrentSession, session(fixture)))
@@ -239,7 +239,7 @@ describe("NotificationRpcHandlers", () => {
             const fixture = yield* makeFixture();
             const error = yield* Effect.flip(
               handlers
-                .NotificationList({ organizationId: fixture.organizationId })
+                .ListNotifications({ organizationId: fixture.organizationId })
                 .pipe(
                   Effect.provideService(CurrentSession, session(fixture, false))
                 )
@@ -270,20 +270,20 @@ describe("NotificationRpcHandlers", () => {
               );
 
             yield* scoped(
-              handlers.NotificationMarkAllRead({
+              handlers.MarkAllNotificationsRead({
                 organizationId: fixture.organizationId,
               })
             );
             expect(
               yield* scoped(
-                handlers.NotificationUnreadCount({
+                handlers.CountUnreadNotifications({
                   organizationId: fixture.organizationId,
                 })
               )
             ).toEqual({ count: 0 });
             expect(
               yield* otherScoped(
-                handlers.NotificationUnreadCount({
+                handlers.CountUnreadNotifications({
                   organizationId: fixture.organizationId,
                 })
               )
@@ -314,14 +314,14 @@ describe("NotificationRpcHandlers", () => {
               );
 
             const firstPage = yield* scoped(
-              handlers.NotificationList({
+              handlers.ListNotifications({
                 organizationId: fixture.organizationId,
                 limit: 1,
               })
             );
             expect(firstPage).toMatchObject([{ id: newest }]);
             const secondPage = yield* scoped(
-              handlers.NotificationList({
+              handlers.ListNotifications({
                 organizationId: fixture.organizationId,
                 cursor: encodeNotificationCursor({
                   createdAt: firstPage[0]!.createdAt,
@@ -359,7 +359,7 @@ describe("NotificationRpcHandlers", () => {
               );
 
             const firstPage = yield* scoped(
-              handlers.NotificationList({
+              handlers.ListNotifications({
                 organizationId: fixture.organizationId,
                 limit: 2,
               })
@@ -368,7 +368,7 @@ describe("NotificationRpcHandlers", () => {
               expectedOrder.slice(0, 2)
             );
             const secondPage = yield* scoped(
-              handlers.NotificationList({
+              handlers.ListNotifications({
                 organizationId: fixture.organizationId,
                 cursor: encodeNotificationCursor({
                   createdAt: firstPage[1]!.createdAt,
@@ -397,7 +397,7 @@ describe("NotificationRpcHandlers", () => {
 
             const malformed = yield* Effect.flip(
               scoped(
-                handlers.NotificationList({
+                handlers.ListNotifications({
                   organizationId: fixture.organizationId,
                   cursor: "not-a-cursor",
                 })
@@ -409,7 +409,7 @@ describe("NotificationRpcHandlers", () => {
             // an absent cursor; an absent one still starts at the newest row.
             const empty = yield* Effect.flip(
               scoped(
-                handlers.NotificationList({
+                handlers.ListNotifications({
                   organizationId: fixture.organizationId,
                   cursor: "",
                 })
@@ -418,7 +418,7 @@ describe("NotificationRpcHandlers", () => {
             expect(empty._tag).toBe("BadRequestError");
             expect(
               yield* scoped(
-                handlers.NotificationList({
+                handlers.ListNotifications({
                   organizationId: fixture.organizationId,
                 })
               )
@@ -444,14 +444,14 @@ describe("NotificationRpcHandlers", () => {
             );
 
           yield* scoped(
-            handlers.NotificationMarkRead({
+            handlers.MarkNotificationRead({
               organizationId: fixture.organizationId,
               notificationId: otherId,
             })
           );
           expect(
             yield* otherScoped(
-              handlers.NotificationUnreadCount({
+              handlers.CountUnreadNotifications({
                 organizationId: fixture.organizationId,
               })
             )

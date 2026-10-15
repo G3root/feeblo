@@ -80,8 +80,8 @@ export const SUGGESTION_LEXICAL_POOL_MINIMUM = 25;
 /**
  * Ranks a workspace's posts against a draft title and body.
  *
- * One program, three surfaces: `PostSuggestions` (dashboard),
- * `PostSuggestionsPublic` (portal), and the widget's `suggestPosts`. The
+ * One program, three surfaces: `GetPostSuggestions` (dashboard),
+ * `GetPostSuggestionsPublic` (portal), and the widget's `suggestPosts`. The
  * semantic pass — query embedding, candidate query ordered by cosine distance,
  * distance threshold — answers when any stored vector is close enough; the
  * lexical pass otherwise ranks the pool by token overlap. Both surfaces must

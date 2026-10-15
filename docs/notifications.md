@@ -44,7 +44,7 @@ The client never supplies a recipient ID. The handler derives the current member
 - `organizationId`
 - `recipientMemberId`
 
-This applies to `NotificationList`, `NotificationUnreadCount`, `NotificationMarkRead`, and `NotificationMarkAllRead`. A member therefore cannot list, count, or mark another member’s notifications—even if they know a notification ID. The handler tests cover membership denial and cross-member mark-read isolation.
+This applies to `ListNotifications`, `CountUnreadNotifications`, `MarkNotificationRead`, and `MarkAllNotificationsRead`. A member therefore cannot list, count, or mark another member’s notifications—even if they know a notification ID. The handler tests cover membership denial and cross-member mark-read isolation.
 
 ## Dashboard behavior
 

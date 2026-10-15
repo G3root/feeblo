@@ -19,42 +19,42 @@ import {
 } from "./schema";
 
 export class PostStatusRpcs extends RpcGroup.make(
-  Rpc.make("PostStatusList", {
+  Rpc.make("ListPostStatuses", {
     success: Schema.Array(PostStatus),
     payload: PostStatusList,
     error: PostStatusServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("PostStatusListPublic", {
+  Rpc.make("ListPostStatusesPublic", {
     success: Schema.Array(PostStatus),
     payload: PostStatusList,
     error: Schema.Union([PostStatusServiceErrors, RateLimitErrors]),
   }).middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("PostStatusCreate", {
+  Rpc.make("CreatePostStatus", {
     success: Schema.Void,
     payload: PostStatusCreate,
     error: PostStatusServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("PostStatusUpdate", {
+  Rpc.make("UpdatePostStatus", {
     success: Schema.Void,
     payload: PostStatusUpdate,
     error: PostStatusServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("PostStatusMakeDefault", {
+  Rpc.make("SetPostStatusDefault", {
     success: Schema.Void,
     payload: PostStatusMakeDefault,
     error: PostStatusServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("PostStatusDelete", {
+  Rpc.make("DeletePostStatus", {
     success: PostStatusDeleteResult,
     payload: PostStatusDelete,
     error: PostStatusServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("PostStatusDeletePreview", {
+  Rpc.make("PreviewPostStatusDelete", {
     success: PostStatusDeletePreviewResult,
     payload: PostStatusDeletePreview,
     error: PostStatusServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("PostStatusReorder", {
+  Rpc.make("ReorderPostStatuses", {
     success: Schema.Void,
     payload: PostStatusReorder,
     error: PostStatusServiceErrors,

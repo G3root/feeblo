@@ -56,7 +56,7 @@ function createPostSubsetQueries(organizationId: string, postSlug: string) {
   return {
     // Full-post body for the detail view. The org-scoped list collection
     // carries slim rows (no `content`); this slug-scoped query resolves the
-    // body through `PostGet` alongside the other subsets so it arrives
+    // body through `GetPost` alongside the other subsets so it arrives
     // before the pending shell clears.
     postDetail: createLiveQueryCollection((query) =>
       query

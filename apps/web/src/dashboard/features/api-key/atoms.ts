@@ -20,7 +20,7 @@ export const apiKeyReactivityKeys = (organizationId: string) => ({
 /** The key list of one organization, cached per organization id. */
 export const apiKeysAtom = Atom.family((organizationId: string) =>
   DashboardClient.query(
-    "ApiKeyList",
+    "ListApiKeys",
     { organizationId },
     { reactivityKeys: apiKeyReactivityKeys(organizationId) }
   ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
@@ -28,5 +28,5 @@ export const apiKeysAtom = Atom.family((organizationId: string) =>
 
 export type ApiKey = Atom.Success<ReturnType<typeof apiKeysAtom>>[number];
 
-export const createApiKeyAtom = DashboardClient.mutation("ApiKeyCreate");
-export const revokeApiKeyAtom = DashboardClient.mutation("ApiKeyRevoke");
+export const createApiKeyAtom = DashboardClient.mutation("CreateApiKey");
+export const revokeApiKeyAtom = DashboardClient.mutation("RevokeApiKey");

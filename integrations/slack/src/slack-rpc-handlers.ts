@@ -15,12 +15,12 @@ export const SlackManagementRpcHandlersEffect = Effect.gen(function* () {
   const service = yield* SlackManagementService;
   const handlers = yield* makeChatManagementRpcHandlers(service);
   return {
-    SlackChannelList: handlers.channelList,
-    SlackChannelNotificationsUpdate: handlers.channelNotificationsUpdate,
-    SlackConnectStart: handlers.connectStart,
-    SlackConnectionDisconnect: handlers.connectionDisconnect,
-    SlackConnectionList: handlers.connectionList,
-    SlackIntegrationStatus: handlers.integrationStatus,
+    ListSlackChannels: handlers.channelList,
+    UpdateSlackChannelNotifications: handlers.channelNotificationsUpdate,
+    StartSlackConnect: handlers.connectStart,
+    DisconnectSlackConnection: handlers.connectionDisconnect,
+    ListSlackConnections: handlers.connectionList,
+    GetSlackIntegrationStatus: handlers.integrationStatus,
   };
 });
 

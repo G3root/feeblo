@@ -8,13 +8,13 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-interface DeleteComment {
+interface DeleteCommentArgs {
   id: string;
   organizationId: string;
   postId: string;
 }
 
-interface UpdateComment {
+interface UpdateCommentArgs {
   content: string;
   id: string;
   organizationId: string;
@@ -36,13 +36,13 @@ interface FindByIdComment {
   userId?: string;
 }
 
-interface PinComment {
+interface PinCommentArgs {
   id: string;
   organizationId: string;
   postId: string;
 }
 
-interface UnpinComment {
+interface UnpinCommentArgs {
   id: string;
   organizationId: string;
   postId: string;
@@ -237,7 +237,7 @@ const makeCommentRepository = Effect.gen(function* () {
           .returning()
           .pipe(Effect.map(EffectArray.get(0)));
       }),
-    delete: (args: DeleteComment) =>
+    delete: (args: DeleteCommentArgs) =>
       db
         .delete(schema.commentTable)
         .where(
@@ -251,7 +251,7 @@ const makeCommentRepository = Effect.gen(function* () {
           id: schema.commentTable.id,
         })
         .pipe(Effect.map(EffectArray.get(0))),
-    update: (args: UpdateComment) =>
+    update: (args: UpdateCommentArgs) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
         return yield* db
@@ -296,7 +296,7 @@ const makeCommentRepository = Effect.gen(function* () {
           )
         )
         .pipe(Effect.map(EffectArray.get(0))),
-    pin: (args: PinComment) =>
+    pin: (args: PinCommentArgs) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
         // Replace the previous single UPDATE (CASE) with explicit steps inside
@@ -372,7 +372,7 @@ const makeCommentRepository = Effect.gen(function* () {
           })
         );
       }),
-    unpin: (args: UnpinComment) =>
+    unpin: (args: UnpinCommentArgs) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
         return yield* db

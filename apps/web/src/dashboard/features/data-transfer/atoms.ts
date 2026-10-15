@@ -10,7 +10,7 @@ import { DashboardClient, dashboardSWR } from "~/lib/atom-rpc";
 
 /** The boards the export picker can name, read once for the card. */
 export const dataTransferBoardsAtom = Atom.family((organizationId: string) =>
-  DashboardClient.query("BoardList", { organizationId }).pipe(
+  DashboardClient.query("ListBoards", { organizationId }).pipe(
     dashboardSWR("30 seconds"),
     Atom.setIdleTTL("5 minutes")
   )
@@ -33,7 +33,7 @@ export const dataImportJobsAtom = Atom.family((organizationId: string) =>
   DashboardClient.runtime.atom(
     Stream.unwrap(
       DashboardClient.use((client) =>
-        Effect.succeed(client("DataImportListWatch", { organizationId }))
+        Effect.succeed(client("WatchDataImports", { organizationId }))
       )
     )
   )
@@ -81,7 +81,7 @@ export const dataImportDetailAtom = Atom.family(
     return DashboardClient.runtime.atom(
       Stream.unwrap(
         DashboardClient.use((client) =>
-          Effect.succeed(client("DataImportWatch", payload))
+          Effect.succeed(client("WatchDataImport", payload))
         )
       )
     );
@@ -89,6 +89,6 @@ export const dataImportDetailAtom = Atom.family(
 );
 
 export const confirmDataImportAtom =
-  DashboardClient.mutation("DataImportConfirm");
+  DashboardClient.mutation("ConfirmDataImport");
 export const cancelDataImportAtom =
-  DashboardClient.mutation("DataImportCancel");
+  DashboardClient.mutation("CancelDataImport");

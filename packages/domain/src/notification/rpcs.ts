@@ -19,28 +19,28 @@ const NotificationPublicErrors = S.Union([
 ]);
 
 export class NotificationRpcs extends RpcGroup.make(
-  Rpc.make("NotificationList", {
+  Rpc.make("ListNotifications", {
     payload: NotificationList,
     success: S.Array(Notification),
     error: NotificationPublicErrors,
   })
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("NotificationUnreadCount", {
+  Rpc.make("CountUnreadNotifications", {
     payload: NotificationUnreadCount,
     success: S.Struct({ count: S.Finite }),
     error: NotificationPublicErrors,
   })
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("NotificationMarkRead", {
+  Rpc.make("MarkNotificationRead", {
     payload: NotificationMarkRead,
     success: S.Void,
     error: NotificationPublicErrors,
   })
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("NotificationMarkAllRead", {
+  Rpc.make("MarkAllNotificationsRead", {
     payload: NotificationMarkAllRead,
     success: S.Void,
     error: NotificationPublicErrors,
@@ -51,28 +51,28 @@ export class NotificationRpcs extends RpcGroup.make(
   // members. Results are always scoped to the session user id. SSO-restricted
   // sessions are authorized per-organization by the handlers' restricted-scope
   // policy, so they must pass auth instead of being rejected by middleware.
-  Rpc.make("NotificationListPublic", {
+  Rpc.make("ListNotificationsPublic", {
     payload: NotificationList,
     success: S.Array(Notification),
     error: NotificationPublicErrors,
   })
     .middleware(PublicAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("NotificationUnreadCountPublic", {
+  Rpc.make("CountUnreadNotificationsPublic", {
     payload: NotificationUnreadCount,
     success: S.Struct({ count: S.Finite }),
     error: NotificationPublicErrors,
   })
     .middleware(PublicAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("NotificationMarkReadPublic", {
+  Rpc.make("MarkNotificationReadPublic", {
     payload: NotificationMarkRead,
     success: S.Void,
     error: NotificationPublicErrors,
   })
     .middleware(PublicAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("NotificationMarkAllReadPublic", {
+  Rpc.make("MarkAllNotificationsReadPublic", {
     payload: NotificationMarkAllRead,
     success: S.Void,
     error: NotificationPublicErrors,

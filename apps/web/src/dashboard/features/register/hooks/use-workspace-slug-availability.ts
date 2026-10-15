@@ -32,7 +32,7 @@ export function useWorkspaceSlugAvailability(slug: string, enabled: boolean) {
 
       try {
         const response = await fetchRpc(
-          (rpc) => rpc.WorkspaceSlugCheck({ slug }),
+          (rpc) => rpc.CheckWorkspaceSlug({ slug }),
           { signal: controller.signal }
         );
 

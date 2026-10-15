@@ -24,62 +24,62 @@ import {
 } from "./schema";
 
 export class AttributeDefinitionRpcs extends RpcGroup.make(
-  Rpc.make("ContactAttributeDefinitionList", {
+  Rpc.make("ListContactAttributeDefinitions", {
     success: Schema.Array(ContactAttributeDefinition),
     payload: ContactAttributeDefinitionList,
     error: AttributeDefinitionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("ContactAttributeDefinitionCreate", {
+  Rpc.make("CreateContactAttributeDefinition", {
     success: Schema.Void,
     payload: ContactAttributeDefinitionCreate,
     error: AttributeDefinitionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("ContactAttributeDefinitionUpdate", {
+  Rpc.make("UpdateContactAttributeDefinition", {
     success: Schema.Void,
     payload: ContactAttributeDefinitionUpdate,
     error: AttributeDefinitionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("ContactAttributeDefinitionDelete", {
+  Rpc.make("DeleteContactAttributeDefinition", {
     success: Schema.Void,
     payload: ContactAttributeDefinitionDelete,
     error: AttributeDefinitionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("CompanyAttributeDefinitionList", {
+  Rpc.make("ListCompanyAttributeDefinitions", {
     success: Schema.Array(CompanyAttributeDefinition),
     payload: CompanyAttributeDefinitionList,
     error: AttributeDefinitionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("CompanyAttributeDefinitionCreate", {
+  Rpc.make("CreateCompanyAttributeDefinition", {
     success: Schema.Void,
     payload: CompanyAttributeDefinitionCreate,
     error: AttributeDefinitionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("CompanyAttributeDefinitionUpdate", {
+  Rpc.make("UpdateCompanyAttributeDefinition", {
     success: Schema.Void,
     payload: CompanyAttributeDefinitionUpdate,
     error: AttributeDefinitionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("CompanyAttributeDefinitionDelete", {
+  Rpc.make("DeleteCompanyAttributeDefinition", {
     success: Schema.Void,
     payload: CompanyAttributeDefinitionDelete,
     error: AttributeDefinitionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("ContactAttributeValueList", {
+  Rpc.make("ListContactAttributeValues", {
     success: Schema.Array(ContactAttributeValue),
     payload: ContactAttributeValueList,
     error: AttributeDefinitionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("ContactAttributeValueUpdate", {
+  Rpc.make("UpdateContactAttributeValue", {
     success: Schema.Void,
     payload: ContactAttributeValueUpdate,
     error: AttributeDefinitionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("CompanyAttributeValueList", {
+  Rpc.make("ListCompanyAttributeValues", {
     success: Schema.Array(CompanyAttributeValue),
     payload: CompanyAttributeValueList,
     error: AttributeDefinitionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("CompanyAttributeValueUpdate", {
+  Rpc.make("UpdateCompanyAttributeValue", {
     success: Schema.Void,
     payload: CompanyAttributeValueUpdate,
     error: AttributeDefinitionServiceErrors,

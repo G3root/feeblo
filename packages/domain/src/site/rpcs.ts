@@ -14,22 +14,22 @@ import {
 } from "./schema";
 
 export class SiteRpcs extends RpcGroup.make(
-  Rpc.make("SiteList", {
+  Rpc.make("ListSites", {
     success: Schema.Array(Site),
     payload: SiteList,
     error: SiteServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("SiteSubdomainList", {
+  Rpc.make("ListSiteSubdomains", {
     success: Schema.Array(Site),
     payload: SiteSubdomainList,
     error: Schema.Union([SiteServiceErrors, RateLimitErrors]),
   }).middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("SiteUpdate", {
+  Rpc.make("UpdateSite", {
     success: Schema.Void,
     payload: SiteUpdate,
     error: SiteServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("SiteHidePoweredByBranding", {
+  Rpc.make("HideSitePoweredByBranding", {
     success: Schema.Void,
     payload: SiteHidePoweredByBranding,
     error: SiteServiceErrors,

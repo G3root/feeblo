@@ -22,7 +22,7 @@ export function DeleteRoadmapDialog() {
         const id = store.get().context.data.roadmapId;
 
         // The row is removed optimistically; close and navigate now so a slow
-        // network never holds the confirm open. `RoadmapDelete` promotes a
+        // network never holds the confirm open. `DeleteRoadmap` promotes a
         // successor atomically server-side, and the collection read-back picks
         // up the new primary — the client must not promote one itself.
         store.send({ type: "setOpen", open: false });

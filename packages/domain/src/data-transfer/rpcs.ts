@@ -20,33 +20,33 @@ import {
  * watchers that keep the page live while the worker drains a confirmed job.
  */
 export class DataTransferRpcs extends RpcGroup.make(
-  Rpc.make("DataImportList", {
+  Rpc.make("ListDataImports", {
     error: DataTransferServiceErrors,
     payload: DataImportList,
     success: Schema.Array(DataImportJobSummary),
   }).middleware(AuthMiddleware),
-  Rpc.make("DataImportGet", {
+  Rpc.make("GetDataImport", {
     error: DataTransferServiceErrors,
     payload: DataImportGet,
     success: DataImportJobDetail,
   }).middleware(AuthMiddleware),
-  Rpc.make("DataImportConfirm", {
+  Rpc.make("ConfirmDataImport", {
     error: DataTransferServiceErrors,
     payload: DataImportConfirm,
     success: Schema.Void,
   }).middleware(AuthMiddleware),
-  Rpc.make("DataImportCancel", {
+  Rpc.make("CancelDataImport", {
     error: DataTransferServiceErrors,
     payload: DataImportCancel,
     success: Schema.Void,
   }).middleware(AuthMiddleware),
-  Rpc.make("DataImportListWatch", {
+  Rpc.make("WatchDataImports", {
     error: DataTransferServiceErrors,
     payload: DataImportList,
     stream: true,
     success: Schema.Array(DataImportJobSummary),
   }).middleware(AuthMiddleware),
-  Rpc.make("DataImportWatch", {
+  Rpc.make("WatchDataImport", {
     error: DataTransferServiceErrors,
     payload: DataImportGet,
     stream: true,

@@ -146,7 +146,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   // The dashboard RPC and the public portal RPC are two names for one write;
   // the shared body takes the surface, and the pair holds the policy and
   // rate-limit level that differ. Public updates are rename semantics only,
-  // which is why `PostUpdate`'s public policy adds `hasUnchangedLocation`.
+  // which is why `UpdatePost`'s public policy adds `hasUnchangedLocation`.
 
   // One factory per admission rule the surfaces share: each entry passes its
   // own surface to it, so the policy's `source` is the surface the entry
@@ -160,14 +160,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     });
 
   const deleteWrite = defineSurfacePair<TPostDelete, PostRpcTag>()({
-    operation: "PostDelete",
+    operation: "DeletePost",
     remap: { action: "delete", entity: "Post" },
     dashboard: { rateLimit: undefined, policy: canDeleteAs },
     public: { rateLimit: "write", policy: canDeleteAs },
   });
 
   const updateWrite = defineSurfacePair<TPostUpdate, PostRpcTag>()({
-    operation: "PostUpdate",
+    operation: "UpdatePost",
     remap: { action: "update", entity: "Post" },
     dashboard: {
       rateLimit: undefined,
@@ -217,14 +217,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     TPostUpdateContent,
     PostRpcTag
   >()({
-    operation: "PostUpdateContent",
+    operation: "UpdatePostContent",
     remap: { action: "update", entity: "Post" },
     dashboard: { rateLimit: undefined, policy: canUpdateAs },
     public: { rateLimit: "expensive", policy: canUpdateAs },
   });
 
   const updateTitleWrite = defineSurfacePair<TPostUpdateTitle, PostRpcTag>()({
-    operation: "PostUpdateTitle",
+    operation: "UpdatePostTitle",
     remap: { action: "update", entity: "Post" },
     dashboard: { rateLimit: undefined, policy: canUpdateAs },
     public: { rateLimit: "expensive", policy: canUpdateAs },
@@ -298,7 +298,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     });
 
   const createWrite = defineSurfacePair<TPostCreate, PostRpcTag>()({
-    operation: "PostCreate",
+    operation: "CreatePost",
     remap: {
       action: "create",
       entity: "Post",
@@ -335,13 +335,13 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   // -- One-sided public reads (the dashboard bodies differ) --
 
   const listPublicEntry = definePublicEntry<TPostList, PostRpcTag>()({
-    operation: "PostList",
+    operation: "ListPosts",
     remap: { action: "select", entity: "Post" },
     config: { rateLimit: "read", policy: () => Policy.allow },
   });
 
   const getPublicEntry = definePublicEntry<TPostGet, PostRpcTag>()({
-    operation: "PostGet",
+    operation: "GetPost",
     remap: { action: "select", entity: "Post" },
     config: { rateLimit: "read", policy: () => Policy.allow },
   });
@@ -350,7 +350,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     TPostSuggestions,
     PostRpcTag
   >()({
-    operation: "PostSuggestions",
+    operation: "GetPostSuggestions",
     remap: { action: "select", entity: "Post" },
     config: { rateLimit: "expensive", limit: 30, policy: () => Policy.allow },
   });
@@ -359,7 +359,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     TPostDeleteEligibilityListPublic,
     PostRpcTag
   >()({
-    operation: "PostDeleteEligibilityList",
+    operation: "ListPostDeleteEligibility",
     remap: { action: "select", entity: "Post" },
     config: { rateLimit: "read", policy: () => Policy.allow },
   });
@@ -367,7 +367,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   // -- RPC handlers --
 
   return {
-    PostList: (args: TPostList) => {
+    ListPosts: (args: TPostList) => {
       // No per-row delete hints here: `canDeleteAsCreator` probes cost two
       // anti-joins per list fetch while only the caller's own rows can be
       // true. Affordances resolve it on demand via PostDeleteEligibility.
@@ -382,7 +382,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         );
     },
 
-    PostListPublic: listPublicEntry.entry((args) =>
+    ListPostsPublic: listPublicEntry.entry((args) =>
       withPublicViewer({
         read: () =>
           repository.findManyPublic({
@@ -393,7 +393,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       })
     ),
 
-    PostGet: (args: TPostGet) => {
+    GetPost: (args: TPostGet) => {
       return Effect.gen(function* () {
         const post = yield* repository.findBySlug({
           organizationId: args.organizationId,
@@ -411,8 +411,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       );
     },
 
-    PostGetPublic: getPublicEntry.entry((args) =>
-      // Same visibility rule as PostListPublic: board visibility is enforced
+    GetPostPublic: getPublicEntry.entry((args) =>
+      // Same visibility rule as ListPostsPublic: board visibility is enforced
       // inside `findPublicBySlug` (public boards only).
       withPublicViewer({
         read: () =>
@@ -432,13 +432,13 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       })
     ),
 
-    PostSuggestions: (args: TPostSuggestions) =>
+    GetPostSuggestions: (args: TPostSuggestions) =>
       suggestions({ ...args, publicOnly: false }).pipe(
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
         withRemapDbErrors("Post", "select")
       ),
 
-    PostResolveMergedPublic: (args: TPostGet) =>
+    ResolveMergedPostPublic: (args: TPostGet) =>
       Effect.gen(function* () {
         const target = yield* repository.findMergedPublicTargetBySlug({
           organizationId: args.organizationId,
@@ -447,24 +447,24 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         return target?.slug ?? null;
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
-          name: "PostResolveMergedPublic",
+          name: "ResolveMergedPostPublic",
           level: "read",
         }),
         withRemapDbErrors("Post", "select")
       ),
 
-    PostSuggestionsPublic: suggestionsPublicEntry.entry((args) =>
+    GetPostSuggestionsPublic: suggestionsPublicEntry.entry((args) =>
       withPublicViewer({
         read: () => suggestions({ ...args, publicOnly: true }),
         redact: redactCreatorIdentities,
       })
     ),
 
-    PostDelete: removePost.dashboard,
+    DeletePost: removePost.dashboard,
 
-    PostDeletePublic: removePost.public,
+    DeletePostPublic: removePost.public,
 
-    PostDeleteEligibilityList: (args: TPostDeleteEligibilityList) =>
+    ListPostDeleteEligibility: (args: TPostDeleteEligibilityList) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const rows = yield* repository.findDeletableIds({
@@ -477,7 +477,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "select")
       ),
 
-    PostDeleteEligibilityListPublic: deleteEligibilityPublicEntry.entry(
+    ListPostDeleteEligibilityPublic: deleteEligibilityPublicEntry.entry(
       (args) =>
         Effect.gen(function* () {
           const viewer = yield* currentPublicViewer;
@@ -492,23 +492,23 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         })
     ),
 
-    PostUpdate: updatePost.dashboard,
+    UpdatePost: updatePost.dashboard,
 
-    PostUpdatePublic: updatePost.public,
+    UpdatePostPublic: updatePost.public,
 
-    PostUpdateContent: updatePostContent.dashboard,
+    UpdatePostContent: updatePostContent.dashboard,
 
-    PostUpdateTitle: updatePostTitle.dashboard,
+    UpdatePostTitle: updatePostTitle.dashboard,
 
-    PostUpdateContentPublic: updatePostContent.public,
+    UpdatePostContentPublic: updatePostContent.public,
 
-    PostUpdateTitlePublic: updatePostTitle.public,
+    UpdatePostTitlePublic: updatePostTitle.public,
 
-    PostCreate: createPost.dashboard,
+    CreatePost: createPost.dashboard,
 
-    PostCreatePublic: createPost.public,
+    CreatePostPublic: createPost.public,
 
-    PostUpdateEta: (args: TPostUpdateEta) =>
+    UpdatePostEta: (args: TPostUpdateEta) =>
       Effect.flatMap(CurrentSession, (session) =>
         writes.update(
           {
@@ -528,7 +528,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "update")
       ),
 
-    PostUpdateAuthor: (args: TPostUpdateAuthor) =>
+    UpdatePostAuthor: (args: TPostUpdateAuthor) =>
       updatePostAuthorEffect(args).pipe(
         Policy.withPolicy(
           postPolicy.canUpdateAuthor({
@@ -539,7 +539,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "update")
       ),
 
-    PostAdminUpdate: (args: TPostAdminUpdate) =>
+    AdminUpdatePost: (args: TPostAdminUpdate) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
@@ -585,7 +585,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "update")
       ),
 
-    PostOfficialUpdatePublish: (args: TPostOfficialUpdatePublish) =>
+    PublishPostOfficialUpdate: (args: TPostOfficialUpdatePublish) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
@@ -619,7 +619,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "update")
       ),
 
-    PostMerge: (args: TPostMerge) =>
+    MergePost: (args: TPostMerge) =>
       Effect.gen(function* () {
         if (args.sourcePostId === args.targetPostId) {
           return yield* new BadRequestError({
@@ -640,7 +640,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "update")
       ),
 
-    PostUnmerge: (args: TPostUnmerge) =>
+    UnmergePost: (args: TPostUnmerge) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         yield* writes.unmerge(args, memberActor(session, args.organizationId));

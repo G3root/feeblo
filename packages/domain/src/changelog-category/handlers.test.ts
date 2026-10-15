@@ -178,7 +178,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const fixture = yield* makeFixture();
         const id = yield* ChangelogCategoryId.generate;
         yield* handlers
-          .ChangelogCategoryCreate({
+          .CreateChangelogCategory({
             id,
             organizationId: fixture.organizationId,
             name: "New",
@@ -187,7 +187,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         const categories = yield* handlers
-          .ChangelogCategoryList({ organizationId: fixture.organizationId })
+          .ListChangelogCategories({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         expect(categories).toMatchObject([
           {
@@ -207,7 +207,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const fixture = yield* makeFixture();
         const id = yield* insertCategory(fixture);
         yield* handlers
-          .ChangelogCategoryUpdate({
+          .UpdateChangelogCategory({
             id,
             organizationId: fixture.organizationId,
             name: "Improved",
@@ -233,13 +233,13 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const fixture = yield* makeFixture();
         const id = yield* insertCategory(fixture);
         yield* handlers
-          .ChangelogCategoryDelete({
+          .DeleteChangelogCategory({
             id,
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         const categories = yield* handlers
-          .ChangelogCategoryList({ organizationId: fixture.organizationId })
+          .ListChangelogCategories({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         expect(categories).toEqual([]);
       })
@@ -252,7 +252,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const id = yield* ChangelogCategoryId.generate;
         const error = yield* Effect.flip(
           handlers
-            .ChangelogCategoryCreate({
+            .CreateChangelogCategory({
               id,
               organizationId: fixture.organizationId,
               name: "New",
@@ -276,7 +276,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const fixture = yield* makeFixture();
         const error = yield* Effect.flip(
           handlers
-            .ChangelogCategoryList({ organizationId: fixture.organizationId })
+            .ListChangelogCategories({ organizationId: fixture.organizationId })
             .pipe(
               Effect.provideService(
                 CurrentSession,
@@ -299,7 +299,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
           const changelogId = yield* insertChangelog(fixture, "published");
           yield* linkCategory(fixture, id, changelogId);
 
-          const categories = yield* handlers.ChangelogCategoryListPublic({
+          const categories = yield* handlers.ListChangelogCategoriesPublic({
             organizationId: fixture.organizationId,
           });
 
@@ -324,7 +324,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const changelogId = yield* insertChangelog(fixture, "draft");
         yield* linkCategory(fixture, id, changelogId);
 
-        const categories = yield* handlers.ChangelogCategoryListPublic({
+        const categories = yield* handlers.ListChangelogCategoriesPublic({
           organizationId: fixture.organizationId,
         });
 
@@ -340,7 +340,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         yield* insertCategory(fixture);
         yield* insertChangelog(fixture, "published");
 
-        const categories = yield* handlers.ChangelogCategoryListPublic({
+        const categories = yield* handlers.ListChangelogCategoriesPublic({
           organizationId: fixture.organizationId,
         });
 
@@ -358,7 +358,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const id = yield* insertCategory(fixture);
 
         const categories = yield* handlers
-          .ChangelogCategoryList({ organizationId: fixture.organizationId })
+          .ListChangelogCategories({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
         expect(categories).toMatchObject([{ id }]);
@@ -371,7 +371,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const fixture = yield* makeFixture();
         yield* makeSite(fixture, "HIDDEN");
         const error = yield* Effect.flip(
-          handlers.ChangelogCategoryListPublic({
+          handlers.ListChangelogCategoriesPublic({
             organizationId: fixture.organizationId,
           })
         );
@@ -392,7 +392,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const id = yield* ChangelogCategoryId.generate;
         const error = yield* Effect.flip(
           handlers
-            .ChangelogCategoryCreate({
+            .CreateChangelogCategory({
               id,
               organizationId: fixture.organizationId,
               name: "Fourth",
@@ -419,7 +419,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         });
 
         yield* handlers
-          .ChangelogCategorySet({
+          .SetChangelogCategories({
             changelogId,
             organizationId: fixture.organizationId,
             categoryIds: [firstCategoryId, secondCategoryId],
@@ -427,7 +427,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
         const links = yield* handlers
-          .ChangelogCategoryListLinks({
+          .ListChangelogCategoryLinks({
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -452,14 +452,14 @@ describe("ChangelogCategoryRpcHandlers", () => {
         });
 
         yield* handlers
-          .ChangelogCategorySet({
+          .SetChangelogCategories({
             changelogId,
             organizationId: fixture.organizationId,
             categoryIds: [firstCategoryId, secondCategoryId],
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         yield* handlers
-          .ChangelogCategorySet({
+          .SetChangelogCategories({
             changelogId,
             organizationId: fixture.organizationId,
             categoryIds: [firstCategoryId],
@@ -467,7 +467,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
         const links = yield* handlers
-          .ChangelogCategoryListLinks({
+          .ListChangelogCategoryLinks({
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -502,7 +502,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .ChangelogCategorySet({
+            .SetChangelogCategories({
               changelogId,
               organizationId: fixture.organizationId,
               categoryIds: [otherCategoryId],
@@ -522,7 +522,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .ChangelogCategorySet({
+            .SetChangelogCategories({
               changelogId,
               organizationId: fixture.organizationId,
               categoryIds: [categoryId],
@@ -566,7 +566,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
 
         for (const changelogId of [draftChangelogId, publishedChangelogId]) {
           yield* handlers
-            .ChangelogCategorySet({
+            .SetChangelogCategories({
               changelogId,
               organizationId: fixture.organizationId,
               categoryIds: [categoryId],
@@ -574,7 +574,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         }
 
-        const links = yield* handlers.ChangelogCategoryListLinksPublic({
+        const links = yield* handlers.ListChangelogCategoryLinksPublic({
           organizationId: fixture.organizationId,
         });
         expect(links.map((link) => link.changelogId)).toEqual([

@@ -300,7 +300,7 @@ function ScopedPostUpvoteCollection({ children }: { children: ReactNode }) {
 
 /**
  * Survivor lookup for a missing public slug. Mounted only after the cheap
- * post-miss check above, so the `PostResolveMergedPublic` query never runs
+ * post-miss check above, so the `ResolveMergedPostPublic` query never runs
  * for ordinary visits. The atom runtime owns dedup, caching, and abort —
  * no manual effect fetch — and the redirect effect below depends only on
  * the resolved primitive slug. A lookup failure offers a retry instead of

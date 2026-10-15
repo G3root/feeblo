@@ -69,7 +69,7 @@ export function NotificationPreferenceSettings() {
   const preferenceQuery = useQuery({
     queryKey: preferenceQueryKey(organizationId),
     queryFn: () =>
-      fetchRpc((rpc) => rpc.NotificationPreferenceGet({ organizationId })),
+      fetchRpc((rpc) => rpc.GetNotificationPreference({ organizationId })),
     retry: false,
   });
 
@@ -81,7 +81,7 @@ export function NotificationPreferenceSettings() {
       // The write answers with the state it committed, so the switches render
       // the server's resolution instead of a second read of it.
       const next = await fetchRpc((rpc) =>
-        rpc.NotificationPreferenceSet({ enabled, organizationId, target })
+        rpc.SetNotificationPreference({ enabled, organizationId, target })
       );
       queryClient.setQueryData(preferenceQueryKey(organizationId), next);
     } catch {

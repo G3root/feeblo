@@ -9,66 +9,66 @@ import * as S from "./schema";
 
 /** Authenticated RPC surface for GitHub connection, issue publishing, and issue-state rules. */
 export class GitHubManagementRpcs extends RpcGroup.make(
-  Rpc.make("GitHubIntegrationStatus", {
+  Rpc.make("GetGitHubIntegrationStatus", {
     success: S.GitHubIntegrationStatus,
     error: GitHubIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("GitHubConnectionList", {
+  Rpc.make("ListGitHubConnections", {
     success: Schema.Array(S.GitHubConnection),
     payload: S.GitHubConnectionList,
     error: GitHubIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("GitHubConnectStart", {
+  Rpc.make("StartGitHubConnect", {
     success: S.GitHubConnectStarted,
     payload: S.GitHubConnectStart,
     error: GitHubIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("GitHubConnectionDisconnect", {
+  Rpc.make("DisconnectGitHubConnection", {
     success: Schema.Void,
     payload: S.GitHubConnectionDisconnect,
     error: GitHubIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("GitHubRepositoryList", {
+  Rpc.make("ListGitHubRepositories", {
     success: Schema.Array(S.GitHubRepository),
     payload: S.GitHubRepositoryList,
     error: GitHubIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("GitHubSettingsGet", {
+  Rpc.make("GetGitHubSettings", {
     success: S.GitHubPublishSettings,
     payload: S.GitHubSettingsGet,
     error: GitHubIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("GitHubSettingsUpdate", {
+  Rpc.make("UpdateGitHubSettings", {
     success: S.GitHubPublishSettings,
     payload: S.GitHubSettingsUpdate,
     error: GitHubIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("GitHubRuleList", {
+  Rpc.make("ListGitHubRules", {
     success: Schema.Array(S.GitHubSyncRule),
     payload: S.GitHubRuleList,
     error: GitHubIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("GitHubRuleCreate", {
+  Rpc.make("CreateGitHubRule", {
     success: S.GitHubSyncRule,
     payload: S.GitHubRuleCreate,
     error: GitHubIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("GitHubRuleUpdate", {
+  Rpc.make("UpdateGitHubRule", {
     success: S.GitHubSyncRule,
     payload: S.GitHubRuleUpdate,
     error: GitHubIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("GitHubRuleDelete", {
+  Rpc.make("DeleteGitHubRule", {
     success: Schema.Void,
     payload: S.GitHubRuleDelete,
     error: GitHubIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("GitHubPostIssueCreate", {
+  Rpc.make("CreateGitHubPostIssue", {
     success: PostExternalResourceLink,
     payload: S.GitHubPostIssueCreate,
     error: GitHubIntegrationErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("GitHubPostIssueLink", {
+  Rpc.make("LinkGitHubPostIssue", {
     success: PostExternalResourceLink,
     payload: S.GitHubPostIssueLink,
     error: GitHubIntegrationErrors,

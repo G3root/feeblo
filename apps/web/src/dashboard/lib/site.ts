@@ -17,7 +17,7 @@ export async function resolveSite(subdomain: string): Promise<TSite | null> {
   // startup module graph (same pattern as the feed endpoints).
   const { fetchRpcServer } = await import("./runtime-server");
   const sites = await fetchRpcServer((rpc) =>
-    rpc.SiteSubdomainList({ subdomain })
+    rpc.ListSiteSubdomains({ subdomain })
   );
   return sites[0] ?? null;
 }

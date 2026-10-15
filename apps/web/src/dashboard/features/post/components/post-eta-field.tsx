@@ -49,7 +49,7 @@ export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
   const { post, isLocked, isMerged, organizationId } = usePostCollectionData();
   const { postCollection } = useDashboardCollections();
   // Backend mirror: PostPolicy.canUpdateEta lets `posts.status` holders
-  // (managers and above) set the ETA via PostUpdateEta.
+  // (managers and above) set the ETA via UpdatePostEta.
   const { allowed: canUpdateEta } = usePolicy(
     hasPermission(organizationId, "posts.status")
   );
@@ -66,7 +66,7 @@ export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
     },
     mutationFn: async ({ etaQuarter }) => {
       await fetchRpc((rpc) =>
-        rpc.PostUpdateEta({
+        rpc.UpdatePostEta({
           id: post.id,
           organizationId,
           etaQuarter,

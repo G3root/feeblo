@@ -13,14 +13,14 @@ import {
 } from "./schema";
 
 export class ChangelogSubscriptionRpcs extends RpcGroup.make(
-  Rpc.make("ChangelogSubscriptionList", {
+  Rpc.make("ListChangelogSubscriptions", {
     payload: ChangelogSubscriptionList,
     success: Schema.Array(ChangelogSubscription),
     error: Schema.Union([ChangelogSubscriptionServiceErrors, RateLimitErrors]),
   })
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("ChangelogSubscriptionListPublic", {
+  Rpc.make("ListChangelogSubscriptionsPublic", {
     payload: ChangelogSubscriptionList,
     success: Schema.Array(ChangelogSubscription),
     error: Schema.Union([ChangelogSubscriptionServiceErrors, RateLimitErrors]),
@@ -29,7 +29,7 @@ export class ChangelogSubscriptionRpcs extends RpcGroup.make(
     // organization via Policy.hasRestrictedOrganizationScope.
     .middleware(PublicAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("ChangelogSubscriptionCreate", {
+  Rpc.make("CreateChangelogSubscription", {
     payload: ChangelogSubscriptionCreate,
     success: Schema.Struct({
       subscribed: Schema.Boolean,
@@ -38,7 +38,7 @@ export class ChangelogSubscriptionRpcs extends RpcGroup.make(
   })
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("ChangelogSubscriptionCreatePublic", {
+  Rpc.make("CreateChangelogSubscriptionPublic", {
     payload: ChangelogSubscriptionCreate,
     success: Schema.Struct({
       subscribed: Schema.Boolean,
@@ -47,7 +47,7 @@ export class ChangelogSubscriptionRpcs extends RpcGroup.make(
   })
     .middleware(PublicAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("ChangelogSubscriptionDelete", {
+  Rpc.make("DeleteChangelogSubscription", {
     payload: ChangelogSubscriptionDelete,
     success: Schema.Struct({
       subscribed: Schema.Boolean,
@@ -56,7 +56,7 @@ export class ChangelogSubscriptionRpcs extends RpcGroup.make(
   })
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("ChangelogSubscriptionDeletePublic", {
+  Rpc.make("DeleteChangelogSubscriptionPublic", {
     payload: ChangelogSubscriptionDelete,
     success: Schema.Struct({
       subscribed: Schema.Boolean,

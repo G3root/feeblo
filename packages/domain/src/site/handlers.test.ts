@@ -183,14 +183,14 @@ describe("SiteRpcHandlers", () => {
   const TestLayer = Layer.merge(HandlerTest, Database.PgliteDatabaseLive);
 
   layer(TestLayer)("handlers", (it) => {
-    describe("SiteList", () => {
+    describe("ListSites", () => {
       it.effect("rejects users without a membership", () =>
         Effect.gen(function* () {
           const handlers = yield* SiteRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const error = yield* Effect.flip(
             handlers
-              .SiteList({
+              .ListSites({
                 organizationId: fixture.organizationId,
               })
               .pipe(
@@ -210,7 +210,7 @@ describe("SiteRpcHandlers", () => {
           const handlers = yield* SiteRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const results = yield* handlers
-            .SiteList({
+            .ListSites({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -236,7 +236,7 @@ describe("SiteRpcHandlers", () => {
             yield* setHidePoweredBy(fixture, true);
 
             const results = yield* handlers
-              .SiteList({ organizationId: fixture.organizationId })
+              .ListSites({ organizationId: fixture.organizationId })
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
@@ -244,7 +244,7 @@ describe("SiteRpcHandlers", () => {
 
             yield* addPaidPlan(fixture);
             const entitled = yield* handlers
-              .SiteList({ organizationId: fixture.organizationId })
+              .ListSites({ organizationId: fixture.organizationId })
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
@@ -253,14 +253,14 @@ describe("SiteRpcHandlers", () => {
       );
     });
 
-    describe("SiteSubdomainList", () => {
+    describe("ListSiteSubdomains", () => {
       it.effect("returns site by subdomain without auth", () =>
         Effect.gen(function* () {
           const handlers = yield* SiteRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const subdomain = `test-${fixture.organizationId}`;
 
-          const results = yield* handlers.SiteSubdomainList({
+          const results = yield* handlers.ListSiteSubdomains({
             subdomain,
           });
 
@@ -278,7 +278,7 @@ describe("SiteRpcHandlers", () => {
       it.effect("returns empty array for unknown subdomain", () =>
         Effect.gen(function* () {
           const handlers = yield* SiteRpcHandlersEffect;
-          const results = yield* handlers.SiteSubdomainList({
+          const results = yield* handlers.ListSiteSubdomains({
             subdomain: "nonexistent-subdomain-xyz",
           });
 
@@ -294,7 +294,7 @@ describe("SiteRpcHandlers", () => {
             const fixture = yield* makeFixture();
             yield* setHidePoweredBy(fixture, true);
 
-            const results = yield* handlers.SiteSubdomainList({
+            const results = yield* handlers.ListSiteSubdomains({
               subdomain: `test-${fixture.organizationId}`,
             });
 
@@ -311,7 +311,7 @@ describe("SiteRpcHandlers", () => {
             yield* setHidePoweredBy(fixture, true);
             yield* addPaidPlan(fixture);
 
-            const results = yield* handlers.SiteSubdomainList({
+            const results = yield* handlers.ListSiteSubdomains({
               subdomain: `test-${fixture.organizationId}`,
             });
 
@@ -320,14 +320,14 @@ describe("SiteRpcHandlers", () => {
       );
     });
 
-    describe("SiteUpdate", () => {
+    describe("UpdateSite", () => {
       it.effect("rejects users without a membership", () =>
         Effect.gen(function* () {
           const handlers = yield* SiteRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const error = yield* Effect.flip(
             handlers
-              .SiteUpdate({
+              .UpdateSite({
                 id: fixture.siteId,
                 organizationId: fixture.organizationId,
                 name: "Updated name",
@@ -355,7 +355,7 @@ describe("SiteRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .SiteUpdate({
+              .UpdateSite({
                 id: fixture.siteId,
                 organizationId: fixture.organizationId,
                 name: "Updated name",
@@ -382,7 +382,7 @@ describe("SiteRpcHandlers", () => {
           yield* addMember(fixture, "admin");
 
           yield* handlers
-            .SiteUpdate({
+            .UpdateSite({
               id: fixture.siteId,
               organizationId: fixture.organizationId,
               name: "Admin updated",
@@ -398,7 +398,7 @@ describe("SiteRpcHandlers", () => {
             );
 
           const results = yield* handlers
-            .SiteList({
+            .ListSites({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -418,7 +418,7 @@ describe("SiteRpcHandlers", () => {
           const fixture = yield* makeFixture();
 
           yield* handlers
-            .SiteUpdate({
+            .UpdateSite({
               id: fixture.siteId,
               organizationId: fixture.organizationId,
               name: "Owner updated",
@@ -429,7 +429,7 @@ describe("SiteRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const results = yield* handlers
-            .SiteList({
+            .ListSites({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -441,14 +441,14 @@ describe("SiteRpcHandlers", () => {
       );
     });
 
-    describe("SiteHidePoweredByBranding", () => {
+    describe("HideSitePoweredByBranding", () => {
       it.effect("rejects users without a membership", () =>
         Effect.gen(function* () {
           const handlers = yield* SiteRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const error = yield* Effect.flip(
             handlers
-              .SiteHidePoweredByBranding({
+              .HideSitePoweredByBranding({
                 id: fixture.siteId,
                 organizationId: fixture.organizationId,
                 hidePoweredBy: true,
@@ -473,7 +473,7 @@ describe("SiteRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .SiteHidePoweredByBranding({
+              .HideSitePoweredByBranding({
                 id: fixture.siteId,
                 organizationId: fixture.organizationId,
                 hidePoweredBy: true,
@@ -497,7 +497,7 @@ describe("SiteRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .SiteHidePoweredByBranding({
+              .HideSitePoweredByBranding({
                 id: fixture.siteId,
                 organizationId: fixture.organizationId,
                 hidePoweredBy: true,
@@ -517,7 +517,7 @@ describe("SiteRpcHandlers", () => {
             const fixture = yield* makeFixture();
 
             yield* handlers
-              .SiteHidePoweredByBranding({
+              .HideSitePoweredByBranding({
                 id: fixture.siteId,
                 organizationId: fixture.organizationId,
                 hidePoweredBy: false,
@@ -527,7 +527,7 @@ describe("SiteRpcHandlers", () => {
               );
 
             const results = yield* handlers
-              .SiteList({
+              .ListSites({
                 organizationId: fixture.organizationId,
               })
               .pipe(
@@ -545,7 +545,7 @@ describe("SiteRpcHandlers", () => {
           yield* addMember(fixture, "admin");
 
           yield* handlers
-            .SiteHidePoweredByBranding({
+            .HideSitePoweredByBranding({
               id: fixture.siteId,
               organizationId: fixture.organizationId,
               hidePoweredBy: false,
@@ -558,7 +558,7 @@ describe("SiteRpcHandlers", () => {
             );
 
           const results = yield* handlers
-            .SiteList({
+            .ListSites({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));

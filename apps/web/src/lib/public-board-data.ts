@@ -65,7 +65,7 @@ async function resolvePageContent(
       // not-found instead of swallowing it into the default metadata.
       const post = await fetchRpcServer((rpc) =>
         rpc
-          .PostGetPublic({
+          .GetPostPublic({
             organizationId: site.organizationId,
             // SAFETY: The capture group matched, so the index is present.
             slug: postMatch[1]!,
@@ -78,7 +78,7 @@ async function resolvePageContent(
         // A merged source 404s publicly; resolve its survivor so inbound
         // links (and merge emails) land on the canonical post.
         const mergedTargetSlug = await fetchRpcServer((rpc) =>
-          rpc.PostResolveMergedPublic({
+          rpc.ResolveMergedPostPublic({
             organizationId: site.organizationId,
             // SAFETY: The capture group matched, so the index is present.
             slug: postMatch[1]!,
@@ -103,7 +103,7 @@ async function resolvePageContent(
     // that entire payload for one row.
     const changelog = await fetchRpcServer((rpc) =>
       rpc
-        .ChangelogGetPublic({
+        .GetChangelogPublic({
           organizationId: site.organizationId,
           slug: changelogSlug,
         })

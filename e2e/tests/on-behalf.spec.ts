@@ -37,7 +37,7 @@ import { apiUrl, publicBoardUrl, webUrl } from "../helpers/urls";
  *    email to the deferred subject.
  * 2. Post on behalf of an existing contact picked from search.
  * 3. Clearing the picked post author returns the dialog to self-authorship.
- * 4. Dashboard author reassignment (`PostUpdateAuthor`) via search and via
+ * 4. Dashboard author reassignment (`UpdatePostAuthor`) via search and via
  *    the new-user dialog, with activity provenance and permission gating.
  * 5. Voter add via the picker, Already-voted guard, add via the new-user
  *    dialog (with validation), and removal — each with activity provenance.
@@ -211,7 +211,7 @@ async function reassignAuthorThroughDialog(
   await dialog.getByLabel("Name").fill(name);
   await dialog.getByLabel("Email").fill(email);
 
-  const updated = waitForRpc(page, "PostUpdateAuthor");
+  const updated = waitForRpc(page, "UpdatePostAuthor");
   // Dashboard reassignment uses the shared picker's default submit label.
   await dialog.getByRole("button", { name: "Create & set author" }).click();
   await updated;
@@ -236,7 +236,7 @@ async function reassignAuthorThroughSearch(
 
   const row = page.getByRole("option").filter({ hasText: rowText }).first();
   await expect(row).toBeVisible();
-  const updated = waitForRpc(page, "PostUpdateAuthor");
+  const updated = waitForRpc(page, "UpdatePostAuthor");
   await row.click();
   await updated;
   await expect(page.getByText("Author updated", { exact: true })).toBeVisible();
@@ -268,7 +268,7 @@ async function createPostOnBehalfOfNewCustomer(
   await pickPostAuthorNewCustomer(page, dialog, customerEmail);
   await expect(dialog.getByText(customerEmail).first()).toBeVisible();
 
-  const created = waitForRpc(page, "PostCreate");
+  const created = waitForRpc(page, "CreatePost");
   await dialog.getByRole("button", { name: "Create Post" }).click();
   await created;
   await expect(dialog).toBeHidden();
@@ -297,7 +297,7 @@ async function addVoterThroughDialog(page: Page, name: string, email: string) {
   await dialog.getByLabel("Name").fill(name);
   await dialog.getByLabel("Email").fill(email);
 
-  const added = waitForRpc(page, "UpvoteAddOnBehalf");
+  const added = waitForRpc(page, "AddUpvoteOnBehalf");
   await dialog.getByRole("button", { name: "Create & add vote" }).click();
   await added;
   await expect(dialog).toBeHidden();
@@ -495,7 +495,7 @@ test.describe("posts on behalf", () => {
         customerName
       );
 
-      const created = waitForRpc(page, "PostCreate");
+      const created = waitForRpc(page, "CreatePost");
       await dialog.getByRole("button", { name: "Create Post" }).click();
       await created;
       await expect(dialog).toBeHidden();
@@ -556,7 +556,7 @@ test.describe("posts on behalf", () => {
       dialog.getByRole("button", { name: new RegExp(workspace.name) })
     ).toBeVisible();
 
-    const created = waitForRpc(page, "PostCreate");
+    const created = waitForRpc(page, "CreatePost");
     await dialog.getByRole("button", { name: "Create Post" }).click();
     await created;
     await expect(dialog).toBeHidden();
@@ -579,7 +579,7 @@ test.describe("voters on behalf", () => {
       const customerEmail = newCustomerEmail();
 
       // Seed the contact on one post so the voter picker on the next post
-      // exercises the real ContactSearch result path.
+      // exercises the real SearchContacts result path.
       const seedTitle = `Voter seed ${randomUUID().slice(0, 8)}`;
       await createPost(page, seedTitle, "Seeding the voter contact.");
       await dismissToast(page, "Post created successfully");
@@ -662,7 +662,7 @@ test.describe("voters on behalf", () => {
       ).toBeVisible();
 
       await dialog.getByLabel("Email").fill(customerEmail);
-      const added = waitForRpc(page, "UpvoteAddOnBehalf");
+      const added = waitForRpc(page, "AddUpvoteOnBehalf");
       await dialog.getByRole("button", { name: "Create & add vote" }).click();
       await added;
       await expect(dialog).toBeHidden();
@@ -678,7 +678,7 @@ test.describe("voters on behalf", () => {
         name: `Remove voter ${customerName}`,
       });
       await remove.hover();
-      const removed = waitForRpc(page, "UpvoteRemoveOnBehalf");
+      const removed = waitForRpc(page, "RemoveUpvoteOnBehalf");
       await remove.click();
       await removed;
       await expect(page.getByText("Voters (0)")).toBeVisible();
@@ -716,7 +716,7 @@ test.describe("comments on behalf", () => {
 
       // The staged author rides along with the next submit only.
       await fillEditor(page, onBehalfComment, { scope: composerScope(page) });
-      const created = waitForRpc(page, "CommentCreate");
+      const created = waitForRpc(page, "CreateComment");
       await page.getByRole("button", { name: "Comment Public" }).click();
       await created;
 
@@ -735,7 +735,7 @@ test.describe("comments on behalf", () => {
 
       // The next comment is authored by the session user again.
       await fillEditor(page, followUpComment, { scope: composerScope(page) });
-      const second = waitForRpc(page, "CommentCreate");
+      const second = waitForRpc(page, "CreateComment");
       await page.getByRole("button", { name: "Comment Public" }).click();
       await second;
       const followUpCard = commentCard(page, followUpComment);
@@ -785,7 +785,7 @@ test.describe("comments on behalf", () => {
     // next submit attributes to them without reopening.
 
     await fillEditor(page, commentText, { scope: composerScope(page) });
-    const created = waitForRpc(page, "CommentCreate");
+    const created = waitForRpc(page, "CreateComment");
     await page.getByRole("button", { name: "Comment Public" }).click();
     await created;
     const card = commentCard(page, commentText);
@@ -1160,7 +1160,7 @@ test.describe("public board", () => {
       );
       // Picking closes the popover but stages the subject in form state.
       await fillEditor(page, commentText, { scope: composerScope(page) });
-      const created = waitForRpc(page, "CommentCreate");
+      const created = waitForRpc(page, "CreateComment");
       await page.getByRole("button", { name: "Comment Public" }).click();
       await created;
       await expect(commentCard(page, commentText)).toBeVisible();

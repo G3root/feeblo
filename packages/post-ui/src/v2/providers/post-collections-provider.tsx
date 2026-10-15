@@ -76,7 +76,7 @@ export interface PostCollectionsValue {
   organizationId: string;
   /**
    * Persists a new post through the surface's create RPC (dashboard
-   * `PostCreate`, public board `PostCreatePublic`). The shared create form
+   * `CreatePost`, public board `CreatePostPublic`). The shared create form
    * calls this inside its optimistic action; the slim list row is inserted
    * into `collections.postCollection` by the action itself, so the full
    * body travels as action input rather than through the list row.

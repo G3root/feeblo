@@ -72,7 +72,7 @@ async function addComment(
     ).toBeVisible();
   }
 
-  const create = waitForRpc(page, "CommentCreate");
+  const create = waitForRpc(page, "CreateComment");
   await page.getByRole("button", { name: "Comment Public" }).click();
   await create;
 
@@ -169,7 +169,7 @@ test.describe("comment pinning", () => {
       await expectToBeAbove(betaCard, alphaCard);
 
       // Pin Beta. It gets the Pinned badge and moves above Alpha.
-      const pinBeta = waitForRpc(page, "CommentPin");
+      const pinBeta = waitForRpc(page, "PinComment");
       await togglePin(page, betaCard);
       await pinBeta;
 
@@ -180,7 +180,7 @@ test.describe("comment pinning", () => {
       await expectToBeAbove(betaCard, alphaCard);
 
       // Pinning a second comment steals the pin: Beta loses its badge.
-      const pinAlpha = waitForRpc(page, "CommentPin");
+      const pinAlpha = waitForRpc(page, "PinComment");
       await togglePin(page, alphaCard);
       await pinAlpha;
 
@@ -201,7 +201,7 @@ test.describe("comment pinning", () => {
       await expect(page.getByText("Pinned", { exact: true })).toHaveCount(1);
 
       // Unpin: the badge goes away.
-      const unpinAlpha = waitForRpc(page, "CommentUnpin");
+      const unpinAlpha = waitForRpc(page, "UnpinComment");
       await togglePin(page, alphaCard);
       await unpinAlpha;
       await expect(page.getByText("Pinned", { exact: true })).toHaveCount(0);
@@ -330,12 +330,12 @@ test.describe("comment management", () => {
       // composer (no `onCancel` handler) must not show one.
       await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);
 
-      // Track CommentUpdate round-trips so "cancel" is proven to not update.
+      // Track UpdateComment round-trips so "cancel" is proven to not update.
       let commentUpdates = 0;
       page.on("response", (response) => {
         if (
           response.url().includes("/rpc") &&
-          response.request().postData()?.includes("CommentUpdate")
+          response.request().postData()?.includes("UpdateComment")
         ) {
           commentUpdates += 1;
         }
@@ -365,7 +365,7 @@ test.describe("comment management", () => {
       await expect(secondEditEditor).toContainText(original);
       await replaceCommentContent(page, secondEditEditor, edited);
 
-      const update = waitForRpc(page, "CommentUpdate");
+      const update = waitForRpc(page, "UpdateComment");
       // The post content editor also exposes a Save button; scope to the card.
       await editCard.getByRole("button", { name: "Save" }).click();
       await update;
@@ -415,7 +415,7 @@ test.describe("comment management", () => {
 
       // Confirming deletes it for good; the sibling comment stays.
       await clickCommentMenuItem(page, doomedCard, "Delete");
-      const deleted = waitForRpc(page, "CommentDelete");
+      const deleted = waitForRpc(page, "DeleteComment");
       await page
         .getByRole("alertdialog", { name: "Delete Comment" })
         .getByRole("button", { name: "Continue" })
@@ -448,7 +448,7 @@ test.describe("comment management", () => {
     await page.route(
       (url) => url.pathname.startsWith("/rpc"),
       async (route) => {
-        if (route.request().postData()?.includes("CommentDelete")) {
+        if (route.request().postData()?.includes("DeleteComment")) {
           await new Promise((resolve) => setTimeout(resolve, 3_000));
         }
         await route.continue();
@@ -461,7 +461,7 @@ test.describe("comment management", () => {
     });
     await expect(dialog).toBeVisible();
 
-    const deleted = waitForRpc(page, "CommentDelete");
+    const deleted = waitForRpc(page, "DeleteComment");
     await dialog.getByRole("button", { name: "Continue" }).click();
 
     await expect(dialog).toBeHidden({ timeout: 1_000 });
@@ -489,7 +489,7 @@ test.describe("comment management", () => {
     await page.route(
       (url) => url.pathname.startsWith("/rpc"),
       async (route) => {
-        if (route.request().postData()?.includes("CommentCreate")) {
+        if (route.request().postData()?.includes("CreateComment")) {
           await new Promise((resolve) => setTimeout(resolve, 3_000));
         }
         await route.continue();
@@ -497,7 +497,7 @@ test.describe("comment management", () => {
     );
 
     const submit = page.getByRole("button", { name: "Comment Public" });
-    const created = waitForRpc(page, "CommentCreate");
+    const created = waitForRpc(page, "CreateComment");
     await submit.click();
 
     await expect(submit).toHaveAttribute("data-loading", "", {
@@ -539,7 +539,7 @@ test.describe("comment management", () => {
       // Confirming flips the visibility: the Internal badge appears and the
       // menu now offers to make the comment public again.
       await clickCommentMenuItem(page, card, "Make internal");
-      const updated = waitForRpc(page, "CommentUpdate");
+      const updated = waitForRpc(page, "UpdateComment");
       await page
         .getByRole("alertdialog", { name: "Make comment internal" })
         .getByRole("button", { name: "Continue" })
@@ -585,7 +585,7 @@ test.describe("comment replies", () => {
       scope: card.locator('[data-slot="comment-composer"]'),
     });
 
-    const create = waitForRpc(page, "CommentCreate");
+    const create = waitForRpc(page, "CreateComment");
     await card.getByRole("button", { name: "Reply", exact: true }).click();
     await create;
 

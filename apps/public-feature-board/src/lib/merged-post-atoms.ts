@@ -15,7 +15,7 @@ export type MergedPostTargetArgs = {
  * must stop redirecting within seconds, not minutes.
  */
 export const mergedPostTargetAtom = Atom.family((args: MergedPostTargetArgs) =>
-  PublicClient.query("PostResolveMergedPublic", {
+  PublicClient.query("ResolveMergedPostPublic", {
     organizationId: args.organizationId,
     slug: args.slug,
   }).pipe(Atom.setIdleTTL("30 seconds"))

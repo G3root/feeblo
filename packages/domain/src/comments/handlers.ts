@@ -93,14 +93,14 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     });
 
   const deleteWrite = defineSurfacePair<TCommentDelete, CommentRpcTag>()({
-    operation: "CommentDelete",
+    operation: "DeleteComment",
     remap: { action: "delete", entity: "Comment" },
     dashboard: { rateLimit: undefined, policy: canDeleteFor },
     public: { rateLimit: "write", policy: canDeleteFor },
   });
 
   const updateWrite = defineSurfacePair<TCommentUpdate, CommentRpcTag>()({
-    operation: "CommentUpdate",
+    operation: "UpdateComment",
     remap: { action: "update", entity: "Comment" },
     dashboard: { rateLimit: undefined, policy: canUpdateFor },
     public: { rateLimit: "expensive", policy: canUpdateFor },
@@ -150,7 +150,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
   );
 
   const createWrite = defineSurfacePair<TCommentCreate, CommentRpcTag>()({
-    operation: "CommentCreate",
+    operation: "CreateComment",
     remap: { action: "create", entity: "Comment" },
     dashboard: { rateLimit: undefined, policy: canCreateFor },
     public: { rateLimit: "expensive", policy: canCreateFor },
@@ -160,7 +160,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
   // viewer's own rows; the public list projects its own predicate, so the
   // pair does not apply and the dashboard half stays hand-written.
   const listPublicEntry = definePublicEntry<TCommentList, CommentRpcTag>()({
-    operation: "CommentList",
+    operation: "ListComments",
     remap: { action: "select", entity: "Comment" },
     config: { rateLimit: "read", policy: () => Policy.allow },
   });
@@ -223,7 +223,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
   );
 
   return {
-    CommentList: (args: TCommentList) =>
+    ListComments: (args: TCommentList) =>
       repository
         .findMany({
           organizationId: args.organizationId,
@@ -234,7 +234,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Comment", "select")
         ),
 
-    CommentListPublic: listPublicEntry.entry((args) =>
+    ListCommentsPublic: listPublicEntry.entry((args) =>
       withPublicViewer({
         read: (viewer) =>
           repository.findManyPublic({
@@ -246,19 +246,19 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       })
     ),
 
-    CommentCreate: addComment.dashboard,
+    CreateComment: addComment.dashboard,
 
-    CommentCreatePublic: addComment.public,
+    CreateCommentPublic: addComment.public,
 
-    CommentDelete: removeComment.dashboard,
+    DeleteComment: removeComment.dashboard,
 
-    CommentDeletePublic: removeComment.public,
+    DeleteCommentPublic: removeComment.public,
 
-    CommentUpdate: modifyComment.dashboard,
+    UpdateComment: modifyComment.dashboard,
 
-    CommentUpdatePublic: modifyComment.public,
+    UpdateCommentPublic: modifyComment.public,
 
-    CommentPin: (args: TCommentPin) =>
+    PinComment: (args: TCommentPin) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
 
@@ -286,7 +286,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Comment", "update")
       ),
 
-    CommentUnpin: (args: TCommentUnpin) =>
+    UnpinComment: (args: TCommentUnpin) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
 

@@ -114,7 +114,7 @@ describe("CompanyRpcHandlers", () => {
         });
 
         const companies = yield* handlers
-          .CompanyList({ organizationId: fixture.organizationId })
+          .ListCompanies({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         expect(companies).toHaveLength(1);
         expect(companies[0]).toMatchObject({ name: "Acme" });
@@ -127,7 +127,7 @@ describe("CompanyRpcHandlers", () => {
         const fixture = yield* makeFixture();
         const error = yield* Effect.flip(
           handlers
-            .CompanyList({ organizationId: fixture.organizationId })
+            .ListCompanies({ organizationId: fixture.organizationId })
             .pipe(
               Effect.provideService(CurrentSession, makeSession(fixture, false))
             )
@@ -143,7 +143,7 @@ describe("CompanyRpcHandlers", () => {
         const session = makeSession(fixture);
 
         const created = yield* handlers
-          .CompanyCreate({
+          .CreateCompany({
             organizationId: fixture.organizationId,
             name: "Acme",
           })
@@ -151,7 +151,7 @@ describe("CompanyRpcHandlers", () => {
         const companyId = yield* CompanyId.parse(created.id);
 
         const updated = yield* handlers
-          .CompanyUpdate({
+          .UpdateCompany({
             id: companyId,
             organizationId: fixture.organizationId,
             name: "Acme Inc.",
@@ -164,14 +164,14 @@ describe("CompanyRpcHandlers", () => {
         });
 
         yield* handlers
-          .CompanyDelete({
+          .DeleteCompany({
             id: companyId,
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, session));
 
         const companies = yield* handlers
-          .CompanyList({ organizationId: fixture.organizationId })
+          .ListCompanies({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
         expect(companies).toHaveLength(0);
       })
@@ -193,7 +193,7 @@ describe("CompanyRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .CompanyDelete({
+            .DeleteCompany({
               id: companyId,
               organizationId: fixture.organizationId,
             })
@@ -228,7 +228,7 @@ describe("CompanyRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .CompanyCreate({
+            .CreateCompany({
               organizationId: fixture.organizationId,
               name: "Acme",
             })
@@ -237,7 +237,7 @@ describe("CompanyRpcHandlers", () => {
         expect(error._tag).toBe("BadRequestError");
 
         const companies = yield* handlers
-          .CompanyList({ organizationId: fixture.organizationId })
+          .ListCompanies({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         expect(companies).toHaveLength(0);
       })
@@ -265,7 +265,7 @@ describe("CompanyRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .CompanyCreate({
+            .CreateCompany({
               organizationId: fixture.organizationId,
               name: "Acme",
               attributeValues: [{ attributeId, value: 0 }],
@@ -275,7 +275,7 @@ describe("CompanyRpcHandlers", () => {
         expect(error._tag).toBe("BadRequestError");
 
         const companies = yield* handlers
-          .CompanyList({ organizationId: fixture.organizationId })
+          .ListCompanies({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         expect(companies).toHaveLength(0);
       })
@@ -311,7 +311,7 @@ describe("CompanyRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .CompanyCreate({
+              .CreateCompany({
                 organizationId: fixture.organizationId,
                 name: "Acme",
                 attributeValues: [{ attributeId, value: "secret" }],
@@ -321,7 +321,7 @@ describe("CompanyRpcHandlers", () => {
           expect(error._tag).toBe("PolicyDenied");
 
           const companies = yield* handlers
-            .CompanyList({ organizationId: fixture.organizationId })
+            .ListCompanies({ organizationId: fixture.organizationId })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           expect(companies).toHaveLength(0);
         })

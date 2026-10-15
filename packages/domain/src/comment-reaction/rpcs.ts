@@ -13,12 +13,12 @@ import {
 } from "./schema";
 
 export class CommentReactionRpcs extends RpcGroup.make(
-  Rpc.make("CommentReactionList", {
+  Rpc.make("ListCommentReactions", {
     payload: CommentReactionList,
     success: Schema.Array(CommentReaction),
     error: CommentReactionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("CommentReactionToggle", {
+  Rpc.make("ToggleCommentReaction", {
     payload: CommentReactionToggle,
     success: Schema.Struct({
       reacted: Schema.Boolean,
@@ -26,14 +26,14 @@ export class CommentReactionRpcs extends RpcGroup.make(
     }),
     error: CommentReactionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("CommentReactionListPublic", {
+  Rpc.make("ListCommentReactionsPublic", {
     payload: CommentReactionList,
     success: Schema.Array(CommentReaction),
     error: Schema.Union([CommentReactionServiceErrors, RateLimitErrors]),
   })
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("CommentReactionTogglePublic", {
+  Rpc.make("ToggleCommentReactionPublic", {
     payload: CommentReactionToggle,
     success: Schema.Struct({
       reacted: Schema.Boolean,

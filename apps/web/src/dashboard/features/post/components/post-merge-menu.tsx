@@ -312,7 +312,7 @@ function PostMergeCommandDialog({
   );
 
   // Embedding-based duplicate detection over the workspace: the same
-  // `PostSuggestions` flow the create form uses, so likely duplicates are
+  // `GetPostSuggestions` flow the create form uses, so likely duplicates are
   // flagged and sorted to the top of the picker instead of relying on the
   // moderator to scan every title. Subscribing mounts the query atom, so the
   // lookup fires when the picker opens and the atom runtime owns abort,

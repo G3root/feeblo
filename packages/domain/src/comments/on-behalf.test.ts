@@ -229,7 +229,7 @@ describe("CommentRpcHandlers on-behalf", () => {
   );
 
   layer(TestLayer)("handlers", (it) => {
-    describe("CommentCreate with author", () => {
+    describe("CreateComment with author", () => {
       it.effect(
         "persists the resolved subject as author with null memberId and provenance",
         () =>
@@ -240,7 +240,7 @@ describe("CommentRpcHandlers on-behalf", () => {
             const commentId = yield* CommentId.generate;
 
             yield* handlers
-              .CommentCreate({
+              .CreateComment({
                 ...commentCreateInput(
                   fixture,
                   commentId,
@@ -326,7 +326,7 @@ describe("CommentRpcHandlers on-behalf", () => {
             });
 
             yield* handlers
-              .CommentCreate({
+              .CreateComment({
                 ...commentCreateInput(fixture, commentId, "Staff recorded"),
                 author: { userId: teammateUserId },
               })
@@ -369,7 +369,7 @@ describe("CommentRpcHandlers on-behalf", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .CommentCreate({
+              .CreateComment({
                 ...commentCreateInput(
                   fixture,
                   commentId,
@@ -401,7 +401,7 @@ describe("CommentRpcHandlers on-behalf", () => {
             const fixture = yield* makeFixture(role);
             const commentId = yield* CommentId.generate;
             yield* handlers
-              .CommentCreate({
+              .CreateComment({
                 ...commentCreateInput(fixture, commentId, `${role} on behalf`),
                 author: { email: `${role}@example.com` },
               })
@@ -430,7 +430,7 @@ describe("CommentRpcHandlers on-behalf", () => {
             const fixture = yield* makeFixture(role);
             const commentId = yield* CommentId.generate;
             yield* handlers
-              .CommentCreate(
+              .CreateComment(
                 commentCreateInput(fixture, commentId, `${role} self comment`)
               )
               .pipe(
@@ -460,7 +460,7 @@ describe("CommentRpcHandlers on-behalf", () => {
           const commentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreate({
+            .CreateComment({
               ...commentCreateInput(fixture, commentId, "No email for this"),
               author: { email: "jane@example.com" },
             })
@@ -493,7 +493,7 @@ describe("CommentRpcHandlers on-behalf", () => {
           const commentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreate({
+            .CreateComment({
               ...commentCreateInput(
                 fixture,
                 commentId,
@@ -519,7 +519,7 @@ describe("CommentRpcHandlers on-behalf", () => {
           // Internal-comment visibility rules hold: members see it on the
           // dashboard list, the public list hides it.
           const memberComments = yield* handlers
-            .CommentList({
+            .ListComments({
               organizationId: fixture.organizationId,
               slug: fixture.postSlug,
             })
@@ -532,7 +532,7 @@ describe("CommentRpcHandlers on-behalf", () => {
           expect(memberComments.map((row) => row.id)).toEqual([commentId]);
 
           const publicComments = yield* handlers
-            .CommentListPublic({
+            .ListCommentsPublic({
               organizationId: fixture.organizationId,
               slug: fixture.postSlug,
             })
@@ -555,7 +555,7 @@ describe("CommentRpcHandlers on-behalf", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .CommentCreate({
+              .CreateComment({
                 ...commentCreateInput(fixture, commentId, "Missing subject"),
                 author: { contactId: "cnt_does_not_exist" },
               })
@@ -577,7 +577,7 @@ describe("CommentRpcHandlers on-behalf", () => {
       );
     });
 
-    describe("CommentCreatePublic", () => {
+    describe("CreateCommentPublic", () => {
       it.effect("rejects an author with a bad request", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
@@ -587,7 +587,7 @@ describe("CommentRpcHandlers on-behalf", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .CommentCreatePublic({
+              .CreateCommentPublic({
                 ...commentCreateInput(fixture, commentId, "Public on behalf"),
                 author: { email: "jane@example.com" },
               })

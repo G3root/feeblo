@@ -25,12 +25,12 @@ const limiter = (consumed: Array<PublicRpcRateLimitOptions>) =>
 
 describe("surfaceRpcName", () => {
   it("names the dashboard RPC without a suffix", () => {
-    expect(surfaceRpcName("CommentDelete", "dashboard")).toBe("CommentDelete");
+    expect(surfaceRpcName("DeleteComment", "dashboard")).toBe("DeleteComment");
   });
 
   it("names the public RPC with the Public suffix", () => {
-    expect(surfaceRpcName("CommentDelete", "public")).toBe(
-      "CommentDeletePublic"
+    expect(surfaceRpcName("DeleteComment", "public")).toBe(
+      "DeleteCommentPublic"
     );
   });
 });

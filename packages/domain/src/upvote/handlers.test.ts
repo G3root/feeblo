@@ -180,14 +180,14 @@ describe("UpvoteRpcHandlers", () => {
   const TestLayer = Layer.merge(HandlerTest, Database.PgliteDatabaseLive);
 
   layer(TestLayer)("handlers", (it) => {
-    describe("UpvoteList", () => {
+    describe("ListUpvotes", () => {
       it.effect("rejects users without a membership", () =>
         Effect.gen(function* () {
           const handlers = yield* UpvoteRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const error = yield* Effect.flip(
             handlers
-              .UpvoteList({
+              .ListUpvotes({
                 organizationId: fixture.organizationId,
               })
               .pipe(
@@ -212,7 +212,7 @@ describe("UpvoteRpcHandlers", () => {
 
           // Upvote the post
           yield* handlers
-            .UpvoteToggle({
+            .ToggleUpvote({
               organizationId: fixture.organizationId,
               postId,
             })
@@ -220,7 +220,7 @@ describe("UpvoteRpcHandlers", () => {
 
           // List upvotes
           const upvotes = yield* handlers
-            .UpvoteList({
+            .ListUpvotes({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -236,7 +236,7 @@ describe("UpvoteRpcHandlers", () => {
       );
     });
 
-    describe("UpvoteToggle", () => {
+    describe("ToggleUpvote", () => {
       it.effect("rejects users without a membership", () =>
         Effect.gen(function* () {
           const handlers = yield* UpvoteRpcHandlersEffect;
@@ -247,7 +247,7 @@ describe("UpvoteRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .UpvoteToggle({
+              .ToggleUpvote({
                 organizationId: fixture.organizationId,
                 postId,
               })
@@ -281,7 +281,7 @@ describe("UpvoteRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .UpvoteToggle({
+              .ToggleUpvote({
                 organizationId: fixture.organizationId,
                 postId,
               })
@@ -317,7 +317,7 @@ describe("UpvoteRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .UpvoteToggle({
+              .ToggleUpvote({
                 organizationId: fixture.organizationId,
                 postId,
               })
@@ -337,7 +337,7 @@ describe("UpvoteRpcHandlers", () => {
           yield* createPost(fixture, postId, "Test post");
 
           const result = yield* handlers
-            .UpvoteToggle({
+            .ToggleUpvote({
               organizationId: fixture.organizationId,
               postId,
             })
@@ -347,7 +347,7 @@ describe("UpvoteRpcHandlers", () => {
 
           // Verify the upvote is persisted
           const upvotes = yield* handlers
-            .UpvoteList({
+            .ListUpvotes({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -367,7 +367,7 @@ describe("UpvoteRpcHandlers", () => {
 
           // First toggle: upvote
           const first = yield* handlers
-            .UpvoteToggle({
+            .ToggleUpvote({
               organizationId: fixture.organizationId,
               postId,
             })
@@ -376,7 +376,7 @@ describe("UpvoteRpcHandlers", () => {
 
           // Second toggle: remove upvote
           const second = yield* handlers
-            .UpvoteToggle({
+            .ToggleUpvote({
               organizationId: fixture.organizationId,
               postId,
             })
@@ -385,7 +385,7 @@ describe("UpvoteRpcHandlers", () => {
 
           // Verify the upvote is removed
           const upvotes = yield* handlers
-            .UpvoteList({
+            .ListUpvotes({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -394,7 +394,7 @@ describe("UpvoteRpcHandlers", () => {
       );
     });
 
-    describe("UpvoteListPublic", () => {
+    describe("ListUpvotesPublic", () => {
       it.effect("lists upvotes without authentication", () =>
         Effect.gen(function* () {
           const handlers = yield* UpvoteRpcHandlersEffect;
@@ -405,7 +405,7 @@ describe("UpvoteRpcHandlers", () => {
 
           // Upvote the post as a member
           yield* handlers
-            .UpvoteToggle({
+            .ToggleUpvote({
               organizationId: fixture.organizationId,
               postId,
             })
@@ -413,7 +413,7 @@ describe("UpvoteRpcHandlers", () => {
 
           // List publicly without auth
           const upvotes = yield* handlers
-            .UpvoteListPublic({
+            .ListUpvotesPublic({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
@@ -441,20 +441,20 @@ describe("UpvoteRpcHandlers", () => {
           yield* createPost(fixture, postB, "Post B");
 
           yield* handlers
-            .UpvoteToggle({
+            .ToggleUpvote({
               organizationId: fixture.organizationId,
               postId: postA,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           yield* handlers
-            .UpvoteToggle({
+            .ToggleUpvote({
               organizationId: fixture.organizationId,
               postId: postB,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const upvotes = yield* handlers
-            .UpvoteListPublic({
+            .ListUpvotesPublic({
               organizationId: fixture.organizationId,
               postId: postA,
             })
@@ -496,7 +496,7 @@ describe("UpvoteRpcHandlers", () => {
             };
 
             yield* handlers
-              .UpvoteToggle({
+              .ToggleUpvote({
                 organizationId: fixture.organizationId,
                 postId,
               })
@@ -504,14 +504,14 @@ describe("UpvoteRpcHandlers", () => {
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
             yield* handlers
-              .UpvoteTogglePublic({
+              .ToggleUpvotePublic({
                 organizationId: fixture.organizationId,
                 postId,
               })
               .pipe(Effect.provideService(CurrentSession, otherSession));
 
             const upvotes = yield* handlers
-              .UpvoteListPublic({
+              .ListUpvotesPublic({
                 organizationId: fixture.organizationId,
               })
               .pipe(
@@ -560,21 +560,21 @@ describe("UpvoteRpcHandlers", () => {
           });
 
           yield* handlers
-            .UpvoteToggle({
+            .ToggleUpvote({
               organizationId: fixture.organizationId,
               postId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const upvotes = yield* handlers
-            .UpvoteListPublic({
+            .ListUpvotesPublic({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
           expect(upvotes).toHaveLength(0);
 
           const memberUpvotes = yield* handlers
-            .UpvoteList({
+            .ListUpvotes({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -583,7 +583,7 @@ describe("UpvoteRpcHandlers", () => {
       );
     });
 
-    describe("UpvoteTogglePublic", () => {
+    describe("ToggleUpvotePublic", () => {
       it.effect("allows non-members to upvote on public posts", () =>
         Effect.gen(function* () {
           const handlers = yield* UpvoteRpcHandlersEffect;
@@ -593,7 +593,7 @@ describe("UpvoteRpcHandlers", () => {
           yield* createPost(fixture, postId, "Test post");
 
           const result = yield* handlers
-            .UpvoteTogglePublic({
+            .ToggleUpvotePublic({
               organizationId: fixture.organizationId,
               postId,
             })
@@ -605,7 +605,7 @@ describe("UpvoteRpcHandlers", () => {
 
           // Verify the upvote is visible publicly (identity redacted)
           const upvotes = yield* handlers
-            .UpvoteListPublic({
+            .ListUpvotesPublic({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
@@ -633,7 +633,7 @@ describe("UpvoteRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .UpvoteTogglePublic({
+              .ToggleUpvotePublic({
                 organizationId: fixture.organizationId,
                 postId,
               })
@@ -668,7 +668,7 @@ describe("UpvoteRpcHandlers", () => {
 
             const error = yield* Effect.flip(
               handlers
-                .UpvoteTogglePublic({
+                .ToggleUpvotePublic({
                   organizationId: fixture.organizationId,
                   postId,
                 })
@@ -693,7 +693,7 @@ describe("UpvoteRpcHandlers", () => {
 
           // First toggle: upvote
           const first = yield* handlers
-            .UpvoteTogglePublic({
+            .ToggleUpvotePublic({
               organizationId: fixture.organizationId,
               postId,
             })
@@ -702,7 +702,7 @@ describe("UpvoteRpcHandlers", () => {
 
           // Second toggle: remove upvote
           const second = yield* handlers
-            .UpvoteTogglePublic({
+            .ToggleUpvotePublic({
               organizationId: fixture.organizationId,
               postId,
             })
@@ -711,7 +711,7 @@ describe("UpvoteRpcHandlers", () => {
 
           // Verify upvote is removed
           const upvotes = yield* handlers
-            .UpvoteListPublic({
+            .ListUpvotesPublic({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
@@ -729,7 +729,7 @@ describe("UpvoteRpcHandlers", () => {
 
         yield* createPost(fixture, postId, "No implicit subscription");
         const result = yield* handlers
-          .UpvoteToggle({
+          .ToggleUpvote({
             organizationId: fixture.organizationId,
             postId,
           })

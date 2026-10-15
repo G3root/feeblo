@@ -75,7 +75,7 @@ export interface AuthorPickerProps {
 
 /**
  * Shared author picker: a trigger (avatar + name, or a placeholder action)
- * opening a searchable people picker (`ContactSearch`) with a "brand new
+ * opening a searchable people picker (`SearchContacts`) with a "brand new
  * user" entry point backed by the shared name/email dialog. Used for both
  * reattributing an existing post (dashboard details) and staging the
  * author of a post being created — what happens with the selection is the

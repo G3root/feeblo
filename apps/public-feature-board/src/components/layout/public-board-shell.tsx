@@ -69,7 +69,7 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
     ({ signal, ...input }) =>
       fetchRpc(
         (rpc) =>
-          rpc.PostSuggestionsPublic({
+          rpc.GetPostSuggestionsPublic({
             ...input,
             limit: 5,
             organizationId: site.organizationId,
@@ -85,7 +85,7 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
   const persistPost = useCallback<PostCollectionsValue["persistPost"]>(
     async (input) =>
       fetchRpc((rpc) =>
-        rpc.PostCreatePublic({
+        rpc.CreatePostPublic({
           ...input,
           organizationId: getMutationOrganizationId(),
         })

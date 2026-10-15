@@ -24,19 +24,19 @@ export const RoadmapColumnRpcHandlersEffect = Effect.gen(function* () {
   const manage = (organizationId: string) =>
     Policy.canPermission(organizationId, "roadmap.*");
   return {
-    RoadmapColumnList: (args: TRoadmapColumnList) =>
+    ListRoadmapColumns: (args: TRoadmapColumnList) =>
       columns
         .findMany(args)
         .pipe(
           Policy.withPolicy(read(args.organizationId)),
           withRemapDbErrors("RoadmapColumn", "select")
         ),
-    RoadmapColumnListPublic: (args: TRoadmapColumnList) =>
+    ListRoadmapColumnsPublic: (args: TRoadmapColumnList) =>
       columns
         .findMany({ organizationId: args.organizationId, visibility: "public" })
         .pipe(
           RateLimit.withPublicRpcRateLimit({
-            name: "RoadmapColumnListPublic",
+            name: "ListRoadmapColumnsPublic",
             level: "read",
           }),
           Policy.withPublicPolicy(
@@ -44,21 +44,21 @@ export const RoadmapColumnRpcHandlersEffect = Effect.gen(function* () {
           ),
           withRemapDbErrors("RoadmapColumn", "select")
         ),
-    RoadmapColumnCreate: (args: TRoadmapColumnCreate) =>
+    CreateRoadmapColumn: (args: TRoadmapColumnCreate) =>
       columns
         .create(args)
         .pipe(
           Policy.withPolicy(manage(args.organizationId)),
           withRemapDbErrors("RoadmapColumn", "create")
         ),
-    RoadmapColumnUpdate: (args: TRoadmapColumnUpdate) =>
+    UpdateRoadmapColumn: (args: TRoadmapColumnUpdate) =>
       columns
         .update(args)
         .pipe(
           Policy.withPolicy(manage(args.organizationId)),
           withRemapDbErrors("RoadmapColumn", "update")
         ),
-    RoadmapColumnDelete: (args: TRoadmapColumnDelete) =>
+    DeleteRoadmapColumn: (args: TRoadmapColumnDelete) =>
       columns
         .delete(args)
         .pipe(

@@ -166,7 +166,7 @@ describe("RoadmapRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* RoadmapRpcHandlersEffect;
         const fixture = yield* makeFixture("PUBLIC");
-        const roadmaps = yield* handlers.RoadmapListPublic({
+        const roadmaps = yield* handlers.ListRoadmapsPublic({
           organizationId: fixture.organizationId,
         });
         expect(roadmaps).toMatchObject([{ id: fixture.roadmapId }]);
@@ -177,7 +177,7 @@ describe("RoadmapRpcHandlers", () => {
         const handlers = yield* RoadmapRpcHandlersEffect;
         const fixture = yield* makeFixture("HIDDEN");
         const error = yield* Effect.flip(
-          handlers.RoadmapListPublic({
+          handlers.ListRoadmapsPublic({
             organizationId: fixture.organizationId,
           })
         );
@@ -191,13 +191,13 @@ describe("RoadmapRpcHandlers", () => {
         const roadmapId = yield* RoadmapId.generate;
 
         yield* handlers
-          .RoadmapCreate(
+          .CreateRoadmap(
             roadmapCreateInput(fixture, roadmapId, "Public roadmap")
           )
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
         const roadmaps = yield* handlers
-          .RoadmapList({
+          .ListRoadmaps({
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -217,7 +217,7 @@ describe("RoadmapRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .RoadmapCreate(
+            .CreateRoadmap(
               roadmapCreateInput(fixture, roadmapId, "Member roadmap")
             )
             .pipe(
@@ -239,7 +239,7 @@ describe("RoadmapRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .RoadmapCreate(
+            .CreateRoadmap(
               roadmapCreateInput(
                 fixture,
                 roadmapId,
@@ -288,13 +288,13 @@ describe("RoadmapRpcHandlers", () => {
         });
 
         yield* handlers
-          .RoadmapCreate(
+          .CreateRoadmap(
             roadmapCreateInput(fixture, roadmapId, "Private roadmap", "private")
           )
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
         const roadmaps = yield* handlers
-          .RoadmapList({
+          .ListRoadmaps({
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -313,7 +313,7 @@ describe("RoadmapRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .RoadmapUpdate({
+            .UpdateRoadmap({
               id: fixture.roadmapId,
               organizationId: fixture.organizationId,
               name: "Updated roadmap",
@@ -353,7 +353,7 @@ describe("RoadmapRpcHandlers", () => {
         });
 
         yield* handlers
-          .RoadmapUpdate({
+          .UpdateRoadmap({
             id: privateRoadmapId,
             organizationId: fixture.organizationId,
             name: "Private roadmap",
@@ -374,13 +374,13 @@ describe("RoadmapRpcHandlers", () => {
         const roadmapId = yield* RoadmapId.generate;
 
         yield* handlers
-          .RoadmapCreate(
+          .CreateRoadmap(
             roadmapCreateInput(fixture, roadmapId, "First roadmap")
           )
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
         const roadmaps = yield* handlers
-          .RoadmapList({
+          .ListRoadmaps({
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -399,16 +399,16 @@ describe("RoadmapRpcHandlers", () => {
         const secondId = yield* RoadmapId.generate;
 
         yield* handlers
-          .RoadmapCreate(roadmapCreateInput(fixture, firstId, "First roadmap"))
+          .CreateRoadmap(roadmapCreateInput(fixture, firstId, "First roadmap"))
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         yield* handlers
-          .RoadmapCreate(
+          .CreateRoadmap(
             roadmapCreateInput(fixture, secondId, "Second roadmap")
           )
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
         const roadmaps = yield* handlers
-          .RoadmapList({
+          .ListRoadmaps({
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -436,14 +436,14 @@ describe("RoadmapRpcHandlers", () => {
         yield* Effect.all(
           [
             handlers
-              .RoadmapCreate(
+              .CreateRoadmap(
                 roadmapCreateInput(fixture, firstId, "Concurrent roadmap A")
               )
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               ),
             handlers
-              .RoadmapCreate(
+              .CreateRoadmap(
                 roadmapCreateInput(fixture, secondId, "Concurrent roadmap B")
               )
               .pipe(
@@ -454,7 +454,7 @@ describe("RoadmapRpcHandlers", () => {
         );
 
         const roadmaps = yield* handlers
-          .RoadmapList({
+          .ListRoadmaps({
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -470,13 +470,13 @@ describe("RoadmapRpcHandlers", () => {
         const secondId = yield* RoadmapId.generate;
 
         yield* handlers
-          .RoadmapCreate(
+          .CreateRoadmap(
             roadmapCreateInput(fixture, secondId, "Second roadmap")
           )
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
         yield* handlers
-          .RoadmapUpdate({
+          .UpdateRoadmap({
             id: secondId,
             organizationId: fixture.organizationId,
             name: "Second roadmap",
@@ -490,7 +490,7 @@ describe("RoadmapRpcHandlers", () => {
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
         const roadmaps = yield* handlers
-          .RoadmapList({
+          .ListRoadmaps({
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -515,20 +515,20 @@ describe("RoadmapRpcHandlers", () => {
           const secondId = yield* RoadmapId.generate;
 
           yield* handlers
-            .RoadmapCreate(
+            .CreateRoadmap(
               roadmapCreateInput(fixture, secondId, "Second roadmap")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           yield* handlers
-            .RoadmapDelete({
+            .DeleteRoadmap({
               id: fixture.roadmapId,
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const roadmaps = yield* handlers
-            .RoadmapList({
+            .ListRoadmaps({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -545,14 +545,14 @@ describe("RoadmapRpcHandlers", () => {
         const fixture = yield* makeFixture("PUBLIC");
 
         yield* handlers
-          .RoadmapDelete({
+          .DeleteRoadmap({
             id: fixture.roadmapId,
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
         const roadmaps = yield* handlers
-          .RoadmapList({
+          .ListRoadmaps({
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -568,20 +568,20 @@ describe("RoadmapRpcHandlers", () => {
           const secondId = yield* RoadmapId.generate;
 
           yield* handlers
-            .RoadmapCreate(
+            .CreateRoadmap(
               roadmapCreateInput(fixture, secondId, "Second roadmap")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           yield* handlers
-            .RoadmapDelete({
+            .DeleteRoadmap({
               id: secondId,
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const roadmaps = yield* handlers
-            .RoadmapList({
+            .ListRoadmaps({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -639,7 +639,7 @@ describe("RoadmapRpcHandlers", () => {
           yield* Effect.all(
             [
               handlers
-                .RoadmapDelete({
+                .DeleteRoadmap({
                   id: fixture.roadmapId,
                   organizationId: fixture.organizationId,
                 })
@@ -647,7 +647,7 @@ describe("RoadmapRpcHandlers", () => {
                   Effect.provideService(CurrentSession, makeSession(fixture))
                 ),
               handlers
-                .RoadmapDelete({
+                .DeleteRoadmap({
                   id: secondId,
                   organizationId: fixture.organizationId,
                 })
@@ -659,7 +659,7 @@ describe("RoadmapRpcHandlers", () => {
           );
 
           const roadmaps = yield* handlers
-            .RoadmapList({
+            .ListRoadmaps({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -685,7 +685,7 @@ describe("RoadmapRpcHandlers", () => {
           yield* Effect.all(
             [
               handlers
-                .RoadmapDelete({
+                .DeleteRoadmap({
                   id: fixture.roadmapId,
                   organizationId: fixture.organizationId,
                 })
@@ -693,7 +693,7 @@ describe("RoadmapRpcHandlers", () => {
                   Effect.provideService(CurrentSession, makeSession(fixture))
                 ),
               handlers
-                .RoadmapCreate(
+                .CreateRoadmap(
                   roadmapCreateInput(fixture, createdId, "Racing roadmap")
                 )
                 .pipe(
@@ -704,7 +704,7 @@ describe("RoadmapRpcHandlers", () => {
           );
 
           const roadmaps = yield* handlers
-            .RoadmapList({
+            .ListRoadmaps({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));

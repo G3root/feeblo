@@ -40,7 +40,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
   const userRepository = yield* UserRepository;
 
   return {
-    ContactList: (args: TContactList) =>
+    ListContacts: (args: TContactList) =>
       repository
         .findManyContacts(args.organizationId)
         .pipe(
@@ -48,7 +48,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Contact", "select")
         ),
 
-    ContactSearch: (args: TContactSearch) => {
+    SearchContacts: (args: TContactSearch) => {
       const searchArgs: ContactSearchArgs = {
         organizationId: args.organizationId,
         query: args.query.trim(),
@@ -87,7 +87,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
      * decides inside its transaction, so this is a hint that can safely go
      * stale.
      */
-    ContactCreateEligibility: (args: TContactCreateEligibility) =>
+    CheckContactCreateEligibility: (args: TContactCreateEligibility) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         yield* consumeDashboardRateLimit({
@@ -113,7 +113,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Contact", "select")
       ),
 
-    ContactCreate: (args: TContactCreate) =>
+    CreateContact: (args: TContactCreate) =>
       createCrmEntry({
         organizationId: args.organizationId,
         insert: Effect.gen(function* () {
@@ -171,7 +171,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Contact", "create")
       ),
 
-    ContactUpdate: (args: TContactUpdate) =>
+    UpdateContact: (args: TContactUpdate) =>
       Effect.gen(function* () {
         const contact = yield* repository.update(args);
         if (Option.isNone(contact)) {
@@ -185,7 +185,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Contact", "update")
       ),
 
-    ContactUnsubscribe: (args: TContactUnsubscribe) =>
+    UnsubscribeContact: (args: TContactUnsubscribe) =>
       Effect.gen(function* () {
         const contact = yield* repository.findById(args);
         if (Option.isNone(contact)) {
@@ -206,7 +206,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Contact", "update")
       ),
 
-    ContactDelete: (args: TContactDelete) =>
+    DeleteContact: (args: TContactDelete) =>
       Effect.gen(function* () {
         const deleted = yield* transaction(
           Effect.gen(function* () {

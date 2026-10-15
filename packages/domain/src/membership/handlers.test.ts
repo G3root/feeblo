@@ -109,7 +109,7 @@ describe("MembershipRpcHandlers", () => {
         const handlers = yield* MembershipRpcHandlersEffect;
         const fixture = yield* makeFixture();
         const memberships = yield* handlers
-          .MembershipList()
+          .ListMemberships()
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         expect(memberships).toMatchObject([
           { id: fixture.membershipId, organizationId: fixture.organizationId },
@@ -122,7 +122,7 @@ describe("MembershipRpcHandlers", () => {
         const fixture = yield* makeFixture();
         const error = yield* Effect.flip(
           handlers
-            .OrganizationMembersList({ organizationId: fixture.organizationId })
+            .ListOrganizationMembers({ organizationId: fixture.organizationId })
             .pipe(
               Effect.provideService(CurrentSession, makeSession(fixture, null))
             )
@@ -183,7 +183,7 @@ describe("MembershipRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .OrganizationUpdateMemberRole({
+            .UpdateOrganizationMemberRole({
               organizationId: fixture.organizationId,
               memberId: fixture.membershipId,
               role: "owner",
@@ -237,7 +237,7 @@ describe("MembershipRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .OrganizationUpdateMemberRole({
+            .UpdateOrganizationMemberRole({
               organizationId: fixture.organizationId,
               memberId: targetMemberId,
               role: "owner",
@@ -273,7 +273,7 @@ describe("MembershipRpcHandlers", () => {
         });
 
         yield* handlers
-          .OrganizationUpdateMemberRole({
+          .UpdateOrganizationMemberRole({
             organizationId: fixture.organizationId,
             memberId: targetMemberId,
             role: "owner",
@@ -304,7 +304,7 @@ describe("MembershipRpcHandlers", () => {
 
         const removeError = yield* Effect.flip(
           handlers
-            .OrganizationRemoveMember({
+            .RemoveOrganizationMember({
               organizationId: fixture.organizationId,
               memberId: otherOwnerMemberId,
             })
@@ -314,7 +314,7 @@ describe("MembershipRpcHandlers", () => {
 
         const demoteError = yield* Effect.flip(
           handlers
-            .OrganizationUpdateMemberRole({
+            .UpdateOrganizationMemberRole({
               organizationId: fixture.organizationId,
               memberId: otherOwnerMemberId,
               role: "admin",
@@ -356,7 +356,7 @@ describe("MembershipRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .OrganizationRemoveMember({
+            .RemoveOrganizationMember({
               organizationId: fixture.organizationId,
               memberId: ownerMemberId,
             })
@@ -397,7 +397,7 @@ describe("MembershipRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .OrganizationRemoveMember({
+            .RemoveOrganizationMember({
               organizationId: fixture.organizationId,
               memberId: admin2MemberId,
             })
@@ -437,7 +437,7 @@ describe("MembershipRpcHandlers", () => {
           .where(eq(schema.memberTable.id, fixture.membershipId));
 
         yield* handlers
-          .OrganizationRemoveMember({
+          .RemoveOrganizationMember({
             organizationId: fixture.organizationId,
             memberId,
           })
@@ -474,7 +474,7 @@ describe("MembershipRpcHandlers", () => {
         });
 
         yield* handlers
-          .OrganizationRemoveMember({
+          .RemoveOrganizationMember({
             organizationId: fixture.organizationId,
             memberId,
           })
