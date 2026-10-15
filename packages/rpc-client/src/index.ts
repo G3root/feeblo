@@ -1,4 +1,6 @@
 import { AllRpcs } from "@feeblo/domain/rpc-group";
+import { isReadRpc } from "@feeblo/domain/rpc-kind";
+import { hasWindow } from "@feeblo/utils/runtime-kind";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
@@ -7,6 +9,8 @@ import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as RpcClient from "effect/rpc/RpcClient";
 import type * as RpcClientError from "effect/rpc/RpcClientError";
 import * as RpcSerialization from "effect/rpc/RpcSerialization";
+
+import { layerProtocolHttpBatch } from "./batch-protocol";
 
 /** Fetch client that sends cookies (needed for BetterAuth session) */
 export const FetchWithCredentials = FetchHttpClient.layer.pipe(
@@ -55,10 +59,20 @@ export const rpcProtocolFor = (
   return protocol;
 };
 
-export const createRpcProtocolLive = (apiUrl: string) =>
-  RpcClient.layerProtocolHttp({
-    url: `${normalizeApiUrl(apiUrl)}/rpc`,
-  }).pipe(Layer.provide([FetchWithCredentials, RpcSerialization.layerNdjson]));
+export const createRpcProtocolLive = (apiUrl: string) => {
+  const url = `${normalizeApiUrl(apiUrl)}/rpc`;
+  // A batch carries one set of request headers, so only a runtime that belongs
+  // to one request may batch. The server's runtime is a module-level singleton
+  // shared by every concurrent request; batching there would let one request's
+  // cookie authenticate another's frames.
+  const protocol = hasWindow()
+    ? layerProtocolHttpBatch({ url, sharesBatch: isReadRpc })
+    : RpcClient.layerProtocolHttp({ url });
+
+  return protocol.pipe(
+    Layer.provide([FetchWithCredentials, RpcSerialization.layerNdjson])
+  );
+};
 
 export type RpcClientType = RpcClient.FromGroup<
   typeof AllRpcs,

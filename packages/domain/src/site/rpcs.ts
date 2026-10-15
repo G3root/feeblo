@@ -9,7 +9,7 @@ import {
   Site,
   SiteHidePoweredByBranding,
   SiteList,
-  SiteListBySubdomain,
+  SiteSubdomainList,
   SiteUpdate,
 } from "./schema";
 
@@ -19,9 +19,9 @@ export class SiteRpcs extends RpcGroup.make(
     payload: SiteList,
     error: SiteServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("SiteListBySubdomain", {
+  Rpc.make("SiteSubdomainList", {
     success: Schema.Array(Site),
-    payload: SiteListBySubdomain,
+    payload: SiteSubdomainList,
     error: Schema.Union([SiteServiceErrors, RateLimitErrors]),
   }).middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("SiteUpdate", {

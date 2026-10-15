@@ -13,7 +13,7 @@ import type {
   TSite,
   TSiteHidePoweredByBranding,
   TSiteList,
-  TSiteListBySubdomain,
+  TSiteSubdomainList,
   TSiteUpdate,
 } from "./schema";
 
@@ -53,7 +53,7 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
         withRemapDbErrors("Site", "select")
       ),
-    SiteListBySubdomain: (args: TSiteListBySubdomain) =>
+    SiteSubdomainList: (args: TSiteSubdomainList) =>
       Effect.gen(function* () {
         const sites = yield* repository.findMany({
           subdomain: args.subdomain,
@@ -68,7 +68,7 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
         return [yield* applyBrandingEntitlement(site)];
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
-          name: "SiteListBySubdomain",
+          name: "SiteSubdomainList",
           level: "read",
         }),
         withRemapDbErrors("Site", "select")

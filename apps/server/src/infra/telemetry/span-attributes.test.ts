@@ -6,6 +6,7 @@ import {
   allowedSpans,
   httpSpanAttributeAllowlist,
   rootSpanNoise,
+  routeTemplates,
   spanAttributeAllowed,
 } from "./span-attributes";
 
@@ -135,6 +136,64 @@ describe("allowedSpans", () => {
       expect(spans.map((span) => span.sampled)).toEqual([true, true]);
     })
   );
+
+  it.effect("replaces a matched path with the router's route template", () =>
+    Effect.gen(function* () {
+      const { spans, tracer } = recordingTracer();
+      // The router records the route after the request middleware.
+      yield* Effect.annotateCurrentSpan(
+        "http.route",
+        "/email-provider/ses/:token"
+      ).pipe(
+        Effect.withSpan("http.server.request", {
+          attributes: { "url.path": "/email-provider/ses/secret-token" },
+        }),
+        withTracer(tracer, { sampleRate: 1 })
+      );
+
+      const attributes = spans[0]?.attributes;
+      expect(attributes?.get("url.path")).toBe("/email-provider/ses/:token");
+      expect(attributes?.get("http.route")).toBe("/email-provider/ses/:token");
+    })
+  );
+
+  it.effect("records the route template when it arrives before the path", () =>
+    Effect.gen(function* () {
+      const { spans, tracer } = recordingTracer();
+      yield* Effect.annotateCurrentSpan("url.path", "/posts/lg_secret").pipe(
+        Effect.withSpan("http.server.request", {
+          attributes: { "http.route": "/posts/:postId" },
+        }),
+        withTracer(tracer, { sampleRate: 1 })
+      );
+
+      expect(spans[0]?.attributes.get("url.path")).toBe("/posts/:postId");
+    })
+  );
+
+  it("names a fixed endpoint served under a wildcard route", () => {
+    const templates = routeTemplates([
+      "/api/auth/sign-in",
+      "/api/auth/callback/:provider",
+    ]);
+
+    expect(templates.match("/api/auth/sign-in")).toBe("/api/auth/sign-in");
+    expect(templates.match("/api/auth/callback/github")).toBe(
+      "/api/auth/callback/:provider"
+    );
+    expect(templates.match("/api/auth/unknown")).toBeUndefined();
+  });
+
+  it("prefers a fixed segment over a parameter from left to right", () => {
+    const templates = routeTemplates([
+      "/api/auth/:provider/callback",
+      "/api/auth/callback/:provider",
+    ]);
+
+    expect(templates.match("/api/auth/callback/callback")).toBe(
+      "/api/auth/callback/:provider"
+    );
+  });
 
   it.effect("drops only the configured root names", () =>
     Effect.gen(function* () {

@@ -16,6 +16,7 @@ catalog:
   "@base-ui/react": ^1.7.0
   "@better-auth/api-key": 1.7.2
   "@better-auth/utils": ^0.4.0
+  "@bufbuild/protobuf": 2.16.0
   "@cloudflare/workers-types": ^4.20260702.1
   "@dotenvx/dotenvx": ^1.75.1
   "@effect-aws/client-s3": 2.0.0-beta.6
