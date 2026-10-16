@@ -162,6 +162,8 @@ Polar also caps a customer at one billable subscription unless the organization 
 
 Production deployments use the Docker images referenced in `docker-compose.yml` (`ghcr.io/g3root/feeblo-server` and `ghcr.io/g3root/feeblo-web`). Images are published automatically to GHCR: pushes to `main` produce `edge` and `sha-*` tags, while version tags produce the release version, `major.minor`, `major`, and `latest` tags. The dashboard can alternatively be deployed to Cloudflare using the Wrangler configuration in `apps/web/wrangler.jsonc`.
 
+The Cloudflare Worker is built from the `prod` branch, which only ever moves forward to a release tag: run the **Promote prod** workflow with the tag name (Actions → Promote prod → Run workflow), or `gh workflow run promote-prod.yml -f tag=v1.2.0 -f dry_run=true`. `prod` is never merged into and never force-pushed; see `docs/adr/0018`.
+
 Production startup enforces two safety checks: `AUTH_ENCRYPTION_KEY` must be at least 32 bytes, and `REDIS_URL` must be set so rate limits are shared across server instances.
 
 The Compose database uses the pgvector-enabled PostgreSQL image. Post embeddings default to OpenAI `text-embedding-3-small` at 1536 dimensions. Set `EMBEDDING_API_KEY` to enable embeddings; OpenAI-compatible self-hosted providers can also set `EMBEDDING_API_URL`, `EMBEDDING_MODEL`, and `EMBEDDING_DIMENSIONS`.
