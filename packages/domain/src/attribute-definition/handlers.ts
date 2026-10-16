@@ -27,14 +27,14 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
   const attributeDefinitionPolicy = yield* AttributeDefinitionPolicy;
 
   return {
-    ContactAttributeDefinitionList: (args: TContactAttributeDefinitionList) =>
+    ListContactAttributeDefinitions: (args: TContactAttributeDefinitionList) =>
       repository
         .findContactAttributeDefinitions(args.organizationId)
         .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("ContactAttributeDefinition", "select")
         ),
-    ContactAttributeDefinitionCreate: (
+    CreateContactAttributeDefinition: (
       args: TContactAttributeDefinitionCreate
     ) =>
       repository
@@ -45,7 +45,7 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           ),
           withRemapDbErrors("ContactAttributeDefinition", "create")
         ),
-    ContactAttributeDefinitionUpdate: (
+    UpdateContactAttributeDefinition: (
       args: TContactAttributeDefinitionUpdate
     ) =>
       repository
@@ -54,7 +54,7 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(attributeDefinitionPolicy.canUpdateContact(args)),
           withRemapDbErrors("ContactAttributeDefinition", "update")
         ),
-    ContactAttributeDefinitionDelete: (
+    DeleteContactAttributeDefinition: (
       args: TContactAttributeDefinitionDelete
     ) =>
       repository
@@ -63,14 +63,14 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(attributeDefinitionPolicy.canDeleteContact(args)),
           withRemapDbErrors("ContactAttributeDefinition", "delete")
         ),
-    CompanyAttributeDefinitionList: (args: TCompanyAttributeDefinitionList) =>
+    ListCompanyAttributeDefinitions: (args: TCompanyAttributeDefinitionList) =>
       repository
         .findCompanyAttributeDefinitions(args.organizationId)
         .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("CompanyAttributeDefinition", "select")
         ),
-    CompanyAttributeDefinitionCreate: (
+    CreateCompanyAttributeDefinition: (
       args: TCompanyAttributeDefinitionCreate
     ) =>
       repository
@@ -81,7 +81,7 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           ),
           withRemapDbErrors("CompanyAttributeDefinition", "create")
         ),
-    CompanyAttributeDefinitionUpdate: (
+    UpdateCompanyAttributeDefinition: (
       args: TCompanyAttributeDefinitionUpdate
     ) =>
       repository
@@ -90,7 +90,7 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(attributeDefinitionPolicy.canUpdateCompany(args)),
           withRemapDbErrors("CompanyAttributeDefinition", "update")
         ),
-    CompanyAttributeDefinitionDelete: (
+    DeleteCompanyAttributeDefinition: (
       args: TCompanyAttributeDefinitionDelete
     ) =>
       repository
@@ -99,14 +99,14 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(attributeDefinitionPolicy.canDeleteCompany(args)),
           withRemapDbErrors("CompanyAttributeDefinition", "delete")
         ),
-    ContactAttributeValueList: (args: TContactAttributeValueList) =>
+    ListContactAttributeValues: (args: TContactAttributeValueList) =>
       repository
         .findContactAttributeValues(args.organizationId)
         .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("ContactAttributeValue", "select")
         ),
-    ContactAttributeValueUpdate: (args: TContactAttributeValueUpdate) =>
+    UpdateContactAttributeValue: (args: TContactAttributeValueUpdate) =>
       Effect.gen(function* () {
         const definition = yield* repository.findContactAttributeDefinitionById(
           contactAttributeDefinitionReference(args)
@@ -132,7 +132,7 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           Policy.all(
             Policy.hasMembership(args.organizationId),
             // Writing contact attribute values writes contact data, so it must
-            // require the same grant as ContactUpdate; otherwise a contributor
+            // require the same grant as UpdateContact; otherwise a contributor
             // with no CRM grants could overwrite SSO-synced attribute values.
             Policy.canPermission(args.organizationId, "contacts.update"),
             Policy.policy(() =>
@@ -147,14 +147,14 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
         ),
         withRemapDbErrors("ContactAttributeValue", "update")
       ),
-    CompanyAttributeValueList: (args: TCompanyAttributeValueList) =>
+    ListCompanyAttributeValues: (args: TCompanyAttributeValueList) =>
       repository
         .findCompanyAttributeValues(args.organizationId)
         .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("CompanyAttributeValue", "select")
         ),
-    CompanyAttributeValueUpdate: (args: TCompanyAttributeValueUpdate) =>
+    UpdateCompanyAttributeValue: (args: TCompanyAttributeValueUpdate) =>
       Effect.gen(function* () {
         const definition = yield* repository.findCompanyAttributeDefinitionById(
           companyAttributeDefinitionReference(args)
@@ -180,7 +180,7 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           Policy.all(
             Policy.hasMembership(args.organizationId),
             // Writing company attribute values writes company data, so it must
-            // require the same grant as CompanyUpdate; otherwise a contributor
+            // require the same grant as UpdateCompany; otherwise a contributor
             // with no CRM grants could overwrite SSO-synced attribute values.
             Policy.canPermission(args.organizationId, "companies.update"),
             Policy.policy(() =>

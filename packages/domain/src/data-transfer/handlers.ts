@@ -32,29 +32,29 @@ export const DataTransferRpcHandlersEffect = Effect.gen(function* () {
   const service = yield* DataImportService;
 
   return {
-    DataImportCancel: (args: TDataImportCancel) =>
+    CancelDataImport: (args: TDataImportCancel) =>
       service.cancelImport({
         id: args.id,
         organizationId: args.organizationId,
       }),
-    DataImportConfirm: (args: TDataImportConfirm) =>
+    ConfirmDataImport: (args: TDataImportConfirm) =>
       service.confirmImport({
         id: args.id,
         organizationId: args.organizationId,
       }),
-    DataImportGet: (args: TDataImportGet) =>
+    GetDataImport: (args: TDataImportGet) =>
       service
         .describeImport(toDescribeInput(args))
         .pipe(Effect.map(toDataImportJobDetail)),
-    DataImportList: (args: TDataImportList) =>
+    ListDataImports: (args: TDataImportList) =>
       service
         .listImports({ organizationId: args.organizationId })
         .pipe(Effect.map((jobs) => jobs.map(toDataImportJobSummary))),
-    DataImportListWatch: (args: TDataImportList) =>
+    WatchDataImports: (args: TDataImportList) =>
       service
         .watchImportList({ organizationId: args.organizationId })
         .pipe(Stream.map((jobs) => jobs.map(toDataImportJobSummary))),
-    DataImportWatch: (args: TDataImportGet) =>
+    WatchDataImport: (args: TDataImportGet) =>
       service
         .watchImport(toDescribeInput(args))
         .pipe(Stream.map(toDataImportJobDetail)),

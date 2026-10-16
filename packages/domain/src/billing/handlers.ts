@@ -15,7 +15,10 @@ export const BillingRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* BillingRepository;
 
   return {
-    BillingCheckout: ({ organizationId, productId }: TBillingCheckoutInput) =>
+    CreateBillingCheckout: ({
+      organizationId,
+      productId,
+    }: TBillingCheckoutInput) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const product = yield* repository.findCheckoutProduct({ productId });
@@ -54,7 +57,7 @@ export const BillingRpcHandlersEffect = Effect.gen(function* () {
         ),
         withRemapDbErrors("Billing", "select")
       ),
-    BillingPortal: ({ organizationId }: TBillingPortalInput) =>
+    CreateBillingPortal: ({ organizationId }: TBillingPortalInput) =>
       Effect.gen(function* () {
         const subscription = yield* repository.findSubscriptionByOrganizationId(
           {

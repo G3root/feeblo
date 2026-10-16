@@ -128,7 +128,7 @@ describe("ContactRpcHandlers", () => {
         });
 
         const contacts = yield* handlers
-          .ContactList({ organizationId: fixture.organizationId })
+          .ListContacts({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         expect(contacts).toHaveLength(1);
         expect(contacts[0]).toMatchObject({
@@ -145,7 +145,7 @@ describe("ContactRpcHandlers", () => {
         const session = makeSession(fixture);
 
         const created = yield* handlers
-          .ContactCreate({
+          .CreateContact({
             organizationId: fixture.organizationId,
             name: "Ada",
             email: "ada@example.com",
@@ -154,7 +154,7 @@ describe("ContactRpcHandlers", () => {
         const contactId = yield* ContactId.parse(created.id);
 
         const updated = yield* handlers
-          .ContactUpdate({
+          .UpdateContact({
             id: contactId,
             organizationId: fixture.organizationId,
             name: "Ada Lovelace",
@@ -169,14 +169,14 @@ describe("ContactRpcHandlers", () => {
         });
 
         yield* handlers
-          .ContactDelete({
+          .DeleteContact({
             id: contactId,
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, session));
 
         const contacts = yield* handlers
-          .ContactList({ organizationId: fixture.organizationId })
+          .ListContacts({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
         expect(contacts).toHaveLength(0);
       })
@@ -235,14 +235,14 @@ describe("ContactRpcHandlers", () => {
         ]);
 
         yield* handlers
-          .ContactUpdate({
+          .UpdateContact({
             id: shadowContactId,
             organizationId: fixture.organizationId,
             name: "New Name",
           })
           .pipe(Effect.provideService(CurrentSession, session));
         yield* handlers
-          .ContactUpdate({
+          .UpdateContact({
             id: realContactId,
             organizationId: fixture.organizationId,
             name: "CRM Label",
@@ -292,7 +292,7 @@ describe("ContactRpcHandlers", () => {
           });
 
           yield* handlers
-            .ContactDelete({
+            .DeleteContact({
               id: contactId,
               organizationId: fixture.organizationId,
             })
@@ -349,7 +349,7 @@ describe("ContactRpcHandlers", () => {
         });
 
         yield* handlers
-          .ContactDelete({
+          .DeleteContact({
             id: contactId,
             organizationId: fixture.organizationId,
           })
@@ -404,7 +404,7 @@ describe("ContactRpcHandlers", () => {
         });
 
         yield* handlers
-          .ContactDelete({
+          .DeleteContact({
             id: contactId,
             organizationId: fixture.organizationId,
           })
@@ -458,7 +458,7 @@ describe("ContactRpcHandlers", () => {
           });
 
           yield* handlers
-            .ContactUnsubscribe({
+            .UnsubscribeContact({
               id: contactId,
               organizationId: fixture.organizationId,
             })
@@ -493,7 +493,7 @@ describe("ContactRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .ContactUnsubscribe({
+            .UnsubscribeContact({
               id: contactId,
               organizationId: fixture.organizationId,
             })
@@ -520,7 +520,9 @@ describe("ContactRpcHandlers", () => {
         const session = makeSession(fixture);
 
         const room = yield* handlers
-          .ContactCreateEligibility({ organizationId: fixture.organizationId })
+          .CheckContactCreateEligibility({
+            organizationId: fixture.organizationId,
+          })
           .pipe(Effect.provideService(CurrentSession, session));
         expect(room.canCreate).toBe(true);
 
@@ -538,7 +540,9 @@ describe("ContactRpcHandlers", () => {
         );
 
         const full = yield* handlers
-          .ContactCreateEligibility({ organizationId: fixture.organizationId })
+          .CheckContactCreateEligibility({
+            organizationId: fixture.organizationId,
+          })
           .pipe(Effect.provideService(CurrentSession, session));
         expect(full.canCreate).toBe(false);
       })
@@ -551,7 +555,7 @@ describe("ContactRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .ContactCreate({
+            .CreateContact({
               organizationId: fixture.organizationId,
               name: "Ada",
               email: "ada@example.com",
@@ -588,7 +592,7 @@ describe("ContactRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .ContactCreate({
+            .CreateContact({
               organizationId: fixture.organizationId,
               name: "Ada",
               email: "ada@example.com",
@@ -598,7 +602,7 @@ describe("ContactRpcHandlers", () => {
         expect(error._tag).toBe("BadRequestError");
 
         const contacts = yield* handlers
-          .ContactList({ organizationId: fixture.organizationId })
+          .ListContacts({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         expect(contacts).toHaveLength(0);
       })
@@ -625,7 +629,7 @@ describe("ContactRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .ContactCreate({
+            .CreateContact({
               organizationId: fixture.organizationId,
               name: "Ada",
               email: "ada@example.com",
@@ -636,7 +640,7 @@ describe("ContactRpcHandlers", () => {
         expect(error._tag).toBe("BadRequestError");
 
         const contacts = yield* handlers
-          .ContactList({ organizationId: fixture.organizationId })
+          .ListContacts({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         expect(contacts).toHaveLength(0);
       })
@@ -672,7 +676,7 @@ describe("ContactRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .ContactCreate({
+              .CreateContact({
                 organizationId: fixture.organizationId,
                 name: "Ada",
                 email: "ada@example.com",
@@ -683,7 +687,7 @@ describe("ContactRpcHandlers", () => {
           expect(error._tag).toBe("PolicyDenied");
 
           const contacts = yield* handlers
-            .ContactList({ organizationId: fixture.organizationId })
+            .ListContacts({ organizationId: fixture.organizationId })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           expect(contacts).toHaveLength(0);
         })
@@ -706,7 +710,7 @@ describe("ContactRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .ContactDelete({
+            .DeleteContact({
               id: contactId,
               organizationId: fixture.organizationId,
             })
@@ -754,7 +758,7 @@ describe("ContactRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .ContactCreate({
+              .CreateContact({
                 organizationId: fixture.organizationId,
                 name: "Ada",
                 email: "ada@example.com",
@@ -772,7 +776,7 @@ describe("ContactRpcHandlers", () => {
         const fixture = yield* makeFixture();
 
         const created = yield* handlers
-          .ContactCreate({
+          .CreateContact({
             organizationId: fixture.organizationId,
             name: "Ada",
             email: "ada@example.com",

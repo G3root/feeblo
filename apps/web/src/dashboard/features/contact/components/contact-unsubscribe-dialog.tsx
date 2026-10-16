@@ -44,7 +44,7 @@ export function ContactUnsubscribeDialog() {
       onConfirm={() => {
         store.send({ type: "setOpen", open: false });
         void fetchRpc((rpc) =>
-          rpc.ContactUnsubscribe({ id: contactId, organizationId })
+          rpc.UnsubscribeContact({ id: contactId, organizationId })
         ).then(
           () => {
             trackEvent("contact_unsubscribed", { success: true });

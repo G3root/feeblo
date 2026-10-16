@@ -60,8 +60,8 @@ function VoterAvatar({
 /**
  * Dashboard voter management for a post: lists the current voters and lets
  * members with `votes.onBehalf` add voters through the contact picker
- * (`UpvoteAddOnBehalf`) or remove an individual voter
- * (`UpvoteRemoveOnBehalf`). Removal is deliberately confirm-free — the action
+ * (`AddUpvoteOnBehalf`) or remove an individual voter
+ * (`RemoveUpvoteOnBehalf`). Removal is deliberately confirm-free — the action
  * is activity-logged and re-addable.
  */
 export function VoterPanel() {
@@ -101,7 +101,7 @@ export function VoterPanel() {
   // refetching it alone is the full invalidation.
   const addVoter = async ({ author }: { author: TPostCreateAuthor }) => {
     await fetchRpc((rpc) =>
-      rpc.UpvoteAddOnBehalf({
+      rpc.AddUpvoteOnBehalf({
         author,
         organizationId,
         postId: post.id,
@@ -112,7 +112,7 @@ export function VoterPanel() {
 
   const removeVoter = async ({ userId }: { userId: string }) => {
     await fetchRpc((rpc) =>
-      rpc.UpvoteRemoveOnBehalf({
+      rpc.RemoveUpvoteOnBehalf({
         organizationId,
         postId: post.id,
         userId,

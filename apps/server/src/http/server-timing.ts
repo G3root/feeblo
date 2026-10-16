@@ -2,39 +2,19 @@ import { Clock } from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as HttpEffect from "effect/http/HttpEffect";
 import * as HttpMiddleware from "effect/http/HttpMiddleware";
-import type * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
+import * as Option from "effect/Option";
 
-/**
- * Human-readable request label used to identify each timing entry. Dynamic
- * segments are redacted to keep the label set bounded: the SES feedback
- * webhook embeds its signing token in the URL path, and other routes carry
- * unbounded identifiers (UUIDs, prefixed legids) that would otherwise leak
- * into `Server-Timing` headers.
- */
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const legidPattern = /^[a-z]{2,}_[a-z0-9]{6,}$/i;
-
-const redactIdentifierSegment = (segment: string): string =>
-  uuidPattern.test(segment) || legidPattern.test(segment) ? ":id" : segment;
-
-const requestLabel = (request: HttpServerRequest.HttpServerRequest): string => {
-  const path = request.url.split("?")[0] ?? "";
-  const redacted = path
-    .replace(/^(\/email-provider\/ses\/).+$/, "$1:token")
-    .split("/")
-    .map(redactIdentifierSegment)
-    .join("/");
-  return `${request.method} ${redacted}`;
-};
+import { requestLabel } from "./request-label";
 
 /**
  * Adds timing headers to every response:
  *
  * - `Server-Timing: total;dur=<ms>;desc="GET /health"` — the W3C-standard,
- *   structured form.
- * - `X-Response-Time: <ms>ms` — the widely tooled (e.g. Express-style)
+ *   structured form. When a request span exists, its trace, span, and
+ *   sampling decision follow as `feeblo-trace`, `feeblo-span`, and
+ *   `feeblo-sampled`, so a client can quote the trace in a support report.
+ * - `X-Response-Time: <ms>ms` — the widely tooled (e.g., Express-style)
  *   convenience form.
  *
  * Both carry the total server-side request duration in milliseconds, measured
@@ -45,16 +25,32 @@ const requestLabel = (request: HttpServerRequest.HttpServerRequest): string => {
 export const serverTimingMiddleware = HttpMiddleware.make((httpApp) =>
   Effect.withFiber((fiber) => {
     const startedAt = fiber.getRef(Clock).monotonicTimeNanosUnsafe();
-    return HttpEffect.withPreResponseHandler(httpApp, (request, response) => {
-      const duration =
-        Number(fiber.getRef(Clock).monotonicTimeNanosUnsafe() - startedAt) /
-        1_000_000;
-      const durationMs = duration.toFixed(2);
-      return Effect.succeed(
-        HttpServerResponse.setHeaders(response, {
-          "server-timing": `total;dur=${durationMs};desc="${requestLabel(request)}"`,
-          "x-response-time": `${durationMs}ms`,
-        })
+    return Effect.gen(function* () {
+      const span = yield* Effect.currentSpan.pipe(Effect.option);
+      return yield* HttpEffect.withPreResponseHandler(
+        httpApp,
+        (request, response) => {
+          const duration =
+            Number(fiber.getRef(Clock).monotonicTimeNanosUnsafe() - startedAt) /
+            1_000_000;
+          const durationMs = duration.toFixed(2);
+          const timings = [
+            `total;dur=${durationMs};desc="${requestLabel(request)}"`,
+          ];
+          if (Option.isSome(span)) {
+            timings.push(`feeblo-trace;desc="${span.value.traceId}"`);
+            timings.push(`feeblo-span;desc="${span.value.spanId}"`);
+            timings.push(
+              `feeblo-sampled;desc="${span.value.sampled ? "1" : "0"}"`
+            );
+          }
+          return Effect.succeed(
+            HttpServerResponse.setHeaders(response, {
+              "server-timing": timings.join(", "),
+              "x-response-time": `${durationMs}ms`,
+            })
+          );
+        }
       );
     });
   })

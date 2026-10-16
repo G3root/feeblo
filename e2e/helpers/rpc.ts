@@ -9,7 +9,7 @@ import type { Page } from "@playwright/test";
  * Capture the promise *before* the triggering action, then await it after:
  *
  * ```ts
- * const create = waitForRpc(page, "CommentCreate");
+ * const create = waitForRpc(page, "CreateComment");
  * await page.getByRole("button", { name: "Comment Public" }).click();
  * await create;
  * ```

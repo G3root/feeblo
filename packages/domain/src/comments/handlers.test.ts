@@ -243,14 +243,14 @@ describe("CommentRpcHandlers", () => {
   );
 
   layer(TestLayer)("handlers", (it) => {
-    describe("CommentList", () => {
+    describe("ListComments", () => {
       it.effect("rejects users without a membership", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const error = yield* Effect.flip(
             handlers
-              .CommentList({
+              .ListComments({
                 organizationId: fixture.organizationId,
                 slug: fixture.postSlug,
               })
@@ -273,13 +273,13 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreate(
+            .CreateComment(
               commentCreateInput(fixture, commentId, "A test comment")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const comments = yield* handlers
-            .CommentList({
+            .ListComments({
               organizationId: fixture.organizationId,
               slug: fixture.postSlug,
             })
@@ -304,7 +304,7 @@ describe("CommentRpcHandlers", () => {
             const commentId = yield* CommentId.generate;
 
             yield* handlers
-              .CommentCreate(
+              .CreateComment(
                 commentCreateInput(fixture, commentId, "Merged comment")
               )
               .pipe(
@@ -320,7 +320,7 @@ describe("CommentRpcHandlers", () => {
             // the survivor, keyed under the requested slug so the client can
             // keep a single slug-scoped subset per page.
             const merged = yield* handlers
-              .CommentList({
+              .ListComments({
                 organizationId: fixture.organizationId,
                 slug: fixture.postSlug,
               })
@@ -338,7 +338,7 @@ describe("CommentRpcHandlers", () => {
 
             // The survivor lists the same comment under its own slug.
             const survivor = yield* handlers
-              .CommentList({
+              .ListComments({
                 organizationId: fixture.organizationId,
                 slug: targetPostId,
               })
@@ -357,7 +357,7 @@ describe("CommentRpcHandlers", () => {
       );
     });
 
-    describe("CommentListPublic", () => {
+    describe("ListCommentsPublic", () => {
       it.effect("does not expose internal comments", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
@@ -366,12 +366,12 @@ describe("CommentRpcHandlers", () => {
           const internalCommentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreate(
+            .CreateComment(
               commentCreateInput(fixture, publicCommentId, "Public comment")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           yield* handlers
-            .CommentCreate(
+            .CreateComment(
               commentCreateInput(
                 fixture,
                 internalCommentId,
@@ -382,7 +382,7 @@ describe("CommentRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const comments = yield* handlers
-            .CommentListPublic({
+            .ListCommentsPublic({
               organizationId: fixture.organizationId,
               slug: fixture.postSlug,
             })
@@ -403,13 +403,13 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreate(
+            .CreateComment(
               commentCreateInput(fixture, commentId, "Private board comment")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const comments = yield* handlers
-            .CommentListPublic({
+            .ListCommentsPublic({
               organizationId: fixture.organizationId,
               slug: fixture.postSlug,
             })
@@ -430,14 +430,14 @@ describe("CommentRpcHandlers", () => {
             const childId = yield* CommentId.generate;
 
             yield* handlers
-              .CommentCreate(
+              .CreateComment(
                 commentCreateInput(fixture, rootId, "Root comment")
               )
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
             yield* handlers
-              .CommentCreate({
+              .CreateComment({
                 ...commentCreateInput(fixture, intermediaryId, "Intermediary"),
                 parentCommentId: rootId,
               })
@@ -445,7 +445,7 @@ describe("CommentRpcHandlers", () => {
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
             yield* handlers
-              .CommentCreate({
+              .CreateComment({
                 ...commentCreateInput(fixture, childId, "Child reply"),
                 parentCommentId: intermediaryId,
               })
@@ -458,7 +458,7 @@ describe("CommentRpcHandlers", () => {
             // its nearest visible ancestor (the root) instead of surfacing
             // as an unrelated top-level thread.
             yield* handlers
-              .CommentUpdate({
+              .UpdateComment({
                 id: intermediaryId,
                 organizationId: fixture.organizationId,
                 postId: fixture.postId,
@@ -470,7 +470,7 @@ describe("CommentRpcHandlers", () => {
               );
 
             const comments = yield* handlers
-              .CommentListPublic({
+              .ListCommentsPublic({
                 organizationId: fixture.organizationId,
                 slug: fixture.postSlug,
               })
@@ -497,7 +497,7 @@ describe("CommentRpcHandlers", () => {
       );
     });
 
-    describe("CommentCreate", () => {
+    describe("CreateComment", () => {
       it.effect("rejects non-members", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
@@ -505,7 +505,7 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
           const error = yield* Effect.flip(
             handlers
-              .CommentCreate(
+              .CreateComment(
                 commentCreateInput(fixture, commentId, "Non-member comment")
               )
               .pipe(
@@ -529,7 +529,7 @@ describe("CommentRpcHandlers", () => {
             const commentId = yield* CommentId.generate;
             const error = yield* Effect.flip(
               handlers
-                .CommentCreate(
+                .CreateComment(
                   commentCreateInput(
                     fixture,
                     commentId,
@@ -556,7 +556,7 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
 
           const result = yield* handlers
-            .CommentCreate(
+            .CreateComment(
               commentCreateInput(fixture, commentId, "Member comment")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -564,7 +564,7 @@ describe("CommentRpcHandlers", () => {
           expect(result.message).toBe("Comment created successfully");
 
           const comments = yield* handlers
-            .CommentList({
+            .ListComments({
               organizationId: fixture.organizationId,
               slug: fixture.postSlug,
             })
@@ -588,7 +588,7 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
           const error = yield* Effect.flip(
             handlers
-              .CommentCreate({
+              .CreateComment({
                 id: commentId,
                 organizationId: fixture.organizationId,
                 postId: lockedPostId,
@@ -624,7 +624,7 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
           const error = yield* Effect.flip(
             handlers
-              .CommentCreate({
+              .CreateComment({
                 id: commentId,
                 organizationId: fixture.organizationId,
                 postId: mergedPostId,
@@ -647,13 +647,13 @@ describe("CommentRpcHandlers", () => {
           const childCommentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreate(
+            .CreateComment(
               commentCreateInput(fixture, parentCommentId, "Parent")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const result = yield* handlers
-            .CommentCreate({
+            .CreateComment({
               id: childCommentId,
               organizationId: fixture.organizationId,
               postId: fixture.postId,
@@ -676,7 +676,7 @@ describe("CommentRpcHandlers", () => {
           const internalReplyId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreate(
+            .CreateComment(
               commentCreateInput(
                 fixture,
                 internalCommentId,
@@ -690,7 +690,7 @@ describe("CommentRpcHandlers", () => {
           // context to public visitors, so it is denied.
           const error = yield* Effect.flip(
             handlers
-              .CommentCreate({
+              .CreateComment({
                 id: publicReplyId,
                 organizationId: fixture.organizationId,
                 postId: fixture.postId,
@@ -704,7 +704,7 @@ describe("CommentRpcHandlers", () => {
 
           // An INTERNAL reply to the same parent is allowed.
           const result = yield* handlers
-            .CommentCreate({
+            .CreateComment({
               id: internalReplyId,
               organizationId: fixture.organizationId,
               postId: fixture.postId,
@@ -727,7 +727,7 @@ describe("CommentRpcHandlers", () => {
 
           // Parent comment on the first post.
           yield* handlers
-            .CommentCreate(
+            .CreateComment(
               commentCreateInput(fixture, parentCommentId, "Parent")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -735,7 +735,7 @@ describe("CommentRpcHandlers", () => {
           // Child comment on the second post pointing at the first post's comment.
           const error = yield* Effect.flip(
             handlers
-              .CommentCreate({
+              .CreateComment({
                 id: childCommentId,
                 organizationId: fixture.organizationId,
                 postId: otherPostId,
@@ -761,7 +761,7 @@ describe("CommentRpcHandlers", () => {
           // Option.none branch of canReplyToParent.
           const error = yield* Effect.flip(
             handlers
-              .CommentCreate({
+              .CreateComment({
                 id: childCommentId,
                 organizationId: fixture.organizationId,
                 postId: fixture.postId,
@@ -786,7 +786,7 @@ describe("CommentRpcHandlers", () => {
 
           // A comment in org B.
           yield* handlers
-            .CommentCreate(
+            .CreateComment(
               commentCreateInput(orgB, orgBCommentId, "Org B comment")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(orgB)));
@@ -794,7 +794,7 @@ describe("CommentRpcHandlers", () => {
           // A comment in org A replying to org B's comment.
           const error = yield* Effect.flip(
             handlers
-              .CommentCreate({
+              .CreateComment({
                 id: orgACommentId,
                 organizationId: orgA.organizationId,
                 postId: orgA.postId,
@@ -810,7 +810,7 @@ describe("CommentRpcHandlers", () => {
       );
     });
 
-    describe("CommentCreatePublic", () => {
+    describe("CreateCommentPublic", () => {
       it.effect(
         "allows non-members to create public comments on public boards",
         () =>
@@ -820,7 +820,7 @@ describe("CommentRpcHandlers", () => {
             const commentId = yield* CommentId.generate;
 
             const result = yield* handlers
-              .CommentCreatePublic(
+              .CreateCommentPublic(
                 commentCreateInput(fixture, commentId, "Public feedback")
               )
               .pipe(
@@ -833,7 +833,7 @@ describe("CommentRpcHandlers", () => {
             expect(result.message).toBe("Comment created successfully");
 
             const comments = yield* handlers
-              .CommentListPublic({
+              .ListCommentsPublic({
                 organizationId: fixture.organizationId,
                 slug: fixture.postSlug,
               })
@@ -869,7 +869,7 @@ describe("CommentRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .CommentCreatePublic({
+              .CreateCommentPublic({
                 ...commentCreateInput(fixture, commentId, "Shipped it"),
                 statusUpdateId: completedStatusId,
               })
@@ -909,7 +909,7 @@ describe("CommentRpcHandlers", () => {
           // Contributors can move posts (posts.move) but never change status.
           const error = yield* Effect.flip(
             handlers
-              .CommentCreatePublic({
+              .CreateCommentPublic({
                 ...commentCreateInput(fixture, commentId, "Shipped it"),
                 statusUpdateId: completedStatusId,
               })
@@ -939,7 +939,7 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreatePublic(
+            .CreateCommentPublic(
               commentCreateInput(fixture, commentId, "My comment")
             )
             .pipe(
@@ -947,7 +947,7 @@ describe("CommentRpcHandlers", () => {
             );
 
           const comments = yield* handlers
-            .CommentListPublic({
+            .ListCommentsPublic({
               organizationId: fixture.organizationId,
               slug: fixture.postSlug,
             })
@@ -980,7 +980,7 @@ describe("CommentRpcHandlers", () => {
             memberships: [],
           };
           const asOther = yield* handlers
-            .CommentListPublic({
+            .ListCommentsPublic({
               organizationId: fixture.organizationId,
               slug: fixture.postSlug,
             })
@@ -1007,11 +1007,11 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
 
           // canCreate policy allows PUBLIC by anyone, INTERNAL only by members
-          // When opts.allowNonMemberPublic is true (CommentCreatePublic) and !membership:
+          // When opts.allowNonMemberPublic is true (CreateCommentPublic) and !membership:
           //   if visibility !== PUBLIC then it denies
           const error = yield* Effect.flip(
             handlers
-              .CommentCreatePublic(
+              .CreateCommentPublic(
                 commentCreateInput(
                   fixture,
                   commentId,
@@ -1040,7 +1040,7 @@ describe("CommentRpcHandlers", () => {
             const commentId = yield* CommentId.generate;
 
             const result = yield* handlers
-              .CommentCreatePublic(
+              .CreateCommentPublic(
                 commentCreateInput(
                   fixture,
                   commentId,
@@ -1055,7 +1055,7 @@ describe("CommentRpcHandlers", () => {
             expect(result.message).toBe("Comment created successfully");
 
             const publicComments = yield* handlers
-              .CommentListPublic({
+              .ListCommentsPublic({
                 organizationId: fixture.organizationId,
                 slug: fixture.postSlug,
               })
@@ -1066,7 +1066,7 @@ describe("CommentRpcHandlers", () => {
             expect(publicComments).toEqual([]);
 
             const memberComments = yield* handlers
-              .CommentList({
+              .ListComments({
                 organizationId: fixture.organizationId,
                 slug: fixture.postSlug,
               })
@@ -1091,7 +1091,7 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
           const error = yield* Effect.flip(
             handlers
-              .CommentCreatePublic(
+              .CreateCommentPublic(
                 commentCreateInput(fixture, commentId, "Private board feedback")
               )
               .pipe(
@@ -1114,7 +1114,7 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
           const error = yield* Effect.flip(
             handlers
-              .CommentCreatePublic({
+              .CreateCommentPublic({
                 id: commentId,
                 organizationId: fixture.organizationId,
                 postId: lockedPostId,
@@ -1143,7 +1143,7 @@ describe("CommentRpcHandlers", () => {
 
           // A member creates an internal comment.
           yield* handlers
-            .CommentCreate(
+            .CreateComment(
               commentCreateInput(
                 fixture,
                 internalCommentId,
@@ -1156,7 +1156,7 @@ describe("CommentRpcHandlers", () => {
           // A non-member tries to reply to it via the public endpoint.
           const error = yield* Effect.flip(
             handlers
-              .CommentCreatePublic({
+              .CreateCommentPublic({
                 id: childCommentId,
                 organizationId: fixture.organizationId,
                 postId: fixture.postId,
@@ -1207,7 +1207,7 @@ describe("CommentRpcHandlers", () => {
 
             // A non-member posts a public comment on the public board.
             yield* handlers
-              .CommentCreatePublic(
+              .CreateCommentPublic(
                 commentCreateInput(fixture, parentCommentId, "Public question")
               )
               .pipe(Effect.provideService(CurrentSession, guestSession));
@@ -1215,7 +1215,7 @@ describe("CommentRpcHandlers", () => {
             // A member replies internally; the non-member parent author
             // cannot see the reply, so they must not be notified.
             yield* handlers
-              .CommentCreate({
+              .CreateComment({
                 ...commentCreateInput(
                   fixture,
                   replyId,
@@ -1286,7 +1286,7 @@ describe("CommentRpcHandlers", () => {
 
           // A member posts a public comment.
           yield* handlers
-            .CommentCreate(
+            .CreateComment(
               commentCreateInput(fixture, parentCommentId, "Member question")
             )
             .pipe(Effect.provideService(CurrentSession, otherMemberSession));
@@ -1294,7 +1294,7 @@ describe("CommentRpcHandlers", () => {
           // Another member replies internally; the member parent author can
           // see the reply and is still notified.
           yield* handlers
-            .CommentCreate({
+            .CreateComment({
               ...commentCreateInput(
                 fixture,
                 replyId,
@@ -1323,7 +1323,7 @@ describe("CommentRpcHandlers", () => {
       );
     });
 
-    describe("CommentUpdate", () => {
+    describe("UpdateComment", () => {
       it.effect("lets a comment creator update their comment", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
@@ -1331,13 +1331,13 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreate(
+            .CreateComment(
               commentCreateInput(fixture, commentId, "Original comment")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const result = yield* handlers
-            .CommentUpdate({
+            .UpdateComment({
               id: commentId,
               organizationId: fixture.organizationId,
               postId: fixture.postId,
@@ -1349,7 +1349,7 @@ describe("CommentRpcHandlers", () => {
           expect(result.message).toBe("Comment updated successfully");
 
           const comments = yield* handlers
-            .CommentList({
+            .ListComments({
               organizationId: fixture.organizationId,
               slug: fixture.postSlug,
             })
@@ -1369,7 +1369,7 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreate(commentCreateInput(fixture, commentId, "My comment"))
+            .CreateComment(commentCreateInput(fixture, commentId, "My comment"))
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           // Create a different user who is a member but not the comment owner
@@ -1409,7 +1409,7 @@ describe("CommentRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .CommentUpdate({
+              .UpdateComment({
                 id: commentId,
                 organizationId: fixture.organizationId,
                 postId: fixture.postId,
@@ -1430,7 +1430,7 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreatePublic(
+            .CreateCommentPublic(
               commentCreateInput(fixture, commentId, "Public comment")
             )
             .pipe(
@@ -1439,7 +1439,7 @@ describe("CommentRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .CommentUpdate({
+              .UpdateComment({
                 id: commentId,
                 organizationId: fixture.organizationId,
                 postId: fixture.postId,
@@ -1459,7 +1459,7 @@ describe("CommentRpcHandlers", () => {
       );
     });
 
-    describe("CommentUpdatePublic", () => {
+    describe("UpdateCommentPublic", () => {
       it.effect("allows non-members to update their own public comment", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
@@ -1467,7 +1467,7 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreatePublic(
+            .CreateCommentPublic(
               commentCreateInput(fixture, commentId, "Public comment")
             )
             .pipe(
@@ -1475,7 +1475,7 @@ describe("CommentRpcHandlers", () => {
             );
 
           const result = yield* handlers
-            .CommentUpdatePublic({
+            .UpdateCommentPublic({
               id: commentId,
               organizationId: fixture.organizationId,
               postId: fixture.postId,
@@ -1489,7 +1489,7 @@ describe("CommentRpcHandlers", () => {
           expect(result.message).toBe("Comment updated successfully");
 
           const comments = yield* handlers
-            .CommentListPublic({
+            .ListCommentsPublic({
               organizationId: fixture.organizationId,
               slug: fixture.postSlug,
             })
@@ -1509,7 +1509,7 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreatePublic(
+            .CreateCommentPublic(
               commentCreateInput(fixture, commentId, "Original")
             )
             .pipe(
@@ -1538,7 +1538,7 @@ describe("CommentRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .CommentUpdatePublic({
+              .UpdateCommentPublic({
                 id: commentId,
                 organizationId: fixture.organizationId,
                 postId: fixture.postId,
@@ -1553,7 +1553,7 @@ describe("CommentRpcHandlers", () => {
       );
     });
 
-    describe("CommentDelete", () => {
+    describe("DeleteComment", () => {
       it.effect("lets a comment creator delete their comment", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
@@ -1561,13 +1561,13 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreate(
+            .CreateComment(
               commentCreateInput(fixture, commentId, "To be deleted")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const result = yield* handlers
-            .CommentDelete({
+            .DeleteComment({
               id: commentId,
               organizationId: fixture.organizationId,
               postId: fixture.postId,
@@ -1577,7 +1577,7 @@ describe("CommentRpcHandlers", () => {
           expect(result.message).toBe("Comment deleted successfully");
 
           const comments = yield* handlers
-            .CommentList({
+            .ListComments({
               organizationId: fixture.organizationId,
               slug: fixture.postSlug,
             })
@@ -1594,7 +1594,7 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreate(commentCreateInput(fixture, commentId, "My comment"))
+            .CreateComment(commentCreateInput(fixture, commentId, "My comment"))
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const otherUserId = `other_user_${fixture.organizationId}`;
@@ -1632,7 +1632,7 @@ describe("CommentRpcHandlers", () => {
           };
 
           const result = yield* handlers
-            .CommentDelete({
+            .DeleteComment({
               id: commentId,
               organizationId: fixture.organizationId,
               postId: fixture.postId,
@@ -1650,7 +1650,7 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreate(commentCreateInput(fixture, commentId, "My comment"))
+            .CreateComment(commentCreateInput(fixture, commentId, "My comment"))
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const otherUserId = `other_contributor_${fixture.organizationId}`;
@@ -1689,7 +1689,7 @@ describe("CommentRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .CommentDelete({
+              .DeleteComment({
                 id: commentId,
                 organizationId: fixture.organizationId,
                 postId: fixture.postId,
@@ -1702,7 +1702,7 @@ describe("CommentRpcHandlers", () => {
       );
     });
 
-    describe("CommentDeletePublic", () => {
+    describe("DeleteCommentPublic", () => {
       it.effect("allows non-members to delete their own public comment", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
@@ -1710,7 +1710,7 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreatePublic(
+            .CreateCommentPublic(
               commentCreateInput(fixture, commentId, "Public comment")
             )
             .pipe(
@@ -1718,7 +1718,7 @@ describe("CommentRpcHandlers", () => {
             );
 
           const result = yield* handlers
-            .CommentDeletePublic({
+            .DeleteCommentPublic({
               id: commentId,
               organizationId: fixture.organizationId,
               postId: fixture.postId,
@@ -1730,7 +1730,7 @@ describe("CommentRpcHandlers", () => {
           expect(result.message).toBe("Comment deleted successfully");
 
           const comments = yield* handlers
-            .CommentListPublic({
+            .ListCommentsPublic({
               organizationId: fixture.organizationId,
               slug: fixture.postSlug,
             })
@@ -1747,7 +1747,7 @@ describe("CommentRpcHandlers", () => {
           const commentId = yield* CommentId.generate;
 
           yield* handlers
-            .CommentCreatePublic(
+            .CreateCommentPublic(
               commentCreateInput(fixture, commentId, "Original")
             )
             .pipe(
@@ -1776,7 +1776,7 @@ describe("CommentRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .CommentDeletePublic({
+              .DeleteCommentPublic({
                 id: commentId,
                 organizationId: fixture.organizationId,
                 postId: fixture.postId,
@@ -1797,7 +1797,7 @@ describe("CommentRpcHandlers", () => {
         const commentId = yield* CommentId.generate;
 
         const result = yield* handlers
-          .CommentCreate(
+          .CreateComment(
             commentCreateInput(fixture, commentId, "A comment without opt-in")
           )
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -1850,7 +1850,7 @@ describe("CommentRpcHandlers", () => {
             );
 
             yield* handlers
-              .CommentCreate({
+              .CreateComment({
                 ...commentCreateInput(fixture, commentId, "Shipped it"),
                 statusUpdateId: completedStatusId,
               })
@@ -1910,7 +1910,7 @@ describe("CommentRpcHandlers", () => {
             const before = recordedIntegrationEvents.length;
 
             yield* handlers
-              .CommentCreate({
+              .CreateComment({
                 ...commentCreateInput(fixture, commentId, "Shipped it"),
                 statusUpdateId: completedStatusId,
               })
@@ -1937,7 +1937,7 @@ describe("CommentRpcHandlers", () => {
 
             // The fixture post already sits in PENDING.
             yield* handlers
-              .CommentCreate({
+              .CreateComment({
                 ...commentCreateInput(fixture, commentId, "Still pending"),
                 statusUpdateId: fixture.statusId,
               })
@@ -1964,13 +1964,13 @@ describe("CommentRpcHandlers", () => {
           const completedStatusId = yield* makeStatus(fixture, "COMPLETED", 1);
 
           yield* handlers
-            .CommentCreate(
+            .CreateComment(
               commentCreateInput(fixture, parentCommentId, "Parent")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           const replyId = yield* CommentId.generate;
           yield* handlers
-            .CommentCreate({
+            .CreateComment({
               ...commentCreateInput(fixture, replyId, "Reply"),
               parentCommentId,
               statusUpdateId: completedStatusId,
@@ -2005,7 +2005,7 @@ describe("CommentRpcHandlers", () => {
             );
 
             yield* handlers
-              .CommentCreatePublic({
+              .CreateCommentPublic({
                 ...commentCreateInput(fixture, commentId, "Shipped it"),
                 statusUpdateId: completedStatusId,
               })
@@ -2042,7 +2042,7 @@ describe("CommentRpcHandlers", () => {
           // on the dashboard path too.
           const error = yield* Effect.flip(
             handlers
-              .CommentCreate({
+              .CreateComment({
                 ...commentCreateInput(fixture, commentId, "Shipped it"),
                 statusUpdateId: completedStatusId,
               })

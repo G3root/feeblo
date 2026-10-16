@@ -209,7 +209,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
           // notifications and the email_subscription row that drives delivery.
           expect(
             yield* handlers
-              .ChangelogSubscriptionCreatePublic({ organizationId })
+              .CreateChangelogSubscriptionPublic({ organizationId })
               .pipe(Effect.provideService(CurrentSession, session))
           ).toEqual({ subscribed: true });
           expect(
@@ -227,7 +227,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
 
           expect(
             yield* handlers
-              .ChangelogSubscriptionDeletePublic({ organizationId })
+              .DeleteChangelogSubscriptionPublic({ organizationId })
               .pipe(Effect.provideService(CurrentSession, session))
           ).toEqual({ subscribed: false });
           expect(
@@ -261,7 +261,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
           });
 
           yield* handlers
-            .ChangelogSubscriptionCreate({ organizationId })
+            .CreateChangelogSubscription({ organizationId })
             .pipe(Effect.provideService(CurrentSession, session));
 
           const [row] = yield* findChangelogRow({
@@ -282,7 +282,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
 
           expect(
             yield* handlers
-              .ChangelogSubscriptionCreatePublic({ organizationId })
+              .CreateChangelogSubscriptionPublic({ organizationId })
               .pipe(
                 Effect.provideService(
                   CurrentSession,
@@ -313,10 +313,10 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
         });
 
         yield* handlers
-          .ChangelogSubscriptionCreate({ organizationId })
+          .CreateChangelogSubscription({ organizationId })
           .pipe(Effect.provideService(CurrentSession, memberSession));
         yield* handlers
-          .ChangelogSubscriptionCreatePublic({ organizationId })
+          .CreateChangelogSubscriptionPublic({ organizationId })
           .pipe(
             Effect.provideService(
               CurrentSession,
@@ -325,7 +325,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
           );
 
         const roster = yield* handlers
-          .ChangelogSubscriptionList({ organizationId })
+          .ListChangelogSubscriptions({ organizationId })
           .pipe(Effect.provideService(CurrentSession, memberSession));
         expect(roster.map((row) => row.userId).sort()).toEqual(
           [member.userId, visitor.userId].sort()
@@ -333,7 +333,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
 
         // Public lists only ever expose the current visitor's own row.
         const publicRows = yield* handlers
-          .ChangelogSubscriptionListPublic({ organizationId })
+          .ListChangelogSubscriptionsPublic({ organizationId })
           .pipe(
             Effect.provideService(
               CurrentSession,
@@ -362,14 +362,14 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
 
         const subscribeError = yield* Effect.flip(
           handlers
-            .ChangelogSubscriptionCreatePublic({ organizationId })
+            .CreateChangelogSubscriptionPublic({ organizationId })
             .pipe(scoped)
         );
         expect(subscribeError._tag).toBe("PolicyDenied");
 
         const listError = yield* Effect.flip(
           handlers
-            .ChangelogSubscriptionListPublic({ organizationId })
+            .ListChangelogSubscriptionsPublic({ organizationId })
             .pipe(scoped)
         );
         expect(listError._tag).toBe("PolicyDenied");
@@ -397,14 +397,14 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
 
           const subscribeError = yield* Effect.flip(
             handlers
-              .ChangelogSubscriptionCreatePublic({ organizationId })
+              .CreateChangelogSubscriptionPublic({ organizationId })
               .pipe(Effect.provideService(CurrentSession, restrictedSession))
           );
           expect(subscribeError._tag).toBe("PolicyDenied");
 
           const listError = yield* Effect.flip(
             handlers
-              .ChangelogSubscriptionListPublic({ organizationId })
+              .ListChangelogSubscriptionsPublic({ organizationId })
               .pipe(Effect.provideService(CurrentSession, restrictedSession))
           );
           expect(listError._tag).toBe("PolicyDenied");

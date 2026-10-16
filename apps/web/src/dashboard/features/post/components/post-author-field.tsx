@@ -17,7 +17,7 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
 /**
  * Dashboard author picker for a post, shown in the details sidebar. Wraps
  * the shared {@link AuthorPicker} with the dashboard's permission gate and
- * `PostUpdateAuthor` persistence: picking a person — or creating one —
+ * `UpdatePostAuthor` persistence: picking a person — or creating one —
  * reattributes the post and refreshes the post + activity collections.
  *
  * Self-gates with the permission the backend enforces
@@ -28,7 +28,7 @@ export function PostAuthorField() {
   const { post, organizationId, isLocked, isMerged } = usePostCollectionData();
   const { postCollection, postActivityCollection } = useDashboardCollections();
   // Backend mirror: PostPolicy.canUpdateAuthor lets `posts.createOnBehalf`
-  // holders (managers and above) reattribute a post via PostUpdateAuthor.
+  // holders (managers and above) reattribute a post via UpdatePostAuthor.
   const { allowed: canUpdateAuthor } = usePolicy(
     hasPermission(organizationId, "posts.createOnBehalf")
   );
@@ -36,7 +36,7 @@ export function PostAuthorField() {
   const updateAuthor = async (author: TPostCreateAuthor) => {
     try {
       await fetchRpc((rpc) =>
-        rpc.PostUpdateAuthor({
+        rpc.UpdatePostAuthor({
           id: post.id,
           organizationId,
           author,

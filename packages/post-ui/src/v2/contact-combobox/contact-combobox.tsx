@@ -91,7 +91,7 @@ export const searchContacts: ContactSearchFn = ({
   query,
 }) =>
   fetchRpc((rpc) =>
-    rpc.ContactSearch({
+    rpc.SearchContacts({
       organizationId,
       query,
       ...(postId === undefined ? undefined : { postId }),
@@ -100,7 +100,7 @@ export const searchContacts: ContactSearchFn = ({
 
 /**
  * The plan-room probe that decides whether the create-new-customer row is
- * offered. Separate from `ContactSearch` so the picker does not pay for two
+ * offered. Separate from `SearchContacts` so the picker does not pay for two
  * counts on every keystroke; it runs once, when the entry point appears.
  */
 export type ContactCreateEligibilityFn = (input: {
@@ -110,7 +110,7 @@ export type ContactCreateEligibilityFn = (input: {
 /** Live eligibility transport; injectable so stories/tests stay hermetic. */
 export const fetchContactCreateEligibility: ContactCreateEligibilityFn = ({
   organizationId,
-}) => fetchRpc((rpc) => rpc.ContactCreateEligibility({ organizationId }));
+}) => fetchRpc((rpc) => rpc.CheckContactCreateEligibility({ organizationId }));
 
 /**
  * Projects a selection onto the wire shape shared by `PostCreate.author`,

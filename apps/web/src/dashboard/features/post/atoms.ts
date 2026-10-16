@@ -14,7 +14,7 @@ export type PostSuggestion = Atom.Success<
 >[number];
 
 /**
- * Duplicate candidates for one post via `PostSuggestions` — the same
+ * Duplicate candidates for one post via `GetPostSuggestions` — the same
  * embedding+lexical search the create form uses. Keyed per post; runs when a
  * consumer mounts (the merge picker), and the idle TTL keeps the result
  * around so re-opening the picker reuses it instead of re-running the search.
@@ -24,7 +24,7 @@ export type PostSuggestion = Atom.Success<
  */
 export const postSuggestionsAtom = Atom.family((args: PostSuggestionsArgs) =>
   DashboardClient.query(
-    "PostSuggestions",
+    "GetPostSuggestions",
     {
       content: args.excerpt,
       limit: 5,
@@ -35,5 +35,5 @@ export const postSuggestionsAtom = Atom.family((args: PostSuggestionsArgs) =>
   ).pipe(Atom.setIdleTTL("5 minutes"))
 );
 
-export const postMergeAtom = DashboardClient.mutation("PostMerge");
-export const postUnmergeAtom = DashboardClient.mutation("PostUnmerge");
+export const postMergeAtom = DashboardClient.mutation("MergePost");
+export const postUnmergeAtom = DashboardClient.mutation("UnmergePost");

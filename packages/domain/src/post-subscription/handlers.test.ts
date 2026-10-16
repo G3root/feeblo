@@ -145,7 +145,7 @@ describe("PostSubscriptionRpcHandlers", () => {
             const f = yield* fixture();
             const error = yield* Effect.flip(
               handlers
-                .PostSubscriptionList({
+                .ListPostSubscriptions({
                   organizationId: f.organizationId,
                   slug: f.postSlug,
                 })
@@ -168,24 +168,24 @@ describe("PostSubscriptionRpcHandlers", () => {
           };
           expect(
             yield* handlers
-              .PostSubscriptionCreate(mutationInput)
+              .CreatePostSubscription(mutationInput)
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toEqual({ subscribed: true });
           expect(
             yield* handlers
-              .PostSubscriptionList(listInput)
+              .ListPostSubscriptions(listInput)
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toMatchObject([
             { postId: f.postId, userId: f.userId, memberId: f.membershipId },
           ]);
           expect(
             yield* handlers
-              .PostSubscriptionDelete(mutationInput)
+              .DeletePostSubscription(mutationInput)
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toEqual({ subscribed: false });
           expect(
             yield* handlers
-              .PostSubscriptionList(listInput)
+              .ListPostSubscriptions(listInput)
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toHaveLength(0);
           const emailSubscription =
@@ -221,7 +221,7 @@ describe("PostSubscriptionRpcHandlers", () => {
 
             const error = yield* Effect.flip(
               handlers
-                .PostSubscriptionCreate(mutationInput)
+                .CreatePostSubscription(mutationInput)
                 .pipe(
                   Effect.provideService(CurrentSession, invalidEmailSession)
                 )
@@ -230,7 +230,7 @@ describe("PostSubscriptionRpcHandlers", () => {
             expect(error._tag).toBe("InternalServerError");
             expect(
               yield* handlers
-                .PostSubscriptionList(listInput)
+                .ListPostSubscriptions(listInput)
                 .pipe(Effect.provideService(CurrentSession, validSession))
             ).toHaveLength(0);
           })
@@ -266,20 +266,20 @@ describe("PostSubscriptionRpcHandlers", () => {
           });
           expect(
             yield* handlers
-              .PostSubscriptionCreatePublic(mutationInput)
+              .CreatePostSubscriptionPublic(mutationInput)
               .pipe(Effect.provideService(CurrentSession, session(f, false)))
           ).toEqual({ subscribed: true });
           yield* handlers
-            .PostSubscriptionCreatePublic(mutationInput)
+            .CreatePostSubscriptionPublic(mutationInput)
             .pipe(Effect.provideService(CurrentSession, otherSession));
           expect(
             yield* handlers
-              .PostSubscriptionListPublic(listInput)
+              .ListPostSubscriptionsPublic(listInput)
               .pipe(Effect.provideService(CurrentSession, session(f, false)))
           ).toMatchObject([{ userId: f.userId, memberId: null }]);
           expect(
             yield* handlers
-              .PostSubscriptionListPublic(listInput)
+              .ListPostSubscriptionsPublic(listInput)
               .pipe(Effect.provideService(CurrentSession, session(f, false)))
           ).toHaveLength(1);
         })
@@ -300,7 +300,7 @@ describe("PostSubscriptionRpcHandlers", () => {
 
             const error = yield* Effect.flip(
               handlers
-                .PostSubscriptionListPublic(listInput)
+                .ListPostSubscriptionsPublic(listInput)
                 .pipe(
                   Effect.provideService(
                     CurrentSession,
@@ -318,7 +318,7 @@ describe("PostSubscriptionRpcHandlers", () => {
           const handlers = yield* PostSubscriptionRpcHandlersEffect;
           const f = yield* fixture();
           yield* handlers
-            .PostSubscriptionCreate({
+            .CreatePostSubscription({
               organizationId: f.organizationId,
               postId: f.postId,
             })
@@ -331,7 +331,7 @@ describe("PostSubscriptionRpcHandlers", () => {
 
           expect(
             yield* handlers
-              .PostSubscriptionListPublic({
+              .ListPostSubscriptionsPublic({
                 organizationId: f.organizationId,
                 slug: f.postSlug,
               })
@@ -360,11 +360,11 @@ describe("PostSubscriptionRpcHandlers", () => {
               postId: f.postId,
             };
             yield* handlers
-              .PostSubscriptionCreate(mutationInput)
+              .CreatePostSubscription(mutationInput)
               .pipe(Effect.provideService(CurrentSession, session(f)));
             expect(
               yield* handlers
-                .PostSubscriptionListPublic(listInput)
+                .ListPostSubscriptionsPublic(listInput)
                 .pipe(Effect.provideService(CurrentSession, session(f)))
             ).toHaveLength(0);
           })

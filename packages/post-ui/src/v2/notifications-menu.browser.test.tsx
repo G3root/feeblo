@@ -38,10 +38,10 @@ const mocks = vi.hoisted(() => {
   ];
 
   const rpc = {
-    NotificationListPublic: vi.fn(() => Promise.resolve(rows)),
-    NotificationMarkAllReadPublic: vi.fn(() => Promise.resolve(undefined)),
-    NotificationMarkReadPublic: vi.fn(() => Promise.resolve(undefined)),
-    NotificationUnreadCountPublic: vi.fn(() => Promise.resolve({ count: 1 })),
+    ListNotificationsPublic: vi.fn(() => Promise.resolve(rows)),
+    MarkAllNotificationsReadPublic: vi.fn(() => Promise.resolve(undefined)),
+    MarkNotificationReadPublic: vi.fn(() => Promise.resolve(undefined)),
+    CountUnreadNotificationsPublic: vi.fn(() => Promise.resolve({ count: 1 })),
   };
 
   return {
@@ -130,7 +130,7 @@ describe("NotificationsMenu", () => {
       .getByRole("menuitem", { name: /New comment on feedback/ })
       .click();
     await vi.waitFor(() =>
-      expect(mocks.rpc.NotificationMarkReadPublic).toHaveBeenCalledWith({
+      expect(mocks.rpc.MarkNotificationReadPublic).toHaveBeenCalledWith({
         notificationId: "notification_1",
         organizationId: "org_1",
       })
@@ -140,7 +140,7 @@ describe("NotificationsMenu", () => {
     await screen.getByRole("button", { name: m.quaint_less_panther() }).click();
     await screen.getByRole("button", { name: m.tasty_loose_lizard() }).click();
     await vi.waitFor(() =>
-      expect(mocks.rpc.NotificationMarkAllReadPublic).toHaveBeenCalledWith({
+      expect(mocks.rpc.MarkAllNotificationsReadPublic).toHaveBeenCalledWith({
         organizationId: "org_1",
       })
     );

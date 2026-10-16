@@ -184,7 +184,7 @@ describe("PostStatusRpcHandlers", () => {
         ]);
 
         const statuses = yield* handlers
-          .PostStatusList({ organizationId: fixture.organizationId })
+          .ListPostStatuses({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
         expect(statuses.map((status) => status.id)).toEqual([firstId, laterId]);
@@ -197,7 +197,7 @@ describe("PostStatusRpcHandlers", () => {
         const fixture = yield* makeFixture();
         const error = yield* Effect.flip(
           handlers
-            .PostStatusList({ organizationId: fixture.organizationId })
+            .ListPostStatuses({ organizationId: fixture.organizationId })
             .pipe(
               Effect.provideService(CurrentSession, makeSession(fixture, null))
             )
@@ -217,7 +217,7 @@ describe("PostStatusRpcHandlers", () => {
           type: "PENDING",
         });
 
-        const statuses = yield* handlers.PostStatusListPublic({
+        const statuses = yield* handlers.ListPostStatusesPublic({
           organizationId: fixture.organizationId,
         });
 
@@ -260,7 +260,7 @@ describe("PostStatusRpcHandlers", () => {
         });
 
         const preview = yield* handlers
-          .PostStatusDeletePreview({
+          .PreviewPostStatusDelete({
             id: doomedId,
             organizationId: fixture.organizationId,
           })
@@ -287,7 +287,7 @@ describe("PostStatusRpcHandlers", () => {
         const id = yield* PostStatusId.generate;
 
         yield* handlers
-          .PostStatusCreate({
+          .CreatePostStatus({
             id,
             organizationId: fixture.organizationId,
             type: "REVIEW",
@@ -324,7 +324,7 @@ describe("PostStatusRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .PostStatusCreate({
+            .CreatePostStatus({
               id: yield* PostStatusId.generate,
               organizationId: fixture.organizationId,
               type: "COMPLETED",
@@ -354,7 +354,7 @@ describe("PostStatusRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .PostStatusCreate({
+            .CreatePostStatus({
               id,
               organizationId: fixture.organizationId,
               type: "REVIEW",
@@ -387,7 +387,7 @@ describe("PostStatusRpcHandlers", () => {
         yield* insertStatus(fixture, { orderIndex: 4, type: "COMPLETED" });
 
         yield* handlers
-          .PostStatusUpdate({
+          .UpdatePostStatus({
             id: reviewId,
             organizationId: fixture.organizationId,
             type: "COMPLETED",
@@ -433,7 +433,7 @@ describe("PostStatusRpcHandlers", () => {
           yield* insertPost(fixture, previousDefaultId, "stays-put");
 
           yield* handlers
-            .PostStatusMakeDefault({
+            .SetPostStatusDefault({
               id: nextDefaultId,
               organizationId: fixture.organizationId,
             })
@@ -488,7 +488,7 @@ describe("PostStatusRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .PostStatusMakeDefault({
+            .SetPostStatusDefault({
               id: nextDefaultId,
               organizationId: fixture.organizationId,
             })
@@ -516,7 +516,7 @@ describe("PostStatusRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .PostStatusDelete({
+            .DeletePostStatus({
               id: defaultId,
               organizationId: fixture.organizationId,
             })
@@ -554,7 +554,7 @@ describe("PostStatusRpcHandlers", () => {
           yield* insertPost(fixture, defaultId, "third");
 
           const result = yield* handlers
-            .PostStatusDelete({
+            .DeletePostStatus({
               id: doomedId,
               organizationId: fixture.organizationId,
             })
@@ -633,7 +633,7 @@ describe("PostStatusRpcHandlers", () => {
         ]);
 
         const result = yield* handlers
-          .PostStatusDelete({
+          .DeletePostStatus({
             id: doomedId,
             organizationId: fixture.organizationId,
           })
@@ -674,7 +674,7 @@ describe("PostStatusRpcHandlers", () => {
         });
 
         yield* handlers
-          .PostStatusReorder({
+          .ReorderPostStatuses({
             organizationId: fixture.organizationId,
             type: "REVIEW",
             orderedIds: [secondReviewId, firstReviewId],
@@ -722,7 +722,7 @@ describe("PostStatusRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .PostStatusReorder({
+              .ReorderPostStatuses({
                 organizationId: fixture.organizationId,
                 type: "REVIEW",
                 orderedIds: [firstReviewId],

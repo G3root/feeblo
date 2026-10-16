@@ -131,7 +131,7 @@ describe("WorkspaceRpcHandlers", () => {
   );
 
   layer(TestLayer)("handlers", (it) => {
-    describe("WorkspaceCreate", () => {
+    describe("CreateWorkspace", () => {
       it.effect(
         "creates a workspace with default boards, statuses, and tags",
         () =>
@@ -159,7 +159,7 @@ describe("WorkspaceRpcHandlers", () => {
             };
 
             const result = yield* handlers
-              .WorkspaceCreate({ workspaceName: "My Awesome Workspace" })
+              .CreateWorkspace({ workspaceName: "My Awesome Workspace" })
               .pipe(Effect.provideService(CurrentSession, session));
 
             expect(result.organizationId).toBeDefined();
@@ -273,7 +273,7 @@ describe("WorkspaceRpcHandlers", () => {
             const fixture = yield* makeFixture();
             const error = yield* Effect.flip(
               handlers
-                .WorkspaceCreate({ workspaceName: "a" })
+                .CreateWorkspace({ workspaceName: "a" })
                 .pipe(
                   Effect.provideService(CurrentSession, makeSession(fixture))
                 )
@@ -292,7 +292,7 @@ describe("WorkspaceRpcHandlers", () => {
           // "feeblo" is a reserved subdomain and is at least 4 characters
           const error = yield* Effect.flip(
             handlers
-              .WorkspaceCreate({ workspaceName: "feeblo" })
+              .CreateWorkspace({ workspaceName: "feeblo" })
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
 
@@ -314,7 +314,7 @@ describe("WorkspaceRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .WorkspaceCreate({ workspaceName: "Existing Workspace" })
+              .CreateWorkspace({ workspaceName: "Existing Workspace" })
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
 
@@ -324,13 +324,13 @@ describe("WorkspaceRpcHandlers", () => {
       );
     });
 
-    describe("WorkspaceProductList", () => {
+    describe("ListWorkspaceProducts", () => {
       it.effect("returns an empty list when there are no products", () =>
         Effect.gen(function* () {
           const handlers = yield* WorkspaceRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const products = yield* handlers
-            .WorkspaceProductList()
+            .ListWorkspaceProducts()
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(products).toEqual([]);
@@ -367,7 +367,7 @@ describe("WorkspaceRpcHandlers", () => {
           });
 
           const products = yield* handlers
-            .WorkspaceProductList()
+            .ListWorkspaceProducts()
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(products).toHaveLength(1);
@@ -409,7 +409,7 @@ describe("WorkspaceRpcHandlers", () => {
             ]);
 
             const products = yield* handlers
-              .WorkspaceProductList()
+              .ListWorkspaceProducts()
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
@@ -424,13 +424,13 @@ describe("WorkspaceRpcHandlers", () => {
       );
     });
 
-    describe("WorkspacePlanGet", () => {
+    describe("GetWorkspacePlan", () => {
       it.effect('returns "free" when no active subscription exists', () =>
         Effect.gen(function* () {
           const handlers = yield* WorkspaceRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const plan = yield* handlers
-            .WorkspacePlanGet({ organizationId: fixture.organizationId })
+            .GetWorkspacePlan({ organizationId: fixture.organizationId })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(plan).toEqual({
@@ -446,7 +446,7 @@ describe("WorkspaceRpcHandlers", () => {
           const fixture = yield* makeFixture();
           const error = yield* Effect.flip(
             handlers
-              .WorkspacePlanGet({ organizationId: fixture.organizationId })
+              .GetWorkspacePlan({ organizationId: fixture.organizationId })
               .pipe(
                 Effect.provideService(
                   CurrentSession,
@@ -498,7 +498,7 @@ describe("WorkspaceRpcHandlers", () => {
           });
 
           const plan = yield* handlers
-            .WorkspacePlanGet({ organizationId: fixture.organizationId })
+            .GetWorkspacePlan({ organizationId: fixture.organizationId })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(plan).toEqual({
@@ -544,7 +544,7 @@ describe("WorkspaceRpcHandlers", () => {
             });
 
             const plan = yield* handlers
-              .WorkspacePlanGet({ organizationId: fixture.organizationId })
+              .GetWorkspacePlan({ organizationId: fixture.organizationId })
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
@@ -608,7 +608,7 @@ describe("WorkspaceRpcHandlers", () => {
           ]);
 
           const plan = yield* handlers
-            .WorkspacePlanGet({ organizationId: fixture.organizationId })
+            .GetWorkspacePlan({ organizationId: fixture.organizationId })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(plan.plan).toBe("starter");
@@ -616,13 +616,13 @@ describe("WorkspaceRpcHandlers", () => {
       );
     });
 
-    describe("WorkspaceSlugCheck", () => {
+    describe("CheckWorkspaceSlug", () => {
       it.effect("returns available: true for an unused slug", () =>
         Effect.gen(function* () {
           const handlers = yield* WorkspaceRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const result = yield* handlers
-            .WorkspaceSlugCheck({ slug: "my-unique-slug" })
+            .CheckWorkspaceSlug({ slug: "my-unique-slug" })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(result).toEqual({
@@ -638,7 +638,7 @@ describe("WorkspaceRpcHandlers", () => {
           const handlers = yield* WorkspaceRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const result = yield* handlers
-            .WorkspaceSlugCheck({ slug: "app" })
+            .CheckWorkspaceSlug({ slug: "app" })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(result).toEqual({
@@ -658,7 +658,7 @@ describe("WorkspaceRpcHandlers", () => {
             yield* createSiteForSubdomain("taken-slug", fixture.organizationId);
 
             const result = yield* handlers
-              .WorkspaceSlugCheck({ slug: "taken-slug" })
+              .CheckWorkspaceSlug({ slug: "taken-slug" })
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );

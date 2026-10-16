@@ -82,7 +82,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
           const fixture = yield* makeFixture();
 
           const state = yield* handlers
-            .NotificationPreferenceGet({
+            .GetNotificationPreference({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)));
@@ -104,7 +104,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
           const fixture = yield* makeFixture();
 
           const written = yield* handlers
-            .NotificationPreferenceSet({
+            .SetNotificationPreference({
               organizationId: fixture.organizationId,
               target: "new_feedback",
               enabled: false,
@@ -115,7 +115,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
           expect(written.pausedAll).toBe(false);
 
           const read = yield* handlers
-            .NotificationPreferenceGet({
+            .GetNotificationPreference({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)));
@@ -129,7 +129,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
           const fixture = yield* makeFixture();
 
           const paused = yield* handlers
-            .NotificationPreferenceSet({
+            .SetNotificationPreference({
               organizationId: fixture.organizationId,
               target: "all",
               enabled: false,
@@ -139,7 +139,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
           expect(paused.categories.changelog_published).toBe(true);
 
           const oneOff = yield* handlers
-            .NotificationPreferenceSet({
+            .SetNotificationPreference({
               organizationId: fixture.organizationId,
               target: "changelog_published",
               enabled: false,
@@ -159,14 +159,14 @@ describe("NotificationPreferenceRpcHandlers", () => {
             const fixture = yield* makeFixture();
 
             yield* handlers
-              .NotificationPreferenceSet({
+              .SetNotificationPreference({
                 organizationId: fixture.organizationId,
                 target: "post_status_changed",
                 enabled: false,
               })
               .pipe(Effect.provideService(CurrentSession, session(fixture)));
             const restored = yield* handlers
-              .NotificationPreferenceSet({
+              .SetNotificationPreference({
                 organizationId: fixture.organizationId,
                 target: "post_status_changed",
                 enabled: true,
@@ -197,7 +197,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .NotificationPreferenceSet({
+              .SetNotificationPreference({
                 organizationId: fixture.organizationId,
                 target: "all",
                 enabled: false,
@@ -235,7 +235,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
           });
 
           const read = yield* handlers
-            .NotificationPreferenceGet({
+            .GetNotificationPreference({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)));

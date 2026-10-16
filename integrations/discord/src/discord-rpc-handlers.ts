@@ -15,12 +15,12 @@ export const DiscordManagementRpcHandlersEffect = Effect.gen(function* () {
   const service = yield* DiscordManagementService;
   const handlers = yield* makeChatManagementRpcHandlers(service);
   return {
-    DiscordChannelList: handlers.channelList,
-    DiscordChannelNotificationsUpdate: handlers.channelNotificationsUpdate,
-    DiscordConnectStart: handlers.connectStart,
-    DiscordConnectionDisconnect: handlers.connectionDisconnect,
-    DiscordConnectionList: handlers.connectionList,
-    DiscordIntegrationStatus: handlers.integrationStatus,
+    ListDiscordChannels: handlers.channelList,
+    UpdateDiscordChannelNotifications: handlers.channelNotificationsUpdate,
+    StartDiscordConnect: handlers.connectStart,
+    DisconnectDiscordConnection: handlers.connectionDisconnect,
+    ListDiscordConnections: handlers.connectionList,
+    GetDiscordIntegrationStatus: handlers.integrationStatus,
   };
 });
 

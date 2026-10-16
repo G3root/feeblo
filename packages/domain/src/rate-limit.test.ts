@@ -16,7 +16,7 @@ describe("publicRpc", () => {
         yield* Effect.all(
           Array.from({ length: 60 }, () =>
             RateLimit.publicRpc({
-              name: "PostListPublic",
+              name: "ListPostsPublic",
               level: "read",
               limit: 60,
             })
@@ -26,20 +26,20 @@ describe("publicRpc", () => {
 
         const error = yield* Effect.flip(
           RateLimit.publicRpc({
-            name: "PostListPublic",
+            name: "ListPostsPublic",
             level: "read",
             limit: 60,
           })
         );
 
         yield* RateLimit.publicRpc({
-          name: "BoardListPublic",
+          name: "ListBoardsPublic",
           level: "read",
           limit: 60,
         });
 
         const secondClientSucceeded = yield* RateLimit.publicRpc({
-          name: "PostListPublic",
+          name: "ListPostsPublic",
           level: "read",
           limit: 60,
         }).pipe(
@@ -87,7 +87,7 @@ describe("publicRpc", () => {
             yield* Effect.all(
               Array.from({ length: 5 }, () =>
                 RateLimit.publicRpc({
-                  name: "PostCreatePublic",
+                  name: "CreatePostPublic",
                   level: "expensive",
                 })
               ),
@@ -96,7 +96,7 @@ describe("publicRpc", () => {
 
             return yield* Effect.flip(
               RateLimit.publicRpc({
-                name: "PostCreatePublic",
+                name: "CreatePostPublic",
                 level: "expensive",
               })
             );

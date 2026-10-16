@@ -5,7 +5,7 @@ import * as Schema from "effect/Schema";
 
 import { ContactCreate } from "./schema";
 
-describe("ContactCreate", () => {
+describe("CreateContact", () => {
   it.effect("rejects duplicate attribute IDs", () =>
     Effect.gen(function* () {
       const organizationId = yield* WorkspaceId.generate;

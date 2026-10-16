@@ -30,7 +30,7 @@ export const PostActivityKind = S.Literals([
   // staff member; the subject is recorded in `post_activity.metadata`.
   "VOTE_ADDED",
   "VOTE_REMOVED",
-  // Dashboard author reassignment (`PostUpdateAuthor`): the actor is the
+  // Dashboard author reassignment (`UpdatePostAuthor`): the actor is the
   // staff member, the new author is recorded in `post_activity.metadata`.
   "AUTHOR_CHANGED",
   "COMMENT_PINNED",

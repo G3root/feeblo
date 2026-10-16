@@ -155,7 +155,7 @@ describe("CommentReactionRpcHandlers", () => {
           const f = yield* fixture();
           const error = yield* Effect.flip(
             handlers
-              .CommentReactionList({
+              .ListCommentReactions({
                 organizationId: f.organizationId,
                 slug: f.postSlug,
               })
@@ -176,11 +176,11 @@ describe("CommentReactionRpcHandlers", () => {
           };
           expect(
             yield* handlers
-              .CommentReactionToggle(input)
+              .ToggleCommentReaction(input)
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toEqual({ reacted: true, emoji: "rocket" });
           const reactions = yield* handlers
-            .CommentReactionList({
+            .ListCommentReactions({
               organizationId: f.organizationId,
               slug: f.postSlug,
             })
@@ -218,7 +218,7 @@ describe("CommentReactionRpcHandlers", () => {
             updatedAt: now,
           });
           yield* handlers
-            .CommentReactionToggle({
+            .ToggleCommentReaction({
               commentId: f.commentId,
               emoji: "rocket",
               organizationId: f.organizationId,
@@ -234,7 +234,7 @@ describe("CommentReactionRpcHandlers", () => {
           // The merged post's page lists the comment's reactions (and thus
           // the counts) under its own slug, matching the comment list.
           const reactions = yield* handlers
-            .CommentReactionList({
+            .ListCommentReactions({
               organizationId: f.organizationId,
               slug: f.postSlug,
             })
@@ -257,7 +257,7 @@ describe("CommentReactionRpcHandlers", () => {
             const f = yield* fixture("PRIVATE");
             const error = yield* Effect.flip(
               handlers
-                .CommentReactionTogglePublic({
+                .ToggleCommentReactionPublic({
                   organizationId: f.organizationId,
                   postId: f.postId,
                   commentId: f.commentId,
@@ -279,11 +279,11 @@ describe("CommentReactionRpcHandlers", () => {
             emoji: "rocket" as const,
           };
           yield* handlers
-            .CommentReactionToggle(input)
+            .ToggleCommentReaction(input)
             .pipe(Effect.provideService(CurrentSession, session(f)));
 
           const anonymous = yield* handlers
-            .CommentReactionListPublic({
+            .ListCommentReactionsPublic({
               organizationId: f.organizationId,
               slug: f.postSlug,
             })
@@ -297,7 +297,7 @@ describe("CommentReactionRpcHandlers", () => {
           });
 
           const own = yield* handlers
-            .CommentReactionListPublic({
+            .ListCommentReactionsPublic({
               organizationId: f.organizationId,
               slug: f.postSlug,
             })
@@ -329,7 +329,7 @@ describe("CommentReactionRpcHandlers", () => {
             memberships: [],
           };
           const other = yield* handlers
-            .CommentReactionListPublic({
+            .ListCommentReactionsPublic({
               organizationId: f.organizationId,
               slug: f.postSlug,
             })
@@ -360,10 +360,10 @@ describe("CommentReactionRpcHandlers", () => {
               commentId: f.commentId,
             };
             yield* handlers
-              .CommentReactionToggle({ ...input, emoji: "thumbs_up" })
+              .ToggleCommentReaction({ ...input, emoji: "thumbs_up" })
               .pipe(Effect.provideService(CurrentSession, session(f)));
             const reactions = yield* handlers
-              .CommentReactionListPublic({
+              .ListCommentReactionsPublic({
                 organizationId: f.organizationId,
                 slug: f.postSlug,
               })
@@ -373,7 +373,7 @@ describe("CommentReactionRpcHandlers", () => {
             expect(reactions).toHaveLength(0);
             expect(
               yield* handlers
-                .CommentReactionTogglePublic({ ...input, emoji: "fire" })
+                .ToggleCommentReactionPublic({ ...input, emoji: "fire" })
                 .pipe(Effect.provideService(CurrentSession, session(f, false)))
             ).toEqual({ reacted: false, emoji: null });
           })

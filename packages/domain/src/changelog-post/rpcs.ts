@@ -13,24 +13,24 @@ import {
 } from "./schema";
 
 export class ChangelogPostRpcs extends RpcGroup.make(
-  Rpc.make("ChangelogPostList", {
+  Rpc.make("ListChangelogPosts", {
     payload: ChangelogPostList,
     success: Schema.Array(ChangelogPost),
     error: ChangelogPostServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("ChangelogPostListPublic", {
+  Rpc.make("ListChangelogPostsPublic", {
     payload: ChangelogPostList,
     success: Schema.Array(ChangelogPost),
     error: Schema.Union([ChangelogPostServiceErrors, RateLimitErrors]),
   })
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("ChangelogPostCreate", {
+  Rpc.make("CreateChangelogPost", {
     payload: ChangelogPostCreate,
     success: Schema.Void,
     error: ChangelogPostServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("ChangelogPostDelete", {
+  Rpc.make("DeleteChangelogPost", {
     payload: ChangelogPostDelete,
     success: Schema.Void,
     error: ChangelogPostServiceErrors,

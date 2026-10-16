@@ -95,7 +95,7 @@ describe("BillingRpcHandlers", () => {
         const fixture = yield* makeFixture();
         const error = yield* Effect.flip(
           handlers
-            .BillingCheckout({
+            .CreateBillingCheckout({
               organizationId: fixture.organizationId,
               productId: "product",
             })
@@ -115,7 +115,7 @@ describe("BillingRpcHandlers", () => {
         const fixture = yield* makeFixture();
         const error = yield* Effect.flip(
           handlers
-            .BillingPortal({ organizationId: fixture.organizationId })
+            .CreateBillingPortal({ organizationId: fixture.organizationId })
             .pipe(
               Effect.provideService(CurrentSession, makeSession(fixture, null))
             )
@@ -142,7 +142,7 @@ describe("BillingRpcHandlers", () => {
         });
 
         const result = yield* handlers
-          .BillingCheckout({
+          .CreateBillingCheckout({
             organizationId: fixture.organizationId,
             productId: "prod_checkout_current",
           })
@@ -173,7 +173,7 @@ describe("BillingRpcHandlers", () => {
 
         const error = yield* Effect.flip(
           handlers
-            .BillingCheckout({
+            .CreateBillingCheckout({
               organizationId: fixture.organizationId,
               productId: "prod_checkout_archived",
             })
@@ -228,7 +228,7 @@ describe("BillingRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .BillingCheckout({
+              .CreateBillingCheckout({
                 organizationId: fixture.organizationId,
                 productId: "prod_checkout_duplicate",
               })
@@ -300,7 +300,7 @@ describe("BillingRpcHandlers", () => {
         ]);
 
         const result = yield* handlers
-          .BillingPortal({ organizationId: fixture.organizationId })
+          .CreateBillingPortal({ organizationId: fixture.organizationId })
           .pipe(
             Effect.provideService(CurrentSession, makeSession(fixture, "owner"))
           );

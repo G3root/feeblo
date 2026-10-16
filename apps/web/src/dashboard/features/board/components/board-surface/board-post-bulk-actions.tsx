@@ -29,7 +29,7 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
  * created by the caller)`. Eligibility syncs once per organization into a
  * collection; every selection check below is a client-side live query with
  * no RPC, so a contributor may bulk-delete a selection consisting only of
- * their own untouched posts — exactly what PostDelete authorizes.
+ * their own untouched posts — exactly what DeletePost authorizes.
  */
 function useCanBulkDeleteSelectedPosts(): boolean {
   const organizationId = useOrganizationId();

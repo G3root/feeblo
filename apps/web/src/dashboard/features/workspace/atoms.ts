@@ -13,6 +13,6 @@ import { DashboardClient, dashboardSWR } from "~/lib/atom-rpc";
  * succeeds.
  */
 export const workspaceCreationStateAtom = DashboardClient.query(
-  "WorkspaceCreationStateGet",
+  "GetWorkspaceCreationState",
   void 0
 ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"));

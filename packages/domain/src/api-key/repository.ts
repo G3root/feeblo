@@ -86,7 +86,7 @@ const makeApiKeyRepository = Effect.gen(function* () {
 
     /**
      * Records who minted a key. The api-key plugin owns row creation and does
-     * not know this column, so the `ApiKeyCreate` handler writes it immediately
+     * not know this column, so the `CreateApiKey` handler writes it immediately
      * after the plugin inserts. Never fails on zero rows: a key that vanished
      * between the two writes is already gone.
      */

@@ -189,14 +189,14 @@ describe("TagRpcHandlers", () => {
             const f = yield* fixture();
             const tagId = yield* TagId.generate;
             yield* handlers
-              .TagCreate({
+              .CreateTag({
                 id: tagId,
                 name: "Feature",
                 organizationId: f.organizationId,
               })
               .pipe(Effect.provideService(CurrentSession, session(f)));
             yield* handlers
-              .PostTagSet({
+              .SetPostTags({
                 organizationId: f.organizationId,
                 postId: f.postId,
                 tagIds: [tagId],
@@ -204,11 +204,11 @@ describe("TagRpcHandlers", () => {
               .pipe(Effect.provideService(CurrentSession, session(f)));
             const error = yield* Effect.flip(
               handlers
-                .TagList({ organizationId: f.organizationId })
+                .ListTags({ organizationId: f.organizationId })
                 .pipe(Effect.provideService(CurrentSession, session(f, "none")))
             );
             expect(error._tag).toBe("PolicyDenied");
-            const publicTags = yield* handlers.TagListPublic({
+            const publicTags = yield* handlers.ListTagsPublic({
               organizationId: f.organizationId,
             });
             expect(publicTags).toMatchObject([{ id: tagId, name: "Feature" }]);
@@ -222,14 +222,14 @@ describe("TagRpcHandlers", () => {
           const f = yield* fixture();
           const tagId = yield* TagId.generate;
           yield* handlers
-            .TagCreate({
+            .CreateTag({
               id: tagId,
               name: "Old name",
               organizationId: f.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session(f)));
           yield* handlers
-            .TagUpdate({
+            .UpdateTag({
               id: tagId,
               name: "New name",
               organizationId: f.organizationId,
@@ -237,7 +237,7 @@ describe("TagRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, session(f)));
           expect(
             yield* handlers
-              .TagList({ organizationId: f.organizationId })
+              .ListTags({ organizationId: f.organizationId })
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toMatchObject([{ id: tagId, name: "New name", slug: "new-name" }]);
         })
@@ -248,14 +248,14 @@ describe("TagRpcHandlers", () => {
           const f = yield* fixture();
           const tagId = yield* TagId.generate;
           yield* handlers
-            .TagCreate({
+            .CreateTag({
               id: tagId,
               name: "Feature",
               organizationId: f.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session(f)));
           yield* handlers
-            .PostTagSet({
+            .SetPostTags({
               organizationId: f.organizationId,
               postId: f.postId,
               tagIds: [tagId, tagId],
@@ -263,7 +263,7 @@ describe("TagRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, session(f)));
           expect(
             yield* handlers
-              .PostTagList({ organizationId: f.organizationId })
+              .ListPostTags({ organizationId: f.organizationId })
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toMatchObject([{ postId: f.postId, tagId }]);
         })
@@ -274,14 +274,14 @@ describe("TagRpcHandlers", () => {
           const f = yield* fixture();
           const tagId = yield* TagId.generate;
           yield* handlers
-            .TagCreate({
+            .CreateTag({
               id: tagId,
               name: "Feature",
               organizationId: f.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session(f)));
           yield* handlers
-            .PostTagSet({
+            .SetPostTags({
               organizationId: f.organizationId,
               postId: f.postId,
               tagIds: [tagId],
@@ -291,7 +291,7 @@ describe("TagRpcHandlers", () => {
             );
           expect(
             yield* handlers
-              .PostTagList({ organizationId: f.organizationId })
+              .ListPostTags({ organizationId: f.organizationId })
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toMatchObject([{ postId: f.postId, tagId }]);
         })
@@ -304,7 +304,7 @@ describe("TagRpcHandlers", () => {
             const f = yield* fixture();
             const tagId = yield* TagId.generate;
             yield* handlers
-              .TagCreate({
+              .CreateTag({
                 id: tagId,
                 name: "Feature",
                 organizationId: f.organizationId,
@@ -312,7 +312,7 @@ describe("TagRpcHandlers", () => {
               .pipe(Effect.provideService(CurrentSession, session(f)));
             const error = yield* Effect.flip(
               handlers
-                .PostTagSet({
+                .SetPostTags({
                   organizationId: f.organizationId,
                   postId: f.postId,
                   tagIds: [tagId],
@@ -327,7 +327,7 @@ describe("TagRpcHandlers", () => {
             expect(error._tag).toBe("PolicyDenied");
             expect(
               yield* handlers
-                .PostTagList({ organizationId: f.organizationId })
+                .ListPostTags({ organizationId: f.organizationId })
                 .pipe(Effect.provideService(CurrentSession, session(f)))
             ).toHaveLength(0);
           })
@@ -340,14 +340,14 @@ describe("TagRpcHandlers", () => {
             const f = yield* fixture();
             const tagId = yield* TagId.generate;
             yield* handlers
-              .TagCreate({
+              .CreateTag({
                 id: tagId,
                 name: "Feature",
                 organizationId: f.organizationId,
               })
               .pipe(Effect.provideService(CurrentSession, session(f)));
             yield* handlers
-              .PostTagSet({
+              .SetPostTags({
                 organizationId: f.organizationId,
                 postId: f.postId,
                 tagIds: [tagId],
@@ -357,7 +357,7 @@ describe("TagRpcHandlers", () => {
               );
             expect(
               yield* handlers
-                .PostTagList({ organizationId: f.organizationId })
+                .ListPostTags({ organizationId: f.organizationId })
                 .pipe(Effect.provideService(CurrentSession, session(f)))
             ).toMatchObject([{ postId: f.postId, tagId }]);
           })
@@ -415,7 +415,7 @@ describe("TagRpcHandlers", () => {
 
             const tagId = yield* TagId.generate;
             yield* handlers
-              .TagCreate({
+              .CreateTag({
                 id: tagId,
                 name: "Feature",
                 organizationId: f.organizationId,
@@ -423,7 +423,7 @@ describe("TagRpcHandlers", () => {
               .pipe(Effect.provideService(CurrentSession, session(f)));
             const error = yield* Effect.flip(
               handlers
-                .PostTagSet({
+                .SetPostTags({
                   organizationId: f.organizationId,
                   postId: f.postId,
                   tagIds: [tagId],
@@ -448,7 +448,7 @@ describe("TagRpcHandlers", () => {
           const tagB = yield* TagId.generate;
           for (const tagId of [tagA, tagB]) {
             yield* handlers
-              .TagCreate({
+              .CreateTag({
                 id: tagId,
                 name: tagId,
                 organizationId: f.organizationId,
@@ -457,14 +457,14 @@ describe("TagRpcHandlers", () => {
           }
 
           yield* handlers
-            .PostTagSet({
+            .SetPostTags({
               organizationId: f.organizationId,
               postId: f.postId,
               tagIds: [tagA, tagB],
             })
             .pipe(Effect.provideService(CurrentSession, session(f)));
           yield* handlers
-            .PostTagSet({
+            .SetPostTags({
               organizationId: f.organizationId,
               postId: f.postId,
               tagIds: [tagB],
@@ -547,7 +547,7 @@ describe("TagRpcHandlers", () => {
             const privateBoardId = yield* BoardId.generate;
             const privatePostId = yield* PostId.generate;
             yield* handlers
-              .TagCreate({
+              .CreateTag({
                 id: tagId,
                 name: "Feature",
                 organizationId: f.organizationId,
@@ -579,25 +579,25 @@ describe("TagRpcHandlers", () => {
               updatedAt: yield* DateTime.nowAsDate,
             });
             yield* handlers
-              .PostTagSet({
+              .SetPostTags({
                 organizationId: f.organizationId,
                 postId: privatePostId,
                 tagIds: [tagId],
               })
               .pipe(Effect.provideService(CurrentSession, session(f)));
             expect(
-              yield* handlers.PostTagListPublic({
+              yield* handlers.ListPostTagsPublic({
                 organizationId: f.organizationId,
               })
             ).toHaveLength(0);
             expect(
-              yield* handlers.TagListPublic({
+              yield* handlers.ListTagsPublic({
                 organizationId: f.organizationId,
               })
             ).toHaveLength(0);
             expect(
               yield* handlers
-                .PostTagList({ organizationId: f.organizationId })
+                .ListPostTags({ organizationId: f.organizationId })
                 .pipe(Effect.provideService(CurrentSession, session(f)))
             ).toHaveLength(1);
           })

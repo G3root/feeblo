@@ -54,8 +54,8 @@ export const NotificationPreferenceRpcHandlersEffect = Effect.gen(function* () {
     );
 
   return {
-    NotificationPreferenceGet: get,
-    NotificationPreferenceSet: set,
+    GetNotificationPreference: get,
+    SetNotificationPreference: set,
   };
 });
 

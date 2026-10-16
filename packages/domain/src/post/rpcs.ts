@@ -34,13 +34,13 @@ export class PostRpcs extends RpcGroup.make(
   // (or OptionalAuthMiddleware for reads) plus PublicRpcRateLimitMiddleware.
   // Removing AuthMiddleware would make portal posts writable by unauthenticated
   // callers — do not do that without adding an explicit anonymous-identity path.
-  Rpc.make("PostList", {
+  Rpc.make("ListPosts", {
     payload: PostList,
     success: Schema.Array(PostListItem),
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("PostListPublic", {
+  Rpc.make("ListPostsPublic", {
     payload: PostList,
     success: Schema.Array(PostListItem),
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
@@ -51,13 +51,13 @@ export class PostRpcs extends RpcGroup.make(
   // Authenticated detail fetch (full `Post` including `content`) for the
   // dashboard. Lists return the slim `PostListItem`; detail routes resolve
   // the body through this RPC instead of over-fetching it for every row.
-  Rpc.make("PostGet", {
+  Rpc.make("GetPost", {
     payload: PostGet,
     success: Post,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("PostGetPublic", {
+  Rpc.make("GetPostPublic", {
     payload: PostGet,
     success: Post,
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
@@ -68,7 +68,7 @@ export class PostRpcs extends RpcGroup.make(
   // Resolves a merged source slug to its surviving target slug so public
   // detail routes can 301 redirect instead of 404ing. Returns null when the
   // source is not a publicly visible merged post.
-  Rpc.make("PostResolveMergedPublic", {
+  Rpc.make("ResolveMergedPostPublic", {
     payload: PostGet,
     success: Schema.NullOr(Schema.String),
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
@@ -76,13 +76,13 @@ export class PostRpcs extends RpcGroup.make(
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
 
-  Rpc.make("PostSuggestions", {
+  Rpc.make("GetPostSuggestions", {
     payload: PostSuggestions,
     success: Schema.Array(Post),
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("PostSuggestionsPublic", {
+  Rpc.make("GetPostSuggestionsPublic", {
     payload: PostSuggestions,
     success: Schema.Array(Post),
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
@@ -90,7 +90,7 @@ export class PostRpcs extends RpcGroup.make(
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
 
-  Rpc.make("PostCreate", {
+  Rpc.make("CreatePost", {
     // Returns the slug the insert actually persisted (including any
     // collision suffix) so callers can reference the stored post.
     success: Schema.String,
@@ -99,7 +99,7 @@ export class PostRpcs extends RpcGroup.make(
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   }).middleware(AuthMiddleware),
 
-  Rpc.make("PostCreatePublic", {
+  Rpc.make("CreatePostPublic", {
     // Returns the slug the insert actually persisted (including any
     // collision suffix) so callers can reference the stored post.
     success: Schema.String,
@@ -109,13 +109,13 @@ export class PostRpcs extends RpcGroup.make(
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
 
-  Rpc.make("PostDelete", {
+  Rpc.make("DeletePost", {
     success: Schema.Void,
     payload: PostDelete,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("PostDeletePublic", {
+  Rpc.make("DeletePostPublic", {
     success: Schema.Void,
     payload: PostDeletePublic,
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
@@ -123,16 +123,16 @@ export class PostRpcs extends RpcGroup.make(
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
 
-  // Delete affordance sync (see `PostDeleteEligibilityList` schema): the
+  // Delete affordance sync (see `ListPostDeleteEligibility` schema): the
   // caller's whole eligible set in one lookup, overfetched client-side,
   // instead of per-row probes on every list fetch.
-  Rpc.make("PostDeleteEligibilityList", {
+  Rpc.make("ListPostDeleteEligibility", {
     success: PostDeleteEligibilityListResult,
     payload: PostDeleteEligibilityList,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("PostDeleteEligibilityListPublic", {
+  Rpc.make("ListPostDeleteEligibilityPublic", {
     success: PostDeleteEligibilityListResult,
     payload: PostDeleteEligibilityListPublic,
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
@@ -140,26 +140,26 @@ export class PostRpcs extends RpcGroup.make(
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
 
-  Rpc.make("PostUpdate", {
+  Rpc.make("UpdatePost", {
     success: Schema.Void,
     payload: PostUpdate,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("PostUpdateEta", {
+  Rpc.make("UpdatePostEta", {
     success: Schema.Void,
     payload: PostUpdateEta,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("PostUpdateAuthor", {
+  Rpc.make("UpdatePostAuthor", {
     success: Schema.Void,
     payload: PostUpdateAuthor,
     // Reassignment shares the on-behalf write rate limit with creation.
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   }).middleware(AuthMiddleware),
 
-  Rpc.make("PostUpdatePublic", {
+  Rpc.make("UpdatePostPublic", {
     success: Schema.Void,
     payload: PostUpdate,
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
@@ -167,19 +167,19 @@ export class PostRpcs extends RpcGroup.make(
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
 
-  Rpc.make("PostUpdateContent", {
+  Rpc.make("UpdatePostContent", {
     success: Schema.Void,
     payload: PostUpdateContent,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("PostUpdateTitle", {
+  Rpc.make("UpdatePostTitle", {
     success: Schema.Void,
     payload: PostUpdateTitle,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("PostUpdateContentPublic", {
+  Rpc.make("UpdatePostContentPublic", {
     success: Schema.Void,
     payload: PostUpdateContent,
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
@@ -187,7 +187,7 @@ export class PostRpcs extends RpcGroup.make(
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
 
-  Rpc.make("PostUpdateTitlePublic", {
+  Rpc.make("UpdatePostTitlePublic", {
     success: Schema.Void,
     payload: PostUpdateTitle,
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
@@ -195,25 +195,25 @@ export class PostRpcs extends RpcGroup.make(
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
 
-  Rpc.make("PostAdminUpdate", {
+  Rpc.make("AdminUpdatePost", {
     success: Schema.Void,
     payload: PostAdminUpdate,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("PostMerge", {
+  Rpc.make("MergePost", {
     success: Schema.Void,
     payload: PostMerge,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("PostUnmerge", {
+  Rpc.make("UnmergePost", {
     success: Schema.Void,
     payload: PostUnmerge,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("PostOfficialUpdatePublish", {
+  Rpc.make("PublishPostOfficialUpdate", {
     success: Schema.Void,
     payload: PostOfficialUpdatePublish,
     error: PostServiceErrors,

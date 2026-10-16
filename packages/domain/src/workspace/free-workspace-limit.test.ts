@@ -152,7 +152,7 @@ describe("free workspace limit", () => {
           yield* createOwnedWorkspace(userId);
 
           const result = yield* handlers
-            .WorkspaceCreate({ workspaceName: "Third Workspace" })
+            .CreateWorkspace({ workspaceName: "Third Workspace" })
             .pipe(
               Effect.provideService(CurrentSession, makeBareSession(userId))
             );
@@ -174,7 +174,7 @@ describe("free workspace limit", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .WorkspaceCreate({ workspaceName: "Fourth Workspace" })
+              .CreateWorkspace({ workspaceName: "Fourth Workspace" })
               .pipe(
                 Effect.provideService(CurrentSession, makeBareSession(userId))
               )
@@ -212,7 +212,7 @@ describe("free workspace limit", () => {
         );
 
         const result = yield* handlers
-          .WorkspaceCreate({ workspaceName: "Member Workspace" })
+          .CreateWorkspace({ workspaceName: "Member Workspace" })
           .pipe(
             Effect.provideService(CurrentSession, makeBareSession(memberId))
           );
@@ -233,7 +233,7 @@ describe("free workspace limit", () => {
           yield* createOwnedWorkspace(userId, { paid: true });
 
           const result = yield* handlers
-            .WorkspaceCreate({ workspaceName: "Third Free Workspace" })
+            .CreateWorkspace({ workspaceName: "Third Free Workspace" })
             .pipe(
               Effect.provideService(CurrentSession, makeBareSession(userId))
             );
@@ -256,7 +256,7 @@ describe("free workspace limit", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .WorkspaceCreate({ workspaceName: "Fourth Free Workspace" })
+              .CreateWorkspace({ workspaceName: "Fourth Free Workspace" })
               .pipe(
                 Effect.provideService(CurrentSession, makeBareSession(userId))
               )
@@ -278,7 +278,7 @@ describe("free workspace limit", () => {
           yield* createOwnedWorkspace(userId, { paid: true });
 
           const state = yield* handlers
-            .WorkspaceCreationStateGet()
+            .GetWorkspaceCreationState()
             .pipe(
               Effect.provideService(CurrentSession, makeBareSession(userId))
             );
@@ -299,7 +299,7 @@ describe("free workspace limit", () => {
         );
 
         const state = yield* handlers
-          .WorkspaceCreationStateGet()
+          .GetWorkspaceCreationState()
           .pipe(Effect.provideService(CurrentSession, makeBareSession(userId)));
 
         expect(state.canCreate).toBe(false);
@@ -319,7 +319,7 @@ describe("free workspace limit", () => {
         yield* createOwnedWorkspace(userId, { paid: true });
 
         const state = yield* handlers
-          .WorkspaceCreationStateGet()
+          .GetWorkspaceCreationState()
           .pipe(Effect.provideService(CurrentSession, makeBareSession(userId)));
 
         expect(state.canCreate).toBe(true);

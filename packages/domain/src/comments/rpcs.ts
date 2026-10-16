@@ -16,19 +16,19 @@ import {
 } from "./schema";
 
 export class CommentRpcs extends RpcGroup.make(
-  Rpc.make("CommentList", {
+  Rpc.make("ListComments", {
     success: Schema.Array(Comment),
     error: CommentServiceErrors,
     payload: CommentList,
   }).middleware(AuthMiddleware),
-  Rpc.make("CommentListPublic", {
+  Rpc.make("ListCommentsPublic", {
     success: Schema.Array(Comment),
     error: Schema.Union([CommentServiceErrors, RateLimitErrors]),
     payload: CommentList,
   })
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("CommentCreate", {
+  Rpc.make("CreateComment", {
     success: Schema.Struct({
       message: Schema.String,
     }),
@@ -36,7 +36,7 @@ export class CommentRpcs extends RpcGroup.make(
     error: Schema.Union([CommentServiceErrors, RateLimitErrors]),
     payload: CommentCreate,
   }).middleware(AuthMiddleware),
-  Rpc.make("CommentCreatePublic", {
+  Rpc.make("CreateCommentPublic", {
     success: Schema.Struct({
       message: Schema.String,
     }),
@@ -45,14 +45,14 @@ export class CommentRpcs extends RpcGroup.make(
   })
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("CommentDelete", {
+  Rpc.make("DeleteComment", {
     success: Schema.Struct({
       message: Schema.String,
     }),
     error: CommentServiceErrors,
     payload: CommentDelete,
   }).middleware(AuthMiddleware),
-  Rpc.make("CommentDeletePublic", {
+  Rpc.make("DeleteCommentPublic", {
     success: Schema.Struct({
       message: Schema.String,
     }),
@@ -61,14 +61,14 @@ export class CommentRpcs extends RpcGroup.make(
   })
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("CommentUpdate", {
+  Rpc.make("UpdateComment", {
     success: Schema.Struct({
       message: Schema.String,
     }),
     error: CommentServiceErrors,
     payload: CommentUpdate,
   }).middleware(AuthMiddleware),
-  Rpc.make("CommentUpdatePublic", {
+  Rpc.make("UpdateCommentPublic", {
     success: Schema.Struct({
       message: Schema.String,
     }),
@@ -77,14 +77,14 @@ export class CommentRpcs extends RpcGroup.make(
   })
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
-  Rpc.make("CommentPin", {
+  Rpc.make("PinComment", {
     success: Schema.Struct({
       message: Schema.String,
     }),
     error: CommentServiceErrors,
     payload: CommentPin,
   }).middleware(AuthMiddleware),
-  Rpc.make("CommentUnpin", {
+  Rpc.make("UnpinComment", {
     success: Schema.Struct({
       message: Schema.String,
     }),

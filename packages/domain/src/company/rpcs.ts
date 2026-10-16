@@ -13,22 +13,22 @@ import {
 } from "./schema";
 
 export class CompanyRpcs extends RpcGroup.make(
-  Rpc.make("CompanyList", {
+  Rpc.make("ListCompanies", {
     success: Schema.Array(Company),
     payload: CompanyList,
     error: CompanyServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("CompanyCreate", {
+  Rpc.make("CreateCompany", {
     success: Company,
     payload: CompanyCreate,
     error: CompanyServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("CompanyUpdate", {
+  Rpc.make("UpdateCompany", {
     success: Company,
     payload: CompanyUpdate,
     error: CompanyServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("CompanyDelete", {
+  Rpc.make("DeleteCompany", {
     success: Schema.Void,
     payload: CompanyDelete,
     error: CompanyServiceErrors,

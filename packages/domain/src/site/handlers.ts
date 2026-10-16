@@ -13,7 +13,7 @@ import type {
   TSite,
   TSiteHidePoweredByBranding,
   TSiteList,
-  TSiteListBySubdomain,
+  TSiteSubdomainList,
   TSiteUpdate,
 } from "./schema";
 
@@ -38,7 +38,7 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
     });
 
   return {
-    SiteList: (args: TSiteList) =>
+    ListSites: (args: TSiteList) =>
       Effect.gen(function* () {
         const sites = yield* repository.findMany({
           organizationId: args.organizationId,
@@ -53,7 +53,7 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
         withRemapDbErrors("Site", "select")
       ),
-    SiteListBySubdomain: (args: TSiteListBySubdomain) =>
+    ListSiteSubdomains: (args: TSiteSubdomainList) =>
       Effect.gen(function* () {
         const sites = yield* repository.findMany({
           subdomain: args.subdomain,
@@ -68,19 +68,19 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
         return [yield* applyBrandingEntitlement(site)];
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
-          name: "SiteListBySubdomain",
+          name: "ListSiteSubdomains",
           level: "read",
         }),
         withRemapDbErrors("Site", "select")
       ),
-    SiteUpdate: (args: TSiteUpdate) =>
+    UpdateSite: (args: TSiteUpdate) =>
       repository
         .update(args)
         .pipe(
           Policy.withPolicy(sitePolicy.canManageSite(args.organizationId)),
           withRemapDbErrors("Site", "update")
         ),
-    SiteHidePoweredByBranding: (args: TSiteHidePoweredByBranding) =>
+    HideSitePoweredByBranding: (args: TSiteHidePoweredByBranding) =>
       repository.updateHidePoweredByBranding(args).pipe(
         Policy.withPolicy(
           sitePolicy.canHidePoweredByBranding({

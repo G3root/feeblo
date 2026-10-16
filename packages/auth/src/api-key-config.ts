@@ -59,7 +59,7 @@ export const publicApiKeyPlugin = apiKey(publicApiKeyOptions);
 
 /**
  * The plugin route that mints a key. The dashboard never calls it directly —
- * the `ApiKeyCreate` RPC does — but any session can POST it, so the plan gate
+ * the `CreateApiKey` RPC does — but any session can POST it, so the plan gate
  * below must cover it.
  */
 export const PUBLIC_API_KEY_CREATE_PATH = "/api-key/create";

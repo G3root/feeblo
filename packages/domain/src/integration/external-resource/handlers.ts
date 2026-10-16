@@ -8,7 +8,7 @@ import { ExternalResourceService } from "./service";
 export const ExternalResourceRpcHandlersEffect = Effect.gen(function* () {
   const service = yield* ExternalResourceService;
   return {
-    PostExternalResourceLinkList: (
+    ListPostExternalResourceLinks: (
       input: Parameters<typeof service.listPostLinks>[0]
     ) =>
       service

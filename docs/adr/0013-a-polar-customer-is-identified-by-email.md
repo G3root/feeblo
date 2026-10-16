@@ -18,6 +18,6 @@ The cost is accepted: a buyer with several workspaces sees one portal for all of
 
 Deleting a user must never call Polar's customer delete. The only Polar deletion Feeblo performs is the per-subscription revocation in `PolarService.revokeSubscription`, driven by the durable queue in ADR 0014.
 
-`WorkspacePlanGet`, entitlements, and every webhook read use the subscription's `organizationId` (decoded from `metadata.org`), never the customer. A subscription whose metadata has no string `org`, or whose `org` workspace no longer exists, is logged and acknowledged rather than retried: it belongs to no workspace this deployment can serve.
+`GetWorkspacePlan`, entitlements, and every webhook read use the subscription's `organizationId` (decoded from `metadata.org`), never the customer. A subscription whose metadata has no string `org`, or whose `org` workspace no longer exists, is logged and acknowledged rather than retried: it belongs to no workspace this deployment can serve.
 
 The portal is per customer, so an admin of workspace A with `billing.*` can see workspace B's subscription in the portal when both were bought with the same email. That is visible in the product and accepted here; the alternative is a Polar constraint Feeblo cannot remove.

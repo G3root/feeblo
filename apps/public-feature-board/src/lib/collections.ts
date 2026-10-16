@@ -107,7 +107,7 @@ export const publicPostDescriptor = collectionOptions(
 
         const data = await fetchRpc(
           (rpc) =>
-            rpc.PostListPublic({
+            rpc.ListPostsPublic({
               organizationId,
               boardId: null,
             }),
@@ -127,7 +127,7 @@ export const publicPostDescriptor = collectionOptions(
         const { modified: updatedPost } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.PostUpdatePublic({
+          rpc.UpdatePostPublic({
             id: updatedPost.id,
             statusId: updatedPost.statusId,
             boardId: updatedPost.boardId,
@@ -140,7 +140,7 @@ export const publicPostDescriptor = collectionOptions(
         const { modified: deletedPost } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.PostDeletePublic({
+          rpc.DeletePostPublic({
             organizationId: deps.getMutationOrganizationId(),
             boardId: deletedPost.boardId,
             id: deletedPost.id,
@@ -178,7 +178,7 @@ export const publicPostStatusDescriptor = collectionOptions(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.PostStatusListPublic({ organizationId }),
+          (rpc) => rpc.ListPostStatusesPublic({ organizationId }),
           { signal: ctx.signal }
         );
 
@@ -206,7 +206,7 @@ export const publicRoadmapDescriptor = collectionOptions(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.RoadmapListPublic({ organizationId }),
+          (rpc) => rpc.ListRoadmapsPublic({ organizationId }),
           { signal: ctx.signal }
         );
 
@@ -234,7 +234,7 @@ export const publicRoadmapColumnDescriptor = collectionOptions(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.RoadmapColumnListPublic({ organizationId }),
+          (rpc) => rpc.ListRoadmapColumnsPublic({ organizationId }),
           { signal: ctx.signal }
         );
 
@@ -262,7 +262,7 @@ export const publicChangelogDescriptor = collectionOptions(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.ChangelogListPublic({ organizationId }),
+          (rpc) => rpc.ListChangelogsPublic({ organizationId }),
           { signal: ctx.signal }
         );
 
@@ -291,7 +291,7 @@ export const publicChangelogCategoryDescriptor = collectionOptions(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.ChangelogCategoryListPublic({ organizationId }),
+          (rpc) => rpc.ListChangelogCategoriesPublic({ organizationId }),
           { signal: ctx.signal }
         );
 
@@ -320,7 +320,7 @@ export const publicChangelogCategoryLinkDescriptor = collectionOptions(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.ChangelogCategoryListLinksPublic({ organizationId }),
+          (rpc) => rpc.ListChangelogCategoryLinksPublic({ organizationId }),
           { signal: ctx.signal }
         );
 
@@ -359,7 +359,7 @@ export const publicChangelogDetailDescriptor = collectionOptions(
 
         try {
           const entry = await fetchRpc(
-            (rpc) => rpc.ChangelogGetPublic({ organizationId, slug }),
+            (rpc) => rpc.GetChangelogPublic({ organizationId, slug }),
             { signal: ctx.signal }
           );
           return [entry];
@@ -397,7 +397,7 @@ export const publicBoardDescriptor = collectionOptions(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.BoardListPublic({ organizationId }),
+          (rpc) => rpc.ListBoardsPublic({ organizationId }),
           { signal: ctx.signal }
         );
 
@@ -425,7 +425,7 @@ export const publicTagDescriptor = collectionOptions(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.TagListPublic({ organizationId }),
+          (rpc) => rpc.ListTagsPublic({ organizationId }),
           {
             signal: ctx.signal,
           }
@@ -467,7 +467,7 @@ export const publicPostTagDescriptor = collectionOptions(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.PostTagListPublic({ organizationId, slug }),
+          (rpc) => rpc.ListPostTagsPublic({ organizationId, slug }),
           {
             signal: ctx.signal,
           }
@@ -504,20 +504,19 @@ export const publicCommentDescriptor = collectionOptions(
           return [];
         }
 
-        try {
-          const data = await fetchRpc(
-            (rpc) =>
-              rpc.CommentListPublic({
-                organizationId,
-                slug,
-              }),
-            { signal: ctx.signal }
-          );
+        // No catch: a rate limit or transport failure is the query's error
+        // state, not an empty thread. A hidden post's comments are filtered in
+        // the repository and arrive as a successful empty list.
+        const data = await fetchRpc(
+          (rpc) =>
+            rpc.ListCommentsPublic({
+              organizationId,
+              slug,
+            }),
+          { signal: ctx.signal }
+        );
 
-          return [...data];
-        } catch {
-          return [];
-        }
+        return [...data];
       },
       queryClient: deps.queryClient,
       getKey: (item) => item.id,
@@ -526,7 +525,7 @@ export const publicCommentDescriptor = collectionOptions(
         const { modified: newComment } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.CommentCreatePublic({
+          rpc.CreateCommentPublic({
             organizationId: deps.getMutationOrganizationId(),
             visibility: newComment.visibility,
             content: newComment.content,
@@ -549,7 +548,7 @@ export const publicCommentDescriptor = collectionOptions(
         const { modified: updatedComment } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.CommentUpdatePublic({
+          rpc.UpdateCommentPublic({
             id: updatedComment.id,
             organizationId: deps.getMutationOrganizationId(),
             postId: updatedComment.postId,
@@ -563,7 +562,7 @@ export const publicCommentDescriptor = collectionOptions(
         const { original: deletedComment } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.CommentDeletePublic({
+          rpc.DeleteCommentPublic({
             id: deletedComment.id,
             organizationId: deps.getMutationOrganizationId(),
             postId: deletedComment.postId,
@@ -603,16 +602,14 @@ export const publicCommentReactionDescriptor = collectionOptions(
           return [];
         }
 
-        try {
-          const data = await fetchRpc(
-            (rpc) => rpc.CommentReactionListPublic({ organizationId, slug }),
-            { signal: ctx.signal }
-          );
+        // No catch here either: the public reaction list has no "hidden"
+        // answer, so any failure is the query's error state, not an empty list.
+        const data = await fetchRpc(
+          (rpc) => rpc.ListCommentReactionsPublic({ organizationId, slug }),
+          { signal: ctx.signal }
+        );
 
-          return [...data];
-        } catch {
-          return [];
-        }
+        return [...data];
       },
       // SAFETY: The endpoint/API contract guarantees this response shape.
       queryClient: deps.queryClient,
@@ -625,7 +622,7 @@ export const publicCommentReactionDescriptor = collectionOptions(
         const { modified: newCommentReaction } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.CommentReactionTogglePublic({
+          rpc.ToggleCommentReactionPublic({
             organizationId: deps.getMutationOrganizationId(),
             postId: newCommentReaction.postId,
             commentId: newCommentReaction.commentId,
@@ -638,7 +635,7 @@ export const publicCommentReactionDescriptor = collectionOptions(
         const { original: deletedCommentReaction } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.CommentReactionTogglePublic({
+          rpc.ToggleCommentReactionPublic({
             organizationId: deps.getMutationOrganizationId(),
             postId: deletedCommentReaction.postId,
             commentId: deletedCommentReaction.commentId,
@@ -665,7 +662,7 @@ export const publicUpvoteDescriptor = collectionOptions(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.UpvoteListPublic({ organizationId }),
+          (rpc) => rpc.ListUpvotesPublic({ organizationId }),
           {
             signal: ctx.signal,
           }
@@ -683,7 +680,7 @@ export const publicUpvoteDescriptor = collectionOptions(
         const { modified: newUpvote } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.UpvoteTogglePublic({
+          rpc.ToggleUpvotePublic({
             organizationId: deps.getMutationOrganizationId(),
             postId: newUpvote.postId,
           })
@@ -699,7 +696,7 @@ export const publicUpvoteDescriptor = collectionOptions(
         const { original: deletedUpvote } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.UpvoteTogglePublic({
+          rpc.ToggleUpvotePublic({
             organizationId: deps.getMutationOrganizationId(),
             postId: deletedUpvote.postId,
           })
@@ -738,7 +735,7 @@ export const publicPostUpvoteDescriptor = collectionOptions(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.UpvoteListPublic({ organizationId, slug }),
+          (rpc) => rpc.ListUpvotesPublic({ organizationId, slug }),
           {
             signal: ctx.signal,
           }
@@ -755,7 +752,7 @@ export const publicPostUpvoteDescriptor = collectionOptions(
         const { modified: newUpvote } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.UpvoteTogglePublic({
+          rpc.ToggleUpvotePublic({
             organizationId: deps.getMutationOrganizationId(),
             postId: newUpvote.postId,
           })
@@ -770,7 +767,7 @@ export const publicPostUpvoteDescriptor = collectionOptions(
         const { original: deletedUpvote } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.UpvoteTogglePublic({
+          rpc.ToggleUpvotePublic({
             organizationId: deps.getMutationOrganizationId(),
             postId: deletedUpvote.postId,
           })
@@ -807,7 +804,7 @@ export const publicPostReactionDescriptor = collectionOptions(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.PostReactionListPublic({ organizationId, slug }),
+          (rpc) => rpc.ListPostReactionsPublic({ organizationId, slug }),
           {
             signal: ctx.signal,
           }
@@ -826,7 +823,7 @@ export const publicPostReactionDescriptor = collectionOptions(
         const { modified: newPostReaction } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.PostReactionTogglePublic({
+          rpc.TogglePostReactionPublic({
             organizationId: deps.getMutationOrganizationId(),
             postId: newPostReaction.postId,
             emoji: newPostReaction.emoji,
@@ -838,7 +835,7 @@ export const publicPostReactionDescriptor = collectionOptions(
         const { original: deletedPostReaction } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.PostReactionTogglePublic({
+          rpc.TogglePostReactionPublic({
             organizationId: deps.getMutationOrganizationId(),
             postId: deletedPostReaction.postId,
             emoji: deletedPostReaction.emoji,
@@ -873,7 +870,7 @@ export const publicPostSubscriptionDescriptor = collectionOptions(
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.PostSubscriptionListPublic({ organizationId, slug }),
+          (rpc) => rpc.ListPostSubscriptionsPublic({ organizationId, slug }),
           {
             signal: ctx.signal,
           }
@@ -894,7 +891,7 @@ export const publicPostSubscriptionDescriptor = collectionOptions(
         const { modified: newSubscription } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.PostSubscriptionCreatePublic({
+          rpc.CreatePostSubscriptionPublic({
             organizationId: deps.getMutationOrganizationId(),
             postId: newSubscription.postId,
           })
@@ -905,7 +902,7 @@ export const publicPostSubscriptionDescriptor = collectionOptions(
         const { original: deletedSubscription } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.PostSubscriptionDeletePublic({
+          rpc.DeletePostSubscriptionPublic({
             organizationId: deps.getMutationOrganizationId(),
             postId: deletedSubscription.postId,
           })
@@ -934,7 +931,7 @@ export const publicChangelogSubscriptionDescriptor = collectionOptions(
         }
 
         const data = await fetchRpc((rpc) =>
-          rpc.ChangelogSubscriptionListPublic({ organizationId })
+          rpc.ListChangelogSubscriptionsPublic({ organizationId })
         );
         // SAFETY: The endpoint/API contract guarantees this response shape.
         return [...data];
@@ -947,14 +944,14 @@ export const publicChangelogSubscriptionDescriptor = collectionOptions(
       ) => string,
       onInsert: async () => {
         await fetchRpc((rpc) =>
-          rpc.ChangelogSubscriptionCreatePublic({
+          rpc.CreateChangelogSubscriptionPublic({
             organizationId: deps.getMutationOrganizationId(),
           })
         );
       },
       onDelete: async () => {
         await fetchRpc((rpc) =>
-          rpc.ChangelogSubscriptionDeletePublic({
+          rpc.DeleteChangelogSubscriptionPublic({
             organizationId: deps.getMutationOrganizationId(),
           })
         );
@@ -993,7 +990,7 @@ export const publicPostDetailDescriptor = collectionOptions(
 
         try {
           const post = await fetchRpc(
-            (rpc) => rpc.PostGetPublic({ organizationId, slug }),
+            (rpc) => rpc.GetPostPublic({ organizationId, slug }),
             { signal: ctx.signal }
           );
           return [post];
@@ -1029,7 +1026,7 @@ export const publicDeleteEligibilityDescriptor = collectionOptions(
         }
 
         const result = await fetchRpc(
-          (rpc) => rpc.PostDeleteEligibilityListPublic({ organizationId }),
+          (rpc) => rpc.ListPostDeleteEligibilityPublic({ organizationId }),
           { signal: ctx.signal }
         );
         return result.eligibleIds.map((postId) => ({

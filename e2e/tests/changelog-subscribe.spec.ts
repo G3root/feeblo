@@ -60,7 +60,7 @@ test.describe("changelog email subscription", () => {
         /\/rpc\/?$/.test(response.url()) &&
         response.request().method() === "POST" &&
         (response.request().postData() ?? "").includes(
-          "ChangelogSubscriptionCreatePublic"
+          "CreateChangelogSubscriptionPublic"
         )
     );
     await page.getByRole("button", { name: "Subscribe", exact: true }).click();
@@ -79,7 +79,7 @@ test.describe("changelog email subscription", () => {
         /\/rpc\/?$/.test(response.url()) &&
         response.request().method() === "POST" &&
         (response.request().postData() ?? "").includes(
-          "ChangelogSubscriptionDeletePublic"
+          "DeleteChangelogSubscriptionPublic"
         )
     );
     await page

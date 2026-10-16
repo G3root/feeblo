@@ -135,7 +135,7 @@ describe("ChangelogRpcHandlers", () => {
         const fixture = yield* makeFixture();
         const id = yield* ChangelogId.generate;
         yield* handlers
-          .ChangelogCreate({
+          .CreateChangelog({
             assetIds: [],
             coverImage: null,
             id,
@@ -149,7 +149,7 @@ describe("ChangelogRpcHandlers", () => {
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         const entries = yield* handlers
-          .ChangelogList({ organizationId: fixture.organizationId })
+          .ListChangelogs({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         expect(entries[0]).toMatchObject({
           id,
@@ -181,7 +181,7 @@ describe("ChangelogRpcHandlers", () => {
           status: "draft" | "published"
         ) =>
           handlers
-            .ChangelogCreate({
+            .CreateChangelog({
               assetIds: [],
               coverImage: null,
               id: entryId,
@@ -199,7 +199,7 @@ describe("ChangelogRpcHandlers", () => {
         yield* create(draftId, "Unshipped", "draft");
 
         const entry = yield* handlers
-          .ChangelogGetPublic({
+          .GetChangelogPublic({
             organizationId: fixture.organizationId,
             slug: "shipped",
           })
@@ -215,7 +215,7 @@ describe("ChangelogRpcHandlers", () => {
         // Drafts stay invisible to the public getter.
         const draftError = yield* Effect.flip(
           handlers
-            .ChangelogGetPublic({
+            .GetChangelogPublic({
               organizationId: fixture.organizationId,
               slug: "unshipped",
             })
@@ -225,7 +225,7 @@ describe("ChangelogRpcHandlers", () => {
 
         const missingError = yield* Effect.flip(
           handlers
-            .ChangelogGetPublic({
+            .GetChangelogPublic({
               organizationId: fixture.organizationId,
               slug: "no-such-entry",
             })
@@ -259,7 +259,7 @@ describe("ChangelogRpcHandlers", () => {
           });
 
           yield* handlers
-            .ChangelogCreate({
+            .CreateChangelog({
               assetIds: [assetId],
               coverImage: null,
               id,
@@ -340,7 +340,7 @@ describe("ChangelogRpcHandlers", () => {
           });
 
           yield* handlers
-            .ChangelogCreate({
+            .CreateChangelog({
               assetIds: [assetId],
               coverImage: temporaryUrl,
               id,
@@ -379,7 +379,7 @@ describe("ChangelogRpcHandlers", () => {
             .from(schema.changelogAssetTable)
             .where(eq(schema.changelogAssetTable.changelogId, id));
           const listed = yield* handlers
-            .ChangelogListPublic({
+            .ListChangelogsPublic({
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -392,7 +392,7 @@ describe("ChangelogRpcHandlers", () => {
           // unknown (assetIds empty) but the cover URL is unchanged, so the
           // reference must survive so the asset is not garbage collected.
           yield* handlers
-            .ChangelogUpdate({
+            .UpdateChangelog({
               assetIds: [],
               coverImage: permanentUrl,
               id,
@@ -414,7 +414,7 @@ describe("ChangelogRpcHandlers", () => {
 
           // Removing the cover image prunes the reference again.
           yield* handlers
-            .ChangelogUpdate({
+            .UpdateChangelog({
               assetIds: [],
               coverImage: null,
               id,
@@ -440,7 +440,7 @@ describe("ChangelogRpcHandlers", () => {
           const unmatchedCoverUrl =
             "https://assets.example/unmatched/cover.png";
           yield* handlers
-            .ChangelogUpdate({
+            .UpdateChangelog({
               assetIds: [],
               coverImage: unmatchedCoverUrl,
               id,
@@ -495,7 +495,7 @@ describe("ChangelogRpcHandlers", () => {
 
         const exit = yield* Effect.exit(
           handlers
-            .ChangelogCreate({
+            .CreateChangelog({
               assetIds: [assetId],
               coverImage: null,
               id,
@@ -540,7 +540,7 @@ describe("ChangelogRpcHandlers", () => {
         const fixture = yield* makeFixture();
         const error = yield* Effect.flip(
           handlers
-            .ChangelogList({ organizationId: fixture.organizationId })
+            .ListChangelogs({ organizationId: fixture.organizationId })
             .pipe(
               Effect.provideService(CurrentSession, makeSession(fixture, false))
             )
@@ -560,7 +560,7 @@ describe("ChangelogRpcHandlers", () => {
           const session = makeSession(fixture);
 
           yield* handlers
-            .ChangelogCreate({
+            .CreateChangelog({
               assetIds: [],
               coverImage: null,
               id,
@@ -596,7 +596,7 @@ describe("ChangelogRpcHandlers", () => {
           const publishedAt = yield* DateTime.nowAsDate;
 
           yield* handlers
-            .ChangelogCreate({
+            .CreateChangelog({
               assetIds: [],
               coverImage: null,
               id,
@@ -610,7 +610,7 @@ describe("ChangelogRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, session));
           yield* handlers
-            .ChangelogUpdate({
+            .UpdateChangelog({
               assetIds: [],
               coverImage: null,
               id,
@@ -624,7 +624,7 @@ describe("ChangelogRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, session));
           yield* handlers
-            .ChangelogUpdate({
+            .UpdateChangelog({
               assetIds: [],
               coverImage: null,
               id,

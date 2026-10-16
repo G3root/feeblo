@@ -53,7 +53,7 @@ export function PostStatusSettings() {
    *
    * A reorder cannot ride the collection's own `onUpdate`: that path writes a
    * status's label, colour and section, not its position. So the drop is sent
-   * as one `PostStatusReorder` call and the list holds the dropped order until
+   * as one `ReorderPostStatuses` call and the list holds the dropped order until
    * the refetch lands, rather than snapping back and forward.
    */
   const [pendingOrder, setPendingOrder] = useState<{
@@ -78,7 +78,7 @@ export function PostStatusSettings() {
 
       try {
         await fetchRpc((rpc) =>
-          rpc.PostStatusReorder({ organizationId, type, orderedIds })
+          rpc.ReorderPostStatuses({ organizationId, type, orderedIds })
         );
         await postStatusCollection.utils.refetch();
       } catch {
@@ -277,7 +277,7 @@ function PostStatusRow({
     void (async () => {
       try {
         await fetchRpc((rpc) =>
-          rpc.PostStatusMakeDefault({ id: status.id, organizationId })
+          rpc.SetPostStatusDefault({ id: status.id, organizationId })
         );
         await postStatusCollection.utils.refetch();
 

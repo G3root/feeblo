@@ -171,7 +171,7 @@ describe("EmailSubscriptionConsentHandlers", () => {
           const organizationId = yield* createWorkspace({ paid: true });
 
           expect(
-            yield* handlers.EmailSubscriptionChangelogSubscribePublic({
+            yield* handlers.SubscribeEmailSubscriptionPublic({
               email: "subscriber@example.com",
               organizationId,
             })

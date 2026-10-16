@@ -734,7 +734,7 @@ export function ChangelogEditorCategoryField() {
     }
     try {
       await fetchRpc((rpc) =>
-        rpc.ChangelogCategorySet({
+        rpc.SetChangelogCategories({
           changelogId: changelog.id,
           organizationId,
           categoryIds: [...nextCategoryIds],

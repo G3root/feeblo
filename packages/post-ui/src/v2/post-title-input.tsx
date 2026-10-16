@@ -64,13 +64,13 @@ export function PostTitleUpdateInput() {
     mutationFn: async ({ title }) => {
       await fetchRpc((rpc) =>
         pageType === "Dashboard"
-          ? rpc.PostUpdateTitle({
+          ? rpc.UpdatePostTitle({
               id: postId,
               boardId: post.boardId,
               organizationId,
               title,
             })
-          : rpc.PostUpdateTitlePublic({
+          : rpc.UpdatePostTitlePublic({
               id: postId,
               boardId: post.boardId,
               organizationId,

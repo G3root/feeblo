@@ -16,13 +16,13 @@ import {
 } from "./schema";
 
 export class ChangelogCategoryRpcs extends RpcGroup.make(
-  Rpc.make("ChangelogCategoryList", {
+  Rpc.make("ListChangelogCategories", {
     payload: ChangelogCategoryList,
     success: Schema.Array(ChangelogCategory),
     error: ChangelogCategoryServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("ChangelogCategoryListPublic", {
+  Rpc.make("ListChangelogCategoriesPublic", {
     payload: ChangelogCategoryList,
     success: Schema.Array(ChangelogCategory),
     error: Schema.Union([ChangelogCategoryServiceErrors, RateLimitErrors]),
@@ -30,31 +30,31 @@ export class ChangelogCategoryRpcs extends RpcGroup.make(
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
 
-  Rpc.make("ChangelogCategoryCreate", {
+  Rpc.make("CreateChangelogCategory", {
     success: Schema.Void,
     payload: ChangelogCategoryCreate,
     error: ChangelogCategoryServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("ChangelogCategoryUpdate", {
+  Rpc.make("UpdateChangelogCategory", {
     success: Schema.Void,
     payload: ChangelogCategoryUpdate,
     error: ChangelogCategoryServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("ChangelogCategoryDelete", {
+  Rpc.make("DeleteChangelogCategory", {
     success: Schema.Void,
     payload: ChangelogCategoryDelete,
     error: ChangelogCategoryServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("ChangelogCategoryListLinks", {
+  Rpc.make("ListChangelogCategoryLinks", {
     payload: ChangelogCategoryList,
     success: Schema.Array(ChangelogCategoryLink),
     error: ChangelogCategoryServiceErrors,
   }).middleware(AuthMiddleware),
 
-  Rpc.make("ChangelogCategoryListLinksPublic", {
+  Rpc.make("ListChangelogCategoryLinksPublic", {
     payload: ChangelogCategoryList,
     success: Schema.Array(ChangelogCategoryLink),
     error: Schema.Union([ChangelogCategoryServiceErrors, RateLimitErrors]),
@@ -62,7 +62,7 @@ export class ChangelogCategoryRpcs extends RpcGroup.make(
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
 
-  Rpc.make("ChangelogCategorySet", {
+  Rpc.make("SetChangelogCategories", {
     success: Schema.Void,
     payload: ChangelogCategorySet,
     error: ChangelogCategoryServiceErrors,

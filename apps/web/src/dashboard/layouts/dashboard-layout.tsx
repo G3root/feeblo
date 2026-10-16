@@ -62,7 +62,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     ({ signal, ...input }) =>
       fetchRpc(
         (rpc) =>
-          rpc.PostSuggestions({
+          rpc.GetPostSuggestions({
             ...input,
             limit: 5,
             organizationId,
@@ -72,7 +72,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     [organizationId]
   );
   const persistPost = useCallback<PostCollectionsValue["persistPost"]>(
-    async (input) => fetchRpc((rpc) => rpc.PostCreate(input)),
+    async (input) => fetchRpc((rpc) => rpc.CreatePost(input)),
     []
   );
   return (

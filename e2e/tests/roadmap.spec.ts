@@ -267,7 +267,7 @@ test.describe("roadmap", () => {
 
       // The first toast lingers for a few seconds. If we toggle the switch
       // again while it is still on screen, the assertion below would match the
-      // OLD toast (identical text) and pass before the second SiteUpdate write
+      // OLD toast (identical text) and pass before the second UpdateSite write
       // has actually persisted — then the visitor reload below could capture
       // the still-stale HIDDEN visibility. Wait for the first toast to dismiss
       // so the next assertion can only match the second toggle's toast, which

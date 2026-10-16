@@ -36,7 +36,7 @@ export class CurrentSession extends Context.Service<CurrentSession, Session>()(
   "@feeblo/domain/CurrentSession"
 ) {}
 
-/** Session when authenticated; None when unauthenticated. Use for optional-auth routes (e.g. PostListPublic). */
+/** Session when authenticated; None when unauthenticated. Use for optional-auth routes (e.g. ListPostsPublic). */
 export class OptionalCurrentSession extends Context.Service<
   OptionalCurrentSession,
   Option.Option<Session>

@@ -10,7 +10,7 @@ The same change scopes the monthly provider-volume guard per organization, evalu
 
 ## Why
 
-One submission produced one delivery per opted-in recipient, with no upper bound. `PostCreatePublic` allows five writes per minute per IP, so a single source produced 300 emails an hour into an owner's inbox, and the email's subject line was constant, which is exactly the pattern receiving providers degrade as bulk spam. The blast radius was the workspace's own recipients, and — worse — the platform's shared monthly provider allowance, which was summed across every organization against one 100k cap with a one-hour deferral. A flooded workspace therefore deferred every other workspace's email for the rest of the calendar month.
+One submission produced one delivery per opted-in recipient, with no upper bound. `CreatePostPublic` allows five writes per minute per IP, so a single source produced 300 emails an hour into an owner's inbox, and the email's subject line was constant, which is exactly the pattern receiving providers degrade as bulk spam. The blast radius was the workspace's own recipients, and — worse — the platform's shared monthly provider allowance, which was summed across every organization against one 100k cap with a one-hour deferral. A flooded workspace therefore deferred every other workspace's email for the rest of the calendar month.
 
 The market does not send this email either. Canny's own email inventory has no "a post was created" message at all: admins get a report that is daily by default with a configurable frequency, and Slack or Teams is the realtime channel. Featurebase debounces its notifications by three minutes, bundles everything into one message, and suppresses the email when the admin already saw it in the app.
 

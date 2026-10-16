@@ -117,9 +117,9 @@ const xmlResponse = (body: string) =>
  * crawlers to keep out, so no URLs are advertised.
  *
  * The sitemap only contains URLs the anonymous public can already see: posts
- * from public boards (`PostListPublic`), published changelog entries
- * (`ChangelogListPublic`, gated on the site's changelog visibility), and
- * public roadmaps (`RoadmapListPublic`, gated on the site's roadmap
+ * from public boards (`ListPostsPublic`), published changelog entries
+ * (`ListChangelogsPublic`, gated on the site's changelog visibility), and
+ * public roadmaps (`ListRoadmapsPublic`, gated on the site's roadmap
  * visibility). Board pages are included without `lastmod` because a board
  * row only changes when its name changes, not when its posts do.
  *
@@ -189,19 +189,19 @@ async function collectUrls(
   const [roadmaps, entries, boards, posts] = await Promise.all([
     site.roadmapVisibility === "PUBLIC"
       ? fetchRpcServer((rpc) =>
-          rpc.RoadmapListPublic({ organizationId: site.organizationId })
+          rpc.ListRoadmapsPublic({ organizationId: site.organizationId })
         )
       : Promise.resolve([]),
     site.changelogVisibility === "PUBLIC"
       ? fetchRpcServer((rpc) =>
-          rpc.ChangelogListPublic({ organizationId: site.organizationId })
+          rpc.ListChangelogsPublic({ organizationId: site.organizationId })
         )
       : Promise.resolve([]),
     fetchRpcServer((rpc) =>
-      rpc.BoardListPublic({ organizationId: site.organizationId })
+      rpc.ListBoardsPublic({ organizationId: site.organizationId })
     ),
     fetchRpcServer((rpc) =>
-      rpc.PostListPublic({
+      rpc.ListPostsPublic({
         organizationId: site.organizationId,
         boardId: null,
       })
@@ -305,7 +305,7 @@ export async function handleBoardRss(request: Request) {
   let changelogs: readonly TChangelog[];
   try {
     changelogs = await fetchRpcServer((rpc) =>
-      rpc.ChangelogListPublic({ organizationId: site.organizationId })
+      rpc.ListChangelogsPublic({ organizationId: site.organizationId })
     );
   } catch {
     return new Response("Feed unavailable", { status: 502 });

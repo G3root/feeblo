@@ -282,7 +282,7 @@ export const CommentComposerField = withForm({
     );
 
     // Keep the composer inert while the comment persists server-side: the
-    // editor is only cleared after the CommentCreate RPC settles, so text
+    // editor is only cleared after the CreateComment RPC settles, so text
     // typed in that window would otherwise be wiped by the reset — and could
     // race the optimistic insert itself.
     return (

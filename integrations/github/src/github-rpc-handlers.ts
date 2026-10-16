@@ -14,11 +14,11 @@ export const GitHubManagementRpcHandlersEffect = Effect.gen(function* () {
       Policy.canPermission(organizationId, "integrations.manage")
     );
   return {
-    GitHubIntegrationStatus: () => service.status,
-    GitHubConnectionList: (
+    GetGitHubIntegrationStatus: () => service.status,
+    ListGitHubConnections: (
       input: Parameters<typeof service.listConnections>[0]
     ) => service.listConnections(input).pipe(authorize(input.organizationId)),
-    GitHubConnectStart: (input: Parameters<typeof service.connectStart>[0]) =>
+    StartGitHubConnect: (input: Parameters<typeof service.connectStart>[0]) =>
       Effect.gen(function* () {
         // Starting an App installation additionally requires the plan's
         // integrations capability. Existing connections stay manageable, so a
@@ -29,29 +29,29 @@ export const GitHubManagementRpcHandlersEffect = Effect.gen(function* () {
         authorize(input.organizationId),
         withRemapDbErrors("Integration", "select")
       ),
-    GitHubConnectionDisconnect: (
+    DisconnectGitHubConnection: (
       input: Parameters<typeof service.disconnect>[0]
     ) => service.disconnect(input).pipe(authorize(input.organizationId)),
-    GitHubRepositoryList: (
+    ListGitHubRepositories: (
       input: Parameters<typeof service.listRepositories>[0]
     ) => service.listRepositories(input).pipe(authorize(input.organizationId)),
-    GitHubSettingsGet: (input: Parameters<typeof service.getSettings>[0]) =>
+    GetGitHubSettings: (input: Parameters<typeof service.getSettings>[0]) =>
       service.getSettings(input).pipe(authorize(input.organizationId)),
-    GitHubSettingsUpdate: (
+    UpdateGitHubSettings: (
       input: Parameters<typeof service.updateSettings>[0]
     ) => service.updateSettings(input).pipe(authorize(input.organizationId)),
-    GitHubRuleList: (input: Parameters<typeof service.listRules>[0]) =>
+    ListGitHubRules: (input: Parameters<typeof service.listRules>[0]) =>
       service.listRules(input).pipe(authorize(input.organizationId)),
-    GitHubRuleCreate: (input: Parameters<typeof service.createRule>[0]) =>
+    CreateGitHubRule: (input: Parameters<typeof service.createRule>[0]) =>
       service.createRule(input).pipe(authorize(input.organizationId)),
-    GitHubRuleUpdate: (input: Parameters<typeof service.updateRule>[0]) =>
+    UpdateGitHubRule: (input: Parameters<typeof service.updateRule>[0]) =>
       service.updateRule(input).pipe(authorize(input.organizationId)),
-    GitHubRuleDelete: (input: Parameters<typeof service.deleteRule>[0]) =>
+    DeleteGitHubRule: (input: Parameters<typeof service.deleteRule>[0]) =>
       service.deleteRule(input).pipe(authorize(input.organizationId)),
-    GitHubPostIssueCreate: (
+    CreateGitHubPostIssue: (
       input: Parameters<typeof service.createPostIssue>[0]
     ) => service.createPostIssue(input).pipe(authorize(input.organizationId)),
-    GitHubPostIssueLink: (input: Parameters<typeof service.linkPostIssue>[0]) =>
+    LinkGitHubPostIssue: (input: Parameters<typeof service.linkPostIssue>[0]) =>
       service.linkPostIssue(input).pipe(authorize(input.organizationId)),
   };
 });

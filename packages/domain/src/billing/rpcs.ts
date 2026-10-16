@@ -11,12 +11,12 @@ import {
 } from "./schema";
 
 export class BillingRpcs extends RpcGroup.make(
-  Rpc.make("BillingCheckout", {
+  Rpc.make("CreateBillingCheckout", {
     payload: BillingCheckoutInput,
     success: BillingCheckoutOutput,
     error: BillingServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("BillingPortal", {
+  Rpc.make("CreateBillingPortal", {
     payload: BillingPortalInput,
     success: BillingPortalOutput,
     error: BillingServiceErrors,
