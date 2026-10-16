@@ -58,6 +58,14 @@ jobs:
         run: |
           git fetch origin main prod --tags --quiet
 
+          # `publish-images.yml` builds images only for `v*` tags, so an
+          # `sdk@*` tag would promote a commit whose server image was never
+          # published.
+          case "$TAG" in
+            v*) ;;
+            *) echo "::error::${TAG} is not a v* release tag"; exit 1 ;;
+          esac
+
           # `git rev-parse --verify` accepts revision syntax, so `v1.2.0~1` or
           # `v1.2.0^{commit}` would pass it and resolve a commit no tag points
           # at. `git show-ref --verify` matches the ref name exactly, and the
@@ -67,10 +75,13 @@ jobs:
           target="$(git rev-parse "refs/tags/${TAG}^{commit}")" \
             || { echo "::error::${TAG} does not point at a commit"; exit 1; }
 
-          # The Docker images are published on `release: published`, so a tag
-          # with no Release has no image to deploy.
-          gh release view "${TAG}" >/dev/null \
-            || { echo "::error::${TAG} has no published GitHub Release"; exit 1; }
+          # Images are published on `release: published`, so a missing Release
+          # and a draft both mean no image exists. This token can see a draft,
+          # so `isDraft` has to be checked explicitly.
+          draft="$(gh release view "${TAG}" --json isDraft --jq '.isDraft' 2>/dev/null)" \
+            || { echo "::error::${TAG} has no GitHub Release"; exit 1; }
+          [ "$draft" = "false" ] \
+            || { echo "::error::${TAG} is only a draft release; its images were never published"; exit 1; }
 
           git merge-base --is-ancestor "$target" origin/main \
             || { echo "::error::${TAG} is not on main, so promoting it would fork prod off main"; exit 1; }
