@@ -182,9 +182,7 @@ function RouteComponent() {
     [organizationId, post?.id]
   );
 
-  const preloadActivity = () => {
-    activityQuery.preload();
-  };
+  const preloadActivity = () => activityQuery.preload();
 
   // The post query is derived from the preloaded collections, but it still
   // passes through a brief `loading` phase on mount and post navigation.

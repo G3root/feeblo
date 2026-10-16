@@ -66,7 +66,7 @@ const RoadmapColumnsSection = withForm({
                         )
                       }
                       onRemoveColumn={() => {
-                        form.removeFieldValue("columns", index);
+                        void form.removeFieldValue("columns", index);
                         setOpenItems((current) =>
                           current.filter((item) => item !== column.id)
                         );

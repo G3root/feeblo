@@ -97,7 +97,7 @@ export function WorkspaceSwitcher() {
                     });
                     return;
                   }
-                  navigate({
+                  void navigate({
                     to: "/register",
                   });
                 }}

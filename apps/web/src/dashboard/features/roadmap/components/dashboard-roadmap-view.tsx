@@ -92,12 +92,12 @@ function DashboardRoadmapIndexProvider({
     (nextSlug: string) => {
       const primarySlug = allRoadmaps[0]?.slug;
       if (nextSlug === primarySlug) {
-        navigate({
+        void navigate({
           to: "/$organizationId/roadmap",
           params: { organizationId },
         });
       } else {
-        navigate({
+        void navigate({
           params: { organizationId, slug: nextSlug },
           to: "/$organizationId/roadmap/$slug",
         });
@@ -169,12 +169,12 @@ function DashboardRoadmapDetailProvider({
     (nextSlug: string) => {
       const primarySlug = allRoadmaps[0]?.slug;
       if (nextSlug === primarySlug) {
-        navigate({
+        void navigate({
           to: "/$organizationId/roadmap",
           params: { organizationId },
         });
       } else {
-        navigate({
+        void navigate({
           params: { organizationId, slug: nextSlug },
           to: "/$organizationId/roadmap/$slug",
         });

@@ -74,7 +74,7 @@ export const useChangelogAction = () => {
       await tx.isPersisted.promise;
       trackEvent("changelog_created", { success: true });
 
-      navigate({
+      void navigate({
         to: "/$organizationId/changelog/edit/$changelogSlug",
         params: { organizationId, changelogSlug: slug },
       });

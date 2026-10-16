@@ -73,7 +73,7 @@ function RegisterRoute() {
             window.location.assign(getSafeCallbackURL(search.redirectTo));
             return;
           }
-          navigate({
+          void navigate({
             to: "/$organizationId",
             params: { organizationId: result.organizationId },
           });
@@ -113,7 +113,7 @@ function RegisterRoute() {
                     onSubmit={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      form.handleSubmit();
+                      void form.handleSubmit();
                     }}
                   >
                     <RegisterShell.Body>

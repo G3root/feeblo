@@ -23,7 +23,7 @@ describe("FeebloProvider", () => {
     // The test containerStyles override reaches the embed.
     expect(container?.style.width).toBe("2px");
 
-    screen.unmount();
+    await screen.unmount();
     expect(document.getElementById("feeblo-embed-container")).toBeNull();
   });
 
@@ -301,7 +301,7 @@ describe("FeebloProvider", () => {
     postFromWidget({ event: "READY" });
     await expect.element(screen.getByText("ready:yes")).toBeVisible();
 
-    screen.unmount();
+    await screen.unmount();
     expect(document.getElementById("feeblo-embed-container")).toBeNull();
   });
 });

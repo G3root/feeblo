@@ -57,7 +57,7 @@ export function PostBoardField({ disabled = false }: { disabled?: boolean }) {
             return;
           }
 
-          navigate({
+          void navigate({
             to: "/$organizationId/post/$boardSlug/$postSlug",
             params: {
               organizationId,

@@ -68,7 +68,7 @@ function Harness({
       organizationId="organization-id"
       postId="post-1"
       search={(input) => {
-        onSearch(input);
+        void onSearch(input);
         const query = input.query.toLowerCase();
         const fixtures = [member, voter, deferred].filter((contact) =>
           `${contact.name ?? ""} ${contact.email ?? ""}`

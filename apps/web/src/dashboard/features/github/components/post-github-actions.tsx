@@ -301,7 +301,7 @@ function GitHubPostIssueForm({
       onSubmit={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        form.handleSubmit();
+        void form.handleSubmit();
       }}
     >
       <DialogPanel className="grid gap-4">

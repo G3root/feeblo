@@ -14,7 +14,7 @@ export function createFloatingInstance(
   logger?: Logger
 ): () => void {
   return autoUpdate(reference, floating, () => {
-    computePosition(reference, floating, {
+    void computePosition(reference, floating, {
       placement: "bottom",
       middleware: [offset(10), flip({ padding: 8 }), shift({ padding: 8 })],
     }).then(({ x, y }) => {

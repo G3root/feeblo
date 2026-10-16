@@ -417,7 +417,7 @@ export function PostCreateForm() {
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       event.stopPropagation();
-      form.handleSubmit();
+      void form.handleSubmit();
     },
     [form]
   );

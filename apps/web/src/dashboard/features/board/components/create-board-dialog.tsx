@@ -133,7 +133,7 @@ function CreateBoardForm() {
       onSubmit={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        form.handleSubmit();
+        void form.handleSubmit();
       }}
     >
       <SheetPanel className="grid gap-4">

@@ -80,7 +80,7 @@ export function useHomePageFilters({
         nextSearch.sort = sort;
       }
 
-      navigate({
+      void navigate({
         // Board navigation uses the host router's internal `/s` spelling
         // everywhere (`lib/board-links.ts`); the host rewrite hides it from
         // visitors, and it stays correct on a host that also serves the board

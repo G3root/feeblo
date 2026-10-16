@@ -160,6 +160,13 @@ export default defineConfig({
     // snapshot fixtures are pinned to `warn` in the override below.
     "effecttsgo/global-date-in-effect": "error",
 
+    // ADR 0005's console rung. The 26 findings were two human-facing CLIs,
+    // whose `console.log` is the output an operator reads; `Effect.log` would
+    // add fiber ids and timestamps to it. Those two files keep a `warn`
+    // override below, and every other file is `error`, so a service that logs
+    // to the console instead of through its `Logger` fails the gate.
+    "effecttsgo/global-console-in-effect": "error",
+
     // Cleared by composing every layer where its scope lives: production
     // surfaces capture their collaborators at group construction, and tests
     // use `layer`/`it.layer` fixtures (or build the one per-call layer in the
@@ -192,6 +199,14 @@ export default defineConfig({
     "effecttsgo/process-env-in-effect": "error",
     "effecttsgo/schema-sync-in-effect": "error",
 
+    // ADR 0005's floating-promise rung. A promise started in an event handler,
+    // an effect body or a React callback and never awaited is an unhandled
+    // rejection, and the failure surfaces somewhere else. Every site the rule
+    // reported now marks the wait it chose not to take with `void` (the pattern
+    // the tree already used at 27 other sites), returns it, or awaits it; from
+    // here a new float fails the gate instead of warning.
+    "typescript/no-floating-promises": "error",
+
     // anti-slop
     "anti-slop/no-chained-type-assertions": "error",
     "anti-slop/no-conditional-empty-object-spread": "error",
@@ -218,9 +233,20 @@ export default defineConfig({
   // the DB half because it legitimately talks to Postgres.
   overrides: [
     {
-      // A human-facing CLI, not a service: `seed.ts` builds fixture timestamps
-      // for the rows it inserts, and ADR 0005 leaves those 22 sites as the
-      // rule's only remaining findings. Every other file is `error`.
+      // Human-facing CLIs, not services: `seed.ts` prints its progress as it
+      // goes, and `nuke.ts` prints what it removes. `Effect.log` would add
+      // fiber ids and timestamps to output a person reads directly, so the
+      // console rule stays `warn` for both and is `error` everywhere else.
+      files: ["packages/db/seed.ts", "packages/db/nuke.ts"],
+      rules: {
+        "effecttsgo/global-console-in-effect": "warn",
+      },
+    },
+    {
+      // ADR 0005's date rung excepts only `seed.ts`, whose fixture timestamps
+      // for the rows it inserts are the 22 remaining findings. `nuke.ts`
+      // constructs no dates, so it stays under the global `error`: a new
+      // `new Date()` there fails the gate instead of warning.
       files: ["packages/db/seed.ts"],
       rules: {
         "effecttsgo/global-date-in-effect": "warn",

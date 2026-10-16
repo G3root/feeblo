@@ -266,7 +266,7 @@ export function VoterPanel() {
                           if (!upvote.userId) {
                             return;
                           }
-                          handleRemove(upvote.userId);
+                          void handleRemove(upvote.userId);
                         }}
                         size="icon-xs"
                         type="button"

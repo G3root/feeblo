@@ -205,7 +205,7 @@ function ContactCreateForm() {
       onSubmit={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        form.handleSubmit();
+        void form.handleSubmit();
       }}
     >
       <SheetPanel className="grid gap-4">

@@ -169,7 +169,7 @@ export function RoadmapAddColumnButton({
             <Button
               disabled={!nextStatus}
               onClick={() => {
-                onAddColumn(nextStatus);
+                void onAddColumn(nextStatus);
               }}
               size="sm"
               type="button"
