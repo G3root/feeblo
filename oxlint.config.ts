@@ -233,15 +233,22 @@ export default defineConfig({
   // the DB half because it legitimately talks to Postgres.
   overrides: [
     {
-      // Human-facing CLIs, not services: `seed.ts` builds fixture timestamps
-      // for the rows it inserts and prints its progress as it goes, and
-      // `nuke.ts` prints what it removes. ADR 0005 leaves these as the only
-      // sites both rules report, so both stay `warn` here and are `error`
-      // everywhere else; `Effect.log` would add fiber and timestamp noise to
-      // output a person reads directly.
+      // Human-facing CLIs, not services: `seed.ts` prints its progress as it
+      // goes, and `nuke.ts` prints what it removes. `Effect.log` would add
+      // fiber ids and timestamps to output a person reads directly, so the
+      // console rule stays `warn` for both and is `error` everywhere else.
       files: ["packages/db/seed.ts", "packages/db/nuke.ts"],
       rules: {
         "effecttsgo/global-console-in-effect": "warn",
+      },
+    },
+    {
+      // ADR 0005's date rung excepts only `seed.ts`, whose fixture timestamps
+      // for the rows it inserts are the 22 remaining findings. `nuke.ts`
+      // constructs no dates, so it stays under the global `error`: a new
+      // `new Date()` there fails the gate instead of warning.
+      files: ["packages/db/seed.ts"],
+      rules: {
         "effecttsgo/global-date-in-effect": "warn",
       },
     },
