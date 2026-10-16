@@ -10,7 +10,7 @@ import {
   WorkspaceId,
   type LegidOf,
 } from "@feeblo/id";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -749,6 +749,89 @@ describe("integration persistence", () => {
               )
           ).toHaveLength(0);
         })
+    );
+
+    it.effect("records one delivery per matched route in one fan-out", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const recorder = yield* IntegrationEventRecorder;
+        const first = yield* seedRoute();
+        const second = yield* seedRoute({
+          organizationId: first.organizationId,
+        });
+        const input = yield* makePostCreatedEvent;
+        const event = {
+          ...input.event,
+          organizationId: first.organizationId,
+        };
+
+        const result = yield* transaction(
+          recorder.recordIntegrationEvent({ event })
+        );
+
+        expect(result).toEqual({ deliveryCount: 2, eventRecorded: true });
+        const deliveries = yield* db
+          .select()
+          .from(schema.integrationDeliveryTable)
+          .where(eq(schema.integrationDeliveryTable.eventId, event.id));
+        expect(
+          deliveries.map((delivery) => delivery.actionKey).toSorted()
+        ).toEqual(
+          [
+            `${event.id}:${first.routeId}`,
+            `${event.id}:${second.routeId}`,
+          ].toSorted()
+        );
+      })
+    );
+
+    it.effect("claims a batch of due deliveries in one lease round", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const recorder = yield* IntegrationEventRecorder;
+        const repository = yield* makeIntegrationDeliveryWorkerRepository(
+          new Map([["webhook", ["batching.probe"]]]),
+          {}
+        );
+        // A capability no other test uses keeps this claim scoped to this
+        // test's three deliveries, however many earlier tests leave pending.
+        const route = yield* seedRoute({ capabilityKey: "batching.probe" });
+        for (let count = 0; count < 3; count++) {
+          const input = yield* makePostCreatedEvent;
+          yield* transaction(
+            recorder.recordIntegrationEvent({
+              event: { ...input.event, organizationId: route.organizationId },
+            })
+          );
+        }
+
+        const claimed = yield* repository.claimDueDeliveries({
+          leaseDurationMs: 60_000,
+          leaseOwner: "batch-claimer",
+          limit: 10,
+        });
+
+        expect(claimed).toHaveLength(3);
+        expect(
+          claimed.map((delivery) => delivery.input.delivery.attemptCount)
+        ).toEqual([1, 1, 1]);
+        const attempts = yield* db
+          .select({
+            attemptNumber: schema.integrationDeliveryAttemptTable.attemptNumber,
+            deliveryId: schema.integrationDeliveryAttemptTable.deliveryId,
+          })
+          .from(schema.integrationDeliveryAttemptTable)
+          .where(
+            inArray(
+              schema.integrationDeliveryAttemptTable.deliveryId,
+              claimed.map((delivery) => delivery.input.delivery.id)
+            )
+          );
+        expect(attempts).toHaveLength(3);
+        expect(attempts.every((attempt) => attempt.attemptNumber === 1)).toBe(
+          true
+        );
+      })
     );
   });
 });
