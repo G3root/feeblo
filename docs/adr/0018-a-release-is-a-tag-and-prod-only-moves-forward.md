@@ -2,11 +2,11 @@
 
 ## Decision
 
-A release is an annotated tag on `main` plus the GitHub Release that publishes the Docker images. `prod` is a deployment pointer for the dashboard Worker (`apps/web/wrangler.jsonc`, Worker `feeblo`), which Cloudflare's Git integration builds from that branch. It is not a development branch: it only ever moves to the commit of a release tag, and `.github/workflows/promote-prod.yml` is the only thing that moves it. The workflow takes a tag name, refuses it unless the tag's commit is already on `main` and `origin/prod` is an ancestor of it, and then pushes `"${target}:prod"`. Every promotion is therefore a fast-forward.
+A release is a lightweight tag on `main` plus the GitHub Release that publishes the Docker images. `prod` is a deployment pointer for the dashboard Worker (`apps/web/wrangler.jsonc`, Worker `feeblo`), which Cloudflare's Git integration builds from that branch. It is not a development branch: it only ever moves to the commit of a release tag, and `.github/workflows/promote-prod.yml` is the only thing that moves it. The workflow takes a tag name, refuses it unless the name is an exact tag ref, the tag has a published Release, its commit is already on `main`, and `origin/prod` is an ancestor of it, and then pushes `"${target}:prod"`. Every promotion is therefore a fast-forward.
 
 Two repository rulesets hold the invariant. _prod moves forward only_ (target `branch`, `refs/heads/prod`, rules `non_fast_forward` and `deletion`) rejects a rewrite or a delete of the branch even when someone has the permissions to attempt one. _release tags are immutable_ (target `tag`, `refs/tags/v*` and `refs/tags/sdk*`, rules `update` and `deletion`) makes a published tag a fixed point. Neither ruleset blocks creation: tags are still cut by hand.
 
-A rollback is a revert on `main` released as the next patch version — `git revert <sha>`, tag `v1.2.1`, promote it like any other release. `prod` is never rewound and `main` is never rewritten. The inputs of the workflow default to `dry_run: true`, so the first run of a release reports what it would do and a promotion is a second, explicit run.
+A rollback is a revert on `main` released as the next patch version — `git revert <sha>`, tag `v1.2.4` (the next patch after the release being replaced), promote it like any other release. `prod` is never rewound and `main` is never rewritten. The inputs of the workflow default to `dry_run: true`, so the first run of a release reports what it would do and a promotion is a second, explicit run.
 
 ## Why
 
@@ -16,7 +16,7 @@ The invariant is one sentence: `prod` may only ever advance to a commit that is 
 
 ## Consequences
 
-Releasing now ends with one manual run of **Promote prod** after the image is deployed, and the branch can no longer be merged by hand. Because the workflow is `workflow_dispatch`, its button exists only once this file is on the default branch. Publishing a release without promoting it leaves Cloudflare one version behind, which is visible: the deployed Worker commit and `prod` are the same thing.
+Releasing now ends with the two runs of **Promote prod** after the image is deployed — the input defaults to a dry run, so the first reports what would move and the second, with the box cleared, moves it — and the branch can no longer be merged by hand. Because the workflow is `workflow_dispatch`, its button exists only once this file is on the default branch. Publishing a release without promoting it leaves Cloudflare one version behind, which is visible: the deployed Worker commit and `prod` are the same thing.
 
 Cloudflare's own deployment history is the fast rollback lever, and the git-visible truth is a revert released as the next patch. A rollback also means old code against a newer schema, because the server image runs `packages/db-migrator` before `apps/server` starts, so a migration has to be expand-only for one release — add and backfill in release N, remove in N+1 — for the rollback to be a real option rather than a crash loop.
 

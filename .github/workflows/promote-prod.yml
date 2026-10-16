@@ -54,12 +54,24 @@ jobs:
       - name: Verify the tag is on main and prod can fast-forward to it
         env:
           TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           git fetch origin main prod --tags --quiet
-          git rev-parse --verify "refs/tags/${TAG}" >/dev/null \
-            || { echo "::error::${TAG} does not exist"; exit 1; }
 
-          target="$(git rev-parse "${TAG}^{commit}")"
+          # `git rev-parse --verify` accepts revision syntax, so `v1.2.0~1` or
+          # `v1.2.0^{commit}` would pass it and resolve a commit no tag points
+          # at. `git show-ref --verify` matches the ref name exactly, and the
+          # peel stays anchored to the validated `refs/tags/` name.
+          git show-ref --verify --quiet "refs/tags/${TAG}" 2>/dev/null \
+            || { echo "::error::${TAG} is not an exact tag ref name"; exit 1; }
+          target="$(git rev-parse "refs/tags/${TAG}^{commit}")" \
+            || { echo "::error::${TAG} does not point at a commit"; exit 1; }
+
+          # The Docker images are published on `release: published`, so a tag
+          # with no Release has no image to deploy.
+          gh release view "${TAG}" >/dev/null \
+            || { echo "::error::${TAG} has no published GitHub Release"; exit 1; }
+
           git merge-base --is-ancestor "$target" origin/main \
             || { echo "::error::${TAG} is not on main, so promoting it would fork prod off main"; exit 1; }
           git merge-base --is-ancestor origin/prod "$target" \
