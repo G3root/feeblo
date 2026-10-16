@@ -100,9 +100,9 @@ const makeIntegrationEventRecorder = Effect.gen(function* () {
       type: event.type,
       version: event.version,
     });
-    // One event fans out to every matched route; the delivery rows share the
-    // event's insert so a route count never costs that many round trips inside
-    // the caller's transaction.
+    // One event fans out to every matched route, and the delivery rows are
+    // written as batched inserts in the caller's transaction rather than one
+    // round trip per route.
     const deliveries = yield* Effect.forEach(matched, (route) =>
       IntegrationDeliveryId.generate.pipe(
         Effect.map((id) => ({
@@ -118,7 +118,20 @@ const makeIntegrationEventRecorder = Effect.gen(function* () {
         }))
       )
     );
-    yield* db.insert(schema.integrationDeliveryTable).values(deliveries);
+    // Each `VALUES` row binds one parameter per column, and Postgres rejects a
+    // statement past 65,535 parameters. Route fan-out has no bound, so the
+    // rows go in fixed-size chunks inside the same transaction: a fan-out past
+    // the chunk size costs one extra statement, not one per route.
+    const DELIVERY_INSERT_CHUNK = 500;
+    for (
+      let offset = 0;
+      offset < deliveries.length;
+      offset += DELIVERY_INSERT_CHUNK
+    ) {
+      yield* db
+        .insert(schema.integrationDeliveryTable)
+        .values(deliveries.slice(offset, offset + DELIVERY_INSERT_CHUNK));
+    }
     return { deliveryCount: matched.length, eventRecorded: true };
   });
   return {
