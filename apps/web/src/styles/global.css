@@ -44,6 +44,30 @@
   line-height: 0;
 }
 
+/*
+ * Auth actions before the session resolves.
+ *
+ * A public board document is shared (see the cache policy in `s/route.tsx`),
+ * so the server cannot render the visitor's identity: every document ships
+ * both a "Sign in" button and a neutral account slot. The `authHintScript`
+ * pre-hydration script reads the display-only hint cookie and marks <html>
+ * with `data-auth`, and these rules pick a variant before React hydrates —
+ * otherwise a signed-in visitor watches "Sign in" until the session
+ * resolves. The slot attributes exist only while the session is loading, so a
+ * stale hint can never hide the button once a resolution says otherwise.
+ */
+[data-auth-slot="account"] {
+  display: none;
+}
+html[data-auth="hint"] [data-auth-slot="sign-in"],
+html[data-auth="exchanging"] [data-auth-slot="sign-in"] {
+  display: none;
+}
+html[data-auth="hint"] [data-auth-slot="account"],
+html[data-auth="exchanging"] [data-auth-slot="account"] {
+  display: flex;
+}
+
 .skeleton-loader > *,
 .skeleton-loader::after,
 .skeleton-loader::before {

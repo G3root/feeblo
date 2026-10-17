@@ -9,6 +9,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { useEffect, type ReactNode } from "react";
 
 import {
+  authHintScript,
   envScript,
   localeScript,
   themeScript,
@@ -34,7 +35,10 @@ import "../styles/global.css";
  * The pre-hydration scripts (`ScriptOnce`) replace the Astro layout's
  * `ThemeScript`/`LocaleScript`/`EnvScript` includes: theme and locale must be
  * applied before first paint, and `window.global.__ENV` must exist before the
- * client entry reads it. The values come from the root loader, which is a
+ * client entry reads it. `authHintScript` has no Astro counterpart — the old
+ * layouts painted a server-verified hint into a client-only app, and this is
+ * its replacement now that the board's document is server-rendered and
+ * shared. The env and locale values come from the root loader, which is a
  * server function — on Workers env is request-scoped, so it cannot be read at
  * module scope.
  *
@@ -98,6 +102,7 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
         ) : null}
         <HeadContent />
         <ScriptOnce children={clientHintCheckScript} />
+        <ScriptOnce children={authHintScript()} />
         <ScriptOnce children={envScript(env)} />
         <ScriptOnce children={themeScript} />
         <ScriptOnce children={localeScript()} />
