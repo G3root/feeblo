@@ -400,7 +400,10 @@ function PostPageContent({
             <PostPageActions />
 
             <div className="flex items-start gap-4 sm:gap-6">
-              <div className="shrink-0 pt-1">
+              {/* The leading vote column indents the whole article by its
+                  width plus the gap, which costs a phone more than it earns;
+                  below `sm` the vote moves into the reactions row instead. */}
+              <div className="hidden shrink-0 pt-1 sm:block">
                 <ComposedPostPage.CompactVote />
               </div>
 
@@ -411,7 +414,14 @@ function PostPageContent({
 
                 <ComposedPostPage.Content />
 
-                <ComposedPostPage.Reactions />
+                {/* Mobile-only placement, parallel to the dashboard's post
+                    detail: reactions on the left, vote on the right. */}
+                <div className="flex items-center justify-between gap-3">
+                  <ComposedPostPage.Reactions />
+                  <div className="shrink-0 sm:hidden">
+                    <ComposedPostPage.CompactVote />
+                  </div>
+                </div>
 
                 <div className="space-y-4">
                   <ComposedPostPage.PublicCommentComposer />
