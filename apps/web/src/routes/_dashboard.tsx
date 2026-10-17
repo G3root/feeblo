@@ -8,6 +8,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 import { getLocale, setLocale } from "@/paraglide/runtime.js";
+import { DashboardPendingShell } from "~/components/dashboard-pending-shell";
 import {
   PostHogIdentify,
   PostHogProvider,
@@ -38,6 +39,10 @@ export const Route = createFileRoute("/_dashboard")({
   beforeLoad: dashboardAuthBeforeLoad,
   head: () => ({ meta: [{ title: "Dashboard" }] }),
   component: DashboardBoundary,
+  // The boundary owns the full-page loader: it runs before the layout (and its
+  // provider stack) exists, so per-route loading cannot cover it. The router's
+  // default covers the routes inside the mounted shell instead.
+  pendingComponent: DashboardPendingShell,
 });
 
 function DashboardBoundary() {

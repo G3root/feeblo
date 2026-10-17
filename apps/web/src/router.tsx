@@ -4,7 +4,7 @@ import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { routerWithDbClient } from "@tanstack/react-router-with-db";
 import { createIsomorphicFn } from "@tanstack/react-start";
 
-import { DashboardPendingShell } from "./dashboard/components/dashboard-pending-shell";
+import { DashboardRoutePending } from "./dashboard/components/dashboard-route-pending";
 import { getContext } from "./dashboard/integrations/tanstack-query/root-provider";
 import { getDbClient } from "./lib/db-client";
 import {
@@ -57,17 +57,21 @@ export function getRouter() {
     rewrite: createPublicBoardRewrite(
       getRootDomain
     ) satisfies PublicBoardRewrite,
-    defaultPendingComponent: DashboardPendingShell,
+    // The per-route placeholder: it renders inside whichever layout is
+    // already mounted, so a slow navigation keeps the shell and swaps only
+    // the content area. The full-page loader is `DashboardPendingShell`, owned
+    // by the `_dashboard` and `_dashboard-layout` routes.
+    defaultPendingComponent: DashboardRoutePending,
     // The dashboard inherits the router's `pendingMinMs: 500` default, which
     // holds the route commit for 500ms after the data is already ready. That
     // hold is pure wait here, because the flash it guards against cannot
     // happen on either load path:
     //
-    //   - Cold loads render the skeleton server-side, so it is on screen from
-    //     first paint for the whole load — it can never flash late.
+    //   - Cold loads render the shell loader server-side, so it is on screen
+    //     from first paint for the whole load — it can never flash late.
     //   - Client-side navigations measured 24-66ms (median 39ms) across the
     //     dashboard, 15-40x below the 1s `defaultPendingMs` gate, so the
-    //     skeleton never appears at all.
+    //     pending component never appears at all.
     //
     // The paid cost is `max(0, pendingMinMs - elapsed)` on every load: measured
     // ~380ms at the 500ms default, and 0 here. Median time-to-content over 5
