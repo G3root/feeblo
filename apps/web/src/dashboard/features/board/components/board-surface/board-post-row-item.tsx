@@ -47,7 +47,7 @@ export function BoardPostRowItem({
       />
 
       <Link
-        className="flex min-w-0 flex-1 items-center justify-between gap-3"
+        className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
         params={{
           organizationId,
           boardSlug: post.boardSlug,
@@ -69,7 +69,32 @@ export function BoardPostRowItem({
             {post.title}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-3">
+
+        {/* Phones stack the row the way the home card does: the author and
+            board move to their own line instead of squeezing the title. */}
+        <div className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs sm:hidden">
+          <UserAvatar
+            className="size-5"
+            image={post.user.image}
+            isMember={post.authorIsMember}
+            memberLabel={m.sad_soft_tadpole()}
+            name={post.user.name}
+            size="sm"
+          />
+          <span className="truncate">
+            {post.user.name ?? m.active_equal_hedgehog()}
+          </span>
+          {post.boardName ? (
+            <>
+              <span aria-hidden="true" className="text-border">
+                ·
+              </span>
+              <span className="truncate">{post.boardName}</span>
+            </>
+          ) : null}
+        </div>
+
+        <div className="hidden shrink-0 items-center gap-3 sm:flex">
           {post.boardName ? (
             <span className="bg-muted/70 text-muted-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">
               {post.boardName}

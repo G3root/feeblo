@@ -35,7 +35,7 @@ export function PostPageSkeleton() {
           <Skeleton className="h-10 w-full" />
         </section>
       </div>
-      <aside className="px-6 py-6">
+      <aside className="px-4 py-6 md:px-6">
         <Skeleton className="h-40 w-full" />
       </aside>
     </div>

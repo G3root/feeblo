@@ -728,7 +728,7 @@ function InviteMemberForm() {
 
   return (
     <form
-      className="grid grid-cols-[1fr_180px_auto] gap-2"
+      className="grid gap-2 sm:grid-cols-[1fr_180px_auto]"
       onSubmit={(event) => {
         event.preventDefault();
         event.stopPropagation();
