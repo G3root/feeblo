@@ -420,6 +420,84 @@ test("the board document language follows the locale cookie before hydration", a
   }
 });
 
+test("a signed-in visitor never paints the sign-in button while the session resolves", async ({
+  browser,
+  page,
+}) => {
+  const user = createTestUser();
+  await createAuthenticatedWorkspace(page, user);
+  const boardUrl = publicBoardUrl(user.workspaceName);
+
+  const visitorContext = await browser.newContext();
+  const visitorPage = await visitorContext.newPage();
+
+  try {
+    // Sign in once so the board host holds both the session and the
+    // display-only hint cookie the pre-hydration script reads.
+    await visitorPage.goto(boardUrl);
+    await waitForHydration(visitorPage);
+    await signInThroughPublicBoard(visitorPage, user.email, user.password);
+
+    // With the app's JS blocked, only the server document and the inline
+    // pre-hydration scripts remain: what is painted then is the anti-flash
+    // contract. The document still contains the anonymous button, but the
+    // hint cookie already says otherwise, so the button must not be the
+    // thing that paints.
+    await visitorPage.route("**/*.js", (route) => route.abort());
+    await visitorPage.goto(boardUrl, { waitUntil: "domcontentloaded" });
+
+    await expect(visitorPage.locator("html")).toHaveAttribute(
+      "data-auth",
+      "hint"
+    );
+    await expect(
+      visitorPage.getByRole("button", { name: authButtonName })
+    ).toBeHidden();
+    await expect(
+      visitorPage.locator('[data-auth-slot="account"]')
+    ).toBeVisible();
+
+    // Now with the app running but the session probe held open: the hint
+    // has to carry the navbar through the in-flight request, and the probe's
+    // late answer must not flip the rendered result.
+    await visitorPage.unroute("**/*.js");
+    let releaseProbe!: () => void;
+    const probeGate = new Promise<void>((resolve) => {
+      releaseProbe = resolve;
+    });
+    await visitorPage.route("**/api/auth/get-session**", async (route) => {
+      await probeGate;
+      await route.continue();
+    });
+    await visitorPage.goto(boardUrl);
+    await waitForHydration(visitorPage);
+
+    await expect(
+      visitorPage.getByRole("button", { name: "User menu" })
+    ).toBeVisible();
+    await expect(
+      visitorPage.getByRole("button", { name: authButtonName })
+    ).toBeHidden();
+
+    releaseProbe();
+    await expect(
+      visitorPage.getByRole("button", { name: "User menu" })
+    ).toBeVisible();
+    await expect(
+      visitorPage.getByRole("button", { name: authButtonName })
+    ).toBeHidden();
+
+    // Only the fragment-derived `exchanging` marker is cleared; a hint from
+    // the cookie still describes the document.
+    await expect(visitorPage.locator("html")).toHaveAttribute(
+      "data-auth",
+      "hint"
+    );
+  } finally {
+    await visitorContext.close();
+  }
+});
+
 test(
   "board navigation stays on the board",
   { tag: "@critical" },

@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
+import { DashboardPendingShell } from "~/components/dashboard-pending-shell";
 import { DashboardLayout } from "~/layouts/dashboard-layout";
 import { dashboardCollections } from "~/lib/collections";
 
@@ -19,6 +20,9 @@ export const Route = createFileRoute(
     return null;
   },
   component: DashboardLayoutComponent,
+  // Hold the shell-shaped loader through the layout's own preloads, so the
+  // sidebar never appears after the content it frames.
+  pendingComponent: DashboardPendingShell,
 });
 
 function DashboardLayoutComponent() {

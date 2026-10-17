@@ -16,6 +16,7 @@ import {
   removeSsoTokenFromHash,
 } from "@feeblo/public-feature-board/sso-token";
 import { AnchoredToastProvider, ToastProvider } from "@feeblo/ui/toast";
+import { hasWindow } from "@feeblo/utils/runtime-kind";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import { AuthProvider } from "@feeblo/web-shared/auth-context";
 import {
@@ -38,7 +39,7 @@ import {
 } from "@tanstack/react-router";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { getPublicBoardPage } from "@/lib/public-board-data";
 import { getLocale, setLocale } from "@/paraglide/runtime.js";
@@ -278,60 +279,103 @@ function initBoardI18n() {
  * server renders the anonymous board and the visitor upgrades to their
  * restricted session a moment later. The token is stripped from history
  * immediately so a refresh cannot replay it.
+ *
+ * Returns whether an exchange is in flight. `AuthProvider` must keep reporting
+ * `loading` while it is: the atom's signed-out answer is already stale — the
+ * token says a session is coming — and painting the navbar from it would show
+ * a sign-in button for the several round trips the exchange takes.
  */
-function useBoardSsoToken(organizationId: string | undefined) {
+function useBoardSsoToken(organizationId: string | undefined): boolean {
+  // Read the fragment once, during the first render. The effect below strips
+  // it, and `window.location` is mutable browser state the effect does not
+  // depend on: re-reading it on a later pass (StrictMode's double-invoke, a
+  // future dependency) would find no token and end the pending state while the
+  // first exchange is still in flight — exactly the flash this hook prevents.
+  const [token] = useState(() =>
+    hasWindow() ? getSsoTokenFromHash(window.location.hash) : null
+  );
+  const [reconciliationSettled, setReconciliationSettled] = useState(false);
+  const reconciliationStartedFor = useRef<string | undefined>(undefined);
+
+  // Derived during render, not set from the effect: the token is known at
+  // first render, so the navbar is already in its pending state before any
+  // effect runs. The server has no `window` and reports `false`, but hydration
+  // renders `loading` either way, so the difference never reaches the markup.
+  const isExchanging =
+    organizationId !== undefined && token !== null && !reconciliationSettled;
+
   useEffect(() => {
-    if (!organizationId) {
+    if (
+      organizationId === undefined ||
+      reconciliationStartedFor.current === organizationId
+    ) {
       return;
     }
-
-    const url = new URL(window.location.href);
-    const token = getSsoTokenFromHash(url.hash);
+    reconciliationStartedFor.current = organizationId;
 
     if (token !== null) {
+      const url = new URL(window.location.href);
       url.hash = removeSsoTokenFromHash(url.hash);
       window.history.replaceState(window.history.state, "", url);
     }
 
     void (async () => {
-      const session = await getAuthSession();
-      const restrictedToOrganizationId =
-        session?.user.restrictedToOrganizationId;
+      try {
+        const session = await getAuthSession();
+        const restrictedToOrganizationId =
+          session?.user.restrictedToOrganizationId;
 
-      if (
-        restrictedToOrganizationId &&
-        restrictedToOrganizationId !== organizationId
-      ) {
-        // A session restricted to another board must not act here — discard
-        // it first. The stale restriction says nothing about the token
-        // itself, though: after the sign-out a present token may still claim
-        // this visit, so fall through to the exchange.
-        await authClient.signOut();
-        await refreshAuthSession();
-        if (token === null) {
-          return;
-        }
-      }
-
-      if (
-        token !== null &&
-        session?.user.restrictedToOrganizationId !== organizationId
-      ) {
-        const result = await authClient.signIn.jwtAutoLogin({
-          organizationId,
-          token,
-        });
-
-        if (result.error) {
-          // Staying signed out is the safe outcome for a rejected token; the
-          // visitor can still use the regular sign-in dialog.
-          return;
+        if (
+          restrictedToOrganizationId &&
+          restrictedToOrganizationId !== organizationId
+        ) {
+          // A session restricted to another board must not act here — discard
+          // it first. The stale restriction says nothing about the token
+          // itself, though: after the sign-out a present token may still claim
+          // this visit, so fall through to the exchange.
+          await authClient.signOut();
+          await refreshAuthSession();
         }
 
-        await refreshAuthSession();
+        if (
+          token !== null &&
+          session?.user.restrictedToOrganizationId !== organizationId
+        ) {
+          const result = await authClient.signIn.jwtAutoLogin({
+            organizationId,
+            token,
+          });
+
+          if (result.error) {
+            // Staying signed out is the safe outcome for a rejected token; the
+            // visitor can still use the regular sign-in dialog.
+            return;
+          }
+
+          await refreshAuthSession();
+        }
+      } finally {
+        setReconciliationSettled(true);
       }
     })().catch(() => undefined);
-  }, [organizationId]);
+  }, [organizationId, token]);
+
+  // The fragment-derived marker only describes an in-flight exchange, so drop
+  // it once the exchange settles. This runs from an effect rather than the
+  // exchange's `finally`: that update commits asynchronously, and clearing
+  // the marker before React replaces the loading branch would expose the
+  // sign-in button for the frames in between. The cookie-derived `hint`
+  // value still describes the document and is left alone.
+  useEffect(() => {
+    if (
+      !isExchanging &&
+      document.documentElement.dataset.auth === "exchanging"
+    ) {
+      delete document.documentElement.dataset.auth;
+    }
+  }, [isExchanging]);
+
+  return isExchanging;
 }
 
 function BoardLayout() {
@@ -347,14 +391,14 @@ function BoardLayout() {
   // the route's data here. A parent renders before its children, so every
   // collection materialized below reads a filled scope.
   setBoardOrganizationId(dbClient, organizationId);
-  useBoardSsoToken(organizationId);
+  const isSsoExchanging = useBoardSsoToken(organizationId);
 
   if (boardPage.kind !== "found") {
     return <BoardUnavailablePage />;
   }
 
   return (
-    <AuthProvider hydrationSafe>
+    <AuthProvider hydrationSafe transitionPending={isSsoExchanging}>
       <AuthDialogProvider>
         {/* The board's RPC-backed collections own their QueryClient, but
             `post-ui` surfaces (notifications, suggestions) read cache state

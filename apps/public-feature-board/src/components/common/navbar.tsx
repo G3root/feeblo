@@ -101,19 +101,45 @@ function NavTab({ href, label }: { href: string; label: string }) {
 function UserActions() {
   const site = useSite();
   const auth = useAuth();
-  const isAuthenticated = auth.status === "authenticated";
 
   return (
     <div className="flex items-center gap-2">
       <LocaleSwitcher />
-      {isAuthenticated ? (
+      {auth.status === "loading" ? <AuthActionsPending /> : null}
+      {auth.status === "authenticated" ? (
         <>
           <NotificationsMenu organizationId={site.organizationId} />
           <UserMenu />
         </>
-      ) : (
-        <AuthButton />
-      )}
+      ) : null}
+      {auth.status === "unauthenticated" ? <AuthButton /> : null}
     </div>
+  );
+}
+
+/**
+ * The auth actions while the session is unknown: the signed-out button and a
+ * neutral account slot ship together, because a public board document is
+ * shared and cannot carry a visitor's identity. The document's pre-hydration
+ * script marks `<html data-auth>` from the display-only hint cookie (or a
+ * pending SSO exchange), and the matching rules in
+ * `apps/web/src/styles/global.css` reveal one before React runs. The slot
+ * attributes live only in this branch, so a stale hint can never hide the
+ * button once the session actually resolves.
+ */
+function AuthActionsPending() {
+  return (
+    <>
+      <span className="flex items-center" data-auth-slot="sign-in">
+        <AuthButton />
+      </span>
+      <span
+        aria-hidden="true"
+        className="flex items-center py-1 pr-2 pl-1"
+        data-auth-slot="account"
+      >
+        <span className="bg-muted size-8 animate-pulse rounded-full" />
+      </span>
+    </>
   );
 }

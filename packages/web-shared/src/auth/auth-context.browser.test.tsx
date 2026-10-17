@@ -123,6 +123,36 @@ describe("AuthProvider session revalidation", () => {
     expect(document.cookie).toContain("fresh%40example.com");
   });
 
+  it("keeps a pending transition from leaking the atom's resolution", async () => {
+    const getSession = vi.fn(async () => ({
+      data: {
+        user: { email: "person@example.com", image: null, name: "Person" },
+      },
+      error: null,
+    }));
+    overrideSessionGetterForTests(getSession);
+
+    const screen = await render(
+      <AuthProvider registry={AtomRegistry.make()} transitionPending>
+        <AuthProbe />
+      </AuthProvider>
+    );
+
+    // The atom's request resolves, and React processes that update...
+    await expect.poll(() => getSession.mock.calls.length).toBe(1);
+    await vi.waitFor(() => {
+      expect(screen.getByText("loading").query()).not.toBeNull();
+    });
+
+    // ...but the transition flag, not the stale result, owns the reported
+    // state until the caller clears it.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.getByText("loading").query()).not.toBeNull();
+    expect(
+      screen.getByText("authenticated:person@example.com").query()
+    ).toBeNull();
+  });
+
   it("clears the hint cookie after a confirmed sign-out", async () => {
     writeAuthHintToCookie({
       email: "cached@example.com",

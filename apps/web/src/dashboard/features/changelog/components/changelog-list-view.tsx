@@ -29,13 +29,16 @@ type TChangelogListItem = {
   };
 };
 
+// Narrow screens keep the title and status — the two columns that answer
+// "what is it" and "where is it" — and drop the rest. The table can still
+// scroll horizontally, but six columns on a phone leaves every cell clipped.
 const headItems = [
-  "Title",
-  "Category",
-  "Author",
-  "Status",
-  "Publish date",
-  "Updated",
+  { label: "Title", className: "" },
+  { label: "Category", className: "hidden sm:table-cell" },
+  { label: "Author", className: "hidden md:table-cell" },
+  { label: "Status", className: "" },
+  { label: "Publish date", className: "hidden md:table-cell" },
+  { label: "Updated", className: "hidden sm:table-cell" },
 ];
 
 export function ChangelogListView({
@@ -90,8 +93,8 @@ export function ChangelogListView({
         <TableHeader>
           <TableRow>
             {headItems.map((item) => (
-              <TableHead key={item}>
-                <SkeletonWrapper>{item}</SkeletonWrapper>
+              <TableHead className={item.className} key={item.label}>
+                <SkeletonWrapper>{item.label}</SkeletonWrapper>
               </TableHead>
             ))}
           </TableRow>
@@ -109,7 +112,9 @@ export function ChangelogListView({
 
             return (
               <TableRow key={changelog.id}>
-                <TableCell>
+                {/* The table cell default is `nowrap`; a long title would
+                    otherwise force the table wider than a phone screen. */}
+                <TableCell className="whitespace-normal">
                   <Link
                     params={{ organizationId, changelogSlug: changelog.slug }}
                     to="/$organizationId/changelog/edit/$changelogSlug"
@@ -117,7 +122,7 @@ export function ChangelogListView({
                     {changelog.title}
                   </Link>
                 </TableCell>
-                <TableCell>
+                <TableCell className="hidden sm:table-cell">
                   {changelogCategories.length > 0 ? (
                     <span className="flex flex-wrap gap-1.5">
                       {changelogCategories.map((category) => (
@@ -142,17 +147,21 @@ export function ChangelogListView({
                     <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
-                <TableCell>{changelog.user.name ?? "Unknown"}</TableCell>
+                <TableCell className="hidden md:table-cell">
+                  {changelog.user.name ?? "Unknown"}
+                </TableCell>
                 <TableCell>
                   <ChangelogStatusBadge status={changelog.status} />
                 </TableCell>
-                <TableCell>
+                <TableCell className="hidden md:table-cell">
                   {formatPublishDate(
                     changelog.publishedAt,
                     changelog.scheduledAt
                   )}
                 </TableCell>
-                <TableCell>{formatDate(changelog.updatedAt)}</TableCell>
+                <TableCell className="hidden sm:table-cell">
+                  {formatDate(changelog.updatedAt)}
+                </TableCell>
               </TableRow>
             );
           })}
