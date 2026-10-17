@@ -91,9 +91,11 @@ const hintState = (hint: AuthUser | null): AuthState | null =>
 function AuthProviderClient({
   children,
   hydrationSafe,
+  transitionPending,
 }: {
   readonly children: React.ReactNode;
   readonly hydrationSafe: boolean;
+  readonly transitionPending: boolean;
 }) {
   const resolved = useResolvedAuth();
   // Read once per mount: the cookie only changes through the atom itself, so
@@ -102,7 +104,9 @@ function AuthProviderClient({
   // In hydration-safe mode the hint is read *after* mount instead: a server
   // render has no session and therefore renders the anonymous variant, and the
   // first client render has to agree with that HTML before the hint can take
-  // over. The flip costs one frame, not a request.
+  // over. The flip costs one frame, not a request; surfaces that would show a
+  // wrong variant during it (the public board's navbar) paint a neutral
+  // placeholder from the document's pre-hydration `data-auth` attribute.
   const [initialHint, setInitialHint] = useState<AuthUser | null>(() =>
     hydrationSafe ? null : readAuthHintFromCookie()
   );
@@ -113,13 +117,20 @@ function AuthProviderClient({
     }
   }, [hydrationSafe]);
 
-  const state = useMemo<AuthState>(
-    () =>
-      resolved.status === "loading"
-        ? (hintState(initialHint) ?? resolved)
-        : resolved,
-    [initialHint, resolved]
-  );
+  const state = useMemo<AuthState>(() => {
+    // A transition (an SSO token exchange, say) is an authentication event
+    // the atom cannot know about yet: its current answer predates it, and a
+    // signed-out result would paint the wrong UI for the round trips the
+    // transition takes. Report loading — and withhold the hint — until the
+    // caller clears the flag after refreshing the session.
+    if (transitionPending) {
+      return loadingAuthState;
+    }
+
+    return resolved.status === "loading"
+      ? (hintState(initialHint) ?? resolved)
+      : resolved;
+  }, [initialHint, resolved, transitionPending]);
 
   return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>;
 }
@@ -128,6 +139,7 @@ export function AuthProvider({
   children,
   registry = authAtomRegistry,
   hydrationSafe = false,
+  transitionPending = false,
 }: {
   readonly children: React.ReactNode;
   /** Test seam: defaults to the shared app-wide registry. */
@@ -138,6 +150,14 @@ export function AuthProvider({
    * surfaces containing auth-dependent UI (the public board).
    */
   readonly hydrationSafe?: boolean;
+  /**
+   * Set while a client-side authentication transition (an SSO token exchange,
+   * for example) is in flight. The atom's current result predates it, so the
+   * provider reports `loading` until the caller clears the flag; without it, a
+   * stale signed-out result would paint and then flip. Set by hosts that can
+   * start an exchange, like the public board's `useBoardSsoToken`.
+   */
+  readonly transitionPending?: boolean;
 }) {
   if (!hasWindow()) {
     return (
@@ -149,7 +169,10 @@ export function AuthProvider({
 
   return (
     <RegistryContext.Provider value={registry}>
-      <AuthProviderClient hydrationSafe={hydrationSafe}>
+      <AuthProviderClient
+        hydrationSafe={hydrationSafe}
+        transitionPending={transitionPending}
+      >
         {children}
       </AuthProviderClient>
     </RegistryContext.Provider>

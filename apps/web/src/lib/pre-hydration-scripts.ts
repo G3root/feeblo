@@ -1,3 +1,5 @@
+import { AUTH_HINT_COOKIE_NAME } from "@feeblo/web-shared/auth-hint-cookie";
+
 import {
   baseLocale,
   cookieName,
@@ -69,4 +71,50 @@ export function envScript(env: Record<string, string | undefined>): string {
 
   return `window.global = window.global || {};
 window.global.__ENV = ${serialized};`;
+}
+
+/**
+ * The auth anti-flash script (no Astro counterpart: the old layouts painted a
+ * server-verified hint into a client-only app instead).
+ *
+ * The public board's document is shared — only the locale cookie can make it
+ * private — so the server cannot render a visitor's identity: every document
+ * ships both a signed-out button and a neutral account slot. Reading the
+ * display-only hint cookie here, before first paint, lets the CSS in
+ * `global.css` pick the right variant while React is still loading, so a
+ * signed-in visitor never watches "Sign in" until hydration replaces it.
+ *
+ * `data-auth` names the window, not the visitor: `hint` when the cookie
+ * carries an identity, `exchanging` when the URL fragment carries an SSO token
+ * whose exchange is still in flight. A malformed payload paints the
+ * signed-out variant, and the atom's authoritative response always wins.
+ */
+export function authHintScript(): string {
+  return `(function () {
+  var hash = window.location.hash;
+  if (hash && new URLSearchParams(hash.slice(1)).has("ssoToken")) {
+    document.documentElement.dataset.auth = "exchanging";
+    return;
+  }
+  var name = ${JSON.stringify(AUTH_HINT_COOKIE_NAME)} + "=";
+  var entry = document.cookie.split("; ").find(function (cookie) {
+    return cookie.indexOf(name) === 0;
+  });
+  if (!entry) {
+    return;
+  }
+  try {
+    var parsed = JSON.parse(decodeURIComponent(entry.slice(name.length)));
+    var user = parsed && parsed.user;
+    if (
+      parsed && parsed.v === 1 && user &&
+      typeof user.email === "string" && typeof user.name === "string"
+    ) {
+      document.documentElement.dataset.auth = "hint";
+    }
+  } catch (error) {
+    // Malformed or stale payloads paint the signed-out variant; the atom
+    // reconciles from its own response.
+  }
+})();`;
 }

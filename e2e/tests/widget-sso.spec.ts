@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { expect, test } from "../fixtures";
 import { createAuthenticatedWorkspace } from "../helpers/auth";
+import { waitForHydration } from "../helpers/hydration";
+import { assertNoPageErrors, trackPageErrors } from "../helpers/page-errors";
 import { setPlan } from "../helpers/set-plan";
 import { createTestUser } from "../helpers/test-users";
 import { apiUrl, publicBoardUrl, webUrl } from "../helpers/urls";
@@ -13,6 +15,103 @@ import {
 
 const organizationIdPattern = /^org_/;
 const ssoTokenPattern = /ssoToken/;
+
+test("an SSO visitor never paints the sign-in button while the token exchanges", async ({
+  browser,
+  page,
+}) => {
+  const owner = createTestUser();
+  const workspace = await createAuthenticatedWorkspace(page, owner);
+  const organizationId = new URL(workspace.organizationUrl).pathname
+    .split("/")
+    .find(Boolean);
+
+  if (!organizationId) {
+    throw new Error("Workspace URL did not contain an organization id");
+  }
+
+  await setPlan(page.request, { organizationId, plan: "starter" });
+  const secret = await copyWorkspaceJwtSecret(page, organizationId);
+
+  const token = signWidgetToken(
+    secret,
+    {
+      userId: `visitor-${randomUUID().slice(0, 12)}`,
+      name: "SSO Flash Visitor",
+      email: `sso-flash-${randomUUID().slice(0, 12)}@feeblo.dev`,
+    },
+    organizationId
+  );
+
+  const boardUrl = publicBoardUrl(owner.workspaceName);
+  const visitorContext = await browser.newContext();
+  const visitorPage = await visitorContext.newPage();
+  trackPageErrors(visitorPage);
+
+  try {
+    // Hold both legs of the exchange open: the session probe's answer is what
+    // would otherwise paint the signed-out navbar, and the token exchange is
+    // what proves the probe's answer is already stale.
+    let releaseSession!: () => void;
+    const sessionGate = new Promise<void>((resolve) => {
+      releaseSession = resolve;
+    });
+    let releaseExchange!: () => void;
+    const exchangeGate = new Promise<void>((resolve) => {
+      releaseExchange = resolve;
+    });
+    await visitorPage.route("**/api/auth/get-session**", async (route) => {
+      await sessionGate;
+      await route.continue();
+    });
+    await visitorPage.route(
+      "**/api/auth/sign-in/jwt-auto-login",
+      async (route) => {
+        await exchangeGate;
+        await route.continue();
+      }
+    );
+
+    const exchangeStarted = visitorPage.waitForRequest(
+      "**/api/auth/sign-in/jwt-auto-login"
+    );
+
+    await visitorPage.goto(
+      `${boardUrl}/#ssoToken=${encodeURIComponent(token)}`
+    );
+    await waitForHydration(visitorPage);
+
+    await expect(visitorPage.locator("html")).toHaveAttribute(
+      "data-auth",
+      "exchanging"
+    );
+
+    // Let the session probe answer `null` while the token exchange is still
+    // in flight. Issuing the exchange request proves that answer has landed:
+    // a navbar driven by the atom alone would now paint the sign-in button.
+    releaseSession();
+    await exchangeStarted;
+
+    await expect(
+      visitorPage.getByRole("button", { name: "Sign in / Sign up" })
+    ).toBeHidden();
+    await expect(
+      visitorPage.locator('[data-auth-slot="account"]')
+    ).toBeVisible();
+
+    releaseExchange();
+    await expect(
+      visitorPage.getByRole("button", { name: "User menu" })
+    ).toBeVisible();
+    await expect(
+      visitorPage.getByRole("button", { name: "Sign in / Sign up" })
+    ).toBeHidden();
+
+    await assertNoPageErrors(visitorPage);
+  } finally {
+    await visitorContext.close();
+  }
+});
 
 test(
   "identified users can submit widget feedback and sign in with SSO",

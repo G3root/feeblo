@@ -21,7 +21,12 @@ import * as Schema from "effect/Schema";
 //   it purely as a paint optimization that the atom's response replaces.
 // ---------------------------------------------------------------------------
 
-const HINT_COOKIE_NAME = "feeblo_auth_hint";
+/**
+ * The cookie name is shared with the document's pre-hydration script
+ * (`apps/web/src/lib/pre-hydration-scripts.ts`), which reads it before React
+ * hydrates so the navbar can paint the hinted variant in the first frame.
+ */
+export const AUTH_HINT_COOKIE_NAME = "feeblo_auth_hint";
 
 /** Display identity persisted for anti-flash painting; never authorization. */
 export interface AuthHintUser {
@@ -73,7 +78,7 @@ export function writeAuthHintToCookie(user: AuthHintUser): void {
   }
 
   document.cookie = [
-    `${HINT_COOKIE_NAME}=${serializeAuthHint(user)}`,
+    `${AUTH_HINT_COOKIE_NAME}=${serializeAuthHint(user)}`,
     `Max-Age=${AUTH_SESSION_DURATION_SECONDS}`,
     "Path=/",
     "SameSite=Lax",
@@ -88,7 +93,7 @@ export function clearAuthHintCookie(): void {
   }
 
   document.cookie = [
-    `${HINT_COOKIE_NAME}=`,
+    `${AUTH_HINT_COOKIE_NAME}=`,
     "Max-Age=0",
     "Path=/",
     "SameSite=Lax",
@@ -105,7 +110,7 @@ export function readAuthHintFromCookie(): AuthHintUser | null {
     return null;
   }
 
-  const prefix = `${HINT_COOKIE_NAME}=`;
+  const prefix = `${AUTH_HINT_COOKIE_NAME}=`;
   const entry = document.cookie
     .split("; ")
     .find((cookie) => cookie.startsWith(prefix));

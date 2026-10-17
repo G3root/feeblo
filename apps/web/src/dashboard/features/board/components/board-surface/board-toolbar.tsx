@@ -160,7 +160,8 @@ function DisplayPopOver() {
           </Button>
         }
       />
-      <PopoverPopup className="w-100">
+      {/* `w-100` is 400px; clamp it so the popover cannot spill off a phone. */}
+      <PopoverPopup className="w-[min(25rem,calc(100vw-2rem))]">
         <div className="p-4">
           <ViewSelect />
         </div>

@@ -46,6 +46,10 @@
       "types": "./src/auth/atoms.ts",
       "default": "./src/auth/atoms.ts"
     },
+    "./auth-hint-cookie": {
+      "types": "./src/auth/hint-cookie.ts",
+      "default": "./src/auth/hint-cookie.ts"
+    },
     "./organization-id-gate": {
       "types": "./src/auth/org-slug-gate.tsx",
       "default": "./src/auth/org-slug-gate.tsx"

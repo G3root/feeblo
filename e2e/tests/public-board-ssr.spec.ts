@@ -55,9 +55,9 @@ test.describe("public board server rendering", () => {
     request,
   }) => {
     // `/p/$slug` is `ssr: false`, which leaves the router free to fall back to
-    // its `defaultPendingComponent` — the dashboard's skeleton — in the child
-    // slot. The board parent still SSRs around it, so the raw response must
-    // show the board, not a dashboard-shaped shell.
+    // its `defaultPendingComponent` — the dashboard's per-route spinner — in
+    // the child slot. The board parent still SSRs around it, so the raw
+    // response must show the board, not the dashboard's placeholders.
     const user = createTestUser();
     await createAuthenticatedWorkspace(page, user);
 
@@ -77,9 +77,10 @@ test.describe("public board server rendering", () => {
     const html = await response.text();
 
     expect(html).toContain(user.workspaceName);
-    // The dashboard's pending shell ships in its own document; it must never
-    // appear inside the board's.
+    // The dashboard's full-page shell and its per-route spinner both ship in
+    // the dashboard's own document; neither may appear inside the board's.
     expect(html).not.toContain("pending-shell");
+    expect(html).not.toContain("dashboard-pending");
   });
 
   test("a shared document is cacheable; a locale-cookie one is private", async ({

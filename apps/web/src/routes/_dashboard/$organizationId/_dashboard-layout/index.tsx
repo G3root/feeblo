@@ -49,12 +49,13 @@ function RouteComponent() {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-wrap-balance text-2xl font-semibold">
           Hello, {userName}
         </h1>
         <div className="flex gap-2">
           <Button
+            className="flex-1 sm:flex-none"
             onClick={() =>
               createPostStore.send({
                 type: "toggle",
@@ -68,6 +69,7 @@ function RouteComponent() {
             New post
           </Button>
           <Button
+            className="flex-1 sm:flex-none"
             onClick={() => createBoardStore.send({ type: "toggle" })}
             size="sm"
             variant="outline"

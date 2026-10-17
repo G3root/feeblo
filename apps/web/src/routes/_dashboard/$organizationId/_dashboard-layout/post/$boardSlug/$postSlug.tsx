@@ -295,7 +295,7 @@ function RouteComponent() {
           </section>
         </div>
 
-        <aside className="px-6 py-6">
+        <aside className="px-4 py-6 md:px-6">
           <div className="space-y-4 lg:sticky lg:top-0">
             <PostSidebarActions />
 

@@ -222,11 +222,16 @@ export function PostCardMobileMeta({
       data-slot="post-card-mobile-meta"
       {...props}
     >
+      {/* The mobile meta row sits inside a 12px text block, so it uses the
+          20px avatar the board rows use instead of the 32px author avatar the
+          desktop meta column has room for. */}
       <UserAvatar
+        className="size-5"
         image={image}
         isMember={isMember}
         memberLabel={m.sad_soft_tadpole()}
         name={name}
+        size="sm"
       />
       <span className="truncate" data-slot="post-card-mobile-author">
         {name ?? m.active_equal_hedgehog()}
