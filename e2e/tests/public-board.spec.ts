@@ -486,6 +486,13 @@ test("a signed-in visitor never paints the sign-in button while the session reso
     await expect(
       visitorPage.getByRole("button", { name: authButtonName })
     ).toBeHidden();
+
+    // Only the fragment-derived `exchanging` marker is cleared; a hint from
+    // the cookie still describes the document.
+    await expect(visitorPage.locator("html")).toHaveAttribute(
+      "data-auth",
+      "hint"
+    );
   } finally {
     await visitorContext.close();
   }

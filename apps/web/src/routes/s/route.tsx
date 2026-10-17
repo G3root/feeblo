@@ -360,6 +360,21 @@ function useBoardSsoToken(organizationId: string | undefined): boolean {
     })().catch(() => undefined);
   }, [organizationId, token]);
 
+  // The fragment-derived marker only describes an in-flight exchange, so drop
+  // it once the exchange settles. This runs from an effect rather than the
+  // exchange's `finally`: that update commits asynchronously, and clearing
+  // the marker before React replaces the loading branch would expose the
+  // sign-in button for the frames in between. The cookie-derived `hint`
+  // value still describes the document and is left alone.
+  useEffect(() => {
+    if (
+      !isExchanging &&
+      document.documentElement.dataset.auth === "exchanging"
+    ) {
+      delete document.documentElement.dataset.auth;
+    }
+  }, [isExchanging]);
+
   return isExchanging;
 }
 

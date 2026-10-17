@@ -107,6 +107,13 @@ test("an SSO visitor never paints the sign-in button while the token exchanges",
       visitorPage.getByRole("button", { name: "Sign in / Sign up" })
     ).toBeHidden();
 
+    // The marker described the exchange, so the settled document must not
+    // still claim to be exchanging.
+    await expect(visitorPage.locator("html")).not.toHaveAttribute(
+      "data-auth",
+      "exchanging"
+    );
+
     await assertNoPageErrors(visitorPage);
   } finally {
     await visitorContext.close();
