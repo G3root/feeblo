@@ -160,7 +160,7 @@ describe("collections module invariants", () => {
   const blocks = descriptorBlocks();
 
   it("finds every collection descriptor", () => {
-    expect(blocks.length).toBe(32);
+    expect(blocks.length).toBe(33);
   });
 
   it("keys every route-slug-scoped collection by slug", () => {

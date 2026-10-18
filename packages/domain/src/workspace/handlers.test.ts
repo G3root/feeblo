@@ -7,6 +7,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import { CurrentSession, type Session } from "../session-middleware";
 import { ReservedSubdomainError } from "../site/subdomain/errors";
 import { SubdomainValidationService } from "../site/subdomain/service";
@@ -104,6 +105,11 @@ describe("WorkspaceRpcHandlers", () => {
     Layer.provide(RepositoryTest)
   );
 
+  const EntitlementTest = EntitlementPolicy.layer.pipe(
+    Layer.provide(WorkspaceRepository.layer),
+    Layer.provideMerge(Database.PgliteDatabaseLive)
+  );
+
   const MockSubdomainValidationLayer = Layer.effect(
     SubdomainValidationService,
     Effect.succeed({
@@ -127,7 +133,8 @@ describe("WorkspaceRpcHandlers", () => {
     RepositoryTest,
     Database.PgliteDatabaseLive,
     MockSubdomainValidationLayer,
-    WorkspacePolicyTest
+    WorkspacePolicyTest,
+    EntitlementTest
   );
 
   layer(TestLayer)("handlers", (it) => {

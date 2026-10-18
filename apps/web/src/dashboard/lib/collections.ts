@@ -1396,6 +1396,38 @@ export function workspacePlanCollection(scope: DashboardCollectionScope) {
   );
 }
 
+export function workspacePlanLockCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId(
+    "workspacePlanLockCollection",
+    scope
+  );
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey(scope, "workspace-plan-lock"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.GetWorkspacePlanLock({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+        return [{ organizationId, ...data }];
+      },
+      getKey: (item) => item.organizationId,
+      staleTime: Number.POSITIVE_INFINITY,
+    })
+  );
+}
+
 export function postSubscriptionCollection(scope: DashboardCollectionScope) {
   const id = slugScopedCollectionId("postSubscriptionCollection", scope);
 
@@ -2263,6 +2295,11 @@ export const dashboardCollections = {
   get workspacePlanCollection() {
     return getBrowserDbClient().collection(
       workspacePlanCollection(currentScope())
+    );
+  },
+  get workspacePlanLockCollection() {
+    return getBrowserDbClient().collection(
+      workspacePlanLockCollection(currentScope())
     );
   },
 };

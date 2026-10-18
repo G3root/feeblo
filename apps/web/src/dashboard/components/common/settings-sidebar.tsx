@@ -92,6 +92,12 @@ const settingsItems = [
         to: "/$organizationId/settings/billing" as const,
       },
       {
+        label: "Plan limits",
+        icon: LockIcon,
+        permission: "workspace.update" as const,
+        to: "/$organizationId/settings/plan-limits" as const,
+      },
+      {
         label: "Security",
         icon: LockIcon,
         permission: "workspace.update" as const,

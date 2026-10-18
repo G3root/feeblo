@@ -4,6 +4,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import type { PlanLockState } from "../entitlement/lock";
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
@@ -14,12 +16,34 @@ import { WorkspaceRpcs } from "./rpcs";
 import type {
   TCreateWorkspaceInput,
   TWorkspaceInput,
+  TWorkspacePlanLock,
+  TWorkspacePlanLockSelectionInput,
   TWorkspaceSlugCheckInput,
 } from "./schema";
+
+/**
+ * Projects the computed lock state onto the wire shape. The kept set is
+ * dropped on purpose: it is the complement of `lockedIds` inside a resource
+ * list the caller already has, and on a plan with no limit it would be every
+ * row (a Professional workspace's CRM feature alone could be thousands of
+ * ids).
+ */
+const toWorkspacePlanLockState = (
+  state: PlanLockState
+): TWorkspacePlanLock["current"] => ({
+  plan: state.plan,
+  features: state.features.map(({ feature, limit, count, lockedIds }) => ({
+    feature,
+    limit,
+    count,
+    lockedIds: [...lockedIds],
+  })),
+});
 
 export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* WorkspaceRepository;
   const workspacePolicy = yield* WorkspacePolicy;
+  const entitlementPolicy = yield* EntitlementPolicy;
   const { validate: validateSubdomain } = yield* SubdomainValidationService;
 
   return {
@@ -87,6 +111,59 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Workspace", "select")
         ),
+    GetWorkspacePlanLock: (args: TWorkspaceInput) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const input = {
+          organizationId: args.organizationId,
+          userId: session.session.userId,
+        };
+        const current = yield* entitlementPolicy.getPlanLock(input);
+        // On free the preview is the current state; only a paid workspace
+        // needs the second, free-evaluated computation.
+        const preview =
+          current.plan === "free"
+            ? current
+            : yield* entitlementPolicy.getPlanLockPreview(input);
+
+        return {
+          current: toWorkspacePlanLockState(current),
+          preview: toWorkspacePlanLockState(preview),
+        };
+      }).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Workspace", "select")
+      ),
+    SetWorkspacePlanLockSelection: (args: TWorkspacePlanLockSelectionInput) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const input = {
+          organizationId: args.organizationId,
+          userId: session.session.userId,
+        };
+        const current = yield* entitlementPolicy.setPlanLockSelection({
+          ...input,
+          featureKey: args.featureKey,
+          resourceIds: args.resourceIds,
+        });
+        const preview =
+          current.plan === "free"
+            ? current
+            : yield* entitlementPolicy.getPlanLockPreview(input);
+
+        return {
+          current: toWorkspacePlanLockState(current),
+          preview: toWorkspacePlanLockState(preview),
+        };
+      }).pipe(
+        Policy.withPolicy(
+          Policy.all(
+            Policy.hasMembership(args.organizationId),
+            Policy.canPermission(args.organizationId, "workspace.update")
+          )
+        ),
+        withRemapDbErrors("Workspace", "update")
+      ),
     CheckWorkspaceSlug: (args: TWorkspaceSlugCheckInput) =>
       validateSubdomain(args.slug).pipe(
         Effect.matchEffect({
@@ -126,5 +203,6 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
 ).pipe(
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(WorkspacePolicy.layer),
+  Layer.provide(EntitlementPolicy.layer),
   Layer.provide(SubdomainValidationService.layerEnv)
 );
