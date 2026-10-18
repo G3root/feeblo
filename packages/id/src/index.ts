@@ -233,3 +233,8 @@ export const DataImportJobId = makeId("data_import_job", "dij", {
 export const DataImportRowId = makeId("data_import_row", "dir", {
   approximateLength,
 });
+
+/** Identifies one resource a plan-lock keeper selection keeps usable. */
+export const PlanLockSelectionId = makeId("plan_lock_selection", "pls", {
+  approximateLength,
+});

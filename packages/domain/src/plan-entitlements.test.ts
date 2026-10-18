@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   getPlanFeatureRows,
+  LIMIT_FEATURE_KEYS,
   PAID_PLAN_KEYS,
   PLAN_ENTITLEMENTS,
+  PLAN_FEATURE_CATALOG,
 } from "./plan-entitlements";
 
 describe("plan feature catalog", () => {
@@ -109,5 +111,18 @@ describe("plan feature catalog", () => {
         .filter((plan) => plan !== "free")
         .sort()
     );
+  });
+
+  it("keeps the shared limit-feature list equal to every limit key of PLAN_FEATURE_CATALOG", () => {
+    // `LIMIT_FEATURE_KEYS` is shared with `@feeblo/db/schema/feedback`, which
+    // types the plan-lock selection table's `feature_key` column with it and
+    // cannot import this package. A limit feature added to the catalog must be
+    // added there too, or a keeper selection row becomes unreadable.
+    const catalogLimitKeys = Object.entries(PLAN_FEATURE_CATALOG)
+      .filter(([, definition]) => definition.kind === "limit")
+      .map(([key]) => key)
+      .sort();
+
+    expect([...LIMIT_FEATURE_KEYS].sort()).toEqual(catalogLimitKeys);
   });
 });

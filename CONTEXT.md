@@ -14,6 +14,12 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Public portal**: The feedback-board and widget surface that is readable without a dashboard session. `*Public` in RPC names — `ListPostsPublic`, `GetPostPublic` — refers to this surface, not to anonymity and not to the Public API. _Avoid_: Public API, anonymous API
 
+### Plans
+
+**Plan lock**: The computed read-time state of a free workspace whose resources exceed a free plan limit: the resources inside the limit stay usable, the rest become read-only (visible, exportable, deletable, never deleted) until the plan is restored or the owner resolves it. It is never stored as a flag; see `docs/adr/0019`. _Avoid_: downgrade flag, suspension, overage
+
+**Keeper selection**: The owner's persisted choice of which resources stay usable under a plan limit, in `plan_lock_selection`. Absence means the resolver's deterministic default, oldest first. _Avoid_: whitelist, allowlist, exemption
+
 ### Data transfer
 
 **Export**: a workspace's posts — every board's, or one board's — rendered as a CSV file the workspace downloads. _Avoid_: download, dump, backup

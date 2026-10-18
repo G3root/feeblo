@@ -1,4 +1,7 @@
-import { PAID_PLAN_KEYS as PAID_PLAN_KEYS_CONTRACT } from "@feeblo/domain-contracts/plan";
+import {
+  LIMIT_FEATURE_KEYS as LIMIT_FEATURE_KEYS_CONTRACT,
+  PAID_PLAN_KEYS as PAID_PLAN_KEYS_CONTRACT,
+} from "@feeblo/domain-contracts/plan";
 
 export type OrganizationPlan = "free" | "starter" | "professional";
 
@@ -13,12 +16,17 @@ export const INTEGRATION_CAPABILITY_PROVIDER_KEYS = [
   "github",
 ] as const;
 
-export type LimitFeatureKey =
-  | "feedbackBoards"
-  | "privilegedMembers"
-  | "changelogCategories"
-  | "crmEntries"
-  | "workspaces";
+/**
+ * Limit feature keys. The literal is owned by
+ * `@feeblo/domain-contracts/plan` — the plan-lock selection table types its
+ * `feature_key` column with the same list and cannot import this package —
+ * and must equal every `kind: "limit"` key of `PLAN_FEATURE_CATALOG`;
+ * `plan-entitlements.test.ts` enforces that equality.
+ */
+export type LimitFeatureKey = (typeof LIMIT_FEATURE_KEYS_CONTRACT)[number];
+
+/** Runtime counterpart of `LimitFeatureKey`, re-exported for callers that iterate it. */
+export const LIMIT_FEATURE_KEYS = LIMIT_FEATURE_KEYS_CONTRACT;
 export type CapabilityFeatureKey =
   | "roadmap"
   | "changelog"

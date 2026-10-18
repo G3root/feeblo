@@ -1,0 +1,33 @@
+# ADR 0019: A plan lock is computed and non-destructive
+
+## Decision
+
+When a workspace's plan resolves to `free` while it holds more resources than the free plan allows, the over-limit resources become read-only. The gate is a **computed state**, never a stored flag:
+
+- `packages/domain/src/entitlement/lock.ts` is pure keeper math over `(resource, createdAt)` lists. On free, a feature keeps the owner's selected resources first (in stable resource order, capped at the limit), then the oldest unselected ones until the limit is full. Every other resource is locked.
+- `packages/domain/src/entitlement/repository.ts` gathers the resources each limit feature counts and persists the owner's **keeper selection** in `plan_lock_selection`. Absence of a row means the deterministic default, oldest first with `id` as the tiebreaker.
+- `EntitlementPolicy` exposes `getPlanLock` (the current plan), `getPlanLockPreview` (the same state evaluated on `free`, for the downgrade wizard), and `setPlanLockSelection`.
+
+Locked is **read-only, not deleted**: a locked resource stays visible in the dashboard, exportable, and deletable, and comes back on re-subscribe. Never auto-deleted, at any limit, on any cycle.
+
+The lock applies to the five `LimitFeatureKey` features (feedback boards, privileged members, changelog categories, CRM entries, workspaces) and to the paid capabilities, which wind down per feature (deliveries pause, branding returns, subscriber sends stop). Webhook endpoints stay ungated on every plan. It is a **free-plan rule**: paid plans gate new creation through the entitlement policies but never retroactively lock existing resources, so the pure math treats a paid evaluation as display-only.
+
+`privilegedMembers` holds the owner aside: an owner is privileged but not demotable, so its keeper limit is the plan limit minus the owner count, and owner member rows are never selection candidates.
+
+## Why
+
+The plan already resolves to `free` by computation (`WorkspaceRepository.findPlanByOrganizationId`), with no downgrade event to hook: cancel-at-period-end entries stay entitled until `currentPeriodEnd`, after which the resolved plan simply changes. Storing a "locked" flag would duplicate that resolution and could disagree with it; a computed lock cannot drift.
+
+Deletion was rejected outright. Locking is the anti-abuse property; deleting the excess is data loss with no undo, and the difference between "you can see and export it" and "it is gone" is the difference between a gate and an incident. Read-only with export (the existing data-transfer surface) is what makes the lock actionable for the owner.
+
+The keeper selection is the only persisted piece because it is the only part that cannot be computed: "which two of your five boards matter" is knowledge only the owner has. One `(subject, feature, resource_id)` table covers every limit feature; organization-scoped features select against the workspace, the owner-scoped `workspaces` feature selects against the user, matching ADR 0013's per-owner cap.
+
+The database handle is read per call in `entitlement/repository.ts` rather than captured in a layered service. Bundling a new service into `EntitlementPolicy.layer` would add `Database` to that layer's requirements and change every existing composition; the methods that actually read the database are the honest place for the requirement.
+
+## Consequences
+
+- Adding a `LimitFeatureKey` fails to compile until `computePlanLockState`'s caller supplies that feature's resource list: the feature record is total on purpose.
+- The workspace-level lock (a fourth-plus free workspace is read-only) has no central write boundary in this codebase and needs a per-feature enforcement sweep; that is tracked separately from this record.
+- Selection rows are harmless on a paid plan and are kept across upgrades: the resolver only reads them while the plan is free and the count is over the limit.
+- The selection table cascades with the organization and the user, so account erasure (ADR 0011) and workspace deletion take their selections with them.
+- Locked boards are treated as not found on public surfaces. They must never be flipped to public to satisfy the board count, and a private board must never be auto-published: both would trade abuse prevention for a privacy incident.

@@ -1,3 +1,4 @@
+import type { LimitFeatureKey } from "@feeblo/domain-contracts/plan";
 import { DEFAULT_POST_STATUS_COLORS } from "@feeblo/domain-contracts/post-status-colors";
 import { sql } from "drizzle-orm";
 import {
@@ -1541,6 +1542,53 @@ export const notificationPreferenceTable = pgTable(
       table.channel,
       table.category
     ),
+  ]
+);
+
+/**
+ * One resource a workspace owner explicitly chose to keep usable while the
+ * plan is over its limit.
+ *
+ * The lock itself is never stored: it is computed on read
+ * (`packages/domain/src/entitlement/lock.ts`). Selection rows only remember
+ * the owner's choice, and their absence means the resolver's deterministic
+ * default (oldest first, `createdAt` then `id`). A row for a paid workspace is
+ * harmless — the resolver reads selection only while the plan is free and the
+ * count is over the limit.
+ *
+ * Organization-scoped features (feedback boards, changelog categories, CRM
+ * entries, privileged members) set `organizationId`; the owner-scoped
+ * `workspaces` feature sets `userId`. Both foreign keys cascade, so deleting
+ * the workspace or the account takes its selections with it.
+ */
+export const planLockSelectionTable = pgTable(
+  "plan_lock_selection",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").references(
+      () => organizationTable.id,
+      { onDelete: "cascade" }
+    ),
+    userId: text("user_id").references(() => userTable.id, {
+      onDelete: "cascade",
+    }),
+    featureKey: text("feature_key").$type<LimitFeatureKey>().notNull(),
+    resourceId: text("resource_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    check(
+      "plan_lock_selection_subject_chk",
+      sql`num_nonnulls(${table.organizationId}, ${table.userId}) = 1`
+    ),
+    uniqueIndex("plan_lock_selection_organization_uidx")
+      .on(table.organizationId, table.featureKey, table.resourceId)
+      .where(sql`${table.organizationId} is not null`),
+    uniqueIndex("plan_lock_selection_user_uidx")
+      .on(table.userId, table.featureKey, table.resourceId)
+      .where(sql`${table.userId} is not null`),
   ]
 );
 

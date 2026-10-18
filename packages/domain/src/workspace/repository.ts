@@ -93,6 +93,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
           .select({
             id: schema.organizationTable.id,
             name: schema.organizationTable.name,
+            createdAt: schema.organizationTable.createdAt,
             role: schema.memberTable.role,
           })
           .from(schema.memberTable)
@@ -104,7 +105,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
 
         return memberships
           .filter(({ role }) => role.split(",").includes("owner"))
-          .map(({ id, name }) => ({ id, name }));
+          .map(({ id, name, createdAt }) => ({ id, name, createdAt }));
       }),
 
     isSubdomainTaken: (subdomain: string) =>
