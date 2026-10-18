@@ -12,6 +12,7 @@ import {
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { and, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -188,6 +189,49 @@ describe("CommentRpcHandlers", () => {
       });
 
       return id;
+    });
+
+  /**
+   * Puts the workspace on Starter. A private board is a paid capability and is
+   * read-only on free, so a test about private-board read hiding has to build
+   * the private board the way a paying workspace would.
+   */
+  const activateStarterPlan = (organizationId: string) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const now = yield* DateTime.nowAsDate;
+      const productId = `product_${organizationId}`;
+
+      yield* db.insert(schema.productTable).values({
+        id: productId,
+        name: "Starter",
+        isRecurring: true,
+        isArchived: false,
+        externalOrganizationId: "feeblo",
+        visibility: "public",
+        metadata: { plan: "starter", variant: "monthly" },
+        createdAt: now,
+        updatedAt: now,
+      });
+      yield* db.insert(schema.subscriptionTable).values({
+        id: `subscription_${organizationId}`,
+        externalId: `external_${organizationId}`,
+        organizationId,
+        amount: 1000,
+        cancelAtPeriodEnd: false,
+        currency: "usd",
+        recurringInterval: "month",
+        recurringIntervalCount: 1,
+        status: "active",
+        currentPeriodStart: now,
+        currentPeriodEnd: DateTime.toDateUtc(
+          DateTime.addDuration(DateTime.fromDateUnsafe(now), Duration.days(30))
+        ),
+        customerId: `customer_${organizationId}`,
+        productId,
+        createdAt: now,
+        updatedAt: now,
+      });
     });
 
   const RepositoriesTest = Layer.mergeAll(
@@ -400,6 +444,7 @@ describe("CommentRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
           const fixture = yield* makeFixture("PRIVATE");
+          yield* activateStarterPlan(fixture.organizationId);
           const commentId = yield* CommentId.generate;
 
           yield* handlers

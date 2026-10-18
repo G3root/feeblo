@@ -19,8 +19,10 @@ import * as Stream from "effect/Stream";
 import { TestClock } from "effect/testing";
 
 import { BoardRepository } from "../board/repository";
+import { EntitlementPolicy } from "../entitlement/policies";
 import { PostStatusRepository } from "../post-status/repository";
 import { CurrentSession, type Session } from "../session-middleware";
+import { WorkspaceRepository } from "../workspace/repository";
 import { streamImportProblemsCsv } from "./import-problems-csv";
 import { DataImportService, type DataImportJobDetail } from "./import-service";
 import { DATA_IMPORT_WATCH_MS } from "./limits";
@@ -145,11 +147,20 @@ const stage = (
       );
   });
 
+const WorkspaceLayer = WorkspaceRepository.layer.pipe(
+  Layer.provide(Database.PgliteDatabaseLive)
+);
+const EntitlementTest = EntitlementPolicy.layer.pipe(
+  Layer.provide(WorkspaceLayer)
+);
+
 const TestLayer = Layer.mergeAll(
-  DataImportService.layer,
+  DataImportService.layer.pipe(Layer.provideMerge(EntitlementTest)),
   DataTransferRepository.layer,
   BoardRepository.layer,
-  PostStatusRepository.layer
+  PostStatusRepository.layer,
+  EntitlementTest,
+  WorkspaceLayer
 ).pipe(
   Layer.provideMerge(Database.PgliteDatabaseLive),
   Layer.provideMerge(NodeCrypto.layer)

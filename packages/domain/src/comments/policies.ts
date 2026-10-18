@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { PostRepository } from "../post/repository";
 import type { Surface } from "../surface";
@@ -50,6 +51,7 @@ type TCanPin = {
 const makeCommentPolicy = Effect.gen(function* () {
   const repository = yield* CommentRepository;
   const postRepository = yield* PostRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
 
   /**
    * Guards against cross-tenant/cross-post parent references: a reply must
@@ -87,16 +89,47 @@ const makeCommentPolicy = Effect.gen(function* () {
         );
     });
 
+  /**
+   * The post's own state plus the plan lock on its board. A comment write
+   * refuses both the same way the post write does, so a locked board stops
+   * receiving comments on either surface. Deletes deliberately stay outside
+   * this helper: removing content is how an over-limit workspace cleans up.
+   */
+  const postAcceptsWrites = (args: {
+    organizationId: string;
+    postId: string;
+  }) =>
+    Policy.all(
+      Policy.policy(() =>
+        postRepository.isUnlocked({
+          id: args.postId,
+          organizationId: args.organizationId,
+        })
+      ),
+      entitlementPolicy.assertPostBoardWritable(args),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId)
+    );
+
+  const postAcceptsPublicWrites = (args: {
+    organizationId: string;
+    postId: string;
+  }) =>
+    Policy.all(
+      Policy.policy(() =>
+        postRepository.isUnlockedPublic({
+          id: args.postId,
+          organizationId: args.organizationId,
+        })
+      ),
+      entitlementPolicy.assertPostBoardWritable(args),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId)
+    );
+
   const canCreate = (args: TCanCreate) => {
     if (args.source === "public") {
       return Policy.all(
         Policy.hasRestrictedOrganizationScope(args.organizationId),
-        Policy.policy(() =>
-          postRepository.isUnlockedPublic({
-            id: args.postId,
-            organizationId: args.organizationId,
-          })
-        ),
+        postAcceptsPublicWrites(args),
         Policy.any(
           // member can create internal and public comments
           Policy.hasMembership(args.organizationId),
@@ -119,12 +152,7 @@ const makeCommentPolicy = Effect.gen(function* () {
       return Policy.all(
         Policy.hasMembership(args.organizationId),
         Policy.canPermission(args.organizationId, "comments.createOnBehalf"),
-        Policy.policy(() =>
-          postRepository.isUnlocked({
-            id: args.postId,
-            organizationId: args.organizationId,
-          })
-        ),
+        postAcceptsWrites(args),
         canReplyToParent(args),
         // Moving the post via a comment is a manager+ privilege everywhere,
         // matching the post editor's status transition gate.
@@ -136,12 +164,7 @@ const makeCommentPolicy = Effect.gen(function* () {
 
     return Policy.all(
       Policy.hasMembership(args.organizationId),
-      Policy.policy(() =>
-        postRepository.isUnlocked({
-          id: args.postId,
-          organizationId: args.organizationId,
-        })
-      ),
+      postAcceptsWrites(args),
       canReplyToParent(args),
       // Moving the post via a comment is a manager+ privilege everywhere,
       // matching the post editor's status transition gate.
@@ -207,12 +230,7 @@ const makeCommentPolicy = Effect.gen(function* () {
     if (args.source === "public") {
       return Policy.all(
         Policy.hasRestrictedOrganizationScope(args.organizationId),
-        Policy.policy(() =>
-          postRepository.isUnlockedPublic({
-            id: args.postId,
-            organizationId: args.organizationId,
-          })
-        ),
+        postAcceptsPublicWrites(args),
         isOwner({
           organizationId: args.organizationId,
           commentId: args.commentId,
@@ -223,12 +241,7 @@ const makeCommentPolicy = Effect.gen(function* () {
 
     return Policy.all(
       Policy.hasMembership(args.organizationId),
-      Policy.policy(() =>
-        postRepository.isUnlocked({
-          id: args.postId,
-          organizationId: args.organizationId,
-        })
-      ),
+      postAcceptsWrites(args),
       isOwner({
         organizationId: args.organizationId,
         commentId: args.commentId,
@@ -241,24 +254,14 @@ const makeCommentPolicy = Effect.gen(function* () {
     if (args.source === "public") {
       return Policy.all(
         Policy.hasRestrictedOrganizationScope(args.organizationId),
-        Policy.policy(() =>
-          postRepository.isUnlockedPublic({
-            id: args.postId,
-            organizationId: args.organizationId,
-          })
-        ),
+        postAcceptsPublicWrites(args),
         Policy.canPermission(args.organizationId, "comments.*")
       );
     }
 
     return Policy.all(
       Policy.hasMembership(args.organizationId),
-      Policy.policy(() =>
-        postRepository.isUnlocked({
-          id: args.postId,
-          organizationId: args.organizationId,
-        })
-      ),
+      postAcceptsWrites(args),
       Policy.canPermission(args.organizationId, "comments.*")
     );
   };

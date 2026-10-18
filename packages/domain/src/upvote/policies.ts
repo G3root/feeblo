@@ -45,7 +45,8 @@ const makeUpvotePolicy = Effect.gen(function* () {
             organizationId: args.organizationId,
           })
         ),
-        entitlementPolicy.assertPostBoardWritable(args)
+        entitlementPolicy.assertPostBoardWritable(args),
+        entitlementPolicy.assertWorkspaceWritable(args.organizationId)
       );
     }
 
@@ -57,7 +58,8 @@ const makeUpvotePolicy = Effect.gen(function* () {
           organizationId: args.organizationId,
         })
       ),
-      entitlementPolicy.assertPostBoardWritable(args)
+      entitlementPolicy.assertPostBoardWritable(args),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId)
     );
   };
 
@@ -77,7 +79,8 @@ const makeUpvotePolicy = Effect.gen(function* () {
           organizationId: args.organizationId,
         })
       ),
-      entitlementPolicy.assertPostBoardWritable(args)
+      entitlementPolicy.assertPostBoardWritable(args),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId)
     );
 
   return {

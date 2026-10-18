@@ -194,7 +194,9 @@ const TestLayer = Layer.mergeAll(
   PostWriteService.layer.pipe(
     Layer.provideMerge(Layer.mergeAll(PostWriteDependenciesTest, RuntimeTest))
   ),
-  DataImportService.layer,
+  DataImportService.layer.pipe(
+    Layer.provideMerge(Layer.mergeAll(PostWriteDependenciesTest, RuntimeTest))
+  ),
   DataTransferRepository.layer,
   TagRepository.layer,
   PostStatusRepository.layer

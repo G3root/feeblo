@@ -1,6 +1,15 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
 import type { InsertComment } from "@feeblo/db/schema/feedback";
-import { and, desc, eq, isNotNull, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  isNotNull,
+  notInArray,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -55,6 +64,8 @@ interface FindManyComments {
 }
 
 interface FindManyPublicComments {
+  /** Boards the public plan lock took offline; never publicly readable. */
+  excludeBoardIds?: readonly string[] | undefined;
   organizationId: string;
   slug: string;
   includeInternal?: boolean;
@@ -138,6 +149,7 @@ const makeCommentRepository = Effect.gen(function* () {
           );
       }),
     findManyPublic: ({
+      excludeBoardIds,
       organizationId,
       slug,
       includeInternal = false,
@@ -180,7 +192,10 @@ const makeCommentRepository = Effect.gen(function* () {
           and(
             eq(schema.commentTable.organizationId, organizationId),
             eq(schema.postTable.slug, slug),
-            eq(schema.boardTable.visibility, "PUBLIC")
+            eq(schema.boardTable.visibility, "PUBLIC"),
+            ...(excludeBoardIds !== undefined && excludeBoardIds.length > 0
+              ? [notInArray(schema.postTable.boardId, [...excludeBoardIds])]
+              : [])
           )
         )
         .orderBy(

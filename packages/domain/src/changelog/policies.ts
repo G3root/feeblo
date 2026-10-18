@@ -2,6 +2,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { ChangelogRepository } from "./repository";
 
@@ -17,9 +18,13 @@ type TCanUpdate = {
 
 const makeChangelogPolicy = Effect.gen(function* () {
   const repository = yield* ChangelogRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
 
   const canCreate = (organizationId: string) =>
-    Policy.canPermission(organizationId, "changelog.create");
+    Policy.all(
+      Policy.canPermission(organizationId, "changelog.create"),
+      entitlementPolicy.assertWorkspaceWritable(organizationId)
+    );
 
   const canDelete = (args: TCanDelete) =>
     Policy.canPermission(args.organizationId, "changelog.*");
@@ -30,6 +35,7 @@ const makeChangelogPolicy = Effect.gen(function* () {
   const canUpdate = (args: TCanUpdate) =>
     Policy.all(
       Policy.canPermission(args.organizationId, "changelog.*"),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId),
       Policy.policy(() =>
         repository.existsInOrganization({
           id: args.changelogId,

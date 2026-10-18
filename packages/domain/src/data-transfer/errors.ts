@@ -1,6 +1,7 @@
 import { LegidError } from "@feeblo/id";
 import * as Schema from "effect/Schema";
 
+import { PlanLockedError } from "../entitlement/errors";
 import { PolicyDeniedError } from "../policy";
 import {
   BadRequestError,
@@ -108,6 +109,7 @@ export const DataTransferServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
   PolicyDeniedError,
+  PlanLockedError,
   BadRequestError,
   InvalidBoardPostCsvError,
   DataImportFileTooLargeError,

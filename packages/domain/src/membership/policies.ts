@@ -99,15 +99,32 @@ const makeMembershipPolicy = Effect.gen(function* () {
     });
 
   const canInviteRoleWithinPlan = (args: TCanInviteRoleWithinPlan) =>
-    Permissions.isPrivilegedRole(args.role)
-      ? canAddPrivilegedRole(args.organizationId)
-      : Effect.void;
+    Effect.gen(function* () {
+      yield* entitlementPolicy.assertWorkspaceWritable(args.organizationId);
 
+      if (Permissions.isPrivilegedRole(args.role)) {
+        yield* canAddPrivilegedRole(args.organizationId);
+      }
+    });
+
+  /**
+   * Promotions are writes. Demotions stay open even inside a locked
+   * workspace: reducing privileges is part of the cleanup that resolves an
+   * over-limit plan, so it follows the delete rule rather than this one.
+   */
   const canChangeRoleWithinPlan = (args: TCanChangeRoleWithinPlan) =>
-    Permissions.isPrivilegedRole(args.newRole) &&
-    !Permissions.isPrivilegedRole(args.currentRole)
-      ? canAddPrivilegedRole(args.organizationId)
-      : Effect.void;
+    Effect.gen(function* () {
+      const promotes =
+        Permissions.isPrivilegedRole(args.newRole) &&
+        !Permissions.isPrivilegedRole(args.currentRole);
+
+      if (!promotes) {
+        return;
+      }
+
+      yield* entitlementPolicy.assertWorkspaceWritable(args.organizationId);
+      yield* canAddPrivilegedRole(args.organizationId);
+    });
 
   const canAssignRoleWithinPlan = (args: TCanAssignRoleWithinPlan) =>
     Effect.gen(function* () {

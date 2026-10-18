@@ -3,6 +3,7 @@ import * as Layer from "effect/Layer";
 
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
+import { EntitlementPolicy } from "../entitlement/policies";
 import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
@@ -15,6 +16,7 @@ import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
 import { type Surface, definePublicEntry, defineSurfacePair } from "../surface";
+import { WorkspaceRepository } from "../workspace/repository";
 import { CommentPolicy } from "./policies";
 import { CommentRepository } from "./repository";
 import { CommentRpcs } from "./rpcs";
@@ -35,6 +37,7 @@ type CommentRpcTag = RpcTagsOf<typeof CommentRpcs>;
 export const CommentRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CommentRepository;
   const commentPolicy = yield* CommentPolicy;
+  const entitlementPolicy = yield* EntitlementPolicy;
   // The writes themselves live in the shared service so the Public API's
   // comment endpoints land in the same timeline, notification, and transaction
   // machinery this surface uses. What stays here is the part only a member
@@ -235,14 +238,23 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     ListCommentsPublic: listPublicEntry.entry((args) =>
-      withPublicViewer({
-        read: (viewer) =>
-          repository.findManyPublic({
-            includeInternal: viewer.isMember(args.organizationId),
-            organizationId: args.organizationId,
-            slug: args.slug,
-          }),
-        redact: redactActorIdentities,
+      Effect.gen(function* () {
+        // A post on a plan-locked board is not publicly readable, so its
+        // comments are not either; the exclusion stays inside the query.
+        const lockedBoardIds = yield* entitlementPolicy.listLockedBoardIds(
+          args.organizationId
+        );
+
+        return yield* withPublicViewer({
+          read: (viewer) =>
+            repository.findManyPublic({
+              excludeBoardIds: [...lockedBoardIds],
+              includeInternal: viewer.isMember(args.organizationId),
+              organizationId: args.organizationId,
+              slug: args.slug,
+            }),
+          redact: redactActorIdentities,
+        });
       })
     ),
 
@@ -321,6 +333,8 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
 ).pipe(
   // Layer.provide(SitePolicy.layer),
   Layer.provide(CommentPolicy.layer),
+  Layer.provide(EntitlementPolicy.layer),
+  Layer.provide(WorkspaceRepository.layer),
   Layer.provide(CommentService.layer),
   Layer.provide(PostRepository.layer),
   Layer.provide(CommentRepository.layer),

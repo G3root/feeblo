@@ -18,6 +18,7 @@ const makeChangelogCategoryPolicy = Effect.gen(function* () {
   const canCreate = (organizationId: string) =>
     Policy.all(
       Policy.canPermission(organizationId, "changelog-categories.create"),
+      entitlementPolicy.assertWorkspaceWritable(organizationId),
       entitlementPolicy.canCreateChangelogCategory({
         organizationId,
         categoryCount: repository.countByOrganizationId({ organizationId }),
@@ -30,6 +31,7 @@ const makeChangelogCategoryPolicy = Effect.gen(function* () {
   const canUpdate = (args: { organizationId: string; categoryId: string }) =>
     Policy.all(
       Policy.canPermission(args.organizationId, "changelog-categories.*"),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId),
       entitlementPolicy.assertChangelogCategoryWritable(args)
     );
 
@@ -42,6 +44,7 @@ const makeChangelogCategoryPolicy = Effect.gen(function* () {
   const canSetChangelogCategories = (args: TCanSetChangelogCategories) =>
     Policy.all(
       Policy.hasMembership(args.organizationId),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId),
       Policy.any(
         Policy.canPermission(args.organizationId, "changelog.*"),
         Policy.canPermission(args.organizationId, "changelog-categories.*")

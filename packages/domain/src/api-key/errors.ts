@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 
+import { PlanLockedError } from "../entitlement/errors";
 import { PolicyDeniedError } from "../policy";
 import {
   BadRequestError,
@@ -18,6 +19,7 @@ import {
 export const ApiKeyServiceErrors = Schema.Union([
   UnauthorizedError,
   PolicyDeniedError,
+  PlanLockedError,
   NotFoundError,
   BadRequestError,
   InternalServerError,

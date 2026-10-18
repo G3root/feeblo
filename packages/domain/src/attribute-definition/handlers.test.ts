@@ -12,7 +12,9 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import { CurrentSession, type Session } from "../session-middleware";
+import { WorkspaceRepository } from "../workspace/repository";
 import { AttributeDefinitionRpcHandlersEffect } from "./handlers";
 import { AttributeDefinitionPolicy } from "./policies";
 import { AttributeDefinitionRepository } from "./repository";
@@ -63,10 +65,17 @@ describe("AttributeDefinitionRpcHandlers", () => {
   const RepositoryLayer = AttributeDefinitionRepository.layer.pipe(
     Layer.provide(Database.PgliteDatabaseLive)
   );
+  const EntitlementTest = EntitlementPolicy.layer.pipe(
+    Layer.provide(WorkspaceRepository.layer),
+    Layer.provideMerge(Database.PgliteDatabaseLive)
+  );
   const TestLayer = Layer.merge(
     Layer.merge(
       RepositoryLayer,
-      AttributeDefinitionPolicy.layer.pipe(Layer.provide(RepositoryLayer))
+      AttributeDefinitionPolicy.layer.pipe(
+        Layer.provide(RepositoryLayer),
+        Layer.provide(EntitlementTest)
+      )
     ),
     Database.PgliteDatabaseLive
   );

@@ -30,6 +30,7 @@ const makeBoardPolicy = Effect.gen(function* () {
   const canCreate = (args: TCanCreate) =>
     Policy.all(
       Policy.canPermission(args.organizationId, "boards.create"),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId),
       entitlementPolicy.canCreateBoard({
         ...args,
         boardCount: repository.countByOrganizationId({
@@ -44,6 +45,7 @@ const makeBoardPolicy = Effect.gen(function* () {
   const canUpdate = (args: TCanUpdate) =>
     Policy.all(
       Policy.canPermission(args.organizationId, "boards.update"),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId),
       entitlementPolicy.assertBoardWritable({
         boardId: args.boardId,
         nextVisibility: args.visibility,

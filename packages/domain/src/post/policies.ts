@@ -132,7 +132,8 @@ const makePostPolicy = Effect.gen(function* () {
       // A merged post and a locked post are different refusals: the first is a
       // content state, the second a plan state. The shared post write path
       // checks board locks for create/update as well (see `write.ts`).
-      entitlementPolicy.assertPostBoardWritable(args)
+      entitlementPolicy.assertPostBoardWritable(args),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId)
     );
 
   /**
@@ -161,7 +162,8 @@ const makePostPolicy = Effect.gen(function* () {
           organizationId: args.organizationId,
         })
       ),
-      entitlementPolicy.assertPostBoardWritable(args)
+      entitlementPolicy.assertPostBoardWritable(args),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId)
     );
 
   /**
@@ -189,17 +191,24 @@ const makePostPolicy = Effect.gen(function* () {
 
   const canCreate = (args: TCanCreate) => {
     if (args.source === "public") {
-      return Policy.hasRestrictedOrganizationScope(args.organizationId);
+      return Policy.all(
+        Policy.hasRestrictedOrganizationScope(args.organizationId),
+        entitlementPolicy.assertWorkspaceWritable(args.organizationId)
+      );
     }
     if (args.onBehalf === true) {
       // Attributing a post to a customer is a curation capability reserved
       // for managers and above (`posts.createOnBehalf`).
       return Policy.all(
         Policy.hasMembership(args.organizationId),
+        entitlementPolicy.assertWorkspaceWritable(args.organizationId),
         Policy.canPermission(args.organizationId, "posts.createOnBehalf")
       );
     }
-    return Policy.hasMembership(args.organizationId);
+    return Policy.all(
+      Policy.hasMembership(args.organizationId),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId)
+    );
   };
 
   const canDelete = (args: TCanDelete) => {
@@ -248,6 +257,7 @@ const makePostPolicy = Effect.gen(function* () {
     }
     return Policy.all(
       Policy.hasMembership(args.organizationId),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId),
       isNotMerged({
         organizationId: args.organizationId,
         postId: args.postId,
@@ -263,6 +273,7 @@ const makePostPolicy = Effect.gen(function* () {
   const canUpdateProperties = (args: TCanUpdateProperties) =>
     Policy.all(
       Policy.hasMembership(args.organizationId),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId),
       isNotMerged({
         organizationId: args.organizationId,
         postId: args.postId,
@@ -296,6 +307,7 @@ const makePostPolicy = Effect.gen(function* () {
   const canUpdateAuthor = (args: TPostRef) =>
     Policy.all(
       Policy.hasMembership(args.organizationId),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId),
       isNotMerged(args),
       Policy.canPermission(args.organizationId, "posts.createOnBehalf")
     );
@@ -304,18 +316,23 @@ const makePostPolicy = Effect.gen(function* () {
   const canUpdateEta = (args: TPostRef) =>
     Policy.all(
       Policy.hasMembership(args.organizationId),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId),
       isNotMerged(args),
       Policy.canPermission(args.organizationId, "posts.status")
     );
 
   const canAdminUpdate = (args: TPostRef) =>
     Policy.all(
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId),
       isNotMerged(args),
       Policy.canPermission(args.organizationId, "posts.*")
     );
 
   const canMerge = (organizationId: string) =>
-    Policy.canPermission(organizationId, "posts.*");
+    Policy.all(
+      Policy.canPermission(organizationId, "posts.*"),
+      entitlementPolicy.assertWorkspaceWritable(organizationId)
+    );
 
   return {
     isUnlocked,

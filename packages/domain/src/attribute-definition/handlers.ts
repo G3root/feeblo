@@ -1,8 +1,10 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
+import { WorkspaceRepository } from "../workspace/repository";
 import { AttributeDefinitionPolicy } from "./policies";
 import { AttributeDefinitionRepository } from "./repository";
 import { AttributeDefinitionRpcs } from "./rpcs";
@@ -221,7 +223,9 @@ export const AttributeDefinitionRpcHandlers = AttributeDefinitionRpcs.toLayer(
 ).pipe(
   Layer.provide(
     AttributeDefinitionPolicy.layer.pipe(
-      Layer.provideMerge(AttributeDefinitionRepository.layer)
+      Layer.provideMerge(AttributeDefinitionRepository.layer),
+      Layer.provide(EntitlementPolicy.layer),
+      Layer.provide(WorkspaceRepository.layer)
     )
   )
 );

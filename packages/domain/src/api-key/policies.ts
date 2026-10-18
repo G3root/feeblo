@@ -26,7 +26,8 @@ const makeApiKeyPolicy = Effect.gen(function* () {
   const canCreate = (organizationId: string) =>
     Policy.all(
       canManage(organizationId),
-      entitlementPolicy.canUsePublicApi(organizationId)
+      entitlementPolicy.canUsePublicApi(organizationId),
+      entitlementPolicy.assertWorkspaceWritable(organizationId)
     );
 
   return { canCreate, canManage };

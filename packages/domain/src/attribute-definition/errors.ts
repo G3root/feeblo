@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 
+import { PlanLockedError } from "../entitlement/errors";
 import { PolicyDeniedError } from "../policy";
 import {
   BadRequestError,
@@ -23,6 +24,7 @@ export const AttributeDefinitionServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
   PolicyDeniedError,
+  PlanLockedError,
   AttributeDefinitionNotFoundError,
   FailedToUpsertAttributeValueError,
   BadRequestError,

@@ -575,5 +575,99 @@ describe("plan lock policy", () => {
         expect(error._tag).toBe("PlanLockedError");
       })
     );
+
+    it.effect("locks the workspace an owner cannot keep", () =>
+      Effect.gen(function* () {
+        const policy = yield* EntitlementPolicy;
+        const userId = yield* makeUser;
+
+        const first = yield* makeWorkspaceOwnedBy(
+          userId,
+          dateAt("2026-01-01T00:00:00Z")
+        );
+        const second = yield* makeWorkspaceOwnedBy(
+          userId,
+          dateAt("2026-01-02T00:00:00Z")
+        );
+        const third = yield* makeWorkspaceOwnedBy(
+          userId,
+          dateAt("2026-01-03T00:00:00Z")
+        );
+        const fourth = yield* makeWorkspaceOwnedBy(
+          userId,
+          dateAt("2026-01-04T00:00:00Z")
+        );
+
+        yield* policy.assertWorkspaceWritable(first);
+
+        const error = yield* Effect.flip(
+          policy.assertWorkspaceWritable(fourth)
+        );
+        expect(error._tag).toBe("PlanLockedError");
+
+        expect(yield* policy.isWorkspaceLocked(first)).toBe(false);
+        expect(yield* policy.isWorkspaceLocked(second)).toBe(false);
+        expect(yield* policy.isWorkspaceLocked(third)).toBe(false);
+        expect(yield* policy.isWorkspaceLocked(fourth)).toBe(true);
+      })
+    );
+
+    it.effect("unlocks a workspace the owner selected to keep", () =>
+      Effect.gen(function* () {
+        const policy = yield* EntitlementPolicy;
+        const userId = yield* makeUser;
+
+        const first = yield* makeWorkspaceOwnedBy(
+          userId,
+          dateAt("2026-01-01T00:00:00Z")
+        );
+        const second = yield* makeWorkspaceOwnedBy(
+          userId,
+          dateAt("2026-01-02T00:00:00Z")
+        );
+        const third = yield* makeWorkspaceOwnedBy(
+          userId,
+          dateAt("2026-01-03T00:00:00Z")
+        );
+        const fourth = yield* makeWorkspaceOwnedBy(
+          userId,
+          dateAt("2026-01-04T00:00:00Z")
+        );
+
+        yield* policy.setPlanLockSelection({
+          featureKey: "workspaces",
+          organizationId: first,
+          resourceIds: [fourth],
+          userId,
+        });
+
+        yield* policy.assertWorkspaceWritable(fourth);
+        expect(yield* policy.isWorkspaceLocked(fourth)).toBe(false);
+        expect(yield* policy.isWorkspaceLocked(second)).toBe(false);
+        expect(yield* policy.isWorkspaceLocked(third)).toBe(true);
+      })
+    );
+
+    it.effect("hides every public board of a locked workspace", () =>
+      Effect.gen(function* () {
+        const policy = yield* EntitlementPolicy;
+        const userId = yield* makeUser;
+
+        yield* makeWorkspaceOwnedBy(userId, dateAt("2026-01-01T00:00:00Z"));
+        yield* makeWorkspaceOwnedBy(userId, dateAt("2026-01-02T00:00:00Z"));
+        yield* makeWorkspaceOwnedBy(userId, dateAt("2026-01-03T00:00:00Z"));
+        const fourth = yield* makeWorkspaceOwnedBy(
+          userId,
+          dateAt("2026-01-04T00:00:00Z")
+        );
+        const lockedBoard = yield* addBoard(
+          fourth,
+          dateAt("2026-01-05T00:00:00Z")
+        );
+
+        const lockedBoardIds = yield* policy.listLockedBoardIds(fourth);
+        expect(lockedBoardIds.has(lockedBoard)).toBe(true);
+      })
+    );
   });
 });

@@ -1,3 +1,4 @@
+import { Database } from "@feeblo/db";
 import { pickDefaultPostStatus } from "@feeblo/domain-contracts/post-status-default";
 import { DataImportJobId, type LegidError } from "@feeblo/id";
 import * as Context from "effect/Context";
@@ -10,6 +11,8 @@ import * as Schedule from "effect/Schedule";
 import * as Stream from "effect/Stream";
 
 import { BoardRepository } from "../board/repository";
+import { PlanLockedError } from "../entitlement/errors";
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { PostStatusRepository } from "../post-status/repository";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
@@ -80,6 +83,7 @@ export type DataImportServiceContract = {
     | DataImportRowLimitError
     | DataImportFileTooLargeError
     | DataImportAlreadyActiveError
+    | PlanLockedError
     | Policy.PolicyDeniedError
     | InternalServerError
     | LegidError,
@@ -92,6 +96,7 @@ export type DataImportServiceContract = {
     void,
     | DataImportNotFoundError
     | DataImportNotConfirmableError
+    | PlanLockedError
     | Policy.PolicyDeniedError
     | InternalServerError,
     CurrentSession
@@ -101,21 +106,27 @@ export type DataImportServiceContract = {
     readonly id: string;
   }) => Effect.Effect<
     void,
-    DataImportNotFoundError | Policy.PolicyDeniedError | InternalServerError,
+    | DataImportNotFoundError
+    | PlanLockedError
+    | Policy.PolicyDeniedError
+    | InternalServerError,
     CurrentSession
   >;
   readonly describeImport: (
     input: DescribeImportInput
   ) => Effect.Effect<
     DataImportJobDetail,
-    DataImportNotFoundError | Policy.PolicyDeniedError | InternalServerError,
+    | DataImportNotFoundError
+    | PlanLockedError
+    | Policy.PolicyDeniedError
+    | InternalServerError,
     CurrentSession
   >;
   readonly listImports: (input: {
     readonly organizationId: string;
   }) => Effect.Effect<
     readonly DataImportJobRecord[],
-    Policy.PolicyDeniedError | InternalServerError,
+    PlanLockedError | Policy.PolicyDeniedError | InternalServerError,
     CurrentSession
   >;
   /**
@@ -127,7 +138,10 @@ export type DataImportServiceContract = {
     input: DescribeImportInput
   ) => Stream.Stream<
     DataImportJobDetail,
-    DataImportNotFoundError | Policy.PolicyDeniedError | InternalServerError,
+    | DataImportNotFoundError
+    | PlanLockedError
+    | Policy.PolicyDeniedError
+    | InternalServerError,
     CurrentSession
   >;
   /**
@@ -139,7 +153,7 @@ export type DataImportServiceContract = {
     readonly organizationId: string;
   }) => Stream.Stream<
     readonly DataImportJobRecord[],
-    Policy.PolicyDeniedError | InternalServerError,
+    PlanLockedError | Policy.PolicyDeniedError | InternalServerError,
     CurrentSession
   >;
 };
@@ -269,6 +283,21 @@ const makeDataImportService = Effect.gen(function* () {
   const boards = yield* BoardRepository;
   const statuses = yield* PostStatusRepository;
   const crypto = yield* Crypto.Crypto;
+  const database = yield* Database.Database;
+  const entitlementPolicy = yield* EntitlementPolicy;
+
+  /**
+   * The plan policy reads the database and the entitlement service from the
+   * running context, but the service contract must stay free of those
+   * requirements. Capturing both at layer creation and providing them around
+   * each method keeps the requirement internal to this layer, the same shape
+   * the post write service uses for its collaborators.
+   */
+  const provideImportEnvironment = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    effect.pipe(
+      Effect.provideService(Database.Database, database),
+      Effect.provideService(EntitlementPolicy, entitlementPolicy)
+    );
 
   const stageBoardImport: DataImportServiceContract["stageBoardImport"] = (
     input
@@ -388,7 +417,10 @@ const makeDataImportService = Effect.gen(function* () {
             )
           )
         );
-    }).pipe(Policy.withPolicy(canImportPosts(input.organizationId)));
+    }).pipe(
+      Policy.withPolicy(canImportPosts(input.organizationId)),
+      provideImportEnvironment
+    );
 
   const confirmImport: DataImportServiceContract["confirmImport"] = (input) =>
     Effect.gen(function* () {
@@ -418,7 +450,10 @@ const makeDataImportService = Effect.gen(function* () {
         status: job.value.status,
         message: `This import is ${job.value.status.replaceAll("_", " ")} and cannot be confirmed.`,
       });
-    }).pipe(Policy.withPolicy(canImportPosts(input.organizationId)));
+    }).pipe(
+      Policy.withPolicy(canImportPosts(input.organizationId)),
+      provideImportEnvironment
+    );
 
   const cancelImport: DataImportServiceContract["cancelImport"] = (input) =>
     Effect.gen(function* () {
@@ -446,7 +481,10 @@ const makeDataImportService = Effect.gen(function* () {
       }
       // A finished or already-canceled job is not an error: cancel is
       // idempotent, and the caller's intent is satisfied either way.
-    }).pipe(Policy.withPolicy(canImportPosts(input.organizationId)));
+    }).pipe(
+      Policy.withPolicy(canImportPosts(input.organizationId)),
+      provideImportEnvironment
+    );
 
   const describeImport: DataImportServiceContract["describeImport"] = (input) =>
     Effect.gen(function* () {
@@ -500,7 +538,10 @@ const makeDataImportService = Effect.gen(function* () {
           total: report.total,
         },
       };
-    }).pipe(Policy.withPolicy(canImportPosts(input.organizationId)));
+    }).pipe(
+      Policy.withPolicy(canImportPosts(input.organizationId)),
+      provideImportEnvironment
+    );
 
   const listImports: DataImportServiceContract["listImports"] = (input) =>
     fromStore(
@@ -509,7 +550,10 @@ const makeDataImportService = Effect.gen(function* () {
         limit: IMPORT_JOB_LIST_LIMIT,
         organizationId: input.organizationId,
       })
-    ).pipe(Policy.withPolicy(canImportPosts(input.organizationId)));
+    ).pipe(
+      Policy.withPolicy(canImportPosts(input.organizationId)),
+      provideImportEnvironment
+    );
 
   const watchImport: DataImportServiceContract["watchImport"] = (input) =>
     Stream.fromEffectSchedule(

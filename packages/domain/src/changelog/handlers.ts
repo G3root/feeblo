@@ -15,6 +15,7 @@ import {
 import { ChangelogPostRepository } from "../changelog-post/repository";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { EmailOutboxRepository } from "../email-outbox/repository";
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
@@ -279,6 +280,7 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
 ).pipe(
   Layer.provide(SitePolicy.layer),
   Layer.provide(ChangelogPolicy.layer),
+  Layer.provide(EntitlementPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(SiteRepository.layer),
   Layer.provide(ChangelogRepository.layer),

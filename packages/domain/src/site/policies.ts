@@ -19,7 +19,8 @@ const makeSitePolicy = Effect.gen(function* () {
   const canManageSite = (organizationId: string) =>
     Policy.all(
       Policy.hasMembership(organizationId),
-      Policy.canPermission(organizationId, "site.*")
+      Policy.canPermission(organizationId, "site.*"),
+      entitlementPolicy.assertWorkspaceWritable(organizationId)
     );
 
   const canHidePoweredByBranding = (args: TCanHidePoweredByBranding) =>

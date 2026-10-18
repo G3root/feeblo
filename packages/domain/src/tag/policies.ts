@@ -2,6 +2,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { TagRepository } from "./repository";
 
@@ -22,6 +23,7 @@ type TCanSetPostTags = {
 
 const makeTagPolicy = Effect.gen(function* () {
   const repository = yield* TagRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
 
   // `tags.create` is used only by `canCreate`; `canDelete` and `canUpdate`
   // require `tags.*`. Tag assignment via `canSetPostTags` may use `posts.*`,
@@ -29,13 +31,19 @@ const makeTagPolicy = Effect.gen(function* () {
   // `changelog.*` or `tags.*`; both `canSet*` methods enforce membership
   // directly.
   const canCreate = (organizationId: string) =>
-    Policy.canPermission(organizationId, "tags.create");
+    Policy.all(
+      Policy.canPermission(organizationId, "tags.create"),
+      entitlementPolicy.assertWorkspaceWritable(organizationId)
+    );
 
   const canDelete = (args: TCanDelete) =>
     Policy.canPermission(args.organizationId, "tags.*");
 
   const canUpdate = (args: TCanUpdate) =>
-    Policy.canPermission(args.organizationId, "tags.*");
+    Policy.all(
+      Policy.canPermission(args.organizationId, "tags.*"),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId)
+    );
 
   const isPostCreator = (args: TCanSetPostTags) =>
     Policy.policy((user) =>
@@ -55,6 +63,7 @@ const makeTagPolicy = Effect.gen(function* () {
   const canSetPostTags = (args: TCanSetPostTags) =>
     Policy.all(
       Policy.hasMembership(args.organizationId),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId),
       Policy.any(
         Policy.canPermission(args.organizationId, "posts.*"),
         Policy.canPermission(args.organizationId, "tags.*"),

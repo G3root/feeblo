@@ -136,10 +136,12 @@ describe("MembershipRpcHandlers", () => {
         const fixture = yield* makeFixture();
         yield* addAdmin(fixture.organizationId);
 
-        yield* policy.canInviteRoleWithinPlan({
-          organizationId: fixture.organizationId,
-          role: "manager",
-        });
+        yield* policy
+          .canInviteRoleWithinPlan({
+            organizationId: fixture.organizationId,
+            role: "manager",
+          })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
       })
     );
     it.effect("rejects privileged invitations at the plan limit", () =>
@@ -149,10 +151,12 @@ describe("MembershipRpcHandlers", () => {
         yield* addAdmin(fixture.organizationId);
 
         const error = yield* Effect.flip(
-          policy.canInviteRoleWithinPlan({
-            organizationId: fixture.organizationId,
-            role: "admin",
-          })
+          policy
+            .canInviteRoleWithinPlan({
+              organizationId: fixture.organizationId,
+              role: "admin",
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
         );
 
         expect(error).toMatchObject({ _tag: "PolicyDenied" });

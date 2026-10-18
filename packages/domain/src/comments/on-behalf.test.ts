@@ -205,6 +205,7 @@ describe("CommentRpcHandlers on-behalf", () => {
     CommentService.layer
   ).pipe(
     Layer.provideMerge(RepositoriesTest),
+    Layer.provideMerge(EntitlementsTest),
     // The shared write service captures its database handle and the crypto
     // service at construction; both are the TestLayer's own instances, not
     // new ones, because layer memoization is per build and keyed by identity.

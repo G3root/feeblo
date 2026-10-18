@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 
+import { PlanLockedError } from "../entitlement/errors";
 import {
   CrmEntryLimitReachedError,
   InvalidSubjectError,
@@ -73,6 +74,7 @@ export const CommentServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
   PolicyDeniedError,
+  PlanLockedError,
   FailedToDeleteCommentError,
   FailedToUpdateCommentError,
   FailedToCreateCommentError,

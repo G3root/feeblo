@@ -29,6 +29,7 @@ const makeRoadmapPolicy = Effect.gen(function* () {
   const canCreate = (args: TCanCreate) =>
     Policy.all(
       Policy.canPermission(args.organizationId, "roadmap.*"),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId),
       entitlementPolicy.canCreateRoadmap(args)
     );
 
@@ -38,6 +39,7 @@ const makeRoadmapPolicy = Effect.gen(function* () {
   const canUpdate = (args: TCanUpdate) =>
     Policy.all(
       Policy.canPermission(args.organizationId, "roadmap.*"),
+      entitlementPolicy.assertWorkspaceWritable(args.organizationId),
       Effect.gen(function* () {
         if (args.visibility !== "private") {
           return;
